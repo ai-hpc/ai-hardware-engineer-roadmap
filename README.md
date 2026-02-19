@@ -102,8 +102,8 @@ A **5-phase self-study curriculum** for engineers who want to build expertise in
 | **HPC with Nvidia GPU** | vGPU, KVM, NCCL, NVLink/NVSwitch, InfiniBand, RDMA, MPS, GPU clusters |
 | **Robotics Application** | ROS/ROS 2, sensor fusion, motion planning, industrial automation |
 | **Security in Embedded Systems** | Cryptography, secure boot, side-channel resistance, FPGA security |
-| **Autonomous Driving** | Openpilot reference—perception, planning, control, ADAS |
-| **AI Chip Design** | tinygrad, ML frameworks, hardware-software co-design for AI accelerators |
+| [**Autonomous Driving**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/4.%20Autonomous%20Driving/Guide.md) | Openpilot reference—perception, planning, control, ADAS |
+| [**AI Chip Design**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/5.%20AI%20Chip%20Design/Guide.md) | tinygrad, ML frameworks, hardware-software co-design for AI accelerators |
 
 ---
 

@@ -20,6 +20,7 @@
 **Resources:**
 
 * **Openpilot GitHub:** https://github.com/commaai/openpilot — Source code, documentation, and community.
+* **tinygrad:** Openpilot uses tinygrad for neural network inference. See [tinygrad](tinygrad/) (learning materials) and [tinygrad-source](tinygrad-source/) (source code).
 * **comma.ai Blog and Videos:** Technical deep dives and development updates.
 * **"Openpilot Development Guide" (community docs):** Fork documentation and development setup.
 
