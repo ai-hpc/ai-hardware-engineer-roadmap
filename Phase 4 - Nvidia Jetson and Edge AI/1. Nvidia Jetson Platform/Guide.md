@@ -1,4 +1,4 @@
-﻿**Phase 1: Nvidia Jetson Platform (12-24 months)**
+**Phase 1: Nvidia Jetson Platform (12-24 months)**
 
 **1. Jetson Hardware and Software (Deep Dive)**
 
@@ -72,11 +72,14 @@
     * **cuBLAS (CUDA Basic Linear Algebra Subroutines):**  Master cuBLAS, a library of optimized linear algebra routines for CUDA.
     * **cuFFT (CUDA Fast Fourier Transform):**  Explore cuFFT, a library for performing Fast Fourier Transforms on the GPU.
     * **CUDA Profiler:**  Learn how to use the CUDA Profiler to analyze the performance of your CUDA code and identify bottlenecks.
+    * **Nsight Compute:**  Familiarize yourself with Nsight Compute for GPU kernel profiling and optimization. Learn to analyze memory throughput, occupancy, warp execution efficiency, and identify bottlenecks in CUDA kernels. Use the roofline model and occupancy analysis to optimize kernel performance.
+    * **Nsight Systems:**  Master Nsight Systems for system-wide performance analysis. Use it to trace CPU-GPU synchronization, memory transfers, kernel launch overhead, and system bottlenecks. Profile end-to-end application performance to optimize GPU utilization and pipeline efficiency.
 
 **Resources:**
 
 * **CUDA Programming Guide:**  Refer to the official CUDA Programming Guide from Nvidia for detailed information on CUDA programming and optimization techniques.
 * **CUDA Toolkit Documentation:**  Explore the CUDA Toolkit documentation for information on CUDA libraries, tools, and APIs.
+* **Nsight Compute and Nsight Systems Documentation:**  Refer to Nvidia's documentation for Nsight Compute (kernel profiling) and Nsight Systems (system profiling) to learn profiling workflows and optimization techniques.
 * **Online CUDA Tutorials and Courses:**  Find online tutorials and courses on advanced CUDA programming and optimization.
 
 **Projects:**
@@ -84,6 +87,7 @@
 * **Optimize a CUDA Kernel for Memory Access:**  Analyze and optimize a CUDA kernel to improve memory access patterns and achieve better performance.
 * **Implement a Parallel Algorithm with CUDA:**  Implement a parallel algorithm (e.g., matrix multiplication, sorting) using CUDA and compare its performance to a CPU implementation.
 * **Profile and Optimize a CUDA Application:**  Use the CUDA Profiler to analyze the performance of a CUDA application and identify areas for optimization.
+* **Optimize a CUDA Kernel with Nsight Compute:**  Profile a CUDA kernel using Nsight Compute, analyze occupancy and memory throughput, and apply optimizations to improve GPU kernel performance on Jetson.
 
 
 **4. Robotics and Autonomous Systems (Specialized)**
@@ -169,6 +173,10 @@ You're right, let's push the boundaries of your Jetson knowledge even further!  
     * **CUDA in ROS:**  Dive deeper into integrating CUDA with ROS (Robot Operating System) to accelerate robotics algorithms and perception tasks.
     * **CUDA for Embedded Vision:**  Explore the use of CUDA for embedded vision applications, such as image processing, object detection, and video analytics.
     * **CUDA for Sensor Fusion:**  Learn how to use CUDA to accelerate sensor fusion algorithms, such as Kalman filtering and particle filtering, for robotics and autonomous systems.
+
+* **Nsight Compute and Nsight Systems (Advanced Profiling):**
+    * **Nsight Compute (Advanced):**  Master advanced Nsight Compute features for kernel optimization, including custom metrics, comparison reports, and automated optimization recommendations. Learn to use the Roofline analysis to identify compute-bound vs. memory-bound kernels and apply targeted optimizations.
+    * **Nsight Systems (Advanced):**  Use Nsight Systems for complex multi-process and multi-GPU profiling. Trace full application timelines, analyze CPU-GPU overlap, identify pipeline stalls, and optimize end-to-end throughput for Jetson edge AI workloads.
 
 
 **4. Robotics and Autonomous Systems (Advanced)**

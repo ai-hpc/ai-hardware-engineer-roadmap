@@ -1,4 +1,4 @@
-﻿**Phase 1: Foundational Knowledge (6-12 months)**
+**Phase 1: Foundational Knowledge (6-12 months)**
 
 * **Digital Design Fundamentals:**
     * **Dive into Number Systems:**  Master binary, hexadecimal, and their conversions. Explore how data is represented digitally.
@@ -127,6 +127,7 @@
     * **Jetson Hardware and Software:**  Familiarize yourself with the different Jetson modules (Nano, TX2, Xavier, Orin), the JetPack SDK, and the L4T (Linux for Tegra) operating system.
     * **Deep Learning Frameworks:**  Learn how to use deep learning frameworks like TensorFlow, PyTorch, and Caffe on the Jetson platform.
     * **CUDA Programming:**  Master CUDA programming to write high-performance code for the Jetson's GPU.
+    * **Nsight Compute and Nsight System:**  Familiarize yourself with Nvidia's profiling tools for GPU kernel optimization and system-wide performance analysis. Use Nsight Compute to profile and optimize CUDA kernels, and Nsight System for end-to-end system performance analysis.
     * **Projects:**
         * Implement a real-time object detection system on a Jetson Nano using a pre-trained model.
         * Train a custom deep learning model for image classification or object detection and deploy it on a Jetson device.
