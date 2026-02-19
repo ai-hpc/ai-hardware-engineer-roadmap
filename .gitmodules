@@ -1,0 +1,3 @@
+[submodule "Phase 5 - Advanced Topics and Specialization/4. Autonomous Driving/tinygrad-source"]
+	path = Phase 5 - Advanced Topics and Specialization/4. Autonomous Driving/tinygrad-source
+	url = https://github.com/tinygrad/tinygrad
