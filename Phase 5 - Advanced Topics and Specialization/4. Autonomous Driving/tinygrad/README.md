@@ -1,6 +1,6 @@
 # Tinygrad: Hackable Learning Path
 
-Learn tinygrad at the **hackable level**—understand the compiler, IR, and how to extend it. Used by [Openpilot](https://github.com/commaai/openpilot) for inference.
+Part of the [AI Hardware Engineer Roadmap](../../../README.md). Learn tinygrad at the **hackable level**—understand the compiler, IR, and how to extend it. Used by [Openpilot](https://github.com/commaai/openpilot) (comma.ai ADAS) for neural network inference.
 
 ## Hackable Learning Path
 

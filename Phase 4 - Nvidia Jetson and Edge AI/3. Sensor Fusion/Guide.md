@@ -1,4 +1,4 @@
-﻿**Phase 1 (Supercharged): Sensor Fusion (18-36 Months)**
+**Phase 1 (Supercharged): Sensor Fusion (18-36 Months)**
 
 **1. Sensor Integration (Beyond the Basics)**
 
@@ -52,6 +52,7 @@
 
 **Resources:**
 
+* **[Kalman Filter Learning Series](kalman-filter/README.md):**  A complete educational path from elementary concepts to expert-level implementation—1D, 2D, 6D filters with Python code. Start here before EKF/UKF.
 * **"Probabilistic Robotics" by Sebastian Thrun, Wolfram Burgard, and Dieter Fox:**  A classic textbook on probabilistic robotics, covering sensor fusion, state estimation, and localization.
 * **"State Estimation for Robotics" by Timothy D. Barfoot:**  A comprehensive book on state estimation techniques for robotics, including Kalman filtering, factor graphs, and nonlinear optimization.
 * **ROS Documentation (Advanced Topics):**  Explore the advanced sections of the ROS documentation, including the Navigation Stack, Control framework, and sensor fusion packages.

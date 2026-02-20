@@ -1,5 +1,7 @@
 **4. Autonomous Driving (12-24 months)**
 
+This phase uses **Openpilot** (comma.ai) as a reference implementation for ADAS—perception, planning, and control. Openpilot is open-source, well-documented, and uses tinygrad for inference, making it an ideal case study for this curriculum.
+
 **1. Openpilot and Open-Source ADAS**
 
 * **Openpilot Deep Dive:**

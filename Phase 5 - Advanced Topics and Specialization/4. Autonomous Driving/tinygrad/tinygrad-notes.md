@@ -75,7 +75,7 @@ result.realize()
 
 ## Real-World Usage
 
-Tinygrad is used in **openpilot** to run the driving model on Snapdragon 845 GPU, replacing SNPE with:
+Tinygrad is used in [Openpilot](https://github.com/commaai/openpilot) (comma.ai ADAS) to run the driving model on Snapdragon 845 GPU, replacing SNPE with:
 - Better performance
 - ONNX file loading support
 - Training support
@@ -96,7 +96,7 @@ Tinygrad supports multiple backends:
 
 - [Quickstart Guide](https://tinygrad.github.io/tinygrad/quickstart/)
 - [MNIST Tutorial](https://docs.tinygrad.org/mnist/)
-- [GitHub Examples](https://github.com/tinygrad/tinygrad/tree/master/examples)
+- [GitHub Examples](https://github.com/tinygrad/tinygrad/tree/main/examples)
 - [Runtime Documentation](https://docs.tinygrad.org/runtime/)
 
 ## The Tinybox
