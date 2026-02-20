@@ -74,3 +74,96 @@
 * **Troubleshoot Network Performance Issues:**  Use network monitoring and analysis tools to identify and resolve performance bottlenecks in a network.
 * **Set up a DHCP Server:**  Configure a DHCP server to automatically assign IP addresses to clients on a network.
 * **Create a Network File Share with NFS:**  Set up an NFS server to share files and directories with other Linux machines on the network.
+
+
+**Phase 2 (Significantly Expanded): Linux Fundamentals (12-24 months)**
+
+**1. System Administration and Performance Tuning**
+
+* **Systemd and Service Management:**
+    * **Systemd Units and Targets:**  Master systemd unit files (service, socket, timer, path, device) and understand boot targets. Write and manage custom service units for production deployments.
+    * **Journald and Logging:**  Use `journalctl` with filters, priorities, and structured logging. Configure journal persistence, log rotation, and forwarding to centralized logging systems (rsyslog, Loki).
+    * **Timers and Scheduled Tasks:**  Replace cron jobs with systemd timers for more precise scheduling, logging integration, and dependency management.
+    * **Socket Activation:**  Implement socket activation for on-demand service startup, reducing boot time and resource usage.
+
+* **Kernel Tuning and sysctl:**
+    * **sysctl Parameters:**  Tune kernel parameters via `sysctl` for networking (TCP buffer sizes, connection tracking), memory (vm.swappiness, huge pages), and I/O (read-ahead, scheduler).
+    * **Huge Pages and THP:**  Configure Transparent Huge Pages (THP) and explicit huge pages for memory-intensive applications. Understand the performance trade-offs.
+    * **NUMA (Non-Uniform Memory Access):**  Use `numactl` and `numastat` to understand NUMA topology and pin processes/memory to specific NUMA nodes for optimal performance on multi-socket systems.
+
+* **Performance Monitoring and Profiling:**
+    * **perf:**  Use Linux `perf` for CPU profiling, hardware performance counter analysis, and generating flame graphs. Identify hot paths and CPU bottlenecks in applications.
+    * **eBPF and bpftrace:**  Use eBPF-based tools (bpftrace, BCC toolkit) for low-overhead, programmable system tracing—trace system calls, network packets, and memory allocations without modifying application code.
+    * **I/O Performance:**  Profile block device I/O with `iostat`, `blktrace`, and `fio`. Understand I/O schedulers (mq-deadline, kyber, bfq) and tune for latency-sensitive or throughput workloads.
+
+**Resources:**
+
+* **"Linux System Programming" by Robert Love:**  Deep dive into Linux system calls, processes, memory, and I/O.
+* **"Systems Performance: Enterprise and the Cloud" by Brendan Gregg:**  Comprehensive performance analysis methodology with Linux-specific tools and techniques.
+* **Brendan Gregg's Website (brendangregg.com):**  Extensive collection of performance analysis tools, flame graph tutorials, and eBPF guides.
+
+**Projects:**
+
+* **Systemd Service with Socket Activation:**  Write a networked service managed by systemd with socket activation, health checks, and journal logging.
+* **System Performance Baseline:**  Use `perf`, `sar`, and `iostat` to profile a Linux server under load. Identify and resolve one CPU or I/O bottleneck.
+* **Custom eBPF Tracer:**  Write a bpftrace script that traces latency distribution for a specific system call (e.g., `read()` or `write()`) in a running application.
+
+
+**2. Linux Security and Hardening**
+
+* **Access Control and Mandatory Access Control (MAC):**
+    * **SELinux:**  Understand SELinux modes (enforcing, permissive, disabled), policy types, and contexts. Write and debug custom SELinux policies for services and files.
+    * **AppArmor:**  Use AppArmor profiles to confine applications to defined file, network, and capability access. Write profiles for services using `aa-genprof` and `aa-logprof`.
+    * **Linux Capabilities:**  Replace full root privileges with fine-grained Linux capabilities (`cap_net_admin`, `cap_sys_nice`, etc.) to minimize the attack surface of privileged services.
+
+* **Network Security:**
+    * **nftables and iptables:**  Write firewall rules using nftables (modern) and iptables (legacy). Implement stateful packet filtering, NAT, and port forwarding. Understand netfilter hooks.
+    * **Fail2ban and Intrusion Prevention:**  Configure Fail2ban to monitor logs and automatically block IP addresses with excessive failed authentication attempts.
+    * **SSH Hardening:**  Harden SSH configuration—disable password auth, restrict ciphers/algorithms, use `AllowUsers`/`AllowGroups`, configure key-based auth, and set up two-factor authentication.
+
+* **Audit, Integrity, and Compliance:**
+    * **auditd:**  Configure the Linux audit daemon to log security-relevant events (file access, system calls, user logins). Write audit rules and analyze logs for anomalous behavior.
+    * **File Integrity Monitoring (FIM):**  Use AIDE or Tripwire to detect unauthorized changes to system files and directories. Integrate FIM into a security monitoring workflow.
+    * **Linux Security Benchmarks:**  Apply CIS Benchmark recommendations for Linux hardening. Automate compliance checks with tools like OpenSCAP or Lynis.
+
+**Resources:**
+
+* **"Linux Security Cookbook" by Daniel J. Barrett, Richard E. Silverman, and Robert G. Byrnes:**  Practical recipes for securing Linux systems.
+* **CIS Benchmarks for Linux:**  Center for Internet Security hardening guidelines for major Linux distributions.
+* **"SELinux System Administration" by Sven Vermeulen:**  In-depth guide to SELinux policy writing and system administration.
+
+**Projects:**
+
+* **Harden a Linux Server:**  Apply CIS Benchmark hardening to a fresh Linux installation. Verify compliance using OpenSCAP and document deviations.
+* **Write an SELinux Policy:**  Create a custom SELinux policy that allows a web server to read a specific directory while denying all other file access outside its normal scope.
+* **Intrusion Detection Setup:**  Configure auditd with rules for privilege escalation and unauthorized file access. Set up a Fail2ban jail and test automatic IP blocking.
+
+
+**3. Containers, Virtualization, and Cloud-Native Linux**
+
+* **Container Technologies:**
+    * **Docker and OCI Runtime:**  Go beyond basic Docker usage. Understand container internals—namespaces (PID, network, mount, UTS, IPC), cgroups for resource limits, and overlay filesystems. Write optimized multi-stage Dockerfiles.
+    * **Podman and Rootless Containers:**  Use Podman for daemonless, rootless containers that enhance security. Understand the advantages over Docker for production and embedded deployments.
+    * **Container Networking:**  Configure container networking—bridge, host, macvlan, and overlay networks. Understand how CNI plugins work in Kubernetes contexts.
+
+* **Kubernetes Fundamentals:**
+    * **Kubernetes Architecture:**  Understand control plane (API server, etcd, scheduler, controller manager) and worker node (kubelet, kube-proxy, container runtime) components.
+    * **Workloads and Services:**  Deploy applications using Deployments, StatefulSets, and DaemonSets. Expose them via Services (ClusterIP, NodePort, LoadBalancer) and Ingress.
+    * **Resource Management:**  Configure resource requests and limits for CPU and memory. Use LimitRanges and ResourceQuotas for namespace-level governance.
+
+* **KVM and Virtual Machine Management:**
+    * **KVM/QEMU Internals:**  Understand how KVM uses hardware virtualization extensions (Intel VT-x, AMD-V) to run VMs with near-native performance. Learn how QEMU provides device emulation.
+    * **libvirt and virsh:**  Manage VMs using libvirt (CLI: `virsh`, GUI: `virt-manager`). Automate VM lifecycle—create, snapshot, migrate, and clone.
+    * **virt-install and Cloud Images:**  Provision VMs from cloud images using `virt-install` and `cloud-init` for automated, reproducible VM configuration.
+
+**Resources:**
+
+* **"Kubernetes in Action" by Marko Luksa:**  Comprehensive guide to Kubernetes architecture, workloads, and production deployment.
+* **"Docker Deep Dive" by Nigel Poulton:**  Practical introduction to Docker with emphasis on production patterns.
+* **Linux KVM Documentation:**  Kernel and libvirt documentation for KVM-based virtualization.
+
+**Projects:**
+
+* **Multi-Container Application:**  Containerize a multi-tier application (web, API, database) using Docker Compose. Convert it to a Kubernetes Deployment and verify resource limits and health checks.
+* **Kubernetes Cluster on VMs:**  Set up a 3-node Kubernetes cluster using KVM VMs and kubeadm. Deploy a workload, expose it via Ingress, and test node failure recovery.
+* **Rootless Container for Embedded:**  Deploy a sensor data collection application as a rootless Podman container on an ARM board (e.g., Raspberry Pi) with network isolation and resource limits.
