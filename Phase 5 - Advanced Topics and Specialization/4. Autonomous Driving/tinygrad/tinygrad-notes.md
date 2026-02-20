@@ -99,6 +99,25 @@ Tinygrad supports multiple backends:
 - [GitHub Examples](https://github.com/tinygrad/tinygrad/tree/main/examples)
 - [Runtime Documentation](https://docs.tinygrad.org/runtime/)
 
+### Community Tutorials (tinygrad-notes)
+
+Prerequisite knowledge before contributing. [GitHub](https://github.com/mesozoic-egg/tinygrad-notes) · [Website](https://mesozoic-egg.github.io/tinygrad-notes/)
+
+| Topic | Description |
+|-------|-------------|
+| Introduction | Read first |
+| JIT explained | Just-in-time compilation |
+| Shapetracker explained | Shape and stride tracking |
+| Convolution and arange | The trick in conv/arange |
+| BEAM search | Kernel optimization |
+| Matrix multiplication | The trick in matmul |
+| VIZ=1 | Visualizing graph rewrite |
+| Pattern matcher | Rewrite rules |
+| Memoryview | Buffer views |
+| Operator fusion | Fusing ops |
+| UOp is singleton | IR design |
+| LOP3 (PTX/SASS) | GPU instruction |
+
 ## The Tinybox
 
 Tiny corp sells high-performance AI workstations:
