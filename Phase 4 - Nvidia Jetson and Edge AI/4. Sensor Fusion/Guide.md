@@ -52,6 +52,8 @@
 
 **Resources:**
 
+* **[BEVFusion — Camera + LiDAR Fusion in Bird's Eye View](BEVFusion/Guide.md):**  Full guide on multi-modal 3D object detection using BEV feature fusion. Covers architecture (Lift-Splat-Shoot, PointPillars, CenterPoint), training on nuScenes, TensorRT export, ROS2 integration, and Jetson Orin Nano optimization. Start here for state-of-the-art sensor fusion.
+
 * **[Kalman Filter Learning Series](kalman-filter/README.md):**  A complete educational path from elementary concepts to expert-level implementation—1D, 2D, 6D filters with Python code. Start here before EKF/UKF.
 * **"Probabilistic Robotics" by Sebastian Thrun, Wolfram Burgard, and Dieter Fox:**  A classic textbook on probabilistic robotics, covering sensor fusion, state estimation, and localization.
 * **"State Estimation for Robotics" by Timothy D. Barfoot:**  A comprehensive book on state estimation techniques for robotics, including Kalman filtering, factor graphs, and nonlinear optimization.
