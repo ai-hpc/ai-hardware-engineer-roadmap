@@ -23,6 +23,12 @@
 15. [Projects](#15-projects)
 16. [Resources](#16-resources)
 
+### Deep Dive Subfolders
+
+| Subfolder | Description |
+|-----------|-------------|
+| [pytorch-and-micrograd/](pytorch-and-micrograd/Guide.md) | Build autograd from scratch with micrograd, master PyTorch, then bridge to tinygrad — the essential prerequisite for deep tinygrad mastery |
+
 ---
 
 ## 1. What is Edge AI?
@@ -1235,6 +1241,25 @@ Adam update:
 Convolution output size:
   out = floor((in + 2p - k) / s) + 1
   in=input, p=padding, k=kernel, s=stride
+```
+
+---
+
+## Deep Dive: Subfolders
+
+### [PyTorch + micrograd → tinygrad](pytorch-and-micrograd/Guide.md)
+
+Before diving deep into tinygrad internals or porting models, you need a rock-solid foundation in how autograd actually works. This subfolder provides exactly that:
+
+- **Part 1 — micrograd**: Reimplement Karpathy's scalar autograd engine from scratch. Every `+`, `*`, `tanh`, `exp` carries a `_backward` closure. You'll see chain rule as running code, not math notation.
+- **Part 2 — PyTorch**: Aligned with the OpenCV PyTorch Bootcamp curriculum. Tensors, autograd, `nn.Module`, CNNs, transfer learning, object detection heads — with the same mental model as micrograd.
+- **Part 3 — Bridge to tinygrad**: Side-by-side comparison of the same MLP in all three frameworks. What PyTorch hides (lazy evaluation, kernel fusion) that tinygrad exposes via `DEBUG=4`.
+
+**Why this matters for tinygrad mastery:**
+```
+micrograd  →  you understand every gradient operation
+PyTorch    →  you understand the production API and patterns
+tinygrad   →  you see what frameworks hide, control the scheduler
 ```
 
 ---
