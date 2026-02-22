@@ -15,14 +15,15 @@
 5. [LiDAR → BEV: Voxelization and Pillars](#5-lidar--bev-voxelization-and-pillars)
 6. [BEV Feature Fusion](#6-bev-feature-fusion)
 7. [3D Detection Head](#7-3d-detection-head)
-8. [Setup and Installation](#8-setup-and-installation)
-9. [Training BEVFusion](#9-training-bevfusion)
-10. [Exporting to ONNX and TensorRT](#10-exporting-to-onnx-and-tensorrt)
-11. [Running on Jetson Orin Nano](#11-running-on-jetson-orin-nano)
-12. [ROS2 Integration](#12-ros2-integration)
-13. [Optimization for Jetson](#13-optimization-for-jetson)
-14. [Projects](#14-projects)
-15. [Resources](#15-resources)
+8. [nuScenes Dataset](#8-nuscenes-dataset)
+9. [Setup and Installation](#9-setup-and-installation)
+10. [Training BEVFusion](#10-training-bevfusion)
+11. [Exporting to ONNX and TensorRT](#11-exporting-to-onnx-and-tensorrt)
+12. [Running on Jetson Orin Nano](#12-running-on-jetson-orin-nano)
+13. [ROS2 Integration](#13-ros2-integration)
+14. [Optimization for Jetson](#14-optimization-for-jetson)
+15. [Projects](#15-projects)
+16. [Resources](#16-resources)
 
 ---
 
@@ -609,7 +610,341 @@ def decode_predictions(preds, bev_range, voxel_size, score_threshold=0.3, top_k=
 
 ---
 
-## 8. Setup and Installation
+## 8. nuScenes Dataset
+
+nuScenes is the **standard benchmark for BEVFusion** and all modern multi-modal 3D detection methods. Every BEVFusion paper reports results on nuScenes. Understanding its structure is required before training or evaluating.
+
+### What nuScenes Is
+
+```
+nuScenes — by nuTonomy (acquired by Aptiv / Motional), released 2019
+Location:  Boston (USA) + Singapore  ← day/night, rain, different traffic rules
+License:   CC BY-NC-SA 4.0 (non-commercial research)
+Paper:     Caesar et al., CVPR 2020 — "nuScenes: A Multimodal Dataset for AD"
+```
+
+### Sensor Suite
+
+nuScenes captures the **full autonomous vehicle sensor stack** — every sensor you'd deploy on a real AV:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Vehicle Top View                         │
+│                                                             │
+│            CAM_FRONT_LEFT  CAM_FRONT  CAM_FRONT_RIGHT       │
+│                    ↖           ↑           ↗                │
+│                                                             │
+│  CAM_BACK_LEFT ←─────────[LIDAR_TOP]─────────→ CAM_BACK_RIGHT │
+│                                                             │
+│                    ↙           ↓           ↘                │
+│                         CAM_BACK                           │
+│                                                             │
+│  RADAR:  FRONT + FRONT_LEFT + FRONT_RIGHT + BACK_LEFT + BACK_RIGHT │
+└─────────────────────────────────────────────────────────────┘
+```
+
+| Sensor | Model | Specs |
+|--------|-------|-------|
+| **Camera ×6** | Basler acA1600-60gc | 1600×900 px, 12 Hz, 360° surround |
+| **LiDAR ×1** | Velodyne HDL-32E | 32 beams, 20 Hz, 70m range, 360° |
+| **RADAR ×5** | Continental ARS 408-21 | 13 Hz, 250m range, Doppler velocity |
+| **IMU** | Applanix POS LV | 6-axis, 100 Hz |
+| **GPS** | Applanix POS LV | RTK, cm-level accuracy |
+
+### Dataset Statistics
+
+| Metric | Value |
+|--------|-------|
+| Scenes | **1,000** (each 20 seconds) |
+| Keyframes | **40,000** (annotated at 2 Hz = 1 per 0.5s) |
+| Camera images | **1.4 million** (6 cameras × keyframes + sweeps) |
+| LiDAR sweeps | **390,000** (20 Hz × 20s × 1000 scenes) |
+| RADAR sweeps | **1.4 million** (5 radars × 13 Hz) |
+| 3D bounding boxes | **1.4 million** |
+| Detection classes | **10** (for detection task) |
+| Full class set | **23** (including rare and static objects) |
+| Attributes | **8** (visibility, activity state) |
+| vs KITTI | 7× more annotations, 100× more images |
+
+### Data Splits
+
+| Split | Scenes | Keyframes | Use |
+|-------|--------|-----------|-----|
+| **train** | 700 | 28,130 | Training |
+| **val** | 150 | 6,019 | Validation during development |
+| **test** | 150 | 6,008 | Hidden labels — submit to leaderboard |
+| **mini** | 10 | 404 | Getting started, debugging |
+
+**Start with mini** — it downloads in minutes, has the same structure as full, and is enough to verify your pipeline works before committing to the 300 GB full download.
+
+### Detection Classes
+
+BEVFusion is evaluated on these **10 detection classes** (subset of 23 full classes):
+
+```python
+NUSCENES_DETECTION_CLASSES = [
+    'car',                   # sedan, SUV, pickup
+    'truck',                 # box truck, delivery
+    'construction_vehicle',  # crane, bulldozer
+    'bus',                   # city bus, tour bus
+    'trailer',               # semi trailer (may be detached)
+    'barrier',               # jersey barrier, temporary divider
+    'motorcycle',
+    'bicycle',
+    'pedestrian',            # person on foot
+    'traffic_cone',
+]
+```
+
+### Download
+
+```bash
+# 1. Register at https://www.nuscenes.org/ (free academic license)
+# 2. Go to "Download" → agree to terms → download via browser or wget
+
+# nuScenes mini (10 scenes, ~4 GB) — START HERE
+# From nuscenes.org download page, get the wget command with your token:
+wget -O nuScenes-v1.0-mini.tar.bz2 \
+  "https://d36yt3mvayqg5m.cloudfront.net/public/v1.0/v1.0-mini.tgz"
+
+# Extract
+mkdir -p /data/nuscenes
+tar -xjf nuScenes-v1.0-mini.tar.bz2 -C /data/nuscenes/
+
+# nuScenes full (300 GB, split into ~30 blobs) — for real training
+# Use the s3 CLI tool provided on nuscenes.org after registration
+pip install awscli
+# They provide a script: nuScenes-v1.0-data.sh
+bash nuScenes-v1.0-data.sh --target /data/nuscenes/
+```
+
+### Dataset Structure on Disk
+
+```
+/data/nuscenes/
+├── v1.0-mini/                   ← or v1.0-trainval/ for full dataset
+│   ├── scene.json               ← 10 scenes (mini) or 850 (trainval)
+│   ├── sample.json              ← keyframes (one every 0.5s)
+│   ├── sample_data.json         ← all sensor readings (cameras, LiDAR, radar)
+│   ├── sample_annotation.json   ← 3D bounding boxes per keyframe
+│   ├── calibrated_sensor.json   ← extrinsics + intrinsics per sensor
+│   ├── ego_pose.json            ← vehicle pose at each timestamp
+│   ├── instance.json            ← object instances (unique IDs across frames)
+│   ├── category.json            ← class taxonomy
+│   ├── attribute.json           ← object attributes (moving, stopped, etc.)
+│   ├── visibility.json          ← annotation visibility levels
+│   ├── log.json                 ← drive metadata (date, location, vehicle)
+│   └── map.json                 ← map metadata
+├── samples/                     ← keyframe sensor data (annotated)
+│   ├── CAM_FRONT/               ← 1600×900 JPEG images
+│   ├── CAM_FRONT_LEFT/
+│   ├── CAM_FRONT_RIGHT/
+│   ├── CAM_BACK/
+│   ├── CAM_BACK_LEFT/
+│   ├── CAM_BACK_RIGHT/
+│   ├── LIDAR_TOP/               ← .bin files (N×5: x,y,z,intensity,ring)
+│   └── RADAR_FRONT/             ← .pcd files
+├── sweeps/                      ← intermediate frames (not annotated)
+│   ├── CAM_FRONT/               ← denser temporal data between keyframes
+│   ├── LIDAR_TOP/               ← LiDAR runs at 20 Hz, keyframes at 2 Hz
+│   └── ...                      ← so 10 LiDAR sweeps between each keyframe
+└── maps/                        ← HD maps as PNG + JSON
+    ├── boston-seaport.png
+    ├── singapore-onenorth.png
+    └── *.json                   ← vectorized road/lane graphs
+```
+
+### Database Schema (Relational)
+
+nuScenes uses a relational database stored as JSON files. Understanding the links is key to loading data correctly:
+
+```
+scene (20s clip)
+  └── sample[] (keyframe every 0.5s, annotated)
+        ├── sample_data[] (one per sensor: 6 cameras + LiDAR + 5 radars)
+        │     ├── calibrated_sensor → intrinsics + extrinsics (T_sensor_ego)
+        │     └── ego_pose          → vehicle pose in world (T_ego_world)
+        └── sample_annotation[] (one 3D box per object per keyframe)
+              ├── instance → tracks the same object across frames
+              ├── category → class name
+              └── attribute → moving/stopped/etc.
+```
+
+### nuScenes Devkit Python API
+
+```python
+from nuscenes.nuscenes import NuScenes
+
+# Initialize — loads all JSON tables into memory (~2 GB RAM for full)
+nusc = NuScenes(version='v1.0-mini', dataroot='/data/nuscenes', verbose=True)
+
+# ── Scene ──────────────────────────────────────────────────────────────────
+scene = nusc.scene[0]
+print(scene['name'])           # 'scene-0061'
+print(scene['description'])    # 'Parked truck, motorcycle, ped...'
+print(scene['nbr_samples'])    # 39 keyframes in this scene
+
+# ── Sample (keyframe) ───────────────────────────────────────────────────────
+first_sample_token = scene['first_sample_token']
+sample = nusc.get('sample', first_sample_token)
+print(sample['timestamp'])     # Unix microseconds
+print(sample.keys())
+# dict_keys(['token', 'timestamp', 'prev', 'next', 'scene_token', 'data', 'anns'])
+
+# ── Access Camera Image ─────────────────────────────────────────────────────
+cam_token = sample['data']['CAM_FRONT']
+cam_data = nusc.get('sample_data', cam_token)
+img_path = nusc.get_sample_data_path(cam_token)
+# img_path = '/data/nuscenes/samples/CAM_FRONT/n015-...-CAM_FRONT__1531281445162460.jpg'
+
+import cv2
+img = cv2.imread(img_path)  # 1600×900
+
+# ── Access LiDAR Point Cloud ────────────────────────────────────────────────
+lidar_token = sample['data']['LIDAR_TOP']
+lidar_path, boxes, camera_intrinsic = nusc.get_sample_data(lidar_token)
+import numpy as np
+pts = np.fromfile(lidar_path, dtype=np.float32).reshape(-1, 5)
+# pts[:, 0:3] = XYZ, pts[:, 3] = intensity, pts[:, 4] = ring index
+
+# ── Get 3D Annotations ──────────────────────────────────────────────────────
+for ann_token in sample['anns']:
+    ann = nusc.get('sample_annotation', ann_token)
+    print(ann['category_name'])     # 'vehicle.car'
+    print(ann['translation'])       # [x, y, z] in ego frame at annotation time
+    print(ann['size'])              # [width, length, height] in meters
+    print(ann['rotation'])          # quaternion [w, x, y, z]
+    print(ann['num_lidar_pts'])     # how many LiDAR points hit this object
+
+# ── Calibrated Sensor (camera intrinsics + extrinsics) ─────────────────────
+cam_data = nusc.get('sample_data', sample['data']['CAM_FRONT'])
+cs = nusc.get('calibrated_sensor', cam_data['calibrated_sensor_token'])
+K = np.array(cs['camera_intrinsic'])      # 3×3 intrinsic matrix
+T_cam_ego = np.array(cs['translation'])   # camera position in ego frame
+R_cam_ego = cs['rotation']                # quaternion
+
+# ── Ego Pose (vehicle pose in world frame) ──────────────────────────────────
+ep = nusc.get('ego_pose', cam_data['ego_pose_token'])
+T_ego_world = np.array(ep['translation'])  # [x, y, z] in global map frame
+R_ego_world = ep['rotation']               # quaternion
+
+# ── Iterate Through a Scene ─────────────────────────────────────────────────
+def iter_scene(nusc, scene):
+    """Yield all samples in a scene in temporal order."""
+    token = scene['first_sample_token']
+    while token:
+        sample = nusc.get('sample', token)
+        yield sample
+        token = sample['next']   # empty string at end
+
+for sample in iter_scene(nusc, scene):
+    print(sample['timestamp'])
+```
+
+### Visualization with Devkit
+
+```python
+# Render a sample — annotated BEV + 6 camera images + LiDAR
+nusc.render_sample(sample['token'])
+
+# Render just the LiDAR point cloud in BEV with GT boxes
+nusc.render_sample_data(sample['data']['LIDAR_TOP'],
+                        with_anns=True, axes_limit=50)
+
+# Render camera image with projected LiDAR points + 2D boxes
+nusc.render_sample_data(sample['data']['CAM_FRONT'],
+                        with_anns=True)
+
+# Render a full scene as video
+nusc.render_scene_channel(scene['token'], channel='CAM_FRONT',
+                          out_path='scene_front.avi')
+
+# nuScenes-lidarseg: render semantic segmentation labels on point cloud
+from nuscenes.eval.lidarseg.utils import colormap_to_colors
+nusc.render_pointcloud_in_image(sample['token'],
+                                pointsensor_channel='LIDAR_TOP',
+                                camera_channel='CAM_FRONT',
+                                render_intensity=False)
+```
+
+### Coordinate Systems
+
+nuScenes uses three coordinate frames — understanding them is critical for BEVFusion:
+
+```
+Global (world) frame:
+  Origin: fixed point in the map (city-level)
+  Used for: ego_pose, global object tracks, HD maps
+
+Ego (vehicle) frame:
+  Origin: rear axle midpoint
+  Used for: sample_annotation translations are in THIS frame
+  +X: forward, +Y: left, +Z: up
+
+Sensor frame:
+  Origin: sensor mounting position
+  Used for: raw point cloud data is in THIS frame
+  calibrated_sensor gives T_sensor→ego transform
+
+Conversion chain:
+  LiDAR points (sensor frame)
+    → apply calibrated_sensor.T → ego frame
+    → apply ego_pose.T → global frame
+    → (subtract target_ego_pose.T) → another ego frame
+```
+
+```python
+from pyquaternion import Quaternion
+import numpy as np
+
+def lidar_to_ego(pts_lidar: np.ndarray, cs_record: dict) -> np.ndarray:
+    """Transform LiDAR points from sensor frame to ego frame."""
+    R = Quaternion(cs_record['rotation']).rotation_matrix   # 3×3
+    t = np.array(cs_record['translation'])                  # (3,)
+    return (R @ pts_lidar[:, :3].T).T + t
+
+def ego_to_global(pts_ego: np.ndarray, ep_record: dict) -> np.ndarray:
+    """Transform ego-frame points to global frame."""
+    R = Quaternion(ep_record['rotation']).rotation_matrix
+    t = np.array(ep_record['translation'])
+    return (R @ pts_ego.T).T + t
+```
+
+### Evaluation Metrics (NDS)
+
+BEVFusion papers report **NDS (nuScenes Detection Score)** — a composite metric:
+
+```
+NDS = (1/5) × (5 × mAP + (1 - mATE) + (1 - mASE) + (1 - mAOE) + (1 - mAAE) + (1 - mAVE))
+
+where:
+  mAP  = mean Average Precision (matching threshold: BEV center distance, not IoU)
+  mATE = mean Average Translation Error  [meters]   ← lower is better
+  mASE = mean Average Scale Error        [1 - IoU]  ← lower is better
+  mAOE = mean Average Orientation Error  [radians]  ← lower is better
+  mAAE = mean Average Attribute Error    [1 - acc]  ← lower is better
+  mAVE = mean Average Velocity Error     [m/s]      ← lower is better
+
+Key difference from KITTI:
+  nuScenes uses center-distance matching (2D BEV), not 3D IoU.
+  Threshold: 0.5m, 1.0m, 2.0m, 4.0m → average over thresholds.
+  This makes nearby objects count more (right for AV safety).
+```
+
+### BEVFusion Reference Performance on nuScenes
+
+| Method | Cameras | LiDAR | mAP | NDS |
+|--------|---------|-------|-----|-----|
+| PointPillars | — | ✓ | 40.1 | 53.0 |
+| BEVDet | ✓ (6) | — | 29.8 | 38.8 |
+| BEVFusion (MIT) | ✓ (6) | ✓ | **68.5** | **71.4** |
+| BEVFusion (NVIDIA) | ✓ (6) | ✓ | 67.9 | 71.0 |
+
+nuScenes val set. Fusion gives +28 mAP over LiDAR-only, +38 mAP over camera-only.
+
+---
+
+## 9. Setup and Installation
 
 ### Clone and Setup (MIT HAN Lab BEVFusion)
 
@@ -694,7 +1029,7 @@ ln -s /path/to/nuscenes data/nuscenes
 
 ---
 
-## 9. Training BEVFusion
+## 10. Training BEVFusion
 
 ### Prepare nuScenes Data
 
@@ -808,7 +1143,7 @@ python3 tools/test.py \
 
 ---
 
-## 10. Exporting to ONNX and TensorRT
+## 11. Exporting to ONNX and TensorRT
 
 ### The Challenge
 
@@ -954,7 +1289,7 @@ bash download_model.sh
 
 ---
 
-## 11. Running on Jetson Orin Nano
+## 12. Running on Jetson Orin Nano
 
 ### Inference Pipeline (Python)
 
@@ -1087,7 +1422,7 @@ Total                    —        80ms    → ~12 FPS
 
 ---
 
-## 12. ROS2 Integration
+## 13. ROS2 Integration
 
 ### BEVFusion ROS2 Node
 
@@ -1246,7 +1581,7 @@ ros2 topic hz /bevfusion/detections
 
 ---
 
-## 13. Optimization for Jetson
+## 14. Optimization for Jetson
 
 ### Strategy 1: Lighter Camera Backbone
 
@@ -1380,7 +1715,7 @@ sudo nvpmodel -m 1              # 7W mode
 
 ---
 
-## 14. Projects
+## 15. Projects
 
 ### Project 1: BEVFusion Inference on nuScenes
 Run the pretrained BEVFusion checkpoint on a nuScenes validation scene. Visualize detections in BEV space with matplotlib. Compare camera-only vs LiDAR-only vs fusion mAP.
@@ -1414,7 +1749,7 @@ Plot accuracy vs compute vs memory for each. Write a concrete recommendation for
 
 ---
 
-## 15. Resources
+## 16. Resources
 
 ### Papers
 - **"BEVFusion: Multi-Task Multi-Sensor Fusion with Unified Bird's-Eye View Representation"** (MIT HAN Lab, ICRA 2023): the primary paper. Read Sections 3 and 4 carefully — the architecture, LSS, and fusion are all explained.

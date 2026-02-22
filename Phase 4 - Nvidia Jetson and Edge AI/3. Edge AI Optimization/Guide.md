@@ -22,6 +22,12 @@
 14. [Projects](#14-projects)
 15. [Resources](#15-resources)
 
+### Deep Dive Subfolders
+
+| Subfolder | Description |
+|-----------|-------------|
+| [tao-toolkit/](tao-toolkit/Guide.md) | NVIDIA TAO Toolkit — fine-tune NGC pre-trained models, prune, QAT, export to TensorRT, and deploy on Jetson without writing a training loop |
+
 ---
 
 ## 1. Why Optimize? — The Edge Constraints
@@ -1701,6 +1707,28 @@ This is a simplified version of what tools like NVIDIA's AMO (Automatic Mixed Pr
 - **"MobileNetV2: Inverted Residuals and Linear Bottlenecks"** — depthwise separable convolution for edge
 - **"Distilling the Knowledge in a Neural Network"** (Hinton et al.) — original distillation paper
 - **"The Lottery Ticket Hypothesis"** — understanding pruning from a training perspective
+
+---
+
+## Deep Dive: Subfolders
+
+### [NVIDIA TAO Toolkit](tao-toolkit/Guide.md)
+
+The manual pipeline (tinygrad → ONNX → TensorRT) gives you full control. TAO Toolkit takes the other approach: **start from a pre-trained model from NGC, configure via YAML, and get a production INT8 TensorRT engine without writing training code**.
+
+- **Transfer learning** from NGC pretrained models (ResNet, EfficientNet, YOLO, SSD) with 500–5,000 images instead of millions
+- **One-command pruning**: `tao model yolo_v4 prune -prune_ratio 0.6` removes 60% of channels
+- **QAT built-in**: `enable_qat: True` in the spec file — fake quantization inserted automatically
+- **Direct TensorRT export**: `tao model yolo_v4 export` → calibrated `.engine` file
+- **DeepStream drop-in**: generated model works as `nvinfer` primary GIE with a config file
+
+```
+TAO vs Manual tradeoff:
+  TAO:    hours to working INT8 engine, limited to NGC architectures
+  Manual: days to implement, unlimited architectural freedom
+```
+
+Use TAO for standard detection/classification on Jetson. Use the manual pipeline for custom architectures (BEVFusion, PointPillars, custom transformers).
 
 ---
 
