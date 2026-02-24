@@ -1724,7 +1724,7 @@ Run the pretrained BEVFusion checkpoint on a nuScenes validation scene. Visualiz
 Replace Swin-Transformer with MobileNetV2. Retrain for 6 epochs on nuScenes mini. Export to TensorRT FP16. Target: >10 FPS on Orin Nano with <5 mAP drop.
 
 ### Project 3: Custom Dataset — Robot Corridor Navigation
-Collect data with 2 cameras (front + rear) + a low-cost LiDAR (RPLIDAR S2) on a robot platform. Label with label-studio or CVAT. Train BEVFusion for pedestrian and obstacle detection in indoor corridors.
+Collect data with 2 cameras (front + rear) + a low-cost LiDAR (RPLIDAR S2) on a robot platform. Label with label-studio, CVAT, or Roboflow. Train BEVFusion for pedestrian and obstacle detection in indoor corridors.
 
 ### Project 4: BEVFusion ROS2 Integration
 Complete the ROS2 node from Section 12. Add:

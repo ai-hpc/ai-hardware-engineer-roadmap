@@ -1012,6 +1012,7 @@ TAO models:
 - **DeepStream SDK** — docs.nvidia.com/metropolis/deepstream/dev-guide/
 - **trtexec documentation** — docs.nvidia.com/deeplearning/tensorrt/developer-guide/ (section: trtexec)
 - **CVAT** (labeling tool) — github.com/opencv/cvat — recommended for KITTI export
+  - **Roboflow** (roboflow.com) — cloud annotate, augment, export YOLO/COCO; good for quick iteration and edge deployment
 
 ### Benchmark Reference (Orin Nano 8GB, JetPack 6.x)
 

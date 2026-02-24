@@ -1168,6 +1168,7 @@ Data annotation is the foundation of supervised learning. The quality and format
 | **RectLabel** | Desktop (macOS) | Paid | ✓ | COCO, VOC, YOLO | macOS users, fast polygon annotation |
 | **VGG VIA** | Browser | Free | ✗ | JSON, CSV | Lightweight, no install needed |
 | **Labelbox** | Cloud SaaS | Freemium | ✓ | COCO, VOC, YOLO + custom | Enterprise scale, team management |
+| **Roboflow** | Cloud | Freemium | ✓ | YOLO, COCO, VOC, TFRecord, TensorFlow | Dataset versioning, augmentation, train & deploy, edge export |
 | **COCO Annotator** | Web / Self-hosted | Free | ✓ (limited) | COCO JSON | COCO-format segmentation datasets |
 
 ---
@@ -1636,7 +1637,64 @@ for row in export_task.get_buffered_stream():
 
 ---
 
-### 10.7 COCO Annotator
+### 10.7 Roboflow
+
+Roboflow is a cloud platform for building computer vision datasets and pipelines — annotate, augment, version, and export to YOLO/COCO/VOC, then train in the cloud or export for local/edge deployment (Jetson, TensorRT, ONNX, TFLite).
+
+**Website:** [roboflow.com](https://roboflow.com)
+
+#### Key Features
+
+```
+Dataset Management:
+  Upload images/video; annotate in browser (boxes, polygons, keypoints)
+  Dataset versioning — track changes and augmentations per version
+  Train/valid/test split with one click
+  Public dataset catalog (COCO, Open Images, etc.) and custom uploads
+
+Augmentation & Preprocessing:
+  Built-in augmentations (flip, rotate, brightness, mosaic, etc.)
+  Auto-orientation and resize for target model input
+  Generate new versions with different augmentations without re-labeling
+
+Export & Deployment:
+  Export: YOLO (v5/v8/v11), COCO, Pascal VOC, TFRecord, TensorFlow, Create ML
+  Train in Roboflow (YOLOv8, etc.) or download dataset for local training
+  Deploy: Roboflow API, ONNX, TensorRT, TFLite, Core ML, browser (JavaScript)
+  Edge: direct export for Jetson, Raspberry Pi, and embedded targets
+
+API & Integrations:
+  Python SDK (roboflow) for upload, annotation, version, and inference
+  REST API for pipelines and MLOps
+  Integrates with Labelbox, CVAT (import/export), and major frameworks
+```
+
+#### When to Use Roboflow
+
+- You want one place to version datasets, augment, and export to YOLO/COCO for training and edge deployment.
+- You need quick iteration: annotate → augment → export → train (locally or in cloud) → deploy to Jetson/edge.
+- You prefer a managed pipeline over self-hosting CVAT or managing raw files and scripts.
+
+#### Quick Start (Python)
+
+```python
+# pip install roboflow
+
+from roboflow import Roboflow
+
+rf = Roboflow(api_key="YOUR_API_KEY")
+project = rf.workspace("my-workspace").project("my-project")
+dataset = project.version(1).download("yolov8")   # or "coco", "voc", etc.
+
+# Inference with hosted model
+model = project.version(1).model
+pred = model.predict("image.jpg")
+print(pred.json())
+```
+
+---
+
+### 10.8 COCO Annotator
 
 COCO Annotator is an open-source web-based annotation tool built specifically for the COCO dataset format — supports segmentation masks natively.
 
@@ -1718,7 +1776,7 @@ for ann in coco['annotations']:
 
 ---
 
-### 10.8 Annotation Workflow Best Practices
+### 10.9 Annotation Workflow Best Practices
 
 #### Quality Control
 
@@ -2076,6 +2134,7 @@ class PointNet(nn.Module):
 | RectLabel | rectlabel.com |
 | VGG VIA | robots.ox.ac.uk/~vgg/software/via |
 | Labelbox | labelbox.com |
+| Roboflow | roboflow.com |
 | COCO Annotator | github.com/jsbroks/coco-annotator |
 
 ### Conferences
