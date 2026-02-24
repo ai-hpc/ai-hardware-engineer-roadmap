@@ -2,6 +2,8 @@
 
 This phase uses **Openpilot** (comma.ai) as a reference implementation for ADAS—perception, planning, and control. Openpilot is open-source, well-documented, and uses tinygrad for inference, making it an ideal case study for this curriculum.
 
+> **📊 [Flow Diagram](flow-diagram.md)** — End-to-end pipeline from perception → planning → control → actuation.
+
 **1. Openpilot and Open-Source ADAS**
 
 * **Openpilot Deep Dive:**
