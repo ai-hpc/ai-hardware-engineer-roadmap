@@ -12,7 +12,7 @@
 4. [Image Segmentation](#4-image-segmentation) — threshold, watershed, semantic segmentation, instance segmentation
 5. [Object Detection](#5-object-detection)
 6. [Object Tracking](#6-object-tracking)
-7. [3D Vision](#7-3d-vision)
+7. [3D Vision](#7-3d-vision) — calibration, stereo depth, pose, multi-camera ADAS (openpilot near/wide)
 8. [Advanced Deep Learning Architectures](#8-advanced-deep-learning-architectures)
 9. [OpenCV — Core to Advanced](#9-opencv--core-to-advanced)
 10. [Annotation Tools](#10-annotation-tools)
@@ -965,6 +965,343 @@ projected, _ = cv2.projectPoints(object_points, rvec, tvec, K, dist)
 
 # Draw axes on object
 cv2.drawFrameAxes(img, K, dist, rvec, tvec, length=0.05)
+```
+
+### 7.4 Multi-Camera ADAS: openpilot Near + Wide Camera
+
+openpilot (comma.ai) is the reference open-source ADAS stack. It uses two forward-facing cameras with deliberately different fields of view — a design decision that reveals the fundamental trade-off in ADAS perception.
+
+#### Why Two Cameras?
+
+```
+Single camera problem:
+  Wide FOV (120°) → low focal length → poor resolution at distance
+                  → lane lines 50m ahead are only a few pixels wide
+                  → lead vehicle at 80m is too small to detect reliably
+
+  Narrow FOV (60°) → high focal length → good long-range resolution
+                   → misses adjacent lanes and near-field cut-ins
+                   → blind to pedestrians at crossings
+
+Solution: run both simultaneously, fuse their outputs per task
+```
+
+```
+comma 3 / 3X camera layout:
+  ┌─────────────────────────────────────────────┐
+  │         windshield mount (top center)        │
+  │                                              │
+  │  [Wide road cam]   [Road cam]   [Driver cam] │
+  │   ~120° HFOV       ~60° HFOV   (inward)     │
+  │   1.71 mm lens     2.2 mm lens               │
+  └─────────────────────────────────────────────┘
+```
+
+#### Camera Specifications
+
+| Property | Road (Narrow) | Wide Road |
+|----------|--------------|-----------|
+| Sensor | OV8856 | OV8856 |
+| Focal length (approx) | 2.2 mm | 1.71 mm |
+| HFOV | ~60° | ~120° |
+| Native resolution | 1928×1208 | 1928×1208 |
+| Model input crop | 1152×1152 | 1152×1152 |
+| Resized for model | 512×256 → 128×256 | 512×256 → 128×256 |
+| Primary use | Lead vehicle, lane geometry, long range | Adjacent lanes, near-field, wider view |
+
+#### Intrinsic Matrix for Each Camera
+
+```python
+import numpy as np
+
+# comma 3 road camera intrinsics (approximate — calibrated per device)
+# K = [[fx,  0, cx],
+#       [ 0, fy, cy],
+#       [ 0,  0,  1]]
+
+K_road = np.array([
+    [2648.0,    0.0,  964.0],
+    [   0.0, 2648.0,  604.0],
+    [   0.0,    0.0,    1.0],
+], dtype=np.float64)
+
+K_wide = np.array([
+    [1036.0,    0.0,  964.0],
+    [   0.0, 1036.0,  604.0],
+    [   0.0,    0.0,    1.0],
+], dtype=np.float64)
+
+# Focal lengths: road (2648 px) vs wide (1036 px)
+# Lower fx/fy = shorter focal length = wider field of view
+# Both cameras at same image center (cx=964, cy=604) assuming no lens offset
+
+def pixel_to_ray(u: float, v: float, K: np.ndarray) -> np.ndarray:
+    """Convert pixel (u, v) to unit direction ray in camera frame."""
+    fx, fy = K[0, 0], K[1, 1]
+    cx, cy = K[0, 2], K[1, 2]
+    ray = np.array([(u - cx) / fx, (v - cy) / fy, 1.0])
+    return ray / np.linalg.norm(ray)
+
+# Road camera: pixel at image center-right (u=1200, v=604)
+ray_road = pixel_to_ray(1200, 604, K_road)
+angle_road = np.degrees(np.arctan2(ray_road[0], ray_road[2]))
+print(f"Road cam angle: {angle_road:.1f}°")   # ~8.7° off-center
+
+# Wide camera: same pixel
+ray_wide = pixel_to_ray(1200, 604, K_wide)
+angle_wide = np.degrees(np.arctan2(ray_wide[0], ray_wide[2]))
+print(f"Wide cam angle: {angle_wide:.1f}°")   # ~22.5° off-center
+```
+
+#### YUV420 Frame Packing — supercombo Input
+
+The supercombo model takes `input_imgs` of shape `(1, 12, 128, 256)`. These 12 channels encode two consecutive YUV420 frames (temporal context for motion estimation).
+
+```
+YUV420 memory layout for one frame (H=128, W=256):
+  Y  plane: 128 × 256 = 32768 bytes  (full luma)
+  U  plane:  64 × 128 =  8192 bytes  (half-res chroma)
+  V  plane:  64 × 128 =  8192 bytes  (half-res chroma)
+  Total: 49152 bytes per frame
+
+Packed into 6 channels at (128, 256):
+  ch 0: Y[0::2, 0::2]   — even rows, even cols  (64×128, tiled to 128×256)
+  ch 1: Y[0::2, 1::2]   — even rows, odd cols
+  ch 2: Y[1::2, 0::2]   — odd rows, even cols
+  ch 3: Y[1::2, 1::2]   — odd rows, odd cols
+  ch 4: U resized to 128×256 via nearest-neighbor
+  ch 5: V resized to 128×256 via nearest-neighbor
+
+Two frames (t and t-1) → 6 × 2 = 12 channels
+```
+
+```python
+import numpy as np
+import cv2
+
+
+def yuv420_to_6ch(yuv420_frame: np.ndarray, out_h: int = 128, out_w: int = 256) -> np.ndarray:
+    """
+    Convert a YUV420 frame to the 6-channel format used by supercombo.
+
+    Args:
+        yuv420_frame: raw YUV420 bytes as (H*3//2, W) uint8 array,
+                      OR (H + H//2, W) array (standard cv2 YUV420 layout).
+                      For comma 3: H=886 (after crop), W=1152.
+        out_h, out_w: target spatial size (128, 256 for supercombo)
+
+    Returns:
+        (6, out_h, out_w) float32 array, values in [0, 1]
+    """
+    h_full = yuv420_frame.shape[0] * 2 // 3
+    w_full = yuv420_frame.shape[1]
+
+    # Split Y, U, V planes
+    Y = yuv420_frame[:h_full, :]                                  # (H, W)
+    uv = yuv420_frame[h_full:, :].reshape(h_full // 2, w_full)
+    U = uv[:h_full // 4, :]                                      # (H/2, W/2) after reshape
+    V = uv[h_full // 4:, :]
+
+    # Resize Y to target
+    Y_resized = cv2.resize(Y, (out_w, out_h), interpolation=cv2.INTER_AREA)
+
+    # Sub-sample Y into 4 interleaved channels
+    ch0 = Y_resized[0::2, 0::2]   # (out_h//2, out_w//2)
+    ch1 = Y_resized[0::2, 1::2]
+    ch2 = Y_resized[1::2, 0::2]
+    ch3 = Y_resized[1::2, 1::2]
+
+    # Resize to full (out_h, out_w) via repeat
+    ch0 = np.repeat(np.repeat(ch0, 2, axis=0), 2, axis=1)
+    ch1 = np.repeat(np.repeat(ch1, 2, axis=0), 2, axis=1)
+    ch2 = np.repeat(np.repeat(ch2, 2, axis=0), 2, axis=1)
+    ch3 = np.repeat(np.repeat(ch3, 2, axis=0), 2, axis=1)
+
+    # Resize U and V to (out_h, out_w)
+    ch4 = cv2.resize(U, (out_w, out_h), interpolation=cv2.INTER_NEAREST)
+    ch5 = cv2.resize(V, (out_w, out_h), interpolation=cv2.INTER_NEAREST)
+
+    channels = np.stack([ch0, ch1, ch2, ch3, ch4, ch5], axis=0)  # (6, H, W) uint8
+    return channels.astype(np.float32) / 255.0
+
+
+def build_supercombo_input(frame_t: np.ndarray, frame_t1: np.ndarray) -> np.ndarray:
+    """
+    Stack two consecutive YUV420 frames into supercombo input_imgs.
+
+    Args:
+        frame_t:  current frame YUV420 raw array
+        frame_t1: previous frame YUV420 raw array
+
+    Returns:
+        (1, 12, 128, 256) float32 — ready for supercombo inference
+    """
+    ch_t  = yuv420_to_6ch(frame_t)    # (6, 128, 256)
+    ch_t1 = yuv420_to_6ch(frame_t1)   # (6, 128, 256)
+    stacked = np.concatenate([ch_t, ch_t1], axis=0)   # (12, 128, 256)
+    return stacked[np.newaxis]                         # (1, 12, 128, 256)
+
+
+# Load two consecutive dashcam frames (BGR → YUV420)
+frame_bgr_0 = cv2.imread('frame_000.jpg')
+frame_bgr_1 = cv2.imread('frame_001.jpg')
+
+yuv_0 = cv2.cvtColor(frame_bgr_0, cv2.COLOR_BGR2YUV_I420)
+yuv_1 = cv2.cvtColor(frame_bgr_1, cv2.COLOR_BGR2YUV_I420)
+
+input_imgs = build_supercombo_input(yuv_0, yuv_1)
+print(input_imgs.shape)  # (1, 12, 128, 256)
+print(input_imgs.min(), input_imgs.max())  # 0.0  1.0
+```
+
+#### Road vs Wide: Per-Task Routing
+
+```
+Task                     Primary camera       Reason
+──────────────────────────────────────────────────────────────────────
+Lane detection (far)     Road (narrow)        High focal length → lane lines at 50m are wider
+Lead vehicle distance    Road (narrow)        Accurate size → distance estimation
+Adjacent lane cuts       Wide                 FOV covers 2 lanes either side
+Near-field pedestrians   Wide                 Pedestrians at <10m outside road cam FOV
+Traffic sign reading     Road (narrow)        Signs need text resolution at distance
+Blind spot monitoring    Wide                 ~120° catches what road cam misses at sides
+Ego-motion estimation    Road (narrow)        Stable horizon → cleaner optical flow
+```
+
+openpilot's supercombo model receives **only the road camera** frame as `input_imgs`. The wide camera feeds a separate path (e.g., driver monitoring, wide-angle object detection). The two outputs are fused in `controlsd` — the lateral controller uses road-camera-derived lane predictions while wide-angle detections update the obstacle map.
+
+#### Projecting Between Camera Coordinate Systems
+
+```python
+import numpy as np
+
+
+def project_road_to_wide(
+    pts_road_cam: np.ndarray,   # (N, 3) 3D points in road camera frame
+    R_r2w: np.ndarray,          # (3, 3) rotation: road cam → wide cam
+    t_r2w: np.ndarray,          # (3,) translation: road cam → wide cam
+    K_wide: np.ndarray,         # (3, 3) wide cam intrinsics
+    D_wide: np.ndarray = None,  # (5,) wide cam distortion (optional)
+) -> np.ndarray:
+    """
+    Project 3D points seen in road camera frame into wide camera pixel coordinates.
+    Used to cross-validate detections across cameras.
+
+    Returns:
+        (N, 2) pixel coordinates in wide camera image
+    """
+    # Transform points to wide camera frame
+    pts_wide_cam = (R_r2w @ pts_road_cam.T).T + t_r2w   # (N, 3)
+
+    # Project to wide image plane
+    if D_wide is not None:
+        pts_2d, _ = cv2.projectPoints(
+            pts_wide_cam.astype(np.float64),
+            np.zeros(3), np.zeros(3),   # identity (already in cam frame)
+            K_wide, D_wide
+        )
+        return pts_2d.squeeze()   # (N, 2)
+    else:
+        # Simple pinhole projection (no distortion)
+        z = pts_wide_cam[:, 2:3].clip(0.01, None)
+        xy = pts_wide_cam[:, :2] / z
+        uv = (K_wide[:2, :2] @ xy.T + K_wide[:2, 2:3]).T
+        return uv   # (N, 2)
+
+
+# Example: project lead vehicle center from road cam 3D into wide cam 2D
+# Lead vehicle detected at 30m ahead, ~0m lateral, ~1.5m height
+lead_vehicle_3d = np.array([[30.0, 0.0, 1.5]])   # (N, 3) in road cam frame
+
+# Extrinsic: wide cam is ~5mm to the left, same orientation (approx)
+R_r2w = np.eye(3)   # cameras are nearly parallel
+t_r2w = np.array([-0.005, 0.0, 0.0])   # 5mm lateral offset
+
+uv_in_wide = project_road_to_wide(lead_vehicle_3d, R_r2w, t_r2w, K_wide)
+print(f"Lead vehicle projects to wide cam pixel: {uv_in_wide}")
+```
+
+#### Camera-to-Ground Homography (Flat Road Assumption)
+
+```python
+def camera_to_ground_homography(K: np.ndarray,
+                                 camera_height_m: float = 1.22,
+                                 pitch_deg: float = 0.0) -> np.ndarray:
+    """
+    Compute homography mapping image pixels → ground plane (Z=0) coordinates.
+
+    Assumes flat road. Used for:
+      - Lane width estimation in meters
+      - Lead vehicle distance from pixel height
+      - Free-space estimation
+
+    Args:
+        K:                camera intrinsics
+        camera_height_m:  camera height above road (comma 3: ~1.22m)
+        pitch_deg:        downward pitch of camera (positive = looking down)
+
+    Returns:
+        H: (3, 3) homography — pixel (u,v,1) → ground (X, Y, 1) in meters
+    """
+    pitch = np.radians(pitch_deg)
+    # Rotation: camera tilted downward by pitch
+    R = np.array([
+        [1,           0,            0],
+        [0,  np.cos(pitch), -np.sin(pitch)],
+        [0,  np.sin(pitch),  np.cos(pitch)],
+    ])
+    t = np.array([0, -camera_height_m, 0])   # camera above ground
+
+    # Ground plane normal in world: [0, 1, 0], d = 0
+    # Homography from image to ground (standard derivation)
+    # P = K [R | t], solve for intersection with Y=0 plane
+    P = K @ np.hstack([R, t[:, None]])
+    # Columns 0, 2, 3 of P (drop Y column since Y=0 on ground)
+    H = P[:, [0, 2, 3]]
+    return np.linalg.inv(H)
+
+
+def pixel_to_ground(u: float, v: float, H: np.ndarray):
+    """Convert image pixel to ground plane coordinates (meters from camera)."""
+    p = H @ np.array([u, v, 1.0])
+    return p[0] / p[2], p[1] / p[2]   # (X_meters, Z_meters)
+
+
+H_road = camera_to_ground_homography(K_road, camera_height_m=1.22, pitch_deg=1.5)
+H_wide = camera_to_ground_homography(K_wide, camera_height_m=1.22, pitch_deg=1.5)
+
+# Where does bottom-center of image touch the road in road cam?
+x, z = pixel_to_ground(964, 1100, H_road)
+print(f"Road cam bottom-center → ({x:.2f}m lateral, {z:.2f}m ahead)")
+
+# Same pixel in wide cam
+x_w, z_w = pixel_to_ground(964, 1100, H_wide)
+print(f"Wide cam bottom-center → ({x_w:.2f}m lateral, {z_w:.2f}m ahead)")
+```
+
+#### openpilot Model Input Summary
+
+```
+supercombo inputs:
+  input_imgs:             (1, 12, 128, 256)  ← 2 consecutive road cam YUV420 frames
+  desire:                 (1, 8)             ← one-hot: lane change L/R, keep, turn L/R
+  traffic_convention:     (1, 2)             ← [RHD, LHD] traffic direction
+  lateral_control_params: (1, 2)             ← [v_ego, roll]
+  nav_features:           (1, 64)            ← map/route embedding
+  nav_instructions:       (1, 150)           ← turn-by-turn instruction vector
+
+supercombo output:
+  outputs: flat float32 vector (~6504 values)
+  Parsed by openpilot modeldata.py into:
+    lead:         lead vehicle position, velocity, acceleration
+    path:         lane line polynomials (4 points × 33 time steps)
+    desire_state: predicted driver intent
+    meta:         model confidence, disengagement probability
+    pose:         ego velocity and orientation
+
+Wide camera (separate model / separate input stream):
+  Feeds wide-angle obstacle detection (pedestrians, cyclists at ±60° off-center)
+  Output merged in controlsd with supercombo lead predictions
 ```
 
 ---
