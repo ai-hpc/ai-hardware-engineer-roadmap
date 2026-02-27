@@ -15,7 +15,8 @@
 7. [VisionIpc](#7-visionipc)
 8. [Data Flow](#8-data-flow)
 9. [Source Map](#9-source-map)
-10. [Key Concepts](#10-key-concepts)
+10. [Code Walkthrough — Every Piece](#10-code-walkthrough--every-piece)
+11. [Key Concepts](#11-key-concepts)
 
 ---
 
@@ -313,20 +314,92 @@ VIDIOC_DQEVENT (frame done)
 
 ## 9. Source Map
 
-| Component | Path |
-|-----------|------|
-| Main loop | `system/camerad/main.cc` |
-| Camera state, AE | `system/camerad/cameras/camera_qcom2.cc` |
-| Camera buf, VIPC send | `system/camerad/cameras/camera_common.cc` |
-| ISP (IFE, BPS, CDM) | `system/camerad/cameras/spectra.cc`, `cdm.cc` |
-| Sensor drivers | `system/camerad/sensors/ox03c10.cc`, `os04c10.cc` |
-| Camera config | `system/camerad/cameras/hw.h` |
-| Intrinsics (Python) | `common/transformations/camera.py` |
-| VisionIpc | `msgq/visionipc/` |
+**Local path (in this roadmap):** `openpilot/system/camerad/` under the Autonomous Driving folder.
+
+| Component                     | Path                                                    | Meaning / Responsibility (including file name meaning)                                                                                     |
+|-------------------------------|---------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+| Main loop                     | `system/camerad/main.cc`                               | Main entry point; runs `main()` and pins process to CPU/core; launches camerad main thread.                                               |
+| Camera state, AE (qcom2: Qualcomm Gen2) | `system/camerad/cameras/camera_qcom2.cc`               | Camera state logic and auto-exposure (AE); "qcom2" refers to Qualcomm 2nd-Gen ISP platform (used in Snapdragon SoCs). Manages pipeline and event handling for these ISPs. |
+| Camera buffer, VIPC send      | `system/camerad/cameras/camera_common.cc`              | Camera buffer ring management and Vision IPC (Interprocess Communication) data sending. "common" means shared/common camera logic (not platform- or sensor-specific).     |
+| ISP (IFE, BPS, CDM: Image Signal Processor, Bayer processing, Camera Data Mover) | `system/camerad/cameras/spectra.cc`, `cdm.cc`          | Qualcomm "Spectra" is the ISP subsystem. IFE = Image Front End (captures/initial process), BPS = Bayer Processing Segment, CDM = Camera Data Mover (DMA/HW offload management). These files initialize and operate the ISP. |
+| Sensor drivers                | `system/camerad/sensors/ox03c10.cc`, `os04c10.cc`      | Sensor-specific drivers: `ox03c10` and `os04c10` are image sensor model names (OmniVision OX03C10 & OS04C10). Each file contains initialization, I2C register access, and sensor settings. |
+| Camera config (hw: hardware)  | `system/camerad/cameras/hw.h`                          | Camera hardware and configuration header. "hw" stands for "hardware": defines types, capabilities, and constants for different cameras used.                          |
+| Intrinsics (Python)           | `common/transformations/camera.py`                     | Camera intrinsic/extrinsic parameters and transformations, projection and rectification logic, written in Python. Used for geometric camera model math. |
+| VisionIpc                     | `msgq/visionipc/`                                      | VisionIPC (Inter-Process Communication) framework directory: shared memory and message-passing (server/client) for image/frame data transport between processes.        |
 
 ---
 
-## 10. Key Concepts
+## 10. Code Walkthrough — Every Piece
+
+Use the **local openpilot clone** at `../openpilot/system/camerad/` (relative to this Guide). Read in this order:
+
+### Entry Point
+
+| File | What it does |
+|------|---------------|
+| **main.cc** | `main()` → pins process to CPU 6 → calls `camerad_thread()`. No RT priority (isolcpus used). |
+
+### Configuration
+
+| File | What it does |
+|------|---------------|
+| **cameras/hw.h** | `CameraConfig` struct: `camera_num`, `stream_type`, `focal_len`, `publish_name`, `output_type` (IFE vs BPS). Defines `WIDE_ROAD_CAMERA_CONFIG`, `ROAD_CAMERA_CONFIG`, `DRIVER_CAMERA_CONFIG`, `ALL_CAMERA_CONFIGS`. |
+
+### Core Loop & AE (Qualcomm)
+
+| File | What it does |
+|------|---------------|
+| **cameras/camera_qcom2.cc** | `camerad_thread()`: init `SpectraMaster`, create `CameraState` per config, start sensors, **poll** `video0_fd` for `POLLPRI` → `VIDIOC_DQEVENT` → `handle_camera_event()` → `sendState()`. `CameraState`: holds `SpectraCamera`, exposure params, AE rect. `set_camera_exposure()`: PI-like control, brute-force over (exp_t, gain_idx), DC gain hysteresis, I2C via `sensors_i2c()`. `set_exposure_rect()`: AE rectangles per camera (wide/road/driver). |
+
+### Buffer & VIPC
+
+| File | What it does |
+|------|---------------|
+| **cameras/camera_common.h** | `CameraBuf`: `vipc_server`, `stream_type`, `cur_buf_idx`, `cur_frame_data`, `cur_yuv_buf`, `camera_bufs_raw`. `FrameMetadata`: frame_id, request_id, timestamps. Declares `camerad_thread()`, `calculate_exposure_value()`, `get_raw_frame_image()`, `open_v4l_by_name_and_index()`. |
+| **cameras/camera_common.cc** | `CameraBuf::init()`: allocates raw buffers (if BPS), creates VIPC buffers. `sendFrameToVipc()`: gets YUV buf, sets `VisionIpcBufExtra`, calls `vipc_server->send()`. `calculate_exposure_value()`: bins Y luminance in `ae_xywh`, returns median/256. `open_v4l_by_name_and_index()`: scans `/sys/class/video4linux/` for subdev name, opens `/dev/v4l-subdevN`. |
+
+### ISP (Spectra)
+
+| File | What it does |
+|------|---------------|
+| **cameras/spectra.h** | `SpectraMaster`: `video0_fd`, `cam_sync_fd`, `isp_fd`, `icp_fd`, `MemoryManager`. `SpectraCamera`: sensor, IFE/BPS config, `handle_camera_event()`, `camera_open()`, `sensors_init/start/i2c()`, `config_ife()`, `config_bps()`, `enqueue_frame()`. `SpectraBuf`: mmap'd DMA buffer. |
+| **cameras/spectra.cc** | `SpectraMaster::init()`: opens `/dev/video0`, sync, ISP, ICP. `SpectraCamera`: sensor probe, IFE/BPS setup, link devices, request queue. `handle_camera_event()`: validates event, calls `processFrame()`, re-enqueues. CDM (Camera Data Mover) setup. |
+| **cameras/cdm.cc**, **cdm.h** | CDM programs for IFE/BPS: DMA descriptors, striping. |
+| **cameras/ife.h** | IFE (Image Front End) register layouts, LUTs. |
+| **cameras/bps_blobs.h** | BPS (Bayer Processing Segment) binary blobs / config. |
+| **cameras/nv12_info.h**, **nv12_info.py** | NV12 layout (stride, uv_offset) for different resolutions. |
+
+### Sensors
+
+| File | What it does |
+|------|---------------|
+| **sensors/sensor.h** | `SensorInfo`: frame dimensions, exposure limits, analog gains, DC gain, CCM, gamma LUT, linearization, vignetting. `OX03C10`, `OS04C10` subclasses: `getExposureRegisters()`, `getExposureScore()`, `getSlaveAddress()`. |
+| **sensors/ox03c10.cc** | OX03C10 init, exposure register writes, I2C slave addr. |
+| **sensors/ox03c10_registers.h** | Register addresses for OX03C10. |
+| **sensors/os04c10.cc** | OS04C10 init, `ife_downscale_configure()`, exposure. |
+| **sensors/os04c10_registers.h** | Register addresses for OS04C10. |
+
+### Other
+
+| File | What it does |
+|------|---------------|
+| **snapshot.py** | Utility to capture a frame (for debugging). |
+| **SConscript** | Build rules for camerad. |
+| **test/** | `test_camerad.py`, `debug.sh`, `stress_restart.sh`, `test_ae_gray.cc` — tests and debug scripts. |
+
+### Reading Order (Suggested)
+
+1. **main.cc** — entry
+2. **hw.h** — config
+3. **camera_common.h** + **camera_common.cc** — buffers, VIPC, AE measurement
+4. **sensor.h** — sensor interface
+5. **camera_qcom2.cc** — main loop, AE control, `camerad_thread()`
+6. **spectra.h** + **spectra.cc** — ISP init, `handle_camera_event`, `processFrame`
+7. **ox03c10.cc** / **os04c10.cc** — sensor-specific init and exposure
+
+---
+
+## 11. Key Concepts
 
 | Concept | Description |
 |---------|-------------|
@@ -343,6 +416,7 @@ VIDIOC_DQEVENT (frame done)
 
 ## Further Reading
 
+- **Local openpilot camerad:** `../openpilot/system/camerad/` (relative to this Guide)
 - **V4L2 API:** [kernel.org V4L2 documentation](https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/v4l2.html) — device nodes, ioctls, buffer flow, Request API
 - **Trace the pipeline:** Start at `camerad_thread()` in `camera_qcom2.cc`, follow `handle_camera_event` → `processFrame` → `sendFrameToVipc`
 - **modeld consumption:** `selfdrive/modeld/modeld.py` — `VisionIpcClient` for `VISION_STREAM_ROAD` (and wide if used)
