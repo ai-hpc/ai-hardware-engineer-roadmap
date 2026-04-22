@@ -5,7 +5,7 @@
 Focused mini-courses that sit inside this module:
 
 - [**IoT**](IoT/Guide.md) for networking stacks like OpenThread and Zigbee
-- [**Espressif**](Espressif/Guide.md) for `arduino-esp32`, ESP32-family workflow, and the bridge toward ESP-IDF
+- [**Espressif**](Espressif/Guide.md) for `arduino-esp32`, ESP32-family workflow, the official Espressif education path, and the bridge toward ESP-IDF
 
 ---
 

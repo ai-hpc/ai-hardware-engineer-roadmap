@@ -1,8 +1,8 @@
-# Espressif - Step-by-Step Lectures
+# Arduino-ESP32 - Step-by-Step Lectures
 
 Work through these in order. Each file is one session: read it, do the lab at the end, then move on.
 
-**Hub:** [Espressif course guide](../Guide.md)
+**Hub:** [Espressif track guide](../Guide.md)
 
 | Lecture | Topic |
 |---------|-------|
