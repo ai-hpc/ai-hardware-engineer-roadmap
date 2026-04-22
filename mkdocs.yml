@@ -206,6 +206,14 @@ nav:
           - "15": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-15.md
           - "16": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-16.md
           - "Lab: Edge AI Camera": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lab-01-Worked-Example-Edge-AI-Camera.md
+    - Product Design:
+      - Guide: Phase 2 - Embedded Systems/4. Product Design/Guide.md
+      - Lectures:
+        - Overview: Phase 2 - Embedded Systems/4. Product Design/Lecture/README.md
+        - "01": Phase 2 - Embedded Systems/4. Product Design/Lecture/Lecture-01.md
+        - "02": Phase 2 - Embedded Systems/4. Product Design/Lecture/Lecture-02.md
+        - "03": Phase 2 - Embedded Systems/4. Product Design/Lecture/Lecture-03.md
+        - "04": Phase 2 - Embedded Systems/4. Product Design/Lecture/Lecture-04.md
 
   # ── Phase 3 ─────────────────────────────────────────────────
   - Phase 3 — AI:
