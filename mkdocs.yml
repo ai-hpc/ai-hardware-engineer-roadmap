@@ -319,7 +319,9 @@ nav:
           - ESP32-C6 OpenThread RCP: Phase 4 - Track B - Nvidia Jetson/5. Application Development/2. Network and Connectivity/ESP32-C6-OpenThread-RCP-Jetson-Orin-Nano.md
           - ESP32-C6 Zigbee NCP: Phase 4 - Track B - Nvidia Jetson/5. Application Development/2. Network and Connectivity/ESP32-C6-Zigbee-NCP-Jetson-Orin-Nano.md
         - GUI: Phase 4 - Track B - Nvidia Jetson/5. Application Development/3. GUI/Guide.md
-        - Multimedia: Phase 4 - Track B - Nvidia Jetson/5. Application Development/4. Multimedia/Guide.md
+        - Multimedia:
+          - Guide: Phase 4 - Track B - Nvidia Jetson/5. Application Development/4. Multimedia/Guide.md
+          - Audio Setup & Development: Phase 4 - Track B - Nvidia Jetson/5. Application Development/4. Multimedia/Jetson-Audio-Setup-and-Development/Guide.md
         - ML & AI:
           - Guide: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/Guide.md
           - Small Object Detection: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/small-object-detection-jetson/Guide.md

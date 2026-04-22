@@ -5,6 +5,7 @@
 > **Focus:** Build hardware-accelerated multimedia pipelines on the **Jetson Orin Nano 8GB** — audio playback/capture, camera integration (USB and CSI), GStreamer video pipelines, display output, and video encode/decode using NVIDIA's NVENC/NVDEC engines.
 
 **Hub:** [5. Application Development](../Guide.md)
+**Dedicated audio deep dive:** [Jetson Audio Setup and Development](Jetson-Audio-Setup-and-Development/Guide.md)
 
 ---
 
@@ -12,6 +13,16 @@
 ## 1. Audio (Linux)
 
 Audio on Jetson uses ALSA (kernel driver) with PulseAudio or PipeWire (userspace).
+
+If you want the full Jetson-specific model for:
+
+- `APE` vs `HDA`
+- 40-pin header `I2S2`
+- device tree bring-up for custom codecs
+- `amixer` routing through `ADMAIF` / `I2S`
+- DAPM and ASoC debugging
+
+use the dedicated guide: [Jetson Audio Setup and Development](Jetson-Audio-Setup-and-Development/Guide.md).
 
 ### Check audio devices
 
@@ -51,6 +62,8 @@ sound {
     nvidia,i2s-controller = <&i2s1>;
 };
 ```
+
+> **Deep dive:** for the full Jetson audio stack, official NVIDIA ASoC model, 40-pin header pinmux, and custom codec bring-up flow, see [Jetson Audio Setup and Development](Jetson-Audio-Setup-and-Development/Guide.md).
 
 ---
 
@@ -296,6 +309,7 @@ cat /dev/urandom > /dev/fb0   # random noise
 | Resource | Description |
 |----------|-------------|
 | **NVIDIA Multimedia API** | Jetson multimedia framework documentation (Argus, V4L2, GStreamer) |
+| [Jetson Audio Setup and Development](Jetson-Audio-Setup-and-Development/Guide.md) | Jetson-specific ALSA, ASoC, AHUB, `APE`, device tree, pinmux, codec bring-up |
 | **GStreamer documentation** (gstreamer.freedesktop.org) | Pipeline syntax, plugin reference |
 | **NVIDIA GStreamer plugins** | `nvarguscamerasrc`, `nvv4l2decoder`, `nvv4l2h264enc`, `nv3dsink` |
 | **ALSA project** (alsa-project.org) | Advanced Linux Sound Architecture documentation |
