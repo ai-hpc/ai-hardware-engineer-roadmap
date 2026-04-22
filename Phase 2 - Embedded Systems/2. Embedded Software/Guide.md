@@ -2,6 +2,11 @@
 
 *Follows [**Phase 2 section 1 — Schematic Capture and PCB Design**](../1.%20Schematic%20Capture%20and%20PCB%20Design/Guide.md) when you are bringing up **custom hardware**; dev-kit learners can start here in parallel. Builds on Phase 1 (digital, HDL, architecture, OS) — focuses on ARM Cortex-M microcontrollers, RTOS practice, and buses (SPI/UART/I2C/CAN) that connect sensors and peripherals.*
 
+Focused mini-courses that sit inside this module:
+
+- [**IoT**](IoT/Guide.md) for networking stacks like OpenThread and Zigbee
+- [**Espressif**](Espressif/Guide.md) for `arduino-esp32`, ESP32-family workflow, and the bridge toward ESP-IDF
+
 ---
 
 ## 1. ARM Cortex-M Architecture
