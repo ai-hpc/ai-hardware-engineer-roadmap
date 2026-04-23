@@ -18,6 +18,7 @@ A hands-on lecture series building from LLM fundamentals to production multi-age
 | [Lecture 10](Lecture-10.md) | RAG — Retrieval & Reranking | Hybrid search, MMR, cross-encoder reranking, evaluation |
 | [Lecture 11](Lecture-11.md) | Evaluation & Observability | LLM-as-judge, RAGAS, tracing, cost tracking |
 | [Lecture 12](Lecture-12.md) | Production Deployment | Streaming, caching, model routing, safety, scaling |
+| [Lecture 13](Lecture-13.md) | Runtime Discipline & AI Runtime Security | Runtime controls, tool policy, telemetry, auditability, agent risk |
 
 ## Lab Index
 

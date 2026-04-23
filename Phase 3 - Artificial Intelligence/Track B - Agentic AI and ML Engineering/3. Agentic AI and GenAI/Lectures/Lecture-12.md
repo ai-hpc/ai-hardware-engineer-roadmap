@@ -1,6 +1,6 @@
 # Lecture 12 — Production Deployment
 
-**Track B · Agentic AI & GenAI** | [← Lecture 11](Lecture-11.md) | [Next → Lab 01](Lab-01-Research-Agent.md)
+**Track B · Agentic AI & GenAI** | [← Lecture 11](Lecture-11.md) | [Next → Lecture 13](Lecture-13.md)
 
 ---
 
@@ -672,4 +672,4 @@ Write integration tests (using `httpx.AsyncClient` and `pytest-asyncio`) that ve
 
 ---
 
-*Next: [Lab 01 — Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 13 — Runtime Discipline and AI Runtime Security](Lecture-13.md)*

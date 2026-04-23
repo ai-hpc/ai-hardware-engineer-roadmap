@@ -12,7 +12,7 @@
 
 ## Lecture Series
 
-12 lectures + 3 hands-on labs covering everything from LLM fundamentals to production multi-agent systems. **[→ Start here](Lectures/README.md)**
+13 lectures + 3 hands-on labs covering everything from LLM fundamentals to production multi-agent systems. **[→ Start here](Lectures/README.md)**
 
 | # | Lecture | # | Lecture |
 |---|---------|---|---------|
@@ -22,6 +22,7 @@
 | [04](Lectures/Lecture-04.md) | Agent Architecture | [10](Lectures/Lecture-10.md) | RAG — Retrieval |
 | [05](Lectures/Lecture-05.md) | Memory Systems | [11](Lectures/Lecture-11.md) | Evaluation |
 | [06](Lectures/Lecture-06.md) | LangGraph | [12](Lectures/Lecture-12.md) | Production |
+|  |  | [13](Lectures/Lecture-13.md) | Runtime Discipline |
 
 **Labs:** [Lab 01 — Research Agent](Lectures/Lab-01-Research-Agent.md) · [Lab 02 — Multi-Agent Pipeline](Lectures/Lab-02-Multi-Agent-Pipeline.md) · [Lab 03 — Production RAG](Lectures/Lab-03-Production-RAG.md)
 
@@ -204,6 +205,7 @@ For this roadmap, the important takeaway is that **Track B should teach the work
 * **Evaluation:** automated metrics (ROUGE, BLEU), LLM-as-judge, human evaluation
 * **Guardrails:** input moderation, output filtering, content safety, prompt-injection defense, hallucination mitigation
 * **Production deployment:** API design, streaming, rate limiting, cost management
+* **Runtime discipline:** live telemetry, tool-call policy gates, least-privilege agent identities, audit trails, and runtime incident response
 
 **Projects:**
 1. Fine-tune a 7B model with QLoRA on a domain-specific dataset. Measure improvement vs base model.
