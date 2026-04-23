@@ -753,6 +753,244 @@ It helps answer:
 - does `I2S2` power up?
 - is the problem outside the SoC rather than inside it?
 
+### Product example: 3x analog `IM73A135` microphones with `ES7210`
+
+This is the kind of example that helps the whole guide become concrete.
+
+Assume your product is:
+
+- a **Jetson Orin Nano**
+- a **3-microphone far-field capture board**
+- **analog microphones** such as the analog version of `IM73A135`
+- an external **audio ADC / codec** such as `ES7210`
+- Jetson connected to the codec through:
+  - `I2S2` for digital audio
+  - `I2C` for codec control
+
+The mental model is:
+
+```text
+analog microphone
+  -> analog voltage
+  -> ES7210 ADC
+  -> I2S/TDM digital stream
+  -> Jetson I2S2
+  -> AHUB / ADMAIF
+  -> ALSA capture device
+  -> ASR / beamforming / recording app
+```
+
+The key difference from a **digital microphone** design is simple:
+
+- a **digital mic** already outputs digital audio, often `PDM`
+- an **analog mic** outputs an analog waveform
+- so you need an **ADC stage**
+
+In this example, `ES7210` is the ADC stage.
+
+#### What each part is doing
+
+| Part | Job in the system |
+|---|---|
+| `IM73A135` analog mic | turns sound pressure into analog voltage |
+| `ES7210` | digitizes microphone signals and frames them as digital audio |
+| `I2S2` on Jetson | carries the digital audio stream into the SoC |
+| `AHUB` / `ADMAIF1` | routes that stream to ALSA |
+| your app | records, streams, beamforms, or feeds ASR |
+
+#### Why this is a useful Jetson example
+
+This example is realistic for:
+
+- AI smart speakers
+- voice appliances
+- local assistants
+- embedded meeting-room devices
+- robotics voice interfaces
+
+It also matches a common product pattern:
+
+- **analog microphone array on a custom board**
+- **external multichannel ADC**
+- **Jetson only sees digital audio**
+
+That is the right way to think about the boundary:
+
+> Jetson does not read the analog microphones directly. Jetson reads the **codec's digital output**.
+
+#### Hardware view
+
+At a system level you would usually have:
+
+- microphone bias / power for each analog mic
+- analog routing from each mic into `ES7210`
+- `MCLK`, `BCLK`, `LRCLK`, and `DOUT` or equivalent digital audio lines between `ES7210` and Jetson
+- `I2C` control lines so Jetson can configure codec registers
+- clean analog grounding and layout, because analog microphones are much more sensitive to board noise than digital interfaces
+
+If you use **3 microphones** with a **4-channel codec**, that is still normal.
+
+Typical product choices are:
+
+- leave one channel unused
+- reserve one channel for future expansion
+- use one channel for a reference input or different analog source
+
+#### Software view
+
+From Linux and ASoC's point of view, the flow is:
+
+1. the codec driver for `ES7210` is instantiated
+2. the machine driver binds Jetson `I2S2` to that codec
+3. the route inside Jetson moves data between `I2S2` and `ADMAIF`
+4. ALSA exposes a capture PCM node
+5. `arecord` or your app reads the samples
+
+So your debugging layers become:
+
+```text
+analog mic hardware
+  -> codec power and clocks
+  -> codec driver probe
+  -> I2C control path
+  -> I2S data path
+  -> AHUB route
+  -> ALSA capture
+  -> application
+```
+
+#### A device-tree shape to keep in your head
+
+The exact DTS for a real board depends on:
+
+- your carrier board
+- your pinmux
+- exact `I2S` instance
+- clock master/slave decisions
+- whether the codec is using plain `I2S` or a multichannel `TDM` mode
+- your machine driver binding
+
+So the example below is **illustrative**, not drop-in production DTS:
+
+```dts
+&i2s2 {
+    status = "okay";
+};
+
+&i2c1 {
+    es7210: audio-codec@40 {
+        compatible = "everest,es7210";
+        reg = <0x40>;
+        status = "okay";
+    };
+};
+
+sound {
+    compatible = "nvidia,tegra186-audio-graph-card";
+    status = "okay";
+
+    dais = <&i2s2_port>;
+
+    audio-routing =
+        "Mic Jack", "MIC1",
+        "Mic Jack", "MIC2",
+        "Mic Jack", "MIC3";
+};
+```
+
+What you should learn from this example is not the exact property names.
+
+What matters is the structure:
+
+- Jetson `I2S2` must exist
+- the codec must probe on `I2C`
+- the sound card must bind the CPU DAI and codec DAI
+- routing must describe how capture widgets connect
+
+#### The first capture route to try
+
+Once the codec is actually probed and the sound card exists, the first Jetson-side route to think about is:
+
+```bash
+amixer -c APE cset name="ADMAIF1 Mux" "I2S2"
+```
+
+That means:
+
+> take audio coming in from `I2S2` and send it to `ADMAIF1`, which ALSA exposes as `hw:APE,0`
+
+Then the first capture test is:
+
+```bash
+arecord -D hw:APE,0 -r 48000 -c 3 -f S16_LE test-3mic.wav
+```
+
+If your codec is outputting 4 channels instead of 3, then test the real channel count:
+
+```bash
+arecord -D hw:APE,0 -r 48000 -c 4 -f S16_LE test-4ch.wav
+```
+
+That detail matters because the codec format and the capture command must agree.
+
+#### A practical bring-up sequence
+
+For this exact analog-mic design, the lowest-risk bring-up order is:
+
+1. verify the codec probes on `I2C`
+2. verify the sound card appears
+3. verify `I2S2` route into `ADMAIF1`
+4. record raw multichannel audio
+5. confirm each microphone channel is alive
+6. only then add beamforming, VAD, wake-word, or ASR
+
+That order is important.
+
+Do **not** start with far-field DSP claims like:
+
+- echo cancellation
+- beamforming
+- speaker tracking
+- wake-word tuning
+
+until you have already proven:
+
+- clocks are correct
+- channels are not swapped
+- sample rate is correct
+- gain is reasonable
+- the raw recording is clean
+
+#### What usually breaks first
+
+For this kind of design, the most common early failures are:
+
+- codec never probes on `I2C`
+- wrong pinmux for `I2S2`
+- wrong clock direction or frame format
+- wrong channel count
+- wrong ALSA route
+- analog front-end noise from layout or power
+- gain staging problems that make recordings seem "dead" even when the path is alive
+
+That is why the right debug question is not only:
+
+> "Does `arecord` run?"
+
+but also:
+
+> "Do I have clean, correctly ordered, correctly clocked channels?"
+
+#### How to explain this to yourself simply
+
+Use this one-line summary:
+
+> Analog microphones need a codec or ADC to become digital audio. Jetson then treats that codec like any other external audio front end connected over `I2S`.
+
+That is the core idea.
+
+If you keep that model in your head, the guide's ASoC, AHUB, routing, and device-tree pieces stop feeling random.
+
 ### Which official examples should you postpone
 
 The NVIDIA guide also shows:
