@@ -12,7 +12,7 @@
 
 ## Lecture Series
 
-13 lectures + 3 hands-on labs covering everything from LLM fundamentals to production multi-agent systems. **[→ Start here](Lectures/README.md)**
+14 lectures + 3 hands-on labs covering everything from LLM fundamentals to production multi-agent systems. **[→ Start here](Lectures/README.md)**
 
 | # | Lecture | # | Lecture |
 |---|---------|---|---------|
@@ -23,6 +23,7 @@
 | [05](Lectures/Lecture-05.md) | Memory Systems | [11](Lectures/Lecture-11.md) | Evaluation |
 | [06](Lectures/Lecture-06.md) | LangGraph | [12](Lectures/Lecture-12.md) | Production |
 |  |  | [13](Lectures/Lecture-13.md) | Runtime Discipline |
+|  |  | [14](Lectures/Lecture-14.md) | Deterministic Startup |
 
 **Labs:** [Lab 01 — Research Agent](Lectures/Lab-01-Research-Agent.md) · [Lab 02 — Multi-Agent Pipeline](Lectures/Lab-02-Multi-Agent-Pipeline.md) · [Lab 03 — Production RAG](Lectures/Lab-03-Production-RAG.md)
 
@@ -206,6 +207,7 @@ For this roadmap, the important takeaway is that **Track B should teach the work
 * **Guardrails:** input moderation, output filtering, content safety, prompt-injection defense, hallucination mitigation
 * **Production deployment:** API design, streaming, rate limiting, cost management
 * **Runtime discipline:** live telemetry, tool-call policy gates, least-privilege agent identities, audit trails, and runtime incident response
+* **Deterministic startup:** startup contracts, readiness checks, prompt/tool/policy versioning, memory hydration, and reproducible agent boot
 
 **Projects:**
 1. Fine-tune a 7B model with QLoRA on a domain-specific dataset. Measure improvement vs base model.

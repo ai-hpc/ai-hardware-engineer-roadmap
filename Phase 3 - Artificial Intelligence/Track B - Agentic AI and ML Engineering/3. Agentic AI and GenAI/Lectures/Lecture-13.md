@@ -1,6 +1,6 @@
 # Lecture 13 - Runtime Discipline and AI Runtime Security
 
-**Track B - Agentic AI & GenAI** | [<- Lecture 12](Lecture-12.md) | [Next -> Lab 01](Lab-01-Research-Agent.md)
+**Track B - Agentic AI & GenAI** | [<- Lecture 12](Lecture-12.md) | [Next -> Lecture 14](Lecture-14.md)
 
 ---
 
@@ -1106,4 +1106,4 @@ Define when a person must approve:
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 14 - Deterministic Startup for AI Agent Systems](Lecture-14.md)*
