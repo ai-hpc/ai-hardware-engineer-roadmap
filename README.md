@@ -2,7 +2,7 @@
 
 ![AI Hardware Engineer Roadmap](Assets/images/ai-hardware-roadmap-hero.svg)
 
-[⭐ Star this repo](https://github.com/ai-hpc/ai-hardware-engineer-roadmap)
+[Star this repo](https://github.com/ai-hpc/ai-hardware-engineer-roadmap) · [Read the full roadmap online](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/)
 
 </div>
 
