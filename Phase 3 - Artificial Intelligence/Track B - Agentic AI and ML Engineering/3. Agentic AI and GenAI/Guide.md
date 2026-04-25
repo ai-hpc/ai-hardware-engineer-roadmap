@@ -12,7 +12,7 @@
 
 ## Lecture Series
 
-14 lectures + 3 hands-on labs covering everything from LLM fundamentals to production multi-agent systems. **[→ Start here](Lectures/README.md)**
+18 lectures + 3 hands-on labs covering everything from LLM fundamentals to production multi-agent systems. **[→ Start here](Lectures/README.md)**
 
 | # | Lecture | # | Lecture |
 |---|---------|---|---------|
@@ -24,6 +24,10 @@
 | [06](Lectures/Lecture-06.md) | LangGraph | [12](Lectures/Lecture-12.md) | Production |
 |  |  | [13](Lectures/Lecture-13.md) | Runtime Discipline |
 |  |  | [14](Lectures/Lecture-14.md) | Deterministic Startup |
+|  |  | [15](Lectures/Lecture-15.md) | OpenClaw Gateway |
+|  |  | [16](Lectures/Lecture-16.md) | Routing and Sessions |
+|  |  | [17](Lectures/Lecture-17.md) | Isolation and Memory |
+|  |  | [18](Lectures/Lecture-18.md) | Operations and Security |
 
 **Labs:** [Lab 01 — Research Agent](Lectures/Lab-01-Research-Agent.md) · [Lab 02 — Multi-Agent Pipeline](Lectures/Lab-02-Multi-Agent-Pipeline.md) · [Lab 03 — Production RAG](Lectures/Lab-03-Production-RAG.md)
 
@@ -208,6 +212,8 @@ For this roadmap, the important takeaway is that **Track B should teach the work
 * **Production deployment:** API design, streaming, rate limiting, cost management
 * **Runtime discipline:** live telemetry, tool-call policy gates, least-privilege agent identities, audit trails, and runtime incident response
 * **Deterministic startup:** startup contracts, readiness checks, prompt/tool/policy versioning, memory hydration, and reproducible agent boot
+* **Agent control planes:** gateways, sessions, routing, and multi-surface delivery
+* **OpenClaw-style agent development:** multi-agent isolation, workspace design, pairing, and operations for persistent local-first assistants
 
 **Projects:**
 1. Fine-tune a 7B model with QLoRA on a domain-specific dataset. Measure improvement vs base model.

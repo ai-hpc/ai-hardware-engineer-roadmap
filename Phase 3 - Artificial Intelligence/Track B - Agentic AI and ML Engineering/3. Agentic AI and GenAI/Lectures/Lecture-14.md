@@ -1,6 +1,6 @@
 # Lecture 14 - Deterministic Startup for AI Agent Systems
 
-**Track B - Agentic AI & GenAI** | [<- Lecture 13](Lecture-13.md) | [Next -> Lab 01](Lab-01-Research-Agent.md)
+**Track B - Agentic AI & GenAI** | [<- Lecture 13](Lecture-13.md) | [Next -> Lecture 15](Lecture-15.md)
 
 ---
 
@@ -1200,4 +1200,4 @@ Then answer:
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 15 - OpenClaw Case Study: Why Real Agents Need a Gateway](Lecture-15.md)*
