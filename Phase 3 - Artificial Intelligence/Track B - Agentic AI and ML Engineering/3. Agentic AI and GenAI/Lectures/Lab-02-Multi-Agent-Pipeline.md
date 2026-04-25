@@ -94,7 +94,7 @@ from openai import OpenAI
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "sk-fake"))
 
-DEFAULT_MODEL = "gpt-4o-mini"  # swap to "gpt-4o" for higher quality
+DEFAULT_MODEL = "your-fast-model-id"  # swap to "your-smart-model-id" for higher quality
 
 
 def _call(system: str, user: str, model: str = DEFAULT_MODEL, temperature: float = 0.2) -> str:
@@ -676,7 +676,7 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 def llm(system: str, user: str) -> str:
     r = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="your-fast-model-id",
         temperature=0.1,
         messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
     )
@@ -769,7 +769,7 @@ if __name__ == "__main__":
 | `AuthenticationError` | Bad API key | Check `OPENAI_API_KEY` in `.env` |
 | Agent always returns `NEEDS_FIXES` | Reviewer too strict | Add "Be lenient on style issues" to reviewer system prompt |
 | Code block not extracted | Model didn't wrap code in ``` | Improve coder system prompt: "You MUST wrap code in a ```python block" |
-| Pipeline runs too long | Slow model | Use `gpt-4o-mini` for all agents; switch planner to `gpt-4o` only |
+| Pipeline runs too long | Slow model | Use `your-fast-model-id` for all agents; switch planner to `your-smart-model-id` only |
 | Output file not created | `output/` dir missing | `OUTPUT_DIR.mkdir(exist_ok=True)` should handle this |
 
 ---

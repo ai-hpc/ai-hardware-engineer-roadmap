@@ -38,7 +38,7 @@ client = anthropic.Anthropic()
 def researcher_agent(task: str) -> str:
     """Gathers information and facts."""
     response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model="your-fast-model-id",
         max_tokens=1024,
         system="You are a research specialist. Find relevant facts and technical details. Be thorough.",
         messages=[{"role": "user", "content": task}]
@@ -48,7 +48,7 @@ def researcher_agent(task: str) -> str:
 def coder_agent(task: str) -> str:
     """Writes and reviews code."""
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model="your-agent-model-id",
         max_tokens=2048,
         system="You are a senior software engineer. Write clean, well-commented code with examples.",
         messages=[{"role": "user", "content": task}]
@@ -58,7 +58,7 @@ def coder_agent(task: str) -> str:
 def reviewer_agent(task: str) -> str:
     """Reviews and critiques work."""
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model="your-agent-model-id",
         max_tokens=1024,
         system="You are a strict technical reviewer. Identify bugs, edge cases, and improvements.",
         messages=[{"role": "user", "content": task}]
@@ -68,7 +68,7 @@ def reviewer_agent(task: str) -> str:
 def writer_agent(task: str) -> str:
     """Writes documentation and explanations."""
     response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model="your-fast-model-id",
         max_tokens=1024,
         system="You are a technical writer. Create clear, well-structured documentation.",
         messages=[{"role": "user", "content": task}]
@@ -132,7 +132,7 @@ def supervisor_agent(user_task: str) -> str:
 
     for _ in range(20):  # max iterations
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model="your-agent-model-id",
             max_tokens=1024,
             system=SUPERVISOR_SYSTEM,
             tools=SUPERVISOR_TOOLS,
@@ -213,7 +213,7 @@ def build_pipeline(*stages: tuple[str, Callable[[str, dict], str]]):
 # Define pipeline stages
 def outline_stage(task: str, artifacts: dict) -> str:
     response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model="your-fast-model-id",
         max_tokens=512,
         messages=[{"role": "user", "content": f"Create a brief outline for: {task}"}]
     )
@@ -221,7 +221,7 @@ def outline_stage(task: str, artifacts: dict) -> str:
 
 def draft_stage(outline: str, artifacts: dict) -> str:
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model="your-agent-model-id",
         max_tokens=2048,
         messages=[{"role": "user", "content": f"Write a technical guide based on this outline:\n{outline}"}]
     )
@@ -229,7 +229,7 @@ def draft_stage(outline: str, artifacts: dict) -> str:
 
 def review_stage(draft: str, artifacts: dict) -> str:
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model="your-agent-model-id",
         max_tokens=1024,
         system="Identify errors and suggest improvements. Be specific.",
         messages=[{"role": "user", "content": draft}]
@@ -239,7 +239,7 @@ def review_stage(draft: str, artifacts: dict) -> str:
 def revise_stage(review: str, artifacts: dict) -> str:
     draft = artifacts.get("draft_stage", "")
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model="your-agent-model-id",
         max_tokens=2048,
         messages=[{
             "role": "user",
@@ -276,7 +276,7 @@ def debate_agents(question: str, rounds: int = 2) -> str:
             f"{pos}: {arg}" for pos, arg in previous_arguments
         )
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model="your-agent-model-id",
             max_tokens=512,
             system=f"You argue {position}. Be persuasive but technically accurate.",
             messages=[{
@@ -297,7 +297,7 @@ def debate_agents(question: str, rounds: int = 2) -> str:
     # Judge synthesizes
     transcript = "\n\n".join(f"{pos}:\n{arg}" for pos, arg in arguments)
     judge_response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model="your-agent-model-id",
         max_tokens=1024,
         system="You are an impartial judge. Synthesize the strongest points from both sides.",
         messages=[{

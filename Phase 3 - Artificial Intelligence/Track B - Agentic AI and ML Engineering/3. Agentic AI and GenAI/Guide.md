@@ -14,9 +14,11 @@
 
 18 lectures + 3 hands-on labs covering everything from LLM fundamentals to production multi-agent systems. **[→ Start here](Lectures/README.md)**
 
+**Course currency note:** exact model names, context windows, SDK features, and pricing change quickly. This module teaches stable interfaces and system patterns: model APIs, tool protocols, runtime loops, workflow graphs, gateways, telemetry, and policy boundaries. Always check provider documentation before copying model IDs or prices into a real deployment.
+
 | # | Lecture | # | Lecture |
 |---|---------|---|---------|
-| [01](Lectures/Lecture-01.md) | LLM Fundamentals | [07](Lectures/Lecture-07.md) | Claude Agent SDK |
+| [01](Lectures/Lecture-01.md) | LLM Fundamentals | [07](Lectures/Lecture-07.md) | Agent SDKs |
 | [02](Lectures/Lecture-02.md) | Prompt Engineering | [08](Lectures/Lecture-08.md) | Multi-Agent Systems |
 | [03](Lectures/Lecture-03.md) | Tool Use | [09](Lectures/Lecture-09.md) | RAG — Ingestion |
 | [04](Lectures/Lecture-04.md) | Agent Architecture | [10](Lectures/Lecture-10.md) | RAG — Retrieval |
@@ -109,7 +111,30 @@ Claude Code’s docs explicitly position MCP, plugins, skills, hooks, monitors, 
 
 The implication is important: the application layer is becoming a **tool-and-protocol ecosystem**, not just a prompt template.
 
-### 4. Multi-Agent Structure Is Becoming Practical, Not Theoretical
+### 4. Agent SDKs Are Becoming Runtime Layers, Not Just API Wrappers
+
+Modern agent SDKs now sit above raw model calls. They increasingly manage:
+- agent loops
+- tool dispatch
+- handoffs between specialists
+- sessions and state
+- guardrails and human review
+- tracing and evaluation
+- MCP server integration
+
+This matters because production agent systems need more than a `messages.create()` call. They need a repeatable runtime contract: what tools are available, which identity executes them, which actions require approval, where state is stored, and what gets logged.
+
+The practical design rule for this course is:
+
+```text
+Provider API details belong in adapters.
+Product behavior belongs in your runtime contract.
+Security decisions belong outside the LLM.
+```
+
+This is why Lecture 07 teaches SDKs and runtime APIs as a general layer instead of treating one vendor SDK as the architecture.
+
+### 5. Multi-Agent Structure Is Becoming Practical, Not Theoretical
 
 The industry has moved beyond “one model, one prompt, one answer.”
 
@@ -127,7 +152,7 @@ This is a practical trend because it maps well to real products:
 - personal assistant workflows
 - project automation and governance workflows
 
-### 5. Security and Permission Boundaries Are Now Core Product Features
+### 6. Security and Permission Boundaries Are Now Core Product Features
 
 This is one of the biggest changes from early LLM apps.
 
@@ -143,7 +168,7 @@ OpenClaw’s docs emphasize pairing approval, DM safety, sandbox modes, and gate
 
 This means “application architecture” now includes trust boundaries, not just prompts and UI.
 
-### 6. What To Learn From These Examples
+### 7. What To Learn From These Examples
 
 Do not study OpenClaw and Claude Code just because they are popular. Study them because they represent two high-signal application patterns:
 
@@ -174,7 +199,7 @@ For this roadmap, the important takeaway is that **Track B should teach the work
 ## 2. Agentic AI
 
 * **What agents are:** LLM + tools + memory + planning loop
-* **Agent frameworks:** LangChain, LangGraph, CrewAI, AutoGen, Claude Agent SDK
+* **Agent runtimes and frameworks:** raw provider APIs, OpenAI Agents SDK, LangGraph, MCP servers, OpenClaw-style gateways, CrewAI/AutoGen for experiments
 * **Tool use:** function calling, API integration, code execution
 * **Security boundaries:** prompt injection, tool abuse, least-privilege credentials, human approval for risky actions
 * **Memory:** conversation history, vector store retrieval, working memory
@@ -227,6 +252,10 @@ For this roadmap, the important takeaway is that **Track B should teach the work
 | Resource | What it covers |
 |----------|---------------|
 | [LangChain Documentation](https://python.langchain.com/) | Agent and RAG framework |
+| [LangGraph Documentation](https://docs.langchain.com/oss/python/langgraph/overview) | Durable, stateful agent workflows, human-in-the-loop, memory, and tracing |
+| [OpenAI Agents SDK](https://openai.github.io/openai-agents-python/) | Agent loops, tools, handoffs, guardrails, sessions, tracing, and MCP integration |
+| [OpenAI API Agents Guide](https://platform.openai.com/docs/guides/agents) | Current OpenAI guidance for code-first agent apps, tools, orchestration, and observability |
+| [Model Context Protocol Specification](https://modelcontextprotocol.io/specification/2025-11-25) | Standard protocol for tools, resources, prompts, hosts, clients, servers, and safety considerations |
 | [Claude Code Overview](https://code.claude.com/docs/en/overview) | Agentic coding workflows, MCP, multi-agent use, and CI patterns |
 | [Claude Code Plugins](https://code.claude.com/docs/en/plugins) | Skills, agents, hooks, MCP servers, plugin structure, and distribution |
 | [Claude Code Repository](https://github.com/anthropics/claude-code) | Public implementation surface, examples, plugins, and project layout |
@@ -235,6 +264,8 @@ For this roadmap, the important takeaway is that **Track B should teach the work
 | [OpenClaw Gateway Architecture](https://docs.openclaw.ai/concepts/architecture) | Long-lived gateway, WS protocol, nodes, pairing, and remote access model |
 | [OpenClaw Features](https://docs.openclaw.ai/concepts/features) | Multi-agent routing, media, channels, tools, apps, and provider support |
 | [GitHub Agentic Workflows](https://github.github.com/gh-aw/slides/github-agentic-workflows.pdf) | Official GitHub framing for agentic CI/CD, permissions, and safe outputs |
+| [OWASP Top 10 for LLM Applications](https://owasp.org/www-project-top-10-for-large-language-model-applications/) | Prompt injection, insecure output handling, plugin/tool risk, excessive agency, and LLM app security |
+| [NIST AI RMF Generative AI Profile](https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-generative-artificial-intelligence) | Governance and risk-management framing for generative AI systems |
 | [RAG best practices](https://docs.llamaindex.ai/) | LlamaIndex documentation |
 | *Build a Large Language Model (From Scratch)* (Raschka) | LLM internals |
 

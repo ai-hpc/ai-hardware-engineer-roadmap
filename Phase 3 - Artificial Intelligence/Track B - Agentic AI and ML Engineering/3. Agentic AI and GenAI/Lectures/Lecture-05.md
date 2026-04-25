@@ -49,7 +49,7 @@ class ConversationAgent:
             self.messages = self.messages[:2] + self.messages[-(self.max_history-2):]
 
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model="your-agent-model-id",
             max_tokens=1024,
             system=self.system,
             messages=self.messages
@@ -80,7 +80,7 @@ def compress_history(messages: list, keep_recent: int = 6) -> list:
     )
 
     summary_response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model="your-fast-model-id",
         max_tokens=512,
         messages=[{
             "role": "user",
@@ -177,7 +177,7 @@ class MemoryAugmentedAgent:
         self.messages.append({"role": "user", "content": augmented_input})
 
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model="your-agent-model-id",
             max_tokens=1024,
             system="You are a helpful assistant with access to long-term memory.",
             messages=self.messages
@@ -194,7 +194,7 @@ class MemoryAugmentedAgent:
     def _extract_and_store(self, user_input: str, reply: str):
         """Extract facts worth remembering."""
         extract_response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model="your-fast-model-id",
             max_tokens=256,
             system="""Extract facts worth remembering from this exchange.
 Return a JSON array of strings. Return [] if nothing notable.
@@ -298,7 +298,7 @@ def agent_with_episodic_memory(task: str) -> str:
             )
 
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model="your-agent-model-id",
         max_tokens=1024,
         system=f"You are a task executor.{prior_context}",
         messages=[{"role": "user", "content": task}]

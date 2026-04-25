@@ -51,7 +51,7 @@ def judge_answer(question: str, reference: str, answer: str) -> dict:
         question=question, reference=reference, answer=answer
     )
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=os.environ.get("OPENAI_JUDGE_MODEL", "your-judge-model-id"),
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
         temperature=0,
@@ -113,6 +113,7 @@ RAGAS (Retrieval Augmented Generation Assessment) defines four complementary met
 ```python
 # pip install ragas langchain-openai datasets
 
+import os
 from datasets import Dataset
 from ragas import evaluate
 from ragas.metrics import (
@@ -151,8 +152,8 @@ eval_data = {
 dataset = Dataset.from_dict(eval_data)
 
 # Configure LLM and embeddings for RAGAS internal evaluation
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+llm = ChatOpenAI(model=os.environ.get("OPENAI_EVAL_MODEL", "your-eval-model-id"), temperature=0)
+embeddings = OpenAIEmbeddings(model=os.environ.get("OPENAI_EMBEDDING_MODEL", "your-embedding-model-id"))
 
 results = evaluate(
     dataset=dataset,
@@ -297,16 +298,18 @@ print(f"Trace written to {TRACE_FILE}")
 ```python
 import os
 import time
+import uuid
 from dataclasses import dataclass, field
-from functools import wraps
 from openai import OpenAI
 
-# OpenAI pricing per million tokens (as of early 2025)
+# Example pricing per million tokens.
+# Do not use this table for billing decisions. Keep real prices in deployment
+# config and update them from the current provider pricing page.
 PRICING = {
-    "gpt-4o":           {"input": 2.50,  "output": 10.00},
-    "gpt-4o-mini":      {"input": 0.15,  "output": 0.60},
-    "gpt-3.5-turbo":    {"input": 0.50,  "output": 1.50},
-    "text-embedding-3-small": {"input": 0.02, "output": 0.0},
+    "fast-model": {"input": 0.15, "output": 0.60},
+    "balanced-agent-model": {"input": 3.00, "output": 15.00},
+    "reasoning-model": {"input": 15.00, "output": 75.00},
+    "embedding-model": {"input": 0.02, "output": 0.0},
 }
 
 @dataclass
@@ -344,9 +347,10 @@ class CostTracker:
 # Global tracker for the session
 tracker = CostTracker()
 
-def tracked_completion(messages: list[dict], model: str = "gpt-4o-mini") -> str:
+def tracked_completion(messages: list[dict], model: str | None = None) -> str:
     """OpenAI chat completion with automatic cost tracking."""
     client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "sk-fake"))
+    model = model or os.environ.get("OPENAI_MODEL", "your-model-id")
     start = time.perf_counter()
     response = client.chat.completions.create(
         model=model, messages=messages, temperature=0
@@ -382,9 +386,9 @@ log_file = Path("llm_calls.jsonl")
 class LLMLogger:
     """Logs every LLM call to both console and a JSONL file."""
 
-    def __init__(self, model: str = "gpt-4o-mini", log_path: Path = log_file):
+    def __init__(self, model: str | None = None, log_path: Path = log_file):
         self.client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "sk-fake"))
-        self.model = model
+        self.model = model or os.environ.get("OPENAI_MODEL", "your-model-id")
         self.log_path = log_path
 
     def _write(self, record: dict):

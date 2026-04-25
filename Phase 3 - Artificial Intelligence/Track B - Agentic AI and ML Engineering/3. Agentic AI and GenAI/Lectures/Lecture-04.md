@@ -119,7 +119,7 @@ class ReActAgent:
         while step < self.max_steps:
             step += 1
             response = client.messages.create(
-                model="claude-sonnet-4-6",
+                model="your-agent-model-id",
                 max_tokens=2048,
                 system=REACT_SYSTEM,
                 tools=tools,
@@ -190,7 +190,7 @@ class PlanAndExecuteAgent:
     def plan_task(self, goal: str) -> list[Task]:
         """Generate a structured plan for the goal."""
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model="your-agent-model-id",
             max_tokens=1024,
             system="""Create a numbered execution plan. Return JSON array of tasks.
 Each task: {"id": int, "description": str, "depends_on": [int]}
@@ -205,7 +205,7 @@ Keep tasks atomic — one action each. Maximum 10 tasks.""",
     def execute_task(self, task: Task, context: str) -> str:
         """Execute a single task given accumulated context."""
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model="your-agent-model-id",
             max_tokens=1024,
             system="Execute the given task. Be concise. Return only the result.",
             tools=tools,
@@ -218,7 +218,7 @@ Keep tasks atomic — one action each. Maximum 10 tasks.""",
         messages = [{"role": "user", "content": f"Task: {task.description}\n\nContext:\n{context}"}]
         while True:
             response = client.messages.create(
-                model="claude-sonnet-4-6",
+                model="your-agent-model-id",
                 max_tokens=1024,
                 system="Execute the given task. Be concise. Return only the result.",
                 tools=tools,
@@ -264,7 +264,7 @@ Keep tasks atomic — one action each. Maximum 10 tasks.""",
         # Final synthesis
         all_results = "\n".join(context_parts)
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model="your-agent-model-id",
             max_tokens=1024,
             messages=[{
                 "role": "user",
@@ -288,7 +288,7 @@ def reflexion_agent(task: str, max_retries: int = 3) -> str:
     for i in range(max_retries):
         # Generate attempt
         attempt_response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model="your-agent-model-id",
             max_tokens=1024,
             messages=[{
                 "role": "user",
@@ -299,7 +299,7 @@ def reflexion_agent(task: str, max_retries: int = 3) -> str:
 
         # Self-critique
         critique_response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model="your-agent-model-id",
             max_tokens=512,
             system="You are a strict quality reviewer. Identify any errors, gaps, or improvements needed.",
             messages=[{

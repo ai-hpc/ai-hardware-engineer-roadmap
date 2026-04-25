@@ -56,7 +56,7 @@ def planner_node(state: AgentState) -> AgentState:
     client = anthropic.Anthropic()
 
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model="your-agent-model-id",
         max_tokens=512,
         messages=[{
             "role": "user",
@@ -77,7 +77,7 @@ def executor_node(state: AgentState) -> AgentState:
     context = "\n".join(state["results"])
 
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model="your-agent-model-id",
         max_tokens=512,
         messages=[{
             "role": "user",
@@ -97,7 +97,7 @@ def synthesizer_node(state: AgentState) -> AgentState:
 
     all_results = "\n".join(state["results"])
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model="your-agent-model-id",
         max_tokens=1024,
         messages=[{
             "role": "user",
@@ -204,7 +204,7 @@ class ReviewState(TypedDict):
 def generate_code_node(state: ReviewState) -> ReviewState:
     """Generate code based on a task."""
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model="your-agent-model-id",
         max_tokens=1024,
         messages=[{"role": "user", "content": "Write a CUDA kernel for matrix multiplication."}]
     )
@@ -222,7 +222,7 @@ def apply_review_node(state: ReviewState) -> ReviewState:
     if not state["approved"]:
         # Regenerate with feedback
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model="your-agent-model-id",
             max_tokens=1024,
             messages=[{
                 "role": "user",
@@ -304,4 +304,4 @@ workflow.add_edge("research_memory", "synthesize")
 
 ---
 
-**Previous:** [Lecture 05](Lecture-05.md) | **Next:** [Lecture 07 — Claude Agent SDK](Lecture-07.md)
+**Previous:** [Lecture 05](Lecture-05.md) | **Next:** [Lecture 07 - Agent SDKs and Runtime APIs](Lecture-07.md)

@@ -1,6 +1,21 @@
-# Agentic AI Development — Lecture Series
+# Agentic AI Development - Lecture Series
 
 A hands-on lecture series building from LLM fundamentals to production multi-agent systems.
+
+## How to Read This Course in 2026
+
+Model names, context windows, SDK features, and token prices change quickly. Treat vendor-specific examples as implementation snapshots, not permanent recommendations.
+
+The durable concepts in this course are:
+
+- **Model API:** the direct text, structured output, tool-call, and streaming interface.
+- **Agent runtime:** the loop that manages turns, tools, sessions, handoffs, guardrails, and traces.
+- **Tool protocol:** MCP-style tools, resources, and prompts exposed by external systems.
+- **Workflow control:** graphs, checkpoints, retries, human review, and deterministic startup.
+- **Product control plane:** gateways, channels, sessions, routing, identities, and audit logs.
+- **Runtime security:** least privilege, policy gates, telemetry, incident response, and evidence.
+
+Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-18 focus on production discipline and OpenClaw-style gateway systems.
 
 ## Lecture Index
 
@@ -12,7 +27,7 @@ A hands-on lecture series building from LLM fundamentals to production multi-age
 | [Lecture 04](Lecture-04.md) | Agent Architecture Patterns | ReAct, CoT, Reflexion, plan-and-execute |
 | [Lecture 05](Lecture-05.md) | Memory Systems | Short-term, long-term, episodic, semantic memory |
 | [Lecture 06](Lecture-06.md) | LangGraph — Stateful Workflows | Nodes, edges, state, checkpointing, human-in-the-loop |
-| [Lecture 07](Lecture-07.md) | Claude Agent SDK | Subagents, tool loops, streaming, computer use |
+| [Lecture 07](Lecture-07.md) | Agent SDKs and Runtime APIs | SDKs, provider adapters, MCP, handoffs, streaming, runtime policy |
 | [Lecture 08](Lecture-08.md) | Multi-Agent Systems | CrewAI, AutoGen, supervisor patterns, coordination |
 | [Lecture 09](Lecture-09.md) | RAG — Ingestion & Embeddings | Chunking, embedding models, vector stores, indexing |
 | [Lecture 10](Lecture-10.md) | RAG — Retrieval & Reranking | Hybrid search, MMR, cross-encoder reranking, evaluation |
@@ -37,9 +52,14 @@ A hands-on lecture series building from LLM fundamentals to production multi-age
 
 - Python 3.10+
 - PyTorch basics (Phase 3 Core — Neural Networks)
-- API keys: Anthropic, OpenAI (optional)
+- API keys for whichever provider examples you run
 
 ```bash
-pip install anthropic langchain langgraph langchain-anthropic \
-            chromadb sentence-transformers ragas openai
+pip install anthropic openai pydantic fastapi uvicorn \
+            langchain langgraph langchain-anthropic langchain-openai \
+            chromadb sentence-transformers ragas opentelemetry-api
 ```
+
+Install only the packages needed for the lecture you are running. For production work, pin versions in `requirements.txt` or `pyproject.toml` and review provider migration notes before upgrading SDKs.
+
+Code snippets use placeholder model IDs such as `your-agent-model-id`, `your-fast-model-id`, and `your-embedding-model-id`. Replace them with current model IDs from your provider before running the examples.

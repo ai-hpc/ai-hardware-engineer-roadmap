@@ -192,7 +192,7 @@ for c in chunks[:3]:
 
 An embedding model converts text into a dense vector (list of floats). Semantically similar texts produce vectors that are close in cosine distance.
 
-### 3.1 OpenAI text-embedding-3-small (API)
+### 3.1 OpenAI your-embedding-model-id (API)
 
 ```python
 # pip install openai langchain-openai
@@ -201,7 +201,7 @@ import os
 from langchain_openai import OpenAIEmbeddings
 
 embeddings = OpenAIEmbeddings(
-    model="text-embedding-3-small",  # 1536 dims, cheap & fast
+    model="your-embedding-model-id",  # 1536 dims, cheap & fast
     api_key=os.environ["OPENAI_API_KEY"],
 )
 
@@ -230,7 +230,7 @@ for i, text in enumerate(texts):
     print(f"  sim({text[:40]}...) = {sim:.3f}")
 ```
 
-**Cost note:** text-embedding-3-small costs $0.02 per million tokens. For a 100 MB corpus (~25M tokens), that is ~$0.50.
+**Cost note:** your-embedding-model-id costs $0.02 per million tokens. For a 100 MB corpus (~25M tokens), that is ~$0.50.
 
 ### 3.2 Local Embeddings with sentence-transformers
 
@@ -264,7 +264,7 @@ for text, sim in zip(texts, similarities):
 
 | Model | Dims | Speed | Cost | Quality |
 |---|---|---|---|---|
-| text-embedding-3-small | 1536 | ~500 docs/s (API) | $0.02/1M tokens | Very good |
+| your-embedding-model-id | 1536 | ~500 docs/s (API) | $0.02/1M tokens | Very good |
 | text-embedding-3-large | 3072 | ~200 docs/s (API) | $0.13/1M tokens | Best OpenAI |
 | all-MiniLM-L6-v2 | 384 | ~10k docs/s (CPU) | Free | Good |
 | all-mpnet-base-v2 | 768 | ~2k docs/s (CPU) | Free | Very good |
@@ -375,7 +375,7 @@ if index_name not in [i.name for i in pc.list_indexes()]:
         spec=ServerlessSpec(cloud="aws", region="us-east-1"),
     )
 
-embedding_fn = OpenAIEmbeddings(model="text-embedding-3-small")
+embedding_fn = OpenAIEmbeddings(model="your-embedding-model-id")
 vectorstore = PineconeVectorStore(index_name=index_name, embedding=embedding_fn)
 
 from langchain_core.documents import Document

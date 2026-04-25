@@ -27,7 +27,7 @@ In this lab you build a production-quality RAG system with hybrid search, cross-
      └──────────────────────────┬──────────────────┘
                                 │ top-3 reranked
      ┌──────────────────────────▼──────────────────┐
-     │   LLM Generation (gpt-4o-mini)              │
+     │   LLM Generation (your-fast-model-id)              │
      └──────────────────────────┬──────────────────┘
                                 │
      ┌──────────────────────────▼──────────────────┐
@@ -513,7 +513,7 @@ def format_context(docs: list[Document]) -> str:
 
 
 class RAGChain:
-    def __init__(self, retriever: HybridRAGRetriever, model: str = "gpt-4o-mini"):
+    def __init__(self, retriever: HybridRAGRetriever, model: str = "your-fast-model-id"):
         self.retriever = retriever
         self.model = model
 
@@ -636,8 +636,8 @@ def run_evaluation():
     print("\nRunning RAGAS evaluation (requires OpenAI API)...")
     dataset = Dataset.from_dict(results)
 
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-    embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+    llm = ChatOpenAI(model="your-fast-model-id", temperature=0)
+    embeddings = OpenAIEmbeddings(model="your-embedding-model-id")
 
     ragas_result = ragas_evaluate(
         dataset=dataset,

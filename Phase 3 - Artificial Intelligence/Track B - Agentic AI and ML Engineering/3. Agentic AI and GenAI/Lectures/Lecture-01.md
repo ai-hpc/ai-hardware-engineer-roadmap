@@ -43,26 +43,30 @@ Input tokens → [Transformer] → Logits → Sample → Output token
 Tokens ≠ words. Rule of thumb: **1 token ≈ 0.75 English words** (4 characters).
 
 ```python
+import os
 import anthropic
 
 client = anthropic.Anthropic()
 
 # Count tokens before sending
 response = client.messages.count_tokens(
-    model="claude-opus-4-6",
+    model=os.environ.get("ANTHROPIC_MODEL", "your-model-id"),
     messages=[{"role": "user", "content": "Hello, how are you?"}]
 )
 print(response.input_tokens)  # → 10
 ```
 
-**Context window limits (2025):**
+**Context windows change quickly. Think in categories instead of memorizing one snapshot:**
 
-| Model | Context | Notes |
-|-------|---------|-------|
-| Claude Opus 4.6 (1M) | 1,000,000 tokens | ~750K words — full codebases |
-| Claude Sonnet 4.6 | 200,000 tokens | Balanced speed/cost |
-| GPT-4o | 128,000 tokens | |
-| Llama 3.3 70B | 128,000 tokens | Open-weight |
+| Category | Typical use | Engineering concern |
+|----------|-------------|---------------------|
+| Small/fast chat model | routing, classification, short summaries | low latency and low cost |
+| Balanced agent model | tool use, JSON extraction, code review | reliable structure and good reasoning |
+| Long-context model | repo analysis, large documents, multi-file tasks | context cost, retrieval quality, memory pressure |
+| Local/open-weight model | edge inference, privacy, offline demos | VRAM, quantization, throughput |
+| Embedding model | RAG indexing and retrieval | vector dimension, recall, index cost |
+
+Always verify current context limits in the provider documentation before designing a production agent around a specific window size.
 
 **Why context size matters for agents:**
 - Multi-step reasoning accumulates tokens fast
@@ -74,8 +78,10 @@ print(response.input_tokens)  # → 10
 ## 3. Inference Parameters
 
 ```python
+import os
+
 response = client.messages.create(
-    model="claude-sonnet-4-6",
+    model=os.environ.get("ANTHROPIC_MODEL", "your-model-id"),
     max_tokens=1024,
     temperature=0.0,    # 0 = deterministic (good for agents/tools)
                         # 1 = creative (good for writing)
@@ -97,12 +103,13 @@ response = client.messages.create(
 ## 4. The Anatomy of an API Call
 
 ```python
+import os
 import anthropic
 
 client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
 
 response = client.messages.create(
-    model="claude-sonnet-4-6",
+    model=os.environ.get("ANTHROPIC_MODEL", "your-model-id"),
     max_tokens=2048,
     system="You are a helpful assistant.",       # system prompt
     messages=[
@@ -135,22 +142,26 @@ Not every task needs the most powerful model. Cost and latency add up in multi-s
 ```python
 # Router pattern: use fast/cheap model for simple steps
 def route_model(task_type: str) -> str:
+    fast_model = "provider-fast-model"
+    balanced_model = "provider-balanced-agent-model"
+    reasoning_model = "provider-reasoning-model"
+
     routing = {
-        "classification":   "claude-haiku-4-5-20251001",   # fast, cheap
-        "summarization":    "claude-haiku-4-5-20251001",
-        "tool_use":         "claude-sonnet-4-6",            # reliable tool use
-        "complex_reasoning":"claude-opus-4-6",              # full power
-        "coding":           "claude-sonnet-4-6",
+        "classification": fast_model,
+        "summarization": fast_model,
+        "tool_use": balanced_model,
+        "complex_reasoning": reasoning_model,
+        "coding": balanced_model,
     }
-    return routing.get(task_type, "claude-sonnet-4-6")
+    return routing.get(task_type, balanced_model)
 ```
 
-| Task | Recommended model | Why |
-|------|------------------|-----|
-| Simple Q&A, routing | Haiku | Fast + cheap |
-| Tool use, JSON extraction | Sonnet | Reliable structured output |
-| Complex reasoning, long context | Opus | Best accuracy |
-| Embeddings | `text-embedding-3-small` (OpenAI) or `all-MiniLM` | Specialized |
+| Task | Recommended model class | Why |
+|------|-------------------------|-----|
+| Simple Q&A, routing | fast model | low latency and cost |
+| Tool use, JSON extraction | balanced agent model | reliable structured output |
+| Complex reasoning, long context | reasoning or long-context model | stronger planning and larger working set |
+| Embeddings | embedding model | specialized vector representation |
 
 ---
 
@@ -159,12 +170,13 @@ def route_model(task_type: str) -> str:
 In agentic UIs, streaming dramatically improves perceived responsiveness.
 
 ```python
+import os
 import anthropic
 
 client = anthropic.Anthropic()
 
 with client.messages.stream(
-    model="claude-sonnet-4-6",
+    model=os.environ.get("ANTHROPIC_MODEL", "your-model-id"),
     max_tokens=1024,
     messages=[{"role": "user", "content": "Explain transformer attention."}]
 ) as stream:
@@ -181,23 +193,25 @@ print(f"\nTokens used: {final.usage.input_tokens} in, {final.usage.output_tokens
 ## 7. Cost Estimation
 
 ```python
-# Rough cost calculator (prices change — check provider docs)
+# Rough cost calculator.
+# Do not hardcode provider prices in production. Load this from a config file
+# maintained from the provider pricing page.
 PRICING = {
-    "claude-opus-4-6":          {"input": 15.00, "output": 75.00},   # per 1M tokens
-    "claude-sonnet-4-6":        {"input":  3.00, "output": 15.00},
-    "claude-haiku-4-5-20251001":{"input":  0.80, "output":  4.00},
+    "provider-fast-model": {"input": 0.15, "output": 0.60},       # example only, per 1M tokens
+    "provider-balanced-agent-model": {"input": 3.00, "output": 15.00},
+    "provider-reasoning-model": {"input": 15.00, "output": 75.00},
 }
 
 def estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
     p = PRICING[model]
     return (input_tokens * p["input"] + output_tokens * p["output"]) / 1_000_000
 
-# A 10-step agent loop with Sonnet
+# A 10-step agent loop with a balanced agent model
 steps = 10
 per_step_input  = 2000   # context grows each step
 per_step_output = 500
 total = sum(
-    estimate_cost("claude-sonnet-4-6", per_step_input * i, per_step_output)
+    estimate_cost("provider-balanced-agent-model", per_step_input * i, per_step_output)
     for i in range(1, steps + 1)
 )
 print(f"Estimated loop cost: ${total:.4f}")
@@ -221,7 +235,7 @@ print(f"Estimated loop cost: ${total:.4f}")
 
 1. Write a script that counts tokens for a 10-page PDF before sending it to the API.
 2. Build a simple cost logger that wraps `client.messages.create` and prints cumulative cost.
-3. Implement a model router that uses Haiku for tasks under 200 input tokens and Sonnet otherwise.
+3. Implement a model router that uses a fast model for tasks under 200 input tokens and a balanced agent model otherwise.
 
 ---
 

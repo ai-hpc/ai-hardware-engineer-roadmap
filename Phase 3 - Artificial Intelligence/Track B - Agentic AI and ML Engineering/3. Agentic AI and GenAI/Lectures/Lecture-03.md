@@ -143,7 +143,7 @@ def run_agent(user_message: str) -> str:
 
     while True:
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model="your-agent-model-id",
             max_tokens=2048,
             tools=tools,
             messages=messages
@@ -301,7 +301,7 @@ def run_agent_with_confirmation(user_message: str) -> str:
 
     while True:
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model="your-agent-model-id",
             max_tokens=2048,
             tools=all_tools,
             messages=messages
@@ -349,7 +349,7 @@ Force or restrict which tools the model uses:
 ```python
 # Force the model to use a specific tool
 response = client.messages.create(
-    model="claude-sonnet-4-6",
+    model="your-agent-model-id",
     max_tokens=512,
     tools=tools,
     tool_choice={"type": "tool", "name": "get_gpu_specs"},  # must call this

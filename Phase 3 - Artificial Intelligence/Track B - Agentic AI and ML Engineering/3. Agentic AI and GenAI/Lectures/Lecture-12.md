@@ -40,7 +40,7 @@ from openai import AsyncOpenAI
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=4096)
     session_id: str = Field(default_factory=lambda: uuid.uuid4().hex)
-    model: str = Field(default="gpt-4o-mini")
+    model: str = Field(default_factory=lambda: os.environ.get("OPENAI_MODEL", "your-model-id"))
 
 class ChatResponse(BaseModel):
     session_id: str
@@ -140,7 +140,7 @@ async def chat_stream(req: StreamRequest):
     async def token_generator() -> AsyncGenerator[dict, None]:
         try:
             stream = await state.client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=os.environ.get("OPENAI_MODEL", "your-model-id"),
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user",   "content": req.message},
@@ -269,7 +269,7 @@ async def cached_chat(message: str) -> tuple[str, bool]:
         return cached, True
 
     response = await state.client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=os.environ.get("OPENAI_MODEL", "your-model-id"),
         messages=[{"role": "user", "content": message}],
         temperature=0,
     )
@@ -285,11 +285,12 @@ async def cached_chat(message: str) -> tuple[str, bool]:
 Route cheap/simple queries to a fast model and complex queries to a more capable one.
 
 ```python
+import os
 import re
 
 # Routing rules
-FAST_MODEL   = "gpt-4o-mini"    # cheap, fast
-SMART_MODEL  = "gpt-4o"         # expensive, powerful
+FAST_MODEL = os.environ.get("OPENAI_FAST_MODEL", "provider-fast-model")
+SMART_MODEL = os.environ.get("OPENAI_SMART_MODEL", "provider-reasoning-model")
 
 COMPLEXITY_SIGNALS = [
     r"\bcompare\b", r"\bdifference\b", r"\bwhy\b", r"\bexplain\b",
@@ -428,14 +429,14 @@ async def rate_limited_chat(req: ChatRequest, x_client_id: str = Header(default=
     answer = await resilient_completion(
         state.client,
         [{"role": "user", "content": req.message}],
-        model="gpt-4o-mini",
+        model=req.model,
     )
     latency_ms = (time.perf_counter() - start) * 1000
 
     return ChatResponse(
         session_id=req.session_id,
         answer=answer,
-        model_used="gpt-4o-mini",
+        model_used=req.model,
         latency_ms=round(latency_ms, 1),
         tokens_used=0,  # usage not available without full response object
     )
@@ -472,7 +473,7 @@ async def safe_chat(req: ChatRequest):
     answer = await resilient_completion(
         state.client,
         [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": req.message}],
-        model="gpt-4o-mini",
+        model=req.model,
     )
 
     # Moderate the output as well
@@ -484,7 +485,7 @@ async def safe_chat(req: ChatRequest):
     return ChatResponse(
         session_id=req.session_id,
         answer=answer,
-        model_used="gpt-4o-mini",
+        model_used=req.model,
         latency_ms=round(latency_ms, 1),
         tokens_used=0,
     )

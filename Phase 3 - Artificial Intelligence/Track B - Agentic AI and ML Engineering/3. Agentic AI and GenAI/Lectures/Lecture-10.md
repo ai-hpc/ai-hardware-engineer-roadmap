@@ -255,7 +255,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+llm = ChatOpenAI(model="your-fast-model-id", temperature=0)
 
 expand_prompt = ChatPromptTemplate.from_messages([
     ("system", "You are a search query optimizer. Generate {n} diverse rephrasing of the user's question. Output one per line, no numbering."),
@@ -285,7 +285,7 @@ from langchain_openai import ChatOpenAI
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
+llm = ChatOpenAI(model="your-fast-model-id", temperature=0.3)
 embedder = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
 
@@ -347,7 +347,7 @@ vs.add_documents([
     Document(page_content="The H100 PCIe variant has lower bandwidth than SXM5."),
 ])
 
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+llm = ChatOpenAI(model="your-fast-model-id", temperature=0)
 base_retriever = vs.as_retriever(search_kwargs={"k": 2})
 
 multi_retriever = MultiQueryRetriever.from_llm(
@@ -391,7 +391,7 @@ from sentence_transformers.cross_encoder import CrossEncoder
 # ── Setup ─────────────────────────────────────────────────────────────────────
 embedding_fn = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 cross_encoder = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+llm = ChatOpenAI(model="your-fast-model-id", temperature=0)
 
 # Build vector store
 vs = Chroma(embedding_function=embedding_fn)
