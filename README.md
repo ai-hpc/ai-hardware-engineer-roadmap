@@ -51,9 +51,6 @@ This roadmap uses an **8-layer stack** to explain AI hardware work end to end. T
 
 ![AI Chip Stack Diagram](Assets/images/ai-chip-stack-diagram.svg)
 
-> **L1–L6:** Hands-on throughout this roadmap.
-> **L7–L8:** Included so the stack stays complete, with guided conceptual labs.
-
 ---
 
 ## Where Do I Start?
