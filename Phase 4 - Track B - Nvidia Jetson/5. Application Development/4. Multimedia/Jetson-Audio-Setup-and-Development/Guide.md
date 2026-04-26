@@ -4,7 +4,7 @@
 
 **Hub:** [Multimedia](../Guide.md)  
 **Primary official source:** [NVIDIA Jetson Linux Developer Guide - Audio Setup and Development](https://docs.nvidia.com/jetson/archives/r38.4/DeveloperGuide/SD/Communications/AudioSetupAndDevelopment.html)  
-**Related local guides:** [Application Development](../../Guide.md) · [Orin Nano GPIO / SPI / I2C / CAN](../../../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-GPIO-SPI-I2C-CAN/Guide.md)
+**Related local guides:** [Application Development](../../Guide.md) · [ESP32-LyraT I2S Microphone Capture](../ESP32-LyraT-I2S-Mic-Jetson-Orin-Nano/Guide.md) · [Orin Nano GPIO / SPI / I2C / CAN](../../../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-GPIO-SPI-I2C-CAN/Guide.md)
 
 ---
 

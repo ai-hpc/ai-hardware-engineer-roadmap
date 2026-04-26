@@ -6,6 +6,7 @@
 
 **Hub:** [5. Application Development](../Guide.md)
 **Dedicated audio deep dive:** [Jetson Audio Setup and Development](Jetson-Audio-Setup-and-Development/Guide.md)
+**Audio application:** [ESP32-LyraT I2S Microphone Capture on Jetson Orin Nano](ESP32-LyraT-I2S-Mic-Jetson-Orin-Nano/Guide.md)
 
 ---
 
@@ -300,6 +301,7 @@ cat /dev/urandom > /dev/fb0   # random noise
 - **Multi-camera viewer:** Display 2 CSI cameras side-by-side using GStreamer `nvcompositor` on HDMI output.
 - **Video recorder:** Build a GStreamer pipeline that records H.264 video from a CSI camera to NVMe with timestamp overlay, triggered by GPIO button press.
 - **Audio intercom:** Stream audio between two Jetson devices using GStreamer RTP over Ethernet.
+- **ESP32-LyraT I2S mic capture:** Use a LyraT board as an I2S microphone frontend and capture raw audio through the Jetson Orin Nano 40-pin `I2S2` path.
 - **RTSP camera server:** Serve a CSI camera feed as an RTSP stream accessible from VLC on any network device.
 
 ---
@@ -310,6 +312,7 @@ cat /dev/urandom > /dev/fb0   # random noise
 |----------|-------------|
 | **NVIDIA Multimedia API** | Jetson multimedia framework documentation (Argus, V4L2, GStreamer) |
 | [Jetson Audio Setup and Development](Jetson-Audio-Setup-and-Development/Guide.md) | Jetson-specific ALSA, ASoC, AHUB, `APE`, device tree, pinmux, codec bring-up |
+| [ESP32-LyraT I2S Microphone Capture](ESP32-LyraT-I2S-Mic-Jetson-Orin-Nano/Guide.md) | Focused Jetson 40-pin `I2S2` capture application using LyraT as an audio frontend |
 | **GStreamer documentation** (gstreamer.freedesktop.org) | Pipeline syntax, plugin reference |
 | **NVIDIA GStreamer plugins** | `nvarguscamerasrc`, `nvv4l2decoder`, `nvv4l2h264enc`, `nv3dsink` |
 | **ALSA project** (alsa-project.org) | Advanced Linux Sound Architecture documentation |

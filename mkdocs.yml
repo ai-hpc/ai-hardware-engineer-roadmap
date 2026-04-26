@@ -346,6 +346,7 @@ nav:
         - Multimedia:
           - Guide: Phase 4 - Track B - Nvidia Jetson/5. Application Development/4. Multimedia/Guide.md
           - Audio Setup & Development: Phase 4 - Track B - Nvidia Jetson/5. Application Development/4. Multimedia/Jetson-Audio-Setup-and-Development/Guide.md
+          - ESP32-LyraT I2S Mic Capture: Phase 4 - Track B - Nvidia Jetson/5. Application Development/4. Multimedia/ESP32-LyraT-I2S-Mic-Jetson-Orin-Nano/Guide.md
         - ML & AI:
           - Guide: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/Guide.md
           - Small Object Detection: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/small-object-detection-jetson/Guide.md
