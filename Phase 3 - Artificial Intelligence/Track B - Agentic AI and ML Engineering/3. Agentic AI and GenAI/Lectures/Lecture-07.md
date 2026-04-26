@@ -226,7 +226,42 @@ MCP does not remove the need for authorization. It makes the integration shape c
 
 ## 6. Handoffs and Subagents
 
-Subagents are useful when ownership is explicit. They are dangerous when they become a vague group chat.
+The most common design mistake in multi-agent systems is using one word, "agent," for three different things.
+
+| Pattern | Who owns the user conversation after delegation? | Context model | Best for |
+|---------|-----------------------------------------------|---------------|----------|
+| Agent as tool | Parent keeps ownership | Isolated, request/response only | Stateless specialist capability |
+| Subagent | Parent keeps ownership | Usually filtered or summarized context | Complex bounded sub-problem |
+| Handoff | Ownership moves to another agent/state | Shared state across turns | Multi-stage conversational flow |
+
+Plain language:
+
+- **Agent as tool** means "do this one expert function and return."
+- **Subagent** means "take this bounded mission, work on it, and come back with a result."
+- **Handoff** means "you now own the next part of the conversation."
+
+If you do not define ownership explicitly, you will create duplicate work, token bloat, or dead-end flows where no agent knows who should answer the user.
+
+### 6.1 Choosing the right pattern
+
+Use this decision table first. It prevents most over-engineered agent systems.
+
+| If the task looks like this | Use | Why |
+|-----------------------------|-----|-----|
+| "Generate SQL for this schema." | Agent as tool | Atomic, reusable, strict input/output |
+| "Research three vendors and compare them." | Subagent | Multi-step but bounded; parent should still synthesize |
+| "Collect account details, then transfer to refund specialist." | Handoff | Sequential stateful conversation with capability unlocking |
+| "Search flights, hotels, and attractions at the same time." | Parallel subagents or router | Independent work can run concurrently |
+| "Delete production resources after explicit user confirmation." | Handoff plus approval gate | Ownership and risk must be explicit |
+
+Two practical rules:
+
+1. If the specialist must talk to the user for several turns, prefer a handoff.
+2. If the parent should remain the coordinator and only needs a result back, prefer a subagent.
+
+### 6.2 Ownership is the real contract
+
+Subagents are useful when ownership is explicit. They become dangerous when they turn into a vague group chat.
 
 Good handoff contract:
 
@@ -268,7 +303,158 @@ Bad handoff contract:
 Ask another agent to think about this and see what it says.
 ```
 
-The second version has no owner, no permissions, no stopping condition, and no verifiable output.
+The bad version has no owner, no permissions, no stopping condition, and no verifiable output.
+
+### 6.3 Context capsules beat full history dumps
+
+The second major failure mode is context management. Do not dump the full conversation into every subagent call.
+
+Use a filtered context capsule instead:
+
+```python
+from dataclasses import dataclass
+
+
+@dataclass
+class ContextCapsule:
+    user_goal: str
+    relevant_facts: list[str]
+    constraints: list[str]
+    accepted_decisions: list[str]
+    allowed_tools: list[str]
+    expected_output_schema: dict
+    max_steps: int = 6
+    trace_id: str = ""
+
+
+@dataclass
+class SubagentSpec:
+    name: str
+    mission: str
+    read_only: bool = True
+    can_run_in_parallel: bool = True
+
+
+def build_capsule(task: str) -> ContextCapsule:
+    return ContextCapsule(
+        user_goal=task,
+        relevant_facts=[
+            "Board target: Jetson Orin Nano carrier",
+            "Constraint: no BOM changes this sprint",
+        ],
+        constraints=[
+            "Do not edit unrelated files",
+            "Use only read-only inspection tools",
+        ],
+        accepted_decisions=[
+            "Use UART for first RCP bring-up",
+        ],
+        allowed_tools=["read_repo", "search_datasheets"],
+        expected_output_schema={
+            "type": "object",
+            "properties": {
+                "findings": {"type": "array"},
+                "recommended_action": {"type": "string"},
+            },
+            "required": ["findings", "recommended_action"],
+        },
+    )
+```
+
+What should usually go into a capsule:
+
+- The user goal in one sentence.
+- Only the facts relevant to this specialist.
+- Non-negotiable constraints.
+- Already accepted decisions, so agents do not reopen settled issues.
+- Tool permissions.
+- Output schema and budget.
+
+What should usually stay out:
+
+- Raw full chat history.
+- Internal chain-of-thought.
+- Unrelated tool traces.
+- Every file ever touched by the parent.
+
+### 6.4 Sequential handoffs vs parallel subagents
+
+Handoffs and subagents are not interchangeable from a control-flow standpoint.
+
+| Question | Handoff | Subagent |
+|----------|---------|----------|
+| Can it own the next user turn? | Yes | No, parent usually resumes |
+| Is it naturally sequential? | Yes | Sometimes, but can often be parallel |
+| Does it need shared conversational state? | Often yes | Usually no; pass filtered context |
+| Is centralized orchestration preserved? | Less so | Yes |
+
+Use **sequential handoffs** when capabilities unlock in order:
+
+```text
+triage -> collect details -> eligibility check -> refund specialist
+```
+
+Use **parallel subagents** when work streams do not depend on each other:
+
+```text
+research agent
+security reviewer
+cost estimator
+        -> parent synthesizer
+```
+
+Parallel subagents are often cheaper than one giant generalist agent because each worker sees only the context it needs. They are a bad choice when every worker needs the same large shared conversational state and must keep talking to the user directly.
+
+### 6.5 Safety patterns that actually help
+
+Subagents are also useful as trust boundaries.
+
+Good uses:
+
+- A read-only research subagent for untrusted web content.
+- A verifier subagent that checks a planner's output before execution.
+- A red-team or policy subagent that blocks risky tool requests.
+- A financial or production-write agent that only activates after explicit approval.
+
+Bad uses:
+
+- Giving every subagent shell access "just in case."
+- Letting a reviewer subagent rewrite source files directly when it only needs to inspect.
+- Passing secrets to agents that only need summaries.
+
+The delegation boundary should narrow permissions, not widen them.
+
+### 6.6 Implementation checklist
+
+Before you add a handoff or subagent, answer these six questions:
+
+1. Who owns the next user-facing response?
+2. What exact context is being passed?
+3. Which tools are allowed?
+4. What is the stopping condition?
+5. What shape must the result have?
+6. What happens if the delegate fails or times out?
+
+If you cannot answer those, the design is not ready.
+
+### 6.7 Failure modes
+
+| Failure | What it looks like | Fix |
+|---------|--------------------|-----|
+| Ownership gap | Both agents wait for each other or both answer the user | Define a single response owner per step |
+| Context bloat | Every subagent gets the full transcript | Pass a capsule or summary, not raw history |
+| Handoff without closure | Tool call happens but history is malformed | Record the handoff pair or equivalent transition artifact |
+| Over-spawning | Five agents created for a simple lookup | Start with a tool or a single agent |
+| Hidden side effects | Delegate both routes and mutates data | Separate routing tools from write tools |
+| Verification gap | Planner output executes without review | Add a reviewer or approval gate before action |
+
+### 6.8 Design rule
+
+Use the smallest delegation mechanism that preserves correctness:
+
+- Start with a tool.
+- Move to a subagent when the work is multi-step or domain-specialized.
+- Move to a handoff when conversational ownership must change across turns.
 
 ---
 
@@ -379,6 +565,9 @@ For hardware engineers, this is why agent workloads are not the same as one-shot
 - [OpenAI API Agents guide](https://platform.openai.com/docs/guides/agents)
 - [Model Context Protocol specification](https://modelcontextprotocol.io/specification/2025-11-25)
 - [LangGraph overview](https://docs.langchain.com/oss/python/langgraph/overview)
+- [LangChain handoffs documentation](https://docs.langchain.com/oss/python/langchain/multi-agent/handoffs)
+- [LangChain multi-agent architecture guide](https://www.langchain.com/blog/choosing-the-right-multi-agent-architecture)
+- [Google Cloud ADK: sub-agents versus agents as tools](https://cloud.google.com/blog/topics/developers-practitioners/where-to-use-sub-agents-versus-agents-as-tools)
 - [OWASP Top 10 for LLM Applications](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
 - [NIST AI RMF Generative AI Profile](https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-generative-artificial-intelligence)
 
