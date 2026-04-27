@@ -193,6 +193,32 @@ amixer -c APE controls | grep -E 'I2S2|ADMAIF'
 
 If `APE` does not exist, stop and fix the Jetson audio stack before wiring external hardware.
 
+### How to read a healthy JetPack 6 / R36 baseline
+
+If your Jetson shows output like this:
+
+- `card 1: APE [NVIDIA Jetson Orin Nano APE]`
+- capture and playback devices for `ADMAIF1` through `ADMAIF20`
+- mixer controls such as `I2S2 Mux`, `I2S2 codec frame mode`, `I2S2 codec master mode`, and `ADMAIF1 Mux`
+
+that is a good sign.
+
+It means:
+
+- the `APE` sound card is present
+- the AHUB / ADMAIF fabric is registered
+- the `I2S2` driver is exposed to ALSA
+- `hw:APE,0` maps to `ADMAIF1`, which is the first practical external capture endpoint
+
+It does **not** mean the external header capture path is already working.
+
+You still need:
+
+- `I2S2` enabled on the 40-pin header
+- the correct master/slave clock relationship
+- the correct route from `I2S2` into `ADMAIF1`
+- actual `BCLK`, `LRCK`, and data on the wires
+
 ### Enable 40-pin I2S2 pinmux
 
 Use Jetson-IO if your image supports it:
@@ -264,6 +290,16 @@ If `LRCK` or `SCLK` is not present, Jetson cannot capture anything.
 Once the LyraT is generating clocks and ADC data, route Jetson capture:
 
 ```bash
+amixer -c APE cset name="I2S2 Loopback" "off"
+amixer -c APE cset name="I2S2 codec frame mode" "i2s"
+amixer -c APE cset name="I2S2 codec master mode" "cbm-cfm"
+amixer -c APE cset name="I2S2 Sample Rate" "48000"
+amixer -c APE cset name="I2S2 Capture Audio Channels" "2"
+amixer -c APE cset name="I2S2 Client Channels" "2"
+amixer -c APE cset name="I2S2 Capture Audio Bit Format" "16"
+amixer -c APE cset name="I2S2 Client Bit Format" "16"
+amixer -c APE cset name="ADMAIF1 Capture Audio Channels" "2"
+amixer -c APE cset name="ADMAIF1 Capture Client Channels" "2"
 amixer -c APE cset name="ADMAIF1 Mux" "I2S2"
 ```
 
@@ -284,6 +320,27 @@ If playback is silent, inspect signal level:
 
 ```bash
 sox lyrat-i2s-capture.wav -n stat
+```
+
+Why these settings matter:
+
+- `I2S2 codec frame mode = i2s` matches the normal LyraT `ES8388` I2S framing
+- `I2S2 codec master mode = cbm-cfm` means the external board is clock master and Jetson is the slave
+- `ADMAIF1 Mux = I2S2` routes external `I2S2` receive data into `hw:APE,0`
+- the channel and bit-format settings keep the I2S CIF side and ADMAIF side aligned
+
+If your LyraT firmware sends 32-bit slots with 16-bit valid microphone samples, try this second variant:
+
+```bash
+amixer -c APE cset name="I2S2 Capture Audio Bit Format" "32"
+amixer -c APE cset name="I2S2 Client Bit Format" "32"
+arecord -D hw:APE,0 -r 48000 -c 2 -f S32_LE lyrat-i2s-capture-32.wav
+```
+
+If you intentionally redesign the test so Jetson drives `BCLK` and `LRCK`, reverse the clock-role assumption and change:
+
+```bash
+amixer -c APE cset name="I2S2 codec master mode" "cbs-cfs"
 ```
 
 Useful quick checks:
