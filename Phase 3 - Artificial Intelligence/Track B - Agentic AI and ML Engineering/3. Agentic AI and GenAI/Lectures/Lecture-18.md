@@ -422,4 +422,4 @@ The value of this exercise is that it forces you to think like an operator, not 
 
 ---
 
-*Next: [Lecture 19 - OpenClaw Case Study: Cron, Scheduled Agent Runs, and Automation Reliability](Lecture-19.md)*
+*Next: [Lecture 19 - OpenClaw Case Study: The Agent Loop](Lecture-19.md)*
