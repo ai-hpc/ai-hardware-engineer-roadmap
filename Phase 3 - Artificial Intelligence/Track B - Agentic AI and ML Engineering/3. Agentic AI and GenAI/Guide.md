@@ -12,7 +12,7 @@
 
 ## Lecture Series
 
-18 lectures + 3 hands-on labs covering everything from LLM fundamentals to production multi-agent systems. **[→ Start here](Lectures/README.md)**
+19 lectures + 3 hands-on labs covering everything from LLM fundamentals to production multi-agent systems. **[→ Start here](Lectures/README.md)**
 
 **Course currency note:** exact model names, context windows, SDK features, and pricing change quickly. This module teaches stable interfaces and system patterns: model APIs, tool protocols, runtime loops, workflow graphs, gateways, telemetry, and policy boundaries. Always check provider documentation before copying model IDs or prices into a real deployment.
 
@@ -30,6 +30,7 @@
 |  |  | [16](Lectures/Lecture-16.md) | Routing and Sessions |
 |  |  | [17](Lectures/Lecture-17.md) | Isolation and Memory |
 |  |  | [18](Lectures/Lecture-18.md) | Operations and Security |
+|  |  | [19](Lectures/Lecture-19.md) | Cron and Scheduled Agent Runs |
 
 **Labs:** [Lab 01 — Research Agent](Lectures/Lab-01-Research-Agent.md) · [Lab 02 — Multi-Agent Pipeline](Lectures/Lab-02-Multi-Agent-Pipeline.md) · [Lab 03 — Production RAG](Lectures/Lab-03-Production-RAG.md)
 
@@ -238,6 +239,7 @@ For this roadmap, the important takeaway is that **Track B should teach the work
 * **Runtime discipline:** live telemetry, tool-call policy gates, least-privilege agent identities, audit trails, and runtime incident response
 * **Deterministic startup:** startup contracts, readiness checks, prompt/tool/policy versioning, memory hydration, and reproducible agent boot
 * **Agent control planes:** gateways, sessions, routing, and multi-surface delivery
+* **Scheduled agent execution:** cron jobs, isolated run sessions, delivery fallback, failure routing, retries, run logs, and retention
 * **OpenClaw-style agent development:** multi-agent isolation, workspace design, pairing, and operations for persistent local-first assistants
 
 **Projects:**

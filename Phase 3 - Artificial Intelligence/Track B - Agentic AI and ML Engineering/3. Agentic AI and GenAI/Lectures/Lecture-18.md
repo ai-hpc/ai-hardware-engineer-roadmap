@@ -1,6 +1,6 @@
 # Lecture 18 - OpenClaw Case Study: Operating and Securing a Persistent Agent System
 
-**Track B - Agentic AI & GenAI** | [<- Lecture 17](Lecture-17.md) | [Next -> Lab 01](Lab-01-Research-Agent.md)
+**Track B - Agentic AI & GenAI** | [<- Lecture 17](Lecture-17.md) | [Next -> Lecture 19](Lecture-19.md)
 
 ---
 
@@ -422,4 +422,4 @@ The value of this exercise is that it forces you to think like an operator, not 
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 19 - OpenClaw Case Study: Cron, Scheduled Agent Runs, and Automation Reliability](Lecture-19.md)*

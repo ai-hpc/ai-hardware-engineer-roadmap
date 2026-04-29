@@ -15,7 +15,7 @@ The durable concepts in this course are:
 - **Product control plane:** gateways, channels, sessions, routing, identities, and audit logs.
 - **Runtime security:** least privilege, policy gates, telemetry, incident response, and evidence.
 
-Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-18 focus on production discipline and OpenClaw-style gateway systems.
+Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-19 focus on production discipline and OpenClaw-style gateway systems.
 
 ## Lecture Index
 
@@ -39,6 +39,7 @@ Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, a
 | [Lecture 16](Lecture-16.md) | OpenClaw Case Study - Routing and Sessions | Channel routing, session keys, DM isolation, reply determinism |
 | [Lecture 17](Lecture-17.md) | OpenClaw Case Study - Multi-Agent Isolation | Workspaces, state, sessions, memory boundaries |
 | [Lecture 18](Lecture-18.md) | OpenClaw Case Study - Operations and Security | Pairing, supervision, sandbox, tool policy, remote access |
+| [Lecture 19](Lecture-19.md) | OpenClaw Case Study - Cron and Scheduled Agent Runs | Cron expressions, isolated jobs, delivery, retries, logs, validation |
 
 ## Lab Index
 
