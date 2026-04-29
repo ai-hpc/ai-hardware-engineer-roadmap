@@ -1,6 +1,6 @@
 # Lecture 20 - OpenClaw Case Study: Cron, Scheduled Agent Runs, and Automation Reliability
 
-**Track B - Agentic AI & GenAI** | [<- Lecture 19](Lecture-19.md) | [Next -> Lab 01](Lab-01-Research-Agent.md)
+**Track B - Agentic AI & GenAI** | [<- Lecture 19](Lecture-19.md) | [Next -> Lecture 21](Lecture-21.md)
 
 ---
 
@@ -713,4 +713,4 @@ That is the professional version of "add a cron job."
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 21 - OpenClaw Case Study: System Prompt Architecture](Lecture-21.md)*
