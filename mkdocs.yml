@@ -420,6 +420,7 @@ nav:
             - 06 Debugging: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/06-Debugging.md
             - 07 Trillion-Parameter Scale: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/07-Trillion-Parameter-Scale.md
       - AMD GPU: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/AMD GPU/Guide.md
+      - Distributed AI Interconnects: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Distributed AI Interconnects/Guide.md
       - Accelerator Platform Evaluation: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Accelerator Platform Evaluation/Guide.md
     - "B: HPC (CUDA-X)":
       - Guide: Phase 5 - Advanced Topics and Specialization/2. High Performance Computing/Guide.md
