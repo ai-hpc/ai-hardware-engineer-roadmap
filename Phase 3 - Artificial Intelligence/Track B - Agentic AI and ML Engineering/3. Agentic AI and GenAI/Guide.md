@@ -33,7 +33,7 @@
 |  |  | [19](Lectures/Lecture-19.md) | Agent Loop |
 |  |  | [20](Lectures/Lecture-20.md) | Cron and Scheduled Agent Runs |
 |  |  | [21](Lectures/Lecture-21.md) | System Prompt Architecture |
-|  |  | [22](Lectures/Lecture-22.md) | SDK Dogfooding and RPC Contracts |
+|  |  | [22](Lectures/Lecture-22.md) | App SDK and Typed RPCs |
 
 **Labs:** [Lab 01 — Research Agent](Lectures/Lab-01-Research-Agent.md) · [Lab 02 — Multi-Agent Pipeline](Lectures/Lab-02-Multi-Agent-Pipeline.md) · [Lab 03 — Production RAG](Lectures/Lab-03-Production-RAG.md)
 

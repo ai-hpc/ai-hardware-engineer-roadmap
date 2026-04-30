@@ -821,4 +821,4 @@ If you cannot answer these, your agent system is not yet operationally mature.
 
 ---
 
-*Next: [Lecture 22 - OpenClaw Case Study: SDK Dogfooding and Gateway RPC Contracts](Lecture-22.md)*
+*Next: [Lecture 22 - OpenClaw Case Study: App SDK Dogfooding and Typed Gateway RPCs](Lecture-22.md)*

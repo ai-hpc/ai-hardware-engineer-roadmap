@@ -42,7 +42,7 @@ Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, a
 | [Lecture 19](Lecture-19.md) | OpenClaw Case Study - The Agent Loop | Intake, queues, locks, streaming, tools, hooks, persistence |
 | [Lecture 20](Lecture-20.md) | OpenClaw Case Study - Cron and Scheduled Agent Runs | Cron expressions, isolated jobs, delivery, retries, logs, validation |
 | [Lecture 21](Lecture-21.md) | OpenClaw Case Study - System Prompt Architecture | Prompt ownership, bootstrap context, skills, prompt modes, provider overlays |
-| [Lecture 22](Lecture-22.md) | OpenClaw Case Study - SDK Dogfooding and Gateway RPC Contracts | SDK happy path, event normalization, cancellation, artifacts, tool invoke |
+| [Lecture 22](Lecture-22.md) | OpenClaw Case Study - App SDK Dogfooding and Typed Gateway RPCs | App SDK, happy path, event normalization, future RPC surfaces |
 
 ## Lab Index
 
