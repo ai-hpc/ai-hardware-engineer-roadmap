@@ -1438,4 +1438,4 @@ SDK owns the typed contract between them.
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 23 - OpenClaw Case Study: Gateway RPC Protocol](Lecture-23.md)*
