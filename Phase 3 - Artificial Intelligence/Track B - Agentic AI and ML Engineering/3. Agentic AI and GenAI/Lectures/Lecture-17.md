@@ -1,6 +1,6 @@
 # Lecture 17 - OpenClaw Case Study: Multi-Agent Isolation, Workspaces, and Memory
 
-**Track B - Agentic AI & GenAI** | [<- Lecture 16](Lecture-16.md) | [Next -> Lecture 18](Lecture-18.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 16](Lecture-16.md) | **Next:** [Lecture 18](Lecture-18.md)
 
 ---
 

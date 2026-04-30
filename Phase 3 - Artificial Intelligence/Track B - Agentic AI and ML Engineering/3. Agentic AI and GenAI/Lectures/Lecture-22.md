@@ -1,6 +1,6 @@
 # Lecture 22 - OpenClaw Case Study: App SDK Dogfooding and Typed Gateway RPCs
 
-**Track B - Agentic AI & GenAI** | [<- Lecture 21](Lecture-21.md) | [Next -> Lab 01](Lab-01-Research-Agent.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 21](Lecture-21.md) | **Next:** [Lab 01](Lab-01-Research-Agent.md)
 
 ---
 

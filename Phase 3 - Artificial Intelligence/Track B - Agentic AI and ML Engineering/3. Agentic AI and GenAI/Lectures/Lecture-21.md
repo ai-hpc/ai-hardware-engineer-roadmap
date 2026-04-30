@@ -1,6 +1,6 @@
 # Lecture 21 - OpenClaw Case Study: System Prompt Architecture
 
-**Track B - Agentic AI & GenAI** | [<- Lecture 20](Lecture-20.md) | [Next -> Lecture 22](Lecture-22.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 20](Lecture-20.md) | **Next:** [Lecture 22](Lecture-22.md)
 
 ---
 

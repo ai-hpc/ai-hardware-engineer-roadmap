@@ -1,6 +1,6 @@
 # Lecture 15 - OpenClaw Case Study: Why Real Agents Need a Gateway
 
-**Track B - Agentic AI & GenAI** | [<- Lecture 14](Lecture-14.md) | [Next -> Lecture 16](Lecture-16.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 14](Lecture-14.md) | **Next:** [Lecture 16](Lecture-16.md)
 
 ---
 

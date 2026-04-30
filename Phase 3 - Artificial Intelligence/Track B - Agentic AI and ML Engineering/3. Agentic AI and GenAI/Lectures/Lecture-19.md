@@ -1,6 +1,6 @@
 # Lecture 19 - OpenClaw Case Study: The Agent Loop
 
-**Track B - Agentic AI & GenAI** | [<- Lecture 18](Lecture-18.md) | [Next -> Lecture 20](Lecture-20.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 18](Lecture-18.md) | **Next:** [Lecture 20](Lecture-20.md)
 
 ---
 

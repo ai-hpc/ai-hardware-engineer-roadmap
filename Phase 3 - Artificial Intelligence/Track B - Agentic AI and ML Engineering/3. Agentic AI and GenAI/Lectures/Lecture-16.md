@@ -1,6 +1,6 @@
 # Lecture 16 - OpenClaw Case Study: Channels, Routing, and Session Design
 
-**Track B - Agentic AI & GenAI** | [<- Lecture 15](Lecture-15.md) | [Next -> Lecture 17](Lecture-17.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 15](Lecture-15.md) | **Next:** [Lecture 17](Lecture-17.md)
 
 ---
 

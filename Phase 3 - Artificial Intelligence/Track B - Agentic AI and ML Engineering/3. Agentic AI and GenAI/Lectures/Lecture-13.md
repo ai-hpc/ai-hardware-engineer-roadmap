@@ -1,6 +1,6 @@
 # Lecture 13 - Runtime Discipline and AI Runtime Security
 
-**Track B - Agentic AI & GenAI** | [<- Lecture 12](Lecture-12.md) | [Next -> Lecture 14](Lecture-14.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 12](Lecture-12.md) | **Next:** [Lecture 14](Lecture-14.md)
 
 ---
 

@@ -1,6 +1,6 @@
 # Lecture 14 - Deterministic Startup for AI Agent Systems
 
-**Track B - Agentic AI & GenAI** | [<- Lecture 13](Lecture-13.md) | [Next -> Lecture 15](Lecture-15.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 13](Lecture-13.md) | **Next:** [Lecture 15](Lecture-15.md)
 
 ---
 

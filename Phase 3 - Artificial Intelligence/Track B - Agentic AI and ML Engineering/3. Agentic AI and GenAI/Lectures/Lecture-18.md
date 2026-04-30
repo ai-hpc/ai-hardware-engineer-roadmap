@@ -1,6 +1,6 @@
 # Lecture 18 - OpenClaw Case Study: Operating and Securing a Persistent Agent System
 
-**Track B - Agentic AI & GenAI** | [<- Lecture 17](Lecture-17.md) | [Next -> Lecture 19](Lecture-19.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 17](Lecture-17.md) | **Next:** [Lecture 19](Lecture-19.md)
 
 ---
 

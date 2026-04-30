@@ -1,6 +1,6 @@
 # Lecture 20 - OpenClaw Case Study: Cron, Scheduled Agent Runs, and Automation Reliability
 
-**Track B - Agentic AI & GenAI** | [<- Lecture 19](Lecture-19.md) | [Next -> Lecture 21](Lecture-21.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 19](Lecture-19.md) | **Next:** [Lecture 21](Lecture-21.md)
 
 ---
 
