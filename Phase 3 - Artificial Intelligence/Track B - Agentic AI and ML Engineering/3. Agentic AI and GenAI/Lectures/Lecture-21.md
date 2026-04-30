@@ -1,6 +1,6 @@
 # Lecture 21 - OpenClaw Case Study: System Prompt Architecture
 
-**Track B - Agentic AI & GenAI** | [<- Lecture 20](Lecture-20.md) | [Next -> Lab 01](Lab-01-Research-Agent.md)
+**Track B - Agentic AI & GenAI** | [<- Lecture 20](Lecture-20.md) | [Next -> Lecture 22](Lecture-22.md)
 
 ---
 
@@ -821,4 +821,4 @@ If you cannot answer these, your agent system is not yet operationally mature.
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 22 - OpenClaw Case Study: SDK Dogfooding and Gateway RPC Contracts](Lecture-22.md)*
