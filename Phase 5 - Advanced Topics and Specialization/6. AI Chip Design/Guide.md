@@ -77,6 +77,7 @@
 * **ASIC and Tape-Out (Advanced):**
     * **Physical Design:** Overview of place-and-route, timing closure, and power analysis for AI chips.
     * **Industry and Startups:** Study commercial AI chips (Nvidia, AMD, Cerebras, Groq, etc.) and startup approaches.
+    * **RISC-V AI Platforms:** Study RISC-V as an AI-chip design point, including vector AI CPUs, CPU+NPU SoCs, RISC-V control cores inside accelerators, and market positioning. See the focused course: [RISC-V Based AI Chip Design and Market Analysis](RISC-V-AI-Chip-Design-and-Market/Guide.md).
 
 **Resources:**
 
@@ -159,6 +160,7 @@
     * **Commercial AI Chip Analysis:**  Study the architectures of commercial AI chips—Nvidia H100 (SXM5), AMD MI300X (CDNA3), Google TPUv4, Cerebras WSE-3, Groq TSP, Graphcore IPU, and SambaNova RDU. Compare performance, memory bandwidth, precision support, and total cost of ownership.
     * **Inference vs. Training Chips:**  Understand the different design points for training (high-precision, large memory, flexible) vs. inference (low-latency, low-power, quantized, fixed function) accelerators.
     * **Edge AI Chips:**  Study edge inference chips—Apple Neural Engine, Qualcomm Hexagon DSP, Hailo-8, Kendryte K210—and their design trade-offs for power-constrained embedded deployment.
+    * **RISC-V AI Market:**  Analyze where RISC-V can win first—industrial edge, robotics, AI sensors, automotive controllers, and developer platforms—and where CUDA, Arm, and x86 ecosystems remain stronger.
 
 * **Chiplets and Advanced Packaging:**
     * **Chiplet Architecture:**  Understand chiplet-based design where a large chip is disaggregated into smaller dies connected via high-bandwidth die-to-die interconnects (UCIe, BoW, AIB, HBI).
@@ -175,10 +177,12 @@
 * **Chip Architects Podcast and SemiAnalysis:**  Industry analysis of AI chip architectures, competitive landscape, and technology trends.
 * **Hot Chips and ISSCC Conference Proceedings:**  Annual conferences where leading companies present AI chip architectures—primary source for understanding state-of-the-art designs.
 * **"Demystifying AI Chipmakers" (Various analyst reports):**  Business and technology landscape of AI chip startups and incumbents.
+* **RISC-V AI Chip Design and Market Course:**  [Focused course](RISC-V-AI-Chip-Design-and-Market/Guide.md) on SpacemiT, RISC-V vector AI, software enablement, and edge AI market fit.
 
 **Projects:**
 
 * **AI Chip Architecture Comparison:**  Perform a systematic comparison of three AI chips (e.g., H100, MI300X, TPUv4) across performance, memory bandwidth, precision, and TCO for LLM training. Present findings as a technical report.
+* **RISC-V AI Platform Review:**  Review a RISC-V AI chip such as SpacemiT K3, Tenstorrent, SiFive Intelligence, MIPS S8200, Semidynamics Cervell, or Andes vector AI cores. Analyze architecture, software stack, workload fit, market position, and adoption risk.
 * **Chiplet Design Study:**  Design a simple chiplet system with a compute die and an HBM-equivalent memory die. Model die-to-die bandwidth, latency, and power using UCIe specifications.
 * **Research Proposal:**  Write a 2-page research proposal for a novel AI accelerator architecture targeting a specific gap (e.g., long-context transformer inference, sparse GNN acceleration). Include workload analysis, proposed architecture, and expected benefits.
 
