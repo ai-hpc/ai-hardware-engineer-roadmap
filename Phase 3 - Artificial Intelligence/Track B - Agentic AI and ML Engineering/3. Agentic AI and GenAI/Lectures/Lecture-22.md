@@ -36,7 +36,9 @@ By the end of this lecture, you should be able to:
 5. Understand what the current SDK supports today versus what remains explicit future surface.
 6. Design a narrow typed RPC surface without mixing unrelated responsibilities.
 7. Explain how dogfooding with a real app stabilizes SDK contracts.
-8. Build a testing strategy around normalized events, waits, cancellation, and unsupported feature errors.
+8. Explain how nodes expose remote device and media capabilities without becoming gateways.
+9. Separate authoritative runtime state from deterministic presentation metadata.
+10. Build a testing strategy around normalized events, waits, cancellation, and unsupported feature errors.
 
 ---
 
@@ -622,6 +624,317 @@ Discovery is safer than control.
 
 The app can show users where work can run without being allowed to create or destroy environments.
 
+### Device model database as UI metadata
+
+A concrete companion-app example is the OpenClaw macOS device model database.
+
+In the Instances UI, raw Apple model identifiers such as:
+
+```text
+iPad16,6
+Mac16,6
+```
+
+are not friendly for users.
+
+The macOS app maps them to human-readable Apple device names using vendored JSON files under:
+
+```text
+apps/macos/Sources/OpenClaw/Resources/DeviceModels/
+```
+
+This is not a new runtime authority.
+
+It is app-side reference metadata.
+
+That distinction matters:
+
+```text
+Stable device identity:
+  model identifier, node id, instance id, capability fields
+
+Friendly UI label:
+  "iPad Pro ..." or "MacBook Pro ..."
+```
+
+Do not use friendly names for auth, policy, routing, or compatibility decisions.
+
+Use them for display.
+
+OpenClaw vendors this mapping from the MIT-licensed `kyle-seongwoo-jun/apple-device-identifiers` repository and pins the JSON files to specific upstream commits. The pinned commit hashes are recorded in:
+
+```text
+apps/macos/Sources/OpenClaw/Resources/DeviceModels/NOTICE.md
+```
+
+The build lesson is important:
+
+> deterministic apps should pin external metadata, vendor the license, and keep a clear update procedure
+
+A safe update flow is:
+
+```bash
+IOS_COMMIT="<commit sha for ios-device-identifiers.json>"
+MAC_COMMIT="<commit sha for mac-device-identifiers.json>"
+
+curl -fsSL "https://raw.githubusercontent.com/kyle-seongwoo-jun/apple-device-identifiers/${IOS_COMMIT}/ios-device-identifiers.json" \
+  -o apps/macos/Sources/OpenClaw/Resources/DeviceModels/ios-device-identifiers.json
+
+curl -fsSL "https://raw.githubusercontent.com/kyle-seongwoo-jun/apple-device-identifiers/${MAC_COMMIT}/mac-device-identifiers.json" \
+  -o apps/macos/Sources/OpenClaw/Resources/DeviceModels/mac-device-identifiers.json
+
+swift build --package-path apps/macos
+```
+
+Also verify that:
+
+- `NOTICE.md` records the exact pinned commits
+- `LICENSE.apple-device-identifiers.txt` still matches upstream
+- unknown model identifiers fall back to the raw identifier instead of breaking the UI
+- the UI treats this database as optional presentation data
+
+This is the same platform discipline as typed RPCs:
+
+```text
+runtime state should be authoritative
+presentation metadata should be deterministic, pinned, licensed, and replaceable
+```
+
+### Nodes and media as remote peripherals
+
+Nodes are companion devices connected to the Gateway WebSocket with:
+
+```json
+{ "role": "node" }
+```
+
+Examples:
+
+- macOS menubar app running in node mode
+- iOS companion device
+- Android companion device
+- headless node host on Linux, macOS, or Windows
+
+Legacy TCP JSONL bridge transport may still exist historically, but the current mental model is WebSocket node connection through the Gateway protocol.
+
+The key rule:
+
+> nodes are peripherals, not gateways
+
+They do not run the Gateway service.
+
+Messages from Telegram, WhatsApp, WebChat, or other channels still land on the Gateway. The Gateway owns the model, session routing, tool calls, and policy. Nodes expose device-local capabilities that the Gateway can invoke.
+
+macOS can run as a node through the menubar app. In that mode it exposes local canvas and camera commands for that Mac. In remote gateway mode, browser automation should be handled by the CLI node host or installed node service, not by assuming the native app node owns all remote automation.
+
+The raw invocation shape is:
+
+```text
+node.invoke
+```
+
+A node can declare command families such as:
+
+```text
+canvas.*
+camera.*
+screen.*
+location.*
+device.*
+notifications.*
+system.*
+```
+
+Practical examples:
+
+```bash
+openclaw nodes status
+openclaw nodes describe --node <idOrNameOrIp>
+openclaw nodes invoke --node <idOrNameOrIp> --command canvas.eval --params '{"javaScript":"location.href"}'
+```
+
+Higher-level helpers exist for common media workflows:
+
+```bash
+openclaw nodes canvas snapshot --node <idOrNameOrIp> --format png
+openclaw nodes camera list --node <idOrNameOrIp>
+openclaw nodes camera snap --node <idOrNameOrIp> --facing front
+openclaw nodes screen record --node <idOrNameOrIp> --duration 10s --fps 10
+openclaw nodes location get --node <idOrNameOrIp>
+```
+
+The app-facing lesson:
+
+```text
+Do not make the agent pretend the camera, screen, or canvas is local.
+Represent them as node capabilities behind Gateway-mediated commands.
+```
+
+#### Pairing and durable node identity
+
+WebSocket nodes use device pairing.
+
+The node presents a device identity during connect. The Gateway creates a pairing request for `role: node`. An operator approves or rejects that request:
+
+```bash
+openclaw devices list
+openclaw devices approve <requestId>
+openclaw devices reject <requestId>
+openclaw nodes status
+```
+
+This approval is the durable role contract.
+
+Token rotation must stay inside that contract. A rotated token should not silently upgrade a node into a different role or broader command surface.
+
+If a node reconnects with changed auth details, scopes, public key, or command declarations, treat the old pending request as stale and approve the current request.
+
+That avoids this unsafe state:
+
+```text
+operator approved old capability set
+node later exposes broader capability set
+gateway accidentally trusts it
+```
+
+Avoid a common pairing confusion:
+
+```text
+device pairing:
+  gates the WebSocket node role and approved role contract
+
+gateway-owned node pairing store:
+  supports older nodes pending/approve/reject/remove/rename flows
+  does not gate the WebSocket connect handshake
+```
+
+#### Node command policy
+
+A node command should pass two gates before invocation:
+
+```text
+1. The node declared the command at connect time.
+2. Gateway policy allows that declared command.
+```
+
+This matters for privacy-heavy capabilities.
+
+Safe or low-risk commands may be allowed by default on known platforms:
+
+```text
+canvas.*
+camera.list
+location.get
+screen.snapshot
+```
+
+More sensitive commands should require explicit opt-in:
+
+```text
+camera.snap
+camera.clip
+screen.record
+sms.send
+system.run
+system.which
+```
+
+The conservative rule:
+
+> unknown node platform means conservative allowlist
+
+If the Gateway cannot recognize the node platform or device family, it should not assume that `system.run` or other powerful commands are safe.
+
+#### Remote node host and `system.run`
+
+The headless node host is the pattern for remote execution.
+
+Use it when:
+
+```text
+Gateway host:
+  receives messages, runs the model, routes tool calls
+
+Node host:
+  executes selected system commands on another machine
+```
+
+Start a node host:
+
+```bash
+openclaw node run --host <gateway-host> --port 18789 --display-name "Build Node"
+```
+
+If the Gateway is bound to loopback, connect through an SSH tunnel:
+
+```bash
+ssh -N -L 18790:127.0.0.1:18789 user@gateway-host
+
+export OPENCLAW_GATEWAY_TOKEN="<gateway-token>"
+openclaw node run --host 127.0.0.1 --port 18790 --display-name "Build Node"
+```
+
+Then bind exec to the node:
+
+```bash
+openclaw config set tools.exec.host node
+openclaw config set tools.exec.security allowlist
+openclaw config set tools.exec.node "<id-or-name>"
+```
+
+Exec approvals live on the node host:
+
+```text
+~/.openclaw/exec-approvals.json
+```
+
+That is intentional. The machine executing the command enforces the local approval and allowlist state.
+
+The important security boundary:
+
+```text
+shell execution should go through the exec path
+explicit device commands should go through node.invoke
+```
+
+That separation keeps approvals, allowlists, and audit behavior understandable.
+
+For approval-backed node execution, bind the exact prepared command context. After approval, the Gateway should forward the stored plan, not a later caller-edited command, working directory, or session field.
+
+#### Media payload design
+
+Media commands often return large payloads:
+
+- canvas screenshots
+- camera photos
+- camera clips
+- screen recordings
+- latest photos from a device
+
+Do not force every app to parse base64 from transcript text.
+
+A better app architecture is:
+
+```text
+node media command
+  -> Gateway result
+  -> artifact record or MEDIA attachment
+  -> SDK event
+  -> app renderer
+```
+
+This connects directly to the artifact API discussion:
+
+```text
+node commands produce media
+artifact APIs make media discoverable and downloadable
+SDK events tell the UI what changed
+```
+
+For app developers, the rule is simple:
+
+> display media through structured attachments or artifacts, not transcript scraping
+
 ---
 
 ## 17. Controlled tool invocation
@@ -849,6 +1162,10 @@ Test these paths:
 - unsupported `oc.environments.*`
 - unsupported `oc.tasks.*`
 - unsupported `oc.tools.invoke`
+- device model lookup fallback for unknown Apple model identifiers
+- node pairing approval and stale request replacement
+- declared node command allowed versus denied by Gateway policy
+- node media event creates a structured attachment or artifact
 
 The goal is not just correctness.
 
@@ -872,6 +1189,8 @@ For external apps:
 - do not parse transcripts to find files once artifact APIs exist
 - do not assume direct tool invocation is available
 - do not mix App SDK and Plugin SDK assumptions
+- treat nodes as remote peripherals, not as alternate gateways
+- render node media through structured attachments or artifacts, not transcript parsing
 
 For SDK implementers:
 
@@ -881,6 +1200,7 @@ For SDK implementers:
 - keep auth and scope checks server-side
 - normalize events before exposing them
 - make cancellation semantics deterministic
+- keep node command policy server-side and fail closed for unknown platforms
 - add fixtures before expanding surface area
 
 ---
@@ -915,6 +1235,179 @@ Answer:
 
 ---
 
+## 26. Five apps that could use the App SDK
+
+The App SDK is useful when an application wants OpenClaw's agent runtime without embedding OpenClaw itself.
+
+Here are five realistic app patterns.
+
+### 1. Personal desktop control center
+
+A macOS, Windows, or Linux desktop app that lets a user manage agents, sessions, models, approvals, nodes, screenshots, and long-running work.
+
+Core user flow:
+
+```text
+open app
+  -> connect to Gateway
+  -> list agents and sessions
+  -> start a run
+  -> stream assistant and tool events
+  -> approve or reject risky actions
+  -> show artifacts and node media
+```
+
+SDK surfaces:
+
+- `oc.agents`
+- `oc.sessions`
+- `oc.runs`
+- `oc.models`
+- `oc.approvals`
+- future `oc.artifacts`
+- feature-detected node/media events
+
+Why it fits:
+
+```text
+The app is a remote operator UI. It should not run the agent loop locally.
+```
+
+### 2. AI lab dashboard for experiments
+
+A web dashboard for comparing prompts, models, agents, and tool behavior across repeated runs.
+
+Core user flow:
+
+```text
+select agent + model
+  -> run experiment batch
+  -> stream outputs
+  -> collect artifacts/logs
+  -> compare final results
+  -> export report
+```
+
+SDK surfaces:
+
+- `oc.agents`
+- `oc.models`
+- `oc.runs`
+- `Run.events()`
+- `Run.wait()`
+- future `oc.tasks`
+- future `oc.artifacts`
+
+Why it fits:
+
+```text
+The dashboard needs stable run lifecycle, normalized events, and durable result tracking.
+It should not parse CLI output or transcripts to reconstruct experiment state.
+```
+
+### 3. CI and code-review automation app
+
+A GitHub/GitLab-adjacent service that asks OpenClaw agents to review changes, inspect logs, run approved checks, and produce review artifacts.
+
+Core user flow:
+
+```text
+pull request opened
+  -> app creates or resumes review session
+  -> starts review run
+  -> streams progress into CI UI
+  -> waits for final result
+  -> uploads review summary/artifacts
+```
+
+SDK surfaces:
+
+- `oc.sessions`
+- `oc.runs`
+- `Run.wait()`
+- `Run.events()`
+- `oc.approvals`
+- future `oc.artifacts`
+- future `oc.tools.invoke` only if tightly policy-gated
+
+Why it fits:
+
+```text
+CI needs deterministic wait/cancel behavior and clear approval boundaries.
+It cannot depend on a human watching a terminal.
+```
+
+### 4. Smart device and media companion
+
+A mobile or desktop companion app that exposes camera, screen, canvas, location, notifications, and device status to OpenClaw through nodes.
+
+Core user flow:
+
+```text
+pair device as node
+  -> Gateway sees declared capabilities
+  -> user asks agent to inspect screen/camera/canvas
+  -> node returns media
+  -> app displays MEDIA attachment or artifact
+```
+
+SDK surfaces:
+
+- `oc.rawEvents()` or normalized SDK node/media events
+- future node-aware helpers
+- future `oc.artifacts`
+- `oc.approvals` for sensitive actions
+- device model metadata for friendly instance names
+
+Why it fits:
+
+```text
+The app turns physical device capabilities into Gateway-mediated agent capabilities.
+The node remains a peripheral; the Gateway remains the control plane.
+```
+
+### 5. Operations console for distributed agent infrastructure
+
+An admin app for teams running multiple Gateways, node hosts, models, agents, and execution environments.
+
+Core user flow:
+
+```text
+connect to Gateway
+  -> inspect agents/models/nodes/environments
+  -> view active runs and approvals
+  -> identify stuck tasks
+  -> cancel or retry work
+  -> audit artifacts and events
+```
+
+SDK surfaces:
+
+- `oc.agents`
+- `oc.models`
+- `oc.runs`
+- `oc.approvals`
+- future `oc.environments`
+- future `oc.tasks`
+- future `oc.artifacts`
+
+Why it fits:
+
+```text
+Operations needs observability and control through typed APIs.
+It should not SSH into machines and scrape logs as the primary interface.
+```
+
+The common pattern across all five:
+
+```text
+App owns UX.
+Gateway owns agent runtime.
+SDK owns the typed contract between them.
+```
+
+---
+
 ## Key takeaways
 
 - `@openclaw/sdk` is the app-facing contract for code outside OpenClaw.
@@ -923,8 +1416,12 @@ Answer:
 - The happy path is connect, discover, session, run, stream, wait, cancel, and approvals.
 - Current SDK helpers cover agents, runs, sessions, models, tools catalog, approvals, raw events, and event normalization.
 - Future app-facing surfaces should be narrow: `artifacts.*`, `environments.*`, `tools.invoke`, and `tasks.*`.
+- Nodes extend the Gateway with companion-device capabilities such as canvas, camera, screen, location, notifications, and controlled system execution.
+- Nodes are peripherals, not gateways; the Gateway still owns messages, model execution, sessions, policy, and routing.
 - Unsupported future surfaces should throw explicit errors rather than pretending to work.
 - Dogfooding with OpenMeow-style clients is how the SDK contract becomes stable enough for external apps.
+- Good App SDK use cases include desktop control centers, experiment dashboards, CI automation, smart-device companions, and operations consoles.
+- Friendly device names are presentation metadata; raw device identifiers and capability fields remain authoritative for runtime decisions.
 
 ---
 
@@ -934,6 +1431,9 @@ Answer:
 - OpenClaw Gateway protocol: [https://openclaw.knidal.com/gateway-protocol](https://openclaw.knidal.com/gateway-protocol)
 - OpenClaw RPC adapters: [https://openclaw.knidal.com/rpc-adapters](https://openclaw.knidal.com/rpc-adapters)
 - OpenClaw Tools Invoke API: [https://openclaw.knidal.com/tools-invoke-api](https://openclaw.knidal.com/tools-invoke-api)
+- OpenClaw Nodes: [https://openclaw.knidal.com/nodes](https://openclaw.knidal.com/nodes)
+- OpenClaw Node troubleshooting: [https://openclaw.knidal.com/nodes/troubleshooting](https://openclaw.knidal.com/nodes/troubleshooting)
+- Apple device identifiers data source: [kyle-seongwoo-jun/apple-device-identifiers](https://github.com/kyle-seongwoo-jun/apple-device-identifiers)
 - Case-study source repo: [OpenClaw](https://github.com/openclaw/openclaw)
 
 ---
