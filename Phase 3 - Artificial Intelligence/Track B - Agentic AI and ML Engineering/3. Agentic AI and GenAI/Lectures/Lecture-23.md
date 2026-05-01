@@ -1,6 +1,6 @@
 # Lecture 23 - OpenClaw Case Study: Gateway RPC Protocol
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 22](Lecture-22.md) | **Next:** [Lecture 24](Lecture-24.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 22](Lecture-22.md) | **Next:** [Lecture 25](Lecture-25.md)
 
 ---
 
@@ -1307,4 +1307,4 @@ Compare the difference between discovery-only APIs and mutation APIs.
 
 ---
 
-*Next: [Lecture 24 - OpenViking Case Study: Context Database and Structured Agent Memory](Lecture-24.md)*
+*Next: [Lecture 25 - OpenCoven Case Study: Agent-Native Workspace and Local Harness Substrate](Lecture-25.md)*

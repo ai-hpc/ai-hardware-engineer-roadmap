@@ -61,7 +61,6 @@ The previous lectures covered:
 | Lecture | Main layer |
 |---|---|
 | OpenClaw | runtime, gateway, tools, sessions, nodes |
-| OpenViking | structured context database and memory |
 | OpenCoven | local harness substrate and agent workspace |
 | OpenKnots | product interfaces and trust surfaces |
 
@@ -111,7 +110,7 @@ OpenClaw gateway / agent runtime
   -> visible state, traceability, and user control
 ```
 
-That is why it belongs after OpenClaw, OpenViking, and OpenCoven.
+That is why it belongs after OpenClaw and OpenCoven.
 
 ---
 
@@ -408,12 +407,9 @@ OpenClaw session traces
   -> operator-grade memory and traceability
 ```
 
-This complements OpenViking:
+OpenTrust emphasizes evidence, lineage, traceability, and operational UX for OpenClaw data.
 
-- OpenViking emphasizes structured context database and memory references.
-- OpenTrust emphasizes evidence, lineage, traceability, and operational UX for OpenClaw data.
-
-Both teach the same broad lesson:
+The broad lesson:
 
 ```text
 Memory must be auditable, not mystical.

@@ -35,7 +35,6 @@
 |  |  | [21](Lectures/Lecture-21.md) | System Prompt Architecture |
 |  |  | [22](Lectures/Lecture-22.md) | App SDK and Typed RPCs |
 |  |  | [23](Lectures/Lecture-23.md) | Gateway RPC Protocol |
-|  |  | [24](Lectures/Lecture-24.md) | OpenViking Memory |
 |  |  | [25](Lectures/Lecture-25.md) | OpenCoven Workspace |
 |  |  | [26](Lectures/Lecture-26.md) | OpenKnots Interfaces |
 

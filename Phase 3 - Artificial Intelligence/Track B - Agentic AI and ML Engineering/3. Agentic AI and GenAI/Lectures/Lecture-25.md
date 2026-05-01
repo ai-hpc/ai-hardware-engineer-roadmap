@@ -1,6 +1,6 @@
 # Lecture 25 - OpenCoven Case Study: Agent-Native Workspace and Local Harness Substrate
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 24](Lecture-24.md) | **Next:** [Lecture 26](Lecture-26.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 23](Lecture-23.md) | **Next:** [Lecture 26](Lecture-26.md)
 
 ---
 
@@ -497,14 +497,13 @@ An agent that controls a machine must be observable before it is autonomous.
 
 ---
 
-## 12. How OpenCoven relates to OpenClaw and OpenViking
+## 12. How OpenCoven relates to OpenClaw
 
-The recent lectures introduced three adjacent pieces:
+The recent lectures introduced two adjacent pieces:
 
 | System | Primary role |
 |---|---|
 | OpenClaw | Gateway, agent runtime, sessions, tools, nodes, approvals |
-| OpenViking | structured context database and memory layer |
 | OpenCoven | agent-native workspace and local harness ecosystem |
 
 Practical split:
@@ -512,9 +511,6 @@ Practical split:
 ```text
 OpenClaw
   controls agent runtime and gateway protocol
-
-OpenViking
-  stores and retrieves durable structured context
 
 OpenCoven / Coven
   runs and observes local harness sessions inside project boundaries
@@ -534,7 +530,7 @@ This split is more important than any individual tool name.
 It teaches a durable architecture principle:
 
 ```text
-Separate orchestration, memory, harness execution, UI, desktop actuation, and model training.
+Separate orchestration, harness execution, UI, desktop actuation, and model training.
 ```
 
 ---
@@ -661,8 +657,8 @@ OpenMeow / cockpit UI
 OpenClaw Gateway
   -> routes user messages and agent runs
 
-OpenViking
-  -> stores docs, logs, board-specific memory
+Trace and memory store
+  -> stores docs, logs, board-specific notes, and session evidence
 
 Coven daemon
   -> runs Codex or Claude Code inside the repo/project root
@@ -679,7 +675,7 @@ Example workflow:
 ```text
 1. User asks: "Analyze why OTBR stays detached after Thread start."
 2. OpenClaw creates an agent run.
-3. OpenViking retrieves previous OTBR logs and kernel config notes.
+3. The trace/memory store retrieves previous OTBR logs and kernel config notes.
 4. Coven launches a coding/research harness inside the project repo.
 5. The harness reads docs, proposes a markdown update, and runs local checks.
 6. OpenClaw streams progress and approvals to the UI.
