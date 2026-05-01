@@ -12,7 +12,7 @@
 
 ## Lecture Series
 
-23 lectures + 3 hands-on labs covering everything from LLM fundamentals to production multi-agent systems. **[→ Start here](Lectures/README.md)**
+24 lectures + 3 hands-on labs covering everything from LLM fundamentals to production multi-agent systems. **[→ Start here](Lectures/README.md)**
 
 **Course currency note:** exact model names, context windows, SDK features, and pricing change quickly. This module teaches stable interfaces and system patterns: model APIs, tool protocols, runtime loops, workflow graphs, gateways, telemetry, and policy boundaries. Always check provider documentation before copying model IDs or prices into a real deployment.
 
@@ -35,6 +35,7 @@
 |  |  | [21](Lectures/Lecture-21.md) | System Prompt Architecture |
 |  |  | [22](Lectures/Lecture-22.md) | App SDK and Typed RPCs |
 |  |  | [23](Lectures/Lecture-23.md) | Gateway RPC Protocol |
+|  |  | [24](Lectures/Lecture-24.md) | OpenViking Memory |
 
 **Labs:** [Lab 01 — Research Agent](Lectures/Lab-01-Research-Agent.md) · [Lab 02 — Multi-Agent Pipeline](Lectures/Lab-02-Multi-Agent-Pipeline.md) · [Lab 03 — Production RAG](Lectures/Lab-03-Production-RAG.md)
 

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block extrahead %}
+  {{ super() }}
+  {% set seo_image = config.site_url ~ config.extra.seo.image %}
+  <meta name="keywords" content="{{ config.extra.seo.keywords }}">
+  <meta name="robots" content="index, follow">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ config.site_name }}">
+  <meta property="og:title" content="{% if page and page.title %}{{ page.title }} - {{ config.site_name }}{% else %}{{ config.site_name }}{% endif %}">
+  <meta property="og:description" content="{{ config.site_description }}">
+  <meta property="og:url" content="{{ page.canonical_url }}">
+  <meta property="og:image" content="{{ seo_image }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{% if page and page.title %}{{ page.title }} - {{ config.site_name }}{% else %}{{ config.site_name }}{% endif %}">
+  <meta name="twitter:description" content="{{ config.site_description }}">
+  <meta name="twitter:image" content="{{ seo_image }}">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Course",
+    "name": "AI Hardware Engineer Roadmap",
+    "description": "A hardware-first AI engineering roadmap covering CUDA, embedded systems, Jetson, FPGA, ML compilers, RISC-V, accelerator architecture, and edge AI deployment.",
+    "url": "https://ai-hpc.github.io/ai-hardware-engineer-roadmap/",
+    "provider": {
+      "@type": "Organization",
+      "name": "ai-hpc",
+      "url": "https://github.com/ai-hpc"
+    },
+    "educationalLevel": "Intermediate to advanced",
+    "teaches": [
+      "AI hardware engineering",
+      "CUDA and GPU programming",
+      "Embedded AI deployment",
+      "FPGA development",
+      "ML compiler systems",
+      "AI accelerator architecture"
+    ]
+  }
+  </script>
+{% endblock %}

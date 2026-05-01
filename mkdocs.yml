@@ -1,6 +1,6 @@
 site_name: AI Hardware Engineer Roadmap
 site_url: https://ai-hpc.github.io/ai-hardware-engineer-roadmap/
-site_description: Design a custom AI inference chip. 5 phases, 8 layers, 23 sub-layers.
+site_description: A hardware-first AI engineering roadmap covering CUDA, embedded systems, Jetson, FPGA, ML compilers, RISC-V, accelerator architecture, and edge AI deployment.
 site_author: ai-hpc
 repo_url: https://github.com/ai-hpc/ai-hardware-engineer-roadmap
 repo_name: ai-hpc/ai-hardware-engineer-roadmap
@@ -10,6 +10,7 @@ docs_dir: docs
 
 theme:
   name: material
+  custom_dir: overrides
   logo: Assets/images/avatar.png
   favicon: Assets/images/avatar.png
   palette:
@@ -50,6 +51,9 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/ai-hpc
+  seo:
+    keywords: AI hardware engineer roadmap, AI chip design, CUDA programming, Jetson Orin Nano, FPGA development, ML compiler, RISC-V AI accelerator, edge AI, embedded AI, TensorRT, OpenThread, Zigbee, AI agent systems
+    image: Assets/images/ai-hardware-roadmap-hero.svg
   generator: false
 
 markdown_extensions:
@@ -294,6 +298,7 @@ nav:
           - "21: System Prompt Architecture": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-21.md
           - "22: App SDK and Typed RPCs": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-22.md
           - "23: Gateway RPC Protocol": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-23.md
+          - "24: OpenViking Context Database": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-24.md
         - Labs:
           - "Lab 01: Research Agent": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-01-Research-Agent.md
           - "Lab 02: Multi-Agent Pipeline": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-02-Multi-Agent-Pipeline.md

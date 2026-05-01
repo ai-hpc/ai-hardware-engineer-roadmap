@@ -15,7 +15,7 @@ The durable concepts in this course are:
 - **Product control plane:** gateways, channels, sessions, routing, identities, and audit logs.
 - **Runtime security:** least privilege, policy gates, telemetry, incident response, and evidence.
 
-Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-23 focus on production discipline and OpenClaw-style gateway systems.
+Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-24 focus on production discipline, OpenClaw-style gateway systems, and structured agent memory.
 
 ## Lecture Index
 
@@ -44,6 +44,7 @@ Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, a
 | [Lecture 21](Lecture-21.md) | OpenClaw Case Study - System Prompt Architecture | Prompt ownership, bootstrap context, skills, prompt modes, provider overlays |
 | [Lecture 22](Lecture-22.md) | OpenClaw Case Study - App SDK Dogfooding and Typed Gateway RPCs | App SDK, happy path, event normalization, future RPC surfaces |
 | [Lecture 23](Lecture-23.md) | OpenClaw Case Study - Gateway RPC Protocol | WebSocket frames, handshake, roles, scopes, pairing, features, node transport |
+| [Lecture 24](Lecture-24.md) | OpenViking Case Study - Context Database and Structured Memory | `viking://` context references, L0/L1/L2 memory layers, recursive retrieval, OpenClaw integration |
 
 ## Lab Index
 

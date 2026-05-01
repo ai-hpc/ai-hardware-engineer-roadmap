@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ai-hpc.github.io/ai-hardware-engineer-roadmap/sitemap.xml

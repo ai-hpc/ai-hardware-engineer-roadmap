@@ -51,6 +51,8 @@ jobs:
                     --include='*.gif' \
                     --include='*.py' \
                     --include='*.css' \
+                    --include='robots.txt' \
+                    --include='llms.txt' \
                     --exclude='.git' \
                     --exclude='.github' \
                     --exclude='docs' \

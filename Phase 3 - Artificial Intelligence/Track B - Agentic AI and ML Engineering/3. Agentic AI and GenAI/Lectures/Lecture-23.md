@@ -1,6 +1,6 @@
 # Lecture 23 - OpenClaw Case Study: Gateway RPC Protocol
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 22](Lecture-22.md) | **Next:** [Lab 01](Lab-01-Research-Agent.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 22](Lecture-22.md) | **Next:** [Lecture 24](Lecture-24.md)
 
 ---
 
@@ -33,7 +33,8 @@ By the end of this lecture, you should be able to:
 5. Understand why feature discovery lives in `hello-ok.features`.
 6. Explain broadcast scoping and per-client event ordering.
 7. Describe why side-effecting methods need idempotency keys.
-8. Design a new RPC method without leaking secrets or bypassing policy.
+8. Understand shared-secret auth, trusted-proxy auth, private-ingress mode, and device-token reconnect behavior.
+9. Design a new RPC method without leaking secrets or bypassing policy.
 
 ---
 
@@ -455,6 +456,40 @@ device token:
   useful for durable least-privilege reconnects
 ```
 
+Nodes should include a stable `device.id` derived from a keypair fingerprint.
+
+Gateway tokens are issued per:
+
+```text
+device + role + approved scope set
+```
+
+Pairing approvals are required for new device IDs unless a tightly scoped local auto-approval path is enabled.
+
+The safe default:
+
+```text
+new device ID
+  -> pairing request
+  -> operator approval
+  -> device token issuance
+```
+
+Pairing auto-approval should be centered on direct local loopback connects.
+
+Same-host tailnet or LAN connects should still be treated as remote unless explicitly trusted by configuration.
+
+There are a few device-less operator exceptions, but they should be narrow:
+
+- localhost-only insecure Control UI compatibility, if explicitly enabled
+- successful trusted-proxy operator Control UI auth
+- break-glass `dangerouslyDisableDeviceAuth`, which is a severe downgrade
+- direct-loopback backend RPCs authenticated with the shared Gateway token/password
+
+The rule:
+
+> if a client is not in a narrow explicit trust path, require device identity and pairing
+
 ---
 
 ## 10. Device token lifecycle
@@ -474,8 +509,70 @@ Safe behavior:
 - pairing scope rules still apply
 - token rotation must not upgrade roles
 - token revocation should make future reconnect fail
+- token mutation cannot target a device role that pairing approval never granted
+- non-admin callers cannot rotate or revoke a broader operator token than they already hold
 
 This gives OpenClaw a cleaner security model than long-lived shared tokens everywhere.
+
+### Persisting device tokens
+
+After any successful connect, clients should persist the primary token:
+
+```text
+hello-ok.auth.deviceToken
+```
+
+On reconnect, the stored device token should reuse the approved scope set for that token.
+
+Why this matters:
+
+```text
+first connect:
+  approved scopes = operator.read + operator.write
+
+reconnect:
+  reuse stored device token
+  preserve approved read/write access
+```
+
+Bad reconnect behavior:
+
+```text
+client reconnects with stored token
+  -> silently collapses to narrower implicit scope
+  -> status/probe/read UI breaks
+```
+
+Good reconnect behavior:
+
+```text
+stored device token
+  -> approved role + scope set restored
+```
+
+If the caller supplies explicit scopes or an explicit device token, that caller-requested scope set stays authoritative.
+
+Cached scopes are only reused when the client is reusing the stored per-device token.
+
+### Rotation behavior
+
+`device.token.rotate` returns rotation metadata.
+
+It should echo the replacement bearer token only for same-device calls already authenticated with that device token.
+
+That lets token-only clients persist their replacement before reconnecting.
+
+Shared/admin rotations should not echo the bearer token.
+
+Why:
+
+```text
+same-device token rotation:
+  client needs the replacement token to keep working
+
+shared/admin rotation:
+  should not leak bearer tokens to broader control-plane clients
+```
 
 ---
 
@@ -489,6 +586,82 @@ Gateway auth may support multiple paths:
 - bootstrap token
 - trusted proxy headers
 - private-ingress / none, only in intentionally private deployments
+
+### Shared-secret auth
+
+Shared-secret Gateway auth uses one of:
+
+```text
+connect.params.auth.token
+connect.params.auth.password
+```
+
+depending on configured auth mode.
+
+On the client side, password and token are not identical:
+
+```text
+auth.password:
+  orthogonal
+  forwarded when set
+
+auth.token:
+  selected by priority
+```
+
+Token selection priority:
+
+```text
+1. explicit shared token
+2. explicit deviceToken
+3. stored per-device token keyed by deviceId + role
+```
+
+Bootstrap token behavior:
+
+```text
+auth.bootstrapToken is sent only when no auth.token was resolved
+```
+
+That means a shared token or any resolved device token suppresses bootstrap auth.
+
+### Trusted proxy and private ingress
+
+Identity-bearing modes can satisfy connect auth from request headers rather than `connect.params.auth.*`.
+
+Examples:
+
+```text
+gateway.auth.allowTailscale = true
+gateway.auth.mode = "trusted-proxy"
+```
+
+These modes are for deployments where an upstream layer already authenticates identity.
+
+Private-ingress mode:
+
+```text
+gateway.auth.mode = "none"
+```
+
+skips shared-secret connect auth.
+
+Use it only behind trusted private ingress.
+
+Do not expose private-ingress mode on public or untrusted networks.
+
+### Bootstrap handoff tokens
+
+`hello-ok.auth.deviceTokens` can contain additional bootstrap handoff tokens.
+
+Persist them only when the connection used bootstrap auth on a trusted transport such as:
+
+```text
+wss:// with appropriate trust
+loopback / local pairing path
+```
+
+Do not blindly persist handoff tokens from an untrusted public connection.
 
 The client should handle auth failures with recovery logic.
 
@@ -509,9 +682,116 @@ auth failed
   -> otherwise show pairing/login guidance
 ```
 
+### `AUTH_TOKEN_MISMATCH`
+
+For `AUTH_TOKEN_MISMATCH`, trusted clients may attempt one bounded retry with a cached per-device token.
+
+Trusted means:
+
+```text
+loopback
+or
+wss:// with pinned tlsFingerprint
+```
+
+Public `wss://` without pinning does not qualify for automatic token promotion.
+
+If the retry fails:
+
+```text
+stop automatic reconnect loop
+surface operator action guidance
+```
+
+Do not spin forever with bad credentials.
+
+Recovery hints may include:
+
+| Field | Purpose |
+|---|---|
+| `error.details.code` | Stable machine-readable auth failure code |
+| `error.details.canRetryWithDeviceToken` | Whether a device-token retry may help |
+| `error.details.recommendedNextStep` | Suggested client/operator action |
+
+Example recommended next steps:
+
+```text
+retry_with_device_token
+update_auth_configuration
+update_auth_credentials
+wait_then_retry
+review_auth_configuration
+```
+
 ---
 
-## 12. Feature discovery
+## 12. Device auth migration diagnostics
+
+All connections should sign the server-provided `connect.challenge` nonce.
+
+Legacy clients may still use pre-challenge signing behavior.
+
+For those clients, Gateway auth should return stable `DEVICE_AUTH_*` detail codes.
+
+| Message | details.code | details.reason | Meaning |
+|---|---|---|---|
+| device nonce required | `DEVICE_AUTH_NONCE_REQUIRED` | `device-nonce-missing` | Client omitted `device.nonce` or sent it blank |
+| device nonce mismatch | `DEVICE_AUTH_NONCE_MISMATCH` | `device-nonce-mismatch` | Client signed with stale or wrong nonce |
+| device signature invalid | `DEVICE_AUTH_SIGNATURE_INVALID` | `device-signature` | Signature payload does not match expected payload |
+| device signature expired | `DEVICE_AUTH_SIGNATURE_EXPIRED` | `device-signature-stale` | Signed timestamp is outside allowed skew |
+| device identity mismatch | `DEVICE_AUTH_DEVICE_ID_MISMATCH` | `device-id-mismatch` | `device.id` does not match public key fingerprint |
+| device public key invalid | `DEVICE_AUTH_PUBLIC_KEY_INVALID` | `device-public-key` | Public key format or canonicalization failed |
+
+Migration target:
+
+```text
+1. wait for connect.challenge
+2. sign the payload that includes the server nonce
+3. send the same nonce in connect.params.device.nonce
+```
+
+Preferred signing payload:
+
+```text
+v3 signature payload
+  binds platform
+  binds deviceFamily
+  binds device/client/role/scopes/token/nonce fields
+```
+
+Legacy v2 signatures may remain accepted for compatibility, but paired-device metadata should still control command policy on reconnect.
+
+---
+
+## 13. TLS and pinning
+
+Gateway WebSocket connections can use TLS.
+
+Clients may optionally pin the Gateway certificate fingerprint.
+
+Relevant configuration/CLI concepts:
+
+```text
+gateway.tls
+gateway.remote.tlsFingerprint
+--tls-fingerprint
+```
+
+Pinning matters because it upgrades "encrypted connection" into "I know exactly which Gateway certificate I expected."
+
+This is why automatic stored-device-token promotion should be limited to:
+
+```text
+loopback
+or
+wss:// with pinned fingerprint
+```
+
+Without pinning, a public `wss://` endpoint is encrypted but not trusted enough for aggressive credential fallback.
+
+---
+
+## 14. Feature discovery
 
 `hello-ok.features` is the discovery surface.
 
@@ -550,7 +830,7 @@ This makes clients safer across version skew.
 
 ---
 
-## 13. Size limits and payload safety
+## 15. Size limits and payload safety
 
 Before connect, frames are capped tightly.
 
@@ -590,7 +870,7 @@ Use:
 
 ---
 
-## 14. Events and broadcast scoping
+## 16. Events and broadcast scoping
 
 Events are not broadcast blindly to everyone.
 
@@ -621,7 +901,7 @@ This matters because scope filtering could otherwise make event ordering ambiguo
 
 ---
 
-## 15. Common RPC families
+## 17. Common RPC families
 
 The Gateway has many method families.
 
@@ -659,7 +939,7 @@ typed method
 
 ---
 
-## 16. Idempotency
+## 18. Idempotency
 
 Side-effecting methods need idempotency keys.
 
@@ -701,7 +981,7 @@ It is required for reliable distributed clients.
 
 ---
 
-## 17. TypeBox schemas and generated clients
+## 19. TypeBox schemas and generated clients
 
 Gateway RPC shapes should be schema-owned.
 
@@ -731,7 +1011,7 @@ The engineering goal:
 
 ---
 
-## 18. Secret safety
+## 20. Secret safety
 
 Diagnostics and discovery must not leak secrets.
 
@@ -759,7 +1039,7 @@ This is a core rule for control planes:
 
 ---
 
-## 19. Nodes over Gateway RPC
+## 21. Nodes over Gateway RPC
 
 Nodes connect to the same Gateway WebSocket protocol, but with:
 
@@ -805,7 +1085,7 @@ But again:
 
 ---
 
-## 20. Model listing views
+## 22. Model listing views
 
 Model listing is a useful example of one method with multiple views.
 
@@ -831,7 +1111,7 @@ diagnostics:
 
 ---
 
-## 21. Reconnect and timeouts
+## 23. Reconnect and timeouts
 
 Clients need predictable timeout behavior.
 
@@ -862,10 +1142,11 @@ Client behavior:
 - reset faster only when the protocol says it is safe
 - treat protocol mismatch as hard failure
 - treat startup unavailable as retryable
+- stop automatic reconnect loops after a failed bounded device-token retry
 
 ---
 
-## 22. Extending the RPC surface
+## 24. Extending the RPC surface
 
 When adding a new method, use this checklist.
 
@@ -931,7 +1212,7 @@ The public API is not complete until clients can use it safely.
 
 ---
 
-## 23. Gateway protocol versus App SDK
+## 25. Gateway protocol versus App SDK
 
 Lecture 22 focused on:
 
@@ -970,7 +1251,7 @@ SDK authors and platform engineers must understand the Gateway protocol.
 
 ---
 
-## 24. Design exercise
+## 26. Design exercise
 
 Design a new RPC family:
 
@@ -1026,4 +1307,4 @@ Compare the difference between discovery-only APIs and mutation APIs.
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 24 - OpenViking Case Study: Context Database and Structured Agent Memory](Lecture-24.md)*

@@ -27,6 +27,12 @@ done < <(
     '*.css'
 )
 
+for static_file in robots.txt llms.txt; do
+  if [[ -f "$ROOT_DIR/$static_file" ]]; then
+    copy_path "$static_file"
+  fi
+done
+
 while IFS= read -r -d '' path; do
   copy_path "$path"
 done < <(

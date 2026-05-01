@@ -1,0 +1,32 @@
+# AI Hardware Engineer Roadmap
+
+> A hardware-first AI engineering roadmap for CUDA, embedded systems, Jetson, FPGA, ML compilers, RISC-V, accelerator architecture, and edge AI deployment.
+
+## Canonical Site
+
+- [AI Hardware Engineer Roadmap](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/)
+- [GitHub Repository](https://github.com/ai-hpc/ai-hardware-engineer-roadmap)
+
+## Core Entry Points
+
+- [Roles and Market Analysis](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/Roles%20and%20Market%20Analysis/)
+- [Phase 1 - Digital Foundations](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/Phase%201%20-%20Foundational%20Knowledge/)
+- [Phase 2 - Embedded Systems](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/Phase%202%20-%20Embedded%20Systems/)
+- [Phase 3 - Artificial Intelligence](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/Phase%203%20-%20Artificial%20Intelligence/)
+- [Phase 4 - NVIDIA Jetson](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/)
+- [Phase 4 - ML Compiler and Graph Optimization](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/Phase%204%20-%20Track%20C%20-%20ML%20Compiler%20and%20Graph%20Optimization/)
+- [Phase 5 - Advanced Topics and Specialization](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/Phase%205%20-%20Advanced%20Topics%20and%20Specialization/)
+
+## Topic Summary
+
+This roadmap teaches AI hardware engineering across the full stack:
+
+- digital design and computer architecture
+- operating systems and parallel programming
+- embedded systems and firmware
+- CUDA, GPU programming, and profiling
+- Jetson deployment and edge AI systems
+- FPGA development and accelerator prototyping
+- ML compiler and graph optimization flows
+- RISC-V and AI accelerator architecture
+- AI agents, runtime systems, and production AI applications
