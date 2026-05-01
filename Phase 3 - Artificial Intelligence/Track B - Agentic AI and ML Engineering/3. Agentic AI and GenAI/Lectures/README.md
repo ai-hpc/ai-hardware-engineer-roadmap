@@ -17,6 +17,10 @@ The durable concepts in this course are:
 
 Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-26 focus on production discipline, OpenClaw-style gateway systems, local agent workspaces, and trustworthy agent interfaces.
 
+## External Reference
+
+- [The OpenClaw Book](https://openclawconsultant.com/openclaw-book/) — practitioner-facing OpenClaw guide covering architecture, setup, skills, prompting, planning, optimization, proactive automation, sub-agents, real-world use cases, and security.
+
 ## Lecture Index
 
 | # | Title | Topics |

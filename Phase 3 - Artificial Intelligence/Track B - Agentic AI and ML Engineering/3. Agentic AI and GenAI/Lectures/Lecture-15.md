@@ -461,6 +461,7 @@ If you understand this model, you are much closer to building serious agents tha
 ## References
 
 - Case-study source repo: [OpenClaw](https://github.com/openclaw/openclaw)
+- Practitioner reference: [The OpenClaw Book](https://openclawconsultant.com/openclaw-book/)
 - OpenClaw concepts:
   - `docs/concepts/architecture.md`
   - `docs/concepts/agent-loop.md`
