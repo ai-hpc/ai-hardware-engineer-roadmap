@@ -15,7 +15,7 @@ The durable concepts in this course are:
 - **Product control plane:** gateways, channels, sessions, routing, identities, and audit logs.
 - **Runtime security:** least privilege, policy gates, telemetry, incident response, and evidence.
 
-Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-24 focus on production discipline, OpenClaw-style gateway systems, and structured agent memory.
+Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-26 focus on production discipline, OpenClaw-style gateway systems, structured agent memory, local agent workspaces, and trustworthy agent interfaces.
 
 ## Lecture Index
 
@@ -45,6 +45,8 @@ Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, a
 | [Lecture 22](Lecture-22.md) | OpenClaw Case Study - App SDK Dogfooding and Typed Gateway RPCs | App SDK, happy path, event normalization, future RPC surfaces |
 | [Lecture 23](Lecture-23.md) | OpenClaw Case Study - Gateway RPC Protocol | WebSocket frames, handshake, roles, scopes, pairing, features, node transport |
 | [Lecture 24](Lecture-24.md) | OpenViking Case Study - Context Database and Structured Memory | `viking://` context references, L0/L1/L2 memory layers, recursive retrieval, OpenClaw integration |
+| [Lecture 25](Lecture-25.md) | OpenCoven Case Study - Agent-Native Workspace and Local Harness Substrate | Coven sessions, local daemon API, desktop-use adapter, OpenMeow SDK boundary, workspace safety |
+| [Lecture 26](Lecture-26.md) | OpenKnots Case Study - Trustworthy Agent Interfaces and Local-First Coding Surfaces | IDE agents, OK Code, Knot Code, OpenTrust, docs RAG, visible context, event contracts |
 
 ## Lab Index
 

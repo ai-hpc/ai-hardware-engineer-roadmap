@@ -1,6 +1,6 @@
 # Lecture 24 - OpenViking Case Study: Context Database and Structured Agent Memory
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 23](Lecture-23.md) | **Next:** [Lab 01](Lab-01-Research-Agent.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 23](Lecture-23.md) | **Next:** [Lecture 25](Lecture-25.md)
 
 ---
 
@@ -664,4 +664,4 @@ This is the discipline that separates useful memory from accidental prompt pollu
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 25 - OpenCoven Case Study: Agent-Native Workspace and Local Harness Substrate](Lecture-25.md)*
