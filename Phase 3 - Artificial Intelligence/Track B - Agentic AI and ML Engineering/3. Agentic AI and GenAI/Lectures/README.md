@@ -55,6 +55,7 @@ Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, a
 | [Lab 01](Lab-01-Research-Agent.md) | Research Agent with Tool Use | Web search + code execution + citations |
 | [Lab 02](Lab-02-Multi-Agent-Pipeline.md) | Multi-Agent Code Review | Planner → Coder → Reviewer → Summarizer |
 | [Lab 03](Lab-03-Production-RAG.md) | Production RAG System | Ingestion pipeline + hybrid search + RAGAS eval |
+| [Lab 04](Lab-04-TokenJuice-Output-Compaction.md) | TokenJuice Output Compaction | Deterministic terminal-output reduction, raw bypasses, artifact recovery, project reducers |
 
 ## Prerequisites
 

@@ -1,6 +1,6 @@
 # Lab 03 — Production RAG System
 
-**Track B · Agentic AI & GenAI** | [← Index](README.md) | [Next → Lecture 01](Lecture-01.md)
+**Track B · Agentic AI & GenAI** | [← Index](README.md) | [Next → Lab 04](Lab-04-TokenJuice-Output-Compaction.md)
 
 ---
 
@@ -1065,4 +1065,4 @@ After running `evaluate.py`, you should see output close to:
 
 ---
 
-*End of Lab 03. Return to the [Track Index](README.md) or continue with [Lecture 01](Lecture-01.md).*
+*Next: [Lab 04 — TokenJuice Output Compaction](Lab-04-TokenJuice-Output-Compaction.md)*
