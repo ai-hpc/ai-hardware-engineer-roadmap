@@ -59,6 +59,7 @@ Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, a
 | [Lab 02](Lab-02-Multi-Agent-Pipeline.md) | Multi-Agent Code Review | Planner → Coder → Reviewer → Summarizer |
 | [Lab 03](Lab-03-Production-RAG.md) | Production RAG System | Ingestion pipeline + hybrid search + RAGAS eval |
 | [Lab 04](Lab-04-TokenJuice-Output-Compaction.md) | TokenJuice Output Compaction | Deterministic terminal-output reduction, raw bypasses, artifact recovery, project reducers |
+| [Lab 05](Lab-05-OpenMeow-App-SDK-Dogfood.md) | OpenMeow App SDK Dogfood on macOS | Test the OpenClaw App SDK with OpenCoven's OpenMeow adapter, fixtures, UI reducers, live Gateway smoke tests, and optional Coven sessions |
 
 ## Prerequisites
 

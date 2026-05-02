@@ -158,6 +158,7 @@ You are ready for Phase 4 when you can:
 ## Additional Resources
 
 - [CMU AI Courses Reference](CMU-AI-Courses.md)
+- [Maxime Labonne's LLM Course](https://github.com/mlabonne/llm-course) — free LLM roadmap with Colab notebooks covering LLM fundamentals, fine-tuning, quantization, RAG, evaluation, and deployment. Use it as a hands-on companion for Track B.
 
 ---
 

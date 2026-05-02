@@ -1,6 +1,6 @@
 # Lab 04 — TokenJuice Output Compaction for Terminal-Heavy Agents
 
-**Track B · Agentic AI & GenAI** | [← Index](README.md) | [Previous → Lab 03](Lab-03-Production-RAG.md)
+**Track B · Agentic AI & GenAI** | [← Index](README.md) | [Previous → Lab 03](Lab-03-Production-RAG.md) | [Next → Lab 05](Lab-05-OpenMeow-App-SDK-Dogfood.md)
 
 ---
 
@@ -725,4 +725,4 @@ This is a small tool, but it touches a real production problem.
 
 ---
 
-*End of Lab 04. Return to the [Track Index](README.md).*
+*Next: [Lab 05 — OpenMeow App SDK Dogfood on macOS](Lab-05-OpenMeow-App-SDK-Dogfood.md)*

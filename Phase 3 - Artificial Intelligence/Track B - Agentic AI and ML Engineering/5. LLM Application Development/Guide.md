@@ -204,6 +204,7 @@ The point of the example is the pipeline shape, not the exact classifier choice.
 
 | Resource | What it covers |
 |----------|---------------|
+| [Maxime Labonne's LLM Course](https://github.com/mlabonne/llm-course) | Free LLM roadmap and Colab notebooks covering LLM fundamentals, the LLM Scientist path, and the LLM Engineer path: fine-tuning, quantization, RAG, evaluation, and deployment |
 | [Anthropic API Documentation](https://docs.anthropic.com/) | Claude API, tool use, streaming |
 | [OpenAI Cookbook](https://cookbook.openai.com/) | GPT API patterns and best practices |
 | [LlamaIndex](https://docs.llamaindex.ai/) | RAG framework |
