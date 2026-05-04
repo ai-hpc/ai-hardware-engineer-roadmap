@@ -48,6 +48,7 @@ Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, a
 | [Lecture 21](Lecture-21.md) | OpenClaw Case Study - System Prompt Architecture | Prompt ownership, bootstrap context, skills, prompt modes, provider overlays |
 | [Lecture 22](Lecture-22.md) | OpenClaw Case Study - App SDK Dogfooding and Typed Gateway RPCs | App SDK, happy path, event normalization, future RPC surfaces |
 | [Lecture 23](Lecture-23.md) | OpenClaw Case Study - Gateway RPC Protocol | WebSocket frames, handshake, roles, scopes, pairing, features, node transport |
+| [Lecture 24](Lecture-24.md) | What Is an AI Agent Harness? The Runtime Around the Model | Harness vs model, six core responsibilities, Claude Code / Cursor / Codex compared, hardware impact |
 | [Lecture 25](Lecture-25.md) | OpenCoven Case Study - Agent-Native Workspace and Local Harness Substrate | Coven sessions, local daemon API, desktop-use adapter, OpenMeow SDK boundary, workspace safety |
 | [Lecture 26](Lecture-26.md) | OpenKnots Case Study - Trustworthy Agent Interfaces and Local-First Coding Surfaces | IDE agents, OK Code, Knot Code, OpenTrust, docs RAG, visible context, event contracts |
 

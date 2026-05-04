@@ -1,6 +1,6 @@
 # Lecture 25 - OpenCoven Case Study: Agent-Native Workspace and Local Harness Substrate
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 23](Lecture-23.md) | **Next:** [Lecture 26](Lecture-26.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 24](Lecture-24.md) | **Next:** [Lecture 26](Lecture-26.md)
 
 ---
 
