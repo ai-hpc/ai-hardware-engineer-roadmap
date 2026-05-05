@@ -549,6 +549,133 @@ Curated, not a dump. If you read three things from each list with full attention
 
 ---
 
+## 14. Case study — what "security as a major focus" actually looks like in shipping code
+
+Every recommendation in this lecture sounds reasonable in the abstract. The question that decides whether you can do this work is **what does it actually produce in the changelog of a shipping agent platform?**
+
+OpenClaw is the running case study for this course (Lectures 15–23, 26). At the time of writing, its public CHANGELOG and CodeQL workflow include a coherent body of security work that maps almost one-to-one onto the structural defenses in §4. Reading these as a corpus is a faster education than reading the same number of CVEs from web frameworks, because the threat model is *agent-runtime native*: integration plugins, multi-channel inbound routing, exec carriers, and a trust boundary between user input and system instruction that no traditional appsec discipline contemplated.
+
+This section walks the six dominant categories of fix, ties each to the section of this lecture it validates, and pulls out the structural lesson. Issue numbers are real and citable.
+
+### 14.1 Secret handling and redaction
+
+Two themes recur. The first is **never let a secret survive a transformation that doesn't need it**. The second is **a long-lived auth token in a user-visible URL is exfiltration waiting to happen**.
+
+| Fix | Issue | Maps to |
+|---|---|---|
+| Preserve auth-profile `keyRef` / `tokenRef` metadata when scrubbing provider-target secrets, so canonical `SecretRef` metadata survives `secrets apply` without keeping plaintext | (Unreleased) | §4.4 Output and side-effect control |
+| Mint short-lived scoped tickets for assistant media fetches; render ticketed URLs instead of long-lived auth tokens in chat image URLs | #70830 | §4.4 Output channel exfiltration |
+
+Lesson: **the secret leak channel that bites you is the one nobody designed**. Long-lived auth tokens in image URLs are not an "auth bug" in any traditional taxonomy; they are an emergent leak through a benign-looking content-rendering surface. The fix is structural — replace the leakable thing with a non-leakable thing — not "remember to redact."
+
+### 14.2 PATH and environment-variable injection
+
+This category alone produced five distinct fixes and is the cleanest demonstration of why §4.2 (execution security) is non-negotiable. The pattern: a tool resolves an executable by name, the resolution consults `PATH` / `SystemRoot` / `WINDIR` / `LOCALAPPDATA` / `ComSpec`, and any of those values are reachable by user-supplied content (workspace `.env`, dotenv overrides, persisted config). A workspace can therefore *redirect what `whoami.exe` resolves to* if defenses are not in place.
+
+| Fix | Issue | Maps to |
+|---|---|---|
+| Validate `SystemRoot` / `WINDIR` env values through the Windows install-root validator; add to dangerous-host-env policy when resolving `icacls.exe` / `whoami.exe` | #74458 | §4.2 Execution security |
+| Pin Windows registry-probe `reg.exe` resolution to the canonical Windows install root | #74454 | §4.2 |
+| Block `LOCALAPPDATA` from workspace `.env`; resolve update-flow portable Git path prepends from the trusted process-local `LOCALAPPDATA` only | #77470 | §4.2 |
+| Route `.cmd` / `.bat` process wrapper through the shared install-root resolver instead of `process.env.ComSpec`, so dotenv-blocked overrides cannot redirect `cmd.exe` selection | #77472 | §4.2 |
+| Use an absolute POSIX npm script shell during package-manager updates so restricted-PATH environments can still run dependency lifecycle scripts | #77530 | §4.2 |
+
+Lesson: **the binary-resolution path is part of your attack surface**. A platform-aware allowlist of trusted roots beats any blocklist on env-var values. Notice the discipline: each fix names a specific resolver (registry probe, `cmd.exe`, `whoami.exe`, lifecycle script), not "harden env vars in general."
+
+### 14.3 Plugin trust and directory resolution
+
+Plugin systems are §4.2 + §4.3 combined. They expand the tool surface (execution risk) and they cross identity scope (trust risk). Two structural sub-problems show up: distinguishing official-trusted from third-party-untrusted, and recovering from package-manager state drift without losing trust.
+
+| Fix | Issue | Maps to |
+|---|---|---|
+| Suppress dangerous-pattern scanner warnings for trusted official `@openclaw/*` npm installs so installing `@openclaw/discord` no longer prints credential-harvesting warnings | #77483 | §4.2 / §5.1 policy layer |
+| Recover managed-npm external plugins from the owned npm root when a stale persisted registry would otherwise hide them after package-manager upgrades | #77266 | §4.2 plugin lifecycle |
+| Treat official externalized bundled npm migrations and ClawHub-to-npm fallbacks as trusted source-linked installs | #77544 | §4.2 install trust |
+| Make bundled provider discovery honor restrictive `plugins.allow` by default for new configs while doctor migrates legacy configs to preserve upgrade behavior | (Unreleased) | §5.1 default-deny policy |
+| Suppress dangerous-pattern scanner warnings for trusted catalog npm installs from owner-gated `/plugins install` commands | (Unreleased) | §4.3 owner-gated capability |
+
+Lesson: **trust is a directory, not a content scan**. The dangerous-pattern scanner is an advisory layer (correct framing — see §8.3). Suppressing it for a known-trusted install root is the right call; raising the bar on what gets to *be* in that root is the actual control.
+
+### 14.4 Channel-vs-DM routing — the integration trust boundary
+
+Multi-channel agent platforms inherit a category of mistake that pure chatbots never see: **a message routed to the wrong audience is a security event**. A reply intended for one user delivered into a public channel, a planning summary leaked into a broadcast, a DM-only command honored in a forum thread — these are all integration-layer failures, and they are extremely hard to catch in pure prompt logic.
+
+The fixes in this category map onto §4.1 (input domain tagging) and §4.3 (identity / scope).
+
+| Fix | Issue | Maps to |
+|---|---|---|
+| Support explicit WhatsApp Channel/Newsletter `@newsletter` outbound message targets with channel session metadata instead of DM routing | #13417 | §4.1 input domain tagging |
+| Apply the shared group/channel visible-reply mode during inbound dispatch so group replies stay message-tool-only by default without overriding direct-chat harness defaults | #75178 | §4.3 capability scoping |
+| Strip reasoning text from visible rich presentation titles, blocks, buttons, and select labels before message-tool sends, so structured channel payloads cannot leak hidden planning | (Unreleased) | §4.4 output control |
+| Let explicit forum-topic `requireMention` settings override persisted `/activate` and `/deactivate` state so per-topic mention gates work consistently | #49864 | §4.3 per-scope policy |
+| Record thread participation for successful visible threaded Slack sends so unmentioned replies in bot-participated threads can bypass mention gating | #77648 | §4.3 transitive scope |
+
+(The user-paraphrase "WhatsApp XML sanitization" most likely refers to this body of channel-routing safety work. The current CHANGELOG does not cite an XML-specific sanitizer fix; what is cited is the broader structural problem the user named.)
+
+Lesson: **the integration layer is where trust boundaries actually live in a multi-channel agent**. The model has no idea whether it is talking to one person, a group, or a broadcast channel. The harness must, and the harness must enforce **different output policies per audience class**.
+
+### 14.5 DM gating, pairing, and untrusted inbound
+
+Closely related to §14.4 but worth its own category because the threat model differs: §14.4 is about *not leaking* into public surfaces; §14.5 is about *not accepting work* from untrusted ones.
+
+| Fix | Issue | Maps to |
+|---|---|---|
+| Bind the default loopback gateway listener only to `127.0.0.1` on Windows so libuv's dual-stack `::1` behavior cannot wedge localhost HTTP requests | #69701 / #69674 | §4.3 attack surface reduction |
+| Reject non-loopback `ws://` setup URLs before QR / setup-code issuance, and let the iOS Gateway settings screen scan QR codes | (Unreleased) | §4.3 pairing trust |
+| Enforce the existing current-tab URL navigation policy *before* tab-scoped debug, export, and read routes collect from an already-selected tab | #75731 | §4.2 SSRF defense |
+| Disable debug-proxy direct upstream forwarding for proxy requests and CONNECT tunnels while managed-proxy mode is active | (Unreleased) | §4.2 attack surface reduction |
+| Do not record request-shape (`format`) rejections as auth-profile health failures so a single transcript-shape error no longer triggers a profile-wide cooldown that blocks healthy sessions | #77280 | §4.3 availability hardening |
+
+Lesson: **the pairing and listener boundary is its own attack surface**, distinct from "user input." A QR-code setup flow is an authentication primitive; binding to a non-loopback interface is an availability and confidentiality bug; an aggressive cooldown on a benign error is a denial-of-service primitive against your own users. None of these involve the model.
+
+### 14.6 Exec-carrier and approval-bypass detection
+
+This category is what §4.2's "tool calls run code" looks like when you take it seriously. Approving "what command is about to run" is not the same as approving "what `args[0]` happens to be" — POSIX `exec`, BSD `env -P`, and `env -S` all let an attacker hide the actual payload behind a wrapper. Each of these is a published shell technique; each had to be specifically detected in the OpenClaw approval surface.
+
+| Fix | Issue | Maps to |
+|---|---|---|
+| Detect `env -S` split-string command-carrier risks when `-S` / `-s` is combined with other env short options | (Unreleased) | §6.1 tool abuse (Phase 4) |
+| Treat POSIX `exec` as a command carrier for inline eval, shell-wrapper, and eval/source detection | (Unreleased) | §6.1 |
+| Unwrap BSD/macOS `env -P <path>` carrier commands before approval-command and strict inline-eval checks | (Unreleased) | §6.1 |
+| Add a tree-sitter-backed shell command explainer for future approval and command-review surfaces | #75004 | §5.1 explainability for approvals |
+| Fail closed on malformed `/codex` control commands and diagnostics confirmations *before* changing bindings | (Unreleased) | §5.1 fail-closed default |
+
+Lesson: **the approval surface is its own parser problem**. If you ask the user "approve `bash -c '...'`?", you must teach the parser every way that string can carry a payload. This is one of the cleanest examples of the discipline being **applied security thinking**, not "AI security."
+
+### 14.7 Boundary-categorized static analysis (CodeQL)
+
+The most interesting workflow choice in the repository is also the easiest to miss. OpenClaw's `.github/workflows/codeql.yml` does not split CodeQL by code volume; it splits by **security boundary**, with one job per boundary and a dedicated CodeQL config per category:
+
+```text
+codeql matrix
+  ├── core-auth-secrets            (auth and secret-handling code paths)
+  ├── channel-runtime-boundary     (per-channel inbound/outbound surface)
+  ├── network-ssrf-boundary        (egress / fetch / browser tab paths)
+  ├── mcp-process-tool-boundary    (tool dispatch and exec carriers)
+  ├── plugin-trust-boundary        (plugin install + load + scope)
+  └── actions                      (the GitHub Actions language itself)
+```
+
+What the user paraphrased as "CodeQL shard expansion" is more usefully described as **boundary-aware static analysis**. The boundaries are exactly the trust boundaries from §4 of this lecture. Every PR that touches code in one of those boundaries gets a focused scan with a config tuned to that boundary's threats. SSRF queries run over the network code; secret-flow queries run over the auth code. Cross-boundary code triggers multiple scans.
+
+This is the static-analysis equivalent of what §10.4 (defense in depth) demands at runtime: the layers are independent, the categories are aligned with the threat model, and a regression in one boundary has somewhere specific to surface.
+
+Lesson: **align your CI security tooling with your trust-boundary diagram**, not with your repository directory layout.
+
+### 14.8 What the corpus teaches
+
+Treating the OpenClaw security pass as a single artifact rather than a list of fixes:
+
+- **Most of the fixes are not "AI" fixes.** They are classical appsec, but applied to surfaces that classical appsec did not previously care about (npm install trust paths, channel-routing metadata, env-var-influenced binary resolution). The job is **applied** security.
+- **The model is not the layer that fixes any of these.** Every fix lives in the harness — the dispatcher, the resolver, the policy, the static-analysis matrix. This is the lecture's central claim, validated against shipping code.
+- **The fix granularity is per-resolver, per-route, per-boundary.** Compare to the wrong shape of fix: "harden env vars in general." Each landed fix names a specific resolver and tightens a specific code path. That is the right discipline.
+- **CI-side investments compound.** The boundary-categorized CodeQL matrix means every future fix in this corpus comes with a pre-existing per-boundary regression detector. The work scales sub-linearly with the codebase.
+- **The threat model is integration-shaped.** A pure chatbot has none of this. The category of work in §14.2-§14.6 only exists because the platform exposes WhatsApp, Telegram, Slack, Discord, Matrix, etc. as channels and `@openclaw/*` plugins as a tool surface.
+
+For a learner: read this corpus end-to-end. Then go find the equivalent body of work in any other shipping agent platform you have access to. The shape will be the same; the specific names will differ.
+
+---
+
 ## Key takeaways
 
 - AI agent security is not a special case of either appsec or ML safety; it is a discipline about **applying old security thinking to a new substrate** where natural language is executable.
@@ -561,6 +688,8 @@ Curated, not a dump. If you read three things from each list with full attention
 - Hardware-rooted trust is the closing layer for edge AI deployments where the operator cannot trust the physical environment.
 - Realistic timeline: 6–12 months part-time to a portfolio that demonstrates the build / break / fix / repeat loop.
 - The right metric for your progress is not "courses completed" but "attack-suite size of your own runtime, growing over time."
+- A real shipping agent platform's security work (§14) is mostly **classical appsec applied to surfaces classical appsec did not previously care about** — binary-resolution paths, channel routing, install trust roots, approval-time parsers — and almost none of it lives in the model.
+- Align CI security tooling with your trust-boundary diagram, not your directory tree (the OpenClaw boundary-categorized CodeQL matrix is the reference design).
 
 ---
 
@@ -594,6 +723,14 @@ Curated, not a dump. If you read three things from each list with full attention
 - AMD SEV-SNP — [https://www.amd.com/en/developer/sev.html](https://www.amd.com/en/developer/sev.html)
 - Intel TDX — [https://www.intel.com/content/www/us/en/developer/tools/trust-domain-extensions/overview.html](https://www.intel.com/content/www/us/en/developer/tools/trust-domain-extensions/overview.html)
 - NVIDIA H100 Confidential Computing — [https://developer.nvidia.com/blog/confidential-computing-on-h100-gpus/](https://developer.nvidia.com/blog/confidential-computing-on-h100-gpus/)
+
+### Case-study primary sources (§14)
+
+- OpenClaw repository — [https://github.com/openclaw/openclaw](https://github.com/openclaw/openclaw)
+- OpenClaw CHANGELOG — [https://github.com/openclaw/openclaw/blob/main/CHANGELOG.md](https://github.com/openclaw/openclaw/blob/main/CHANGELOG.md)
+- OpenClaw SECURITY policy — [https://github.com/openclaw/openclaw/blob/main/SECURITY.md](https://github.com/openclaw/openclaw/blob/main/SECURITY.md)
+- OpenClaw CodeQL workflow (boundary-categorized) — [https://github.com/openclaw/openclaw/blob/main/.github/workflows/codeql.yml](https://github.com/openclaw/openclaw/blob/main/.github/workflows/codeql.yml)
+- Selected issues cited above: #69674, #69701, #70830, #74454, #74458, #75004, #75178, #75731, #77266, #77280, #77470, #77472, #77483, #77530, #77544, #77648, #13417, #49864.
 
 ### Sibling roadmap modules
 
