@@ -1,6 +1,6 @@
 # Lecture 24 - What Is an AI Agent Harness? The Runtime Around the Model
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 23](Lecture-23.md) | **Next:** [Lecture 25](Lecture-25.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 23](Lecture-23.md) | **Next:** [Lecture 24b](Lecture-24b.md)
 
 ---
 
@@ -440,4 +440,4 @@ A reviewer should be able to point at any user-visible behavior of the agent and
 
 ---
 
-*Next: [Lecture 25 - OpenCoven Case Study: Agent-Native Workspace and Local Harness Substrate](Lecture-25.md)*
+*Next: [Lecture 24b - Session as Source of Truth: Event-Sourced Agent State](Lecture-24b.md)*
