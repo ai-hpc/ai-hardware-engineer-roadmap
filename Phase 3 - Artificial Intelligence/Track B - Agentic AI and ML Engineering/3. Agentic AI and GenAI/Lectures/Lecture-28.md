@@ -1,12 +1,19 @@
-# Lecture 28 - Pi: A Minimal Coding Agent and the Substrate Beneath OpenClaw
+# Lecture 28 - Pi (pi-mono): A Detail Reading of a Minimal Coding Agent
 
 **Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 27](Lecture-27.md) | **Next:** [Lab 01](Lab-01-Research-Agent.md)
 
 ---
 
-The OpenClaw case studies in Lectures 15-23 describe a multi-channel agent platform without ever naming the coding-agent **runtime substrate** it is built on. This lecture closes that gap. Pi, written by Mario Zechner, is the tiny coding agent that sits inside OpenClaw and inside several other agent products. Reading Pi is the most concrete answer the public literature currently offers to the question "what does a minimal but real harness actually look like?"
+This lecture is a close reading of the actual Pi repository: [github.com/badlogic/pi-mono](https://github.com/badlogic/pi-mono). Pi is the coding-agent substrate that sits beneath OpenClaw and several other agent products. Rather than describe the surface, this lecture pulls apart the repo and shows you how each design decision is wired in code: which packages exist, which tools are built in, how extensions register, how sessions are stored as branchable JSONL, what hot reload actually reloads, and what `No MCP` looks like as a real engineering stance with a concrete workaround.
 
-This lecture is built primarily on Armin Ronacher's January 2026 post *Pi: The Minimal Agent Within OpenClaw*. The voice is mine, the pedagogy is mine, but the ground truth about Pi's design comes from that source.
+Primary sources:
+
+- [`badlogic/pi-mono`](https://github.com/badlogic/pi-mono) — the repository itself, MIT-licensed, currently at v0.73.0 with 212 releases and 44.9k stars.
+- [`packages/coding-agent` README](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/README.md) — the CLI / TUI surface.
+- [`packages/agent` README](https://github.com/badlogic/pi-mono/tree/main/packages/agent) — the agent runtime framework.
+- Armin Ronacher, *Pi: The Minimal Agent Within OpenClaw* (Jan 31, 2026) — context and motivation.
+
+Where this lecture quotes specifics (slash commands, file paths, command-line flags, CLI tool names), those come from the project's own README at the time of writing.
 
 ---
 
@@ -14,394 +21,529 @@ This lecture is built primarily on Armin Ronacher's January 2026 post *Pi: The M
 
 By the end of this lecture, you should be able to:
 
-1. Describe Pi's tiny-core philosophy and name its four built-in tools.
-2. Explain why MCP is deliberately absent from Pi and what the structural argument is.
-3. Distinguish Pi's two extension surfaces (LLM tools vs TUI extensions) and decide which surface a given capability belongs in.
-4. Reason about session-tree branching as a context-management and side-quest primitive.
-5. Explain why custom (non-model) messages in the session log unlock extension state, hot reload, and replay.
-6. Identify which of Pi's design choices generalize to any harness and which are Pi-specific.
-7. Sketch how a higher-level product (OpenClaw, a Telegram bot, a chat-connected mom) embeds Pi.
-8. Apply Pi's "agent extends itself" pattern to your own runtime as a design principle.
+1. Name the five packages in pi-mono and explain what each one does.
+2. List Pi's four built-in tools and the three optional ones available via CLI flags.
+3. Read a Pi session JSONL file and explain how `id` / `parentId` produce a tree.
+4. Explain the difference between `/tree`, `/fork`, and `/clone` semantically.
+5. Write a minimal Pi extension that registers one tool, one slash command, and one event handler.
+6. Explain what `/reload` reloads, what hot-reloads automatically, and what does not reload at all.
+7. Tell a beginner why Pi has no MCP and what to do instead when MCP is required.
+8. Map every Pi design decision back to a section of Lecture 24 (harness concerns) and Lecture 24b (event-sourced session).
 
 ---
 
-## 1. What Pi is
+## 1. What Pi actually is
 
-A coding agent. There are many coding agents now. The point of Pi is not novelty in product category; it is **how little is in the core**.
+Pi (`pi-mono`) is a TypeScript monorepo that ships, as its primary product, a coding-agent CLI installed with one command:
 
-Quoting the cited blog: Pi has the shortest system prompt of any agent the author is aware of, and it has only four built-in tools.
-
-```
-Pi's built-in tool surface:
-
-  Read       open and read a file
-  Write      create or overwrite a file
-  Edit       structural edit on a file
-  Bash       execute a shell command
+```bash
+npm install -g @mariozechner/pi-coding-agent
+export ANTHROPIC_API_KEY=sk-ant-...
+pi
 ```
 
-That is the entire native capability. Everything else — git operations, browser automation, web search, todo lists, code review workflows — is either:
+Authentication can also use `/login` for subscription-based providers; the CLI then runs as an interactive TUI. The package is one of five in the monorepo, all MIT-licensed, all under the `@mariozechner/*` npm scope.
 
-- the model writing code at runtime to use one of those four tools to accomplish the goal, or
-- an extension the user (or the agent itself) authored.
-
-Compare to Claude Code's tool set (Read, Write, Edit, Bash, Glob, Grep, Agent, MCP, plus more), or Cursor's editor-aware multi-file edit family, and the difference is structural. Pi takes the position that a coding agent only really needs the file-shaped and shell-shaped primitives; every other capability composes from those.
+The repo description: *"Tools for building AI agents."* That is more accurate than calling Pi "a coding agent" — Pi is an *agent runtime kit*, of which the coding-agent CLI is the most visible product but not the only one.
 
 ---
 
-## 2. What is deliberately not in Pi
-
-Understanding Pi requires understanding the **omissions on purpose**. Three are notable.
-
-### 2.1 No MCP
-
-The Model Context Protocol is a community-standard tool-server interface. Pi does not implement it.
-
-This is not a roadmap item. The structural argument from the cited post: on most current model providers, tools — including MCP-mounted tools — must be loaded into the system context (or the tools section thereof) at session start. **Adding, removing, or hot-reloading tools mid-session invalidates the prompt cache and can confuse the model about how prior tool invocations should be reinterpreted.**
-
-If the harness's central design idea is "the agent writes and reloads its own extensions," a tool registry that requires session-start fixity is incompatible with that idea. So Pi does not adopt MCP at the protocol level.
-
-If MCP tools are needed, the workaround is `mcporter`: a CLI bridge that exposes MCP method calls as commands. The agent then uses Bash to invoke them. The tool surface stays at four built-ins; the MCP server is reachable as ordinary subprocess output.
-
-### 2.2 No community skill marketplace
-
-Pi supports extensions and skills. It does not encourage downloading them.
-
-The expected workflow when you want a new capability:
+## 2. The monorepo, package by package
 
 ```
-"build me an extension like the one over there, but with these changes"
-                                  |
-                                  v
-                       agent writes the extension
-                                  |
-                                  v
-                  hot reload, the agent tests its own work
-                                  |
-                                  v
-                       extension is now part of your runtime
+pi-mono/
+  packages/
+    ai/               @mariozechner/pi-ai             multi-provider LLM API
+    agent/            @mariozechner/pi-agent-core     agent runtime + tool calling
+    coding-agent/     @mariozechner/pi-coding-agent   the `pi` CLI / TUI
+    tui/              @mariozechner/pi-tui            differential-rendered TUI library
+    web-ui/           @mariozechner/pi-web-ui         web components for chat UI
+  .pi/                                                 self-config for development
+  .github/                                             CI workflows
+  scripts/                                             build / release scripts
 ```
 
-The model itself is the package manager. The repository is the user's instructions and the existing codebase.
+Read top-down, this is a stack: `ai` is the model abstraction, `agent` is the runtime that calls models and dispatches tools, `coding-agent` is the CLI that wires `agent` to a TUI, `tui` is the rendering library, `web-ui` is the equivalent surface for a browser. Each package is independently published; consumers can pick the layer they need.
 
-### 2.3 No model-specific feature lock-in
-
-Pi's underlying AI SDK is written so that a single session can contain messages from many different model providers. The framework explicitly avoids leaning into provider-specific features that cannot transfer.
-
-This is a non-trivial constraint. It means Pi is willing to forgo provider-specific FP8 attention plugins, paged-KV-cache APIs, or proprietary tool-calling extensions in exchange for the ability to switch providers mid-session without trashing the session log.
+A consequence: **a non-coding-agent product (a Slack bot, a Telegram bot, OpenClaw itself) consumes `@mariozechner/pi-agent-core` and `@mariozechner/pi-ai` directly** and supplies its own front-end. The coding-agent CLI is one consumer of the runtime, not the only one.
 
 ---
 
-## 3. The extension philosophy
+## 3. The built-in tool surface
 
-The point of Pi is summarized cleanly in the post:
+Pi's **default** tool set is four:
 
-> Pi celebrates the idea of code writing and running code.
+| Tool | Purpose |
+|---|---|
+| `read` | Read a file's contents |
+| `write` | Create or overwrite a file |
+| `edit` | Structural edit on an existing file |
+| `bash` | Execute a shell command |
 
-When you want a capability, the canonical flow is:
+Three more are available through CLI flags but are not enabled by default:
 
-1. Tell the agent what you want.
-2. The agent writes an extension (or remixes an existing one).
-3. Hot reload makes it live.
-4. The agent tests the extension end-to-end.
-5. Iterate until it works.
+| Tool | Purpose |
+|---|---|
+| `grep` | Text search across the workspace |
+| `find` | File-name search |
+| `ls` | Directory listing |
 
-Three properties of Pi's architecture make this loop feasible:
+The README's framing is exact: *"by default, pi gives the model four tools: `read`, `write`, `edit`, and `bash`."* The optional three exist for cases where the model would otherwise burn tokens spawning `bash -c "grep ..."`; they are convenience, not capability expansion.
 
-- **Hot reload at the session level.** Extensions can be added, modified, or removed without restarting the agent or invalidating prior work.
-- **Documentation and examples shipped in the agent's reach.** The agent has read access to Pi's own source and example extensions, so it has a concrete reference when authoring new ones.
-- **Custom messages in the session log.** Extensions can persist state across turns by writing into the same append-only log the model messages use, but in event types the model never sees.
-
-The cited post points out a corollary: Mario uses this same workflow to build his "mom" agent (a personal-assistant agent for his mother). Armin uses it to build a Telegram bot. OpenClaw is also a Pi consumer at the runtime level. **The same minimal coding agent can act as the substrate for very different products** because each consumer adds capability through extensions rather than forking the core.
-
----
-
-## 4. Architecture
-
-Four design decisions matter.
-
-### 4.1 Provider-agnostic AI SDK
-
-A single session can include turns from multiple model providers. The session log carries enough metadata that a turn produced by one provider can be inspected, replayed, or re-issued without depending on provider-specific message shapes.
-
-This is the same engineering posture as Lecture 24b: the session is the source of truth, the context window is a projection. Pi's contribution is making the session log explicitly multi-provider-clean.
-
-### 4.2 Custom (non-model) messages in the session
-
-Most agent runtimes treat the session log as "messages the model exchanged" plus an out-of-band sidecar for everything else. Pi unifies them: extensions write **custom messages** into the same append-only log, distinguished by a type tag. Some are visible to the model on the next turn, some are not.
-
-Concretely, this means:
-
-- An extension's persisted state is an event in the log, not a separate database.
-- Replay determinism (Lecture 24b §4) holds across extensions.
-- An extension can introspect what other extensions have written.
-- The audit / forensics story is the same for extension behavior as for model behavior.
-
-The cost: extensions must agree on a tag namespace and not collide. The benefit: one log, one source of truth, one replay surface.
-
-### 4.3 Hot reload of extensions
-
-Adding, removing, or modifying an extension takes effect in the running agent without losing the current session. This is what makes the "ask the agent to extend itself" workflow more than a research demo.
-
-The hard part is consistency under reload: tools that were exposed to the model on prior turns may no longer exist; tools that did not exist on prior turns may now be available. Pi's design implicitly accepts this by structuring tool exposure as a *session-time* choice rather than baking the tool catalog into prompt-cache prefixes.
-
-This is why Pi does not implement MCP at the protocol level: MCP's tool-mount story does not survive hot reload cleanly across most model providers' caching designs. Pi accepts the limitation and routes around it (see §2.1).
-
-### 4.4 Tree-structured sessions
-
-Pi's sessions are not linear conversation logs. They are trees. Branches diverge from a parent point and develop independently. The user can navigate up the tree and start a new branch from any prior turn.
-
-The case the post calls out:
-
-> a side-quest to fix a broken agent tool without wasting context in the main session. After the tool is fixed, I can rewind the session back to earlier and Pi summarizes what has happened on the other branch.
-
-This is a fundamentally different context-management primitive than linear compaction. Compaction throws information away in the same timeline; branching preserves it in a sibling timeline you can revisit or merge from.
-
-A tree-shaped session log is structurally more demanding (forks, merges, named branches, branch metadata) but pays back in:
-
-- **Side-quests** without polluting the main context.
-- **Counterfactual exploration:** what if the agent had taken a different approach at turn N?
-- **Parallel agents** that write into different branches of the same parent session.
-- **Review workflows** where review happens on a branch and findings are merged back as instructions, not as raw transcript.
+The structural argument for keeping the default at four: **most filesystem and shell capabilities compose from `bash`**. A model that can write a script and run it can do `grep`, `find`, `ls`, `git`, `curl`, `npm`, and any other CLI without each one having to be a separately registered tool whose schema lives in the prompt. This is the same principle as Lecture 24 §6.5: too many tools confuse selection and waste tokens.
 
 ---
 
-## 5. The two extension surfaces
+## 4. The slash command surface
 
-Pi distinguishes two kinds of extension. The distinction is exactly the harness-vs-model boundary from Lecture 24, made operational.
+Pi ships approximately twenty built-in slash commands. They group into clear categories.
 
-### 5.1 LLM tools (in-context)
-
-Capabilities that the model itself decides when to call. They consume context-window tokens (the tool spec must be in the prompt) and they appear in the model's tool-call grammar.
-
-When a capability belongs here:
-
-- The model is the right decider.
-- The capability is structurally narrow (one schema, one purpose).
-- The cost of having it always available is acceptable.
-
-The cited post gives one in-the-wild example: a todo-list tool. The agent writes / reads / updates a small todo list during a coding session. The author chose to expose this as a tool rather than as a CLI because "it felt appropriate for the scope of the problem."
-
-### 5.2 TUI extensions (out-of-context)
-
-Capabilities that are available to the user — not directly to the model — through slash-commands, custom terminal UIs, dashboards, panels, pickers, or interactive overlays. They do not consume context-window tokens.
-
-When a capability belongs here:
-
-- The user is the right decider, not the model.
-- The capability has rich, interactive UI demands (file picker, diff viewer, progress bar).
-- Including it in the model's context would be wasteful.
-
-The TUI surface in Pi is rich enough that one of its proofs of capability is running Doom inside it. The point of the demo is not gaming; it is that **the TUI layer is a real UI runtime, not a print-and-prompt loop**.
-
-### 5.3 The decision rule
-
-A simple test, distilled from the post:
+**Authentication and identity**
 
 ```
-Does the model need to choose when this happens?
-   Yes  -> LLM tool
-   No   -> TUI extension
-
-Does this consume an interactive UI surface?
-   Yes  -> TUI extension
-   No   -> probably an LLM tool, possibly nothing
-
-Does this need to appear in every prompt forever?
-   Yes  -> LLM tool, but reconsider
-   No   -> TUI extension
+/login          OAuth flow for subscription-based providers
+/logout         Drop credentials
+/model          Switch the active model
+/scoped-models  Mark which models cycle under Ctrl+P
+/settings       Thinking level, theme, message delivery, transport
 ```
 
-The harness-design lesson: **most things teams add as MCP tools belong on the TUI / out-of-context surface instead**. Putting them in-context wastes prompt tokens, distracts the model, and breaks cache prefixes.
+**Session control**
+
+```
+/new            Start a new session
+/resume         Pick from previous sessions
+/name <name>    Set the current session's display name
+/session        Show session info
+/quit           Quit
+```
+
+**Tree navigation (the interesting part)**
+
+```
+/tree           Jump to any point in the current session's tree
+/fork           Create a NEW session file from a previous user message
+/clone          Duplicate the current active branch into a new session file
+/compact        Manually compact context (with optional prompt)
+/reload         Reload keybindings, extensions, skills, prompts, context files
+```
+
+**Output and sharing**
+
+```
+/copy           Copy last assistant message to clipboard
+/export [file]  Export session to HTML
+/share          Upload as a private GitHub gist
+/changelog      Show version history
+/hotkeys        Show all keyboard shortcuts
+```
+
+**Extension surface**
+
+```
+/skill:<name>   Invoke a registered skill
+/<templatename> Expand a prompt template
+```
+
+That last category is important: **anything not built in is reachable through the same `/` syntax**. Extensions register their own commands and templates and they appear here without ceremony.
 
 ---
 
-## 6. Example extensions
+## 5. System prompt assembly
 
-The cited post walks through several extensions the author uses. These are useful as design exemplars, not as canonical features.
+Pi assembles its system prompt from layered files, with override and append semantics.
 
-### 6.1 `/answer`
+```
+priority order (highest to lowest):
 
-Reads the agent's last response, extracts the questions in it, and reformats them as a structured input box where the user answers all at once.
+  .pi/SYSTEM.md                 project-level full replacement
+  ~/.pi/agent/SYSTEM.md         global-level full replacement
+  default system prompt         shipped in the binary
 
-This works *with* natural prose answers from the model — the user does not need a structured-question tool that constrains the agent's voice — but gives the user a clean input affordance for replying.
+  + .pi/APPEND_SYSTEM.md        project-level appended after replacement target
+  + ~/.pi/agent/APPEND_SYSTEM.md  global appended after replacement target
 
-### 6.2 `/todos`
+  + AGENTS.md / CLAUDE.md       walked from cwd upward to root, all concatenated
+  + skill files                 all matching files concatenated
+```
 
-Surfaces a markdown todo list stored under `.pi/todos`. Both the agent and the user can manipulate items. Sessions can claim tasks to mark them as in-progress.
+This is the prompt-assembly pattern from Lecture 21 (OpenClaw System Prompt Architecture) made even simpler: a small fixed default, replaceable, with append hooks for project-specific guidance, plus walk-up context files (`AGENTS.md`, `CLAUDE.md`) the way every recent agent has settled on.
 
-This is the rare case where the same capability has *two* surfaces: an LLM tool (so the agent can manipulate todos during a coding session) and a TUI surface (so the human can review and re-prioritize).
-
-### 6.3 `/review`
-
-Branches the session into a review context. Pulls a commit, diff, uncommitted changes, or a remote PR; runs the agent against it with a prompt tuned to call out the things the user cares about; brings findings back into the main session as instructions.
-
-The structural point: review *should* happen in a branched session, because review context is large and burning it into the main session pollutes downstream work. Pi's tree-structured session log is what makes this clean.
-
-### 6.4 `/control`
-
-Lets one Pi instance send prompts to another. A minimal multi-agent primitive without orchestration overhead.
-
-The author calls this "experimental," which is the right framing — most multi-agent systems are over-orchestrated; the Pi-shaped answer is "give one agent the ability to talk to another and see what happens."
-
-### 6.5 `/files`
-
-Lists files changed or referenced in the session. Reveal in Finder, diff in VS Code, quick-look, or reference in the next prompt. A keyboard shortcut quick-looks the most recently mentioned file (handy when the agent produces a PDF).
-
-This is a pure TUI extension — it does not appear to the model — and exemplifies the rule from §5.3: the user is the decider here, not the agent.
-
-### 6.6 What isn't shown
-
-Other extensions cited: an interactive-shell extension that lets Pi autonomously run interactive CLIs in an observable TUI overlay; a sub-agent extension. The point of the catalog is not exhaustiveness; it is showing the *range* of what the surface enables.
+The `CLAUDE.md` filename being honored alongside `AGENTS.md` is a deliberate compatibility move: a workspace already configured for Claude Code drops cleanly into Pi without renaming files.
 
 ---
 
-## 7. Why MCP cannot fit Pi cleanly
+## 6. The session model
 
-Worth making the structural argument explicit, because this is the most argued-about design choice in the public discussion of Pi.
+Sessions are JSONL files stored under `~/.pi/agent/sessions/`, organized by working directory. The on-disk shape is the simplest possible event log:
 
-MCP, as currently deployed, expects:
+```jsonl
+{"id":"a","parentId":null,"role":"user","content":"refactor this fn"}
+{"id":"b","parentId":"a","role":"assistant","content":"…"}
+{"id":"c","parentId":"b","role":"toolResult","name":"read","data":"…"}
+{"id":"d","parentId":"c","role":"assistant","content":"…"}
+{"id":"e","parentId":"a","role":"user","content":"actually try a different approach"}
+{"id":"f","parentId":"e","role":"assistant","content":"…"}
+```
 
-1. Tools are mounted at session start.
-2. Tool descriptions are part of the system context (or a closely-cached tools section).
-3. The model reasons about which tools exist with the assumption that the tool catalog is stable for the session.
+Each line carries an `id` and a `parentId`. Most lines extend the active branch (their `parentId` is the previous line's `id`). When the user takes a side-quest, a new line is written whose `parentId` is **not** the previous line — it is some earlier ancestor. The result is a tree, in one file:
 
-Pi's design wants:
+```
+                    a (user: refactor this fn)
+                   / \
+                  b   e (user: actually try a different approach)
+                  |   |
+                  c   f
+                  |
+                  d
+```
 
-1. Tools can be added, removed, or modified during a session.
-2. Adding or removing a tool should not trash the prompt cache or invalidate the model's prior reasoning.
-3. The agent itself can add tools as part of its work.
+Both branches `[a → b → c → d]` and `[a → e → f]` live in the same JSONL file. The active branch is determined by which leaf the runtime considers current.
 
-These are in tension. Specifically:
+The format is **Lecture 24b's "session is source of truth" principle** at minimum cost: one append-only file, one `parentId` field, no separate database. This is also why replay works trivially: re-read the file, fold events along whichever branch you select, derive the context window from there.
 
-| MCP assumption | Pi requirement | Conflict |
+---
+
+## 7. `/tree`, `/fork`, and `/clone` — three different things
+
+The naming matters. From the README:
+
+| Command | Effect | Files affected |
 |---|---|---|
-| Stable tool set per session | Mutable mid-session | Yes, structurally |
-| Tool descriptions cacheable in prompt prefix | Tools may be reloaded | Cache miss on reload |
-| Model has consistent tool catalog | Model may see different catalogs across turns | Possible incoherence |
+| `/tree` | Jump to any point in the current session's tree, switch branches in place | One file (the current session); just changes the active leaf |
+| `/fork` | Create a **new session file** from a previous user message; copies the active path up to that point; selected prompt placed in the editor for modification | Two files (original untouched; new session created) |
+| `/clone` | Duplicate the current active branch into a **new session file** at the current position; full active-path history kept; opens with empty editor | Two files (original untouched; new session created) |
 
-The right approach for Pi is therefore **not** to implement MCP natively; it is to expose MCP servers through the Bash tool via `mcporter`. The Bash tool surface is stable; the MCP server is just a subprocess.
+The mental model:
 
-The general lesson: **a harness's tool surface and its capability extension model are coupled architectural decisions**. You cannot pick "tools defined as MCP, mounted at session start" and "agent extends itself by writing tools" without paying for the conflict somewhere.
+- `/tree` is *navigation* within one session.
+- `/fork` is *what-if from a past prompt*, with that prompt loaded for editing — you are saying "I want to ask this differently."
+- `/clone` is *snapshot at the current state into a new session* — you are saying "I want to take this conversation somewhere else without polluting the original."
 
----
+These three primitives cover the realistic side-quest design space:
 
-## 8. Software building software
+- Try a different approach to an old prompt → `/fork` from that prompt.
+- Go investigate something orthogonal without losing the main thread → `/clone`, work in the clone, come back.
+- Move between branches that already exist → `/tree`.
 
-The thesis the cited post returns to repeatedly:
-
-> Software that builds more software.
-
-Pi is one expression of this. A minimal core, an extension surface, a model that can write extensions, hot reload to make them live. The user spends most of their time using a runtime that the user (via the agent) keeps growing.
-
-The terminal expression — the one where this stops being a coding-tool feature and becomes a product category — is when you remove the local UI entirely and connect the agent to a chat channel. Then you have **OpenClaw**: Pi underneath, plus the gateway, channel routing, pairing, scope, and audit machinery from Lectures 15-23.
-
-OpenClaw and Pi are not competitors. OpenClaw embeds Pi. The gateway is the part Lectures 15-23 cover; the harness underneath is what this lecture covers. They compose.
-
-The same composition pattern shows up elsewhere:
-
-- A Telegram bot built on Pi as its agent core, with channel-specific tooling layered on top.
-- A "mom agent" — a personal assistant for the author's mother — built the same way.
-- A research agent. A code-review agent. A docs-Q&A agent. All Pi underneath, with extensions added per use case.
-
-The economic and engineering insight: **a minimal harness becomes a substrate**. The same code base can power many products if the extension surface is rich enough that each product gets to grow what it needs.
+A linear-only session log can do none of these without additional machinery.
 
 ---
 
-## 9. What generalizes, what is Pi-specific
+## 8. The Extension API
 
-Worth being precise about what is a transferable design lesson and what is a Pi-shaped choice.
+Extensions live in two well-known locations:
 
-| Decision | Generalizable? | Why |
+```
+~/.pi/agent/extensions/    global, available everywhere
+.pi/extensions/            project-local
+```
+
+A third path is "pi packages" (npm packages discoverable through the normal Node resolution chain). Extensions can be disabled per-run with `--no-extensions` or explicitly loaded with `-e`.
+
+Each extension is a TypeScript module with a default export: a function that takes an `ExtensionAPI` object and registers everything it wants:
+
+```typescript
+export default function (pi: ExtensionAPI) {
+  pi.registerTool({
+    name: "deploy",
+    label: "Deploy",
+    description: "Deploy the current branch to staging",
+    parameters: Type.Object({
+      target: Type.String({ description: "staging | production" })
+    }),
+    execute: async (toolCallId, params, signal, onUpdate) => {
+      // ...
+    }
+  });
+
+  pi.registerCommand("stats", {
+    description: "Show cost and token usage for this session",
+    handler: async (ctx) => { /* ... */ }
+  });
+
+  pi.on("tool_call", async (event, ctx) => {
+    // observe every tool call, with full context
+  });
+}
+```
+
+What `ExtensionAPI` exposes (from the README):
+
+- **`registerTool()`** — add an LLM-visible tool (Lecture 24 §2.1 dispatch surface)
+- **`registerCommand()`** — add a slash command (out-of-context, user-visible)
+- **`on(event, handler)`** — subscribe to runtime events such as `tool_call`
+- Custom UI components, status lines, headers, footers, in-place editors
+- Async extension factories (so extensions can do startup work)
+
+Two structural notes on this API:
+
+1. **The extension surface is the same as Lecture 24's two extension surfaces** (in-context LLM tools vs out-of-context TUI). `registerTool()` is the former; `registerCommand()` and the UI hooks are the latter. The decision rule from Lecture 24 §5.3 applies directly.
+
+2. **Event handlers are first-class.** This is what makes "the agent extends itself" practical: an extension can observe tool calls, react to them, modify them, log them, gate them. The same hook surface that audit / security / telemetry would use is the one extensions see.
+
+---
+
+## 9. The Agent runtime — `pi-agent-core`
+
+If the coding-agent CLI is the visible surface, `pi-agent-core` is the substrate. It is what OpenClaw, a Telegram bot, or your own front-end consumes when they want Pi-style agent behavior without the CLI.
+
+The exposed shape:
+
+```typescript
+agent.state.systemPrompt  = "..."
+agent.state.model         = getModel(...)
+agent.state.tools         = [tool1, tool2]
+agent.state.messages      = [...]    // top-level array; copied on assign
+
+await agent.waitForIdle()
+agent.abort()
+agent.reset()
+
+// read-only:
+agent.isStreaming
+agent.streamingMessage
+agent.pendingToolCalls
+agent.errorMessage
+```
+
+Tool definitions use a TypeBox-based interface:
+
+```typescript
+const readFileTool: AgentTool = {
+  name:           "read_file",
+  label:          "Read File",
+  description:    "Read a file's contents",
+  parameters:     Type.Object({ path: Type.String() }),
+  executionMode:  "sequential",   // or default parallel
+  execute: async (toolCallId, params, signal, onUpdate) => {
+    // tool body
+    // returns a result, or throws on failure
+    // may include `terminate: true` to skip the next LLM call
+  }
+};
+```
+
+Two specifics that matter:
+
+- **`executionMode: "sequential"`** — opt-out of parallel tool execution for tools that must not run concurrently. By default the runtime can execute non-conflicting tool calls in parallel.
+- **`terminate: true`** — a tool result can flag the agent to skip the automatic follow-up LLM call. Useful for tools whose result is the answer (e.g., a `commit` tool that succeeded; nothing more to say).
+
+Custom message types are added by **declaration merging** on a `CustomAgentMessages` interface, then filtered out of the LLM-bound subset by `convertToLlm()`. This is the "custom messages in the session log" pattern from §6 made operational at the type level.
+
+---
+
+## 10. Hot reload — what actually reloads
+
+Pi's hot-reload story is more specific than "edit and save."
+
+**`/reload`** is a manual command that re-reads:
+
+- keybindings
+- extensions
+- skills
+- prompts
+- context files (`AGENTS.md` / `CLAUDE.md`)
+
+**Themes hot-reload automatically** — modify the active theme file and the change applies immediately, no `/reload` needed.
+
+**What does NOT reload at runtime:**
+
+- the underlying agent runtime / TUI itself (requires process restart)
+- already-running tool executions (sequential ones especially)
+- model API state (cache prefixes etc.)
+
+The structural lesson: hot reload in an agent runtime is *not* "every layer is hot-reloadable." It is specifically the *configuration and extension layers* that are hot-reloaded; the runtime core stays stable. This is exactly the right line to draw — it gives you the "agent extends itself" loop without inviting the bug class where a tool is half-reloaded mid-execution.
+
+---
+
+## 11. Configuration paths
+
+| Path | Purpose | Scope |
 |---|---|---|
-| Tiny core / few tools | Yes | Constraints concentrate the model's reasoning; reduces context bloat. |
-| Hot-reloadable extensions | Yes, with care | The harder the cache prefix is to invalidate, the more this matters. |
-| Custom messages in the session log | Yes | Lecture 24b makes this a general principle. |
-| Tree-structured sessions | Yes, but expensive | Branching is structurally valuable; UI and storage cost is real. |
-| TUI vs LLM-tool surface split | Yes | The decision rule generalizes to any harness. |
-| No MCP | No | This is contingent on Pi's hot-reload requirement. Other harnesses with stable tool sets should adopt MCP. |
-| `mcporter`-via-Bash workaround | Pi-specific | Useful idea, but the right shape depends on which compromise the harness makes. |
-| Runs Doom in the TUI | Pi-specific | Provocative demo, not architecture. |
+| `~/.pi/agent/settings.json` | Settings (theme, thinking level, transport, etc.) | Global |
+| `.pi/settings.json` | Settings overrides | Project |
+| `~/.pi/agent/SYSTEM.md` | System prompt full replacement | Global |
+| `.pi/SYSTEM.md` | System prompt full replacement | Project |
+| `~/.pi/agent/APPEND_SYSTEM.md` | System prompt append | Global |
+| `.pi/APPEND_SYSTEM.md` | System prompt append | Project |
+| `~/.pi/agent/extensions/` | Extensions | Global |
+| `.pi/extensions/` | Extensions | Project |
+| `~/.pi/agent/sessions/` | Session JSONL files (organized by cwd) | Per-cwd within global |
+| `~/.pi/agent/skills/` | Skills | Global |
+| `.pi/skills/` | Skills | Project |
+| `AGENTS.md`, `CLAUDE.md` | Context files | Walked up from cwd |
 
-If you are reading this lecture to decide what to put in your own harness, the lessons that travel are: **tiny core, custom-message-in-log extension state, tree-structured sessions when you can afford them, and a clear rule for where tools live**. The MCP debate is secondary.
+The whole config tree is overridable via the `PI_CODING_AGENT_DIR` environment variable, which is useful for testing and for running multiple isolated Pi instances.
 
----
-
-## 10. Hardware-track tie-in
-
-Why this lecture lives in a hardware-engineer roadmap:
-
-- **Edge devices benefit disproportionately from minimal cores.** A 4-tool agent has a smaller memory footprint, a smaller prompt-cache surface, and faster cold-start than a feature-bloated harness. On Jetson AGX or NXP i.MX 95, this matters.
-- **Hot reload on resource-constrained devices is non-trivial.** The Pi pattern transfers but the cost of invalidating a prompt cache differs by device — Hopper / Thor with FP8 caches pay differently from Orin Nano with limited unified memory. The substrate must understand its target.
-- **Provider-agnostic SDKs unlock on-device-vs-cloud routing.** A session that can mix turns from a remote 70B-class model with turns from a local 3B-class model is the right shape for hybrid deployment. Pi's multi-provider posture is the right primitive even when one of those providers is a local llama.cpp server.
-- **Tree-structured sessions are a concurrency primitive on multi-agent edge fleets.** Two robots branching from a shared parent session is a natural way to express coordination without forcing ordering through one master.
-
-The VLA deploy guide in Phase 4 / Track B / ML and AI / `vla-deploy-jetson` is the closest sibling: same engineering posture (minimal substrate, hot-reloadable composition, edge-aware design), different target workload (vision-language-action models instead of coding agents).
+The convention is the well-trodden one: a hidden dotted directory (`.pi`) in the project, a corresponding `~/.pi/agent/` for globals, and a single env var for everything-else cases. No surprises.
 
 ---
 
-## 11. Build it
+## 12. The "No MCP" stance, made concrete
 
-For learners: write your own minimal harness with these constraints, in any language you like.
+The README is direct: *"No MCP. Build CLI tools with READMEs (see Skills), or build an extension that adds MCP support."*
 
-- **Four built-in tools only:** Read, Write, Edit, Bash. No others without explicit justification.
-- **Append-only session log** with two event categories: model messages and custom (extension) messages, distinguished by type tag.
-- **Hot-reloadable extensions** that register either an LLM tool, a TUI surface, or both. Reload must not invalidate the session log.
-- **Branchable sessions.** From any node you can fork; you can navigate up the tree and start a new branch. Branch metadata stored in the same log.
-- **Provider-agnostic model interface** abstracted enough that you can mix providers in a single session.
-- **Bash-as-the-MCP-bridge** if you need MCP servers. Do not implement MCP natively until you understand the cost.
+The structural argument was previewed in Lecture 24 §2.1 and Lecture 27 §14.6. In Pi-specific terms:
 
-Acceptance test: ask your harness to write its own next extension. A `/diff` command that surfaces the current diff in a TUI overlay is a good first goal.
+- Pi expects to **mutate the tool surface mid-session** (extensions register tools; skills are loaded on demand; `/reload` re-reads everything).
+- MCP, as deployed across most providers, expects the tool catalog to be **stable for the session** so it can sit in the cached prompt prefix.
+- These two are in direct tension. Pi resolves it by not adopting MCP at the protocol level.
+
+What you do instead:
+
+1. **Build CLI tools and put a README on them.** Pi's `bash` tool reaches them by name; the README is what teaches the model how to use them. Skills make this idiomatic — a skill is a directory with a few markdown files and supporting scripts.
+2. **Build an MCP-bridge extension** if you genuinely need MCP. The extension can spawn `mcporter` (or similar), translate calls, register the methods as Pi tools dynamically, and clean up on exit.
+
+The lesson is broader than Pi: **a harness's tool-surface mutability and its protocol choice are coupled architectural decisions**. You cannot pick "tools defined as MCP, mounted at session start" and "agent extends itself by writing tools" without paying for the conflict somewhere.
+
+---
+
+## 13. Keyboard shortcuts as a UX primitive
+
+Pi ships a keyboard-first TUI. The shortcuts are not decoration; they are the actual interaction model.
+
+Selected from the README:
+
+| Key | Action |
+|---|---|
+| `Ctrl+C` | Clear editor (single press) |
+| `Ctrl+C` × 2 | Quit |
+| `Escape` | Cancel / abort |
+| `Escape` × 2 | Open `/tree` |
+| `Ctrl+L` | Open model selector |
+| `Ctrl+P` / `Shift+Ctrl+P` | Cycle scoped models forward / backward |
+| `Shift+Tab` | Cycle thinking level |
+| `Ctrl+O` | Collapse / expand tool output |
+| `Ctrl+T` | Collapse / expand thinking blocks |
+| `Shift+Enter` | Multi-line editor (`Ctrl+Enter` on Windows Terminal) |
+| `Tab` | Path completion |
+| `Ctrl+V` | Paste images (`Alt+V` on Windows) |
+| `Enter` | Queue steering message (mid-stream) |
+| `Alt+Enter` | Queue follow-up message |
+| `Ctrl+G` | Open external editor |
+
+Three of these are agent-specific innovations worth calling out:
+
+- **`Enter` queues a steering message during a running stream.** You do not have to abort; you tell the agent something while it is working and it picks the message up at the next safe point.
+- **`Alt+Enter` queues a follow-up.** Same idea but applies after the current turn completes rather than mid-stream.
+- **`Escape` × 2 jumps to `/tree`.** Branch navigation is one keystroke away from anywhere.
+
+These all reflect the same design choice: **the human is in the loop continuously**, not just at turn boundaries. The TUI gives you the affordances to act mid-stream, and the agent runtime is built to accept those signals without breaking.
+
+---
+
+## 14. The pi-mono ecosystem
+
+The repo names two sister projects worth knowing:
+
+- **[`badlogicgames/pi-share-hf`](https://github.com/badlogicgames/pi-share-hf)** — publish a Pi session to Hugging Face. The pattern is "session as artifact": once you have a tree-structured event log, sharing it is just publishing the file.
+- **[`earendil-works/pi-chat`](https://github.com/earendil-works/pi-chat)** — Slack/chat automation workflows on top of Pi. Pi is the runtime; this is one of several front-ends that demonstrate `pi-agent-core` is meant to be embedded.
+
+The branding domain is `pi.dev`.
+
+The 44.9k-star count and 212 releases at v0.73.0 (May 2026) suggest a project that ships frequently and has reached a substantial user base. For a learner: **the version cadence is itself a signal** that the architectural choices in this lecture are not theoretical — they have to survive contact with users in production weekly.
+
+---
+
+## 15. Mapping every Pi decision back to Lectures 24 and 24b
+
+Pi is the most concrete public instantiation of the general harness theory in this course. Walking the mapping:
+
+| Pi decision | Lecture 24 / 24b principle |
+|---|---|
+| Four built-in tools (read, write, edit, bash) | §2.1 dispatch surface; §6.5 too-many-tools anti-pattern |
+| `~/.pi/agent/sessions/*.jsonl` append-only | Lecture 24b §1 session as source of truth |
+| `id` + `parentId` tree | Lecture 24b §2 event sourcing for cognition |
+| Custom message types via declaration merging | Lecture 24b §3 schema; §10 anti-pattern eliminated |
+| `/reload` for extensions, themes auto-reload | §2.6 extensibility; §5 stateless interpreter pattern |
+| `.pi/SYSTEM.md` overrides + `APPEND_SYSTEM.md` | §2.3 context construction; Lecture 21 prompt assembly |
+| `registerCommand` (TUI) vs `registerTool` (LLM) | §5.1 / §5.2 / §5.3 the decision rule |
+| `executionMode: "sequential"` opt-out | §2.4 planning and recovery; tool-call ordering |
+| `terminate: true` in tool result | §2.4 turn-loop control |
+| Walk-up `AGENTS.md` / `CLAUDE.md` | §2.3 context construction |
+| `PI_CODING_AGENT_DIR` env var | §2.5 policy and permission isolation between instances |
+| No MCP, with `bash`-and-CLI workaround | §2.1 dispatch boundary; §2.6 extensibility tradeoff |
+| `/tree`, `/fork`, `/clone` | Lecture 24b §2 capabilities (branching is the unlocked one) |
+| Mid-stream `Enter` to steer | §2.4 planning and recovery; human-in-the-loop |
+
+This table is the answer to "should I copy Pi's design decisions into my own harness?" Yes, except the No-MCP one — that is contingent on whether you also adopt mid-session mutability. Adopt both or neither.
+
+---
+
+## 16. Hardware-track tie-in
+
+For learners on the Jetson / edge AI track, Pi is structurally interesting in three specific ways:
+
+**Minimal core, minimal cold start.** A four-tool harness has a smaller prompt-cache surface and a faster cold start than feature-bloated alternatives. On a Jetson AGX with limited unified memory (Lecture VLA Deployment on Edge GPUs §5), every ~10 KB of system prompt costs decode latency on the first turn. Pi's minimum is small enough that it does not dominate.
+
+**Provider-agnostic SDK enables hybrid routing.** `pi-ai` abstracts model providers cleanly enough that one session can mix a remote Anthropic call with a local on-device model (vLLM, llama.cpp, ONNX Runtime, the VLA stack from `vla-deploy-jetson`). The session log captures provider metadata per turn so replay still works. This is the right primitive for the hybrid cloud-vs-edge deployment pattern.
+
+**Tree-structured sessions as a multi-agent edge primitive.** Two robots branching from a shared parent session expresses coordination without forcing a master-slave ordering. A Pi-on-Jetson fleet has a natural way to do this without bolting orchestration on top.
+
+The VLA deploy guide in Phase 4 / Track B / ML and AI / `vla-deploy-jetson` is the closest sibling: **same engineering posture (minimal substrate, hot-reloadable composition, edge-aware design), different target workload**.
+
+---
+
+## 17. Build it
+
+Two concrete artifacts, in increasing difficulty.
+
+**Beginner — write a Pi extension.** Pick a capability you actually want: a `/diff` command that shows the current uncommitted diff in a TUI overlay, a `/cost` command that surfaces session cost and tokens, a `/scratchpad` command that opens an external editor for a quick note appended to the session as a custom message. Register one slash command, one event handler, and (optionally) one LLM tool. Land it in `.pi/extensions/` in your own working tree.
+
+**Intermediate — embed `pi-agent-core` in a non-CLI front-end.** Build a small Discord bot, Slack bot, or web chat that uses `@mariozechner/pi-ai` and `@mariozechner/pi-agent-core` directly. Implement the four-tool default (or a subset). Persist sessions to JSONL with the same `id` / `parentId` shape. The point: prove to yourself that the substrate is consumable independent of the CLI.
+
+**Advanced — write your own minimal harness in a different language**, applying every principle from the §15 mapping table. Same four built-in tools, same JSONL session format with `parentId` tree, same two extension surfaces. You will know you have understood the architecture when your harness can host an extension written by a model, hot-reload it, and continue the same session afterward.
 
 ---
 
 ## Key takeaways
 
-- Pi is the substrate beneath OpenClaw and the most concrete public answer to "what does a minimal coding-agent harness actually look like."
-- Four built-in tools — Read, Write, Edit, Bash — and the shortest system prompt the cited author has seen. Everything else is extension.
-- The MCP omission is a structural choice, not a roadmap gap. Pi's hot-reloadable extension model conflicts with MCP's session-start tool-catalog assumption.
-- Custom messages in the same append-only session log are how extension state, hot reload, and replay all work cleanly together. This is Lecture 24b's "session is source of truth" principle made operational.
-- Tree-structured sessions are a fundamentally different context-management primitive from linear compaction. Branching enables side-quests, parallel work, and review workflows that linear-only logs cannot.
-- Two extension surfaces: in-context LLM tools (model decides) vs out-of-context TUI extensions (user decides). The decision rule generalizes to any harness.
-- Pi's example extensions (`/answer`, `/todos`, `/review`, `/control`, `/files`) are useful as design exemplars; the principle is more important than the catalog.
-- A minimal harness becomes a substrate. The same Pi core powers OpenClaw, a Telegram bot, a research agent, a personal assistant, and others — each by adding extensions rather than forking.
-- For hardware-track learners: minimal cores, hot-reloadable composition, and provider-agnostic session models are exactly the substrate properties edge AI deployments need.
+- pi-mono is a TypeScript monorepo of five packages: `pi-ai`, `pi-agent-core`, `pi-coding-agent`, `pi-tui`, `pi-web-ui`. The CLI is one product; the runtime is meant to be embedded.
+- The default tool set is exactly four: `read`, `write`, `edit`, `bash`. Three more (`grep`, `find`, `ls`) are CLI-toggleable.
+- Sessions are JSONL files keyed by `id` and `parentId` — a tree in one file. `/tree` navigates, `/fork` branches from a past prompt, `/clone` snapshots the active branch into a new session.
+- Extensions live in `~/.pi/agent/extensions/` or `.pi/extensions/` and register through an `ExtensionAPI` that exposes both LLM-tool registration and TUI / slash-command registration. Event handlers (`pi.on("tool_call", ...)`) make extensions first-class observers.
+- Hot reload is targeted, not universal: `/reload` re-reads keybindings, extensions, skills, prompts, and context files; themes hot-reload automatically; the runtime core does not reload.
+- "No MCP" is a structural choice driven by Pi's mid-session mutability requirement, not a roadmap gap. Use CLI tools with READMEs, or write an extension to bridge MCP, or use `bash` to invoke `mcporter`.
+- Custom message types (declaration-merged into `CustomAgentMessages`) are how extensions persist state into the same append-only session log. This is Lecture 24b's principle made operational.
+- Mid-stream steering (`Enter` queues a message; `Alt+Enter` queues follow-up; `Escape × 2` opens `/tree`) is a UX primitive built on the assumption that the human is in the loop continuously, not only at turn boundaries.
+- Every major Pi design decision maps back to a section of Lecture 24 (harness concerns) and Lecture 24b (event-sourced session). Pi is the cleanest public instance of those principles in shipping code.
+- For hardware-track learners: minimal cores, provider-agnostic SDKs, and tree-structured sessions are exactly the substrate properties edge AI deployments need.
 
 ---
 
 ## References
 
-### Primary source for this lecture
+### Primary sources
 
-- Armin Ronacher, *Pi: The Minimal Agent Within OpenClaw* (Jan 31, 2026) — the cited blog post that grounds this lecture: [https://lucumr.pocoo.org](https://lucumr.pocoo.org) (full URL on the author's blog index).
+- pi-mono repository — [https://github.com/badlogic/pi-mono](https://github.com/badlogic/pi-mono)
+- `packages/coding-agent` README — [https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/README.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/README.md)
+- `packages/agent` README — [https://github.com/badlogic/pi-mono/tree/main/packages/agent](https://github.com/badlogic/pi-mono/tree/main/packages/agent)
+- npm: `@mariozechner/pi-coding-agent` — [https://www.npmjs.com/package/@mariozechner/pi-coding-agent](https://www.npmjs.com/package/@mariozechner/pi-coding-agent)
+- npm: `@mariozechner/pi-agent-core` — [https://www.npmjs.com/package/@mariozechner/pi-agent-core](https://www.npmjs.com/package/@mariozechner/pi-agent-core)
+- npm: `@mariozechner/pi-ai` — [https://www.npmjs.com/package/@mariozechner/pi-ai](https://www.npmjs.com/package/@mariozechner/pi-ai)
+- npm: `@mariozechner/pi-tui` — [https://www.npmjs.com/package/@mariozechner/pi-tui](https://www.npmjs.com/package/@mariozechner/pi-tui)
 
-### Related curriculum lectures
+### Sister and consumer projects
 
-- [Lecture 15 - OpenClaw Gateway Architecture](Lecture-15.md)
-- [Lecture 16 - OpenClaw Routing and Sessions](Lecture-16.md)
-- [Lecture 17 - OpenClaw Multi-Agent Isolation](Lecture-17.md)
-- [Lecture 18 - OpenClaw Operations and Security](Lecture-18.md)
-- [Lecture 19 - The OpenClaw Agent Loop](Lecture-19.md)
-- [Lecture 20 - OpenClaw Cron and Scheduled Agent Runs](Lecture-20.md)
+- `badlogicgames/pi-share-hf` — session publishing to Hugging Face: [https://github.com/badlogicgames/pi-share-hf](https://github.com/badlogicgames/pi-share-hf)
+- `earendil-works/pi-chat` — Slack / chat workflows on Pi: [https://github.com/earendil-works/pi-chat](https://github.com/earendil-works/pi-chat)
+- OpenClaw — multi-channel agent platform consuming Pi as a runtime: [https://github.com/openclaw/openclaw](https://github.com/openclaw/openclaw)
+- pi.dev — the project's primary domain.
+
+### Context
+
+- Armin Ronacher, *Pi: The Minimal Agent Within OpenClaw* (Jan 31, 2026) — the framing essay that introduced this lecture's subject.
+
+### Curriculum cross-references
+
 - [Lecture 21 - OpenClaw System Prompt Architecture](Lecture-21.md)
-- [Lecture 22 - OpenClaw App SDK and Typed Gateway RPCs](Lecture-22.md)
-- [Lecture 23 - OpenClaw Gateway RPC Protocol](Lecture-23.md)
-- [Lecture 24 - What Is an AI Agent Harness?](Lecture-24.md) — the theory Pi instantiates.
-- [Lecture 24b - Session as Source of Truth](Lecture-24b.md) — the event-sourcing model Pi's custom-messages design rests on.
-- [Lecture 25 - OpenCoven Local Harness Substrate](Lecture-25.md) — sibling case study: a local *workspace* substrate, where Pi is a *coding-agent* substrate.
-- [Lecture 26 - OpenKnots Trustworthy Agent Interfaces](Lecture-26.md) — interface layer above harnesses.
-- [Lecture 27 - AI Agent Security Engineer: A Practitioner's Roadmap](Lecture-27.md) — security discipline applicable to any harness.
-
-### Related external projects and tools
-
-- OpenClaw (the chat-channel agent platform that embeds Pi): [https://github.com/openclaw/openclaw](https://github.com/openclaw/openclaw)
-- `mcporter` (CLI bridge exposing MCP server methods as commands; the documented Pi-with-MCP workaround).
-- Model Context Protocol specification: [https://modelcontextprotocol.io/](https://modelcontextprotocol.io/)
-- Claude Code, Cursor, AMP, OpenAI Codex CLI — comparison points cited in the source post.
-
-### Sibling roadmap modules
-
-- [Phase 4 / Track B / VLA Deployment on Edge GPUs](../../../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/5.%20Application%20Development/5.%20ML%20and%20AI/vla-deploy-jetson/Guide.md) — same engineering posture (minimal substrate, hot-reloadable composition) applied to vision-language-action workloads.
+- [Lecture 24 - What Is an AI Agent Harness?](Lecture-24.md)
+- [Lecture 24b - Session as Source of Truth](Lecture-24b.md)
+- [Lecture 25 - OpenCoven Local Harness Substrate](Lecture-25.md)
+- [Lecture 26 - OpenKnots Trustworthy Agent Interfaces](Lecture-26.md)
+- [Lecture 27 - AI Agent Security Engineer Roadmap](Lecture-27.md)
+- [Phase 4 / Track B / VLA Deployment on Edge GPUs](../../../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/5.%20Application%20Development/5.%20ML%20and%20AI/vla-deploy-jetson/Guide.md) — sibling minimal-substrate engineering posture for VLA workloads.
 
 ---
 
