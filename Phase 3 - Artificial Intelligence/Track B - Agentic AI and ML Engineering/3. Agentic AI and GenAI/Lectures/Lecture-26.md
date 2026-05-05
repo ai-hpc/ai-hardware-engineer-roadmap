@@ -1,6 +1,6 @@
 # Lecture 26 - OpenKnots Case Study: Trustworthy Agent Interfaces and Local-First Coding Surfaces
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 25](Lecture-25.md) | **Next:** [Lab 01](Lab-01-Research-Agent.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 25](Lecture-25.md) | **Next:** [Lecture 27](Lecture-27.md)
 
 ---
 
@@ -723,4 +723,4 @@ Make product claims evidence-backed.
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 27 - AI Agent Security Engineer: A Practitioner's Roadmap](Lecture-27.md)*
