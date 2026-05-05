@@ -367,6 +367,7 @@ nav:
           - Small Object Detection: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/small-object-detection-jetson/Guide.md
           - TAO Toolkit: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/tao-toolkit/Guide.md
           - Non-Contact Monitoring: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/non-contact-monitoring-edge/Guide.md
+          - VLA Deployment on Edge GPUs: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/vla-deploy-jetson/Guide.md
         - ROS 2: Phase 4 - Track B - Nvidia Jetson/5. Application Development/6. ROS2/Guide.md
       - 6. Security & OTA: Phase 4 - Track B - Nvidia Jetson/6. Security and OTA/Guide.md
       - 7. Manufacturing: Phase 4 - Track B - Nvidia Jetson/7. Compliance and Manufacturing/Guide.md
