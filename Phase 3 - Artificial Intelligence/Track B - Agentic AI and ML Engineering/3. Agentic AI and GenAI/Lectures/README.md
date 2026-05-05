@@ -53,6 +53,7 @@ Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, a
 | [Lecture 25](Lecture-25.md) | OpenCoven Case Study - Agent-Native Workspace and Local Harness Substrate | Coven sessions, local daemon API, desktop-use adapter, OpenMeow SDK boundary, workspace safety |
 | [Lecture 26](Lecture-26.md) | OpenKnots Case Study - Trustworthy Agent Interfaces and Local-First Coding Surfaces | IDE agents, OK Code, Knot Code, OpenTrust, docs RAG, visible context, event contracts |
 | [Lecture 27](Lecture-27.md) | AI Agent Security Engineer - A Practitioner's Roadmap | 8-phase curriculum, prompt-injection trust boundaries, sandboxing tiers, red-team practice, audit log discipline, hardware-rooted trust |
+| [Lecture 28](Lecture-28.md) | Pi - A Minimal Coding Agent and the Substrate Beneath OpenClaw | Tiny core (4 tools), no-MCP rationale, custom messages in session log, hot reload, tree-structured sessions, TUI vs LLM-tool surfaces |
 
 ## Lab Index
 

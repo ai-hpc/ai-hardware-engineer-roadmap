@@ -1,6 +1,6 @@
 # Lecture 27 - AI Agent Security Engineer: A Practitioner's Roadmap
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 26](Lecture-26.md) | **Next:** [Lab 01](Lab-01-Research-Agent.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 26](Lecture-26.md) | **Next:** [Lecture 28](Lecture-28.md)
 
 ---
 
@@ -959,4 +959,4 @@ The artifact for this section, slotted into the Phase 3 / Project A spec from §
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 28 - Pi: A Minimal Coding Agent and the Substrate Beneath OpenClaw](Lecture-28.md)*
