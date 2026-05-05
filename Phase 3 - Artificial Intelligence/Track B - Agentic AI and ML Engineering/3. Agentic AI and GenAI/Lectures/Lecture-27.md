@@ -676,6 +676,213 @@ For a learner: read this corpus end-to-end. Then go find the equivalent body of 
 
 ---
 
+## 15. The redaction discipline
+
+§14.1 introduced redaction as a category of OpenClaw fix. That framing was too narrow. Redaction in an agent runtime is **its own engineering discipline** — distinct from access control, distinct from sandboxing, distinct from policy. It deserves its own section because it is the security domain most often gotten *visibly* wrong by teams who pass every other audit.
+
+This section is the discipline; §14.1 was one shipping platform's expression of it.
+
+### 15.1 What redaction actually is
+
+In classical data-privacy terms, redaction is the **permanent, irretrievable removal** of sensitive content from an artifact before that artifact is shared, published, persisted, or used to train a downstream system. Three properties define real redaction:
+
+```
+1. Removed at the source layer       (not the rendering layer)
+2. Cannot be recovered, copied, or searched in the released artifact
+3. Metadata, layers, and adjacent state are also scrubbed
+```
+
+If any of those three fails, you have **masking** or **obfuscation**, not redaction. Both are useful at the UI layer; neither is a security control.
+
+The traditional vocabulary (with the agent-runtime translation):
+
+| Concept | Classical meaning | Agent-runtime translation |
+|---|---|---|
+| Redaction | Permanent removal of sensitive content from an artifact | Permanent scrubbing from transcript / log / memory / cache |
+| Masking | Display-time replacement (e.g., `XXXX-XXXX-XXXX-1234`) | UI-only token rendering; underlying tool args still in audit log |
+| Obfuscation | Reversible transformation | Encryption with a key the operator holds |
+| Deletion | Removing a record | Deleting a session row but leaving prompt-cache fragments |
+| Censorship | Suppressing ideas or content | Refusal training; not the same threat model |
+
+The category error to never make: **a refusal in the model's output is not a redaction**. The secret may still be in the transcript, the audit log, the KV cache, the prompt cache, or the embedding store.
+
+### 15.2 The four classical redaction failures, translated
+
+The data-privacy field catalogues four canonical failure patterns. Every one of them has an exact analogue in agent runtimes, and the agent-runtime version is usually worse because the leakage surface is larger and the audit ergonomics are weaker.
+
+#### 15.2.1 White-text-on-white-background
+
+**Classical:** the visible document looks redacted. The text is colored white. Highlighting the page reveals everything.
+
+**Agent runtime:** the visible chat reply is clean (`"I cannot share that key."`). The full secret is in the model's tool-call argument that the chat UI never rendered, which the audit log captured verbatim, which the next session reads back as context.
+
+The reply was sanitized; the **transcript** was not.
+
+#### 15.2.2 Black-box-over-the-text-layer
+
+**Classical:** a black rectangle is drawn on top of the PDF page. The underlying text layer is untouched. A copy-paste pulls the original text out from beneath the rectangle.
+
+**Agent runtime:** the streaming UI renders `[REDACTED]` for matched secret patterns. The pre-render byte stream — held in the WebSocket frame buffer, the SSE event log, the OpenTelemetry span body — still contains the unscrubbed original.
+
+The render layer was redacted; the **carrier** was not.
+
+#### 15.2.3 Metadata not scrubbed
+
+**Classical:** the body of the document is properly redacted but the EXIF metadata, change-tracking history, or document properties contain the names, dates, and authors that were supposed to be hidden.
+
+**Agent runtime:** transcript redaction is applied, but the prompt cache, KV cache, embedding store, fine-tuning dataset, request-replay log, or LLM-provider request body still carry the unscrubbed content. The leak channel that bites is almost always one of these.
+
+The visible artifact was clean; the **adjacent state** was not.
+
+#### 15.2.4 Output not flattened
+
+**Classical:** a layered file format (PSD, DOCX, PDF with overlays) carries hidden layers underneath the redacted view. Opening it in another program reveals the un-redacted layer.
+
+**Agent runtime:** the agent serves a redacted summary to the user, but the **structured tool result** that produced the summary remains in session state and is replayable by anyone who can reach the session store. Agents are layered file formats: surface text on top, structured state underneath.
+
+The surface was clean; the **layered state** was not.
+
+### 15.3 The seven redaction surfaces of an agent runtime
+
+You cannot redact what you have not enumerated. A serious agent runtime has at least seven distinct surfaces where sensitive content can persist. Each one needs its own redaction policy because each has a different lifetime, different access pattern, and different threat model.
+
+```
+1. Tool-call argument log
+2. Tool-result payload log
+3. Visible-message transcript
+4. Streaming carrier (WebSocket frames, SSE events, partial generations)
+5. Long-term memory store
+6. Embedding / vector index
+7. Provider-side request body (LLM API logs, prompt cache, KV cache)
+```
+
+A short threat model per surface:
+
+| Surface | Lifetime | Reachable by | Common leak |
+|---|---|---|---|
+| Tool-call args | Append-only event log (Lecture 24b) | Audit reader; replay; backups | A `bash` arg that contains an env-var-expanded secret |
+| Tool-result payload | Same | Same | A file read that returned `~/.aws/credentials` |
+| Visible transcript | Session-bounded | Current user, future model context, support staff | The model echoing a tool result back into prose |
+| Streaming carrier | Frame-bounded (seconds) | Network observer, reverse proxy logs | Mid-generation secret before scrubber kicks in |
+| Long-term memory | Indefinite, cross-session | Future agent runs, possibly other principals | Memorized credentials; shared-tenant leakage |
+| Embedding index | Indefinite | Anything with vector-search access | Membership inference; nearest-neighbor exfiltration |
+| Provider request body | Vendor SLA-dependent | LLM provider, their subprocessors, their training data pipeline | Provider-side prompt-cache reuse; logged-request retention |
+
+**Rule of thumb derived from the seven-surface model:** if your team can name fewer than seven redaction surfaces in your runtime, you have redaction surfaces you have not yet thought about. Find them before an attacker does.
+
+### 15.4 The irretrievability test
+
+A redaction is real if and only if the redacted artifact passes this test:
+
+```
+   Given:
+     - the redacted artifact, plus
+     - any logs / caches / replays / backups the runtime persists
+   Can a determined adversary, with read access to those persisted layers
+   but not the original input, recover the redacted content?
+
+   If yes  -> you have masking, not redaction.
+   If no   -> you have redaction.
+```
+
+The test must be applied across **all seven surfaces**, not just the one currently in front of the engineer. If the visible transcript is redacted but the audit log is not, you have not passed the test.
+
+This also implies: redaction operations must be **idempotent and replayable**. If the audit log is the source of truth (Lecture 24b) and you redact a session afterward, a deterministic replay must not re-introduce the secret. That means the redaction has to be applied to the log itself, not to a downstream view of it.
+
+### 15.5 LLM-specific redaction failures
+
+Six failure classes that do not exist in classical data-privacy literature because LLMs introduce them:
+
+#### 15.5.1 Model memorization
+
+A sufficiently large model fine-tuned on transcripts can regurgitate verbatim training-set strings under the right prompt. If your training pipeline reads from the audit log and the audit log is not redacted, your model is leaking.
+
+Defense: redact at the log layer, not at the training-data-prep layer. By the time the model has been fine-tuned, the leak is permanent.
+
+#### 15.5.2 Prompt-cache cross-tenant leakage
+
+Provider prompt caches are keyed on prefix. A multi-tenant deployment where two tenants share a system prompt can — in the wrong configuration — share a cache entry whose contents one tenant supplied. The other tenant's request hits the cache and reads a fragment of state.
+
+Defense: tenant-scoped cache keys; never share a system-prompt prefix across tenants without explicit deduplication.
+
+#### 15.5.3 KV-cache reuse across sessions
+
+Inference servers that reuse KV caches across sessions for performance can leak prefix attention state if session boundaries are not strict. Same threat model as prompt cache, lower in the stack.
+
+Defense: zero-on-session-end for the KV cache, or per-tenant inference workers.
+
+#### 15.5.4 Embedding membership inference
+
+Adding a sensitive document to a vector index lets any future cosine-similarity query confirm or deny that document's presence. With enough queries, the document content can be reconstructed.
+
+Defense: do not embed sensitive plaintext; embed redacted derivatives, or hold the index inside a per-tenant boundary.
+
+#### 15.5.5 Generation-time leak before the scrubber
+
+A streaming generation that emits a secret token-by-token cannot be redacted token-by-token without breaking the stream contract. By the time the scrubber recognizes the pattern, the bytes have already left.
+
+Defense: buffer the stream in chunks long enough for pattern recognition before flushing; refuse to surface partial generations through a path that bypasses the scrubber.
+
+#### 15.5.6 Tool-arg-side-channel through model planning
+
+The model emits a tool call whose argument string contains the secret as part of the model's reasoning ("`bash -c \"echo $AWS_KEY\"`"). Even if the tool is denied by policy, the argument was written to the audit log before the policy check.
+
+Defense: scrub tool-call arguments **before** they are persisted, not just before they execute. The audit log is downstream of the policy check, but it is upstream of the redaction step if redaction is implemented as a tool-result post-processor.
+
+### 15.6 What proper redaction looks like in a shipping runtime
+
+Tying §14.1 back to this stronger framework, the OpenClaw `#70830` fix (short-lived scoped tickets replacing long-lived auth tokens in chat image URLs) is a redaction done correctly under §15.4's irretrievability test:
+
+- The original long-lived token never appears in the visible transcript.
+- It does not appear in the streaming carrier (the URL is a ticket, not a token).
+- Even if an attacker recovers the rendered image URL from network logs, the ticket has expired by the time they replay it.
+- The token never enters long-term memory because the ticket is the only thing memorialized.
+
+Compare to a weaker design that would have failed the test:
+
+- Render `[REDACTED]` for the token in the chat UI but log the original to the audit log → fails surface 1 / 2.
+- Replace the token with `xxx` only in the user-visible transcript → fails surface 4 (streaming carrier) and 5 (memory).
+- Mask in the LLM provider's request body but log it locally → fails surface 7 and surface 1.
+
+The lesson is general: **redaction policy is a function of the surface, not of the secret class**. A credit card number requires the same surface-by-surface treatment as an API key, a session cookie, a personal address, or a medical record number. The PII taxonomy tells you *what* to redact; the seven-surface model tells you *where*.
+
+### 15.7 Compliance regimes a working agent runtime touches
+
+The compliance overlay matters because regulators have started prosecuting agent-platform incidents under existing data-privacy law. A short non-exhaustive map:
+
+| Regime | Scope | Agent-runtime implication |
+|---|---|---|
+| **HIPAA** (US) | Protected health information | A medical-domain agent's transcript, memory, embedding index, and provider request bodies are all PHI. All seven surfaces must comply. |
+| **GDPR** (EU) | Personal data of EU residents | Right-to-erasure means redaction must be retroactive — including in audit logs and embedding indexes. Implement irretrievability before the first request lands. |
+| **CCPA / CPRA** (California) | Personal information | Similar to GDPR for in-scope deployments; emphasizes deletion-on-request. |
+| **FOIA** (US, public sector) | Government records | Inverse problem: redact before publication, but maintain an unredacted master. The audit log is the master. |
+| **EU AI Act** (2024+, phased) | High-risk AI systems | Mandates documentation of training data lineage. If your runtime trains on the audit log, redaction failures become AI Act findings, not just GDPR ones. |
+| **PCI-DSS** | Payment card data | A single PAN in any of the seven surfaces puts the runtime in scope. |
+| **SOC 2** (industry) | Security controls evidence | Auditors expect documented redaction policy *and* evidence it operates across all surfaces. |
+
+**Pragmatic guidance for engineers:** redaction is the place where security and compliance are the same code. Build it once, surface-by-surface, and the regime-specific obligations resolve to: pick which secret classes to recognize, pick which retention policy to apply, and the runtime does the rest.
+
+### 15.8 What to build, what to test
+
+The artifact for this section, slotted into the Phase 3 / Project A spec from §5.1:
+
+**Build:**
+
+- A redactor module that runs at log-write time on tool-call args, tool-result payloads, and streaming carrier frames.
+- Pluggable secret-class recognizers (regex, NER, content classifier — composable).
+- A retention policy that expires session memory and re-runs redaction on archive.
+- An admin tool that re-runs redaction over historical logs after a new recognizer is added.
+
+**Test:**
+
+- The irretrievability test from §15.4, automated. For each canonical secret class, plant a fixture, run the agent, attempt recovery from each of the seven surfaces, and assert all attempts fail.
+- Test regression: every new recognizer adds a fixture; the recognizer should redact future occurrences and the retroactive admin tool should redact prior ones.
+- Adversarial test: inject crafted strings designed to evade the recognizer (homoglyph credit-card numbers, base64-wrapped API keys, multi-line split secrets) and confirm they either match or are flagged for human review.
+
+**Anti-pattern:** a runtime where redaction is only applied at chat-UI render time. That is masking. Mark it as a finding in your own attack journal (§6).
+
+---
+
 ## Key takeaways
 
 - AI agent security is not a special case of either appsec or ML safety; it is a discipline about **applying old security thinking to a new substrate** where natural language is executable.
@@ -690,6 +897,8 @@ For a learner: read this corpus end-to-end. Then go find the equivalent body of 
 - The right metric for your progress is not "courses completed" but "attack-suite size of your own runtime, growing over time."
 - A real shipping agent platform's security work (§14) is mostly **classical appsec applied to surfaces classical appsec did not previously care about** — binary-resolution paths, channel routing, install trust roots, approval-time parsers — and almost none of it lives in the model.
 - Align CI security tooling with your trust-boundary diagram, not your directory tree (the OpenClaw boundary-categorized CodeQL matrix is the reference design).
+- Redaction is its own discipline, distinct from access control and sandboxing. The irretrievability test must be applied across all **seven surfaces** of an agent runtime, not only the visible transcript. A refusal in the model's output is not a redaction.
+- LLMs introduce six redaction failure classes that classical data-privacy literature does not contemplate: model memorization, prompt-cache cross-tenant leakage, KV-cache reuse, embedding membership inference, generation-time pre-scrubber leak, and the tool-arg side channel through model planning.
 
 ---
 
@@ -723,6 +932,17 @@ For a learner: read this corpus end-to-end. Then go find the equivalent body of 
 - AMD SEV-SNP — [https://www.amd.com/en/developer/sev.html](https://www.amd.com/en/developer/sev.html)
 - Intel TDX — [https://www.intel.com/content/www/us/en/developer/tools/trust-domain-extensions/overview.html](https://www.intel.com/content/www/us/en/developer/tools/trust-domain-extensions/overview.html)
 - NVIDIA H100 Confidential Computing — [https://developer.nvidia.com/blog/confidential-computing-on-h100-gpus/](https://developer.nvidia.com/blog/confidential-computing-on-h100-gpus/)
+
+### Redaction discipline (§15)
+
+- NIST SP 800-188, *Trustworthy Email* and SP 800-122, *Guide to Protecting the Confidentiality of Personally Identifiable Information* — [https://csrc.nist.gov/publications](https://csrc.nist.gov/publications)
+- HIPAA Security Rule — [https://www.hhs.gov/hipaa/for-professionals/security/](https://www.hhs.gov/hipaa/for-professionals/security/)
+- GDPR full text — [https://gdpr-info.eu/](https://gdpr-info.eu/)
+- CCPA / CPRA — [https://oag.ca.gov/privacy/ccpa](https://oag.ca.gov/privacy/ccpa)
+- EU AI Act — [https://artificialintelligenceact.eu/](https://artificialintelligenceact.eu/)
+- US National Archives FOIA redaction guidance — [https://www.archives.gov/foia](https://www.archives.gov/foia)
+- Carlini et al., *Extracting Training Data from Large Language Models* (2021) — arXiv 2012.07805 (the foundational model-memorization paper).
+- Nasr et al., *Scalable Extraction of Training Data from (Production) Language Models* (2023) — arXiv 2311.17035 (continues the line into deployed systems).
 
 ### Case-study primary sources (§14)
 
