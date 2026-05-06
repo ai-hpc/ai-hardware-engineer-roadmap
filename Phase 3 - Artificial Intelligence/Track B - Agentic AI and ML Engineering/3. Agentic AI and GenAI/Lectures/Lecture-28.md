@@ -1,6 +1,6 @@
 # Lecture 28 - Pi (pi-mono): A Detail Reading of a Minimal Coding Agent
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 27](Lecture-27.md) | **Next:** [Lab 01](Lab-01-Research-Agent.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 27](Lecture-27.md) | **Next:** [Lecture 29](Lecture-29.md)
 
 ---
 
@@ -547,4 +547,4 @@ Two concrete artifacts, in increasing difficulty.
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 29 - Agent Skills: Workflow Discipline for Reliable Coding Agents](Lecture-29.md)*

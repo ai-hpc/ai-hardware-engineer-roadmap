@@ -15,7 +15,7 @@ The durable concepts in this course are:
 - **Product control plane:** gateways, channels, sessions, routing, identities, and audit logs.
 - **Runtime security:** least privilege, policy gates, telemetry, incident response, and evidence.
 
-Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-26 focus on production discipline, OpenClaw-style gateway systems, local agent workspaces, and trustworthy agent interfaces.
+Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-30 focus on production discipline, OpenClaw-style gateway systems, local agent workspaces, trustworthy agent interfaces, agent skills, and the agentic software-development lifecycle.
 
 ## External Reference
 
@@ -54,6 +54,8 @@ Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, a
 | [Lecture 26](Lecture-26.md) | OpenKnots Case Study - Trustworthy Agent Interfaces and Local-First Coding Surfaces | IDE agents, OK Code, Knot Code, OpenTrust, docs RAG, visible context, event contracts |
 | [Lecture 27](Lecture-27.md) | AI Agent Security Engineer - A Practitioner's Roadmap | 8-phase curriculum, prompt-injection trust boundaries, sandboxing tiers, red-team practice, audit log discipline, hardware-rooted trust |
 | [Lecture 28](Lecture-28.md) | Pi - A Minimal Coding Agent and the Substrate Beneath OpenClaw | Tiny core (4 tools), no-MCP rationale, custom messages in session log, hot reload, tree-structured sessions, TUI vs LLM-tool surfaces |
+| [Lecture 29](Lecture-29.md) | Agent Skills - Workflow Discipline for Reliable Coding Agents | Skill workflows, anti-rationalization, verification evidence, progressive disclosure, scope discipline |
+| [Lecture 30](Lecture-30.md) | Agentic SDLC - Explore Fast, Ship Safely | Cheap code, implementation as exploration, tests as contracts, evolving specs, dual-mode agents |
 
 ## Lab Index
 

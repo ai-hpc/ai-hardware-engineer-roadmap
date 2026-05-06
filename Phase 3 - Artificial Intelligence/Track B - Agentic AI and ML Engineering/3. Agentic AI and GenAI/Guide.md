@@ -12,7 +12,7 @@
 
 ## Lecture Series
 
-26 lectures + 5 hands-on labs covering everything from LLM fundamentals to production multi-agent systems. **[→ Start here](Lectures/README.md)**
+30 numbered lectures, one supplemental Lecture 24b, and 5 hands-on labs covering everything from LLM fundamentals to production multi-agent systems. **[→ Start here](Lectures/README.md)**
 
 **Course currency note:** exact model names, context windows, SDK features, and pricing change quickly. This module teaches stable interfaces and system patterns: model APIs, tool protocols, runtime loops, workflow graphs, gateways, telemetry, and policy boundaries. Always check provider documentation before copying model IDs or prices into a real deployment.
 
@@ -35,8 +35,14 @@
 |  |  | [21](Lectures/Lecture-21.md) | System Prompt Architecture |
 |  |  | [22](Lectures/Lecture-22.md) | App SDK and Typed RPCs |
 |  |  | [23](Lectures/Lecture-23.md) | Gateway RPC Protocol |
+|  |  | [24](Lectures/Lecture-24.md) | Agent Harness |
+|  |  | [24b](Lectures/Lecture-24b.md) | Event-Sourced Agent State |
 |  |  | [25](Lectures/Lecture-25.md) | OpenCoven Workspace |
 |  |  | [26](Lectures/Lecture-26.md) | OpenKnots Interfaces |
+|  |  | [27](Lectures/Lecture-27.md) | Agent Security Engineer |
+|  |  | [28](Lectures/Lecture-28.md) | Pi Minimal Agent |
+|  |  | [29](Lectures/Lecture-29.md) | Agent Skills |
+|  |  | [30](Lectures/Lecture-30.md) | Agentic SDLC |
 
 **Labs:** [Lab 01 — Research Agent](Lectures/Lab-01-Research-Agent.md) · [Lab 02 — Multi-Agent Pipeline](Lectures/Lab-02-Multi-Agent-Pipeline.md) · [Lab 03 — Production RAG](Lectures/Lab-03-Production-RAG.md) · [Lab 04 — TokenJuice Output Compaction](Lectures/Lab-04-TokenJuice-Output-Compaction.md) · [Lab 05 — OpenMeow App SDK Dogfood](Lectures/Lab-05-OpenMeow-App-SDK-Dogfood.md)
 
