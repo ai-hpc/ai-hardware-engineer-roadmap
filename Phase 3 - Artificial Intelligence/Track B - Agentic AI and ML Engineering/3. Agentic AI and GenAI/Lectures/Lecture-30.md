@@ -1,6 +1,6 @@
 # Lecture 30 - Agentic SDLC: Explore Fast, Ship Safely
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 29](Lecture-29.md) | **Next:** [Lab 01](Lab-01-Research-Agent.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 29](Lecture-29.md) | **Next:** [Lecture 31](Lecture-31.md)
 
 ---
 
@@ -670,4 +670,4 @@ Then stabilize the best one.
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 31 - Runtime Strategy for Agent Systems: Node, Bun, Rust, and Edge Packaging](Lecture-31.md)*

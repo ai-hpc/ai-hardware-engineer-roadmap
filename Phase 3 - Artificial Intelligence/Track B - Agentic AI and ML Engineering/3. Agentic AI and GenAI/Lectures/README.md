@@ -15,7 +15,7 @@ The durable concepts in this course are:
 - **Product control plane:** gateways, channels, sessions, routing, identities, and audit logs.
 - **Runtime security:** least privilege, policy gates, telemetry, incident response, and evidence.
 
-Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-30 focus on production discipline, OpenClaw-style gateway systems, local agent workspaces, trustworthy agent interfaces, agent skills, and the agentic software-development lifecycle.
+Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-33 focus on production discipline, OpenClaw-style gateway systems, local agent workspaces, trustworthy agent interfaces, agent skills, the agentic software-development lifecycle, runtime strategy, model-under-the-hood mechanics, and structured tool interfaces.
 
 ## External Reference
 
@@ -56,6 +56,9 @@ Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, a
 | [Lecture 28](Lecture-28.md) | Pi - A Minimal Coding Agent and the Substrate Beneath OpenClaw | Tiny core (4 tools), no-MCP rationale, custom messages in session log, hot reload, tree-structured sessions, TUI vs LLM-tool surfaces |
 | [Lecture 29](Lecture-29.md) | Agent Skills - Workflow Discipline for Reliable Coding Agents | Skill workflows, anti-rationalization, verification evidence, progressive disclosure, scope discipline |
 | [Lecture 30](Lecture-30.md) | Agentic SDLC - Explore Fast, Ship Safely | Cheap code, implementation as exploration, tests as contracts, evolving specs, dual-mode agents |
+| [Lecture 31](Lecture-31.md) | Runtime Strategy for Agent Systems - Node, Bun, Rust, and Edge Packaging | Bun Zig-to-Rust signal, Node baseline, Rust offload, runtime measurements, edge packaging |
+| [Lecture 32](Lecture-32.md) | LLM From Scratch - Model Mechanics for Agent and GPU Engineers | Tokenizers, transformer blocks, training loop, inference, prefill/decode, GPU kernel intuition |
+| [Lecture 33](Lecture-33.md) | Structured Tools Beat Computer Use - Interface Hierarchy for Agents | Reflex benchmark, structured API vs vision, tool schemas, verification, security, OpenClaw tool design |
 
 ## Lab Index
 
