@@ -1,6 +1,6 @@
 # Lecture 33 - Structured Tools Beat Computer Use: Interface Hierarchy for Agents
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 32](Lecture-32.md) | **Next:** [Lab 01](Lab-01-Research-Agent.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 32](Lecture-32.md) | **Next:** [Lecture 34](Lecture-34.md)
 
 ---
 
@@ -642,4 +642,4 @@ Which path would you trust in production?
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 34 - Nemotron 3 Nano Omni: Multimodal Perception Sub-Agents for Agent Systems](Lecture-34.md)*

@@ -15,7 +15,7 @@ The durable concepts in this course are:
 - **Product control plane:** gateways, channels, sessions, routing, identities, and audit logs.
 - **Runtime security:** least privilege, policy gates, telemetry, incident response, and evidence.
 
-Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-33 focus on production discipline, OpenClaw-style gateway systems, local agent workspaces, trustworthy agent interfaces, agent skills, the agentic software-development lifecycle, runtime strategy, model-under-the-hood mechanics, and structured tool interfaces.
+Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-40 focus on production discipline, OpenClaw-style gateway systems, local agent workspaces, trustworthy agent interfaces, agent skills, the agentic software-development lifecycle, runtime strategy, model-under-the-hood mechanics, structured tool interfaces, multimodal perception sub-agents, GPU-kernel translation workflows, long-context serving optimization, trace-driven AI performance analysis, compiler-generated sequence parallelism, skill evaluation, and small-model reasoning systems.
 
 ## External Reference
 
@@ -59,6 +59,13 @@ Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, a
 | [Lecture 31](Lecture-31.md) | Runtime Strategy for Agent Systems - Node, Bun, Rust, and Edge Packaging | Bun Zig-to-Rust signal, Node baseline, Rust offload, runtime measurements, edge packaging |
 | [Lecture 32](Lecture-32.md) | LLM From Scratch - Model Mechanics for Agent and GPU Engineers | Tokenizers, transformer blocks, training loop, inference, prefill/decode, GPU kernel intuition |
 | [Lecture 33](Lecture-33.md) | Structured Tools Beat Computer Use - Interface Hierarchy for Agents | Reflex benchmark, structured API vs vision, tool schemas, verification, security, OpenClaw tool design |
+| [Lecture 34](Lecture-34.md) | Nemotron 3 Nano Omni - Multimodal Perception Sub-Agents | Unified video/audio/image/text reasoning, hybrid MoE, EVS, throughput, OpenClaw sub-agent architecture |
+| [Lecture 35](Lecture-35.md) | Agent Skills for GPU Kernel Translation - cuTile Python to cuTile.jl | cuTile semantics, Julia layout/indexing traps, TileGym skill structure, validators, GPU tests |
+| [Lecture 36](Lecture-36.md) | FP8 KV-Cache in vLLM - Long-Context Serving for Agents | KV-cache memory, FP8 attention, ITL/TTFT, sliding-window skips, calibration, deployment decisions |
+| [Lecture 37](Lecture-37.md) | TraceLens - Trace-Driven AI Performance Analysis | Trace2Tree, hierarchical bottleneck reports, roofline metrics, collective skew, trace diff, event replay |
+| [Lecture 38](Lecture-38.md) | AutoSP - Compiler-Generated Sequence Parallelism for Long-Context Training | DeepCompile, DeepSpeed-Ulysses, sequence-aware activation checkpointing, ZeRO composition, graph-break limits |
+| [Lecture 39](Lecture-39.md) | Agent Skills Eval - Benchmarking SKILL.md Files | with-skill vs baseline evals, LLM judge assertions, artifacts, CI gates, OpenClaw skill regression testing |
+| [Lecture 40](Lecture-40.md) | ZAYA1-8B - Small MoE Reasoning, AMD Training, and Test-Time Compute | 760M active parameters, AMD MI300X training, Markovian RSA, math/coding specialization, weak agentic scores |
 
 ## Lab Index
 
