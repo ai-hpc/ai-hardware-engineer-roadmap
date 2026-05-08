@@ -1,6 +1,6 @@
 # Lecture 41 - OpenClaw Threat Model: MITRE ATLAS for Agent Security
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 40](Lecture-40.md) | **Next:** [Lab 01](Lab-01-Research-Agent.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 40](Lecture-40.md) | **Next:** [Lecture 42](Lecture-42.md)
 
 ---
 
@@ -847,4 +847,4 @@ If you cannot test the control, treat it as unproven.
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 42 - OpenAI Agents SDK](Lecture-42.md)*
