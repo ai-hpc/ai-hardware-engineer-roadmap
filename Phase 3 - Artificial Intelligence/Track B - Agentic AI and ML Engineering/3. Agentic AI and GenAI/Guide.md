@@ -12,7 +12,7 @@
 
 ## Lecture Series
 
-40 numbered lectures, one supplemental Lecture 24b, and 5 hands-on labs covering everything from LLM fundamentals to production multi-agent systems. **[→ Start here](Lectures/README.md)**
+41 numbered lectures, one supplemental Lecture 24b, and 5 hands-on labs covering everything from LLM fundamentals to production multi-agent systems. **[→ Start here](Lectures/README.md)**
 
 **Course currency note:** exact model names, context windows, SDK features, and pricing change quickly. This module teaches stable interfaces and system patterns: model APIs, tool protocols, runtime loops, workflow graphs, gateways, telemetry, and policy boundaries. Always check provider documentation before copying model IDs or prices into a real deployment.
 
@@ -53,6 +53,7 @@
 |  |  | [38](Lectures/Lecture-38.md) | AutoSP |
 |  |  | [39](Lectures/Lecture-39.md) | Agent Skills Eval |
 |  |  | [40](Lectures/Lecture-40.md) | ZAYA1-8B |
+|  |  | [41](Lectures/Lecture-41.md) | OpenClaw Threat Model |
 
 **Labs:** [Lab 01 — Research Agent](Lectures/Lab-01-Research-Agent.md) · [Lab 02 — Multi-Agent Pipeline](Lectures/Lab-02-Multi-Agent-Pipeline.md) · [Lab 03 — Production RAG](Lectures/Lab-03-Production-RAG.md) · [Lab 04 — TokenJuice Output Compaction](Lectures/Lab-04-TokenJuice-Output-Compaction.md) · [Lab 05 — OpenMeow App SDK Dogfood](Lectures/Lab-05-OpenMeow-App-SDK-Dogfood.md)
 

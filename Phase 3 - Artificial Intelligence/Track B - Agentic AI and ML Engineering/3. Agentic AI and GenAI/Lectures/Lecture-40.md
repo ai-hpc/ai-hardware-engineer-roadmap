@@ -1,6 +1,6 @@
 # Lecture 40 - ZAYA1-8B: Small MoE Reasoning, AMD Training, and Test-Time Compute
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 39](Lecture-39.md) | **Next:** [Lab 01](Lab-01-Research-Agent.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 39](Lecture-39.md) | **Next:** [Lecture 41](Lecture-41.md)
 
 ---
 
@@ -595,4 +595,4 @@ Runtime blockers:
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 41 - OpenClaw Threat Model](Lecture-41.md)*

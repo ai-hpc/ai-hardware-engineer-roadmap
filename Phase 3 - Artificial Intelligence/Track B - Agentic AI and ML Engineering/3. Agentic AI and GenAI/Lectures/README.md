@@ -15,7 +15,7 @@ The durable concepts in this course are:
 - **Product control plane:** gateways, channels, sessions, routing, identities, and audit logs.
 - **Runtime security:** least privilege, policy gates, telemetry, incident response, and evidence.
 
-Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-40 focus on production discipline, OpenClaw-style gateway systems, local agent workspaces, trustworthy agent interfaces, agent skills, the agentic software-development lifecycle, runtime strategy, model-under-the-hood mechanics, structured tool interfaces, multimodal perception sub-agents, GPU-kernel translation workflows, long-context serving optimization, trace-driven AI performance analysis, compiler-generated sequence parallelism, skill evaluation, and small-model reasoning systems.
+Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-41 focus on production discipline, OpenClaw-style gateway systems, local agent workspaces, trustworthy agent interfaces, agent skills, the agentic software-development lifecycle, runtime strategy, model-under-the-hood mechanics, structured tool interfaces, multimodal perception sub-agents, GPU-kernel translation workflows, long-context serving optimization, trace-driven AI performance analysis, compiler-generated sequence parallelism, skill evaluation, small-model reasoning systems, and AI-agent threat modeling.
 
 ## External Reference
 
@@ -66,6 +66,7 @@ Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, a
 | [Lecture 38](Lecture-38.md) | AutoSP - Compiler-Generated Sequence Parallelism for Long-Context Training | DeepCompile, DeepSpeed-Ulysses, sequence-aware activation checkpointing, ZeRO composition, graph-break limits |
 | [Lecture 39](Lecture-39.md) | Agent Skills Eval - Benchmarking SKILL.md Files | with-skill vs baseline evals, LLM judge assertions, artifacts, CI gates, OpenClaw skill regression testing |
 | [Lecture 40](Lecture-40.md) | ZAYA1-8B - Small MoE Reasoning, AMD Training, and Test-Time Compute | 760M active parameters, AMD MI300X training, Markovian RSA, math/coding specialization, weak agentic scores |
+| [Lecture 41](Lecture-41.md) | OpenClaw Threat Model - MITRE ATLAS for Agent Security | threat matrix, attack chains, trust boundaries, prompt injection, skill supply chain, tool execution controls |
 
 ## Lab Index
 
