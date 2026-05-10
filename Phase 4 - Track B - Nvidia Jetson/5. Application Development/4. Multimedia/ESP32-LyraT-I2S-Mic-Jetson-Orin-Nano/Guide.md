@@ -169,7 +169,7 @@ Use this order. It prevents chasing software routing while the wire-level clocks
 
 1. Prove Jetson internal audio routing.
 2. Prove LyraT microphones and codec work on the LyraT side.
-3. Make LyraT output a stable I2S mic stream.
+3. Make LyraT output a stable I2S mic stream — see [§9 reference firmware `lyrat_jp4_passthrough`](#reference-firmware-lyrat_jp4_passthrough-verified) and [§14 verified result](#verified-test-result--lyrat-side-2026-05-11) for a known-good control.
 4. Verify `SCLK`, `LRCK`, and `ASDOUT` on a scope or logic analyzer.
 5. Enable Jetson 40-pin `I2S2` pinmux.
 6. Configure Jetson audio route from `I2S2` to `ADMAIF1`.
@@ -282,6 +282,71 @@ Expected wire-level clocks for a common stereo 48 kHz setup:
 | `ASDOUT` | toggles when microphone signal is active |
 
 If `LRCK` or `SCLK` is not present, Jetson cannot capture anything.
+
+### Reference firmware: `lyrat_jp4_passthrough` (verified)
+
+A minimal, capture-only ESP-ADF firmware that satisfies all of the requirements above is available in the local `esp-adf` working tree:
+
+```
+esp-adf/examples/recorder/lyrat_jp4_passthrough/
+├── CMakeLists.txt
+├── Makefile
+├── main/
+│   ├── CMakeLists.txt
+│   └── lyrat_jp4_passthrough.c
+├── partitions_passthrough_example.csv
+├── sdkconfig.defaults
+└── sdkconfig.defaults.esp32
+```
+
+What it does, in 90 lines of C:
+
+1. `audio_board_init()` — uses the in-tree `lyrat_v4_3` board config; pin map at `components/audio_board/lyrat_v4_3/board_pins_config.c` (no overrides needed).
+2. `audio_hal_ctrl_codec(... ENCODE, START)` — puts ES8388 into ADC mode driving ASDOUT/`GPIO35`.
+3. Builds an `i2s_stream` reader at 48 kHz / 16-bit / stereo / Philips, master role.
+4. `raw_stream` sink + a small drain task discards bytes — the firmware exists only to keep `BCLK`/`LRCK` alive and the codec ADC pushing data on the JP4 bus. Jetson is the actual consumer.
+5. Logs `rate=N B/s (expected=192000 B/s)` every 2 s as a runtime canary.
+
+Why the drain sink matters: ESP-ADF's `i2s_stream` reader will stall (and stop the I2S clocks) if no one consumes the ringbuffer. A tiny bytes-to-`/dev/null` task is the simplest way to guarantee the bus stays live.
+
+**Upstream tracking:** [`espressif/esp-adf#1607`](https://github.com/espressif/esp-adf/issues/1607) (feature request to merge this example upstream).
+
+**Build (macOS / Linux):**
+
+```bash
+# One-time host prereqs (macOS)
+brew install cmake ninja dfu-util
+cd esp-adf/esp-idf && ./install.sh esp32
+
+# Build
+cd esp-adf/esp-idf && . ./export.sh
+export ADF_PATH=$(realpath ..)
+cd ../examples/recorder/lyrat_jp4_passthrough
+idf.py set-target esp32 build
+```
+
+**Flash artifacts produced** (offsets fixed by the project's `partitions_passthrough_example.csv`):
+
+| File | Offset |
+|---|---|
+| `build/bootloader/bootloader.bin` | `0x1000` |
+| `build/partition_table/partition-table.bin` | `0x8000` |
+| `build/lyrat_jp4_passthrough.bin` | `0x10000` |
+
+**Flash from a Windows host** (one USB micro-B cable to LyraT — auto-bootloader works; the CP2102N enumerates as `COMx`):
+
+```powershell
+pip install esptool
+python -m esptool --chip esp32 -p COM3 -b 460800 erase_flash
+python -m esptool --chip esp32 -p COM3 -b 460800 write_flash --flash_mode dio --flash_size detect --flash_freq 80m 0x1000 build\bootloader\bootloader.bin 0x8000 build\partition_table\partition-table.bin 0x10000 build\lyrat_jp4_passthrough.bin
+```
+
+Espressif's "Flash Download Tool" GUI works too, but two gotchas have bitten this exact bring-up:
+
+- Each file row has a **checkbox on the left** — if unchecked, the row is silently skipped. Symptom: `START` finishes in milliseconds and the board boots an unrelated firmware (e.g. the factory Bluetooth speaker demo).
+- Stale offsets autofill from previous sessions. If `partition-table.bin` is missing or its offset is wrong, the bootloader loops with `flash_parts: partition 0 invalid magic number 0x...` / `Failed to verify partition table`. Re-typing all three offsets and using **EraseAll** once recovers it.
+
+`esptool` from PowerShell makes both classes of mistake impossible — the offsets are explicit on the command line.
 
 ---
 
@@ -467,6 +532,41 @@ Product-level success:
 - GStreamer pipeline
 - application-level audio health checks
 - wake-word or ASR pipeline using the captured audio
+
+### Verified test result — LyraT side (2026-05-11)
+
+Flashed `lyrat_jp4_passthrough.bin` (built from `esp-adf` `release/v2.x`, ESP-IDF v5.5.3) to an ESP32-LyraT V4.3. Boot log confirms the codec/I2S path is live and DMA is moving real data:
+
+```
+I (172) boot: Loaded app from partition at offset 0x10000
+I (197) app_init: Project name:     lyrat_jp4_passthrough
+I (215) app_init: ESP-IDF:          v5.5.3
+I (298) JP4_PASSTHROUGH: [1] Init audio board (LyraT v4.3) + ES8388 codec
+I (329) JP4_PASSTHROUGH:     codec mode=ENCODE (ADC), input=LINPUT1/RINPUT1 (onboard mic)
+I (334) JP4_PASSTHROUGH: [3] I2S: rate=48000 Hz, bits=16, channels=2, format=Philips, role=master
+I (340) JP4_PASSTHROUGH:     JP4 pins: BCLK=GPIO5  LRCK=GPIO25  ASDOUT=GPIO35  MCLK=GPIO0
+I (349) JP4_PASSTHROUGH: [4] Capture started — JP4 I2S bus is live. Samples drained on-chip.
+I (2381) JP4_PASSTHROUGH: rate=194560 B/s (expected=192000 B/s)  total=389120 B
+I (4389) JP4_PASSTHROUGH: rate=192512 B/s (expected=192000 B/s)  total=774144 B
+I (6411) JP4_PASSTHROUGH: rate=194560 B/s (expected=192000 B/s)  total=1163264 B
+```
+
+What this confirms about the LyraT side of the bring-up plan (Section 7, steps 1–4):
+
+- ✅ ES8388 enumerated and put in ENCODE/ADC mode
+- ✅ Onboard mics (`LINPUT1/RINPUT1`) selected
+- ✅ I2S peripheral running as master, `BCLK`/`LRCK` clocking on JP4
+- ✅ DMA is moving 192 ± 1.3 % kB/s = `48000 Hz × 2 ch × 2 B` worth of samples per second (the small overshoot is `xTaskGetTickCount()` granularity in the 2 s reporting window, not clock drift)
+
+What this **does not** prove — the Jetson side (steps 5–7) is still the next milestone:
+
+- ❌ Jetson 40-pin `I2S2` pinmux applied and persistent across reboot
+- ❌ `I2S2 Mux` / `ADMAIF1 Mux` configured for external capture
+- ❌ `arecord -D hw:APE,0` produces a non-silent WAV
+- ❌ Channel mapping and sample format match between LyraT and Jetson
+- ❌ Recording is reproducible after Jetson reboot
+
+The LyraT-side artifact is now a known-good control: if Jetson capture fails after this firmware is flashed, the failure is on the Jetson software path (pinmux, ASoC routing, master/slave config), not the bus.
 
 ---
 
