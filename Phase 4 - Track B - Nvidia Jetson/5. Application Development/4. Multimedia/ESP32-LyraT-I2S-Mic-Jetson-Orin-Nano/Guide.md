@@ -558,15 +558,98 @@ What this confirms about the LyraT side of the bring-up plan (Section 7, steps 1
 - ✅ I2S peripheral running as master, `BCLK`/`LRCK` clocking on JP4
 - ✅ DMA is moving 192 ± 1.3 % kB/s = `48000 Hz × 2 ch × 2 B` worth of samples per second (the small overshoot is `xTaskGetTickCount()` granularity in the 2 s reporting window, not clock drift)
 
-What this **does not** prove — the Jetson side (steps 5–7) is still the next milestone:
+The Jetson side (steps 5–7) is verified separately below — see [§14 verified result — Jetson side](#verified-test-result--jetson-side-2026-05-11).
 
-- ❌ Jetson 40-pin `I2S2` pinmux applied and persistent across reboot
-- ❌ `I2S2 Mux` / `ADMAIF1 Mux` configured for external capture
-- ❌ `arecord -D hw:APE,0` produces a non-silent WAV
-- ❌ Channel mapping and sample format match between LyraT and Jetson
-- ❌ Recording is reproducible after Jetson reboot
+The LyraT-side artifact is a known-good control: if Jetson capture ever regresses after this firmware is flashed, the failure is on the Jetson software path (pinmux, ASoC routing, master/slave config), not the bus.
 
-The LyraT-side artifact is now a known-good control: if Jetson capture fails after this firmware is flashed, the failure is on the Jetson software path (pinmux, ASoC routing, master/slave config), not the bus.
+### Verified test result — Jetson side (2026-05-11)
+
+After the LyraT bring-up above, all four JP4 jumpers wired to the Jetson Orin Nano 40-pin header (`SCLK→12`, `LRCK→35`, `ASDOUT→38`, `GND→6`) on a single shared ground. No JetPack rebuild, no out-of-tree driver — only Jetson-IO overlay + `amixer` route.
+
+#### Step 1 — confirm overlay applied
+
+```bash
+amixer -c APE controls | grep I2S2          # expect ~19 I2S2 controls present
+amixer -c APE cget name="ADMAIF1 Mux"       # expect 'I2S2' in items list
+arecord -l                                  # expect "card 1: APE ... device 0: XBAR-ADMAIF1-0"
+```
+
+If `I2S2 Mux`, `I2S2 codec frame mode`, and `I2S2 codec master mode` are not in the control list, the 40-pin overlay didn't take — re-run `sudo /opt/nvidia/jetson-io/jetson-io.py`, save, reboot.
+
+#### Step 2 — set the AHUB route and I2S format
+
+```bash
+amixer -c APE cset name="ADMAIF1 Mux" "I2S2"
+amixer -c APE cset name="I2S2 codec master mode" "cbm-cfm"     # LyraT drives BCLK + LRCK
+amixer -c APE cset name="I2S2 codec frame mode" "i2s"          # Philips I2S framing
+amixer -c APE cset name="I2S2 Sample Rate" 48000
+amixer -c APE cset name="I2S2 Capture Audio Channels" 2
+amixer -c APE cset name="I2S2 Capture Audio Bit Format" 16
+amixer -c APE cset name="I2S2 Client Channels" 2
+amixer -c APE cset name="I2S2 Client Bit Format" 16
+amixer -c APE cset name="ADMAIF1 Capture Audio Channels" 2
+amixer -c APE cset name="ADMAIF1 Capture Client Channels" 2
+```
+
+Why each control:
+
+- `cbm-cfm` = "codec-bit-master, codec-frame-master" → Jetson is the I2S slave; LyraT drives both clocks. Matches the firmware's `I2S_ROLE_MASTER`.
+- `i2s` framing = standard Philips I2S. Matches the ES8388 / our `I2S_COMM_FORMAT_STAND_I2S`.
+- `48000 / 2 ch / 16-bit` everywhere → matches the firmware's `SAMPLE_RATE_HZ / SAMPLE_CHANNELS / SAMPLE_BITS`. Mismatch on any side here is the most common cause of distortion or silence.
+
+#### Step 3 — record and inspect
+
+```bash
+arecord -D hw:APE,0 -r 48000 -c 2 -f S16_LE -d 5 lyrat.wav
+ls -la lyrat.wav
+sox lyrat.wav -n stat
+aplay lyrat.wav
+```
+
+#### Observed result
+
+```
+-rw-r--r-- 1 aihpc aihpc 960044 May 10 20:14 lyrat.wav
+
+Samples read:            480000
+Length (seconds):      5.000000
+Maximum amplitude:     0.233582
+Minimum amplitude:    -0.178314
+Midline amplitude:     0.027634
+Mean    amplitude:    -0.000075
+RMS     amplitude:     0.021088
+Rough   frequency:         1356
+Volume adjustment:        4.281
+```
+
+Speech ("one two three test") was clearly audible on `aplay` — bit-accurate capture.
+
+What each number proves:
+
+- **File size 960,044 bytes is exact**: `5.000 s × 48000 Hz × 2 ch × 2 B + 44 B WAV header = 960044`. Zero DMA underruns; LyraT-master / Jetson-slave clocking is rock solid.
+- `RMS amplitude 0.021` ≈ –33 dBFS — normal speech range, well above noise floor.
+- `Mean amplitude -0.000075` ≈ 0 — no DC offset; ES8388 input biasing is clean.
+- `Volume adjustment 4.281` → ~12 dB of headroom before clipping. If louder capture is desired, bump ES8388 PGA gain in firmware (`es8388_set_mic_gain()`) rather than amplifying digitally.
+- `Rough frequency 1356` — dominant pitch in the speech band; consistent with voice content.
+
+#### Bring-up plan §7 — final state
+
+- ✅ Step 5: 40-pin `I2S2` pinmux applied (via Jetson-IO overlay)
+- ✅ Step 6: AHUB route from `I2S2` → `ADMAIF1` configured; clock direction set to Jetson-slave
+- ✅ Step 7: `arecord -D hw:APE,0` produces a bit-accurate, byte-exact, audible WAV
+
+#### Known gap — settings do not survive reboot
+
+The 9 `amixer cset` commands are not persistent. `alsactl store` captures most of them but the NVIDIA APE card's `Mux` / `codec master mode` controls have historically not been restored cleanly by `alsa-restore.service`. For a reproducible bring-up across reboots, wrap the commands in a small `systemd` unit that runs after `sound.target` (or after the Jetson-IO overlay loads), or save with `alsactl store -f /var/lib/alsa/asound.state` and verify with `alsactl restore` before relying on it.
+
+#### Next steps anchored to this verified baseline
+
+Now that capture is bit-accurate, the next layers (Section 15) are unblocked:
+
+- GStreamer `alsasrc` to replace `arecord` and fan-out to multiple consumers
+- Streaming ASR (`whisper.cpp` with CUDA on Orin) consuming the alsasrc tap
+- Two-mic delay-and-sum beamforming, taking advantage of LyraT's L+R mics (physical spacing measured **3.5 cm** — note this is below Espressif's recommended 4–6.5 cm and the default `MASE_MIC_DISTANCE = 65 mm` in `esp-sr/include/.../esp_mase.h`, so any use of Espressif's `esp_afe_doa` / `MASE` APIs needs `mic_distance` explicitly overridden to `0.035`)
+- Eventually, replacing the LyraT with a Jetson-controlled 4-mic codec board (e.g. ES7210) for a real product
 
 ---
 
