@@ -453,7 +453,10 @@ nav:
     - "B: HPC (CUDA-X)":
       - Guide: Phase 5 - Advanced Topics and Specialization/2. High Performance Computing/Guide.md
       - CUDA-X Libraries: Phase 5 - Advanced Topics and Specialization/2. High Performance Computing/CUDA-X Libraries/Guide.md
-    - "C: Edge AI": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Guide.md
+    - "C: Edge AI":
+      - Guide: Phase 5 - Advanced Topics and Specialization/3. Edge AI/Guide.md
+      - "Lecture: Edge LLM Inference Internals": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Edge LLM Inference Internals/Lecture-01.md
+      - "Lecture: AI-Driven Wireless Communication": Phase 5 - Advanced Topics and Specialization/3. Edge AI/AI-Driven Wireless Communication/Lecture-01.md
     - "D: Robotics":
       - Guide: Phase 5 - Advanced Topics and Specialization/4. Robotics/Guide.md
       - CMU Robotics Courses: Phase 5 - Advanced Topics and Specialization/4. Robotics/CMU-Robotics-Courses.md
