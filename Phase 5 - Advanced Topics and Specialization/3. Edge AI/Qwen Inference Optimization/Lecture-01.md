@@ -186,26 +186,238 @@ The Qwen-specific detail you'll forget once and regret: **Qwen keeps QKV bias** 
 
 ---
 
-## 4. RoPE: NeoX Layout with Big Theta
+## 4. RoPE — Rotary Position Embedding (the long version)
 
-Both models use **RoPE-NeoX** with `theta = 1 000 000`. The "NeoX" detail matters at the kernel level:
+Position encoding is how the model knows token order. Qwen uses **RoPE** (Rotary Position Embedding) — same family as Llama, Mistral, Phi, Gemma. This section gets long because RoPE is where the subtlest Qwen-specific inference bugs live, and where every long-context technique (YaRN, NTK-aware, Dual-Chunk) plugs in.
+
+### 4.1 Why rotation instead of addition
+
+Older architectures (original Transformer, BERT) added a learned position vector to each token embedding:
 
 ```
-Original RoPE (Llama-1, GPT-NeoX research):
-  pairs are interleaved:  [x0, x1, x2, x3, …]  →  rotate (x0, x1), (x2, x3), …
-
-NeoX-style:
-  pairs are split:        [x0, x2, x4, …, x1, x3, x5, …]
-                          rotate (x0, x_{d/2}), (x1, x_{d/2 + 1}), …
+x'_i = x_i + p_i        # element-wise add a position vector
 ```
 
-If your `rope_kernel` was written for the original layout, applying it to Qwen produces garbage. Your `gen` log will show plausible-looking activations but the model will generate gibberish past token ~10. (This is a classic 4-hour debugging session.)
+Two problems for inference:
 
-### 4.1 YaRN extension to 128 k / 262 k
+1. The `p_i` vectors are learned per-position — sequences longer than the training context have no defined behavior.
+2. Position information mixes into the residual stream and is consumed by every downstream op including FFN — wasting bandwidth on dimensions whose only job is to say "where am I."
 
-Both models ship with `rope_scaling.type == "yarn"` and `factor` set so the effective context multiplies. The runtime applies a smooth interpolation/extrapolation correction to the rotary frequencies — without it, the model degrades quickly past `original_max_position`.
+RoPE does the opposite: **rotate Q and K only**, in place, by an angle proportional to position. The 2D rotation matrix is the high school one:
 
-In practice for inference: **either run within the original context (cheaper) or enable YaRN explicitly via the runtime flag**. Most runtimes have `--rope-scaling yarn` or read it automatically from config; verify by feeding a 50 k-token prompt and checking coherence at the tail.
+```
+R(mθ) = [ cos(mθ)  -sin(mθ) ]
+        [ sin(mθ)   cos(mθ) ]
+```
+
+The algebraic property that makes this work:
+
+```
+⟨ R(mθ)·Q_m , R(nθ)·K_n ⟩  =  ⟨ Q_m , R((n - m)θ)·K_n ⟩
+```
+
+The inner product (which is what attention uses) depends only on the **relative** position `(n − m)`. The model never sees absolute coordinates, only relative geometry.
+
+Practical consequences for an inference engineer:
+
+* Position info never enters the FFN — Q and K are the only tensors touched.
+* Extending context past training is "just" picking the right rotation angles for unseen positions.
+* The **rotated** K is what gets cached, not the raw K. RoPE happens **before** KV insertion.
+
+### 4.2 Where RoPE plugs in
+
+```
+hidden_state ──► RMSNorm ──┬─► q_proj ──► Q ──┐
+                            ├─► k_proj ──► K ──┼─► RoPE(Q, K, pos)
+                            └─► v_proj ──► V   │           │
+                                               │           ▼
+                                               │   write rotated K and V
+                                               │   to KV cache at pos
+                                               │
+                              attention(Q,     ▼
+                                        K_cache, V_cache) → o_proj
+```
+
+The RoPE kernel does:
+
+1. Read the per-head Q and K (shape `[n_heads, head_dim]` and `[n_kv_heads, head_dim]`).
+2. Read the precomputed `cos[pos]` and `sin[pos]` slices for the current position.
+3. Apply the per-pair rotation in registers.
+4. Write Q and K back, usually in place.
+
+Look at your `rope_kernel`'s ptxas line from the JLLM build:
+
+```
+Used 15 registers, used 0 barriers, 389 bytes cmem[0]
+```
+
+That's an embarrassingly parallel signature — one thread per (head × pair) element, no shared memory, no synchronization. The kernel is bandwidth-bound on Q+K traffic, which is tiny compared to the QKV projection's weight read that just preceded it.
+
+### 4.3 Pair layout — NeoX vs original
+
+The rotation is applied to **pairs** of coordinates along the head dimension. Two conventions:
+
+```
+"Original" (Llama-1, GPT-NeoX research code): pairs are interleaved
+   indices: [0, 1, 2, 3, …, d-2, d-1]
+   pair (0,1), (2,3), (4,5), …, (d-2, d-1)
+
+"NeoX-style" (Qwen, Llama-2/3, Mistral, Phi, Gemma): pairs split halves
+   indices: [0, 1, …, d/2-1] | [d/2, d/2+1, …, d-1]
+   pair (0, d/2), (1, d/2+1), (2, d/2+2), …, (d/2-1, d-1)
+```
+
+If your kernel was written for the original layout and you point it at a Qwen model, the math runs, no error fires, and the first ~5–10 generated tokens look plausible because position 0–10 angles are tiny and the corruption is small. Past that, the model goes off the rails. This is the canonical "passes unit tests, fails integration tests" RoPE bug.
+
+Verify by inspecting which two elements of `head_dim` your kernel multiplies by the same `cos`. If they are adjacent (indices `2i` and `2i+1`), you've got the original layout — wrong for Qwen.
+
+### 4.4 The angle — why `rope_theta = 1 000 000`
+
+Each pair index `i ∈ [0, head_dim/2)` rotates at frequency:
+
+```
+θ_i = base ^ (-2i / head_dim)
+```
+
+where `base` is `rope_theta` from `config.json`. Qwen uses `base = 1e6`, **not** Llama-1's `10 000`.
+
+| `base` | Slowest pair `i=0` | Fastest pair `i = head_dim/2 - 1`, head_dim=128 |
+|---|---|---|
+| 10 000 | 1.0 rad/pos | ~1e-4 rad/pos |
+| 1 000 000 | 1.0 rad/pos | ~1e-6 rad/pos |
+
+The larger base **spreads the frequencies further apart**. High-frequency pairs (small `i`) rotate fast — they encode fine-grained local order. Low-frequency pairs (large `i`) rotate slowly — they encode coarse "far away" order.
+
+With `base = 1e6`, the slowest pair barely rotates over the entire 32 k training context. This is **the design choice that lets Qwen2.5 and Qwen3 extend to 131 k tokens without retraining** — the slow channels were trained in a regime where they almost don't change, so extending them slightly stays in-distribution.
+
+Llama-1 with `base = 10 000` exhausts the slow channels much earlier — which is why Llama-1 couldn't do long context without surgery.
+
+### 4.5 PyTorch reference (NeoX layout, matches Qwen)
+
+```python
+import torch
+
+def precompute_cos_sin(head_dim: int, max_pos: int, base: float,
+                       device, dtype=torch.float32):
+    """Build cos/sin tables once at startup. Tables are tiny (max_pos x head_dim/2)."""
+    inv_freq = 1.0 / (base ** (torch.arange(0, head_dim, 2,
+                                            device=device, dtype=torch.float32)
+                               / head_dim))                 # [head_dim/2]
+    positions = torch.arange(max_pos, device=device, dtype=torch.float32)
+    freqs = torch.outer(positions, inv_freq)                # [max_pos, head_dim/2]
+    return freqs.cos().to(dtype), freqs.sin().to(dtype)
+
+
+def rope_neox(x, cos, sin, position_ids):
+    """
+    x:            [B, n_heads, seq_len, head_dim]
+    cos, sin:     [max_pos, head_dim/2]
+    position_ids: [B, seq_len]
+    """
+    half = x.shape[-1] // 2
+    x1 = x[..., :half]      # first half of head_dim
+    x2 = x[..., half:]      # second half
+    cos_p = cos[position_ids].unsqueeze(1)   # [B, 1, seq_len, head_dim/2]
+    sin_p = sin[position_ids].unsqueeze(1)
+    rot1 = x1 * cos_p - x2 * sin_p
+    rot2 = x2 * cos_p + x1 * sin_p
+    return torch.cat([rot1, rot2], dim=-1)
+
+
+# In the attention block:
+q = rope_neox(q, cos, sin, pos_ids)
+k = rope_neox(k, cos, sin, pos_ids)
+# V is NOT rotated — only Q and K.
+```
+
+For inference specifically:
+
+* The `cos/sin` tables are precomputed once for `max_pos = max_position_embeddings` and live in constant or read-only memory. Tiny — at `head_dim=128` and `max_pos=131072` they total ~16 MB combined, FP16.
+* During **decode** at position `n`, you index a single row `cos[n], sin[n]` — no broadcast across batch needed, and certainly no recomputation.
+* The rotated K is what gets appended to the KV cache. If your runtime caches **pre-rotation** K, every attention step recomputes RoPE on the entire prefix — silent O(N²) blow-up.
+
+### 4.6 Extending context without retraining
+
+When you push past the trained context (32 k for Qwen2.5-72B, 40 k for Qwen3-4B native), the slow frequencies start producing rotations the model never saw during training. Without correction, perplexity explodes past the boundary. Several techniques fix this **at inference time only**, no fine-tuning required:
+
+#### 4.6.1 Position Interpolation (PI)
+Scale all position indices by `1/k` so the model effectively sees compressed positions. Works mechanically; loses precision because every pair gets the same scaling — including the fast pairs that were already fine. Used in early Llama-2 long-context tunes; not used in Qwen.
+
+#### 4.6.2 Dynamic NTK-Aware RoPE
+At inference, **scale `rope_theta` upward as the sequence grows past training context**:
+
+```
+base_effective = base · ( k · seq_len / orig_max - (k - 1) ) ^ (head_dim / (head_dim - 2))
+```
+
+The trick: high-frequency pairs (which were trained on many rotations) keep behavior; low-frequency pairs get a stretched effective range. Used in early Qwen and Qwen2 long-context variants. The "dynamic" part means the scaling depends on actual input length, not a fixed factor.
+
+#### 4.6.3 YaRN — the production technique for Qwen2.5 / Qwen3
+YaRN refines NTK-aware in two ways:
+
+* **Per-frequency policy.** Fast pairs use plain extrapolation (no scaling). Slow pairs use interpolation (rescale). Mid pairs blend smoothly. The boundaries are controlled by `beta_fast` and `beta_slow` in config.
+* **Attention temperature correction.** When you rescale frequencies, the variance of attention logits changes — the softmax gets sharper or flatter. YaRN multiplies attention scores by `1/√t(s)` where `t(s)` depends on the scaling factor. Compensates for the entropy drift.
+
+Both models in this series ship YaRN configuration:
+
+```json
+"rope_scaling": {
+  "type": "yarn",
+  "factor": 4.0,
+  "original_max_position_embeddings": 32768,
+  "attention_factor": 0.1,
+  "beta_fast": 32,
+  "beta_slow": 1
+}
+```
+
+The runtime reads these at startup, adjusts the `cos/sin` precompute, and folds the attention scale into the softmax. **Zero per-token cost** — you get long context for free as long as you wire it correctly.
+
+#### 4.6.4 Dual-Chunk RoPE (for 100 k+)
+For the experimental long-context Qwen variants and "Qwen-Long" builds, even YaRN starts to degrade past ~100 k. Dual-Chunk attention splits the computation into:
+
+* **Local chunks** — within a window of N tokens, standard rotated RoPE applies.
+* **Global path** — cross-chunk attention uses **rescaled** angles that compress the absolute range, so long-distance relationships stay in-distribution.
+
+This is implemented as a custom attention kernel, not a pure RoPE patch. As of mid-2026, LMDeploy/TurboMind ships it for Qwen-LongContext; mainline vLLM and TRT-LLM rely on YaRN for the production Qwen2.5/Qwen3 lineup.
+
+### 4.7 The `config.json` cheat sheet
+
+The fields you actually look at when wiring up RoPE for inference:
+
+| Field | Purpose | Qwen3-4B-Instruct | Qwen2.5-72B-Instruct |
+|---|---|---|---|
+| `rope_theta` | Base frequency `θ_base` | 1 000 000 | 1 000 000 |
+| `rope_scaling.type` | Scaling strategy | `yarn` | `yarn` |
+| `rope_scaling.factor` | Context multiplier | 4–8 | 4 |
+| `rope_scaling.original_max_position_embeddings` | Native training context | 32 768 | 32 768 |
+| `rope_scaling.beta_fast` / `beta_slow` | YaRN frequency boundaries | 32 / 1 | 32 / 1 |
+| `max_position_embeddings` | Max allowed context after scaling | 40 960–262 144 | 131 072 |
+| `head_dim` | Determines `head_dim/2` rotated pairs | 128 | 128 |
+
+### 4.8 The four checks every inference runtime must pass
+
+1. **Pair layout is NeoX** — pairs are `(i, i + head_dim/2)`, not `(2i, 2i+1)`.
+2. **`rope_scaling` is read and applied** — not just `rope_theta`. If your runtime only honors `rope_theta`, you get a model that runs at 32 k and breaks past that.
+3. **`cos/sin` tables cover the full extended range** — precompute for `max_position_embeddings`, not `original_max_position_embeddings`.
+4. **Rotation happens before KV insertion** — the cache stores rotated K. If you see `kv_append` *before* `rope` in a trace, the runtime has the order wrong.
+
+A 30-second integration test: feed a ~50 000-token prompt and ask for a 20-token completion. If grammatical and on-topic, YaRN is wired correctly. If it produces gibberish past ~10 generated tokens, RoPE scaling is broken.
+
+### 4.9 RoPE in the GEMV trace
+
+A correctly-instrumented trace for a single decode step on layer 0 shows:
+
+```
+[GEMV-GPU #0] type=12 M=4096 K=2560     ← Q projection
+[GEMV-GPU #1] type=12 M=1024 K=2560     ← K projection
+[GEMV-GPU #2] type=14 M=1024 K=2560     ← V projection
+[rope] applied at position N             ← rotates Q and K in place
+[kv_append] cached K, V at position N    ← cached K is post-rotation
+[attention] flash_attention_decode       ← attends over [0..N]
+```
+
+If you can't see RoPE in your trace at all, either the kernel is silent (most are) or it's been folded into the QKV-projection kernel as a fused epilogue (vLLM does this — `qkv_proj_with_rope_kernel`). Fusing RoPE into QKV saves one launch and one Q+K pass through memory — small win, but free if you have the kernel.
 
 ---
 
@@ -363,6 +575,12 @@ The next lecture starts where the difference is biggest — quantization, which 
 
 5. **RoPE flavor check.** Pick a runtime (llama.cpp, MLC, or your own) and confirm via inspection that its `rope_kernel` uses the NeoX (split) layout for Qwen. The fastest verification: dump the rotation matrix it applies and compare against `cos(theta_i) ± sin(theta_i)` patterns in either order.
 
+6. **YaRN integration test.** Take Qwen3-4B-Instruct and feed it a 50 000-token document with a single distinctive fact buried near token 45 000 ("the password is `puffin-spruce-47`"). Ask the model at the end: "What was the password?" If YaRN is wired correctly the model retrieves it; if not, the answer is gibberish or a refusal. Run this with `--rope-scaling yarn` enabled and disabled to confirm which knob in your runtime matters.
+
+7. **Implement RoPE from scratch.** Copy the §4.5 PyTorch reference. Load Qwen3-4B and replace `transformers`'s built-in RoPE with your implementation. Run a few prompts and confirm bit-identical output to the reference implementation. Then deliberately swap to original-layout pairs (`(2i, 2i+1)` instead of `(i, i+d/2)`) and observe the first ~10 tokens look reasonable before output collapses.
+
+8. **Per-frequency YaRN inspection.** Plot the `cos[pos]` table values for `pos ∈ [0, 32k, 100k, 131k]` and pair indices `i ∈ [0, 16, 32, 48, 63]`. With YaRN applied, fast pairs should look the same as without YaRN; slow pairs should show smooth interpolation. If they don't, YaRN's per-frequency policy isn't being applied.
+
 ---
 
 ## Key Takeaways
@@ -372,7 +590,10 @@ The next lecture starts where the difference is biggest — quantization, which 
 | Twelve numbers in `config.json` determine every tensor shape | You can predict every GEMV in a trace without loading the model |
 | GQA bounds the KV cache regardless of Q-head count | KV scales with `n_kv_heads · n_layers`, not `n_heads` |
 | Qwen keeps QKV biases — Llama/Mistral don't | Loaders that strip bias silently break Qwen |
-| RoPE-NeoX, not original | Wrong layout = silent corruption past ~10 generated tokens |
+| RoPE-NeoX layout (pairs are split halves, not interleaved) | Wrong layout = silent corruption past ~10 generated tokens |
+| `rope_theta = 1e6` spreads frequencies for long-context headroom | The single config value that makes 131 k context possible without retraining |
+| YaRN, not raw `rope_theta`, is what enables 131 k context | Runtimes that only read `rope_theta` silently break long inputs |
+| Cache stores rotated K, not raw K | RoPE must run before `kv_append`, or attention is silently wrong |
 | Tied embeddings on Qwen3-4B, untied on Qwen2.5-72B | LM head is one of the largest GEMVs in the 72B; cheap in 4B |
 | FFN dominates parameters more than attention | Optimizing FFN paths buys more than optimizing attention |
 | `<think>` blocks consume the same bandwidth as visible output | Real-world decode budgets must include hidden CoT |
@@ -385,7 +606,11 @@ The next lecture starts where the difference is biggest — quantization, which 
 * **[Qwen2.5 Technical Report (2024)](https://arxiv.org/abs/2412.15115):** The 72B paper with all configs.
 * **[Hugging Face — Qwen/Qwen3-4B-Instruct](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507):** Weights, tokenizer, generation config.
 * **[Hugging Face — Qwen/Qwen2.5-72B-Instruct](https://huggingface.co/Qwen/Qwen2.5-72B-Instruct):** Weights and `config.json`.
+* **[RoFormer: Enhanced Transformer with Rotary Position Embedding (Su et al., 2021)](https://arxiv.org/abs/2104.09864):** The original RoPE paper.
 * **[YaRN: Efficient Context Window Extension](https://arxiv.org/abs/2309.00071):** The math behind both models' long-context behavior.
+* **["Scaling Laws of RoPE-based Extrapolation" (NTK-aware analysis)](https://arxiv.org/abs/2310.05209):** Why `rope_theta` matters and how dynamic-NTK works.
+* **["Dual Chunk Attention" (Qwen-LongContext team, 2024)](https://arxiv.org/abs/2402.17463):** The 100 k+ context technique used in Qwen-Long variants.
+* **[Hugging Face Transformers — `modeling_qwen2.py`](https://github.com/huggingface/transformers/blob/main/src/transformers/models/qwen2/modeling_qwen2.py):** Production-grade RoPE-NeoX reference (`apply_rotary_pos_emb`).
 * **["GQA: Training Generalized Multi-Query Transformer Models"](https://arxiv.org/abs/2305.13245):** Original GQA paper.
 * **[llama.cpp GGUF format spec](https://github.com/ggerganov/ggml/blob/master/docs/gguf.md):** Tensor naming and on-disk layout.
 * **[Phase 5 — Edge LLM Inference Internals](../Edge%20LLM%20Inference%20Internals/Lecture-01.md):** The prerequisite roofline lecture.
