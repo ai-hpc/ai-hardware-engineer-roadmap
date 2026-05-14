@@ -457,6 +457,13 @@ nav:
       - Guide: Phase 5 - Advanced Topics and Specialization/3. Edge AI/Guide.md
       - "Lecture: Edge LLM Inference Internals": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Edge LLM Inference Internals/Lecture-01.md
       - "Lecture: AI-Driven Wireless Communication": Phase 5 - Advanced Topics and Specialization/3. Edge AI/AI-Driven Wireless Communication/Lecture-01.md
+      - "Qwen Inference Optimization":
+        - Overview: Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/README.md
+        - "01: Qwen Architecture Deep Dive": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-01.md
+        - "02: Quantizing Qwen3-4B to Q4": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-02.md
+        - "03: Decode Optimization on Jetson": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-03.md
+        - "04: Qwen2.5-72B Multi-GPU FP16": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-04.md
+        - "05: Cross-Model and Production Serving": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-05.md
     - "D: Robotics":
       - Guide: Phase 5 - Advanced Topics and Specialization/4. Robotics/Guide.md
       - CMU Robotics Courses: Phase 5 - Advanced Topics and Specialization/4. Robotics/CMU-Robotics-Courses.md
