@@ -464,6 +464,7 @@ nav:
         - "03: Decode Optimization on Jetson": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-03.md
         - "04: Qwen2.5-72B Multi-GPU FP16": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-04.md
         - "05: Cross-Model and Production Serving": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-05.md
+        - "06: Batched GEMM vs Normal GEMM": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-06.md
     - "D: Robotics":
       - Guide: Phase 5 - Advanced Topics and Specialization/4. Robotics/Guide.md
       - CMU Robotics Courses: Phase 5 - Advanced Topics and Specialization/4. Robotics/CMU-Robotics-Courses.md

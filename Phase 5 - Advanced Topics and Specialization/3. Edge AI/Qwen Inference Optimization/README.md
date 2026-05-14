@@ -16,6 +16,7 @@ Same architecture family, completely different hardware engineering. The series 
 | 03 | Decode Optimization on Jetson | GEMV chain, KV cache, fusion, CUDA Graphs, INT8 KV |
 | 04 | Qwen2.5-72B Multi-GPU FP16 | TP/PP, NCCL hot path, paged attention, YaRN |
 | 05 | Cross-Model & Production Serving | Speculative decoding, vLLM/TRT-LLM, observability, hybrid |
+| 06 | Batched GEMM vs Normal GEMM | cuBLAS API forms, layout, tensor cores, bit-exact reproducibility |
 
 **Prerequisites:**
 
