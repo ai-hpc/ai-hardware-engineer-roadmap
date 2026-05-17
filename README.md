@@ -12,13 +12,7 @@
 
 > **Master AI inference, AI agent harness systems, and hardware engineering — then design a physical AI chip.**
 
-Not a generic inference accelerator. A **physical AI chip** — a single die that fuses a **Jetson-class AI brain** (NPU/GPU/DLA) with an **ESP32-class wireless stack** (Wi-Fi, BLE, Thread, Zigbee), plus the sensor I/O, ISP, and embedded Linux substrate needed to host an agent runtime. One chip, one BOM, one boot, one agent that can see, hear, talk, connect, and act in the real world.
-
-This is why the roadmap teaches Jetson and ESP32 side by side. They are the two reference platforms for the two halves of the same future SoC. Phase 2 puts ESP32 in your hand because ESP32 is the wireless IP block your chip is going to embed. Phase 4B puts Jetson in your hand because Jetson is the AI brain your chip is going to embed. Phase 5F shows you how to put them on the same die.
-
-Three pillars. One destination. Everything in this repository is organized so each chapter produces a measurable artifact, and the three pillars converge on a chip you could actually tape out.
-
-If you only want to read about AI hardware, there are better books. This roadmap is for engineers who want to **build a chip that runs real workloads, with a runtime that ships, hosting agents that talk to the physical world.**
+The endpoint is a single die that runs production AI workloads, hosts a real agent runtime, and talks to the physical world over Wi-Fi/BLE/Thread — a Jetson-class AI brain fused with an ESP32-class wireless stack on one chip. Designing it takes three working skill sets at once: **inference engineering** (Qwen-class decode, kernels, quantization, rooflines, multi-GPU serving), **agent harness systems** (sessions, tools, multi-agent loops, RAG, evals, production observability), and **hardware engineering** (RTL, embedded Linux, Jetson, ESP32, RF, ASIC flow). This roadmap teaches all three side by side — the chip is the artifact, but the three pillars are the actual work.
 
 ---
 
