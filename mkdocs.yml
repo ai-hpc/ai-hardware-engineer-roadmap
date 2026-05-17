@@ -240,7 +240,9 @@ nav:
   # ── Phase 3 ─────────────────────────────────────────────────
   - Phase 3 — AI:
     - Overview: Phase 3 - Artificial Intelligence/Guide.md
-    - 1. Neural Networks: Phase 3 - Artificial Intelligence/1. Neural Networks/Guide.md
+    - 1. Neural Networks:
+      - Guide: Phase 3 - Artificial Intelligence/1. Neural Networks/Guide.md
+      - "Transformer Fundamentals": Phase 3 - Artificial Intelligence/1. Neural Networks/Transformer Fundamentals/Lecture-01.md
     - 2. Frameworks:
       - Guide: Phase 3 - Artificial Intelligence/2. Deep Learning Frameworks/Guide.md
       - micrograd: Phase 3 - Artificial Intelligence/2. Deep Learning Frameworks/micrograd/Guide.md
