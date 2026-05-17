@@ -38,7 +38,8 @@ LSTMs and GRUs added gates that helped but didn't eliminate the problem. The arc
 
 ### 1.2 The attention insight
 
-> **Not every token matters equally for every decision.**
+!!! abstract "The core idea"
+    **Not every token matters equally for every decision.**
 
 For the word **bank** in "She sat by the river bank," the word **river** is the single most informative token in the sentence. For the same **bank** in "I deposited money at the bank," it's **money** and **deposited**. The "right" context is **input-dependent**.
 
@@ -54,13 +55,10 @@ No hidden-state bottleneck. No information has to survive a chain of overwrites.
 
 ### 1.3 What attention is *not*
 
-A few corrections people commonly get wrong:
-
-* **Attention weights are not full explanations of the model's decision.** They are useful clues — "the model put more weight on token X for this prediction" — but the actual decision also goes through downstream linear projections, FFN layers, residual additions, and many other attention heads in parallel. Treat attention maps as evidence, not proof.
-
-* **Attention is not retrieval.** A retrieval system would pick the single most relevant key and return its value. Attention returns a **soft, weighted average**. Even the lowest-scoring token contributes something (just very little).
-
-* **Attention is not free.** Computing `Q @ K^T` for sequence length `N` is `O(N²)` in both time and memory. This is why long-context inference is hard — and why so many techniques (sliding window, sparse attention, FlashAttention, paged attention) exist to manage it.
+!!! warning "Three things attention is not"
+    * **Not a full explanation of the model's decision.** Attention weights are useful clues — "the model put more weight on token X" — but the decision also goes through downstream linear projections, FFN layers, residual additions, and many other heads in parallel. Treat attention maps as evidence, not proof.
+    * **Not retrieval.** A retrieval system would pick the single most relevant key and return its value. Attention returns a **soft, weighted average**. Even the lowest-scoring token contributes a sliver.
+    * **Not free.** Computing `Q @ K^T` for sequence length `N` is `O(N²)` in both time and memory. This is why long-context inference is hard — and why sliding window, sparse attention, FlashAttention, and paged attention all exist.
 
 ---
 
@@ -109,9 +107,9 @@ Because the three relationships are **asymmetric**:
 
 Concrete example: the word **"bank"** in "river bank":
 
-- As a **query**, "bank" is looking for context that disambiguates its sense — does it want financial words or geographical words?
-- As a **key**, "bank" is offering itself as a possible match target — "I'm the word you might attend to if your query is about money or geography."
-- As a **value**, "bank" carries the information another token will pull when it attends to it — the word-sense, the part-of-speech, the semantic content.
+* As a **query**, "bank" is looking for context that disambiguates its sense — does it want financial words or geographical words?
+* As a **key**, "bank" is offering itself as a possible match target — "I'm the word you might attend to if your query is about money or geography."
+* As a **value**, "bank" carries the information another token will pull when it attends to it — the word-sense, the part-of-speech, the semantic content.
 
 These three roles need three different vector subspaces. A single shared embedding would conflate them and force the model to compromise. By giving the model **three independent learned projections** of the same input, you give it the flexibility to use one subspace for matching and a different subspace for content delivery.
 
@@ -265,18 +263,18 @@ Concretely for Qwen3-4B at 4 k context, the KV cache for one sequence holds:
 
 That cache is read on every decoded token. It's the second-biggest bandwidth load (after the weights themselves) on the entire decode path. The Phase 5 inference lectures spend a lot of time on it — see [Edge LLM Inference Internals](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Edge%20LLM%20Inference%20Internals/Lecture-01.md) §5.
 
-**Why this matters for understanding Q/K/V**: the three-vector design isn't just an architectural quirk. It's what makes long-context LLM inference economically viable. The asymmetry between "Q recomputed per step" and "K, V cacheable across steps" is the entire reason GPT-class models can hold a conversation.
+!!! tip "Why the three-vector design exists at all"
+    Q/K/V is not just an architectural quirk — it is what makes long-context LLM inference economically viable. The asymmetry between **"Q recomputed per step"** and **"K, V cacheable across steps"** is the entire reason GPT-class models can hold a conversation without recomputing the past from scratch on every token.
 
 ### 2.10 Common mental traps
 
-Things that confuse most learners on first pass:
-
-* **"Q, K, V are different types of information."** No — they are three *projections* of the same input embedding. The token's identity is the same; only the role differs.
-* **"K and V are the same thing in self-attention."** No — they're produced by different matrices `W_K` and `W_V`, into different subspaces. They're paired by position, but not equal in content.
-* **"Attention is just retrieval — find the best match and use it."** No — it's a *soft* weighted blend over all positions. Even the worst match contributes a small weighted slice.
-* **"The attention output is a single token's value."** No — it's a **weighted combination of every token's value vector**, with weights summing to 1. The output has shape `[d_v]` regardless of sequence length.
-* **"Each head computes its own Q, K, V from scratch."** Yes, exactly — and that's the point. Each head has its own `W_Q^h`, `W_K^h`, `W_V^h`, so each head can specialize in a different relationship type.
-* **"Why does Q come from the current token but K and V from past tokens? That's weird."** It's weird only if you're thinking of attention as "the current token asking past tokens for help." It's cleaner if you think of it as the library analogy: you (Q) walk in with a question; the books (K and V) are sitting on the shelves regardless of who walks in.
+!!! danger "Six misconceptions to unlearn"
+    * **"Q, K, V are different types of information."** No — they are three *projections* of the same input embedding. The token's identity is the same; only the role differs.
+    * **"K and V are the same thing in self-attention."** No — they're produced by different matrices `W_K` and `W_V`, into different subspaces. They're paired by position, but not equal in content.
+    * **"Attention is just retrieval — find the best match and use it."** No — it's a *soft* weighted blend over all positions. Even the worst match contributes a small weighted slice.
+    * **"The attention output is a single token's value."** No — it's a **weighted combination of every token's value vector**, with weights summing to 1. The output has shape `[d_v]` regardless of sequence length.
+    * **"Each head computes its own Q, K, V from scratch."** Yes, exactly — and that's the point. Each head has its own `W_Q^h`, `W_K^h`, `W_V^h`, so each head can specialize in a different relationship type.
+    * **"Why does Q come from the current token but K and V from past tokens? That's weird."** It's weird only if you're thinking of attention as "the current token asking past tokens for help." It's cleaner if you think of it as the library analogy: you (Q) walk in with a question; the books (K and V) are sitting on the shelves regardless of who walks in.
 
 ### 2.11 The minimal code, one more time
 
@@ -349,11 +347,14 @@ Where:
 
 The output has shape `[N, d_v]` — one context-aware vector per query position.
 
-### 4.1 Why divide by √d_k
+### 4.1 Why divide by sqrt(d_k)
 
 As `d_k` grows, the **variance** of the dot product `q · k` grows roughly linearly with `d_k` (the sum-of-products of two random vectors). Without scaling, the raw scores become large in magnitude, which pushes the softmax into a **highly peaked** regime — one or two entries get nearly all the weight, and gradients with respect to the rest become tiny.
 
-Note this is the **opposite** of a common misconception: unscaled dot products produce a **too-sharp** softmax, not a flat one. The fix is to compensate by dividing by the standard deviation of the dot-product distribution, which is `√d_k`:
+!!! warning "Common misconception, reversed"
+    Many beginner explanations say "scaling prevents the softmax from being too flat." This is backwards. Unscaled dot products produce a **too-sharp** softmax (one entry dominates), not a flat one. The `1/√d_k` factor is the fix that **broadens** the distribution back into a useful range.
+
+The fix is to compensate by dividing by the standard deviation of the dot-product distribution, which is `√d_k`:
 
 ```
                           q · k         (q · k) / √d_k
@@ -428,9 +429,9 @@ Given the sentence "She sat by the river bank":
 1. Tokenize: `[She, sat, by, the, river, bank]` → 6 token embeddings.
 2. Project each through `W_Q`, `W_K`, `W_V`.
 3. For the query position of `bank`:
-   - Compute scores against each of the 6 keys (including its own).
-   - The score against `river` is high (learned: river-like queries match river-like keys).
-   - The score against `the` is low.
+    * Compute scores against each of the 6 keys (including its own).
+    * The score against `river` is high (learned: river-like queries match river-like keys).
+    * The score against `the` is low.
 4. Softmax → weights → weighted sum of values.
 5. `bank`'s output vector now contains information from `river` — the disambiguation has happened.
 
@@ -634,7 +635,7 @@ x ─┬──────────► RMSNorm ──► MultiHeadAttention �
                                                                        │
    ┌───────────────────────────────────────────────────────────────────┘
    │
-x' ─┬──────────► RMSNorm ──► FFN(x' ) ──► (residual add) ──► x''
+x' ─┬──────────► RMSNorm ──► FFN(x') ──► (residual add) ──► x''
     │
     └─────────────────────────────────────────────►
 ```
@@ -726,7 +727,15 @@ This lecture is the prerequisite for the Phase 5 inference lectures. The bridge:
 * **Phase 5 / Qwen Inference Optimization / Lecture 01 §4** is the full RoPE deep dive — the modern positional-encoding scheme used by Qwen, Llama, Mistral, etc.
 * **Phase 5 / Qwen Inference Optimization / Lecture 06** is the cuBLAS GEMM/batched-GEMM lecture — what the attention `Q @ Kᵀ` actually calls under the hood.
 
-Once you understand this lecture, the inference lectures stop being a wall of acronyms. **GQA, MQA, MHA** are just choices about whether multi-head attention shares K/V across heads. **AWQ, GPTQ, Q4_K_M** are just choices about how to quantize the `W_Q, W_K, W_V, W_O, W_gate, W_up, W_down` matrices. **FlashAttention** is just a faster, tiled implementation of the attention you implemented in §6.2. **Speculative decoding** is just running a small autoregressive model alongside a big one.
+!!! tip "Why this lecture unlocks everything else"
+    Once you understand the material here, the inference lectures stop being a wall of acronyms:
+
+    * **GQA, MQA, MHA** — choices about whether multi-head attention shares K/V across heads.
+    * **AWQ, GPTQ, Q4_K_M** — choices about how to quantize the `W_Q, W_K, W_V, W_O, W_gate, W_up, W_down` matrices.
+    * **FlashAttention** — a faster, tiled implementation of the same attention you implemented in §6.2.
+    * **Speculative decoding** — running a small autoregressive model alongside a big one.
+
+    Each one slots into the architecture you just learned.
 
 ---
 
@@ -769,7 +778,8 @@ Once you understand this lecture, the inference lectures stop being a wall of ac
 
 ## 14. The One-Sentence Takeaway
 
-Attention lets a neural network dynamically focus on the most relevant parts of a sequence by comparing queries to keys, using the resulting weights to combine values into context-aware representations — and a transformer is just `D` layers of multi-head attention plus FFN with residual connections, with a mask choice that determines whether it's an encoder, decoder, or encoder–decoder model.
+!!! quote ""
+    Attention lets a neural network dynamically focus on the most relevant parts of a sequence by comparing queries to keys, using the resulting weights to combine values into context-aware representations — and a transformer is just `D` layers of multi-head attention plus FFN with residual connections, with a mask choice that determines whether it's an encoder, decoder, or encoder–decoder model.
 
 ---
 
