@@ -66,36 +66,236 @@ A few corrections people commonly get wrong:
 
 ## 2. Queries, Keys, and Values
 
-The three roles, abstracted from the dynamics in §1.2:
+This is the part of the transformer most worth slowing down for. Once Q/K/V clicks, the rest of the architecture is mechanical. Until it clicks, every diagram looks like alphabet soup.
+
+### 2.1 The three roles
 
 | Component | Role | One-line intuition |
 |---|---|---|
 | **Query (Q)** | What the current position is *looking for* | "What information do I need?" |
 | **Key (K)** | What each position *offers for matching* | "What kind of information do I contain?" |
-| **Value (V)** | The actual *content* that gets passed along | "Here is my information." |
+| **Value (V)** | The actual *content* passed along when a match happens | "Here is my information." |
 
-The mechanism is:
+The mechanism, in three steps:
 
-1. Compare a query `q` to every key `k_j`. The comparison is a **score**.
-2. Convert scores to a probability distribution (softmax).
-3. Take a weighted sum of values `v_j` using those probabilities.
+1. Compare a query `q` to every key `k_j`. The comparison produces a **score**.
+2. Convert scores to a probability distribution with softmax (weights that are non-negative and sum to 1).
+3. Take a weighted sum of values `v_j` using those weights. That weighted sum **is** the attention output.
 
-In code form:
+### 2.2 The library analogy
+
+Imagine you walk into a library with a question in your head. The question is your **query**. The library has thousands of books on shelves. Each book has a **title** printed on its spine and **contents** inside its covers.
+
+* You scan the spines (the **keys**) and judge which titles look most relevant to your query.
+* You don't read the contents (the **values**) yet — you just compare your question to the spines.
+* Based on how well each title matches your question, you decide how much attention to pay to each book.
+* You then pull down the relevant books and skim their contents in proportion to your interest. A book with a perfect-match title gets fully read; one with a barely-related title gets a glance; an irrelevant one is ignored.
+* The "answer" you leave with is a **blended summary** of all the books you read, weighted by relevance.
+
+Three crucial properties to notice:
+
+1. **The title and the contents are separate things.** A book about *river ecology* might have the title "Riparian Systems" — title-matching ("river bank?" → "riparian!") and content-reading are different operations. Hence: key ≠ value, even when they describe the same item.
+2. **Your query is yours alone.** Two people with different questions standing in the same library would attend to different books. The query is *position-dependent* — each token has its own.
+3. **You attend to every book, not just the best one.** You don't pick the single best match and read it; you read all of them in proportion to relevance. Even a poorly-matching book contributes a little. (This is softmax: small weight, not zero.)
+
+### 2.3 Why three vectors and not one
+
+It's a fair question: why does the model need three different vector representations of each token? Why can't it just use the same embedding to play all three roles?
+
+Because the three relationships are **asymmetric**:
+
+* What a token is *looking for* in others (Q) is not the same as what it *offers to others* (K).
+* What it *offers to be matched* (K) is not the same as what it *contributes when matched* (V).
+
+Concrete example: the word **"bank"** in "river bank":
+
+- As a **query**, "bank" is looking for context that disambiguates its sense — does it want financial words or geographical words?
+- As a **key**, "bank" is offering itself as a possible match target — "I'm the word you might attend to if your query is about money or geography."
+- As a **value**, "bank" carries the information another token will pull when it attends to it — the word-sense, the part-of-speech, the semantic content.
+
+These three roles need three different vector subspaces. A single shared embedding would conflate them and force the model to compromise. By giving the model **three independent learned projections** of the same input, you give it the flexibility to use one subspace for matching and a different subspace for content delivery.
+
+### 2.4 How Q, K, V are actually produced
+
+For a single token's embedding `x` (a vector of dimension `d_model`), the three vectors come from three different learned weight matrices:
+
+```
+q = W_Q · x        W_Q is [d_k × d_model]    →  q is [d_k]
+k = W_K · x        W_K is [d_k × d_model]    →  k is [d_k]
+v = W_V · x        W_V is [d_v × d_model]    →  v is [d_v]
+```
+
+In matrix form, for a whole sequence `X` of shape `[N, d_model]` (`N` tokens):
+
+```
+Q = X · W_Q^T       →  Q is [N, d_k]
+K = X · W_K^T       →  K is [N, d_k]
+V = X · W_V^T       →  V is [N, d_v]
+```
+
+(Whether you write `W_Q · x` or `x · W_Q^T` depends on whether the framework treats inputs as row or column vectors. PyTorch uses row vectors, so it's `X @ W_Q^T`. The math is the same.)
+
+The weight matrices `W_Q`, `W_K`, `W_V` are **trained** like any other neural-network weights — via gradient descent on whatever loss the transformer is optimized for. The training signal pushes:
+
+* `W_Q` to project tokens into a space where "looking for" queries land near matching keys.
+* `W_K` to project tokens into a space where "what I offer" lands where the right queries can find it.
+* `W_V` to project tokens into a space whose **weighted sums** encode useful contextual information.
+
+Crucially, these matrices have **no built-in semantics** at initialization — they start as random numbers. The roles emerge from training. The model figures out on its own what "queries" and "keys" should look like, given the data.
+
+### 2.5 Dimensions — what's free and what's locked
+
+Three dimensions appear in the formulas: `d_model`, `d_k`, `d_v`. Two constraints:
+
+* `d_k` for Q and `d_k` for K **must match** — because the attention score is the inner product `q · k`, which only exists when the two vectors live in the same space.
+* `d_v` is **free**. V can be any width. The output of attention has shape `[N, d_v]` — it inherits V's dimension.
+
+In practice, **all production transformers set `d_v = d_k`.** Why? Because the next operation after attention is usually a linear projection back to `d_model` (the residual stream dimension), and keeping `d_v = d_k` makes the bookkeeping clean and the parameter count predictable.
+
+For multi-head attention with `H` heads, the per-head dimension is `d_k = d_v = d_model / H`. For Qwen3-4B: `d_model = 2560, H = 32`, so `d_k = d_v = 80`. Wait — actually Qwen specifically uses `head_dim = 128` (it doesn't follow the strict `d_model / H` rule), giving the Q projection an output of `n_heads · head_dim = 32 · 128 = 4096`, which is then projected back down. The point: these dimensions are design choices, and modern models tune them independently.
+
+### 2.6 A concrete numerical walkthrough
+
+Let's run attention on a toy example by hand. 4 tokens, `d_model = 4`, `d_k = d_v = 2` (small for legibility).
+
+The input matrix `X` (4 tokens, each a 4-dim embedding):
+
+```
+X = [[1, 0, 1, 0],     # token 0
+     [0, 1, 0, 1],     # token 1
+     [1, 1, 0, 0],     # token 2
+     [0, 0, 1, 1]]     # token 3
+```
+
+Three (small) learned projection matrices (`W` shapes: `[d_k, d_model]` = `[2, 4]`):
+
+```
+W_Q = [[1, 0, 1, 0],
+       [0, 1, 0, 1]]
+
+W_K = [[0, 1, 1, 0],
+       [1, 0, 0, 1]]
+
+W_V = [[1, 1, 0, 0],
+       [0, 0, 1, 1]]
+```
+
+Compute Q, K, V (each `[4, 2]`):
+
+```
+Q = X · W_Q^T = [[2, 0],      # token 0's query
+                 [0, 2],      # token 1's query
+                 [1, 1],      # token 2's query
+                 [1, 1]]      # token 3's query
+
+K = X · W_K^T = [[1, 1],      # token 0's key
+                 [1, 1],      # token 1's key
+                 [1, 1],      # token 2's key
+                 [1, 1]]      # token 3's key
+
+V = X · W_V^T = [[1, 1],      # token 0's value
+                 [1, 1],      # token 1's value
+                 [2, 0],      # token 2's value
+                 [0, 2]]      # token 3's value
+```
+
+Attention for **token 0** (its query is `[2, 0]`):
+
+```
+scores  = Q[0] · K^T = [2, 0]·[[1,1,1,1],[1,1,1,1]] = [2, 2, 2, 2]
+                       (each key is identical here, so all scores match)
+weights = softmax([2,2,2,2]) = [0.25, 0.25, 0.25, 0.25]
+output  = 0.25·V[0] + 0.25·V[1] + 0.25·V[2] + 0.25·V[3]
+        = 0.25·[1,1] + 0.25·[1,1] + 0.25·[2,0] + 0.25·[0,2]
+        = [1, 1]
+```
+
+Token 0's output is `[1, 1]` — the average of all values. Because every key looked identical to its query in this toy, attention spread evenly.
+
+Now token 1 (query `[0, 2]`):
+
+```
+scores  = [0,2]·[[1,1,1,1],[1,1,1,1]] = [2, 2, 2, 2]
+weights = [0.25, 0.25, 0.25, 0.25]
+output  = [1, 1]
+```
+
+Same result, because the keys were degenerate. **This is why the model needs *trained* projections** — random or trivial keys produce uniform attention, which is no better than averaging. After training, `W_K` shapes the keys so that different tokens look different from different angles, and softmax produces meaningful weights.
+
+Repeat the §6.2 multi-head exercise after training a small model and you'll see scores like `[8.3, -1.2, 12.7, 0.4]` instead of `[2, 2, 2, 2]` — softmax then concentrates weight on the relevant tokens.
+
+### 2.7 The asymmetry of attention
+
+`Q · K^T` is **not symmetric**. Token A's attention to token B can be very different from B's attention to A. Concretely:
+
+```
+score(i, j)  =  Q[i] · K[j]      ≠ in general     Q[j] · K[i]  =  score(j, i)
+```
+
+Because Q and K are produced by *different* learned matrices applied to the same input, `Q[i]` and `K[i]` are different vectors. The "asymmetric relationship" is built directly into the math.
+
+Why this matters: in a sentence like "She picked up the book that her teacher had recommended," the word **book** may strongly attend back to **teacher** (to figure out *whose* book), while **teacher** may not need to attend to **book** at all (it already knows what it is). The model learns these one-way dependencies because nothing in the architecture forces symmetry.
+
+### 2.8 K and V are always paired by position
+
+A subtle but critical structural rule: `K[j]` and `V[j]` are produced from the same token `j`. They are not independent slots. When attention weight on position `j` is high, you pull `V[j]` — never `V[k]` for some other `k`.
+
+Why this matters for **cross-attention**: in an encoder–decoder model, the decoder produces queries, and the encoder produces both keys and values. The encoder generates K and V from the same source-sentence tokens, paired by position. The decoder then "reaches across" the diagram, asking "which source token matters here?" (via K) and pulling that token's content (V).
+
+In **self-attention** in modern decoder-only LLMs, all three come from the same sequence — but the position-pairing rule still holds. Token `j`'s key and value always go together.
+
+This is why production runtimes cache K and V as a single **KV cache** indexed by position. It's one logical entry per past token, containing both its key vector and its value vector.
+
+### 2.9 The KV cache — a bridge to inference engineering
+
+A property that doesn't matter at all during training, but matters enormously during inference:
+
+* Once a sequence has been processed, every token's **K and V vectors are fixed**. They don't change when you decode the next token.
+* The new token's **Q changes** every step (it's a new query each time).
+* So during autoregressive decoding, you compute Q fresh each step, but you **reuse K and V from a cache** rather than re-running `W_K · x` and `W_V · x` for every past token.
+
+This is the **KV cache**. It is the single most important data structure in LLM inference, and it's the reason Q, K, V are designed as separate projections rather than fused into a single representation. If keys and values weren't pre-computable from past tokens, every decoded token would cost O(N²) work — and you couldn't run a 4 k-context chat at acceptable latency.
+
+Concretely for Qwen3-4B at 4 k context, the KV cache for one sequence holds:
+
+```
+2 (K and V) × 36 layers × 8 KV heads × 128 head_dim × 4096 positions × 2 bytes (FP16)
+  ≈ 576 MB
+```
+
+That cache is read on every decoded token. It's the second-biggest bandwidth load (after the weights themselves) on the entire decode path. The Phase 5 inference lectures spend a lot of time on it — see [Edge LLM Inference Internals](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Edge%20LLM%20Inference%20Internals/Lecture-01.md) §5.
+
+**Why this matters for understanding Q/K/V**: the three-vector design isn't just an architectural quirk. It's what makes long-context LLM inference economically viable. The asymmetry between "Q recomputed per step" and "K, V cacheable across steps" is the entire reason GPT-class models can hold a conversation.
+
+### 2.10 Common mental traps
+
+Things that confuse most learners on first pass:
+
+* **"Q, K, V are different types of information."** No — they are three *projections* of the same input embedding. The token's identity is the same; only the role differs.
+* **"K and V are the same thing in self-attention."** No — they're produced by different matrices `W_K` and `W_V`, into different subspaces. They're paired by position, but not equal in content.
+* **"Attention is just retrieval — find the best match and use it."** No — it's a *soft* weighted blend over all positions. Even the worst match contributes a small weighted slice.
+* **"The attention output is a single token's value."** No — it's a **weighted combination of every token's value vector**, with weights summing to 1. The output has shape `[d_v]` regardless of sequence length.
+* **"Each head computes its own Q, K, V from scratch."** Yes, exactly — and that's the point. Each head has its own `W_Q^h`, `W_K^h`, `W_V^h`, so each head can specialize in a different relationship type.
+* **"Why does Q come from the current token but K and V from past tokens? That's weird."** It's weird only if you're thinking of attention as "the current token asking past tokens for help." It's cleaner if you think of it as the library analogy: you (Q) walk in with a question; the books (K and V) are sitting on the shelves regardless of who walks in.
+
+### 2.11 The minimal code, one more time
+
+With all the structure now clear, the per-query attention operation reduces to four lines:
 
 ```python
 def attention_one_query(q, K, V):
     """
-    q: [d_k]              one query vector
-    K: [n, d_k]           n key vectors
-    V: [n, d_v]           n value vectors
-    returns:               [d_v]
+    q: [d_k]              one query vector  (e.g., from the current token)
+    K: [n, d_k]           n key vectors     (one per past token)
+    V: [n, d_v]           n value vectors   (one per past token, paired with K)
+    returns:               [d_v]             a weighted blend of values
     """
-    scores = K @ q                       # [n] — one score per key
-    weights = softmax(scores)            # [n] — normalized
-    return weights @ V                   # [d_v] — weighted sum of values
+    scores  = K @ q                  # [n]  — one score per (q, k_j) pair
+    weights = softmax(scores)        # [n]  — non-negative, sum to 1
+    return weights @ V               # [d_v] — weighted sum of values
 ```
 
-That's the entire attention operation for one query. Everything else (scaling, masking, multi-head, batching) is generalization.
+That's the entire attention operation for one query. Everything in §3–§9 (scaling, masking, batching, multi-head, the full block, encoder vs decoder) is generalization or wrapping around this four-line core.
 
 ---
 
