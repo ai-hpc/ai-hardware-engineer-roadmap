@@ -410,6 +410,14 @@ nav:
         - Guide: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/Guide.md
         - HPC Setup:
           - Guide: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Guide.md
+          - Blackwell B200 Qwen Inference:
+            - Overview: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/README.md
+            - "01 Blackwell Architecture": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/01-Blackwell-Architecture.md
+            - "02 FP4 Numerics & Transformer Engine 2": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/02-FP4-Numerics-Transformer-Engine.md
+            - "03 Single-B200 Qwen Inference": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/03-Single-B200-Qwen-Inference.md
+            - "04 Multi-B200 and NVL72": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/04-Multi-B200-NVL72.md
+            - "05 Blackwell Kernel Engineering": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/05-Blackwell-Kernel-Engineering.md
+            - "06 Production Serving on Blackwell": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/06-Production-Serving-on-Blackwell.md
           - 8x H200 Training & Inference:
             - Overview: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/README.md
             - 01 Hardware Architecture: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/01-Hardware-Architecture.md
