@@ -1,6 +1,6 @@
 <div align="center" markdown="1">
 
-![AI Hardware Engineer Roadmap](Assets/images/ai-hardware-roadmap-hero.svg)
+![AI Hardware Engineer Roadmap](Assets/images/physical-ai-chip.png)
 
 [Star this repo](https://github.com/ai-hpc/ai-hardware-engineer-roadmap) · [Read the full roadmap online](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/)
 
@@ -95,7 +95,7 @@ If you only want to call an LLM API, this isn't for you. If you want to design t
 
 Everything in this roadmap maps onto an 8-layer stack. The point isn't to memorize layers — it's to understand how decisions in one layer ripple through the others.
 
-![AI Chip Stack Diagram](Assets/images/ai-chip-stack-diagram.svg)
+![AI Chip Stack Diagram](Assets/images/ai-chip-stack.png)
 
 When you're designing a chip, **every** layer is a constraint and a degree of freedom. The roadmap teaches you to read the whole column.
 

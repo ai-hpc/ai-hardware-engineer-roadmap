@@ -11,8 +11,8 @@ docs_dir: docs
 theme:
   name: material
   custom_dir: overrides
-  logo: Assets/images/avatar.png
-  favicon: Assets/images/avatar.png
+  logo: Assets/images/ai-chip-logo.png
+  favicon: Assets/images/ai-chip-logo.png
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -53,7 +53,7 @@ extra:
       link: https://github.com/ai-hpc
   seo:
     keywords: AI hardware engineer roadmap, AI chip design, CUDA programming, Jetson Orin Nano, FPGA development, ML compiler, RISC-V AI accelerator, edge AI, embedded AI, TensorRT, OpenThread, Zigbee, AI agent systems
-    image: Assets/images/ai-hardware-roadmap-hero.svg
+    image: Assets/images/physical-ai-chip.png
   generator: false
 
 markdown_extensions:
