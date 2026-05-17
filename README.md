@@ -8,230 +8,244 @@
 
 ---
 
-## What is this?
+## The Goal
 
-This repository is a **hardware-first roadmap** for people who want to become AI hardware engineers.
+> **Master AI inference, AI agent harness systems, and hardware engineering — then design a custom AI inference chip.**
 
-It sits in the gap between "I can use AI frameworks" and "I can explain how models map onto compilers, runtimes, boards, and chips." The repository connects the layers that are usually learned separately: digital design, computer architecture, operating systems, parallel programming, embedded systems, AI workloads, deployment, ML compilers, and accelerator design.
+Three pillars. One destination. Everything in this repository is organized so that each pillar deepens, each chapter produces a measurable artifact, and the three converge on a chip you could actually tape out.
 
-The goal is not to collect random resources or to teach generic AI in isolation. The goal is to build **cross-stack engineering judgment**: how workloads create bottlenecks, how software reaches hardware, and how to design, optimize, deploy, or debug AI systems close to the silicon.
-
-AI content in this repository exists to teach the workloads that hardware must serve. The center of gravity is still **hardware, systems, deployment, and performance**.
-
-**By the end, you should be able to:**
-
-- trace an AI workload from model code to compiler, runtime, and hardware behavior
-- write and profile performance-critical code, including GPU and parallel workloads
-- deploy AI on real embedded or programmable hardware such as Jetson and FPGA platforms
-- reason about memory, latency, throughput, precision, and architecture tradeoffs
+If you only want to read about AI hardware, there are better books. This roadmap is for engineers who want to **build a chip that runs real workloads, with a runtime that ships, hosting agents that work.**
 
 ---
 
-## Who is this for?
+## The Three Pillars
 
-This repository is for engineers who want to move into **AI hardware work**, not just use AI tools at a high level.
+```
+                          ┌────────────────────────────────────┐
+                          │     Custom AI Inference Chip       │
+                          │  (the artifact this roadmap aims   │
+                          │   at — silicon you could tape out) │
+                          └────────────────┬───────────────────┘
+                                           │
+                  ┌────────────────────────┼────────────────────────┐
+                  ▼                        ▼                        ▼
+         ┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐
+         │   AI Inference   │   │   Agent Harness  │   │     Hardware     │
+         │   Engineering    │   │     Systems      │   │   Engineering    │
+         ├──────────────────┤   ├──────────────────┤   ├──────────────────┤
+         │ GEMV/GEMM        │   │ Agent runtimes   │   │ Digital design   │
+         │ Quantization     │   │ Gateways/RPC     │   │ HDL & FPGA       │
+         │ KV/paged attn    │   │ Skills & tools   │   │ Computer arch    │
+         │ Multi-GPU TP/PP  │   │ Multi-agent loops│   │ Embedded Linux   │
+         │ Rooflines        │   │ Observability    │   │ Jetson, ESP32    │
+         │ Real models      │   │ Production SDLC  │   │ Carrier boards   │
+         │ (Qwen3, 72B…)    │   │                  │   │ RTL → ASIC flow  │
+         └──────────────────┘   └──────────────────┘   └──────────────────┘
+```
 
-It is built for people crossing into a neighboring layer of the stack:
-- from software into performance, compilers, and hardware behavior
-- from ML into deployment, systems, and runtime constraints
-- from embedded into AI products and accelerator-backed inference
-- from hardware into workloads, compiler flow, and software integration
+### 1. AI Inference Engineering
+The workload your chip will run. You learn how decode is bandwidth-bound, how GEMV/GEMM kernels actually dispatch, how K-quants work, how to size a roofline, how to optimize Qwen3-4B on a Jetson and Qwen2.5-72B on 4×H100 — so when you design silicon, you know exactly what bytes-per-token your accelerator must move and what tile sizes the compiler will hand you.
 
-- **Software Engineer:** Move from APIs and infrastructure into CUDA, runtime behavior, compiler flow, memory hierarchy, and accelerator execution.
-- **ML / AI Engineer:** Connect quantization, batching, graph lowering, deployment, and inference behavior to the hardware limits that actually shape performance.
-- **Embedded / Firmware Engineer:** Extend RTOS, Linux, drivers, BSP, and bring-up skills into Jetson, edge inference, sensor pipelines, and shipped AI devices.
-- **Computer Science Student:** Use a structured path from fundamentals to systems, workloads, deployment, and specialization instead of guessing what to study next.
-- **Hardware / RTL / FPGA Engineer:** Add workload intuition, compiler context, kernels, and deployment constraints so existing hardware knowledge maps to real AI systems.
+### 2. AI Agent Harness Systems
+The software stack that lives *above* your chip. Agentic runtimes (OpenClaw, OpenAI Agents SDK), session models, gateway RPCs, tool calling, skills, multi-agent loops, evals, observability. Your chip will be a substrate for harnesses like these — knowing how they behave in production tells you which inference patterns to optimize for (single-stream decode? batched serving? speculative draft + verify? long-context with paged attention?).
+
+### 3. Hardware Engineering
+The substrate itself. Digital design and HDLs, computer architecture, operating systems and parallel programming, real boards (ESP32, Jetson, Xilinx FPGA), carrier-board PCB, embedded Linux bring-up — then RTL design, HLS, and the AI-chip-design specialization that puts it together. You don't get to a tape-out without standing on this stack.
+
+**Why the combination?** A chip without a runtime is a brick. A runtime without an agent stack is a benchmark. An agent stack without inference cost discipline is a demo. The three pillars are how you build something that actually ships at the workload, the runtime, and the silicon at the same time.
 
 ---
 
-## AI Chip Stack
+## What You'll Have at the End
 
-This roadmap uses an **8-layer stack** to explain AI hardware work end to end. The point is not just to label layers. The point is to understand how decisions in one layer affect the others, from application code at the top to implementation and fabrication at the bottom.
+The reason for this roadmap, written as a checklist:
+
+- [ ] You can take a transformer model, predict its decode tok/s on a given chip from first principles, and explain where it falls short of the roofline.
+- [ ] You can hand-tune a CUDA/kernel path for a Qwen-class model — fused QKV, fused gate+up, CUDA Graphs, INT8 KV, speculative decoding — and quote a before/after benchmark.
+- [ ] You can run a production agent harness end-to-end: gateway, sessions, skills, tool calls, multi-agent supervision, observability dashboards, the lot.
+- [ ] You can take a Jetson module, design a carrier board for it, bring up custom L4T, flash it in volume, and ship a product against FCC/CE.
+- [ ] You can write RTL, drive timing closure on a real FPGA, and lower a small transformer block through HLS or a custom MLIR dialect.
+- [ ] You can write the architecture spec for a custom AI inference accelerator that targets a specific workload (e.g., 8-bit Qwen-class decode at edge power) — with realistic numbers for tile size, SRAM budget, MAC array, DMA, and compiler interface.
+
+That last bullet is the goal. The first five exist to make it real.
+
+---
+
+## Who This Is For
+
+- **AI/ML engineers** who want to stop treating inference as a black box and design the chip that runs it.
+- **Inference engineers** who want to extend up into agent-runtime co-design and down into kernel + silicon.
+- **Embedded/firmware engineers** who want to climb the stack — from boards to runtimes to chip architecture.
+- **Hardware/RTL/FPGA engineers** who need workload and runtime intuition before specing accelerators.
+- **CS students** who want a structured path that ends at "I designed a chip" rather than "I read about chips."
+
+If you only want to call an LLM API, this isn't for you. If you want to design the silicon that calls it, keep reading.
+
+---
+
+## The AI Chip Stack
+
+Everything in this roadmap maps onto an 8-layer stack. The point isn't to memorize layers — it's to understand how decisions in one layer ripple through the others.
 
 ![AI Chip Stack Diagram](Assets/images/ai-chip-stack-diagram.svg)
 
----
-
-## Where Do I Start?
-
-Pick the path that matches both your current background and your target role. Most people should choose one primary entry path first, then branch out later.
-
-- **Software / ML:** Start with execution and performance. Path: `Phase 1 (C++ / Parallel) -> Phase 3 -> Phase 4C or 4B`. Best if you already build models or infrastructure and want to understand kernels, memory behavior, compiler lowering, and deployment constraints.
-- **Embedded / Firmware:** Start with systems and deployment. Path: `Phase 1 (Architecture) -> Phase 2 -> Phase 4B`. Best if you already know boards, RTOS, buses, or Linux bring-up and want to move into edge AI products.
-- **Already know CUDA:** Jump to specialized tracks. Path: `Phase 4A / 4B / 4C`. Best if profiling, kernels, and low-level performance already feel familiar.
-- **Chip design target:** Follow the full hardware path. Path: `Phase 1 -> Phase 2 -> Phase 4A -> Phase 5F`. Best if your goal is accelerator architecture, FPGA prototyping, RTL implementation, or silicon-adjacent work.
+When you're designing a chip, **every** layer is a constraint and a degree of freedom. The roadmap teaches you to read the whole column.
 
 ---
 
-## How To Use This Roadmap
+## The Path
 
-Do not treat this repository like a book to finish once. Use it like a build-and-measure curriculum.
+Five phases. The first four are foundation; the fifth is where the three pillars converge.
 
-1. Read the theory
-2. Build the subsystem or implementation
-3. Measure performance, power, correctness, or utilization
-4. Ship one reusable artifact
+### [Phase 1 — Digital Foundations](Phase%201%20-%20Foundational%20Knowledge/Guide.md) *(Hardware pillar)*
+*The language of hardware. Logic gates → GPU code.*
 
-The artifact matters as much as the reading. Good outputs include a CUDA profile, TensorRT benchmark, device-tree patch, FPGA timing report, compiler experiment, or architecture write-up. The point is to leave each block with evidence of engineering work, not just notes.
+| Module | What you'll learn |
+|--------|------------------|
+| [Digital Design & HDL](Phase%201%20-%20Foundational%20Knowledge/1.%20Digital%20Design%20and%20Hardware%20Description%20Languages/Guide.md) | Verilog/SystemVerilog, simulation, the language you'll later write your accelerator in |
+| [Computer Architecture](Phase%201%20-%20Foundational%20Knowledge/2.%20Computer%20Architecture%20and%20Hardware/Guide.md) | CPUs, GPUs, caches, memory hierarchies — the mental model behind your chip |
+| [Operating Systems](Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Guide.md) | Processes, drivers, scheduling — what your chip's host actually does |
+| [C++ & Parallel Computing](Phase%201%20-%20Foundational%20Knowledge/4.%20C%2B%2B%20and%20Parallel%20Computing/Guide.md) | SIMD, OpenMP, **CUDA**, ROCm, OpenCL/SYCL |
+
+### [Phase 2 — Embedded Systems](Phase%202%20-%20Embedded%20Systems/Guide.md) *(Hardware pillar)*
+*Get hands-on with real hardware. MCUs, sensors, embedded Linux.*
+
+| Module | What you'll learn |
+|--------|------------------|
+| [Schematic & PCB Design](Phase%202%20-%20Embedded%20Systems/1.%20Schematic%20Capture%20and%20PCB%20Design/Guide.md) | Read schematics, design carrier boards |
+| [Embedded Software](Phase%202%20-%20Embedded%20Systems/2.%20Embedded%20Software/Guide.md) | Cortex-M, FreeRTOS, SPI/I²C/CAN, IoT (OpenThread, Zigbee) |
+| [Embedded Linux](Phase%202%20-%20Embedded%20Systems/3.%20Embedded%20Linux/Guide.md) | Yocto, PetaLinux, driver bring-up |
+| [Product Design](Phase%202%20-%20Embedded%20Systems/4.%20Product%20Design/Guide.md) | Going from prototype to shippable product |
+
+### [Phase 3 — AI Workloads](Phase%203%20-%20Artificial%20Intelligence/Guide.md) *(Inference & Agent pillars start here)*
+*Understand the workloads your chip must serve. Core + two tracks.*
+
+**Core (everyone):**
+- [Neural Networks](Phase%203%20-%20Artificial%20Intelligence/1.%20Neural%20Networks/Guide.md) — backprop, CNNs, transformers from first principles
+- [**Transformer Fundamentals**](Phase%203%20-%20Artificial%20Intelligence/1.%20Neural%20Networks/Transformer%20Fundamentals/Lecture-01.md) — the prerequisite for every inference lecture downstream
+- [Deep Learning Frameworks](Phase%203%20-%20Artificial%20Intelligence/2.%20Deep%20Learning%20Frameworks/Guide.md) — micrograd → PyTorch → tinygrad
+
+**Track A — Hardware & Edge AI:** Computer vision, sensor fusion, Voice AI, Edge AI & optimization. Feeds Phase 4B and Phase 5C.
+
+**Track B — Agentic AI & ML Engineering:** [42 lectures](Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Lectures/) on agent harnesses, LangGraph, multi-agent systems, RAG, evaluation, production runtime discipline, OpenClaw, OpenAI Agents SDK, security. This is the **agent harness pillar in its primary form** — read in order if your destination is the chip + runtime + harness story.
+
+### Phase 4 — Deployment & Compilation *(All three pillars co-exist here)*
+*Take AI to real silicon. Three specialized tracks.*
+
+| Track | Focus | Pillar |
+|-------|-------|--------|
+| [**A — Xilinx FPGA**](Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md) | Vivado, Zynq MPSoC, HLS, driver dev, video pipeline | Hardware |
+| [**B — NVIDIA Jetson**](Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md) | Orin platform, custom carrier, L4T, OTA, TensorRT/DLA | Hardware + Inference |
+| [**C — ML Compiler**](Phase%204%20-%20Track%20C%20-%20ML%20Compiler%20and%20Graph%20Optimization/Guide.md) | MLIR, TVM, Triton, kernel engineering, quantization | Inference |
+
+You don't have to do all three. But to land at chip design, you want enough of **A** to write RTL, enough of **B** to know what an inference platform looks like, and enough of **C** to know how a compiler will target your chip.
+
+### [Phase 5 — Specialization & Convergence](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Guide.md)
+*The three pillars converge here. Specialization tracks plus the chip-design endpoint.*
+
+| Track | What you'll specialize in | Pillar(s) |
+|-------|---------------------------|-----------|
+| [**A — GPU Infrastructure**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/1.%20GPU%20Infrastructure/Guide.md) | Multi-GPU, NVLink, NCCL, AMD ROCm/HIP, MI300X | Inference |
+| [**B — HPC (CUDA-X)**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/2.%20High%20Performance%20Computing/Guide.md) | cuBLAS, cuDNN, NVSHMEM, 40+ libraries | Inference |
+| [**C — Edge AI**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Guide.md) | Holoscan, [Edge LLM Inference Internals](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Edge%20LLM%20Inference%20Internals/Lecture-01.md), [**Qwen Inference Optimization (6-lecture series)**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/README.md), AI-driven wireless | Inference |
+| [**D — Robotics**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/4.%20Robotics/Guide.md) | ROS 2, Nav2, motion planning, swarm | Hardware + Inference |
+| [**E — Autonomous Vehicles**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/5.%20Autonomous%20Vehicles/Guide.md) | openpilot, BEV perception, ISO 26262, TRACE32 debug | Hardware + Inference |
+| [**F — AI Chip Design**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/6.%20AI%20Chip%20Design/Guide.md) | **The endpoint.** Systolic arrays, dataflow architectures, tinygrad↔hardware, RISC-V AI accelerator design, ASIC flow | **All three** |
+
+**The signature path:** Phase 1 → Phase 2 → Phase 3 (Core + Track B) → Phase 4 (selected) → Phase 5C + Phase 5F.
+
+---
+
+## Featured Inference Lectures
+
+The deepest, most current technical content lives in these Phase 5 lectures — read them as a single arc:
+
+| # | Lecture | What it teaches |
+|---|---------|-----------------|
+| 1 | [Edge LLM Inference Internals](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Edge%20LLM%20Inference%20Internals/Lecture-01.md) | GEMV vs GEMM rooflines, K-quants, KV-cache math, Jetson `nvpmodel`/`jetson_clocks` diagnostics |
+| 2 | [Qwen Architecture Deep Dive](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/Lecture-01.md) | Qwen3-4B and Qwen2.5-72B side by side, GQA, RoPE-NeoX, SwiGLU, full `config.json` → tensor-shape derivation |
+| 3 | [Quantizing Qwen3-4B to Q4](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/Lecture-02.md) | Q4_K_M vs AWQ vs GPTQ, why V and FFN-down get upgraded, calibration, GGUF layout |
+| 4 | [Decode Optimization on Jetson](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/Lecture-03.md) | 0.2 → 30 tok/s ladder, fused QKV/gate-up, CUDA Graphs, INT8 KV, speculative decoding |
+| 5 | [Qwen2.5-72B Multi-GPU FP16](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/Lecture-04.md) | TP=8 partitioning, NCCL hot path, paged attention, YaRN, runtime recipes |
+| 6 | [Cross-Model & Production Serving](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/Lecture-05.md) | Speculative decoding pairings, edge/cloud routing, observability, capacity planning |
+| 7 | [Batched GEMM vs Normal GEMM](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/Lecture-06.md) | cuBLAS API forms, column-major dance, tensor cores, bit-exact reproducibility |
+| 8 | [AI-Driven Wireless Communication](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/AI-Driven%20Wireless%20Communication/Lecture-01.md) | Neural PHY, O-RAN xApps, SDR + DL, modem NPU silicon |
+
+Read them in order if you're new. Skip to whichever solves your current problem if you're not.
+
+---
+
+## How to Use This Roadmap
+
+Don't read this like a book. Treat it like a **build-and-measure curriculum**.
+
+For every block:
+
+1. Read the theory.
+2. Build the subsystem or implement the technique.
+3. Measure something — latency, throughput, occupancy, bandwidth, power, accuracy, area, perplexity.
+4. Ship one reusable artifact (benchmark, kernel, board, dashboard, RTL block, eval report).
+
+Each artifact is a brick in the chip you're going to design.
 
 Before you start, decide three things:
 
-1. Which role or stack layer you are aiming at. Start with [Roles & Market Analysis](Roles%20and%20Market%20Analysis.md).
-2. What hardware and toolchain you can actually use.
-3. How you will track outputs, failures, measurements, and decisions.
+1. **Where you're entering the stack.** (See "Who This Is For" above.)
+2. **What hardware you can actually use.** Jetson Orin Nano is the cheapest end-to-end inference target; an RTX or rented L40S/H100 covers most of the datacenter path; a Xilinx Zynq dev board covers FPGA; an ESP32 + sensor breakout covers embedded.
+3. **How you'll track outputs.** A notebook, a benchmarks repo, a project log — any system you actually use.
 
 ---
 
-## The 5 Phases
+## Reference Projects
 
-### [Phase 1 — Digital Foundations](Phase%201%20-%20Foundational%20Knowledge/Guide.md)
-*Learn the language of hardware. Go from logic gates to writing GPU code.*
+These projects exist for you to study, not just read about:
 
-| Module | What you'll learn |
-|--------|------------------|
-| [Digital Design & HDL](Phase%201%20-%20Foundational%20Knowledge/1.%20Digital%20Design%20and%20Hardware%20Description%20Languages/Guide.md) | How digital logic works; write Verilog, simulate circuits |
-| [Computer Architecture](Phase%201%20-%20Foundational%20Knowledge/2.%20Computer%20Architecture%20and%20Hardware/Guide.md) | How CPUs and GPUs work internally — pipelines, caches, memory |
-| [Operating Systems](Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Guide.md) | Processes, memory, scheduling, device drivers |
-| [C++ & Parallel Computing](Phase%201%20-%20Foundational%20Knowledge/4.%20C%2B%2B%20and%20Parallel%20Computing/Guide.md) | SIMD, OpenMP, oneTBB, **CUDA**, ROCm, OpenCL/SYCL |
-
----
-
-### [Phase 2 — Embedded Systems](Phase%202%20-%20Embedded%20Systems/Guide.md)
-*Get hands-on with real hardware: microcontrollers, sensors, and embedded Linux.*
-
-| Module | What you'll learn |
-|--------|------------------|
-| [Embedded Software](Phase%202%20-%20Embedded%20Systems/2.%20Embedded%20Software/Guide.md) | ARM Cortex-M, FreeRTOS, communication buses (SPI/I2C/CAN), power management |
-| [Embedded Linux](Phase%202%20-%20Embedded%20Systems/3.%20Embedded%20Linux/Guide.md) | Build custom Linux for embedded devices with Yocto and PetaLinux |
+| Project | Why it's here |
+|---------|---------------|
+| [**jetson-llm-runtime**](Projects/jetson-llm-runtime/README.md) | A custom Jetson LLM inference runtime — every GEMV/GEMM kernel, KV cache, paged-attention path, build flow. The inference pillar in code. |
+| [**jetson-esp-hosted**](https://github.com/ai-hpc/jetson-esp-hosted) | Jetson-validated ESP-Hosted fork for SPI/Wi-Fi/BLE bring-up. The embedded pillar in code. |
+| [**tinygrad**](https://github.com/tinygrad/tinygrad) | ~10 K-line ML framework. The cleanest place to read framework → compiler → kernel → backend in one repo. |
+| [**openpilot**](https://github.com/commaai/openpilot) | Production ADAS stack. End-to-end perception, ML, and embedded software on one board. |
 
 ---
 
-### [Phase 3 — Artificial Intelligence](Phase%203%20-%20Artificial%20Intelligence/Guide.md)
-*Understand the AI workloads your hardware must run. Two tracks — pick one or both.*
+## Target Roles This Enables
 
-**Core (everyone does these):**
+The roadmap is full-stack on purpose, but it produces several well-paid specialist roles along the way:
 
-| Module | What you'll learn |
-|--------|------------------|
-| [Neural Networks](Phase%203%20-%20Artificial%20Intelligence/1.%20Neural%20Networks/Guide.md) | How neural networks learn — backprop, CNNs, transformers from scratch |
-| [Deep Learning Frameworks](Phase%203%20-%20Artificial%20Intelligence/2.%20Deep%20Learning%20Frameworks/Guide.md) | micrograd → PyTorch → tinygrad: understand what frameworks actually do |
+| Role | Key Phases |
+|------|-----------|
+| **AI Inference Engineer** | 3 + 4C + 5A/B/C |
+| **AI Compiler Engineer** | 1 + 4C + 5B |
+| **Edge AI Engineer** | 3A + 4B + 5C |
+| **GPU Runtime / Kernel Engineer** | 1 + 4B + 5A |
+| **Agentic AI / Agent Harness Engineer** | 3B (full lecture series) + 5C |
+| **Embedded / Firmware Engineer** | 1 + 2 + 4B |
+| **Autonomous Vehicles Engineer** | 3A + 4B + 5E |
+| **RTL / FPGA Design Engineer** | 1 + 4A |
+| **AI Accelerator Architect** | 1 + 4A + 5F |
+| **AI Hardware Engineer (Full-Stack)** | Full path — the chip-design endpoint |
 
-**Track A — Hardware & Edge AI** *(leads to Phase 4A/B)*
-
-| Module | What you'll learn |
-|--------|------------------|
-| [Computer Vision](Phase%203%20-%20Artificial%20Intelligence/Track%20A%20-%20Hardware%20and%20Edge%20AI/3.%20Computer%20Vision/Guide.md) | Object detection, segmentation, 3D vision, OpenCV |
-| [Sensor Fusion](Phase%203%20-%20Artificial%20Intelligence/Track%20A%20-%20Hardware%20and%20Edge%20AI/4.%20Sensor%20Fusion/Guide.md) | Fuse camera + LiDAR + IMU; Kalman filters, BEVFusion |
-| [Voice AI](Phase%203%20-%20Artificial%20Intelligence/Track%20A%20-%20Hardware%20and%20Edge%20AI/5.%20Voice%20AI/Guide.md) | Speech-to-text (Whisper), TTS, wake-word detection |
-| [Edge AI & Optimization](Phase%203%20-%20Artificial%20Intelligence/Track%20A%20-%20Hardware%20and%20Edge%20AI/6.%20Edge%20AI%20and%20Model%20Optimization/Guide.md) | Quantization, pruning, deploying models on constrained devices |
-
-**Track B — Agentic AI & ML Engineering** *(leads to Phase 4C / Phase 5)*
-
-| Module | What you'll learn |
-|--------|------------------|
-| [Agentic AI & GenAI](Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Guide.md) | Build LLM agents, RAG systems, tool-using AI |
-| [ML Engineering & MLOps](Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/4.%20ML%20Engineering%20and%20MLOps/Guide.md) | Training pipelines, model serving, monitoring |
-| [LLM Application Development](Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/5.%20LLM%20Application%20Development/Guide.md) | Fine-tuning, RAG architecture, production LLM apps |
+→ See [**Roles & Market Analysis**](Roles%20and%20Market%20Analysis.md) for salary data, 23 sub-roles, remote percentages, and hiring signals.
 
 ---
 
-### Phase 4 — Hardware Deployment & Compilation
-*Deploy AI on real chips. Three specialized tracks — choose based on your target role.*
+## Why This Roadmap Exists
 
-#### Track A — Xilinx FPGA
-*Design hardware accelerators and deploy AI on programmable chips.*
+A custom AI inference chip is one of the most demanding engineering projects a small team can attempt. It needs:
 
-| Module | What you'll learn |
-|--------|------------------|
-| [FPGA Development](Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md) | Vivado, IP cores, timing constraints, hardware debugging |
-| [Zynq MPSoC](Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/2.%20Zynq%20UltraScale%2B%20MPSoC/Guide.md) | Combine ARM CPU + FPGA fabric on one chip |
-| [Advanced FPGA Design](Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/3.%20Advanced%20FPGA%20Design/Guide.md) | Clock domain crossing, floorplanning, power |
-| [HLS (High-Level Synthesis)](Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/4.%20High-Level%20Synthesis%20%28HLS%29/Guide.md) | Write C++ → get hardware automatically |
-| [Runtime & Drivers](Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/5.%20Runtime%20and%20Driver%20Development/Guide.md) | Linux driver for your FPGA, DMA, Vitis AI |
-| [Projects](Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/6.%20Projects/Wireless-Video-FPGA.md) | Build a 4K wireless video pipeline end-to-end |
+- **Workload truth.** You can't design a tile or a memory hierarchy without knowing what bytes-per-token a Qwen-class decode will throw at you. That's the inference pillar.
+- **System truth.** Your chip is going to host runtimes that host agent harnesses. If you optimize for the wrong access pattern (batch=1 chat vs batch=64 agent supervisor vs long-context retrieval), you've shipped the wrong chip. That's the agent harness pillar.
+- **Engineering truth.** Silicon doesn't care about your intentions. RTL, timing, power, embedded software, board, manufacturing — there's no shortcut. That's the hardware pillar.
 
-#### Track B — NVIDIA Jetson
-*Ship AI products on NVIDIA's embedded GPU platform.*
-
-| Module | What you'll learn |
-|--------|------------------|
-| [Jetson Platform](Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md) | JetPack, L4T, GPU on Orin — get up and running |
-| [Carrier Board Design](Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/2.%20Custom%20Carrier%20Board%20Design%20and%20Bring-Up/Guide.md) | Design your own PCB that hosts a Jetson module |
-| [L4T Customization](Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/3.%20L4T%20Customization/Guide.md) | Custom Linux kernel, device tree, OTA updates |
-| [Firmware (FSP)](Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/4.%20FSP%20%28Firmware%20Support%20Package%29%20Customization/Guide.md) | FreeRTOS on the safety co-processor |
-| [AI Application Dev](Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/5.%20Application%20Development/Guide.md) | ML inference, ROS 2, real-time video on Jetson |
-| [Security & OTA](Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/6.%20Security%20and%20OTA/Guide.md) | Secure boot, encrypted storage, over-the-air updates |
-| [Manufacturing](Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/7.%20Compliance%20and%20Manufacturing/Guide.md) | FCC/CE compliance, production flashing, DFM |
-| [TensorRT & DLA](Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/8.%20Runtime%20and%20Driver%20Development/Guide.md) | Optimize models for Jetson's GPU and neural accelerator |
-
-#### Track C — ML Compiler
-*Learn how AI models are compiled and optimized into chip instructions.*
-
-| Module | What you'll learn |
-|--------|------------------|
-| [Compiler Fundamentals](Phase%204%20-%20Track%20C%20-%20ML%20Compiler%20and%20Graph%20Optimization/Guide.md) | How MLIR, TVM, and LLVM work; build a custom backend |
-| [DL Inference Optimization](Phase%204%20-%20Track%20C%20-%20ML%20Compiler%20and%20Graph%20Optimization/DL%20Inference%20Optimization/Guide.md) | Triton kernels, Flash-Attention, TensorRT-LLM, quantization |
-
-Start here:
-- [Track A — Xilinx FPGA](Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md)
-- [Track B — NVIDIA Jetson](Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md)
-- [Track C — ML Compiler](Phase%204%20-%20Track%20C%20-%20ML%20Compiler%20and%20Graph%20Optimization/Guide.md)
-
----
-
-### [Phase 5 — Specialization](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Guide.md)
-*Go deep in one area. These tracks are ongoing and expand continuously.*
-
-| Track | What you'll specialize in | Guide |
-|-------|--------------------------|-------|
-| **GPU Infrastructure** | Multi-GPU systems, NVLink, NCCL, AMD ROCm/HIP, MI300X | [→](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/1.%20GPU%20Infrastructure/Guide.md) |
-| **High-Performance Computing** | 40+ CUDA-X libraries: cuBLAS, cuDNN, NVSHMEM and more | [→](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/2.%20High%20Performance%20Computing/Guide.md) |
-| **Edge AI** | Efficient model architectures, Holoscan, real-time pipelines | [→](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Guide.md) |
-| **Robotics** | ROS 2, Nav2, MoveIt, motion planning | [→](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/4.%20Robotics/Guide.md) |
-| **Autonomous Vehicles** | openpilot, BEV perception, functional safety, hardware debug | [→](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/5.%20Autonomous%20Vehicles/Guide.md) |
-| **AI Chip Design** | Systolic arrays, dataflow architectures, tinygrad↔hardware, ASIC flow | [→](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/6.%20AI%20Chip%20Design/Guide.md) |
-
----
-
-<a id="layer--job-title-quick-reference"></a>
-## What Jobs Does This Lead To?
-
-| Target Role | Key Layers | Recommended Path |
-|-------------|-----------|-----------------|
-| **ML Inference Engineer** | L1 | Phase 3 → Phase 4C |
-| **Edge AI Engineer** | L1 | Phase 3 Track A → Phase 4B |
-| **AI Compiler Engineer** | L2 | Phase 1 → Phase 4C → Phase 5B |
-| **GPU Runtime Engineer** | L3 | Phase 1 (CUDA) → Phase 4A/B §Runtime |
-| **Firmware / Embedded Engineer** | L4 | Phase 1 → Phase 2 → Phase 4B |
-| **AI Accelerator Architect** | L5 | Phase 1 → Phase 4A → Phase 5F |
-| **RTL / FPGA Design Engineer** | L6 | Phase 1 (HDL) → Phase 4A |
-| **Autonomous Vehicles Engineer** | L1–L4 | Phase 3 Track A → Phase 4B → Phase 5E |
-| **AI Hardware Engineer (Full-Stack)** | L1–L6 | Full curriculum — the signature role this roadmap targets |
-
----
-
-## Reference Projects Used Throughout
-
-| Project | Why it's used |
-|---------|--------------|
-| [**tinygrad**](https://github.com/tinygrad/tinygrad) | A tiny DL framework (~2,500 lines) — shows exactly how frameworks, compilers, and hardware backends connect |
-| [**openpilot**](https://github.com/commaai/openpilot) | Real-world ADAS software — shows how perception, ML, and hardware work together in production |
-| [**jetson-llm-runtime**](Projects/jetson-llm-runtime/README.md) | A highly optimized Jetson LLM runtime project — useful for studying inference kernels, memory behavior, runtime design, build flow, and edge deployment tradeoffs |
-| [**jetson-esp-hosted**](https://github.com/ai-hpc/jetson-esp-hosted) | A Jetson-oriented ESP-Hosted fork validated on Jetson Orin Nano — useful for studying SPI bring-up, Wi-Fi/BLE coprocessor integration, Linux driver loading, and embedded connectivity on real hardware |
-
----
-
-## Additional Resources
-
-- [**Roles & Market Analysis**](Roles%20and%20Market%20Analysis.md) — 23 sub-roles, salary data, job postings, remote %, hiring priorities
+Most people learn one pillar. Some learn two. This roadmap is for the people who want to learn all three, and then build the thing.
 
 ---
 
 <div align="center" markdown="1">
 
-**A hardware-first roadmap for people learning to build, deploy, and optimize AI systems close to the silicon.**
+**Build the workload. Build the runtime. Build the silicon. Ship the chip.**
 
-[⭐ Star this repo](https://github.com/ai-hpc/ai-hardware-engineer-roadmap) if you find it useful — it helps others discover it.
+[⭐ Star this repo](https://github.com/ai-hpc/ai-hardware-engineer-roadmap) if you're on this path — it helps the next engineer find it.
 
 </div>
