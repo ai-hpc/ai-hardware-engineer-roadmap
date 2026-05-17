@@ -10,49 +10,62 @@
 
 ## The Goal
 
-> **Master AI inference, AI agent harness systems, and hardware engineering — then design a custom AI inference chip.**
+> **Master AI inference, AI agent harness systems, and hardware engineering — then design a physical AI chip.**
 
-Three pillars. One destination. Everything in this repository is organized so that each pillar deepens, each chapter produces a measurable artifact, and the three converge on a chip you could actually tape out.
+Not a generic inference accelerator. A **physical AI chip** — a single die that fuses a **Jetson-class AI brain** (NPU/GPU/DLA) with an **ESP32-class wireless stack** (Wi-Fi, BLE, Thread, Zigbee), plus the sensor I/O, ISP, and embedded Linux substrate needed to host an agent runtime. One chip, one BOM, one boot, one agent that can see, hear, talk, connect, and act in the real world.
 
-If you only want to read about AI hardware, there are better books. This roadmap is for engineers who want to **build a chip that runs real workloads, with a runtime that ships, hosting agents that work.**
+This is why the roadmap teaches Jetson and ESP32 side by side. They are the two reference platforms for the two halves of the same future SoC. Phase 2 puts ESP32 in your hand because ESP32 is the wireless IP block your chip is going to embed. Phase 4B puts Jetson in your hand because Jetson is the AI brain your chip is going to embed. Phase 5F shows you how to put them on the same die.
+
+Three pillars. One destination. Everything in this repository is organized so each chapter produces a measurable artifact, and the three pillars converge on a chip you could actually tape out.
+
+If you only want to read about AI hardware, there are better books. This roadmap is for engineers who want to **build a chip that runs real workloads, with a runtime that ships, hosting agents that talk to the physical world.**
 
 ---
 
 ## The Three Pillars
 
 ```
-                          ┌────────────────────────────────────┐
-                          │     Custom AI Inference Chip       │
-                          │  (the artifact this roadmap aims   │
-                          │   at — silicon you could tape out) │
-                          └────────────────┬───────────────────┘
+                          ┌──────────────────────────────────────┐
+                          │      Physical AI Agent Chip          │
+                          │   one die  ·  Jetson + ESP32 fused   │
+                          │   AI brain + wireless + sensors      │
+                          │   + agent runtime — ships in product │
+                          └────────────────┬─────────────────────┘
                                            │
                   ┌────────────────────────┼────────────────────────┐
                   ▼                        ▼                        ▼
          ┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐
-         │   AI Inference   │   │   Agent Harness  │   │     Hardware     │
-         │   Engineering    │   │     Systems      │   │   Engineering    │
+         │   AI Inference   │   │   Agent Harness  │   │     Physical     │
+         │   Engineering    │   │     Systems      │   │     Hardware     │
          ├──────────────────┤   ├──────────────────┤   ├──────────────────┤
          │ GEMV/GEMM        │   │ Agent runtimes   │   │ Digital design   │
-         │ Quantization     │   │ Gateways/RPC     │   │ HDL & FPGA       │
+         │ Quantization     │   │ Gateways/RPC     │   │ HDL → ASIC flow  │
          │ KV/paged attn    │   │ Skills & tools   │   │ Computer arch    │
          │ Multi-GPU TP/PP  │   │ Multi-agent loops│   │ Embedded Linux   │
-         │ Rooflines        │   │ Observability    │   │ Jetson, ESP32    │
-         │ Real models      │   │ Production SDLC  │   │ Carrier boards   │
-         │ (Qwen3, 72B…)    │   │                  │   │ RTL → ASIC flow  │
+         │ Rooflines        │   │ Observability    │   │ Jetson (AI brain)│
+         │ Real models      │   │ Production SDLC  │   │ ESP32 (wireless) │
+         │ (Qwen3, 72B…)    │   │ OpenClaw, SDKs   │   │ Sensors / ISP    │
          └──────────────────┘   └──────────────────┘   └──────────────────┘
+
+           ┌─────────────────────────────────────────────────────────┐
+           │ Convergence on one die:                                  │
+           │  Jetson NPU/GPU/DLA  ─┐                                  │
+           │  ESP32 Wi-Fi/BLE/    ─┼──► Physical AI Agent Chip        │
+           │   Thread/Zigbee       │   (your tape-out target)         │
+           │  ISP + sensor MIPI   ─┘                                  │
+           └─────────────────────────────────────────────────────────┘
 ```
 
 ### 1. AI Inference Engineering
 The workload your chip will run. You learn how decode is bandwidth-bound, how GEMV/GEMM kernels actually dispatch, how K-quants work, how to size a roofline, how to optimize Qwen3-4B on a Jetson and Qwen2.5-72B on 4×H100 — so when you design silicon, you know exactly what bytes-per-token your accelerator must move and what tile sizes the compiler will hand you.
 
 ### 2. AI Agent Harness Systems
-The software stack that lives *above* your chip. Agentic runtimes (OpenClaw, OpenAI Agents SDK), session models, gateway RPCs, tool calling, skills, multi-agent loops, evals, observability. Your chip will be a substrate for harnesses like these — knowing how they behave in production tells you which inference patterns to optimize for (single-stream decode? batched serving? speculative draft + verify? long-context with paged attention?).
+The software stack that lives *above* your chip. Agentic runtimes (OpenClaw, OpenAI Agents SDK), session models, gateway RPCs, tool calling, skills, multi-agent loops, evals, observability. A physical AI chip is the substrate that runs harnesses like these in a battery-powered product — knowing how they behave tells you which inference patterns to optimize for, what wake-on-event the radio block must support, and what state your boot ROM has to preserve.
 
-### 3. Hardware Engineering
-The substrate itself. Digital design and HDLs, computer architecture, operating systems and parallel programming, real boards (ESP32, Jetson, Xilinx FPGA), carrier-board PCB, embedded Linux bring-up — then RTL design, HLS, and the AI-chip-design specialization that puts it together. You don't get to a tape-out without standing on this stack.
+### 3. Physical Hardware Engineering
+The substrate itself — both halves of it. **The AI brain** (digital design, computer architecture, CUDA, Jetson Orin platform work, custom carrier boards, L4T, TensorRT/DLA) and **the wireless stack** (ESP32, OpenThread, Zigbee, ESP-Hosted, RF integration). Plus the embedded Linux, RTL design, HLS, and AI-chip-design specialization that puts NPU + radio + ISP + Linux on one die. You don't get to a tape-out without standing on both halves of this stack.
 
-**Why the combination?** A chip without a runtime is a brick. A runtime without an agent stack is a benchmark. An agent stack without inference cost discipline is a demo. The three pillars are how you build something that actually ships at the workload, the runtime, and the silicon at the same time.
+**Why the combination?** A chip without a runtime is a brick. A runtime without an agent stack is a benchmark. An agent stack without inference cost discipline is a demo. An inference accelerator that can't talk to the world over Wi-Fi or BLE is a coprocessor someone else has to integrate. The three pillars are how you build a chip that **ships in a real physical product** — at the workload, the runtime, the radio, and the silicon at the same time.
 
 ---
 
@@ -64,10 +77,11 @@ The reason for this roadmap, written as a checklist:
 - [ ] You can hand-tune a CUDA/kernel path for a Qwen-class model — fused QKV, fused gate+up, CUDA Graphs, INT8 KV, speculative decoding — and quote a before/after benchmark.
 - [ ] You can run a production agent harness end-to-end: gateway, sessions, skills, tool calls, multi-agent supervision, observability dashboards, the lot.
 - [ ] You can take a Jetson module, design a carrier board for it, bring up custom L4T, flash it in volume, and ship a product against FCC/CE.
+- [ ] You can bring up an ESP32 wireless coprocessor over SPI, expose it to a Linux host as a Wi-Fi/BLE/Thread/Zigbee radio, and integrate it into the same product.
 - [ ] You can write RTL, drive timing closure on a real FPGA, and lower a small transformer block through HLS or a custom MLIR dialect.
-- [ ] You can write the architecture spec for a custom AI inference accelerator that targets a specific workload (e.g., 8-bit Qwen-class decode at edge power) — with realistic numbers for tile size, SRAM budget, MAC array, DMA, and compiler interface.
+- [ ] You can write the architecture spec for a **physical AI agent chip** — one die containing an NPU tile (Qwen-class decode at edge power), a wireless subsystem (Wi-Fi 6/BLE 5/Thread/Zigbee), MIPI CSI-2 camera input, ISP, audio I/O, and a Linux-capable CPU — with realistic numbers for tile size, SRAM budget, MAC array, DMA, RF integration, and compiler/runtime interface.
 
-That last bullet is the goal. The first five exist to make it real.
+That last bullet is the goal. The first six exist to make it real.
 
 ---
 
@@ -150,7 +164,7 @@ You don't have to do all three. But to land at chip design, you want enough of *
 | [**C — Edge AI**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Guide.md) | Holoscan, [Edge LLM Inference Internals](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Edge%20LLM%20Inference%20Internals/Lecture-01.md), [**Qwen Inference Optimization (6-lecture series)**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/README.md), AI-driven wireless | Inference |
 | [**D — Robotics**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/4.%20Robotics/Guide.md) | ROS 2, Nav2, motion planning, swarm | Hardware + Inference |
 | [**E — Autonomous Vehicles**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/5.%20Autonomous%20Vehicles/Guide.md) | openpilot, BEV perception, ISO 26262, TRACE32 debug | Hardware + Inference |
-| [**F — AI Chip Design**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/6.%20AI%20Chip%20Design/Guide.md) | **The endpoint.** Systolic arrays, dataflow architectures, tinygrad↔hardware, RISC-V AI accelerator design, ASIC flow | **All three** |
+| [**F — AI Chip Design**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/6.%20AI%20Chip%20Design/Guide.md) | **The endpoint.** Systolic arrays, dataflow architectures, tinygrad↔hardware, RISC-V AI accelerator design, ASIC flow — and the integration question: how do you put an NPU, an ESP32-class radio, an ISP, and a Linux CPU on one die? | **All three** |
 
 **The signature path:** Phase 1 → Phase 2 → Phase 3 (Core + Track B) → Phase 4 (selected) → Phase 5C + Phase 5F.
 
@@ -224,7 +238,7 @@ The roadmap is full-stack on purpose, but it produces several well-paid speciali
 | **Autonomous Vehicles Engineer** | 3A + 4B + 5E |
 | **RTL / FPGA Design Engineer** | 1 + 4A |
 | **AI Accelerator Architect** | 1 + 4A + 5F |
-| **AI Hardware Engineer (Full-Stack)** | Full path — the chip-design endpoint |
+| **Physical AI Chip Architect** | Full path — Jetson + ESP32 fused into one SoC; the chip-design endpoint |
 
 → See [**Roles & Market Analysis**](Roles%20and%20Market%20Analysis.md) for salary data, 23 sub-roles, remote percentages, and hiring signals.
 
@@ -232,19 +246,19 @@ The roadmap is full-stack on purpose, but it produces several well-paid speciali
 
 ## Why This Roadmap Exists
 
-A custom AI inference chip is one of the most demanding engineering projects a small team can attempt. It needs:
+A **physical AI chip** — Jetson-class brain + ESP32-class radio + sensors + Linux on one die — is one of the most demanding engineering projects a small team can attempt. It needs:
 
-- **Workload truth.** You can't design a tile or a memory hierarchy without knowing what bytes-per-token a Qwen-class decode will throw at you. That's the inference pillar.
-- **System truth.** Your chip is going to host runtimes that host agent harnesses. If you optimize for the wrong access pattern (batch=1 chat vs batch=64 agent supervisor vs long-context retrieval), you've shipped the wrong chip. That's the agent harness pillar.
-- **Engineering truth.** Silicon doesn't care about your intentions. RTL, timing, power, embedded software, board, manufacturing — there's no shortcut. That's the hardware pillar.
+- **Workload truth.** You can't design an NPU tile or a memory hierarchy without knowing what bytes-per-token a Qwen-class decode will throw at you. That's the inference pillar.
+- **System truth.** Your chip is going to host runtimes that host agent harnesses in a battery-powered product. Wrong access pattern (batch=1 chat vs always-on wake word vs long-context retrieval), wrong wake-on-radio policy, wrong boot ROM, you've shipped the wrong chip. That's the agent harness pillar.
+- **Engineering truth — both halves.** Silicon doesn't care about your intentions. RTL, timing, power, embedded software, board, antenna, FCC, manufacturing — there's no shortcut. You need the AI-compute side (Jetson stack) *and* the wireless side (ESP32 stack) on the same die *and* on the same Linux. That's the hardware pillar.
 
-Most people learn one pillar. Some learn two. This roadmap is for the people who want to learn all three, and then build the thing.
+Most people learn one pillar. Some learn two. This roadmap is for the people who want to learn all three, and then build the thing that puts an AI agent in a real product — talking to sensors, talking to networks, talking to humans, off a single SoC.
 
 ---
 
 <div align="center" markdown="1">
 
-**Build the workload. Build the runtime. Build the silicon. Ship the chip.**
+**Build the workload. Build the runtime. Build the radio. Build the silicon. Ship the physical AI chip.**
 
 [⭐ Star this repo](https://github.com/ai-hpc/ai-hardware-engineer-roadmap) if you're on this path — it helps the next engineer find it.
 
