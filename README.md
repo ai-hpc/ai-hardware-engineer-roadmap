@@ -210,7 +210,7 @@ These projects exist for you to study, not just read about:
 
 | Project | Why it's here |
 |---------|---------------|
-| [**jetson-llm-runtime**](Projects/jetson-llm-runtime/README.md) | A custom Jetson LLM inference runtime — every GEMV/GEMM kernel, KV cache, paged-attention path, build flow. The inference pillar in code. |
+| [**jetson-llm-runtime**](Projects/jetson-llm-runtime/README.md) &nbsp;·&nbsp; [`GeniePod/genie-ai-runtime` v1.0.0](https://github.com/GeniePod/genie-ai-runtime) | Custom Jetson LLM inference runtime — every GEMV/GEMM kernel, KV cache, paged-attention path, build flow. The scaffold in this folder graduated into the production runtime at `GeniePod/genie-ai-runtime`: 38 tok/s prefill, +115 % vs `llama-bench` on Orin Nano Super 8 GB, tensor-core MMQ, persistent KV, INT8 KV default, OpenAI-shape HTTP server. The inference pillar in code. |
 | [**jetson-esp-hosted**](https://github.com/ai-hpc/jetson-esp-hosted) | Jetson-validated ESP-Hosted fork for SPI/Wi-Fi/BLE bring-up. The embedded pillar in code. |
 | [**tinygrad**](https://github.com/tinygrad/tinygrad) | ~10 K-line ML framework. The cleanest place to read framework → compiler → kernel → backend in one repo. |
 | [**openpilot**](https://github.com/commaai/openpilot) | Production ADAS stack. End-to-end perception, ML, and embedded software on one board. |
