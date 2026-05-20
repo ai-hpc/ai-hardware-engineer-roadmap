@@ -1,6 +1,6 @@
 # Lecture 42 - OpenAI Agents SDK: Native Sandbox and Durable Agent Harness
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 41](Lecture-41.md) | **Next:** [Lab 01](Lab-01-Research-Agent.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 41](Lecture-41.md) | **Next:** [Lecture 43](Lecture-43.md)
 
 ---
 
@@ -745,4 +745,4 @@ Task passes only if:
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 43 - MLSys 2026 Kernel Contest](Lecture-43.md)*
