@@ -328,7 +328,9 @@ nav:
           - "Lab 04: TokenJuice Output Compaction": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-04-TokenJuice-Output-Compaction.md
           - "Lab 05: OpenMeow App SDK Dogfood": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-05-OpenMeow-App-SDK-Dogfood.md
       - 4. ML Engineering & MLOps: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/4. ML Engineering and MLOps/Guide.md
-      - 5. LLM App Development: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/5. LLM Application Development/Guide.md
+      - 5. LLM App Development:
+        - Guide: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/5. LLM Application Development/Guide.md
+        - Qwen3.5-4B Unsloth Fine-Tuning: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/5. LLM Application Development/Qwen3.5-4B Unsloth Fine-Tuning/Guide.md
     - CMU AI Courses: Phase 3 - Artificial Intelligence/CMU-AI-Courses.md
 
   # ── Phase 4 ─────────────────────────────────────────────────

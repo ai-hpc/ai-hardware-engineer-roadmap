@@ -37,10 +37,12 @@ LLM applications are the **largest consumer of GPU inference capacity** in 2025â
 * **Full fine-tuning:** when you need maximum quality and have enough data/compute
 * **Data preparation:** instruction formatting, chat templates, quality filtering
 * **Evaluation:** perplexity, task-specific metrics, human eval, LLM-as-judge
+* **Dedicated course:** [Qwen3.5-4B-Base Fine-Tuning with Unsloth](Qwen3.5-4B%20Unsloth%20Fine-Tuning/Guide.md) â€” 16-bit LoRA SFT, adapter export, evaluation, and hardware-cost reporting
 
 **Projects:**
 1. Fine-tune Llama-3-8B with QLoRA on a domain-specific Q&A dataset. Evaluate vs base model.
 2. Merge LoRA adapters and export to ONNX for deployment.
+3. Fine-tune `Qwen/Qwen3.5-4B-Base` with Unsloth LoRA, then benchmark base, adapter, merged, and quantized artifacts.
 
 ---
 
@@ -205,6 +207,7 @@ The point of the example is the pipeline shape, not the exact classifier choice.
 | Resource | What it covers |
 |----------|---------------|
 | [Maxime Labonne's LLM Course](https://github.com/mlabonne/llm-course) | Free LLM roadmap and Colab notebooks covering LLM fundamentals, the LLM Scientist path, and the LLM Engineer path: fine-tuning, quantization, RAG, evaluation, and deployment |
+| [Qwen3.5-4B-Base Fine-Tuning with Unsloth](Qwen3.5-4B%20Unsloth%20Fine-Tuning/Guide.md) | Roadmap course for LoRA SFT on `Qwen/Qwen3.5-4B-Base`, export, evaluation, and hardware measurements |
 | [Anthropic API Documentation](https://docs.anthropic.com/) | Claude API, tool use, streaming |
 | [OpenAI Cookbook](https://cookbook.openai.com/) | GPT API patterns and best practices |
 | [LlamaIndex](https://docs.llamaindex.ai/) | RAG framework |
