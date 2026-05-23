@@ -398,7 +398,20 @@ nav:
       - DL Inference Optimization:
         - Overview: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/Guide.md
         - 01 Graph & Ops: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/01 - Graph and Operator Optimization/Guide.md
-        - 02 Kernel Engineering: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/Guide.md
+        - 02 Kernel Engineering:
+          - Overview: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/Guide.md
+          - "FlashAttention Course":
+            - "Overview": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Guide.md
+            - "01 Attention Bottleneck & Roofline": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 01 - Attention Bottleneck and Roofline.md
+            - "02 Online Softmax & Correctness": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 02 - Online Softmax and Numerical Correctness.md
+            - "03 FlashAttention-1 Algorithm": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 03 - FlashAttention-1 Algorithm.md
+            - "04 GPU Kernel Performance Basics": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 04 - GPU Kernel Performance Basics.md
+            - "05 Repo Anatomy & Python/CUDA API": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 05 - Repo Anatomy and Python CUDA API.md
+            - "06 FlashAttention-2": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 06 - FlashAttention-2.md
+            - "07 Backward Pass & Validation": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 07 - Backward Pass and Validation.md
+            - "08 Inference Path: KV Cache & Decode": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 08 - Inference Path KV Cache and Decode.md
+            - "09 Hopper / FA3 / FA4": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 09 - Hopper FA3 FA4.md
+            - "10 Capstone": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 10 - Capstone.md
         - 03 Compiler Stack: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/03 - Compiler Stack/Guide.md
         - 04 Quantization: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/04 - Quantization/Guide.md
         - 05 Runtimes: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/05 - Inference Runtimes and Deployment/Guide.md
