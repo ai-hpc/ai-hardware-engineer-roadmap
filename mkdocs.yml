@@ -457,6 +457,18 @@ nav:
             - 04 libcufile API: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/04-libcufile-API.md
             - 05 Performance Tuning: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/05-Performance-Tuning.md
             - 06 Disaggregated Storage: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/06-Disaggregated-Storage.md
+          - "Long-Context MoE Foundation Training":
+            - "Overview": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/README.md
+            - "01 Long-Context Bottlenecks": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/01-Long-Context-Bottlenecks.md
+            - "02 Long-Context Attention": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/02-Long-Context-Attention.md
+            - "03 Position Encoding": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/03-Position-Encoding.md
+            - "04 MoE Fundamentals": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/04-MoE-Fundamentals.md
+            - "05 MoE Systems & Infrastructure": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/05-MoE-Systems-Infrastructure.md
+            - "06 Adaptive Data Pipelines": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/06-Adaptive-Data-Pipelines.md
+            - "07 Long-Context Evaluation": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/07-Long-Context-Evaluation.md
+            - "08 Combining Long-Context & MoE": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/08-Combining-LongContext-and-MoE.md
+            - "09 Distributed Training Infrastructure": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/09-Distributed-Training-Infrastructure.md
+            - "10 General-Purpose Model": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/10-General-Purpose-Model.md
           - L40S x12 Inference:
             - Overview: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/README.md
             - 01 Hardware Architecture: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/01-Hardware-Architecture.md

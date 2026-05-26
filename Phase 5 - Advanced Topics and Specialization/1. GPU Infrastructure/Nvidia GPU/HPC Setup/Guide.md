@@ -17,6 +17,7 @@ Detailed guides for specific GPU cluster configurations and subsystems:
 | **NCCL Deep Dive** | GPU-to-GPU communication: algorithms, tuning, debugging, 1T-scale | [NCCL-Deep-Dive/](./NCCL-Deep-Dive/README.md) |
 | **CUDA Advanced Optimization** | CUDA Graphs, Cooperative Groups, Persistent Kernels, Fusion, Warp Specialization | [CUDA-Advanced-Optimization/](./CUDA-Advanced-Optimization/README.md) |
 | **GPUDirect Storage (GDS)** | Direct NVMe→GPU DMA, NVMe-oF, WD OpenFlex + RapidFlex, libcufile API | [GPUDirect-Storage/](./GPUDirect-Storage/README.md) |
+| **Long-Context MoE Foundation Training** | End-to-end course: long-context attention, MoE routing, mesh design, adaptive data, honest eval | [Long-Context-MoE-Foundation-Training/](./Long-Context-MoE-Foundation-Training/README.md) |
 
 ### 8x H200 — Topics
 - [01 Hardware Architecture](./8x-H200-Training-Inference/01-Hardware-Architecture.md) — GH100 die, HBM3e, NVLink 4.0, NVSwitch topology
