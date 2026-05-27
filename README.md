@@ -159,8 +159,11 @@ You don't have to do all three. But to land at chip design, you want enough of *
 | [**D — Robotics**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/4.%20Robotics/Guide.md) | ROS 2, Nav2, motion planning, swarm | Hardware + Inference |
 | [**E — Autonomous Vehicles**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/5.%20Autonomous%20Vehicles/Guide.md) | openpilot, BEV perception, ISO 26262, TRACE32 debug | Hardware + Inference |
 | [**F — AI Chip Design**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/6.%20AI%20Chip%20Design/Guide.md) | **The endpoint.** Systolic arrays, dataflow architectures, tinygrad↔hardware, RISC-V AI accelerator design, ASIC flow — and the integration question: how do you put an NPU, an ESP32-class radio, an ISP, and a Linux CPU on one die? | **All three** |
+| [**G — ML Systems Engineering**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/7.%20ML%20Systems%20Engineering/Guide.md) | Training systems, inference runtimes, GPU scheduling, distributed serving, compiler/runtime work, observability | Inference + Infrastructure |
 
 **The signature path:** Phase 1 → Phase 2 → Phase 3 (Core + Track B) → Phase 4 (selected) → Phase 5C + Phase 5F.
+
+**The MLSys path:** Phase 1 §3/§4 → Phase 3 Core → Phase 4B/4C → Phase 5A/B/C → Phase 5G.
 
 ---
 
@@ -224,6 +227,7 @@ The roadmap is full-stack on purpose, but it produces several well-paid speciali
 | Role | Key Phases |
 |------|-----------|
 | **AI Inference Engineer** | 3 + 4C + 5A/B/C |
+| **ML Systems Engineer** | 1 + 3 + 4B/4C + 5A/B/C/G |
 | **AI Compiler Engineer** | 1 + 4C + 5B |
 | **Edge AI Engineer** | 3A + 4B + 5C |
 | **GPU Runtime / Kernel Engineer** | 1 + 4B + 5A |

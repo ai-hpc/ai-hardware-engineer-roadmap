@@ -4,7 +4,7 @@
 
 **Layer mapping:** Depends on the track. This phase spans **L1 through L8**, but each specialization should stay coherent around one professional niche.
 
-**Role targets:** GPU Infrastructure Engineer · HPC Engineer · Robotics Engineer · Autonomous Vehicles Engineer · AI Accelerator Architect · Advanced Edge AI Engineer
+**Role targets:** GPU Infrastructure Engineer · HPC Engineer · ML Systems Engineer · Robotics Engineer · Autonomous Vehicles Engineer · AI Accelerator Architect · Advanced Edge AI Engineer
 
 **Prerequisites:** one primary Phase 4 track completed to a project-capable level: [Xilinx FPGA](../Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md), [NVIDIA Jetson](../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md), or [ML Compiler](../Phase%204%20-%20Track%20C%20-%20ML%20Compiler%20and%20Graph%20Optimization/Guide.md), plus whichever earlier phases your track depends on most heavily.
 
@@ -38,6 +38,7 @@ That is the difference between a learner and a differentiated candidate.
 | **4. Robotics** | ROS 2, autonomy software, robot systems integration | robotics and embodied AI | [Guide](4.%20Robotics/Guide.md) |
 | **5. Autonomous Vehicles** | perception, safety, deployment, debugging real vehicle stacks | AV systems and applied autonomy | [Guide](5.%20Autonomous%20Vehicles/Guide.md) |
 | **6. AI Chip Design** | accelerator architecture, dataflow, custom compute design | architecture and chip-design paths | [Guide](6.%20AI%20Chip%20Design/Guide.md) |
+| **7. ML Systems Engineering** | training systems, inference runtimes, GPU scheduling, distributed serving, compiler/runtime work | AI infrastructure and MLSys roles | [Guide](7.%20ML%20Systems%20Engineering/Guide.md) |
 
 **Recommended rule:** pick one primary track first. Add a second track only when it strengthens your main specialization instead of diluting it.
 
@@ -48,6 +49,7 @@ That is the difference between a learner and a differentiated candidate.
 Phase 5 should end with a project that is clearly role-shaped:
 
 - a multi-GPU or performance-engineering runbook
+- an MLSys benchmark suite or runtime prototype
 - an edge deployment case study with hard constraints and metrics
 - a robotics or AV system analysis tied to real software stacks
 - an accelerator architecture note, prototype, or design-space study

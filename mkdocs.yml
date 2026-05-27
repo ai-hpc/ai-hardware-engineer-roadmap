@@ -1,6 +1,6 @@
 site_name: AI Hardware Engineer Roadmap
 site_url: https://ai-hpc.github.io/ai-hardware-engineer-roadmap/
-site_description: A hardware-first AI engineering roadmap covering CUDA, embedded systems, Jetson, FPGA, ML compilers, RISC-V, accelerator architecture, and edge AI deployment.
+site_description: A hardware-first AI engineering roadmap covering CUDA, embedded systems, Jetson, FPGA, ML compilers, ML systems, RISC-V, accelerator architecture, and edge AI deployment.
 site_author: ai-hpc
 repo_url: https://github.com/ai-hpc/ai-hardware-engineer-roadmap
 repo_name: ai-hpc/ai-hardware-engineer-roadmap
@@ -52,7 +52,7 @@ extra:
     - icon: fontawesome/brands/github
       link: https://github.com/ai-hpc
   seo:
-    keywords: AI hardware engineer roadmap, AI chip design, CUDA programming, Jetson Orin Nano, FPGA development, ML compiler, RISC-V AI accelerator, edge AI, embedded AI, TensorRT, OpenThread, Zigbee, AI agent systems
+    keywords: AI hardware engineer roadmap, AI chip design, CUDA programming, Jetson Orin Nano, FPGA development, ML compiler, ML systems engineering, AI infrastructure, distributed training, LLM serving, RISC-V AI accelerator, edge AI, embedded AI, TensorRT, OpenThread, Zigbee, AI agent systems
     image: Assets/images/physical-ai-chip.png
   generator: false
 
@@ -537,3 +537,5 @@ nav:
         - "03": Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Lectures/Lecture-03.md
         - "04": Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Lectures/Lecture-04.md
         - "05": Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Lectures/Lecture-05.md
+    - "G: ML Systems Engineering":
+      - Guide: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Guide.md
