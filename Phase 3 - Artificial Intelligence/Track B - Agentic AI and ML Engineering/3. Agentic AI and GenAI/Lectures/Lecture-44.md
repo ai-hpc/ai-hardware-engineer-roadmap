@@ -1,6 +1,6 @@
 # Lecture 44 - Efficient Local RAG Stack: Qwen3.5-4B INT4 and Granite Embeddings
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 43](Lecture-43.md) | **Next:** [Lab 01](Lab-01-Research-Agent.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 43](Lecture-43.md) | **Next:** [Lecture 45](Lecture-45.md)
 
 ---
 
@@ -854,4 +854,4 @@ First metric to monitor:
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 45 - Qdrant, pgvector, and Embedding Model Selection](Lecture-45.md)*

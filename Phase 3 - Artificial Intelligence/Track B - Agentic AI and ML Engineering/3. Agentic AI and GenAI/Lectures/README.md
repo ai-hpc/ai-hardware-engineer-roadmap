@@ -15,7 +15,7 @@ The durable concepts in this course are:
 - **Product control plane:** gateways, channels, sessions, routing, identities, and audit logs.
 - **Runtime security:** least privilege, policy gates, telemetry, incident response, and evidence.
 
-Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-44 focus on production discipline, OpenClaw-style gateway systems, local agent workspaces, trustworthy agent interfaces, agent skills, the agentic software-development lifecycle, runtime strategy, model-under-the-hood mechanics, structured tool interfaces, multimodal perception sub-agents, GPU-kernel translation workflows, long-context serving optimization, trace-driven AI performance analysis, compiler-generated sequence parallelism, skill evaluation, small-model reasoning systems, AI-agent threat modeling, productized agent harness infrastructure, AI-assisted GPU kernel optimization, and efficient local RAG systems.
+Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-45 focus on production discipline, OpenClaw-style gateway systems, local agent workspaces, trustworthy agent interfaces, agent skills, the agentic software-development lifecycle, runtime strategy, model-under-the-hood mechanics, structured tool interfaces, multimodal perception sub-agents, GPU-kernel translation workflows, long-context serving optimization, trace-driven AI performance analysis, compiler-generated sequence parallelism, skill evaluation, small-model reasoning systems, AI-agent threat modeling, productized agent harness infrastructure, AI-assisted GPU kernel optimization, efficient local RAG systems, and vector-store/embedding model selection.
 
 ## External Reference
 
@@ -70,6 +70,7 @@ Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, a
 | [Lecture 42](Lecture-42.md) | OpenAI Agents SDK - Native Sandbox and Durable Agent Harness | sandbox agents, manifests, shell/apply_patch, MCP, skills, AGENTS.md, state recovery, harness/compute separation |
 | [Lecture 43](Lecture-43.md) | MLSys 2026 Kernel Contest - AI-Assisted Blackwell LLM Kernel Optimization | FlashInfer-Bench, B200, FP8 MoE, sparse attention, Gated Delta Net, CUDA/Triton/CuTe, agent-generated kernels |
 | [Lecture 44](Lecture-44.md) | Efficient Local RAG Stack - Qwen3.5-4B INT4 and Granite Embeddings | Jetson RAG, Granite 97M, Qdrant, chunking, reranking, INT4, llama.cpp, vLLM, TensorRT-LLM, KV cache |
+| [Lecture 45](Lecture-45.md) | Qdrant, pgvector, and Embedding Model Selection | vector stores, HNSW, IVFFlat, dense/sparse/hybrid retrieval, Granite alternatives, embedding evals, migration |
 
 ## Lab Index
 
