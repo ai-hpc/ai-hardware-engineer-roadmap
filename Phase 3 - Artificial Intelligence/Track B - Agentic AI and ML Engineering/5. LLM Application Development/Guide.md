@@ -1,5 +1,15 @@
 # Module 5B — LLM Application Development
 
+<div class="course-identity auto-course" style="--course-accent: #dc2626; --course-accent-rgb: 220, 38, 38;" markdown="1">
+<div class="course-identity__icon">M5LA</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · AI Workloads</p>
+<p class="course-identity__title">Specialized course identity for Module 5B — LLM Application Development.</p>
+<p class="course-identity__meta">Artifact: model or workload study · Measure: accuracy, latency, memory, throughput</p>
+</div>
+</div>
+
+
 **Parent:** [Phase 3 — Artificial Intelligence](../../Guide.md) · Track B
 
 > *Ship GenAI products — from prompt engineering to production deployment.*

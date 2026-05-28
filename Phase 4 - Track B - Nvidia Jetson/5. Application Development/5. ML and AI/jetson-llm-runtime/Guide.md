@@ -1,5 +1,15 @@
 # Jetson LLM Runtime — Memory-First Inference Engine
 
+<div class="course-identity auto-course" style="--course-accent: #65a30d; --course-accent-rgb: 101, 163, 13;" markdown="1">
+<div class="course-identity__icon">JLRM</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Jetson LLM Runtime — Memory-First Inference Engine.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 **Parent:** [ML and AI](../Guide.md)
 
 > **Build a Jetson-native LLM runtime that treats memory as the primary constraint.** Not a fork of llama.cpp — a ground-up engine designed for 8 GB unified memory, with Orin-tuned CUDA kernels, power-aware inference, and zero-allocation decode.

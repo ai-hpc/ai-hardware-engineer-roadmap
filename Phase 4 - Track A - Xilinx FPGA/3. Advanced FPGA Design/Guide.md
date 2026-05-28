@@ -1,5 +1,15 @@
 # 3. Advanced FPGA Design
 
+<div class="course-identity advanced-fpga" markdown="1">
+<div class="course-identity__icon">CDC</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track A3 · Advanced FPGA Design</p>
+<p class="course-identity__title">Make FPGA systems timing-clean, clock-safe, power-aware, and hardware-debuggable.</p>
+<p class="course-identity__meta">Artifact: timing-closed validation package · Measure: slack, CDC, power, robustness</p>
+</div>
+</div>
+
+
 > Move beyond working RTL into timing-closed, clock-safe, power-aware FPGA systems that survive real board constraints.
 
 **Layer mapping:** L5-L6. This module focuses on timing closure, clock-domain crossings, high-speed interfaces, floorplanning, power analysis, partial reconfiguration, and hardware robustness.

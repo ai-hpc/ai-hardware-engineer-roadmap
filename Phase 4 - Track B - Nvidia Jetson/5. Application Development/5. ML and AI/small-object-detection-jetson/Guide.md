@@ -1,5 +1,15 @@
 # Small Object Detection on Jetson — Project Guide
 
+<div class="course-identity auto-course" style="--course-accent: #4f46e5; --course-accent-rgb: 79, 70, 229;" markdown="1">
+<div class="course-identity__icon">SODO</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Small Object Detection on Jetson — Project Guide.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 > **Goal:** Solve small-object detection for a real-time vision backend on NVIDIA Jetson Orin Nano using **VisDrone2019-DET** and established best practices. Deliver a trained model deployable via DeepStream + TensorRT with acceptable accuracy and latency.
 
 **How to achieve the goal (overview):** Train a small-object–aware detector (e.g. YOLOv8 or a variant like SPD-YOLOv8 / LPAE-YOLOv8) on VisDrone2019-DET using higher input resolution (832–960), multi-scale fusion, optional tiling for very high-res frames, and tuned confidence/NMS. Export the model to TensorRT (FP16 or INT8) and integrate it as the primary detector in your existing DeepStream + GStreamer + FastAPI pipeline on Jetson Orin Nano. For 4K or high-resolution drone footage, use tiled inference (e.g. SAHI) with overlapping patches and merge detections so small targets retain enough pixels per tile while balancing latency and throughput on the edge device.

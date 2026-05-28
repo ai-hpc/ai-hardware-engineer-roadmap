@@ -1,5 +1,15 @@
 # Jetson Orin Nano 8GB -- GPIO, SPI, I2C, CAN, and Peripheral I/O Deep-Dive Guide
 
+<div class="course-identity auto-course" style="--course-accent: #475569; --course-accent-rgb: 71, 85, 105;" markdown="1">
+<div class="course-identity__icon">JON8</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Jetson Orin Nano 8GB -- GPIO, SPI, I2C, CAN, and Peripheral I/O Deep-Dive Guide.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 > **Target hardware:** Jetson Orin Nano 8GB Developer Kit (T234 SoC, JetPack 6.x, L4T 36.x)
 > **40-pin header:** Raspberry-Pi-compatible expansion header, 3.3 V logic levels
 

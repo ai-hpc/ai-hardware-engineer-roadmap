@@ -1,5 +1,15 @@
 # ARM MCU, FreeRTOS, and Communication Protocols
 
+<div class="course-identity embedded-software" markdown="1">
+<div class="course-identity__icon">MCU</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Module 2 · Embedded Software</p>
+<p class="course-identity__title">Build firmware around interrupts, DMA, buses, RTOS tasks, and peripheral control.</p>
+<p class="course-identity__meta">Artifact: MCU/RTOS project · Measure: latency, jitter, stack, ISR cost</p>
+</div>
+</div>
+
+
 *Follows [**Phase 2 section 1 — Schematic Capture and PCB Design**](../1.%20Schematic%20Capture%20and%20PCB%20Design/Guide.md) when you are bringing up **custom hardware**; dev-kit learners can start here in parallel. Builds on Phase 1 (digital, HDL, architecture, OS) — focuses on ARM Cortex-M microcontrollers, RTOS practice, and buses (SPI/UART/I2C/CAN) that connect sensors and peripherals.*
 
 Focused mini-courses that sit inside this module:

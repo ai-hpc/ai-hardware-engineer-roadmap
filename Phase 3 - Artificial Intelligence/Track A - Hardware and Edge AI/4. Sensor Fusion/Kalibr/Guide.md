@@ -1,5 +1,15 @@
 # Kalibr — Multi-Sensor Calibration for Autonomous Vehicles
 
+<div class="course-identity auto-course" style="--course-accent: #0891b2; --course-accent-rgb: 8, 145, 178;" markdown="1">
+<div class="course-identity__icon">KMSC</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · AI Workloads</p>
+<p class="course-identity__title">Specialized course identity for Kalibr — Multi-Sensor Calibration for Autonomous Vehicles.</p>
+<p class="course-identity__meta">Artifact: model or workload study · Measure: accuracy, latency, memory, throughput</p>
+</div>
+</div>
+
+
 > **Source:** [ethz-asl/kalibr](https://github.com/ethz-asl/kalibr) — ETH Zurich Autonomous Systems Lab
 > **What it solves:** Camera intrinsics, multi-camera extrinsics, camera-IMU spatial+temporal calibration, rolling-shutter calibration — all through batch continuous-time trajectory optimization.
 > **Why it matters:** Every downstream system (BEVFusion, SLAM, openpilot, VIO) depends on correct calibration. A 1° extrinsic rotation error in a camera-IMU system causes odometry drift of ~1.7% of distance traveled.

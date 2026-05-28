@@ -1,5 +1,15 @@
 # 3. Edge AI
 
+<div class="course-identity edge-ai" markdown="1">
+<div class="course-identity__icon">EDGE</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track 5C · Edge AI</p>
+<p class="course-identity__title">Deploy AI under real device constraints: sensors, latency, memory, power, thermals, and updates.</p>
+<p class="course-identity__meta">Artifact: edge AI case study · Measure: latency, power, memory, reliability</p>
+</div>
+</div>
+
+
 > Design, optimize, deploy, and operate AI systems on constrained hardware where latency, memory, power, thermals, sensors, and reliability matter.
 
 **Layer mapping:** L1-L5. This track connects edge workloads, model optimization, inference runtimes, embedded Linux, sensor pipelines, accelerators, and product deployment.

@@ -1,5 +1,15 @@
 **4. Robotics (12-18 months)**
 
+<div class="course-identity robotics" markdown="1">
+<div class="course-identity__icon">ROS</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track 5D · Robotics</p>
+<p class="course-identity__title">Integrate perception, planning, ROS 2, real-time constraints, and embodied AI systems.</p>
+<p class="course-identity__meta">Artifact: robot subsystem demo · Measure: loop rate, latency, safety, robustness</p>
+</div>
+</div>
+
+
 This phase is organized into **four lecture tracks** (each has its own folder and `Lecture-01.md`). Start with **Advanced Robot Operating System**, then proceed in order or jump by topic.
 
 | # | Track | Folder / lecture |

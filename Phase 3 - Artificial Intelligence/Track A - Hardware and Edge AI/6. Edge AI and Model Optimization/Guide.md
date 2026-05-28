@@ -1,5 +1,15 @@
 # Edge AI
 
+<div class="course-identity auto-course" style="--course-accent: #ca8a04; --course-accent-rgb: 202, 138, 4;" markdown="1">
+<div class="course-identity__icon">EA</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · AI Workloads</p>
+<p class="course-identity__title">Specialized course identity for Edge AI.</p>
+<p class="course-identity__meta">Artifact: model or workload study · Measure: accuracy, latency, memory, throughput</p>
+</div>
+</div>
+
+
 **Phase 3 — Artificial Intelligence** (standalone topic). Learn **where** and **why** models run on-device; learn **what** they compute in **[Neural Networks](../../1.%20Neural%20Networks/Guide.md)**.
 
 > **Goal:** Map the edge stack—latency, privacy, power tiers, and the train → optimize → deploy pipeline—so Phase 4 (Xilinx or Jetson) and specialization tracks have clear context.

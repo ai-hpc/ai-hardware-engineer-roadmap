@@ -1,5 +1,15 @@
 # Orin Nano 8GB -- CUDA Programming Deep Dive
 
+<div class="course-identity auto-course" style="--course-accent: #4f46e5; --course-accent-rgb: 79, 70, 229;" markdown="1">
+<div class="course-identity__icon">ON8C</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Orin Nano 8GB -- CUDA Programming Deep Dive.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 > **Scope:** Production-level CUDA programming on Jetson Orin Nano 8GB (T234 SoC) -- toolchain, kernel authoring, memory optimization, profiling, camera zero-copy, TensorRT integration, and production patterns.
 >
 > **Prerequisites:** Familiarity with [Orin Nano memory architecture](../Orin-Nano-Memory-Architecture/Guide.md) (unified memory, CMA, SMMU) and C/C++. JetPack 6.x installed.

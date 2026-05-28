@@ -1,5 +1,15 @@
 # HPC with Nvidia GPU
 
+<div class="course-identity auto-course" style="--course-accent: #db2777; --course-accent-rgb: 219, 39, 119;" markdown="1">
+<div class="course-identity__icon">HWNG</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Specialization</p>
+<p class="course-identity__title">Specialized course identity for HPC with Nvidia GPU.</p>
+<p class="course-identity__meta">Artifact: specialization case study · Measure: performance, reliability, role fit</p>
+</div>
+</div>
+
+
 **Parent:** [High Performance Computing](../Guide.md)
 
 **Timeline:** 12–24 months (fundamentals and deep dives); 24–48 months for advanced phase.

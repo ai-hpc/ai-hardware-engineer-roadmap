@@ -1,5 +1,15 @@
 # Orin Nano 8GB — Root File System & A/B Redundancy
 
+<div class="course-identity auto-course" style="--course-accent: #16a34a; --course-accent-rgb: 22, 163, 74;" markdown="1">
+<div class="course-identity__icon">ON8R</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Orin Nano 8GB — Root File System & A/B Redundancy.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 > **Scope:** Production-level understanding of Jetson rootfs architecture, the three rootfs flavors, A/B slot redundancy, OTA update strategy, boot validation, partition layout, and how rootfs connects to the memory and boot chain architecture.
 >
 > **Prerequisites:** Familiarity with the [Orin Nano boot chain](../Guide.md#1-orin-nano-8gb--hardware--boot-chain-internals) and [memory architecture](../Orin-Nano-Memory-Architecture/Guide.md).

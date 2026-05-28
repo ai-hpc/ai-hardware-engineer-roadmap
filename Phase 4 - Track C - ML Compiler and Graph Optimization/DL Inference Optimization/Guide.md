@@ -1,5 +1,15 @@
 # DL Inference Optimization (Part 2 of Phase 4 Track C)
 
+<div class="course-identity dl-inference" markdown="1">
+<div class="course-identity__icon">INF</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track C · DL Inference Optimization</p>
+<p class="course-identity__title">Profile, fuse, quantize, kernel-optimize, and deploy neural networks for real inference targets.</p>
+<p class="course-identity__meta">Artifact: optimized inference pipeline · Measure: latency, throughput, memory, accuracy</p>
+</div>
+</div>
+
+
 **Role target:** DL Inference Optimization Engineer
 
 **Also aligns with:** Kernel-focused roles such as **Member of Technical Staff, Kernels** (e.g. AGI/LLM companies): designing and implementing high-performance kernels for training and inference, long-context optimization, and production deployment on NVIDIA GPUs and alternative accelerators (TPU, etc.).

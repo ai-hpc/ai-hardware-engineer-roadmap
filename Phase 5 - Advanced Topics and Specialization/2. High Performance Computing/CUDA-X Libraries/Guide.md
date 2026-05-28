@@ -1,5 +1,15 @@
 # NVIDIA CUDA-X Libraries
 
+<div class="course-identity auto-course" style="--course-accent: #475569; --course-accent-rgb: 71, 85, 105;" markdown="1">
+<div class="course-identity__icon">NCL</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Specialization</p>
+<p class="course-identity__title">Specialized course identity for NVIDIA CUDA-X Libraries.</p>
+<p class="course-identity__meta">Artifact: specialization case study · Measure: performance, reliability, role fit</p>
+</div>
+</div>
+
+
 **Parent:** [Phase 5 — High Performance Computing](../Guide.md)
 
 **Timeline:** Ongoing reference — study each category as your projects demand it.

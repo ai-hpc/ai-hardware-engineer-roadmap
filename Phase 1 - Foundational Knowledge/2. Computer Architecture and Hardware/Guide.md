@@ -1,5 +1,15 @@
 # Computer Architecture for AI Hardware Engineers
 
+<div class="course-identity computer-architecture" markdown="1">
+<div class="course-identity__icon">CPU</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Module 2 · Computer Architecture</p>
+<p class="course-identity__title">Understand how CPUs, GPUs, caches, memory, and accelerators actually execute work.</p>
+<p class="course-identity__meta">Artifact: architecture analysis note · Measure: latency, bandwidth, locality, throughput</p>
+</div>
+</div>
+
+
 Phase 1 · Section 2 — How processors and memory systems work, and why that shapes every AI accelerator ever built.
 
 > **Goal:** By the end of this section you can read a GPU or NPU architecture paper, understand why a transformer is memory-bandwidth-bound, and reason about the trade-offs in any custom accelerator design.

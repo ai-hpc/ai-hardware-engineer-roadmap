@@ -1,5 +1,15 @@
 # 02 — Kernel Engineering for Training & Inference
 
+<div class="course-identity auto-course" style="--course-accent: #dc2626; --course-accent-rgb: 220, 38, 38;" markdown="1">
+<div class="course-identity__icon">KEFT</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Compiler Track</p>
+<p class="course-identity__title">Specialized course identity for 02 — Kernel Engineering for Training & Inference.</p>
+<p class="course-identity__meta">Artifact: compiler/inference optimization · Measure: op count, memory, latency</p>
+</div>
+</div>
+
+
 **Order:** Second. After you know the graph and bottlenecks (01), you implement and own the kernels.
 
 **Role target:** Core of **MTS Kernels** (Member of Technical Staff, Kernels) and **DL Inference Optimization Engineer** — design, implement, deploy, and maintain high-performance kernels; production reliability; co-design with training, inference, and reinforcement-learning (RL) teams.

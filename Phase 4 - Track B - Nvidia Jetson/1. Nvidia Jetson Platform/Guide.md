@@ -1,5 +1,15 @@
 # Nvidia Jetson Platform
 
+<div class="course-identity jetson-platform" markdown="1">
+<div class="course-identity__icon">JET</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track B1 · NVIDIA Jetson Platform</p>
+<p class="course-identity__title">Bring up Orin hardware, boot flow, CUDA, sensors, TensorRT, power, and production constraints.</p>
+<p class="course-identity__meta">Artifact: Jetson platform validation report · Measure: boot, memory, power, inference</p>
+</div>
+</div>
+
+
 **Phase 4 — Track B — Nvidia Jetson** · Module 1 of 7
 
 > **Focus:** Go from unboxed **Jetson Orin Nano 8GB** hardware to a production-quality AI pipeline with ROS 2 integration, sensor fusion, optimized inference, OTA updates, and hardened security.

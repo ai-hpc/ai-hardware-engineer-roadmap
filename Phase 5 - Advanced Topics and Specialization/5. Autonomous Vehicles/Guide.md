@@ -1,5 +1,15 @@
 # Phase 5 — Autonomous Vehicles
 
+<div class="course-identity autonomous-vehicles" markdown="1">
+<div class="course-identity__icon">AV</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track 5E · Autonomous Vehicles</p>
+<p class="course-identity__title">Study production autonomy stacks, perception, prediction, safety, deployment, and vehicle debugging.</p>
+<p class="course-identity__meta">Artifact: AV stack analysis · Measure: sensor timing, model latency, safety constraints</p>
+</div>
+</div>
+
+
 **Timeline:** 12–24 months (modules 1–3); 24–48 months with advanced modules (4–5). Module 6 is optional tooling.
 
 **Prerequisites:** Phase 3 (**Computer Vision**, **Sensor Fusion**), Phase 4 Track B — Jetson (CUDA, TensorRT, edge deployment). Phase 4 Track C recommended for tinygrad compiler context.

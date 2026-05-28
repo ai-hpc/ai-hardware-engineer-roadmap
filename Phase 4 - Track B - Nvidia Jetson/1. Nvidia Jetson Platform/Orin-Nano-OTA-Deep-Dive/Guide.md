@@ -1,5 +1,15 @@
 # Orin Nano 8GB — OTA (Over-The-Air) Update Deep Dive
 
+<div class="course-identity auto-course" style="--course-accent: #65a30d; --course-accent-rgb: 101, 163, 13;" markdown="1">
+<div class="course-identity__icon">ON8O</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Orin Nano 8GB — OTA (Over-The-Air) Update Deep Dive.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 > **Scope:** Complete production-level understanding of OTA update mechanisms on Jetson Orin Nano — from NVIDIA's native update engine internals, through payload generation and cryptographic signing, A/B slot orchestration, Tegra-specific bootloader update chains, to fleet-scale deployment with SWUpdate/Mender/RAUC, delta update engineering, rollback guarantees, and field failure analysis.
 >
 > **Prerequisites:** Familiarity with [Orin Nano boot chain and A/B redundancy](../Orin-Nano-Rootfs-and-AB-Redundancy/Guide.md), [security architecture](../Orin-Nano-Security/Guide.md), and [Yocto BSP production](../Orin-Nano-Yocto-BSP-Production/Guide.md).

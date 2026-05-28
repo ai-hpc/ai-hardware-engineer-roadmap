@@ -1,5 +1,15 @@
 # Orin Nano 8GB — Real-Time Linux (PREEMPT_RT) Deep Dive
 
+<div class="course-identity auto-course" style="--course-accent: #0284c7; --course-accent-rgb: 2, 132, 199;" markdown="1">
+<div class="course-identity__icon">ON8R</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Orin Nano 8GB — Real-Time Linux (PREEMPT_RT) Deep Dive.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 > **Scope:** Kernel-level understanding of real-time Linux on Jetson Orin Nano — PREEMPT_RT patch internals, preemption models, interrupt threading, lock primitives under RT, priority inversion and PI mutexes, rt-tests suite, latency source analysis, WCET methodology, ARM Cortex-A78AE RT specifics, GICv3 tuning, RT-safe kernel module development, and production RT system validation.
 >
 > **Prerequisites:** Familiarity with [Orin Nano kernel internals](../Orin-Nano-Kernel-Internals/Guide.md) and [real-time inference](../Orin-Nano-Real-Time-Inference/Guide.md). Basic understanding of Linux scheduling and kernel concepts.

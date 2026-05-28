@@ -1,5 +1,15 @@
 # Phase 1: Digital Foundations
 
+<div class="course-identity digital-foundations" markdown="1">
+<div class="course-identity__icon">P1</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Phase 1 · Digital Foundations</p>
+<p class="course-identity__title">Logic, architecture, operating systems, and parallel execution form the base of the whole roadmap.</p>
+<p class="course-identity__meta">Artifact: RTL block + profiler note · Measure: timing, bandwidth, utilization</p>
+</div>
+</div>
+
+
 > *Learn how computation is represented, executed, scheduled, and accelerated before you try to deploy AI on real hardware.*
 
 **Layer mapping:** Primarily **L5** (hardware architecture) and **L6** (RTL / logic design), with an important bridge into **L3** (runtime behavior) through operating systems and parallel computing.

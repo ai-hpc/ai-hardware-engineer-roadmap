@@ -1,5 +1,15 @@
 # C++ and SIMD (Phase 1 §4 — Sub-Track 1)
 
+<div class="course-identity auto-course" style="--course-accent: #4f46e5; --course-accent-rgb: 79, 70, 229;" markdown="1">
+<div class="course-identity__icon">ASPS</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Digital Foundations</p>
+<p class="course-identity__title">Specialized course identity for C++ and SIMD (Phase 1 §4 — Sub-Track 1).</p>
+<p class="course-identity__meta">Artifact: working low-level demo · Measure: timing, memory, correctness</p>
+</div>
+</div>
+
+
 **Parent:** [C++ and Parallel Computing](../Guide.md)
 
 > *Modern C++ gives you high-level syntax with low-level performance. Master the language features first — they are the building blocks of every parallel framework that follows.*

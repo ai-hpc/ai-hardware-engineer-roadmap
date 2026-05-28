@@ -1,5 +1,15 @@
 # 2. Zynq UltraScale+ MPSoC
 
+<div class="course-identity zynq-mpsoc" markdown="1">
+<div class="course-identity__icon">ZYNQ</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track A2 · Zynq UltraScale+ MPSoC</p>
+<p class="course-identity__title">Split work between ARM software, programmable logic, AXI, DMA, interrupts, and Linux.</p>
+<p class="course-identity__meta">Artifact: PS/PL accelerator demo · Measure: DMA throughput, latency, CPU overhead</p>
+</div>
+</div>
+
+
 > Build systems that split work cleanly between ARM processing cores, programmable logic, memory, DMA, interrupts, and embedded Linux.
 
 **Layer mapping:** L3-L6. This module connects processing system software, programmable logic, AXI interconnects, DMA, boot flow, device tree, Linux drivers, and hardware/software co-design.

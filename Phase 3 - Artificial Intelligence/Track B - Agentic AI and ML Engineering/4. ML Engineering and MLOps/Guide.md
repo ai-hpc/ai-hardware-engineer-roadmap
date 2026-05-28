@@ -1,5 +1,15 @@
 # Module 4B — ML Engineering & MLOps
 
+<div class="course-identity auto-course" style="--course-accent: #be123c; --course-accent-rgb: 190, 18, 60;" markdown="1">
+<div class="course-identity__icon">M4ME</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · AI Workloads</p>
+<p class="course-identity__title">Specialized course identity for Module 4B — ML Engineering & MLOps.</p>
+<p class="course-identity__meta">Artifact: model or workload study · Measure: accuracy, latency, memory, throughput</p>
+</div>
+</div>
+
+
 **Parent:** [Phase 3 — Artificial Intelligence](../../Guide.md) · Track B
 
 > *Build and operate ML training/inference pipelines — model lifecycle, data pipelines, serving infrastructure.*

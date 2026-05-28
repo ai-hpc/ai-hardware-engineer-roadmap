@@ -1,5 +1,15 @@
 # Module 5 — Safety Standards and Deployment
 
+<div class="course-identity auto-course" style="--course-accent: #0d9488; --course-accent-rgb: 13, 148, 136;" markdown="1">
+<div class="course-identity__icon">MSSA</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Specialization</p>
+<p class="course-identity__title">Specialized course identity for Module 5 — Safety Standards and Deployment.</p>
+<p class="course-identity__meta">Artifact: specialization case study · Measure: performance, reliability, role fit</p>
+</div>
+</div>
+
+
 **Parent:** [Phase 5 — Autonomous Driving](../Guide.md)
 
 **Time:** 3–6 months

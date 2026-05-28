@@ -1,5 +1,15 @@
 # Distributed AI Interconnects: vLLM, PyTorch, UCX, and UCC
 
+<div class="course-identity auto-course" style="--course-accent: #ca8a04; --course-accent-rgb: 202, 138, 4;" markdown="1">
+<div class="course-identity__icon">DAIV</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Specialization</p>
+<p class="course-identity__title">Specialized course identity for Distributed AI Interconnects: vLLM, PyTorch, UCX, and UCC.</p>
+<p class="course-identity__meta">Artifact: specialization case study · Measure: performance, reliability, role fit</p>
+</div>
+</div>
+
+
 **Phase:** 5 - Advanced Topics and Specialization  
 **Track:** GPU Infrastructure  
 **Level:** Advanced infrastructure / distributed inference systems

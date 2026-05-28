@@ -1,5 +1,15 @@
 # Phase 2: Embedded Systems
 
+<div class="course-identity embedded-systems" markdown="1">
+<div class="course-identity__icon">EMB</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Phase 2 · Embedded Systems</p>
+<p class="course-identity__title">Move from abstract computing to boards, buses, boot flows, constrained devices, and products.</p>
+<p class="course-identity__meta">Artifact: bring-up log + embedded demo · Measure: boot, latency, power, reliability</p>
+</div>
+</div>
+
+
 > *Move from abstract computing models to real boards, buses, boot flows, and constrained systems that must work outside the lab.*
 
 **Layer mapping:** Primarily **L4** (firmware, RTOS, BSP, embedded Linux), with direct connections into **L3** (drivers, DMA, device interfaces) and **L1** (edge AI deployment).

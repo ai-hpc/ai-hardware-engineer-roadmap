@@ -1,5 +1,15 @@
 # Espressif Official Education Path
 
+<div class="course-identity auto-course" style="--course-accent: #ca8a04; --course-accent-rgb: 202, 138, 4;" markdown="1">
+<div class="course-identity__icon">EOEP</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Embedded Systems</p>
+<p class="course-identity__title">Specialized course identity for Espressif Official Education Path.</p>
+<p class="course-identity__meta">Artifact: bring-up or firmware demo · Measure: boot, latency, power, reliability</p>
+</div>
+</div>
+
+
 A structured mini-course that follows **Espressif’s official education direction** and adapts it to this roadmap.
 
 This course is based on Espressif’s official education page, especially its:

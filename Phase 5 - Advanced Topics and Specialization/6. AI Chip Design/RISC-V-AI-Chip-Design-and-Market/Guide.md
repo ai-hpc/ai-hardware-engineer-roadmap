@@ -1,5 +1,15 @@
 # RISC-V Based AI Chip Design and Market Analysis
 
+<div class="course-identity auto-course" style="--course-accent: #4f46e5; --course-accent-rgb: 79, 70, 229;" markdown="1">
+<div class="course-identity__icon">RBAC</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Specialization</p>
+<p class="course-identity__title">Specialized course identity for RISC-V Based AI Chip Design and Market Analysis.</p>
+<p class="course-identity__meta">Artifact: specialization case study · Measure: performance, reliability, role fit</p>
+</div>
+</div>
+
+
 **Parent:** [AI Chip Design](../Guide.md)
 
 > Study RISC-V as an AI-chip platform: when the ISA matters, when the accelerator matters more, how software enablement determines adoption, and why SpacemiT is a useful 2026 case study.

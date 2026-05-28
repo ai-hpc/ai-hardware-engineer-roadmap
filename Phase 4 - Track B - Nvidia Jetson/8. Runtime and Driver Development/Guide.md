@@ -1,5 +1,15 @@
 # Track B §8 — Runtime & Driver Development for GPU/Jetson Inference
 
+<div class="course-identity jetson-runtime" markdown="1">
+<div class="course-identity__icon">RT</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track B8 · Jetson Runtime & Drivers</p>
+<p class="course-identity__title">Own the runtime and driver layer between Linux, CUDA, TensorRT, sensors, and application code.</p>
+<p class="course-identity__meta">Artifact: runtime/driver case study · Measure: latency, memory copies, utilization, failures</p>
+</div>
+</div>
+
+
 > *Own the software stack between the compiled model and the GPU hardware — CUDA runtime, TensorRT engine execution, DLA scheduling, and Linux driver interfaces.*
 
 **Prerequisites:** Track B §1 (Jetson Platform, CUDA basics), Phase 1 §3 (Operating Systems — drivers, memory management), Phase 1 §4 (C++/CUDA).

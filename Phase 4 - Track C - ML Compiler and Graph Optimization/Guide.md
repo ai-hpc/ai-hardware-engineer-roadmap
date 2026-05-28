@@ -1,5 +1,15 @@
 # Phase 4 — Track C: ML Compiler & Graph Optimization (6–12 months)
 
+<div class="course-identity ml-compiler" markdown="1">
+<div class="course-identity__icon">IR</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track C · ML Compiler & Graph Optimization</p>
+<p class="course-identity__title">Lower model graphs into optimized kernels, memory plans, quantized paths, and hardware-specific runtimes.</p>
+<p class="course-identity__meta">Artifact: compiler/runtime demo · Measure: op count, memory, latency, correctness</p>
+</div>
+</div>
+
+
 > *The bridge between AI models and hardware — learn how compilers lower neural-network graphs to efficient, hardware-specific code, then apply that knowledge to build and optimize real inference pipelines.*
 
 **Prerequisites:** Phase 1 §4 (C++ and Parallel Computing), Phase 3 (Neural Networks). Recommended: Phase 1 §3 (Operating Systems — memory, processes).

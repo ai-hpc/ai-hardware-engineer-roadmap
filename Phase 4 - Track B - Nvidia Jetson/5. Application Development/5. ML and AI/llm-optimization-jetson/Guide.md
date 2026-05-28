@@ -1,5 +1,15 @@
 # LLM Optimization on Jetson — From Cloud Techniques to Edge Reality
 
+<div class="course-identity auto-course" style="--course-accent: #7c3aed; --course-accent-rgb: 124, 58, 237;" markdown="1">
+<div class="course-identity__icon">LOOJ</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for LLM Optimization on Jetson — From Cloud Techniques to Edge Reality.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 **Parent:** [ML and AI](../Guide.md)
 
 > **Goal:** Take the optimization techniques used by cloud LLM platforms (vLLM, TensorRT-LLM, RunInfra, etc.) and adapt them to the extreme constraints of Jetson Orin Nano Super 8 GB — 102 GB/s bandwidth, 67 TOPS GPU + ~10 TOPS DLA ≈ 77 TOPS total, shared memory, 7–25W power.

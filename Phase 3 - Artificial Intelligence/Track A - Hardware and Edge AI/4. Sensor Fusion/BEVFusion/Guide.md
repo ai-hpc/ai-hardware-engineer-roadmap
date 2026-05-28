@@ -1,5 +1,15 @@
 # BEVFusion — Camera + LiDAR Fusion in Bird's Eye View
 
+<div class="course-identity auto-course" style="--course-accent: #475569; --course-accent-rgb: 71, 85, 105;" markdown="1">
+<div class="course-identity__icon">BCLF</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · AI Workloads</p>
+<p class="course-identity__title">Specialized course identity for BEVFusion — Camera + LiDAR Fusion in Bird's Eye View.</p>
+<p class="course-identity__meta">Artifact: model or workload study · Measure: accuracy, latency, memory, throughput</p>
+</div>
+</div>
+
+
 > **What:** Multi-modal 3D object detection that fuses camera images and LiDAR point clouds in a shared **Bird's Eye View (BEV)** feature space.
 > **Why:** Cameras see color/texture; LiDAR sees accurate depth/geometry. Fusion in BEV gets the best of both — better accuracy than either modality alone.
 > **Hardware:** Jetson Orin Nano 8GB (inference), workstation/cloud (training).

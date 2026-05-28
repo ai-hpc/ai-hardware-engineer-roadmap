@@ -1,5 +1,15 @@
 # PyTorch and micrograd — Insight for Mastering tinygrad
 
+<div class="course-identity auto-course" style="--course-accent: #dc2626; --course-accent-rgb: 220, 38, 38;" markdown="1">
+<div class="course-identity__icon">PAMI</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · AI Workloads</p>
+<p class="course-identity__title">Specialized course identity for PyTorch and micrograd — Insight for Mastering tinygrad.</p>
+<p class="course-identity__meta">Artifact: model or workload study · Measure: accuracy, latency, memory, throughput</p>
+</div>
+</div>
+
+
 > **Course reference:** [OpenCV PyTorch Bootcamp & Deep Learning](https://courses.opencv.org/courses/course-v1:PyTorch+Bootcamp+Deep-Learning/course/)
 > **micrograd reference:** [karpathy/micrograd](https://github.com/karpathy/micrograd)
 >

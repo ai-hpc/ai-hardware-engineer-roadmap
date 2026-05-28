@@ -1,5 +1,15 @@
 # 1. Xilinx FPGA Development
 
+<div class="course-identity fpga-track" markdown="1">
+<div class="course-identity__icon">FPGA</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track A1 · Xilinx FPGA Development</p>
+<p class="course-identity__title">Build the FPGA loop: RTL, simulation, synthesis, implementation, timing, bitstream, board debug.</p>
+<p class="course-identity__meta">Artifact: board-validated RTL project · Measure: timing, utilization, debug captures</p>
+</div>
+</div>
+
+
 > Learn the Xilinx FPGA flow by building, simulating, timing, debugging, and documenting real RTL projects.
 
 **Layer mapping:** L5-L6. This module connects RTL design, FPGA implementation, timing closure, on-chip debug, and hardware validation.

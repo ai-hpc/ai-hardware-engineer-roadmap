@@ -1,5 +1,15 @@
 # Lauterbach TRACE32® Debug (Autonomous Driving — advanced tooling)
 
+<div class="course-identity auto-course" style="--course-accent: #65a30d; --course-accent-rgb: 101, 163, 13;" markdown="1">
+<div class="course-identity__icon">LTDA</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Specialization</p>
+<p class="course-identity__title">Specialized course identity for Lauterbach TRACE32® Debug (Autonomous Driving — advanced tooling).</p>
+<p class="course-identity__meta">Artifact: specialization case study · Measure: performance, reliability, role fit</p>
+</div>
+</div>
+
+
 **Parent:** [Phase 5 — Autonomous Driving](../Guide.md) · Optional professional depth
 
 **Prerequisites:** [Phase 1 — Operating Systems](../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Guide.md) (boot, JTAG concepts), [Phase 2 — Embedded Linux](../../../Phase%202%20-%20Embedded%20Systems/3.%20Embedded%20Linux/Guide.md) and [Phase 2 — Embedded Software](../../../Phase%202%20-%20Embedded%20Systems/2.%20Embedded%20Software/Guide.md) (MCU, RTOS, bring-up). Strong overlap with **automotive ECU**, **functional safety**, and **silicon validation** roles.

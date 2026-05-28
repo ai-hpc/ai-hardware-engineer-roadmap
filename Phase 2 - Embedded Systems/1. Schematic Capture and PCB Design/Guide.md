@@ -1,5 +1,15 @@
 # Schematic Capture and PCB Design
 
+<div class="course-identity pcb-design" markdown="1">
+<div class="course-identity__icon">PCB</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Module 1 · Schematic & PCB Design</p>
+<p class="course-identity__title">Read, review, and design the board-level interfaces that make AI hardware usable.</p>
+<p class="course-identity__meta">Artifact: schematic review or interface map · Measure: constraints, risks, bring-up checks</p>
+</div>
+</div>
+
+
 **Phase 2, section 1** — turn a **netlist intent** into a **fabricated board** you can power, probe, and later program. This sits after Phase 1 (digital + HDL + architecture intuition) and before [**ARM MCU, FreeRTOS, and protocols**](../2.%20Embedded%20Software/Guide.md), where you assume a working PCB or dev kit.
 
 ---

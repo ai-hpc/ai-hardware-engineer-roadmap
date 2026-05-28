@@ -1,5 +1,15 @@
 # Non-Contact Multi-Sensor Monitoring on Edge — Project Guide
 
+<div class="course-identity auto-course" style="--course-accent: #7e22ce; --course-accent-rgb: 126, 34, 206;" markdown="1">
+<div class="course-identity__icon">NCMS</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Non-Contact Multi-Sensor Monitoring on Edge — Project Guide.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 > **Goal:** Build a non-contact monitoring device that fuses RGB/Depth and thermal cameras, extracts micro-fluctuation signals (0.8–3 Hz) from thermal data, and runs the full pipeline in real time on an edge device (e.g. Raspberry Pi or Jetson), with optional IoT integration (BLE, MQTT).
 
 ---

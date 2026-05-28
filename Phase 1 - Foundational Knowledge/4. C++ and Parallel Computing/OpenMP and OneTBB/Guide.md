@@ -1,5 +1,15 @@
 # OpenMP and oneTBB
 
+<div class="course-identity auto-course" style="--course-accent: #be123c; --course-accent-rgb: 190, 18, 60;" markdown="1">
+<div class="course-identity__icon">OAO</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Digital Foundations</p>
+<p class="course-identity__title">Specialized course identity for OpenMP and oneTBB.</p>
+<p class="course-identity__meta">Artifact: working low-level demo · Measure: timing, memory, correctness</p>
+</div>
+</div>
+
+
 Part of [Phase 1 section 4 — C++ and Parallel Computing](../Guide.md).
 
 **Goal:** Shared-memory **CPU parallelism** with **OpenMP** (directive-based) and **oneTBB** (task-based algorithms and flow graphs) so structured parallel patterns feel familiar before CUDA.

@@ -1,5 +1,15 @@
 # AGNOS: Learn with the Operating System Course
 
+<div class="course-identity auto-course" style="--course-accent: #0f766e; --course-accent-rgb: 15, 118, 110;" markdown="1">
+<div class="course-identity__icon">ALWT</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Specialization</p>
+<p class="course-identity__title">Specialized course identity for AGNOS: Learn with the Operating System Course.</p>
+<p class="course-identity__meta">Artifact: specialization case study · Measure: performance, reliability, role fit</p>
+</div>
+</div>
+
+
 **Goal:** Use the [Operating Systems](../../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Guide.md) course (Phase 1) to understand AGNOS—the **forked and custom-modified Linux** that runs **openpilot on the road** on comma 3X and comma four. The lectures map to both where code lives and to the **development changes** comma made in the fork for this practical use case.
 
 ---

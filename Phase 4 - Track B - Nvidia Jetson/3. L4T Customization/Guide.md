@@ -1,5 +1,15 @@
 # L4T customization (production)
 
+<div class="course-identity l4t" markdown="1">
+<div class="course-identity__icon">L4T</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track B3 · L4T Customization</p>
+<p class="course-identity__title">Customize Jetson Linux, BSP assets, boot artifacts, device trees, flashing, and deployment images.</p>
+<p class="course-identity__meta">Artifact: custom L4T image flow · Measure: boot, flash time, logs, reproducibility</p>
+</div>
+</div>
+
+
 **Phase 4 — Track B — Nvidia Jetson** · Module 3 of 7
 
 > **Focus:** Master **Linux for Tegra (L4T)** with **JetPack** as a **production** stack: reproducible images, a minimal root filesystem, kernel and device-tree integration, reliable boot and updates, and hardening—so you ship products instead of fighting the platform.

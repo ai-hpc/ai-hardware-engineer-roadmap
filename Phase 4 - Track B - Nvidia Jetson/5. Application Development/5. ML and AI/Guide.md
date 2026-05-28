@@ -1,5 +1,15 @@
 # ML and AI
 
+<div class="course-identity auto-course" style="--course-accent: #db2777; --course-accent-rgb: 219, 39, 119;" markdown="1">
+<div class="course-identity__icon">MAA</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for ML and AI.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 **Phase 4 — Track B — Module 5.5** · Application Development
 
 > **Focus:** Understand optimization from first principles using **tinygrad**, then apply the full porting pipeline to **Jetson Orin Nano 8GB** with TensorRT. Every concept has working code.

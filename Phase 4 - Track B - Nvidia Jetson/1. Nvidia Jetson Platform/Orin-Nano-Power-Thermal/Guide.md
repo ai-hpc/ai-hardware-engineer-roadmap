@@ -1,5 +1,15 @@
 # Jetson Orin Nano 8GB -- Power Management, Thermal Design, and Energy Optimization
 
+<div class="course-identity auto-course" style="--course-accent: #2563eb; --course-accent-rgb: 37, 99, 235;" markdown="1">
+<div class="course-identity__icon">JON8</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Jetson Orin Nano 8GB -- Power Management, Thermal Design, and Energy Optimization.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 A deep-dive engineering guide for the NVIDIA Jetson Orin Nano 8GB development kit and
 production module, covering the T234 SoC power architecture, thermal subsystem, DVFS
 framework, and real-world optimization techniques for edge AI deployments.

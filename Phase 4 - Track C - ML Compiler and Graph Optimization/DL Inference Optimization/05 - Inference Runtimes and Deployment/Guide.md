@@ -1,5 +1,15 @@
 # 05 — Inference Runtimes & Deployment Targets
 
+<div class="course-identity auto-course" style="--course-accent: #7c3aed; --course-accent-rgb: 124, 58, 237;" markdown="1">
+<div class="course-identity__icon">IRDT</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Compiler Track</p>
+<p class="course-identity__title">Specialized course identity for 05 — Inference Runtimes & Deployment Targets.</p>
+<p class="course-identity__meta">Artifact: compiler/inference optimization · Measure: op count, memory, latency</p>
+</div>
+</div>
+
+
 **Order:** Fifth. After graph, kernels, compiler, and quantization (01–04), you deploy and measure in production-like settings.
 
 **Role target:** DL Inference Optimization Engineer · **MTS Kernels** (deployment, production reliability, measurable outcomes).

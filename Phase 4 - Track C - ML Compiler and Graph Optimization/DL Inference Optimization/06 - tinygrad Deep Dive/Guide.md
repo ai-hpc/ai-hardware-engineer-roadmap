@@ -1,5 +1,15 @@
 # 06 — tinygrad Deep Dive (Optional)
 
+<div class="course-identity auto-course" style="--course-accent: #ea580c; --course-accent-rgb: 234, 88, 12;" markdown="1">
+<div class="course-identity__icon">TDDO</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Compiler Track</p>
+<p class="course-identity__title">Specialized course identity for 06 — tinygrad Deep Dive (Optional).</p>
+<p class="course-identity__meta">Artifact: compiler/inference optimization · Measure: op count, memory, latency</p>
+</div>
+</div>
+
+
 **Order:** Sixth, optional. Hands-on compiler/kernel interface after you've seen graph, kernels, compiler, quantization, and deployment.
 
 **Role target:** DL Inference Optimization Engineer · **MTS Kernels** (compiler–kernel interface, custom backends).

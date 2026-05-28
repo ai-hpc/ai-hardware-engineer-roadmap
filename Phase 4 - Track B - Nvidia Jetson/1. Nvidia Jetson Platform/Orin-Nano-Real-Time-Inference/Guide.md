@@ -1,5 +1,15 @@
 # Jetson Orin Nano 8GB: Real-Time and Deterministic Inference Guide
 
+<div class="course-identity auto-course" style="--course-accent: #ca8a04; --course-accent-rgb: 202, 138, 4;" markdown="1">
+<div class="course-identity__icon">JON8</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Jetson Orin Nano 8GB: Real-Time and Deterministic Inference Guide.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 ## Platform Reference
 
 | Parameter | Value |

@@ -1,5 +1,15 @@
 # ROS 2
 
+<div class="course-identity auto-course" style="--course-accent: #ca8a04; --course-accent-rgb: 202, 138, 4;" markdown="1">
+<div class="course-identity__icon">ROS</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for ROS 2.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 **Phase 4 — Track B — Module 5.6** · Application Development
 
 > **Focus:** Master **ROS 2** from fundamentals through advanced navigation, real-time safety, and **Jetson Orin Nano** edge deployment—so your robot software is production-grade, deterministic, and GPU-accelerated.

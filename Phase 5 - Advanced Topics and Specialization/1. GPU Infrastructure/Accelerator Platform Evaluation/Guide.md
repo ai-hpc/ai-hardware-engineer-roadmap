@@ -1,5 +1,15 @@
 # Accelerator Platform Evaluation: NVIDIA vs AMD vs Google Accelerators
 
+<div class="course-identity auto-course" style="--course-accent: #2563eb; --course-accent-rgb: 37, 99, 235;" markdown="1">
+<div class="course-identity__icon">APEN</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Specialization</p>
+<p class="course-identity__title">Specialized course identity for Accelerator Platform Evaluation: NVIDIA vs AMD vs Google Accelerators.</p>
+<p class="course-identity__meta">Artifact: specialization case study · Measure: performance, reliability, role fit</p>
+</div>
+</div>
+
+
 **Parent:** [GPU Infrastructure](../Guide.md)
 
 **Timeline:** 1-2 weeks for a first pass, then revisit every 6-12 months as hardware, runtimes, and pricing move.

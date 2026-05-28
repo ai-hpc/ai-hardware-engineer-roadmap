@@ -1,5 +1,15 @@
 # camerad — Openpilot Camera Pipeline
 
+<div class="course-identity auto-course" style="--course-accent: #ea580c; --course-accent-rgb: 234, 88, 12;" markdown="1">
+<div class="course-identity__icon">COCP</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Specialization</p>
+<p class="course-identity__title">Specialized course identity for camerad — Openpilot Camera Pipeline.</p>
+<p class="course-identity__meta">Artifact: specialization case study · Measure: performance, reliability, role fit</p>
+</div>
+</div>
+
+
 > **Goal:** Understand how openpilot captures, processes, and delivers camera frames to the perception stack. camerad is the first process in the pipeline: raw sensor → ISP → VisionIpc → modeld.
 
 ---

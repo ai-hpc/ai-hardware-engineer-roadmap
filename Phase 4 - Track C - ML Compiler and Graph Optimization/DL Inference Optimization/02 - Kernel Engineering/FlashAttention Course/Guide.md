@@ -1,5 +1,15 @@
 # FlashAttention — A Systems / Kernel Course
 
+<div class="course-identity auto-course" style="--course-accent: #16a34a; --course-accent-rgb: 22, 163, 74;" markdown="1">
+<div class="course-identity__icon">FSKC</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Compiler Track</p>
+<p class="course-identity__title">Specialized course identity for FlashAttention — A Systems / Kernel Course.</p>
+<p class="course-identity__meta">Artifact: compiler/inference optimization · Measure: op count, memory, latency</p>
+</div>
+</div>
+
+
 **Parent:** [02 — Kernel Engineering](../Guide.md)
 
 **Format:** 10 lectures. Theory → repo / code reading → small lab. Every lecture ships an artifact (notebook, benchmark script, kernel sketch, correctness test, or patch).

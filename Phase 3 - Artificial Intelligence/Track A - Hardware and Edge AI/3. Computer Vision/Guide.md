@@ -1,5 +1,15 @@
 # Computer Vision — Complete Guide
 
+<div class="course-identity auto-course" style="--course-accent: #be123c; --course-accent-rgb: 190, 18, 60;" markdown="1">
+<div class="course-identity__icon">CVCG</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · AI Workloads</p>
+<p class="course-identity__title">Specialized course identity for Computer Vision — Complete Guide.</p>
+<p class="course-identity__meta">Artifact: model or workload study · Measure: accuracy, latency, memory, throughput</p>
+</div>
+</div>
+
+
 > **Goal:** Build a comprehensive understanding of computer vision from image processing fundamentals through modern deep learning architectures, with practical skills in annotation tools, dataset formats, and deployment on edge hardware.
 
 ---

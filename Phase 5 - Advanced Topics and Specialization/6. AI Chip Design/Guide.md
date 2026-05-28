@@ -1,5 +1,15 @@
 **6. AI Chip Design (18-36 months)**
 
+<div class="course-identity ai-chip-design" markdown="1">
+<div class="course-identity__icon">ASIC</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track 5F · AI Chip Design</p>
+<p class="course-identity__title">Design accelerator dataflows, memory hierarchies, interfaces, and silicon-facing architecture specs.</p>
+<p class="course-identity__meta">Artifact: accelerator architecture spec · Measure: area, SRAM, bandwidth, energy, throughput</p>
+</div>
+</div>
+
+
 **Prerequisite: Master AI/Software Stack First**
 
 * **Why Software First:**

@@ -1,5 +1,15 @@
 # Yocto Project — Embedded Linux Distribution Engineering
 
+<div class="course-identity auto-course" style="--course-accent: #0284c7; --course-accent-rgb: 2, 132, 199;" markdown="1">
+<div class="course-identity__icon">YPEL</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Embedded Systems</p>
+<p class="course-identity__title">Specialized course identity for Yocto Project — Embedded Linux Distribution Engineering.</p>
+<p class="course-identity__meta">Artifact: bring-up or firmware demo · Measure: boot, latency, power, reliability</p>
+</div>
+</div>
+
+
 A structured course for hardware and software engineers who need to **build, own, and ship** a custom embedded Linux—not just install one. The goal is clarity first: you should finish with a **mental model** that survives release renames and new boards.
 
 **Time investment (typical):** 4–10 weeks part-time for Modules 0–6; full course including production topics 3–6 months alongside real hardware.

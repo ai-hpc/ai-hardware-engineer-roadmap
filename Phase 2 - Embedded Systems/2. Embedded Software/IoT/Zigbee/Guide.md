@@ -1,5 +1,15 @@
 # Zigbee - Low-Power Mesh Networking for Embedded Systems
 
+<div class="course-identity auto-course" style="--course-accent: #4f46e5; --course-accent-rgb: 79, 70, 229;" markdown="1">
+<div class="course-identity__icon">ZLPM</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Embedded Systems</p>
+<p class="course-identity__title">Specialized course identity for Zigbee - Low-Power Mesh Networking for Embedded Systems.</p>
+<p class="course-identity__meta">Artifact: bring-up or firmware demo · Measure: boot, latency, power, reliability</p>
+</div>
+</div>
+
+
 A structured mini-course for engineers who want to understand **Zigbee as an embedded networking system**, not just as a consumer smart-home buzzword.
 
 This course is placed under **Phase 2 - Embedded Software -> IoT** because Zigbee sits at the boundary between:

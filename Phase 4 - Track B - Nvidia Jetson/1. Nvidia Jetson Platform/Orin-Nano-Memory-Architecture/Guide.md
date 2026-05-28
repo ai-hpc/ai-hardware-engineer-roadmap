@@ -1,5 +1,15 @@
 # Orin Nano 8GB — Memory Architecture Deep Dive
 
+<div class="course-identity auto-course" style="--course-accent: #be123c; --course-accent-rgb: 190, 18, 60;" markdown="1">
+<div class="course-identity__icon">ON8M</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Orin Nano 8GB — Memory Architecture Deep Dive.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 > **Scope:** Production-level understanding of how memory works on Jetson Orin Nano 8GB (T234 SoC) — from DRAM initialization through SMMU translation, CMA internals, camera zero-copy pipelines, secure world isolation, and real production debugging.
 >
 > **Prerequisites:** You should be familiar with the [Orin Nano boot chain](../Guide.md#1-orin-nano-8gb--hardware--boot-chain-internals) and basic Linux memory concepts.

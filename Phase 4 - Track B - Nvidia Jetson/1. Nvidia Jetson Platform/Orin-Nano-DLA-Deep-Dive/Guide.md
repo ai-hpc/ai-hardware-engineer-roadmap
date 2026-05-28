@@ -1,5 +1,15 @@
 # Orin Nano 8GB — Deep Learning Accelerator (DLA) Deep Dive
 
+<div class="course-identity auto-course" style="--course-accent: #be123c; --course-accent-rgb: 190, 18, 60;" markdown="1">
+<div class="course-identity__icon">ON8D</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Orin Nano 8GB — Deep Learning Accelerator (DLA) Deep Dive.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 > **Scope:** Production-level understanding of the DLA on Jetson Orin Nano 8GB — hardware architecture, memory interaction, software stack, TensorRT integration, layer support, multi-engine scheduling, performance profiling, and production deployment patterns.
 >
 > **Prerequisites:** Familiarity with the [Orin Nano memory architecture](../Orin-Nano-Memory-Architecture/Guide.md) (CMA, SMMU, zero-copy) and [kernel internals](../Orin-Nano-Kernel-Internals/Guide.md) (driver model, module loading).

@@ -1,5 +1,15 @@
 # 4. High-Level Synthesis (HLS)
 
+<div class="course-identity hls" markdown="1">
+<div class="course-identity__icon">HLS</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track A4 · High-Level Synthesis</p>
+<p class="course-identity__title">Use C/C++ to generate FPGA hardware and prove whether the generated RTL is worth shipping.</p>
+<p class="course-identity__meta">Artifact: HLS accelerator + Pareto report · Measure: II, latency, area, data movement</p>
+</div>
+</div>
+
+
 > Use C/C++ to generate FPGA hardware, then verify whether the generated RTL actually meets throughput, area, memory, and interface requirements.
 
 **Layer mapping:** L2, L5, and L6. HLS connects algorithm code, compiler scheduling, memory architecture, RTL generation, and FPGA implementation.

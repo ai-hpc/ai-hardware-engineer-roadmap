@@ -1,5 +1,15 @@
 # tinygrad — The Hackable Compiler Framework
 
+<div class="course-identity auto-course" style="--course-accent: #0891b2; --course-accent-rgb: 8, 145, 178;" markdown="1">
+<div class="course-identity__icon">TTHC</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · AI Workloads</p>
+<p class="course-identity__title">Specialized course identity for tinygrad — The Hackable Compiler Framework.</p>
+<p class="course-identity__meta">Artifact: model or workload study · Measure: accuracy, latency, memory, throughput</p>
+</div>
+</div>
+
+
 **Parent:** [Module 2 — Deep Learning Frameworks](../Guide.md)
 
 > *A minimal DL framework (~10K lines) that exposes the entire compiler pipeline in readable Python. The ideal codebase for understanding what happens between `loss.backward()` and the GPU kernel that actually runs.*

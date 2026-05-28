@@ -1,5 +1,15 @@
 # VLA Deployment on Edge GPUs — Stack Selection, Compression, and Profile-Driven Optimization
 
+<div class="course-identity auto-course" style="--course-accent: #be123c; --course-accent-rgb: 190, 18, 60;" markdown="1">
+<div class="course-identity__icon">VDOE</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for VLA Deployment on Edge GPUs — Stack Selection, Compression, and Profile-Driven Optimization.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 **Parent:** [ML and AI](../Guide.md)
 
 > **Vision-Language-Action models are not LLMs.** Treating them as if they were — paged KV, in-flight batching, FP8 attention plugins — wastes silicon and engineering time. This guide is a working survey of how the field is actually deploying VLAs to edge GPUs, NPUs, and 100-gram robots, with cited numbers and concrete tradeoffs.

@@ -1,5 +1,15 @@
 # Jetson Orin Nano: Production-Grade Yocto/OpenEmbedded BSP Guide
 
+<div class="course-identity auto-course" style="--course-accent: #0284c7; --course-accent-rgb: 2, 132, 199;" markdown="1">
+<div class="course-identity__icon">JONP</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Jetson Orin Nano: Production-Grade Yocto/OpenEmbedded BSP Guide.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 **Platform:** NVIDIA Jetson Orin Nano 8GB (T234 SoC)
 **BSP:** Linux for Tegra (L4T) R36.x via meta-tegra
 **Yocto Releases:** Kirkstone (LTS), Scarthgap

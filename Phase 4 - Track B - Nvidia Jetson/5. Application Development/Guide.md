@@ -1,5 +1,15 @@
 # Application Development
 
+<div class="course-identity jetson-apps" markdown="1">
+<div class="course-identity__icon">APP</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track B5 · Jetson Application Development</p>
+<p class="course-identity__title">Build applications across peripherals, networking, UI, multimedia, ML inference, and ROS 2.</p>
+<p class="course-identity__meta">Artifact: integrated Jetson app · Measure: latency, resources, UX, reliability</p>
+</div>
+</div>
+
+
 **Phase 4 — Track B — Nvidia Jetson** · Module 5 of 7
 
 > **Focus:** Build production application software on the **Jetson Orin Nano 8GB** — from low-level peripheral access (GPIO, UART, SPI, I2C, CAN) through networking, GUI, multimedia pipelines, **ML/AI inference** (TensorRT, DLA, tinygrad), and **ROS 2** integration.

@@ -1,5 +1,15 @@
 # Digital Design Fundamentals
 
+<div class="course-identity auto-course" style="--course-accent: #65a30d; --course-accent-rgb: 101, 163, 13;" markdown="1">
+<div class="course-identity__icon">DDF</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Digital Foundations</p>
+<p class="course-identity__title">Specialized course identity for Digital Design Fundamentals.</p>
+<p class="course-identity__meta">Artifact: working low-level demo · Measure: timing, memory, correctness</p>
+</div>
+</div>
+
+
 The circuits inside every AI accelerator — tensor cores, SRAM banks, systolic arrays — are built from the same primitives covered here. This guide takes you from bits to memory hierarchies, with deliberate attention to the representations and building blocks that show up every day in hardware design.
 
 Before diving into the technical building blocks, let's understand the big picture: how a chip idea becomes a physical piece of silicon.

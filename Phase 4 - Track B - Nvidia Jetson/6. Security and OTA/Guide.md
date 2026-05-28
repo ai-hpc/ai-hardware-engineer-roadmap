@@ -1,5 +1,15 @@
 # Security and OTA
 
+<div class="course-identity security-ota" markdown="1">
+<div class="course-identity__icon">SEC</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track B6 · Security & OTA</p>
+<p class="course-identity__title">Harden Jetson products with secure boot, signed artifacts, update strategy, and rollback behavior.</p>
+<p class="course-identity__meta">Artifact: secure update plan · Measure: rollback time, integrity checks, failure recovery</p>
+</div>
+</div>
+
+
 **Phase 4 — Track B — Nvidia Jetson** · Module 6 of 7
 
 > **Focus:** Harden a **Jetson Orin Nano 8GB** product for field deployment: **secure boot** (PKC/SBK fuse programming), **OP-TEE** trusted execution, **disk encryption**, **A/B rootfs redundancy**, and a complete **OTA update pipeline** with rollback, monitoring, and reliability testing.

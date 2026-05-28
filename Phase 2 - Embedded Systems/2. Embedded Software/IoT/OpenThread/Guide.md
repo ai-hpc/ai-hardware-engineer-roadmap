@@ -1,5 +1,15 @@
 # OpenThread
 
+<div class="course-identity auto-course" style="--course-accent: #16a34a; --course-accent-rgb: 22, 163, 74;" markdown="1">
+<div class="course-identity__icon">OPE</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Embedded Systems</p>
+<p class="course-identity__title">Specialized course identity for OpenThread.</p>
+<p class="course-identity__meta">Artifact: bring-up or firmware demo · Measure: boot, latency, power, reliability</p>
+</div>
+</div>
+
+
 *Follows [**IoT Networking and Device Connectivity**](../Guide.md) and extends the Phase 2 embedded-software path from local peripheral buses to low-power IP networking. Use this guide to understand what Thread is, how OpenThread implements it, and how the same stack can run either directly on an MCU or through a Linux host plus radio co-processor.*
 
 ---

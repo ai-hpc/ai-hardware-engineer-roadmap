@@ -1,5 +1,15 @@
 # 01 — Graph and Operator Optimization
 
+<div class="course-identity auto-course" style="--course-accent: #0284c7; --course-accent-rgb: 2, 132, 199;" markdown="1">
+<div class="course-identity__icon">GAOO</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Compiler Track</p>
+<p class="course-identity__title">Specialized course identity for 01 — Graph and Operator Optimization.</p>
+<p class="course-identity__meta">Artifact: compiler/inference optimization · Measure: op count, memory, latency</p>
+</div>
+</div>
+
+
 **Order:** First (foundation). You need to know *what* you're optimizing before writing kernels.
 
 **Role target:** DL Inference Optimization Engineer · MTS Kernels

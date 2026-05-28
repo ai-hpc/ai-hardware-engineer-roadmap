@@ -1,5 +1,15 @@
 # Jetson Orin Nano 8GB -- Camera Subsystem, ISP Pipeline, and Sensor Bring-Up
 
+<div class="course-identity auto-course" style="--course-accent: #db2777; --course-accent-rgb: 219, 39, 119;" markdown="1">
+<div class="course-identity__icon">JON8</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Jetson Orin Nano 8GB -- Camera Subsystem, ISP Pipeline, and Sensor Bring-Up.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 > Target: Jetson Orin Nano 8GB Developer Kit (P3767-0005, T234 SoC)
 > JetPack: 6.x (L4T 36.x), Linux kernel 5.15
 > Audience: Hardware engineers, BSP developers, and embedded vision engineers

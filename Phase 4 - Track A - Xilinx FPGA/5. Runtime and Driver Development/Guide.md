@@ -1,5 +1,15 @@
 # Track A §5 — Runtime & Driver Development for FPGA Accelerators
 
+<div class="course-identity fpga-runtime" markdown="1">
+<div class="course-identity__icon">DRV</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track A5 · FPGA Runtime & Drivers</p>
+<p class="course-identity__title">Expose FPGA accelerators through drivers, userspace runtimes, and production control paths.</p>
+<p class="course-identity__meta">Artifact: driver/runtime interface · Measure: latency, throughput, errors, recovery</p>
+</div>
+</div>
+
+
 > *Connect your FPGA accelerator to the host — write the runtime, drivers, and memory management that make hardware usable from software.*
 
 **Prerequisites:** Track A §1–2 (Vivado, Zynq PS/PL, AXI), Phase 1 §3 (Operating Systems — drivers, memory, system calls), Phase 1 §4 (C++).

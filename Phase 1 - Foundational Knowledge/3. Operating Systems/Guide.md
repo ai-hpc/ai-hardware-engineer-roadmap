@@ -1,5 +1,15 @@
 # Operating Systems (Phase 1 §3)
 
+<div class="course-identity operating-systems" markdown="1">
+<div class="course-identity__icon">OS</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Module 3 · Operating Systems</p>
+<p class="course-identity__title">Learn the runtime layer that schedules processes, memory, files, drivers, and devices.</p>
+<p class="course-identity__meta">Artifact: OS behavior lab · Measure: syscalls, context switches, memory, contention</p>
+</div>
+</div>
+
+
 **Primary source:** [Caltech CS124 Spring 2024](https://users.cms.caltech.edu/~donnie/cs124/lectures/) (Donnie Pinkston).
 
 This section is the **OS theory + Linux-shaped practice** layer of Phase 1. It sits after [**§2 — Computer Architecture**](../2.%20Computer%20Architecture%20and%20Hardware/Guide.md) (you need CPU/memory context) and before [**§4 — C++ and Parallel Computing**](../4.%20C%2B%2B%20and%20Parallel%20Computing/Guide.md) (you will use processes, threads, and VM ideas when writing host and CUDA code).

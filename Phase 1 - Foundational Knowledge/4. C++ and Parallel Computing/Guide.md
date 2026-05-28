@@ -1,5 +1,15 @@
 # C++ and Parallel Computing (Phase 1 §4)
 
+<div class="course-identity parallel-computing" markdown="1">
+<div class="course-identity__icon">CUDA</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Module 4 · C++ & Parallel Computing</p>
+<p class="course-identity__title">Map work onto CPU SIMD, thread pools, CUDA, HIP, OpenCL, and SYCL execution models.</p>
+<p class="course-identity__meta">Artifact: parallel benchmark · Measure: speedup, occupancy, bandwidth, synchronization</p>
+</div>
+</div>
+
+
 > *From a single instruction to a thousand GPU threads — how computing became parallel, and why every AI hardware engineer must think in parallel.*
 
 **Layer mapping:** **L1** (application — you write the code that runs on hardware), **L3** (runtime — CUDA runtime, OpenCL runtime are the bridge to the GPU driver).

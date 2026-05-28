@@ -1,5 +1,15 @@
 # NVIDIA TAO Toolkit — Concrete Guide
 
+<div class="course-identity auto-course" style="--course-accent: #0284c7; --course-accent-rgb: 2, 132, 199;" markdown="1">
+<div class="course-identity__icon">NTTC</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for NVIDIA TAO Toolkit — Concrete Guide.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 > **Goal:** Use NVIDIA TAO Toolkit to take a pre-trained model from NGC, fine-tune it on a custom dataset, prune and quantize it, export to TensorRT, and deploy on Jetson Orin Nano — without training from scratch.
 
 ---

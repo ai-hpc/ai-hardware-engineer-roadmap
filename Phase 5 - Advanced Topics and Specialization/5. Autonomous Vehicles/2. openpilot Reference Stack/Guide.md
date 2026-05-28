@@ -1,5 +1,15 @@
 # Module 2 — openpilot Reference Stack
 
+<div class="course-identity auto-course" style="--course-accent: #0891b2; --course-accent-rgb: 8, 145, 178;" markdown="1">
+<div class="course-identity__icon">MORS</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Specialization</p>
+<p class="course-identity__title">Specialized course identity for Module 2 — openpilot Reference Stack.</p>
+<p class="course-identity__meta">Artifact: specialization case study · Measure: performance, reliability, role fit</p>
+</div>
+</div>
+
+
 **Parent:** [Phase 5 — Autonomous Driving](../Guide.md)
 
 **Time:** 3–4 months

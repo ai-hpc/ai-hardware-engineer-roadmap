@@ -1,5 +1,15 @@
 # Module 3 — tinygrad for Inference
 
+<div class="course-identity auto-course" style="--course-accent: #7c3aed; --course-accent-rgb: 124, 58, 237;" markdown="1">
+<div class="course-identity__icon">MTFI</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Specialization</p>
+<p class="course-identity__title">Specialized course identity for Module 3 — tinygrad for Inference.</p>
+<p class="course-identity__meta">Artifact: specialization case study · Measure: performance, reliability, role fit</p>
+</div>
+</div>
+
+
 **Parent:** [Phase 5 — Autonomous Driving](../Guide.md)
 
 **A structured, hands-on path from first tensor to custom backend**

@@ -1,5 +1,15 @@
 # CUDA and SIMT
 
+<div class="course-identity auto-course" style="--course-accent: #0891b2; --course-accent-rgb: 8, 145, 178;" markdown="1">
+<div class="course-identity__icon">CAS</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Digital Foundations</p>
+<p class="course-identity__title">Specialized course identity for CUDA and SIMT.</p>
+<p class="course-identity__meta">Artifact: working low-level demo · Measure: timing, memory, correctness</p>
+</div>
+</div>
+
+
 Part of [Phase 1 section 4 — C++ and Parallel Computing](../Guide.md).
 
 **Goal:** Master NVIDIA's **SIMT** programming model — GPU architecture, thread hierarchy, memory spaces, kernel writing, and performance optimization — so you can read and write production CUDA code and reason about hardware behavior.

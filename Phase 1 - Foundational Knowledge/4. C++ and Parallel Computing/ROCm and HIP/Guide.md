@@ -1,5 +1,15 @@
 # ROCm and HIP (Phase 1 §4 — Sub-Track 4)
 
+<div class="course-identity auto-course" style="--course-accent: #7c3aed; --course-accent-rgb: 124, 58, 237;" markdown="1">
+<div class="course-identity__icon">RAHP</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Digital Foundations</p>
+<p class="course-identity__title">Specialized course identity for ROCm and HIP (Phase 1 §4 — Sub-Track 4).</p>
+<p class="course-identity__meta">Artifact: working low-level demo · Measure: timing, memory, correctness</p>
+</div>
+</div>
+
+
 **Parent:** [C++ and Parallel Computing](../Guide.md)
 
 > *AMD's answer to CUDA — write GPU code that runs on both NVIDIA and AMD hardware.*

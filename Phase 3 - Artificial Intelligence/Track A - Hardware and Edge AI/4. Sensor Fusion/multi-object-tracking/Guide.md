@@ -1,5 +1,15 @@
 # Multi-Object Tracking: Hungarian Algorithm + Kalman Filter
 
+<div class="course-identity auto-course" style="--course-accent: #475569; --course-accent-rgb: 71, 85, 105;" markdown="1">
+<div class="course-identity__icon">MOTH</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · AI Workloads</p>
+<p class="course-identity__title">Specialized course identity for Multi-Object Tracking: Hungarian Algorithm + Kalman Filter.</p>
+<p class="course-identity__meta">Artifact: model or workload study · Measure: accuracy, latency, memory, throughput</p>
+</div>
+</div>
+
+
 > **Reference implementation:** [srianant/kalman_filter_multi_object_tracking](https://github.com/srianant/kalman_filter_multi_object_tracking)
 > **Goal:** Understand and build a complete MOT system from scratch — Kalman filter for prediction, Hungarian algorithm for assignment, track lifecycle management — then integrate with YOLO detection, BEVFusion 3D output, and ROS2.
 

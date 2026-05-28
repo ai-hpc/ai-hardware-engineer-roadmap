@@ -1,5 +1,15 @@
 # Jetson Audio Setup and Development - Project Guide
 
+<div class="course-identity auto-course" style="--course-accent: #7e22ce; --course-accent-rgb: 126, 34, 206;" markdown="1">
+<div class="course-identity__icon">JASA</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Jetson Audio Setup and Development - Project Guide.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 > **Goal:** Understand Jetson audio well enough to move from "USB audio works" to "I can design and debug a real audio product on Jetson Orin Nano," using NVIDIA's **ALSA + ASoC + APE/AHUB** model.
 
 **Hub:** [Multimedia](../Guide.md)  

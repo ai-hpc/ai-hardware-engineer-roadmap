@@ -1,5 +1,15 @@
 # 04 — Quantization & Low-Precision Inference
 
+<div class="course-identity auto-course" style="--course-accent: #475569; --course-accent-rgb: 71, 85, 105;" markdown="1">
+<div class="course-identity__icon">QLPI</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Compiler Track</p>
+<p class="course-identity__title">Specialized course identity for 04 — Quantization & Low-Precision Inference.</p>
+<p class="course-identity__meta">Artifact: compiler/inference optimization · Measure: op count, memory, latency</p>
+</div>
+</div>
+
+
 **Order:** Fourth. After you have kernels and compiler context (01–03), you add low-precision kernels and deployment.
 
 **Role target:** DL Inference Optimization Engineer · **MTS Kernels** (INT8/INT4 kernels, quantization-aware implementations).

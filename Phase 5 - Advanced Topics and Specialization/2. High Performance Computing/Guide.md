@@ -1,5 +1,15 @@
 # 2. High Performance Computing (Phase 5)
 
+<div class="course-identity hpc" markdown="1">
+<div class="course-identity__icon">HPC</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track 5B · HPC / CUDA-X</p>
+<p class="course-identity__title">Use GPU-accelerated libraries and performance tools to build high-throughput compute systems.</p>
+<p class="course-identity__meta">Artifact: CUDA-X benchmark · Measure: FLOP/s, bandwidth, speedup, efficiency</p>
+</div>
+</div>
+
+
 **Timeline:** Ongoing — study each category as your projects demand it.
 
 **Prerequisites:** Phase 1 §4 (C++/CUDA), Phase 4 Track B (Jetson, CUDA runtime), Phase 4 Track C (ML compiler + DL inference optimization), Phase 5A (GPU Infrastructure).

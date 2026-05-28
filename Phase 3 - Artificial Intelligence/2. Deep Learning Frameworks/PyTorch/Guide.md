@@ -1,5 +1,15 @@
 # PyTorch — Industry-Standard Deep Learning Framework
 
+<div class="course-identity auto-course" style="--course-accent: #0891b2; --course-accent-rgb: 8, 145, 178;" markdown="1">
+<div class="course-identity__icon">PISD</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · AI Workloads</p>
+<p class="course-identity__title">Specialized course identity for PyTorch — Industry-Standard Deep Learning Framework.</p>
+<p class="course-identity__meta">Artifact: model or workload study · Measure: accuracy, latency, memory, throughput</p>
+</div>
+</div>
+
+
 **Parent:** [Module 2 — Deep Learning Frameworks](../Guide.md)
 
 > *The framework most models are written in. You need fluency here because every model you deploy on hardware starts as PyTorch code.*

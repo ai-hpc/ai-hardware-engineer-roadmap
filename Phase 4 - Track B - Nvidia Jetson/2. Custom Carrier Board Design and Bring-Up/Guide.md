@@ -1,5 +1,15 @@
 # Custom Carrier Board Design and Bring-Up
 
+<div class="course-identity carrier-board" markdown="1">
+<div class="course-identity__icon">BRD</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track B2 · Carrier Board Bring-Up</p>
+<p class="course-identity__title">Design and validate the board around a Jetson module: power, signals, connectors, and bring-up risk.</p>
+<p class="course-identity__meta">Artifact: carrier bring-up checklist · Measure: rails, interfaces, signal integrity, faults</p>
+</div>
+</div>
+
+
 **Phase 4 — Track B — Nvidia Jetson** · Module 2 of 7
 
 > **Focus:** Design a **custom carrier board** for the **Jetson Orin Nano 8GB** SoM starting from the NVIDIA **P3768** reference design, through schematic capture, PCB layout, thermal and power-tree design, and first-article board bring-up validation.

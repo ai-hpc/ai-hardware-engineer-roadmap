@@ -1,5 +1,15 @@
 # Hardware Description Languages — Verilog Focus
 
+<div class="course-identity auto-course" style="--course-accent: #0284c7; --course-accent-rgb: 2, 132, 199;" markdown="1">
+<div class="course-identity__icon">HDLV</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Digital Foundations</p>
+<p class="course-identity__title">Specialized course identity for Hardware Description Languages — Verilog Focus.</p>
+<p class="course-identity__meta">Artifact: working low-level demo · Measure: timing, memory, correctness</p>
+</div>
+</div>
+
+
 Verilog is how you turn the digital design concepts from the previous guide into real hardware. You write behavioral or structural descriptions; synthesis tools convert them into gates; place-and-route tools turn those gates into physical layout. This guide teaches Verilog through progressively larger designs — from wires and gates to a pipelined MIPS core — with testbenches at every step.
 
 > **Why Verilog over VHDL?** Both are IEEE standards and fully capable. Verilog dominates in US industry and all major AI chip companies (NVIDIA, AMD, Google, Apple). VHDL is stronger in European defense/aerospace. SystemVerilog extends Verilog with verification features (UVM, assertions) and is covered in Phase 2. Start with Verilog — you can read VHDL in a weekend once you know one HDL.

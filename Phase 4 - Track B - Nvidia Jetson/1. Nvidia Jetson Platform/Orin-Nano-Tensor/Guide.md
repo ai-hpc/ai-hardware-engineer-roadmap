@@ -1,5 +1,15 @@
 # Orin Nano — Tensor Core Architecture and How It Works
 
+<div class="course-identity auto-course" style="--course-accent: #4f46e5; --course-accent-rgb: 79, 70, 229;" markdown="1">
+<div class="course-identity__icon">ONTC</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Orin Nano — Tensor Core Architecture and How It Works.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 > **Context:** This deep dive explains **tensor core** architecture on the Jetson Orin Nano (Ampere GPU) and how it enables fast, power-efficient AI inference. Understanding this helps you choose precisions (FP16/INT8), interpret benchmarks, and reason about why TensorRT and cuDNN achieve high TOPS on Orin.
 
 ---

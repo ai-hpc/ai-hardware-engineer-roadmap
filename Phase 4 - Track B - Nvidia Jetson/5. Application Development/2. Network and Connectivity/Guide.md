@@ -1,5 +1,15 @@
 # Network and Connectivity
 
+<div class="course-identity auto-course" style="--course-accent: #4f46e5; --course-accent-rgb: 79, 70, 229;" markdown="1">
+<div class="course-identity__icon">NAC</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Network and Connectivity.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 **Phase 4 — Track B — Module 5.2** · Application Development
 
 > **Focus:** Configure wired and wireless networking on the **Jetson Orin Nano 8GB** — Ethernet, Wi-Fi (client and AP), Bluetooth, VPN tunnels, and lightweight web servers for device management.

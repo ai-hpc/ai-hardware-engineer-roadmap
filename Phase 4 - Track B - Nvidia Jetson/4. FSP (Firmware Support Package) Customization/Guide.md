@@ -1,5 +1,15 @@
 # FSP (Firmware Support Package) and SPE firmware
 
+<div class="course-identity fsp" markdown="1">
+<div class="course-identity__icon">FSP</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track B4 · Firmware Support Package</p>
+<p class="course-identity__title">Understand low-level firmware, boot configuration, power behavior, and board-specific adaptation.</p>
+<p class="course-identity__meta">Artifact: firmware adaptation note · Measure: boot stages, power rails, config deltas</p>
+</div>
+</div>
+
+
 **Phase 4 — Track B — Nvidia Jetson** · Module 4 of 7
 
 > **Focus:** Customize firmware that runs on the Jetson **Sensor Processing Engine (SPE)**—the **Cortex-R5** in the **always-on (AON)** domain—using NVIDIA’s **Firmware Support Package (FSP)** on **FreeRTOS**. This is the path for **low-level I/O**, **wake** scenarios, and **time-critical** tasks that should not live on the main Linux **CCPLEX**.

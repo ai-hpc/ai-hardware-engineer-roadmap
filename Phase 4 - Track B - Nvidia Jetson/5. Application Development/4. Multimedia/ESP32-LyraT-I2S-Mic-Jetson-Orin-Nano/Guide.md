@@ -1,5 +1,15 @@
 # ESP32-LyraT I2S Microphone Capture on Jetson Orin Nano - Application Guide
 
+<div class="course-identity auto-course" style="--course-accent: #16a34a; --course-accent-rgb: 22, 163, 74;" markdown="1">
+<div class="course-identity__icon">ELIM</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for ESP32-LyraT I2S Microphone Capture on Jetson Orin Nano - Application Guide.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 > **Goal:** Use an **ESP32-LyraT audio dev kit** as a practical I2S microphone/audio frontend for the **Jetson Orin Nano 8GB / Super Developer Kit** 40-pin header, so you can test Jetson I2S capture, AHUB routing, and JetPack audio debugging before designing a custom microphone board.
 
 **Hub:** [Multimedia](../Guide.md)  

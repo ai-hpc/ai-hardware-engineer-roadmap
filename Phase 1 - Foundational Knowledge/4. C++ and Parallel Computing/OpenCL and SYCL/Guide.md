@@ -1,5 +1,15 @@
 # OpenCL and SYCL (Phase 1 §4 — Sub-Track 5)
 
+<div class="course-identity auto-course" style="--course-accent: #0284c7; --course-accent-rgb: 2, 132, 199;" markdown="1">
+<div class="course-identity__icon">OASP</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Digital Foundations</p>
+<p class="course-identity__title">Specialized course identity for OpenCL and SYCL (Phase 1 §4 — Sub-Track 5).</p>
+<p class="course-identity__meta">Artifact: working low-level demo · Measure: timing, memory, correctness</p>
+</div>
+</div>
+
+
 **Parent:** [C++ and Parallel Computing](../Guide.md)
 
 > *Vendor-neutral parallel compute — one programming model for CPU, GPU, and FPGA.*

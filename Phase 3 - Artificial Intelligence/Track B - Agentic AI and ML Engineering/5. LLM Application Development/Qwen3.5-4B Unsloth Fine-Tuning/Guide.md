@@ -1,5 +1,15 @@
 # Qwen3.5-4B-Base Fine-Tuning with Unsloth
 
+<div class="course-identity auto-course" style="--course-accent: #be123c; --course-accent-rgb: 190, 18, 60;" markdown="1">
+<div class="course-identity__icon">Q4BF</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · AI Workloads</p>
+<p class="course-identity__title">Specialized course identity for Qwen3.5-4B-Base Fine-Tuning with Unsloth.</p>
+<p class="course-identity__meta">Artifact: model or workload study · Measure: accuracy, latency, memory, throughput</p>
+</div>
+</div>
+
+
 **Parent:** [Module 5B - LLM Application Development](../Guide.md) / [Phase 3 - Artificial Intelligence](../../../Guide.md)
 
 > *Fine-tune `Qwen/Qwen3.5-4B-Base` with Unsloth, then measure the training, export, and inference costs that matter to an AI hardware engineer.*

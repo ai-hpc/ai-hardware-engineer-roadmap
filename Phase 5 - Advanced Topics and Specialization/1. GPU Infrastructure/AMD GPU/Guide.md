@@ -1,5 +1,15 @@
 # AMD GPU for HPC and AI
 
+<div class="course-identity auto-course" style="--course-accent: #ca8a04; --course-accent-rgb: 202, 138, 4;" markdown="1">
+<div class="course-identity__icon">AGFH</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Specialization</p>
+<p class="course-identity__title">Specialized course identity for AMD GPU for HPC and AI.</p>
+<p class="course-identity__meta">Artifact: specialization case study · Measure: performance, reliability, role fit</p>
+</div>
+</div>
+
+
 **Timeline:** 6–12 months.
 
 **Prerequisites:** Phase 1 §4 (C++ and Parallel Computing — CUDA/OpenCL), Phase 4 Track C (ML compiler fundamentals), Nvidia GPU sub-track recommended for context.

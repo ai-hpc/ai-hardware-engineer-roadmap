@@ -1,5 +1,15 @@
 # Espressif
 
+<div class="course-identity auto-course" style="--course-accent: #db2777; --course-accent-rgb: 219, 39, 119;" markdown="1">
+<div class="course-identity__icon">ESP</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Embedded Systems</p>
+<p class="course-identity__title">Specialized course identity for Espressif.</p>
+<p class="course-identity__meta">Artifact: bring-up or firmware demo · Measure: boot, latency, power, reliability</p>
+</div>
+</div>
+
+
 A structured embedded-software track for engineers who want to learn **Espressif platforms seriously**, not just as isolated board demos.
 
 This track sits under **Phase 2 - Embedded Software** because Espressif development naturally combines:

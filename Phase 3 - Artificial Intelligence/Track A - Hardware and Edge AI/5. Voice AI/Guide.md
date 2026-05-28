@@ -1,5 +1,15 @@
 # Module 6A — Voice AI
 
+<div class="course-identity auto-course" style="--course-accent: #0891b2; --course-accent-rgb: 8, 145, 178;" markdown="1">
+<div class="course-identity__icon">M6VA</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · AI Workloads</p>
+<p class="course-identity__title">Specialized course identity for Module 6A — Voice AI.</p>
+<p class="course-identity__meta">Artifact: model or workload study · Measure: accuracy, latency, memory, throughput</p>
+</div>
+</div>
+
+
 **Parent:** [Phase 3 — Artificial Intelligence](../../Guide.md) · Track A
 
 > *Speech-to-text, text-to-speech, and real-time voice pipelines — the audio workloads that drive edge AI hardware.*

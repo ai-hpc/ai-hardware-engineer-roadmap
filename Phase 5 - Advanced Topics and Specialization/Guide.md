@@ -1,5 +1,15 @@
 # Phase 5: Advanced Topics and Specialization
 
+<div class="course-identity specialization" markdown="1">
+<div class="course-identity__icon">P5</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Phase 5 · Specialization</p>
+<p class="course-identity__title">Turn broad roadmap coverage into a role-shaped body of work with a flagship artifact.</p>
+<p class="course-identity__meta">Artifact: specialization portfolio · Measure: depth, reproducibility, role fit</p>
+</div>
+</div>
+
+
 > *Go deep in one part of the stack until your work looks differentiated, not just broad.*
 
 **Layer mapping:** Depends on the track. This phase spans **L1 through L8**, but each specialization should stay coherent around one professional niche.

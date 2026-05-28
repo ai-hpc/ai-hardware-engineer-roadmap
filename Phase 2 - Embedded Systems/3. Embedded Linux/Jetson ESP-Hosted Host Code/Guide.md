@@ -1,5 +1,15 @@
 # Jetson ESP-Hosted Host Code — Embedded Linux Driver Reading Course
 
+<div class="course-identity auto-course" style="--course-accent: #0f766e; --course-accent-rgb: 15, 118, 110;" markdown="1">
+<div class="course-identity__icon">JEHH</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Embedded Systems</p>
+<p class="course-identity__title">Specialized course identity for Jetson ESP-Hosted Host Code — Embedded Linux Driver Reading Course.</p>
+<p class="course-identity__meta">Artifact: bring-up or firmware demo · Measure: boot, latency, power, reliability</p>
+</div>
+</div>
+
+
 A structured mini-course for engineers who want to read a **real Embedded Linux host stack** instead of only consuming board bring-up tutorials.
 
 The code studied here is the Jetson-oriented fork:

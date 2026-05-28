@@ -1,5 +1,15 @@
 # Neural Networks
 
+<div class="course-identity neural-networks" markdown="1">
+<div class="course-identity__icon">NN</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Module 1 · Neural Networks</p>
+<p class="course-identity__title">Build workload intuition from tensors, backprop, CNNs, transformers, and training flow.</p>
+<p class="course-identity__meta">Artifact: model implementation note · Measure: loss, memory, FLOPs, throughput</p>
+</div>
+</div>
+
+
 **Phase 3 — Artificial Intelligence** (after **[Phase 1 §4 — C++ and Parallel Computing](../../Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/Guide.md)**). *Optional after Phase 2 if you prefer embedded first.*
 
 > **Goal:** Build a concrete, ground-up understanding of what AI is, what artificial neural networks are, how they learn, and how to implement everything hands-on using **tinygrad** — the minimal ML framework that exposes every fundamental operation.

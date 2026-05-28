@@ -1,5 +1,15 @@
 # Module 3B — Agentic AI & GenAI
 
+<div class="course-identity auto-course" style="--course-accent: #0f766e; --course-accent-rgb: 15, 118, 110;" markdown="1">
+<div class="course-identity__icon">M3AA</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · AI Workloads</p>
+<p class="course-identity__title">Specialized course identity for Module 3B — Agentic AI & GenAI.</p>
+<p class="course-identity__meta">Artifact: model or workload study · Measure: accuracy, latency, memory, throughput</p>
+</div>
+</div>
+
+
 **Parent:** [Phase 3 — Artificial Intelligence](../../Guide.md) · Track B
 
 > *Build applications on top of large language models — agents, RAG, tool use, GenAI products.*

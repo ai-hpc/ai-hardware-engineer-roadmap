@@ -1,5 +1,15 @@
 # 7. ML Systems Engineering (Phase 5)
 
+<div class="course-identity mlsys" markdown="1">
+<div class="course-identity__icon">SYS</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track 5G · ML Systems Engineering</p>
+<p class="course-identity__title">Build the runtimes, schedulers, kernels, training systems, and serving infrastructure behind AI at scale.</p>
+<p class="course-identity__meta">Artifact: MLSys benchmark/runtime · Measure: latency, memory, communication, utilization</p>
+</div>
+</div>
+
+
 > Build the runtimes, distributed systems, kernels, schedulers, and infrastructure that make modern AI workloads train and serve reliably.
 
 **Layer mapping:** L3-L8. This track connects model math, CUDA kernels, runtime scheduling, distributed communication, cluster orchestration, compiler/runtime work, serving systems, and observability.

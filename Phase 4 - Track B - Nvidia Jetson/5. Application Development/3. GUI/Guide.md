@@ -1,5 +1,15 @@
 # GUI
 
+<div class="course-identity auto-course" style="--course-accent: #16a34a; --course-accent-rgb: 22, 163, 74;" markdown="1">
+<div class="course-identity__icon">GUI</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for GUI.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 **Phase 4 — Track B — Module 5.3** · Application Development
 
 > **Focus:** Build graphical user interfaces for **Jetson Orin Nano 8GB** products — from lightweight embedded UIs (LVGL, framebuffer) through Qt desktop applications to web-based dashboards. Covers display setup, touch input, and GPU-accelerated rendering.

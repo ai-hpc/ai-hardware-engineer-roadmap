@@ -1,5 +1,15 @@
 # Jetson Orin Nano 8GB (T234) -- Security Architecture and Production Hardening Guide
 
+<div class="course-identity auto-course" style="--course-accent: #65a30d; --course-accent-rgb: 101, 163, 13;" markdown="1">
+<div class="course-identity__icon">JON8</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Jetson Orin Nano 8GB (T234) -- Security Architecture and Production Hardening Guide.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 This guide provides an end-to-end deep dive into the security subsystem of the
 NVIDIA Jetson Orin Nano 8GB developer kit and production module. It covers
 hardware-rooted trust, secure boot, disk encryption, trusted execution, network

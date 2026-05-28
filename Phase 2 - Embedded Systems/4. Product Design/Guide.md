@@ -1,5 +1,15 @@
 # Product Design for Embedded Systems
 
+<div class="course-identity product-design" markdown="1">
+<div class="course-identity__icon">PRD</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Module 4 · Product Design</p>
+<p class="course-identity__title">Turn working hardware into a device with credible setup, controls, trust, and deployment boundaries.</p>
+<p class="course-identity__meta">Artifact: V1 product brief · Measure: setup friction, reliability, trust cues</p>
+</div>
+</div>
+
+
 A structured mini-course for engineers who can already reason about boards, firmware, Linux, and connectivity, but want to learn how those technical choices become a **real product**.
 
 This course sits under **Phase 2 - Embedded Systems** because product design here does not mean marketing language or app mockups. It means:

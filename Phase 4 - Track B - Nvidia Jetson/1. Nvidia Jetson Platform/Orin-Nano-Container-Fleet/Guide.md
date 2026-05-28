@@ -1,5 +1,15 @@
 # Containerized Deployment, Fleet Management, and DevOps for Jetson Orin Nano
 
+<div class="course-identity auto-course" style="--course-accent: #475569; --course-accent-rgb: 71, 85, 105;" markdown="1">
+<div class="course-identity__icon">CDFM</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Containerized Deployment, Fleet Management, and DevOps for Jetson Orin Nano.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 A deep-dive guide for the Jetson Orin Nano 8GB (T234 SoC) covering containers,
 orchestration, fleet management, CI/CD, monitoring, and security at the edge.
 

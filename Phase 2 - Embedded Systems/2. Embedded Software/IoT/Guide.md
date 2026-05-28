@@ -1,5 +1,15 @@
 # IoT Networking and Device Connectivity
 
+<div class="course-identity auto-course" style="--course-accent: #0284c7; --course-accent-rgb: 2, 132, 199;" markdown="1">
+<div class="course-identity__icon">INAD</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Embedded Systems</p>
+<p class="course-identity__title">Specialized course identity for IoT Networking and Device Connectivity.</p>
+<p class="course-identity__meta">Artifact: bring-up or firmware demo · Measure: boot, latency, power, reliability</p>
+</div>
+</div>
+
+
 *Builds on [**Embedded Software**](../Guide.md) once you are comfortable with MCU buses, interrupts, and RTOS basics. This sub-layer shifts from board-local communication like SPI/UART/I2C/CAN to **networked embedded systems** that must join, secure, and maintain real deployments.*
 
 ---

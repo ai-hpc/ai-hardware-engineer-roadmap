@@ -1,5 +1,15 @@
 # Module 4 — Advanced Perception and Prediction
 
+<div class="course-identity auto-course" style="--course-accent: #0d9488; --course-accent-rgb: 13, 148, 136;" markdown="1">
+<div class="course-identity__icon">MAPA</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Specialization</p>
+<p class="course-identity__title">Specialized course identity for Module 4 — Advanced Perception and Prediction.</p>
+<p class="course-identity__meta">Artifact: specialization case study · Measure: performance, reliability, role fit</p>
+</div>
+</div>
+
+
 **Parent:** [Phase 5 — Autonomous Driving](../Guide.md)
 
 **Time:** 6–12 months

@@ -1,5 +1,15 @@
 # Compliance and Manufacturing
 
+<div class="course-identity compliance" markdown="1">
+<div class="course-identity__icon">MFG</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track B7 · Compliance & Manufacturing</p>
+<p class="course-identity__title">Prepare embedded AI hardware for certification, test fixtures, production, and field reliability.</p>
+<p class="course-identity__meta">Artifact: manufacturing readiness pack · Measure: test coverage, yield risks, compliance gaps</p>
+</div>
+</div>
+
+
 **Phase 4 — Track B — Nvidia Jetson** · Module 7 of 7
 
 > **Focus:** Take a validated **Jetson Orin Nano 8GB** product from engineering prototype through **regulatory certification** (FCC/CE/IC), **DFM review**, **production flashing infrastructure**, **supply-chain management**, and **fleet operations** — the last mile before volume shipping and field sustaining.

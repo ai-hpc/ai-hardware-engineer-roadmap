@@ -1,5 +1,15 @@
 # Module 2 — Deep Learning Frameworks
 
+<div class="course-identity dl-frameworks" markdown="1">
+<div class="course-identity__icon">FWK</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Module 2 · Deep Learning Frameworks</p>
+<p class="course-identity__title">Trace how micrograd, PyTorch, and tinygrad turn tensor code into executable workloads.</p>
+<p class="course-identity__meta">Artifact: framework trace · Measure: graph shape, op count, memory, runtime</p>
+</div>
+</div>
+
+
 **Parent:** [Phase 3 — Artificial Intelligence](../Guide.md)
 
 > *Understand how software generates the workloads your hardware must run — from autograd to GPU kernels.*

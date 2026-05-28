@@ -1,5 +1,15 @@
 # Module 1 — Autonomous Driving Fundamentals
 
+<div class="course-identity auto-course" style="--course-accent: #db2777; --course-accent-rgb: 219, 39, 119;" markdown="1">
+<div class="course-identity__icon">MADF</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Specialization</p>
+<p class="course-identity__title">Specialized course identity for Module 1 — Autonomous Driving Fundamentals.</p>
+<p class="course-identity__meta">Artifact: specialization case study · Measure: performance, reliability, role fit</p>
+</div>
+</div>
+
+
 **Parent:** [Phase 5 — Autonomous Driving](../Guide.md)
 
 **Time:** 3–4 months

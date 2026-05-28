@@ -1,5 +1,15 @@
 # Jetson Orin Nano 8GB -- Video Codec Hardware, GStreamer Pipelines, and DeepStream SDK
 
+<div class="course-identity auto-course" style="--course-accent: #4f46e5; --course-accent-rgb: 79, 70, 229;" markdown="1">
+<div class="course-identity__icon">JON8</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Jetson Orin Nano 8GB -- Video Codec Hardware, GStreamer Pipelines, and DeepStream SDK.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 > **Target:** Jetson Orin Nano 8GB Developer Kit (T234 SoC, Ampere GPU, JetPack 6.x / L4T 36.x).
 >
 > **Prerequisites:** Familiarity with the [Orin Nano memory architecture](../Orin-Nano-Memory-Architecture/Guide.md) (NVMM, zero-copy, DMA-BUF) and [real-time inference](../Orin-Nano-Real-Time-Inference/Guide.md) (TensorRT engine building).

@@ -1,5 +1,15 @@
 ## Yocto Project — dedicated course
 
+<div class="course-identity embedded-linux" markdown="1">
+<div class="course-identity__icon">LNX</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Module 3 · Embedded Linux</p>
+<p class="course-identity__title">Customize kernels, root filesystems, device trees, BSPs, and production Linux images.</p>
+<p class="course-identity__meta">Artifact: bootable image or device-tree patch · Measure: boot time, probe logs, footprint</p>
+</div>
+</div>
+
+
 For a full **vendor-neutral** Yocto curriculum (mental model, modules 0–11, labs, capstones, glossary), use:
 
 **[Yocto / Guide.md](Yocto/Guide.md)**

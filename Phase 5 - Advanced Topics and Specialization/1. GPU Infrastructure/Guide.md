@@ -1,5 +1,15 @@
 # 1. GPU Infrastructure (Phase 5)
 
+<div class="course-identity gpu-infra" markdown="1">
+<div class="course-identity__icon">GPU</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Track 5A · GPU Infrastructure</p>
+<p class="course-identity__title">Operate multi-GPU systems, interconnects, distributed runtimes, and accelerator platforms.</p>
+<p class="course-identity__meta">Artifact: GPU cluster/runbook · Measure: scaling, bandwidth, utilization, cost</p>
+</div>
+</div>
+
+
 **Timeline:** 12–24 months (fundamentals); 24–48 months for advanced phase.
 
 **Prerequisites:** Phase 4 Track B (Jetson, CUDA stack), Phase 4 Track C (ML compiler + DL inference optimization).

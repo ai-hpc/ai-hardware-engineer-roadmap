@@ -1,5 +1,15 @@
 # HPC Setup
 
+<div class="course-identity auto-course" style="--course-accent: #ea580c; --course-accent-rgb: 234, 88, 12;" markdown="1">
+<div class="course-identity__icon">HS</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Specialization</p>
+<p class="course-identity__title">Specialized course identity for HPC Setup.</p>
+<p class="course-identity__meta">Artifact: specialization case study · Measure: performance, reliability, role fit</p>
+</div>
+</div>
+
+
 **Part of:** [High Performance Computing — Nvidia GPU](../Guide.md) (Phase 5)
 
 This guide combines **HPC fundamentals, virtualization, interconnects, and advanced topics** with **hardware-specific deep dives** for real-world GPU cluster setup and optimization. Study the fundamentals first, then use the deep dives for your target hardware (8x H200, L40S, NCCL, CUDA, GDS).

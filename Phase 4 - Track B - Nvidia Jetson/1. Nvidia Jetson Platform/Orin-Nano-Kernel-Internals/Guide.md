@@ -1,5 +1,15 @@
 # Orin Nano 8GB — Kernel Internals & Customization
 
+<div class="course-identity auto-course" style="--course-accent: #ea580c; --course-accent-rgb: 234, 88, 12;" markdown="1">
+<div class="course-identity__icon">ON8K</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
+<p class="course-identity__title">Specialized course identity for Orin Nano 8GB — Kernel Internals & Customization.</p>
+<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+</div>
+</div>
+
+
 > **Scope:** Production-level understanding of the Jetson Linux (L4T) kernel on Orin Nano 8GB — from source tree structure and build system through device tree architecture, driver model, kernel configuration, boot time optimization, custom module development, and production kernel hardening.
 >
 > **Prerequisites:** Familiarity with the [Orin Nano boot chain](../Guide.md#1-orin-nano-8gb--hardware--boot-chain-internals), [memory architecture](../Orin-Nano-Memory-Architecture/Guide.md), and basic Linux kernel concepts (processes, syscalls, modules).

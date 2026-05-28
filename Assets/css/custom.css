@@ -193,6 +193,107 @@
   margin-bottom: 0;
 }
 
+/* ── Course identity blocks ───────────────────── */
+.course-identity {
+  --course-accent: var(--md-primary-fg-color);
+  --course-accent-rgb: 63, 81, 181;
+  align-items: center;
+  background:
+    linear-gradient(135deg, rgba(var(--course-accent-rgb), 0.13), rgba(var(--course-accent-rgb), 0.035)),
+    var(--md-admonition-bg-color);
+  border: 1px solid rgba(var(--course-accent-rgb), 0.24);
+  border-left: 0.45rem solid var(--course-accent);
+  border-radius: 10px;
+  box-shadow: 0 5px 18px rgba(15, 23, 42, 0.08);
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: auto 1fr;
+  margin: 0.9rem 0 1.4rem;
+  padding: 0.85rem 1rem;
+}
+
+.course-identity__icon {
+  align-items: center;
+  background: rgba(var(--course-accent-rgb), 0.14);
+  border: 1px solid rgba(var(--course-accent-rgb), 0.24);
+  border-radius: 9px;
+  color: var(--course-accent);
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 900;
+  height: 2.5rem;
+  justify-content: center;
+  letter-spacing: 0.02em;
+  width: 2.5rem;
+}
+
+.course-identity__icon .twemoji,
+.course-identity__icon svg {
+  height: 1.35rem;
+  width: 1.35rem;
+}
+
+.course-identity__eyebrow {
+  color: var(--course-accent);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.18rem !important;
+  text-transform: uppercase;
+}
+
+.course-identity__title {
+  color: var(--md-default-fg-color);
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.35;
+  margin: 0 0 0.25rem !important;
+}
+
+.course-identity__meta {
+  color: var(--md-default-fg-color--light);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  margin: 0 !important;
+}
+
+.course-identity.digital-foundations { --course-accent: #4f46e5; --course-accent-rgb: 79, 70, 229; }
+.course-identity.digital-design { --course-accent: #7c3aed; --course-accent-rgb: 124, 58, 237; }
+.course-identity.computer-architecture { --course-accent: #2563eb; --course-accent-rgb: 37, 99, 235; }
+.course-identity.operating-systems { --course-accent: #0891b2; --course-accent-rgb: 8, 145, 178; }
+.course-identity.parallel-computing { --course-accent: #dc2626; --course-accent-rgb: 220, 38, 38; }
+.course-identity.embedded-systems { --course-accent: #059669; --course-accent-rgb: 5, 150, 105; }
+.course-identity.pcb-design { --course-accent: #ca8a04; --course-accent-rgb: 202, 138, 4; }
+.course-identity.embedded-software { --course-accent: #16a34a; --course-accent-rgb: 22, 163, 74; }
+.course-identity.embedded-linux { --course-accent: #0d9488; --course-accent-rgb: 13, 148, 136; }
+.course-identity.product-design { --course-accent: #ea580c; --course-accent-rgb: 234, 88, 12; }
+.course-identity.ai-workloads { --course-accent: #9333ea; --course-accent-rgb: 147, 51, 234; }
+.course-identity.neural-networks { --course-accent: #db2777; --course-accent-rgb: 219, 39, 119; }
+.course-identity.dl-frameworks { --course-accent: #f97316; --course-accent-rgb: 249, 115, 22; }
+.course-identity.fpga-track { --course-accent: #1d4ed8; --course-accent-rgb: 29, 78, 216; }
+.course-identity.zynq-mpsoc { --course-accent: #0369a1; --course-accent-rgb: 3, 105, 161; }
+.course-identity.advanced-fpga { --course-accent: #0f766e; --course-accent-rgb: 15, 118, 110; }
+.course-identity.hls { --course-accent: #b45309; --course-accent-rgb: 180, 83, 9; }
+.course-identity.fpga-runtime { --course-accent: #be123c; --course-accent-rgb: 190, 18, 60; }
+.course-identity.jetson-platform { --course-accent: #65a30d; --course-accent-rgb: 101, 163, 13; }
+.course-identity.carrier-board { --course-accent: #a16207; --course-accent-rgb: 161, 98, 7; }
+.course-identity.l4t { --course-accent: #0284c7; --course-accent-rgb: 2, 132, 199; }
+.course-identity.fsp { --course-accent: #4d7c0f; --course-accent-rgb: 77, 124, 15; }
+.course-identity.jetson-apps { --course-accent: #7e22ce; --course-accent-rgb: 126, 34, 206; }
+.course-identity.security-ota { --course-accent: #b91c1c; --course-accent-rgb: 185, 28, 28; }
+.course-identity.compliance { --course-accent: #475569; --course-accent-rgb: 71, 85, 105; }
+.course-identity.jetson-runtime { --course-accent: #c2410c; --course-accent-rgb: 194, 65, 12; }
+.course-identity.ml-compiler { --course-accent: #9333ea; --course-accent-rgb: 147, 51, 234; }
+.course-identity.dl-inference { --course-accent: #e11d48; --course-accent-rgb: 225, 29, 72; }
+.course-identity.specialization { --course-accent: #312e81; --course-accent-rgb: 49, 46, 129; }
+.course-identity.gpu-infra { --course-accent: #16a34a; --course-accent-rgb: 22, 163, 74; }
+.course-identity.hpc { --course-accent: #2563eb; --course-accent-rgb: 37, 99, 235; }
+.course-identity.edge-ai { --course-accent: #0891b2; --course-accent-rgb: 8, 145, 178; }
+.course-identity.robotics { --course-accent: #f59e0b; --course-accent-rgb: 245, 158, 11; }
+.course-identity.autonomous-vehicles { --course-accent: #dc2626; --course-accent-rgb: 220, 38, 38; }
+.course-identity.ai-chip-design { --course-accent: #7c2d12; --course-accent-rgb: 124, 45, 18; }
+.course-identity.mlsys { --course-accent: #0f766e; --course-accent-rgb: 15, 118, 110; }
+
 /* ── Admonitions ──────────────────────────────── */
 .md-typeset .admonition {
   border-radius: 8px;
@@ -698,6 +799,21 @@
 
   .md-typeset img[alt="AI Chip Stack Diagram"] {
     width: 100%;
+  }
+
+  .course-identity {
+    gap: 0.65rem;
+    grid-template-columns: 1fr;
+    padding: 0.78rem 0.85rem;
+  }
+
+  .course-identity__icon {
+    height: 2.2rem;
+    width: 2.2rem;
+  }
+
+  .course-identity__title {
+    font-size: 0.86rem;
   }
 
   .md-header__button.md-logo img,

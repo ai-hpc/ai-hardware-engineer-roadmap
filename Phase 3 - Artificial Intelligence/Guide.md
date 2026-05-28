@@ -1,5 +1,15 @@
 # Phase 3: Artificial Intelligence — The Workloads Your Hardware Must Run
 
+<div class="course-identity ai-workloads" markdown="1">
+<div class="course-identity__icon">AI</div>
+<div markdown="1">
+<p class="course-identity__eyebrow">Phase 3 · AI Workloads</p>
+<p class="course-identity__title">Learn the models, frameworks, and application patterns your hardware must actually run.</p>
+<p class="course-identity__meta">Artifact: workload profile · Measure: compute, memory, precision, latency</p>
+</div>
+</div>
+
+
 > *Before you design hardware, you must deeply understand the software it accelerates.*
 
 **Layer mapping:** **L1** (Application & Framework) — this entire phase teaches you what AI chips compute.
