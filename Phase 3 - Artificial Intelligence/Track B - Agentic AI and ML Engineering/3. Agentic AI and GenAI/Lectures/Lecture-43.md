@@ -1,6 +1,6 @@
 # Lecture 43 - MLSys 2026 Kernel Contest: AI-Assisted Blackwell LLM Kernel Optimization
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 42](Lecture-42.md) | **Next:** [Lab 01](Lab-01-Research-Agent.md)
+**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 42](Lecture-42.md) | **Next:** [Lecture 44](Lecture-44.md)
 
 ---
 
@@ -1399,4 +1399,4 @@ The goal is to build a disciplined kernel optimization loop.
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 44 - Efficient Local RAG Stack](Lecture-44.md)*
