@@ -4,7 +4,7 @@
 
 **One-line purpose:** Make MoE training fast at multi-node scale by understanding expert parallelism, all-to-all dispatch, capacity factor under real batch sizes, and where the communication cliff is.
 
-**Prerequisites:** Module 04 (you can write a top-k MoE forward). HPC Setup [NCCL Deep Dive](../NCCL-Deep-Dive).
+**Prerequisites:** Module 04 (you can write a top-k MoE forward). HPC Setup [NCCL Deep Dive](../NCCL-Deep-Dive/README.md).
 
 **Artifact:** An all-to-all dispatch micro-benchmark across NVLink and InfiniBand domains, plus a capacity-factor sweep at realistic batch size showing dropped-token rate and per-iter time.
 
@@ -189,6 +189,6 @@ Drop into `lcm-course/`:
 - [Module 04 — MoE fundamentals](04-MoE-Fundamentals.md)
 - [Module 08 — Combining long-context and MoE](08-Combining-LongContext-and-MoE.md)
 - [Module 09 — Distributed training infrastructure](09-Distributed-Training-Infrastructure.md)
-- [NCCL Deep Dive](../NCCL-Deep-Dive)
+- [NCCL Deep Dive](../NCCL-Deep-Dive/README.md)
 - Megatron-LM MoE: <https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/transformer/moe/README.md>
 - DeepSpeed-MoE: <https://www.deepspeed.ai/tutorials/mixture-of-experts/>

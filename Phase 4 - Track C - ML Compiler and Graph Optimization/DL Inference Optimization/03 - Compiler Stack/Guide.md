@@ -2,7 +2,7 @@
 
 **Order:** Third. After graph/ops (01) and kernel authoring (02), you see how compilers generate and schedule kernels.
 
-**Role target:** [DL Inference Optimization Engineer](../../../README.md#layer--job-title-quick-reference) · **MTS Kernels** (Member of Technical Staff, Kernels — roles focused on code generation, compiler–hardware mapping, and owning kernel/backend implementation at scale).
+**Role target:** DL Inference Optimization Engineer · **MTS Kernels** (Member of Technical Staff, Kernels — roles focused on code generation, compiler–hardware mapping, and owning kernel/backend implementation at scale).
 
 ---
 

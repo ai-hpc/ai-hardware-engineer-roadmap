@@ -1,179 +1,338 @@
-﻿**Phase 1 (Expanded): High-Level Synthesis (9-15 months)**
+# 4. High-Level Synthesis (HLS)
 
-**1. HLS Design Flow (Mastering the Fundamentals)**
+> Use C/C++ to generate FPGA hardware, then verify whether the generated RTL actually meets throughput, area, memory, and interface requirements.
 
-* **Understanding the HLS Process:**
-    * **C/C++ to RTL Transformation:**  Gain a deep understanding of how HLS tools take C/C++ code and transform it into register-transfer level (RTL) descriptions (Verilog or VHDL) that can be synthesized into hardware.
-    * **Design Constraints and Directives:**  Learn how to use constraints and directives (pragmas) in your C/C++ code to guide the HLS tool and achieve the desired hardware implementation in terms of performance, area, and power consumption.
-    * **HLS Tool Flow:**  Master the complete HLS design flow, including C/C++ code preparation, synthesis, co-simulation, and RTL verification.
+**Layer mapping:** L2, L5, and L6. HLS connects algorithm code, compiler scheduling, memory architecture, RTL generation, and FPGA implementation.
 
-* **Xilinx Vitis HLS:**
-    * **Vitis HLS Environment:**  Become familiar with the Vitis HLS environment, including its graphical user interface (GUI) and command-line interface (CLI).
-    * **Code Analysis and Profiling:**  Use Vitis HLS tools to analyze your C/C++ code for potential issues and identify areas for optimization.
-    * **Synthesis Options and Directives:**  Explore the various synthesis options and directives available in Vitis HLS to control the hardware generation process.
+**Role targets:** HLS Engineer · FPGA Acceleration Engineer · ML Compiler/Hardware Co-design Engineer · AI Accelerator Prototyping Engineer
 
-* **Intel HLS Compiler:**
-    * **Intel HLS Compiler Flow:**  Understand the Intel HLS Compiler flow and how it differs from Xilinx Vitis HLS.
-    * **Optimization Techniques for Intel HLS:**  Learn about optimization techniques specific to the Intel HLS Compiler.
+**Prerequisites:** [Xilinx FPGA Development](../1.%20Xilinx%20FPGA%20Development/Guide.md), [Advanced FPGA Design](../3.%20Advanced%20FPGA%20Design/Guide.md), C/C++, and basic performance profiling.
 
-**Resources:**
+**What comes after:** [Runtime and Driver Development](../5.%20Runtime%20and%20Driver%20Development/Guide.md), [ML Compiler and Graph Optimization](../../Phase%204%20-%20Track%20C%20-%20ML%20Compiler%20and%20Graph%20Optimization/Guide.md), and [AI Chip Design](../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/6.%20AI%20Chip%20Design/Guide.md).
 
-* **Xilinx Vitis HLS User Guide:**  The official documentation from Xilinx provides comprehensive information on using Vitis HLS.
-* **Intel HLS Compiler User Guide:**  Refer to the Intel documentation for details on using the Intel HLS Compiler.
-* **Online Courses and Tutorials:**  Explore online courses and tutorials on HLS from platforms like Coursera, edX, and Udemy.
+---
 
-**Projects:**
+## Why This Module Exists
 
-* **Implement a Simple Algorithm in HLS:**  Start with a simple algorithm (e.g., a vector addition, a sorting algorithm) and implement it in HLS using both Xilinx Vitis HLS and Intel HLS Compiler. Compare the results and analyze the generated hardware.
-* **Create a Custom IP Core with HLS:**  Design a custom IP core (e.g., a simple encryption engine, a data compression module) using HLS and integrate it into a larger FPGA design.
-* **Explore HLS Design Space Exploration:**  Experiment with different HLS optimization directives and constraints to explore the design space and find the optimal solution for your application.
+HLS is useful when it shortens the path from algorithm to hardware. It is dangerous when it hides the hardware cost of memory, loops, interfaces, and scheduling.
 
+The HLS question is always:
 
-**2. Optimization Techniques (Fine-tuning for Performance)**
+```text
+What hardware did this C/C++ imply, and is that hardware better than the CPU/GPU/RTL alternative?
+```
 
-* **Dataflow Optimization:**
-    * **Pipeline Optimization:**  Learn how to use HLS directives to pipeline loops and functions in your C/C++ code, enabling parallel execution and improving throughput.
-    * **Dataflow Analysis:**  Understand data dependencies in your code and use HLS directives to optimize dataflow, minimizing stalls and maximizing concurrency.
-    * **Task-Level Parallelism:**  Explore task-level parallelism in HLS, where you can specify independent tasks to be executed concurrently in hardware.
+This module teaches HLS as a compiler and hardware-design discipline, not as a shortcut around RTL understanding.
 
-* **Loop Optimizations:**
-    * **Loop Unrolling:**  Learn how to unroll loops in your C/C++ code to reduce loop overhead and improve performance. Understand the trade-offs between unrolling and resource utilization.
-    * **Loop Pipelining:**  Master loop pipelining techniques to overlap the execution of loop iterations, maximizing throughput and reducing latency.
-    * **Loop Fusion and Fission:**  Explore loop fusion (combining loops) and fission (splitting loops) to improve data locality and optimize memory access patterns.
+---
 
-* **Memory Architecture Optimizations:**
-    * **Array Partitioning:**  Learn how to partition arrays in your C/C++ code to optimize memory access and reduce memory bottlenecks.
-    * **Block RAM Utilization:**  Understand how to efficiently utilize block RAM resources in the FPGA to store data and improve performance.
-    * **Cache Optimization:**  Explore cache optimization techniques in HLS to minimize cache misses and improve data access latency.
+## Course Outcomes
 
-**Resources:**
+By the end, you should be able to:
 
-* **Xilinx HLS Optimization Guide:**  Refer to the Xilinx documentation for detailed information on HLS optimization techniques.
-* **Intel HLS Compiler Optimization Guide:**  Explore the Intel documentation for optimization strategies specific to the Intel HLS Compiler.
-* **Research Papers and Articles:**  Read research papers and articles on HLS optimization techniques and best practices.
+- write synthesizable C/C++ for HLS without accidental hardware explosions
+- read HLS scheduling, latency, initiation interval, and resource reports
+- use pipelining, unrolling, array partitioning, and dataflow directives intentionally
+- design AXI-Lite, AXI memory-mapped, and AXI-Stream interfaces
+- verify HLS blocks with C simulation, co-simulation, and RTL integration
+- compare HLS-generated hardware against CPU, GPU, and hand-written RTL baselines
+- document design-space tradeoffs with numbers
 
-**Projects:**
+---
 
-* **Optimize a Computationally Intensive Algorithm:**  Take a computationally intensive algorithm (e.g., image filtering, matrix multiplication) and apply HLS optimization techniques to improve its performance on an FPGA.
-* **Design a High-Performance Data Processing Pipeline:**  Create a data processing pipeline that uses HLS to accelerate various stages of the pipeline, such as data acquisition, filtering, and analysis.
-* **Explore Different Optimization Strategies:**  Experiment with different HLS optimization techniques (dataflow, loop optimizations, memory optimizations) and compare their impact on performance, area, and power consumption.
+## Unit Map
 
+| Unit | Focus | Artifact |
+|------|-------|----------|
+| 1 | HLS flow and reports | synthesized baseline kernel |
+| 2 | Loops and pipelining | initiation-interval experiment |
+| 3 | Memory architecture | array partitioning/banking report |
+| 4 | Dataflow design | streaming pipeline with backpressure |
+| 5 | Interfaces | AXI-connected HLS IP block |
+| 6 | Verification | C sim, co-sim, and RTL validation package |
+| 7 | Design-space exploration | Pareto table for latency/area/power |
 
-**3. Interface Synthesis (Connecting the Dots)**
+---
 
-* **AXI4 Interface:**
-    * **AXI4 Basics:**  Understand the AXI4 protocol, including its channels (read address, read data, write address, write data, write response) and signaling.
-    * **AXI4 Interface Synthesis:**  Learn how to use HLS directives to create AXI4 interfaces for your HLS modules, enabling them to communicate with other components in your system.
-    * **AXI4 Performance Optimization:**  Explore techniques for optimizing AXI4 performance, such as burst transfers and data width optimization.
+## Unit 1: HLS Flow And Reports
 
-* **Other Interfaces:**
-    * **AXI4-Lite and AXI4-Stream:**  Learn about other AXI4 variations, such as AXI4-Lite for simpler interfaces and AXI4-Stream for streaming data applications.
-    * **Memory-Mapped Interfaces:**  Understand how to create memory-mapped interfaces in HLS, allowing your modules to access memory directly.
-    * **Custom Interfaces:**  Explore techniques for creating custom interfaces in HLS to meet specific communication requirements.
+### Learn
 
-**Resources:**
+- C/C++ to RTL transformation
+- synthesis, C simulation, co-simulation, export
+- latency, initiation interval, tripcount, and resource estimates
+- why estimates can differ from implemented results
+- fixed-point versus floating-point implications
 
-* **Xilinx AXI Reference Guide:**  Refer to the Xilinx documentation for detailed information on the AXI4 protocol and its variations.
-* **ARM AMBA AXI and ACE Protocol Specification:**  Explore the official ARM AMBA documentation for a comprehensive understanding of the AXI protocol.
-* **HLS Interface Synthesis Examples:**  Study examples and tutorials on HLS interface synthesis from Xilinx and other sources.
+### Build It
 
-**Projects:**
+Implement three baseline kernels:
 
-* **Create an HLS Module with an AXI4 Interface:**  Design an HLS module that communicates with other components in your system using an AXI4 interface.
-* **Implement a Data Streaming Application with AXI4-Stream:**  Use AXI4-Stream to create a high-performance data streaming application, such as a video processing pipeline or a high-speed data acquisition system.
-* **Connect an HLS Module to a Zynq PS:**  Integrate an HLS module with an AXI4 interface into a Zynq UltraScale+ MPSoC design and communicate with it from the ARM processor.
+1. vector add
+2. FIR filter or convolution-like stencil
+3. matrix-vector multiply
 
+Synthesize each without aggressive directives first.
 
-**4. Verification and Debugging (Ensuring Correctness)**
+### Measure It
 
-* **C/C++ Testbenches:**
-    * **Testbench Development:**  Learn how to write C/C++ testbenches to verify the functionality of your HLS designs.
-    * **Testbench Automation:**  Explore techniques for automating your testbenches and generating test vectors.
-    * **Code Coverage Analysis:**  Use code coverage tools to assess the completeness of your testbenches and identify areas for improvement.
+- latency
+- initiation interval
+- LUT/FF/BRAM/DSP estimate
+- achieved clock target
+- difference between HLS estimate and implementation if exported
 
-* **Co-simulation with HDL Simulators:**
-    * **Co-simulation Setup:**  Learn how to set up co-simulation between HLS tools and HDL simulators (e.g., Xilinx Vivado Simulator, Mentor Graphics ModelSim) to verify the interaction between your HLS modules and other HDL components.
-    * **Debugging with Co-simulation:**  Use co-simulation to debug your HLS designs in the context of a larger system.
+### Ship It
 
-* **HLS Debugging Tools:**
-    * **Vitis HLS Debugger:**  Explore the debugging features in Vitis HLS, such as breakpoints, waveform viewing, and data inspection.
-    * **Intel HLS Compiler Debugger:**  Learn about the debugging capabilities of the Intel HLS Compiler.
+A baseline HLS report explaining what hardware the code implied.
 
-**Resources:**
+---
 
-* **Xilinx HLS Verification Guide:**  Refer to the Xilinx documentation for guidance on verifying HLS designs.
-* **Intel HLS Compiler Verification Guide:**  Explore the Intel documentation for verification techniques specific to the Intel HLS Compiler.
-* **Online Tutorials and Examples:**  Study tutorials and examples on HLS verification and debugging.
+## Unit 2: Loops And Pipelining
 
-**Projects:**
+### Learn
 
-* **Create a Comprehensive C/C++ Testbench:**  Develop a comprehensive testbench for an HLS design, including test vector generation, output verification, and code coverage analysis.
-* **Co-simulate an HLS Module with an HDL Testbench:**  Set up co-simulation between an HLS module and an HDL testbench to verify their interaction.
-* **Debug an HLS Design Using the Vitis HLS Debugger:**  Use the Vitis HLS debugger to step through your C/C++ code, analyze waveforms, and identify any functional errors.
+- loop pipelining
+- loop unrolling
+- loop-carried dependencies
+- initiation interval limits
+- resource sharing
+- latency versus throughput
 
-**Phase 2: High-Level Synthesis (18-36 months)**
+### Build It
 
-**1. HLS Design Flow (Beyond the Basics)**
+Take the matrix-vector or FIR kernel and run variants:
 
-* **Advanced C/C++ for HLS:**
-    * **Data Structures and Algorithms:**  Master advanced C/C++ data structures (e.g., linked lists, trees, hash tables) and algorithms (e.g., sorting, searching, dynamic programming) and understand how they translate into hardware implementations using HLS.
-    * **Object-Oriented Programming (OOP) in HLS:**  Explore the use of OOP concepts (classes, inheritance, polymorphism) in HLS and learn how to effectively map them to hardware.
-    * **Templates and Metaprogramming:**  Leverage C++ templates and metaprogramming techniques to create reusable and parameterized HLS designs.
-    * **Fixed-Point Arithmetic:**  Understand the limitations of floating-point arithmetic in hardware and learn how to use fixed-point arithmetic in your C/C++ code for efficient HLS implementation.
+- no pipeline
+- pipelined loop
+- unrolled loop
+- pipelined + unrolled
 
-* **Design Space Exploration (DSE):**
-    * **Automated DSE:**  Explore automated design space exploration techniques in HLS tools to find the optimal design parameters (e.g., loop unrolling factors, array partitioning schemes) that meet your performance, area, and power constraints.
-    * **Machine Learning for HLS:**  Investigate the use of machine learning techniques to guide and optimize the HLS design process.
+### Measure It
 
-* **HLS for Different Applications:**
-    * **Image and Video Processing:**  Learn how to use HLS to accelerate image and video processing algorithms, such as filtering, edge detection, object recognition, and video encoding/decoding.
-    * **Digital Signal Processing (DSP):**  Explore HLS for implementing complex DSP algorithms, such as filters, transforms (FFT, DFT), and modulation/demodulation schemes.
-    * **Machine Learning Acceleration:**  Understand how to use HLS to accelerate machine learning inference on FPGAs, including implementing custom operators and optimizing neural network architectures.
+- initiation interval
+- latency
+- throughput
+- DSP usage
+- BRAM pressure
+- timing after implementation
 
+### Ship It
 
-**2. Optimization Techniques (Pushing the Limits)**
+A table showing which directive improved throughput and what it cost.
 
-* **Advanced Pipelining and Dataflow:**
-    * **Pipeline Stalls and Hazards:**  Identify and resolve pipeline stalls and hazards that can hinder performance in pipelined designs.
-    * **Dataflow Optimization with Advanced Directives:**  Explore advanced HLS directives for fine-grained control over dataflow, including data dependencies, resource allocation, and scheduling.
-    * **Custom Dataflow Architectures:**  Learn how to create custom dataflow architectures in HLS to optimize for specific application requirements.
+---
 
-* **Loop Optimizations (Advanced):**
-    * **Loop Tiling and Blocking:**  Master loop tiling and blocking techniques to improve data locality and cache utilization, especially for algorithms with nested loops and large data sets.
-    * **Software Pipelining:**  Explore software pipelining, a technique that overlaps the execution of multiple loop iterations to maximize throughput.
-    * **Loop Carry Chains:**  Understand how loop carry chains can impact performance and learn techniques to break them or optimize their implementation.
+## Unit 3: Memory Architecture
 
-* **Memory Architecture Optimizations (Advanced):**
-    * **Memory Banking and Interleaving:**  Explore memory banking and interleaving techniques to increase memory bandwidth and reduce memory access conflicts.
-    * **Custom Memory Controllers:**  Learn how to design custom memory controllers in HLS to optimize memory access patterns for specific applications.
-    * **Memory Hierarchy Optimization:**  Understand the memory hierarchy in FPGAs (on-chip memory, external memory) and optimize your HLS designs to efficiently utilize different memory levels.
+### Learn
 
+- array partitioning
+- array reshaping
+- memory banking
+- BRAM versus URAM versus registers
+- burst access
+- data reuse
+- memory bandwidth as the common HLS bottleneck
 
-**3. Interface Synthesis (Beyond AXI)**
+### Build It
 
-* **Advanced AXI4 Techniques:**
-    * **AXI4 Burst Transfers:**  Master the use of burst transfers in AXI4 to efficiently transfer large amounts of data.
-    * **AXI4 Interconnect Topologies:**  Explore different AXI4 interconnect topologies (e.g., daisy chain, star topology) and their impact on performance and scalability.
-    * **AXI4 Error Handling:**  Understand how to handle errors and exceptions in AXI4 communication.
+Optimize a memory-bound kernel:
 
-* **High-Speed Interfaces:**
-    * **PCIe Interface Synthesis:**  Learn how to create PCIe interfaces in HLS to connect your FPGA designs to host systems.
-    * **Ethernet Interface Synthesis:**  Explore techniques for synthesizing Ethernet interfaces in HLS for high-speed network communication.
-    * **High-Speed Serial Transceivers:**  Understand how to utilize high-speed serial transceivers (e.g., SerDes) in HLS designs for high-bandwidth data transfer.
+- matrix-vector multiply
+- small convolution
+- histogram
+- feature extractor
 
-* **Custom Interface Design:**
-    * **Interface Design with SystemC:**  Explore using SystemC to model and verify custom interfaces in HLS designs.
-    * **Formal Verification of Interfaces:**  Learn how to use formal verification techniques to prove the correctness of your custom interfaces.
+Use partitioning or banking to feed parallel compute.
 
+### Measure It
 
-**4. Verification and Debugging (Ensuring Robustness)**
+- read/write ports required
+- BRAM/URAM usage
+- achieved II
+- burst efficiency
+- throughput before/after memory changes
 
-* **Advanced Verification Techniques:**
-    * **Formal Property Verification (FPV) for HLS:**  Apply formal verification techniques to your HLS designs to prove their correctness against specific properties.
-    * **Constrained Random Verification (CRV):**  Explore CRV techniques to generate random test cases that cover a wider range of scenarios and improve the quality of your verification.
-    * **Assertion-Based Verification (ABV) in HLS:**  Use assertions in your C/C++ code to monitor design behavior and detect errors during simulation.
+### Ship It
 
-* **Advanced Debugging with HLS Tools:**
-    * **Waveform Analysis and Debugging:**  Master the use of waveform viewers in HLS tools to analyze signal behavior and identify timing-related issues.
-    * **Data Visualization and Analysis:**  Explore tools and techniques for visualizing and analyzing data structures and memory access patterns in your HLS designs.
-    * **Remote Debugging:**  Learn how to debug your HLS designs running on remote hardware targets.
+A memory architecture report with diagrams for data movement and storage.
+
+---
+
+## Unit 4: Dataflow Design
+
+### Learn
+
+- task-level parallelism
+- `dataflow` regions
+- FIFOs and streams
+- producer/consumer balance
+- backpressure
+- deadlock risks
+- pipeline fill and drain behavior
+
+### Build It
+
+Create a three-stage streaming pipeline:
+
+```text
+load -> transform -> store
+```
+
+Then split transform into two stages and add FIFO sizing experiments.
+
+### Measure It
+
+- stage latency
+- end-to-end throughput
+- FIFO depth sensitivity
+- stall behavior
+- resource cost
+
+### Ship It
+
+A streaming pipeline benchmark with a backpressure or deadlock debugging note.
+
+---
+
+## Unit 5: Interfaces
+
+### Learn
+
+- AXI4-Lite control interfaces
+- AXI memory-mapped master interfaces
+- AXI4-Stream interfaces
+- register maps
+- DMA integration
+- host software control path
+- interface timing and protocol constraints
+
+### Build It
+
+Package one HLS kernel as IP with:
+
+- AXI-Lite control
+- AXI memory or stream data path
+- test application or driver
+- block design integration
+
+### Measure It
+
+- host-to-kernel setup latency
+- transfer throughput
+- kernel throughput
+- end-to-end acceleration including data movement
+
+### Ship It
+
+AXI-connected HLS IP with register map, integration diagram, and benchmark.
+
+---
+
+## Unit 6: Verification
+
+### Learn
+
+- golden reference model
+- C simulation
+- C/RTL co-simulation
+- test vector generation
+- numerical tolerance for fixed point
+- waveform inspection
+- integration testing with RTL or software
+
+### Build It
+
+Build a verification package for one HLS kernel:
+
+- C reference
+- randomized tests
+- edge-case tests
+- fixed-point comparison if relevant
+- co-simulation run
+- exported RTL integration smoke test
+
+### Measure It
+
+- test count
+- coverage of edge cases
+- numerical error
+- co-simulation pass/fail logs
+
+### Ship It
+
+A verification report that would let another engineer trust the generated hardware.
+
+---
+
+## Unit 7: Design-Space Exploration
+
+### Learn
+
+- directive sweeps
+- Pareto analysis
+- latency/area/power tradeoffs
+- automated report extraction
+- when HLS is the wrong tool
+
+### Build It
+
+Run a parameter sweep across:
+
+- unroll factors
+- pipeline targets
+- data widths
+- array partitioning factors
+- FIFO depths
+
+### Measure It
+
+- latency
+- throughput
+- LUT/FF/BRAM/DSP usage
+- timing closure
+- estimated power
+
+### Ship It
+
+A Pareto table and recommendation: which design point you would ship and why.
+
+---
+
+## Capstone
+
+Build an HLS accelerator for a realistic kernel:
+
+- image filter
+- audio DSP block
+- matrix-vector multiply
+- quantized neural-network primitive
+- packet-processing stage
+
+Required evidence:
+
+- CPU baseline
+- HLS baseline
+- optimized HLS version
+- C sim and co-sim results
+- implementation reports
+- AXI integration
+- end-to-end benchmark
+- design-space table
+
+The capstone is complete when the report proves whether HLS was a good implementation choice for the workload.
+
+---
+
+## Exit Criteria
+
+You are ready to move on when you can:
+
+- read HLS reports and predict implementation risk
+- optimize loops and memory intentionally
+- build streaming pipelines without deadlock
+- integrate HLS IP into an AXI system
+- verify generated RTL against a reference model
+- compare speedup after including data movement and control overhead
+- explain when hand-written RTL or a GPU kernel would be better

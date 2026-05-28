@@ -2,7 +2,7 @@
 
 **Order:** Fifth. After graph, kernels, compiler, and quantization (01–04), you deploy and measure in production-like settings.
 
-**Role target:** [DL Inference Optimization Engineer](../../../README.md#layer--job-title-quick-reference) · **MTS Kernels** (deployment, production reliability, measurable outcomes).
+**Role target:** DL Inference Optimization Engineer · **MTS Kernels** (deployment, production reliability, measurable outcomes).
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Order:** Fourth. After you have kernels and compiler context (01–03), you add low-precision kernels and deployment.
 
-**Role target:** [DL Inference Optimization Engineer](../../../README.md#layer--job-title-quick-reference) · **MTS Kernels** (INT8/INT4 kernels, quantization-aware implementations).
+**Role target:** DL Inference Optimization Engineer · **MTS Kernels** (INT8/INT4 kernels, quantization-aware implementations).
 
 ---
 

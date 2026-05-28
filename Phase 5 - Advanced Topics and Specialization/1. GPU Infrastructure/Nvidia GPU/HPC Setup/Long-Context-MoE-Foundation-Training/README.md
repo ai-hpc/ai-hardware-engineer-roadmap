@@ -26,7 +26,7 @@
 - Phase 4 Track B (Jetson, CUDA basics, TensorRT).
 - Phase 4 Track C Units 01–02 (graph optimization, kernel engineering).
 - [FlashAttention systems / kernel course](../../../../../Phase%204%20-%20Track%20C%20-%20ML%20Compiler%20and%20Graph%20Optimization/DL%20Inference%20Optimization/02%20-%20Kernel%20Engineering/FlashAttention%20Course/Guide.md) (this course depends on the IO/roofline + online-softmax mental model).
-- HPC Setup [NCCL Deep Dive](../NCCL-Deep-Dive) and [8× H200 Training/Inference](../8x-H200-Training-Inference) modules.
+- HPC Setup [NCCL Deep Dive](../NCCL-Deep-Dive/README.md) and [8× H200 Training/Inference](../8x-H200-Training-Inference/README.md) modules.
 - Working access to at least one 8× H100/H200 node. Real labs assume multi-node access; the smaller labs run on a single 8-GPU node.
 
 ---

@@ -135,7 +135,7 @@ Five phases. The first four are foundation; the fifth is where the three pillars
 
 **Track A — Hardware & Edge AI:** Computer vision, sensor fusion, Voice AI, Edge AI & optimization. Feeds Phase 4B and Phase 5C.
 
-**Track B — Agentic AI & ML Engineering:** [42 lectures](Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Lectures/) on agent harnesses, LangGraph, multi-agent systems, RAG, evaluation, production runtime discipline, OpenClaw, OpenAI Agents SDK, security, plus a [Qwen3.5-4B-Base Unsloth fine-tuning course](Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/5.%20LLM%20Application%20Development/Qwen3.5-4B%20Unsloth%20Fine-Tuning/Guide.md). This is the **agent harness pillar in its primary form** — read in order if your destination is the chip + runtime + harness story.
+**Track B — Agentic AI & ML Engineering:** [42 lectures](Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Lectures/README.md) on agent harnesses, LangGraph, multi-agent systems, RAG, evaluation, production runtime discipline, OpenClaw, OpenAI Agents SDK, security, plus a [Qwen3.5-4B-Base Unsloth fine-tuning course](Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/5.%20LLM%20Application%20Development/Qwen3.5-4B%20Unsloth%20Fine-Tuning/Guide.md). This is the **agent harness pillar in its primary form** — read in order if your destination is the chip + runtime + harness story.
 
 ### Phase 4 — Deployment & Compilation *(All three pillars co-exist here)*
 *Take AI to real silicon. Three specialized tracks.*
@@ -204,6 +204,37 @@ Before you start, decide three things:
 1. **Where you're entering the stack.** (See "Who This Is For" above.)
 2. **What hardware you can actually use.** Jetson Orin Nano is the cheapest end-to-end inference target; an RTX or rented L40S/H100 covers most of the datacenter path; a Xilinx Zynq dev board covers FPGA; an ESP32 + sensor breakout covers embedded.
 3. **How you'll track outputs.** A notebook, a benchmarks repo, a project log — any system you actually use.
+
+---
+
+## Course Quality Bar
+
+Every serious module in this roadmap should end with evidence, not vibes.
+
+Use this standard for each course block:
+
+| Step | What to do | Evidence |
+|------|------------|----------|
+| Understand | Learn the concept and why it matters in the stack | short design note or diagram |
+| Build | Implement the subsystem, kernel, model path, driver, board flow, or runtime feature | code, RTL, config, schematic, or build script |
+| Measure | Collect real numbers | latency, throughput, memory, power, timing, utilization, accuracy, area, or boot time |
+| Debug | Explain at least one failure mode | log, waveform, profiler trace, ILA capture, or root-cause note |
+| Ship | Package the work for review | README, commands, raw results, and final report |
+
+Weak completion:
+
+```text
+I read about CUDA, TensorRT, and FPGAs.
+```
+
+Strong completion:
+
+```text
+I built a TensorRT INT8 benchmark on Orin Nano, captured latency/RAM/power,
+compared it to FP16, and explained why one layer stayed memory-bound.
+```
+
+The roadmap is intentionally broad, but the completion standard is narrow: build something real, measure it, and explain the tradeoff.
 
 ---
 

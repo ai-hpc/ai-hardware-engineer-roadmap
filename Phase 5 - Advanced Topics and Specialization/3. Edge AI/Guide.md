@@ -1,222 +1,426 @@
-**3. Edge AI (12–18 months)**
+# 3. Edge AI
 
-**Prerequisite:** Phases 1–2 (digital design, embedded software/Linux) and Phase 4 Track B (Jetson, TensorRT, sensor fusion). This track deepens your ability to design, optimize, and deploy ML models on resource-constrained edge hardware — from microcontrollers to mobile SoCs to custom accelerators — with emphasis on low-latency, real-time streaming pipelines.
+> Design, optimize, deploy, and operate AI systems on constrained hardware where latency, memory, power, thermals, sensors, and reliability matter.
 
----
+**Layer mapping:** L1-L5. This track connects edge workloads, model optimization, inference runtimes, embedded Linux, sensor pipelines, accelerators, and product deployment.
 
-**1. ML Model Design for Edge Constraints**
+**Role targets:** Edge AI Engineer · Embedded AI Engineer · Jetson Engineer · TinyML Engineer · Robotics Perception Engineer · Edge Inference Optimization Engineer
 
-* **Efficient Architectures:**
-    * **MobileNets (V1–V4):** Depthwise separable convolutions, width/resolution multipliers, inverted residuals (MBConv), and universal inverted bottleneck (UIB).
-    * **EfficientNet / EfficientDet:** Compound scaling (depth, width, resolution), BiFPN for detection, and EfficientViT for vision transformers at the edge.
-    * **YOLO Family (v5–v11, YOLO-NAS):** Real-time detection trade-offs, anchor-free heads, NAS-optimized backbones, deployment on Jetson/mobile.
-    * **Lightweight Transformers:** TinyViT, MobileViT, FastViT — attention on edge, hybrid CNN-Transformer designs.
+**Prerequisites:** [Phase 2 — Embedded Systems](../../Phase%202%20-%20Embedded%20Systems/Guide.md), [Phase 3 — AI Workloads](../../Phase%203%20-%20Artificial%20Intelligence/Guide.md), and preferably [Phase 4 Track B — NVIDIA Jetson](../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md).
 
-* **Neural Architecture Search (NAS) for Edge:**
-    * Hardware-aware NAS: latency/FLOPs-constrained search (MnasNet, Once-for-All, ProxylessNAS).
-    * Supernet training and subnet extraction for target hardware profiles.
-    * Multi-objective optimization: accuracy vs latency vs power vs memory.
-
-* **Task-Specific Edge Models:**
-    * Pose estimation (MoveNet, PoseNet), segmentation (FastSCNN, TopFormer), speech/keyword spotting (DS-CNN), anomaly detection.
-    * On-device generative AI: distilled LLMs, speculative decoding, LoRA adapters on edge.
-
-**Resources:**
-
-* **"Efficient Deep Learning" by Menghani (MIT Press):** Comprehensive coverage of efficient model design, compression, and deployment.
-* **[MIT HAN Lab — TinyML and Efficient AI](https://hanlab.mit.edu/courses):** Lecture series on efficient inference and NAS.
-* **[MLPerf Tiny Benchmark](https://mlcommons.org/en/inference-tiny/):** Industry-standard edge inference benchmarks.
-
-**Projects:**
-
-* Compare MobileNetV3 vs EfficientNet-Lite vs FastViT on Jetson Orin Nano: accuracy, latency, power.
-* Run a hardware-aware NAS search targeting a Cortex-M7 using MCUNetV2 or Once-for-All.
-* Deploy a keyword spotting model (DS-CNN) on an STM32 with latency < 20 ms.
+**What comes after:** [ML Systems Engineering](../7.%20ML%20Systems%20Engineering/Guide.md), [Robotics](../4.%20Robotics/Guide.md), [Autonomous Vehicles](../5.%20Autonomous%20Vehicles/Guide.md), or [AI Chip Design](../6.%20AI%20Chip%20Design/Guide.md).
 
 ---
 
-**2. Model Compression & Optimization**
+## Why This Track Exists
 
-* **Quantization:**
-    * **Post-Training Quantization (PTQ):** INT8, INT4, FP16, mixed-precision calibration, per-channel vs per-tensor.
-    * **Quantization-Aware Training (QAT):** Fake quantization nodes, straight-through estimator, fine-tuning for accuracy recovery.
-    * **Advanced Techniques:** GPTQ, AWQ, SmoothQuant for LLMs; binary/ternary networks for extreme compression.
-    * **Tooling:** TensorRT, ONNX Runtime quantization, AI Edge Torch, tinygrad quantization passes.
+Edge AI is not "cloud inference on a smaller box." The system has different constraints:
 
-* **Pruning:**
-    * **Structured Pruning:** Filter/channel pruning for hardware-friendly speedup; magnitude-based, Taylor, FPGM criteria.
-    * **Unstructured Pruning:** Weight-level sparsity, lottery ticket hypothesis, sparse tensor acceleration.
-    * **Pruning + Quantization Pipelines:** Combined compression with joint fine-tuning.
+- limited memory
+- limited power
+- thermal throttling
+- sensor timing
+- camera/audio preprocessing
+- local reliability requirements
+- intermittent network access
+- update and rollback risk
+- hardware-specific runtimes and accelerators
 
-* **Knowledge Distillation:**
-    * Teacher-student frameworks, feature-level vs logit-level distillation.
-    * Self-distillation and online distillation for edge scenarios.
-    * Distilling large models (LLMs, large vision models) into edge-deployable students.
+The core engineering question is:
 
-* **Operator & Graph Optimization:**
-    * Layer fusion (Conv-BN-ReLU), constant folding, dead code elimination.
-    * Custom operator implementation for target hardware.
-    * ONNX graph optimization and custom passes.
+```text
+Can this model meet the product requirement on this device under real power,
+thermal, memory, sensor, and latency constraints?
+```
 
-**Resources:**
-
-* **[TensorRT Documentation & Best Practices](https://docs.nvidia.com/deeplearning/tensorrt/):** NVIDIA's inference optimization guide.
-* **"Neural Network Distillation" survey papers:** Comprehensive overview of distillation methods.
-* **[ONNX Runtime Optimization](https://onnxruntime.ai/):** Cross-platform inference optimization.
-
-**Projects:**
-
-* Quantize a ResNet-50 to INT8 using TensorRT PTQ; measure accuracy drop and speedup on Jetson.
-* Apply QAT to a detection model; compare accuracy vs PTQ on the same target.
-* Build a pruning + distillation pipeline: prune a BERT model, distill into TinyBERT, deploy on edge.
+This track teaches you to answer that with measurements.
 
 ---
 
-**3. Edge Inference Runtimes & Deployment**
+## Course Outcomes
 
-* **NVIDIA TensorRT:**
-    * Engine building, layer fusion, dynamic shapes, plugin API.
-    * INT8 calibration workflows, DLA (Deep Learning Accelerator) offloading on Jetson.
-    * Profiling with Nsight Systems and `trtexec`.
+By the end, you should be able to:
 
-* **TensorFlow Lite / LiteRT:**
-    * Converter workflow, delegate system (GPU, NNAPI, EdgeTPU, Hexagon DSP).
-    * Custom operators, model metadata, on-device training.
-    * Coral EdgeTPU: compiler, co-compilation, pipelining across multiple TPUs.
-
-* **ONNX Runtime & Other Runtimes:**
-    * Execution providers (CUDA, TensorRT, CoreML, QNN, XNNPACK).
-    * Mobile/embedded deployment patterns.
-    * Apache TVM: auto-tuning, Relay IR, microTVM for bare-metal targets.
-    * tinygrad: understand the stack from tensor ops → linearized IR → optimized kernels → backend codegen.
-
-* **Bare-Metal & RTOS Inference:**
-    * TensorFlow Lite Micro (TFLM): interpreter on Cortex-M, arena allocation, custom kernels.
-    * CMSIS-NN / CMSIS-DSP: ARM's optimized neural network and DSP kernels for Cortex-M.
-    * NNoM, TinyMaix, microTVM for alternative MCU inference paths.
-
-**Resources:**
-
-* **[TensorFlow Lite for Microcontrollers](https://www.tensorflow.org/lite/microcontrollers):** Official guide for MCU deployment.
-* **[Apache TVM Documentation](https://tvm.apache.org/docs/):** Compiler framework for deep learning.
-* **[tinygrad Documentation](https://github.com/tinygrad/tinygrad):** Minimalist ML framework with hardware backend focus.
-
-**Projects:**
-
-* Deploy a YOLOv8 model on Jetson Orin Nano via TensorRT with DLA offloading; profile with Nsight.
-* Run a person detection model on STM32 using TFLM + CMSIS-NN; optimize arena size.
-* Port a tinygrad model to a custom backend; compare generated kernels across CUDA/OpenCL/Metal.
+- choose an edge model architecture for a target device
+- compress and quantize models without guessing
+- deploy through TensorRT, ONNX Runtime, LiteRT/TFLite, TFLM, or a vendor runtime
+- profile latency, memory, throughput, power, and thermals
+- build camera, audio, and sensor-to-model pipelines
+- reason about CPU/GPU/DLA/NPU/DSP partitioning
+- design OTA, rollback, telemetry, and fleet update flows
+- explain when edge inference should stay local and when it should offload
 
 ---
 
-**4. TinyML & Microcontroller AI**
+## Course Map
 
-* **TinyML Foundations:**
-    * Hardware landscape: Cortex-M0/M4/M7/M55, RISC-V with vector extensions, specialized ML accelerators (Ethos-U55/U65, MAX78000).
-    * Memory constraints: SRAM/Flash budgets, model-data co-optimization, double buffering.
-    * Power profiling: active/sleep power, duty cycling, energy harvesting for always-on ML.
-
-* **On-Device Training & Adaptation:**
-    * Transfer learning on MCU: frozen backbone + trainable head.
-    * Federated learning at the edge: communication-efficient updates.
-    * Continual/incremental learning for drift adaptation.
-
-* **Sensor-ML Pipelines:**
-    * Audio: feature extraction (MFCC, mel spectrogram) → keyword spotting / sound classification.
-    * IMU: accelerometer/gyroscope → activity recognition, vibration anomaly detection.
-    * Vision: low-resolution cameras → person detection, gesture recognition.
-    * Time-series: predictive maintenance, environmental monitoring.
-
-* **MLOps for Edge:**
-    * Model versioning and A/B testing on device fleets.
-    * OTA model updates with rollback.
-    * On-device telemetry, drift detection, and feedback loops.
-    * Edge-cloud hybrid inference: when to offload vs compute locally.
-
-**Resources:**
-
-* **"TinyML" by Pete Warden & Daniel Situnayake (O'Reilly):** Foundational book for ML on microcontrollers.
-* **[Edge Impulse](https://www.edgeimpulse.com/):** End-to-end TinyML platform with data collection, training, and deployment.
-* **[Harvard CS249r: Tiny Machine Learning](https://sites.google.com/g.harvard.edu/tinyml):** Academic course on TinyML systems.
-* **[Arm Ethos-U Documentation](https://developer.arm.com/ip-products/processors/machine-learning/arm-ethos-u):** NPU for Cortex-M.
-
-**Projects:**
-
-* Build an always-on keyword spotter on Arduino Nano 33 BLE Sense with Edge Impulse; measure power.
-* Implement vibration-based anomaly detection on STM32 + IMU; deploy with TFLM.
-* Design an OTA model update pipeline for an ESP32 fleet with rollback capability.
-* Run a person detection model on MAX78000 or Ethos-U55 evaluation kit; compare vs Cortex-M inference.
+| Unit | Focus | Artifact |
+|------|-------|----------|
+| 1 | Edge constraints and platform selection | target-device decision memo |
+| 2 | Efficient model architectures | model comparison benchmark |
+| 3 | Compression and quantization | PTQ/QAT/precision tradeoff report |
+| 4 | Runtime deployment | reproducible runtime deployment |
+| 5 | TinyML and MCU inference | constrained-memory inference demo |
+| 6 | Sensor pipelines | camera/audio/sensor pipeline benchmark |
+| 7 | Power, thermal, and reliability | long-run stability report |
+| 8 | Fleet and product operation | OTA/telemetry/rollback design |
 
 ---
 
-**5. Edge AI System Design & Integration**
+## Unit 1: Edge Constraints And Platform Selection
 
-* **Hardware Selection & Benchmarking:**
-    * Comparing platforms: MCU (STM32, nRF), MPU (Jetson, Raspberry Pi), accelerators (Coral, Hailo, Qualcomm QCS).
-    * Metrics: TOPS, TOPS/W, latency, cost, thermal envelope.
-    * MLPerf benchmarking methodology and result interpretation.
+### Learn
 
-* **Camera & Vision Pipelines:**
-    * ISP (Image Signal Processor) pipelines: RAW → debayer → denoise → tone-map → AI input.
-    * Camera interfaces: MIPI CSI-2, USB, GigE Vision.
-    * Video analytics: multi-stream inference, tracker integration (DeepSORT, ByteTrack).
-    * GStreamer / DeepStream for building accelerated video pipelines.
+- MCU versus MPU versus edge GPU versus dedicated accelerator
+- latency, throughput, memory, power, thermals, cost, and enclosure constraints
+- TOPS versus useful throughput
+- model size versus activation/KV-cache/runtime memory
+- sensor bandwidth and preprocessing cost
+- local-only versus edge/cloud hybrid deployment
 
-* **Multi-Model & Multi-Accelerator Systems:**
-    * Pipeline parallelism: camera → detection → classification → tracking across CPU/GPU/DLA/NPU.
-    * Model orchestration: scheduling, priority, preemption on shared accelerators.
-    * Heterogeneous computing: CPU + GPU + DSP + NPU co-execution.
+### Build It
 
-* **Power, Thermal & Reliability:**
-    * Thermal management: heatsinks, throttling policies, dynamic frequency scaling.
-    * Battery-powered AI: duty cycling, wake-on-event, adaptive inference (early exit networks).
-    * Safety and certification: functional safety (IEC 61508), automotive (ISO 26262), medical (IEC 62304).
+Pick one target product:
 
-**Resources:**
+- wake-word speaker
+- smart camera
+- robot perception module
+- industrial anomaly detector
+- local LLM appliance
+- battery-powered wildlife camera
 
-* **[NVIDIA DeepStream SDK](https://developer.nvidia.com/deepstream-sdk):** Video analytics framework for edge AI.
-* **[Hailo Developer Zone](https://hailo.ai/developer-zone/):** Edge AI processor documentation and tools.
-* **[Qualcomm AI Hub](https://aihub.qualcomm.com/):** Model optimization and deployment for Snapdragon.
+Create a target-device decision memo comparing at least three platforms:
 
-**Projects:**
+- Jetson Orin Nano/NX/AGX
+- Raspberry Pi + accelerator
+- Coral Edge TPU
+- Hailo
+- Qualcomm/Android device
+- STM32/nRF/ESP32-class MCU
 
-* Build a multi-camera video analytics system on Jetson with DeepStream: detection + tracking + counting.
-* Design a battery-powered wildlife monitoring camera with duty-cycled inference; target 30-day battery life.
-* Benchmark the same model across Jetson Orin Nano, Coral Edge TPU, Hailo-8, and Raspberry Pi 5 + AI HAT; compare latency, power, cost.
-* Build a heterogeneous pipeline: preprocessing on CPU, detection on GPU, classification on DLA, post-processing on CPU.
+### Measure It
+
+- memory budget
+- latency target
+- power budget
+- sensor bandwidth
+- model size
+- expected update cadence
+
+### Ship It
+
+A platform-selection memo that explains why one device fits the workload better than the alternatives.
 
 ---
 
-**6. NVIDIA Jetson Holoscan for Real-Time Streaming**
+## Unit 2: Efficient Model Architectures
 
-* **Holoscan SDK Overview:**
-    * Domain-agnostic, multimodal AI sensor processing platform for **real-time streaming** at the edge or in the cloud.
-    * Combines low-latency sensor/network connectivity, optimized data-processing and AI libraries, and microservices for streaming and imaging applications on embedded, edge, and cloud.
+### Learn
 
-* **Core Architecture:**
-    * **Applications:** Top-level container for the pipeline.
-    * **Fragments:** Logical groupings that run independently (e.g., capture, inference, visualization).
-    * **Operators:** Individual units of work (IO, inference, visualization) that process streaming data.
-    * Enables building sensor → preprocessing → AI inference → output pipelines with predictable latency.
+- MobileNet, EfficientNet, EfficientDet, EfficientViT, MobileViT, FastViT
+- YOLO family and real-time detection tradeoffs
+- lightweight transformers
+- keyword spotting models
+- tiny segmentation and pose models
+- distilled LLMs and adapter-based local models
+- hardware-aware neural architecture search
 
-* **Hardware & Stack:**
-    * Supported on Jetson AGX Orin (32GB/64GB), Orin NX (16GB), Orin Nano (8GB); requires JetPack 6 (L4T r36.x).
-    * **Holoscan Sensor Bridge:** High-bandwidth sensor data over Ethernet with FPGA interface support.
-    * Built-in operators: HoloInfer (TensorRT integration), HoloViz (visualization), and IO operators for streaming.
+### Build It
 
-* **Use Cases:**
-    * Medical imaging and surgical video workflows, endoscopy tool tracking.
-    * Industrial inspection, robotics, and any application requiring low-latency, multi-sensor AI pipelines.
+Benchmark three model families on the same task and device:
 
-**Resources:**
+- detector: YOLO variant versus EfficientDet-style model
+- classifier: MobileNetV3 versus EfficientNet-Lite versus FastViT
+- audio: DS-CNN versus small transformer or conformer
+- local LLM: quantized small model variants
 
-* **[NVIDIA Holoscan SDK](https://developer.nvidia.com/holoscan-sdk):** Official SDK and documentation.
-* **[Holoscan SDK User Guide](https://docs.nvidia.com/holoscan/sdk-user-guide/overview.html):** Overview, concepts, and APIs.
-* **[HoloHub](https://nvidia-holoscan.github.io/holohub/):** Reference applications, operators, tutorials, and benchmarks.
-* **[Getting Started with Holoscan Sensor Bridge](https://docs.nvidia.com/holoscan/sensor-bridge/latest/getting_started.html):** High-bandwidth sensor ingestion.
+### Measure It
 
-**Projects:**
+- accuracy or task metric
+- latency
+- throughput
+- peak memory
+- power
+- model size
+- preprocessing and postprocessing cost
 
-* Run a HoloHub reference application (e.g., endoscopy tool tracking) on Jetson Orin Nano; measure end-to-end latency.
-* Build a custom Holoscan fragment: camera input → TensorRT detection → HoloViz overlay; compare latency vs a standalone GStreamer/DeepStream pipeline.
-* Integrate Holoscan Sensor Bridge with a high-bandwidth sensor (e.g., multi-camera or FPGA source) and run real-time inference.
+### Ship It
+
+A model-selection report with an accuracy/latency/power table and a clear recommendation.
+
+---
+
+## Unit 3: Compression And Quantization
+
+### Learn
+
+- FP16, BF16, INT8, INT4, mixed precision
+- post-training quantization
+- quantization-aware training
+- calibration datasets
+- per-tensor versus per-channel quantization
+- pruning and structured sparsity
+- distillation
+- LLM quantization methods such as AWQ, GPTQ, SmoothQuant, and GGUF quant families
+- accuracy recovery and regression testing
+
+### Build It
+
+Take one model through at least two compression paths:
+
+1. baseline precision
+2. PTQ
+3. QAT or calibrated INT8
+4. optional INT4 or LLM quantization path
+
+### Measure It
+
+- task accuracy before/after
+- latency before/after
+- memory before/after
+- power before/after
+- layer-level fallback to higher precision
+
+### Ship It
+
+A quantization report that explains what changed, what broke, and which precision you would ship.
+
+---
+
+## Unit 4: Runtime Deployment
+
+### Learn
+
+- TensorRT engine building and calibration
+- ONNX export and graph cleanup
+- ONNX Runtime execution providers
+- LiteRT/TFLite delegates
+- TFLite Micro arena allocation
+- TensorRT DLA offload on Jetson
+- `trtexec`, Nsight Systems, and runtime profiling
+- deployment packaging and versioning
+
+### Build It
+
+Deploy the same model through two runtimes where possible:
+
+- PyTorch eager baseline
+- ONNX Runtime
+- TensorRT
+- LiteRT/TFLite
+- TFLite Micro
+- vendor accelerator runtime
+
+### Measure It
+
+- cold start
+- warm latency
+- throughput
+- peak memory
+- model load time
+- engine build time
+- CPU/GPU/DLA utilization
+
+### Ship It
+
+A reproducible runtime deployment with exact conversion commands, runtime commands, and benchmark output.
+
+---
+
+## Unit 5: TinyML And MCU Inference
+
+### Learn
+
+- Cortex-M class constraints
+- SRAM and flash budgeting
+- TFLite Micro arena allocation
+- CMSIS-NN and DSP kernels
+- fixed-point arithmetic
+- duty cycling and always-on sensing
+- MCU OTA model updates
+- drift and local adaptation limits
+
+### Build It
+
+Build one MCU-scale inference demo:
+
+- keyword spotting
+- gesture recognition from IMU
+- vibration anomaly detection
+- low-resolution person detection
+- environmental anomaly detection
+
+### Measure It
+
+- arena size
+- flash size
+- inference latency
+- active and sleep power
+- battery-life estimate
+- false positive/false negative behavior
+
+### Ship It
+
+A constrained-memory inference demo with firmware, model artifact, and power or latency measurements.
+
+---
+
+## Unit 6: Sensor Pipelines
+
+### Learn
+
+- camera ingest: MIPI CSI-2, USB, GigE, V4L2
+- ISP pipeline: RAW, debayer, denoise, tone map, resize, color convert
+- audio pipeline: I2S, ALSA, VAD, keyword spotting, ASR
+- GStreamer and DeepStream
+- multi-stream inference
+- tracking and postprocessing
+- zero-copy paths and buffer ownership
+
+### Build It
+
+Build one end-to-end sensor pipeline:
+
+- camera -> preprocess -> detection -> tracking -> output
+- microphone -> VAD -> feature extraction -> keyword/ASR -> output
+- IMU -> filtering -> model -> anomaly/event output
+
+### Measure It
+
+- sensor-to-output latency
+- preprocessing time
+- inference time
+- postprocessing time
+- dropped frames or audio underruns
+- memory copies
+- CPU/GPU utilization
+
+### Ship It
+
+A sensor-to-model pipeline report with a latency breakdown and at least one zero-copy or copy-reduction improvement.
+
+---
+
+## Unit 7: Power, Thermal, And Reliability
+
+### Learn
+
+- thermal throttling
+- nvpmodel/jetson_clocks-style power modes
+- DVFS
+- battery budgeting
+- watchdogs
+- model health checks
+- long-run stability testing
+- offline behavior and recovery
+
+### Build It
+
+Run a long-duration edge inference test:
+
+- fixed workload
+- realistic sensor input or replayed stream
+- power/thermal logging
+- automatic restart on failure
+- basic telemetry
+
+### Measure It
+
+- sustained latency
+- sustained throughput
+- temperature
+- throttling events
+- power draw
+- memory growth
+- crash or restart behavior
+
+### Ship It
+
+A stability report that says what the device can sustain, not only what it can do for one benchmark run.
+
+---
+
+## Unit 8: Fleet And Product Operation
+
+### Learn
+
+- OTA model and software updates
+- rollback and A/B slots
+- device telemetry
+- model/version compatibility
+- privacy and local data retention
+- edge/cloud routing
+- monitoring drift and field failures
+- secure boot and signed artifacts at a systems level
+
+### Build It
+
+Design a deployment plan for a small fleet:
+
+- model packaging
+- rollout stages
+- rollback trigger
+- telemetry schema
+- health checks
+- failure triage
+
+### Measure It
+
+- update time
+- rollback time
+- telemetry volume
+- offline recovery behavior
+- version compatibility checks
+
+### Ship It
+
+An edge AI operations plan that another engineer could use to ship the model to devices safely.
+
+---
+
+## Featured Deep Dives
+
+Use these lectures as the technical core for LLM and wireless-oriented edge work:
+
+- [Edge LLM Inference Internals](Edge%20LLM%20Inference%20Internals/Lecture-01.md)
+- [Qwen Inference Optimization](Qwen%20Inference%20Optimization/README.md)
+- [AI-Driven Wireless Communication](AI-Driven%20Wireless%20Communication/Lecture-01.md)
+
+---
+
+## Capstone
+
+Build an edge AI system that includes:
+
+- real sensor or replayed production-like input
+- optimized model
+- runtime deployment
+- latency and throughput benchmark
+- memory report
+- power or thermal report
+- health checks
+- update or rollback plan
+
+Good capstone examples:
+
+- Jetson multi-camera detection and tracking system
+- local LLM runtime with memory and thermal controls
+- MCU keyword spotter with power budget
+- industrial anomaly detector with OTA model updates
+- multimodal robot perception node
+
+The capstone is complete when another engineer can reproduce the deployment and understand the constraints that shaped the design.
+
+---
+
+## Exit Criteria
+
+You are ready to claim edge AI specialization when you can:
+
+- select hardware from workload requirements
+- quantize and deploy a model with measured tradeoffs
+- profile an edge inference runtime end to end
+- build a sensor-to-model pipeline
+- explain power and thermal behavior under sustained load
+- design update, rollback, and telemetry paths
+- ship a reproducible edge AI benchmark or case study

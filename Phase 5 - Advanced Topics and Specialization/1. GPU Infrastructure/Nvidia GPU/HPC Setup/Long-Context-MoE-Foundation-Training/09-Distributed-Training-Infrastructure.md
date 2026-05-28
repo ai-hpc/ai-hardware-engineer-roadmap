@@ -4,7 +4,7 @@
 
 **One-line purpose:** Stand up the multi-node H200/B200 infrastructure that long-context MoE training depends on — interconnects, schedulers, NCCL tuning, checkpointing, and fault tolerance — and verify it with a real multi-node training run.
 
-**Prerequisites:** Modules 02 (long-context attention), 05 (MoE systems), 08 (mesh design). The HPC Setup [NCCL Deep Dive](../NCCL-Deep-Dive), [8×H200 Training/Inference](../8x-H200-Training-Inference), and [GPUDirect Storage](../GPUDirect-Storage) modules.
+**Prerequisites:** Modules 02 (long-context attention), 05 (MoE systems), 08 (mesh design). The HPC Setup [NCCL Deep Dive](../NCCL-Deep-Dive/README.md), [8×H200 Training/Inference](../8x-H200-Training-Inference/README.md), and [GPUDirect Storage](../GPUDirect-Storage/README.md) modules.
 
 **Artifact:** A working multi-node Megatron training launch, a checkpoint + resume cycle, and a fault-injection test that kills one node and proves the run recovers from the last checkpoint.
 
@@ -209,8 +209,8 @@ Drop into `lcm-course/`:
 
 - [Module 05 — MoE systems and infrastructure](05-MoE-Systems-Infrastructure.md)
 - [Module 08 — Combining long-context and MoE](08-Combining-LongContext-and-MoE.md)
-- [NCCL Deep Dive](../NCCL-Deep-Dive)
-- [8×H200 Training/Inference](../8x-H200-Training-Inference)
-- [GPUDirect Storage](../GPUDirect-Storage)
+- [NCCL Deep Dive](../NCCL-Deep-Dive/README.md)
+- [8×H200 Training/Inference](../8x-H200-Training-Inference/README.md)
+- [GPUDirect Storage](../GPUDirect-Storage/README.md)
 - Megatron-LM distributed checkpointing: <https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/dist_checkpointing/README.md>
 - NCCL tuning: <https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html>

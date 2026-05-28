@@ -2,7 +2,7 @@
 
 **Order:** Sixth, optional. Hands-on compiler/kernel interface after you've seen graph, kernels, compiler, quantization, and deployment.
 
-**Role target:** [DL Inference Optimization Engineer](../../../README.md#layer--job-title-quick-reference) · **MTS Kernels** (compiler–kernel interface, custom backends).
+**Role target:** DL Inference Optimization Engineer · **MTS Kernels** (compiler–kernel interface, custom backends).
 
 ---
 

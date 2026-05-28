@@ -1,420 +1,744 @@
 # 7. ML Systems Engineering (Phase 5)
 
-> Build the infrastructure, runtimes, distributed systems, and serving engines that make AI models train and run at scale.
+> Build the runtimes, distributed systems, kernels, schedulers, and infrastructure that make modern AI workloads train and serve reliably.
 
-**Layer mapping:** L3-L8. This track connects model math, kernels, runtime scheduling, distributed communication, cluster orchestration, serving systems, and production observability.
+**Layer mapping:** L3-L8. This track connects model math, CUDA kernels, runtime scheduling, distributed communication, cluster orchestration, compiler/runtime work, serving systems, and observability.
 
 **Role targets:** ML Systems Engineer · AI Infrastructure Engineer · Inference Systems Engineer · Training Systems Engineer · GPU Runtime Engineer · Edge AI Runtime Engineer
 
-**Prerequisites:** [Operating Systems](../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Guide.md), [C++ and Parallel Computing](../../Phase%201%20-%20Foundational%20Knowledge/4.%20C%2B%2B%20and%20Parallel%20Computing/Guide.md), [Neural Networks](../../Phase%203%20-%20Artificial%20Intelligence/1.%20Neural%20Networks/Guide.md), [Deep Learning Frameworks](../../Phase%203%20-%20Artificial%20Intelligence/2.%20Deep%20Learning%20Frameworks/Guide.md), one deployment path from Phase 4, and enough [GPU Infrastructure](../1.%20GPU%20Infrastructure/Guide.md) to run real benchmarks.
+**Prerequisites:** [Operating Systems](../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Guide.md), [C++ and Parallel Computing](../../Phase%201%20-%20Foundational%20Knowledge/4.%20C%2B%2B%20and%20Parallel%20Computing/Guide.md), [Neural Networks](../../Phase%203%20-%20Artificial%20Intelligence/1.%20Neural%20Networks/Guide.md), [Deep Learning Frameworks](../../Phase%203%20-%20Artificial%20Intelligence/2.%20Deep%20Learning%20Frameworks/Guide.md), one Phase 4 deployment path, and enough [GPU Infrastructure](../1.%20GPU%20Infrastructure/Guide.md) to run and debug GPU benchmarks.
 
-**What comes after:** a public systems artifact: an inference runtime, distributed training runbook, CUDA kernel benchmark suite, scheduler prototype, MLIR/Triton lowering demo, or edge MLSys case study with reproducible measurements.
-
----
-
-## Why This Track Exists
-
-MLSys is not "ML engineering with more frameworks." The MLSys engineer builds the machinery underneath the model:
-
-- training systems
-- inference engines
-- GPU scheduling
-- memory optimization
-- distributed communication
-- kernels
-- model serving
-- AI infrastructure
-- compiler and runtime layers
-- observability
-- large-scale orchestration
-
-The core tools are systems tools: PyTorch internals, vLLM, SGLang, Ray, DeepSpeed, Megatron-LM, TensorRT-LLM, Kubernetes, NCCL, Triton Inference Server, CUDA, CUTLASS, FlashAttention, MLIR, TVM, XLA, and Triton language.
-
-The daily question is not "Can I train a model?" It is:
-
-> Where are compute, memory, communication, synchronization, and scheduling wasting time or capacity?
-
-That is why this track sits after inference, GPU infrastructure, and compiler/runtime work. It turns those pieces into one operating discipline.
+**What comes after:** a public systems artifact: inference runtime, distributed training runbook, CUDA/Triton kernel benchmark suite, scheduler prototype, compiler/runtime demo, or edge MLSys case study with reproducible measurements.
 
 ---
 
-## Mental Model
+## Course Contract
 
-MLSys work is the constant reduction of five bottlenecks:
+This is not a course about using ML frameworks as black boxes. It is a course about the systems below those frameworks.
+
+By the end, you should be able to:
+
+- trace a transformer through tensor shapes, memory traffic, kernel launches, and communication calls
+- separate prefill, decode, training forward pass, backward pass, optimizer state, KV cache, and scheduler overhead
+- build a small inference runtime with batching, streaming, cancellation, and backpressure
+- run and profile DDP/FSDP/ZeRO training experiments instead of only reading about them
+- write and benchmark at least one CUDA or Triton kernel used by a transformer path
+- explain when a workload is compute-bound, memory-bound, communication-bound, or scheduler-bound
+- use profiler traces, counters, and logs as the default source of truth
+- ship a reproducible benchmark that another engineer can run
+
+The point is not to become a generic model trainer. The point is to become the engineer who knows why a model is slow, expensive, unstable, underutilized, or hard to deploy.
+
+---
+
+## Why This Belongs In An AI Hardware Roadmap
+
+Hardware is only useful when the software stack can feed it.
+
+MLSys is where workload reality meets hardware reality:
+
+```text
+model architecture
+  -> framework graph
+  -> runtime scheduler
+  -> memory planner
+  -> kernels
+  -> collectives
+  -> cluster fabric
+  -> observability
+  -> production behavior
+```
+
+If you want to design accelerators, edge AI platforms, or AI infrastructure, you need to understand what the workload actually asks the machine to do:
+
+- how many bytes the KV cache consumes
+- how attention changes with sequence length
+- why decode often becomes memory-bandwidth limited
+- why training stalls on all-reduce or activation memory
+- why one extra synchronization point can destroy scaling
+- why a scheduler can make a fast kernel look slow
+- why a topology mismatch can break distributed inference
+
+MLSys is the discipline of finding those constraints, measuring them, and changing the system so the hardware does useful work more often.
+
+---
+
+## The Core Mental Model
+
+Most MLSys work reduces one of five costs:
 
 ```text
 T_total = T_compute + T_memory + T_communication + T_synchronization + T_scheduling
 ```
 
-For training:
-
-```text
-T_step = T_forward + T_backward + T_allreduce + T_checkpoint + T_sync
-```
-
 For inference:
 
 ```text
-T_latency = T_prefill + T_decode + T_memory + T_communication + T_queueing
+T_latency = T_prefill + T_decode + T_queueing + T_communication + T_streaming
+```
+
+For training:
+
+```text
+T_step = T_forward + T_backward + T_optimizer + T_allreduce + T_checkpoint + T_sync
 ```
 
 For memory:
 
 ```text
-M_training = M_weights + M_activations + M_gradients + M_optimizer
+M_training = M_weights + M_activations + M_gradients + M_optimizer + M_workspace
 M_inference = M_weights + M_kv_cache + M_workspace + M_batch_state
 ```
 
-Most meaningful MLSys improvements reduce one of these terms without breaking model quality, reliability, or operational simplicity.
+For distributed scaling:
+
+```text
+efficiency = useful_compute_time / wall_clock_time
+```
+
+Good MLSys engineering starts with a hypothesis and ends with measurement:
+
+```text
+observe -> isolate -> change one thing -> benchmark -> profile -> explain -> repeat
+```
+
+Avoid vague claims like "this is faster." Use concrete claims:
+
+- p95 TTFT dropped from 420 ms to 260 ms at 32 concurrent requests
+- decode throughput increased from 38 to 51 tok/s after KV-cache compaction
+- all-reduce time fell from 31 percent to 18 percent of step time after bucket tuning
+- peak training memory fell by 42 percent after activation checkpointing
+- GPU utilization improved because queue starvation was fixed, not because kernels changed
 
 ---
 
 ## Course Map
 
-| Stage | Focus | Production systems to study | Artifact |
-|-------|-------|-----------------------------|----------|
-| 1 | Systems programming for runtimes | Linux, networking, async runtimes, profilers | async inference server or scheduler |
-| 2 | Deep learning internals | PyTorch, JAX, transformer implementations | small transformer with profiled training and inference |
-| 3 | GPU architecture and CUDA | CUDA, CUTLASS, FlashAttention, Nsight | custom kernel and roofline report |
-| 4 | Distributed training | PyTorch DDP/FSDP, DeepSpeed, Megatron-LM, NCCL | multi-GPU training benchmark |
-| 5 | Serving systems | vLLM, SGLang, TensorRT-LLM, Triton Inference Server | continuous batching or KV-cache prototype |
-| 6 | Compiler and runtime layer | MLIR, TVM, XLA, TensorRT, Triton language | operator fusion or lowering demo |
-| 7 | Research-level MLSys | MLSys, OSDI, NSDI, ASPLOS, NeurIPS systems papers | paper replication or benchmark reproduction |
+| Stage | Focus | Core artifact |
+|-------|-------|---------------|
+| 0 | Measurement discipline | benchmark harness and profiling template |
+| 1 | Systems runtime foundations | async inference-like server with backpressure |
+| 2 | Transformer execution internals | transformer shape, memory, and throughput report |
+| 3 | GPU kernels and CUDA performance | CUDA/Triton kernel benchmark with roofline notes |
+| 4 | Inference serving systems | continuous batching or paged KV-cache prototype |
+| 5 | Distributed training systems | DDP/FSDP/ZeRO benchmark and bottleneck report |
+| 6 | AI infrastructure and orchestration | reproducible cluster/runbook with failure recovery |
+| 7 | Compiler and runtime layer | graph lowering, fusion, or memory-planning demo |
+| 8 | Research and source-code loop | paper reproduction or source-code deep dive |
+
+Recommended order:
+
+1. If you already build edge inference runtimes: Stage 0 -> 1 -> 2 -> 3 -> 5.
+2. If you want AI infrastructure roles: Stage 0 -> 1 -> 4 -> 5 -> 6.
+3. If you want compiler/runtime roles: Stage 0 -> 2 -> 3 -> 7 -> 8.
+4. If you want edge MLSys: Stage 0 -> 1 -> 2 -> 3 -> 4, then add Stage 5 selectively.
 
 ---
 
-## Stage 1: Systems Programming For MLSys
+## Stage 0: Measurement Discipline
 
-This is the foundation. The runtime is still software running on Linux, moving bytes through memory, sockets, drivers, and queues.
+### Why It Matters
+
+MLSys work without measurement turns into tool tourism. Before changing runtimes or kernels, build the habit of collecting comparable numbers.
 
 ### Learn
 
-- Linux internals: processes, threads, signals, cgroups, namespaces, filesystems
-- memory: `mmap`, page faults, huge pages, pinned memory, NUMA, zero-copy paths
-- concurrency: threads, locks, atomics, work stealing, backpressure
-- networking: TCP, gRPC, HTTP streaming, RDMA concepts, `epoll`, `io_uring`
-- performance: CPU cache locality, SIMD basics, perf, flamegraphs, tracing
-- languages: Python for ML ecosystem work, C++ for kernels/runtime integration, Rust for infrastructure and runtime systems
+- latency percentiles: p50, p95, p99
+- throughput: requests/sec, tokens/sec, samples/sec, tokens/sec/GPU
+- GPU counters: occupancy, memory bandwidth, tensor-core utilization, SM activity
+- memory metrics: peak allocated, fragmentation, KV-cache blocks, activation memory
+- distributed metrics: collective time, bandwidth, GPU idle time, rank skew
+- reliability metrics: error rate, retry rate, checkpoint restore time, failed-node recovery
 
-### Build
+### Build It
 
-- async inference server with request queueing and streaming responses
-- tokenizer runtime with zero-copy request parsing
-- scheduler that supports priorities, cancellation, batching windows, and backpressure
-- mini tensor runtime with explicit allocation and shape tracking
+Create a small benchmark harness that can run the same workload repeatedly and emit:
 
-### Measure
+- command line used
+- hardware and driver summary
+- git commit hash
+- model or synthetic workload config
+- concurrency level or batch size
+- warmup count and measured iteration count
+- CSV or JSON result file
 
-- p50/p95/p99 latency
-- throughput under different queue depths
+### Use It In The Real Stack
+
+Use the harness for every later stage. Do not hand-copy benchmark numbers into notes. Generate them from scripts.
+
+### Measure It
+
+Your harness should report:
+
+- mean and percentile latency
+- throughput
+- peak memory
+- CPU and GPU utilization if available
+- profiler trace path
+
+### Ship It
+
+Ship `bench/`, `results/`, and `reports/` directories with one reproducible baseline. The baseline can be synthetic, but it must be rerunnable.
+
+---
+
+## Stage 1: Systems Runtime Foundations
+
+### Why It Matters
+
+An inference or training service is still a distributed Linux program. It queues work, moves bytes, schedules threads, manages memory, handles failure, and emits telemetry.
+
+### Learn
+
+- Linux processes, threads, signals, cgroups, namespaces, and filesystems
+- memory mapping, page faults, huge pages, pinned memory, NUMA, and zero-copy paths
+- concurrency with threads, locks, atomics, queues, work stealing, cancellation, and backpressure
+- networking with TCP, HTTP streaming, gRPC, `epoll`, `io_uring`, and RDMA concepts
+- CPU performance: cache locality, SIMD basics, `perf`, flamegraphs, and tracing
+- production runtime basics: structured logs, metrics, traces, health checks, and graceful shutdown
+
+Languages:
+
+- Python for ML ecosystem integration
+- C++ for runtime and CUDA integration
+- Rust for infrastructure and systems components when it fits the project
+
+### Build It
+
+Build an inference-shaped server without a real model first:
+
+1. Accept requests with prompt length, max tokens, priority, and deadline.
+2. Put requests into a scheduler queue.
+3. Batch compatible requests every few milliseconds.
+4. Stream fake tokens back to clients.
+5. Support cancellation.
+6. Apply backpressure when queues or memory budgets are exceeded.
+
+Then add a second component:
+
+- tokenizer runtime with zero-copy request parsing, or
+- mini tensor runtime with explicit allocation and shape tracking, or
+- memory arena for request state and KV-cache-like blocks.
+
+### Use It In The Real Stack
+
+Compare your design to the control-plane responsibilities in vLLM, SGLang, Ray Serve, and Triton Inference Server. Focus on what the runtime schedules and what the GPU kernels actually execute.
+
+### Measure It
+
+- p50/p95/p99 latency under increasing concurrency
+- queue wait time versus execution time
+- throughput under different batching windows
 - allocation count and peak RSS
 - CPU utilization, lock contention, and context switches
+- cancellation latency
 
-### Ship
+### Ship It
 
-A small runtime that accepts inference-like requests, batches them, streams partial outputs, and produces a benchmark report under load.
+Ship an async runtime with a load generator, dashboard or metrics endpoint, and a short report explaining when batching helps and when it hurts tail latency.
 
 ---
 
-## Stage 2: Deep Learning Internals
+## Stage 2: Transformer Execution Internals
 
-The goal is not to train MNIST. The goal is to understand the exact computation and memory flow of transformers so runtime decisions are grounded in model structure.
+### Why It Matters
 
-### Learn
+MLSys engineers do not need to invent every model architecture, but they must understand the compute and memory flow of the models they serve or train.
 
-- transformer architecture: embeddings, attention, MLP, residuals, layer norm/RMSNorm, logits, sampler
-- attention: QKV projection, grouped-query attention, RoPE, KV cache
-- decoding: prefill vs decode, sampling, batching, speculative decoding
-- optimization: quantization, FlashAttention, paged attention, fused kernels, CUDA graph capture
-- parallelism: tensor parallelism, pipeline parallelism, expert parallelism
+Transformer inference flow:
 
-The basic attention form:
+```text
+tokens -> embeddings -> attention(Q, K, V) -> MLP -> residual -> logits -> sampler
+```
+
+Transformer training flow:
+
+```text
+forward -> loss -> backward -> gradients -> optimizer step -> updated weights
+```
+
+Attention:
 
 ```text
 Attention(Q, K, V) = softmax((Q * K^T) / sqrt(d_k)) * V
 ```
 
-The transformer inference flow:
+### Learn
 
-```text
-token -> embedding -> attention(QKV) -> MLP -> residual -> logits -> sampler
-```
+- embeddings, attention, MLP, residual paths, RMSNorm/layer norm, logits, and sampling
+- QKV projection, grouped-query attention, RoPE, ALiBi-style position handling, and KV cache
+- prefill versus decode
+- activation memory and gradient flow
+- optimizer state memory
+- mixed precision, loss scaling, and gradient accumulation
+- batching, speculative decoding, quantization, and long-context behavior
 
-The transformer training flow:
+### Build It
 
-```text
-forward pass -> loss -> backward pass -> gradients -> optimizer step -> updated weights
-```
+Build a small transformer path that can run both training and inference:
 
-### Build
+1. Print tensor shapes at every major operation.
+2. Track activation memory during training.
+3. Track KV-cache memory during inference.
+4. Separate prefill and decode timing.
+5. Add a minimal sampler.
+6. Add gradient accumulation and mixed precision.
 
-- small transformer from scratch or from a tiny framework
-- custom training loop with mixed precision and gradient accumulation
-- KV-cache implementation with explicit memory accounting
-- tokenizer-to-logits inference path
+### Use It In The Real Stack
 
-### Measure
+Map your toy implementation to PyTorch modules and to production runtime concepts:
+
+| Concept | Training system concern | Inference system concern |
+|---------|-------------------------|--------------------------|
+| activations | memory and recomputation | usually not retained |
+| gradients | all-reduce/reduce-scatter | not present |
+| optimizer state | often larger than weights | not present |
+| KV cache | not central in normal training | primary serving memory pressure |
+| batch size | throughput and convergence | throughput and latency |
+| sequence length | activation and attention cost | KV cache and prefill cost |
+
+### Measure It
 
 - tokens/sec for prefill and decode
-- activation memory during training
-- KV-cache growth with sequence length and batch size
-- effect of batch size on throughput and latency
+- samples/sec or tokens/sec during training
+- activation memory by layer
+- KV-cache bytes per token
+- effect of batch size and sequence length
+- numerical drift across precision modes
 
-### Ship
+### Ship It
 
-A transformer notebook or repo that reports shape flow, memory usage, and throughput for both training and inference.
+Ship a transformer execution report with diagrams or tables for shape flow, memory flow, and throughput. Include at least one surprising bottleneck you found from measurement.
 
 ---
 
-## Stage 3: GPU Architecture And CUDA
+## Stage 3: GPU Kernels And CUDA Performance
 
-This is where MLSys becomes hardware-shaped. You need enough GPU knowledge to know whether a bottleneck is memory bandwidth, launch overhead, occupancy, synchronization, or tensor-core utilization.
+### Why It Matters
 
-### Learn
+This is where MLSys becomes hardware-shaped. You need enough GPU knowledge to know whether a bottleneck is bandwidth, launch overhead, occupancy, synchronization, or tensor-core utilization.
 
-- CUDA programming model: grids, blocks, warps, streams, events
-- warp execution, divergence, occupancy, memory coalescing
-- memory hierarchy: HBM, L2, shared memory, registers
-- tensor cores and matrix-multiply tiling
-- kernel launch overhead, CUDA graphs, persistent kernels
-- kernel fusion and memory traffic reduction
-- NCCL collectives at the GPU boundary
-
-Memory hierarchy to keep in mind:
+Memory hierarchy:
 
 ```text
 HBM -> L2 cache -> SM shared memory -> registers
 ```
 
-### Study
+### Learn
 
-- CUTLASS
-- FlashAttention
-- vLLM scheduler and paged attention
-- TensorRT-LLM kernels
-- llama.cpp CUDA paths
+- CUDA grids, blocks, warps, streams, events, and synchronization
+- warp execution, divergence, occupancy, memory coalescing, and bank conflicts
+- shared memory, registers, L2 behavior, and HBM bandwidth
+- tensor cores and matrix tiling
+- reductions, scans, softmax, normalization, and matmul kernels
+- kernel launch overhead, CUDA graphs, persistent kernels, and kernel fusion
+- profiler workflow with Nsight Systems, Nsight Compute, and simple CUDA events
 
-### Build
+### Build It
 
-- custom CUDA vector and matrix kernels
-- fused RMSNorm kernel
-- benchmark comparing naive attention, tiled attention, and FlashAttention-style memory reduction
-- Jetson inference path optimization with Nsight traces
+Build a small kernel ladder:
 
-### Measure
+1. vector add baseline
+2. reduction kernel
+3. layer norm or RMSNorm
+4. tiled matrix multiply
+5. fused RMSNorm + residual or fused bias + activation
+6. Triton version of one kernel
 
-- achieved memory bandwidth
+Then add a transformer-shaped benchmark:
+
+- compare naive attention, tiled attention, and library attention where possible
+- compare single kernel versus fused path
+- compare launch-by-launch execution versus CUDA graph capture when applicable
+
+### Use It In The Real Stack
+
+Read source with one question in mind: what memory traffic did this code remove?
+
+Study:
+
+- CUTLASS for tiled GEMM and template-based kernel structure
+- FlashAttention for attention memory traffic reduction
+- TensorRT-LLM kernels for production LLM inference paths
+- vLLM or SGLang for scheduler/runtime interaction with kernels
+- llama.cpp CUDA paths for smaller, readable inference kernels
+
+### Measure It
+
+- achieved bandwidth
 - achieved FLOP/s
 - occupancy
 - global memory transactions
+- shared-memory bank conflicts
 - tensor-core utilization
 - kernel launch count
+- numerical error versus reference implementation
 
-### Ship
+### Ship It
 
-A kernel benchmark suite with before/after numbers, profiler screenshots, and a short explanation of whether each kernel is compute-bound or memory-bound.
-
----
-
-## Stage 4: Distributed Training Systems
-
-This is the right next milestone after inference-runtime work. Do not spend this phase on generic fine-tuning tutorials. Focus on the systems mechanics of training.
-
-### Learn
-
-- autograd and activation memory
-- mixed precision and loss scaling
-- gradient accumulation
-- optimizer state memory
-- DDP, FSDP, ZeRO
-- tensor, pipeline, sequence, and expert parallelism
-- all-reduce, reduce-scatter, all-gather, broadcast
-- NCCL topology, NVLink/NVSwitch, InfiniBand, RDMA
-- checkpointing, elastic recovery, and failure handling
-
-Weight update:
-
-```text
-theta_(t+1) = theta_t - eta * grad_theta L(theta_t)
-```
-
-Distributed step time:
-
-```text
-T_step = T_forward + T_backward + T_allreduce + T_sync
-```
-
-### Build
-
-- single-GPU transformer training loop with memory profiling
-- multi-GPU DDP experiment
-- FSDP or ZeRO comparison with the same model and batch target
-- NCCL profiling run that explains communication cost
-- distributed checkpointing experiment
-
-### Measure
-
-- samples/sec or tokens/sec per GPU
-- scaling efficiency
-- all-reduce time
-- GPU idle time
-- optimizer-state memory
-- checkpoint save/restore time
-
-### Ship
-
-A training-systems report that compares single GPU, DDP, and FSDP/ZeRO runs with profiler traces and clear bottleneck analysis.
+Ship a kernel benchmark suite with before/after numbers, profiler screenshots or exported reports, and a short roofline-style explanation for each kernel.
 
 ---
 
-## Stage 5: Serving Systems And Distributed Inference
+## Stage 4: Inference Serving Systems
 
-Serving is where inference systems become product infrastructure. The runtime must schedule requests, control memory, stream tokens, isolate failures, and expose operational signals.
+### Why It Matters
+
+Serving is where kernels become product infrastructure. The runtime must control queueing, memory, streaming, fairness, overload, placement, and observability.
+
+Serving latency decomposes roughly into:
+
+```text
+T_latency = T_queue + T_prefill + T_decode + T_stream + T_network
+```
+
+Throughput is often constrained by:
+
+```text
+min(compute capacity, memory bandwidth, KV-cache capacity, scheduler efficiency)
+```
 
 ### Learn
 
+- prefill versus decode scheduling
 - batching and continuous batching
-- request scheduling and fairness
-- streaming inference
-- async serving and cancellation
-- backpressure and overload control
-- paged KV cache
+- request admission and overload control
+- streaming responses and cancellation
+- paged KV cache and block allocation
+- prefix caching and prompt sharing
 - speculative decoding
 - tensor-parallel and pipeline-parallel inference
-- inference sharding
-- autoscaling and placement
-- observability: traces, metrics, logs, token accounting
+- autoscaling, placement, health checks, and drain logic
+- observability: TTFT, inter-token latency, queue depth, active sequences, KV blocks, tokens/sec/GPU
 
-Inference scaling:
+### Build It
 
-```text
-T_latency = T_compute + T_memory + T_communication + T_queueing
-```
+Build a serving prototype in layers:
 
-### Study
+1. request queue with deadlines and priorities
+2. continuous batching scheduler
+3. KV-cache block allocator
+4. streaming token output
+5. cancellation and eviction path
+6. admission control based on memory budget
+7. metrics endpoint
 
-- vLLM
-- SGLang
-- TensorRT-LLM
-- Triton Inference Server
-- llama.cpp
-- Ray Serve
+Optional advanced additions:
 
-### Build
+- speculative decoding path with draft and target model
+- distributed router that selects replicas by queue depth and health
+- tensor-parallel toy runtime with explicit communication calls
 
-- continuous batching scheduler
-- paged KV-cache prototype
-- speculative decoding prototype
-- tensor-parallel LLM serving experiment
-- distributed inference router with health checks and backpressure
+### Use It In The Real Stack
 
-### Measure
+Study:
+
+- vLLM for PagedAttention, continuous batching, and serving abstractions
+- SGLang for structured generation runtime ideas
+- TensorRT-LLM for optimized NVIDIA inference paths
+- Triton Inference Server for production model serving patterns
+- Ray Serve for distributed service orchestration
+- llama.cpp for local and edge inference constraints
+
+### Measure It
 
 - p50/p95/p99 time-to-first-token
-- inter-token latency
-- requests/sec
-- tokens/sec/GPU
-- KV-cache utilization
-- batch occupancy
+- p50/p95/p99 inter-token latency
+- requests/sec and tokens/sec/GPU
+- prefill throughput versus decode throughput
+- KV-cache utilization and fragmentation
+- active sequence count
+- scheduler overhead
 - tail latency under overload
 
-### Ship
+### Ship It
 
-A serving system that can explain its own behavior through metrics: queue depth, active sequences, KV-cache blocks, token latency, and GPU utilization.
+Ship a serving report that can answer:
+
+- What is the bottleneck at low concurrency?
+- What is the bottleneck at high concurrency?
+- How much memory does the KV cache consume per active request?
+- When does batching improve throughput but hurt latency?
+- What does the system do when overloaded?
 
 ---
 
-## Stage 6: Compiler And Runtime Layer
+## Stage 5: Distributed Training Systems
 
-Compiler/runtime work is where MLSys becomes a full stack: framework graph -> IR -> optimized operators -> kernels -> hardware execution.
+### Why It Matters
+
+Training systems teach the part of MLSys that inference alone does not: gradient synchronization, activation memory, optimizer-state partitioning, checkpointing, data loading, and failure recovery.
+
+Basic update:
+
+```text
+theta_next = theta - learning_rate * gradient(loss, theta)
+```
+
+Step time:
+
+```text
+T_step = T_forward + T_backward + T_optimizer + T_communication + T_sync
+```
+
+Training memory:
+
+```text
+M_total = M_weights + M_activations + M_gradients + M_optimizer + M_workspace
+```
 
 ### Learn
 
-- PyTorch graph capture and export paths
-- graph optimization
-- operator fusion
-- kernel lowering
-- MLIR dialects and passes
-- TVM schedules
-- XLA and TensorRT graph optimization
-- Triton language kernels
-- runtime memory planning
+- autograd, activation memory, and recomputation
+- mixed precision, gradient scaling, and gradient accumulation
+- optimizer state memory and sharding
+- data parallelism, tensor parallelism, pipeline parallelism, sequence parallelism, and expert parallelism
+- DDP, FSDP, ZeRO, and DTensor/DeviceMesh concepts
+- all-reduce, reduce-scatter, all-gather, broadcast, and point-to-point send/recv
+- NCCL topology, NVLink/NVSwitch, PCIe, InfiniBand, RoCE, and RDMA concepts
+- checkpointing, elastic recovery, rank failure, and restart behavior
+
+### Build It
+
+Build the training progression in this order:
+
+1. single-GPU transformer training loop
+2. memory profile with activations and optimizer states
+3. DDP run on 2 or more GPUs
+4. FSDP or ZeRO run on the same model
+5. activation checkpointing experiment
+6. distributed checkpoint save and restore
+7. NCCL debug/profile run
+
+If you only have one GPU locally, use rented GPUs for the distributed step. The artifact matters more than owning the cluster.
+
+### Use It In The Real Stack
+
+Study:
+
+- PyTorch Distributed for process groups, DDP, FSDP, DTensor, and DeviceMesh
+- DeepSpeed for ZeRO and optimizer/memory partitioning
+- Megatron-LM for tensor, pipeline, and sequence parallelism patterns
+- Ray Train for job orchestration and distributed training ergonomics
+- Slurm or Kubernetes for scheduling real GPU jobs
+
+### Measure It
+
+- samples/sec or tokens/sec per GPU
+- step time breakdown
+- scaling efficiency
+- all-reduce/reduce-scatter time
+- GPU idle time
+- data-loader stall time
+- activation memory
+- optimizer-state memory
+- checkpoint write and restore time
+
+### Ship It
+
+Ship a training-systems report comparing single GPU, DDP, and FSDP/ZeRO. Include profiler traces and a clear explanation of which cost dominated each run.
+
+---
+
+## Stage 6: AI Infrastructure And Orchestration
+
+### Why It Matters
+
+MLSys does not stop at kernels and frameworks. Real systems need scheduling, deployment, isolation, storage, monitoring, rollout, and recovery.
+
+### Learn
+
+- GPU scheduling with Slurm, Kubernetes, Ray, or a smaller custom scheduler
+- placement constraints: GPU type, memory, topology, MIG, NUMA, and network reachability
+- container images, driver compatibility, CUDA runtime compatibility, and reproducible environments
+- data pipeline throughput and storage locality
+- checkpoint storage, artifact versioning, and restore paths
+- autoscaling and admission control
+- multi-tenant isolation and quota policies
+- metrics, tracing, logging, alerts, and SLOs
+- incident debugging: hangs, OOM, bad nodes, slow links, clock throttling, and version skew
+
+### Build It
+
+Build a small but realistic runbook:
+
+1. define a container image for training and serving
+2. run a benchmark job locally or on one node
+3. run the same benchmark through a scheduler
+4. collect logs, metrics, and profiler traces
+5. simulate one failure: OOM, killed process, lost worker, failed checkpoint, or bad config
+6. document the recovery path
+
+### Use It In The Real Stack
+
+Tie the infrastructure to the workload:
+
+- training jobs need checkpoint/restart and efficient data loading
+- inference services need health checks, draining, and overload behavior
+- multi-GPU jobs need topology-aware placement
+- edge systems need thermal, power, and storage constraints in the deployment plan
+
+### Measure It
+
+- job startup time
+- image size and cold-start time
+- GPU allocation efficiency
+- failed-job recovery time
+- checkpoint restore time
+- data-loader throughput
+- service availability during rollout
+
+### Ship It
+
+Ship an operations-grade runbook with exact commands, configs, expected metrics, and a failure-mode table.
+
+---
+
+## Stage 7: Compiler And Runtime Layer
+
+### Why It Matters
+
+Compiler/runtime work connects model graphs to hardware execution. It is where high-level operations become fused kernels, memory plans, and backend-specific code.
 
 Compiler path:
 
 ```text
-PyTorch graph -> IR -> fused operators -> lowered kernels -> GPU execution
+framework graph -> IR -> graph rewrite -> fused operators -> lowered kernels -> runtime execution
 ```
 
-### Build
+### Learn
 
-- small operator fusion pass
-- Triton kernel for a transformer primitive
-- MLIR lowering demo for a toy tensor op
-- TensorRT graph optimization comparison
-- runtime memory planner for a fixed graph
+- PyTorch graph capture, export, and compile paths
+- graph optimization: constant folding, dead-code elimination, layout changes, and operator fusion
+- memory planning and buffer reuse
+- MLIR dialects and passes
+- TVM schedules and auto-tuning concepts
+- XLA graph compilation
+- TensorRT graph optimization
+- Triton language for custom kernels
+- correctness testing across rewritten graphs
 
-### Measure
+### Build It
 
-- operator count before/after fusion
+Pick one:
+
+- fuse two simple tensor ops and measure launch-count reduction
+- write a Triton kernel for RMSNorm, softmax, or a small matmul
+- lower a toy tensor op through MLIR
+- compare TensorRT output against eager PyTorch for a small model fragment
+- build a static memory planner for a fixed graph
+
+### Use It In The Real Stack
+
+Connect this stage back to hardware:
+
+- fusion reduces memory traffic and launch overhead
+- layout changes can make kernels faster or slower
+- dynamic shapes increase runtime complexity
+- quantization changes both graph structure and kernel selection
+- compiler wins are only real if numerical quality and deployment constraints survive
+
+### Measure It
+
+- operator count before/after
 - kernel launch count
 - memory traffic
 - latency and throughput
-- numerical differences
+- compile time
+- peak memory
+- numerical error versus reference
 
-### Ship
+### Ship It
 
-A compiler/runtime artifact that takes a small model fragment and shows the performance effect of lowering or fusion with reproducible commands.
+Ship a compiler/runtime artifact with a before/after benchmark and correctness tests.
 
 ---
 
-## Stage 7: Research-Level MLSys
+## Stage 8: Research And Source-Code Loop
 
-At this level, papers become engineering inputs. The loop is:
+### Why It Matters
+
+At senior MLSys level, papers and production code become inputs to engineering decisions. The goal is not to collect papers. The goal is to turn papers into measurements and design choices.
+
+Research loop:
 
 ```text
-read paper -> implement or reproduce -> benchmark -> profile -> optimize -> write findings
+read -> implement or reproduce -> benchmark -> profile -> compare -> write findings
 ```
 
 ### Read
+
+Prioritize systems venues and systems-heavy ML work:
 
 - MLSys
 - OSDI
 - NSDI
 - ASPLOS
-- NeurIPS systems and efficiency papers
+- SOSP
+- NeurIPS systems, efficiency, and infrastructure papers
 
-### Focus Areas
+### Study Source Code
 
-- serving systems
-- distributed training
-- memory optimization
-- scheduling
-- compiler/runtime optimization
-- efficient attention
-- GPU kernels
-- low-power and edge inference
+Use this reading pattern:
 
-### Ship
+1. Identify the hot path.
+2. Find the scheduler or runtime boundary.
+3. Find memory allocation and cache policy.
+4. Find communication calls.
+5. Find the kernel launch path.
+6. Reproduce a small benchmark.
+7. Change one setting and measure the effect.
 
-Every paper should produce one artifact: a reproduction, benchmark, diagram, implementation note, profiler trace, or clear negative result.
+Good source-code targets:
+
+| Area | Systems |
+|------|---------|
+| Inference | vLLM, SGLang, llama.cpp, TensorRT-LLM, Triton Inference Server |
+| Distributed training | PyTorch Distributed, DeepSpeed, Megatron-LM, Horovod |
+| Infrastructure | Ray, Ray Serve, Ray Train, Kubernetes, Slurm, Kubeflow |
+| Kernels | FlashAttention, CUTLASS, xFormers, FlashInfer |
+| Compiler/runtime | Triton language, TVM, MLIR, XLA, TensorRT |
+| Edge | Jetson Linux, TensorRT, Holoscan, ONNX Runtime, llama.cpp |
+
+### Ship It
+
+Every paper or source-code study should produce one artifact:
+
+- reproduction
+- benchmark
+- implementation note
+- diagram
+- profiler trace
+- bug report
+- small patch
+- clear negative result
 
 ---
 
-## The Practical 6-Month Training Milestone
+## The 6-Month Training Systems Milestone
 
-If your current strength is inference/runtime work, the next milestone should be training systems. Make it systems-heavy from day one.
+If your current strength is inference/runtime work, this is the best next milestone. Keep it systems-heavy.
 
 | Month | Focus | Artifact |
 |-------|-------|----------|
-| 1 | transformer training internals, autograd, activation memory | small transformer training loop with memory profile |
+| 1 | transformer training internals, autograd, activation memory | single-GPU training loop with memory profile |
 | 2 | mixed precision, gradient accumulation, optimizer states | throughput and memory report across precision modes |
-| 3 | DDP and NCCL basics | 2-8 GPU DDP benchmark, even if rented |
+| 3 | DDP and NCCL basics | 2-8 GPU DDP benchmark with step-time breakdown |
 | 4 | FSDP/ZeRO and checkpointing | memory scaling comparison and restore test |
 | 5 | DeepSpeed or Megatron-LM internals | annotated runbook for one realistic model config |
-| 6 | custom optimization | fused kernel, scheduler improvement, or distributed checkpoint improvement |
+| 6 | custom optimization | fused kernel, scheduler improvement, checkpoint improvement, or communication tuning |
 
-The point is not to become a generic trainer of models. The point is to understand why training infrastructure stalls, runs out of memory, fails, or scales poorly.
+Minimum acceptable output:
+
+- one repo
+- one model config
+- three training modes
+- profiler traces
+- memory tables
+- scaling chart
+- written bottleneck analysis
+
+Do not stop at "it runs." The milestone is complete when you can explain why it scales or fails to scale.
 
 ---
 
@@ -433,32 +757,116 @@ This combines:
 - CUDA/TensorRT optimization
 - Rust/C++ runtime engineering
 - MLIR/Triton compiler paths
+- observability on constrained devices
 
 Good edge MLSys projects:
 
 - Jetson LLM serving runtime with continuous batching and KV-cache accounting
-- low-memory LoRA or adapter training experiment
+- low-memory LoRA or adapter-training experiment
 - edge model adaptation pipeline with checkpoint recovery
-- multimodal inference scheduler for camera, audio, and text workloads
+- multimodal scheduler for camera, audio, and text workloads
 - local/private AI appliance runtime with observability and overload control
-- CUDA kernel optimization report on Orin vs desktop GPU
+- CUDA kernel optimization report on Orin versus desktop GPU
+- thermal-aware inference scheduler that changes batch/concurrency under power limits
 
-This niche is valuable because it combines skills that are usually split across different engineers: embedded systems, GPU optimization, AI inference, runtime engineering, and production deployment.
+The edge niche is valuable because it joins skills that are usually split across different engineers: embedded Linux, GPU optimization, AI inference, runtime engineering, and production deployment.
 
 ---
 
-## Open Source Systems To Study
+## Capstone Options
 
-| Area | Systems |
-|------|---------|
-| Inference | vLLM, SGLang, llama.cpp, TensorRT-LLM, Triton Inference Server |
-| Distributed training | PyTorch Distributed, DeepSpeed, Megatron-LM, Horovod |
-| Infrastructure | Ray, Ray Serve, Ray Train, Kubernetes, Slurm, Kubeflow |
-| Kernels | FlashAttention, CUTLASS, xFormers, FlashInfer |
-| Compiler/runtime | Triton language, TVM, MLIR, XLA, TensorRT |
-| Edge | Jetson Linux, TensorRT, Holoscan, llama.cpp, ONNX Runtime |
+Choose one. A good capstone is narrow enough to finish and deep enough to prove systems ability.
 
-Study source code with a profiler open. Reading without measurement is too easy to fool yourself.
+### Option A: Edge Inference Runtime
+
+Build a Jetson-focused runtime with:
+
+- tokenizer path
+- request scheduler
+- continuous batching
+- KV-cache accounting
+- streaming output
+- metrics endpoint
+- Nsight profile
+- power and thermal notes
+
+Success criteria:
+
+- reproducible benchmark
+- p50/p95 TTFT and inter-token latency
+- tokens/sec under at least three concurrency levels
+- memory report for weights, KV cache, and workspace
+- overload behavior documented
+
+### Option B: Distributed Training Systems Report
+
+Build a training benchmark suite with:
+
+- single-GPU baseline
+- DDP run
+- FSDP or ZeRO run
+- activation checkpointing experiment
+- checkpoint restore test
+- profiler traces
+
+Success criteria:
+
+- tokens/sec or samples/sec per GPU
+- step-time breakdown
+- scaling efficiency
+- memory comparison
+- communication-cost analysis
+- one concrete tuning recommendation
+
+### Option C: Compiler/Kernel Runtime Demo
+
+Build a model-fragment optimization with:
+
+- reference PyTorch implementation
+- custom CUDA or Triton kernel
+- graph fusion or lowering path
+- correctness tests
+- benchmark harness
+
+Success criteria:
+
+- before/after latency
+- kernel launch count
+- memory traffic estimate
+- numerical error table
+- explanation of when the optimization stops helping
+
+---
+
+## Portfolio Standard
+
+A strong MLSys portfolio artifact includes:
+
+- architecture diagram
+- exact hardware and software versions
+- reproducible setup commands
+- benchmark harness
+- profiler traces
+- raw result files
+- summary charts
+- bottleneck analysis
+- failure modes
+- next optimization hypothesis
+
+Weak artifact:
+
+```text
+I used vLLM and it was faster.
+```
+
+Strong artifact:
+
+```text
+Continuous batching improved throughput from 410 to 690 tok/s at 64 concurrent
+requests, but p95 TTFT increased from 380 ms to 610 ms. The profiler shows
+prefill bursts starving decode, so the next experiment limits prefill tokens per
+scheduling iteration.
+```
 
 ---
 
@@ -474,7 +882,7 @@ This track supports titles like:
 - Edge AI Runtime Engineer
 - LLM Runtime Optimization Engineer
 
-Strong positioning looks like:
+Strong positioning:
 
 ```text
 ML Systems Engineer | GPU Runtime Optimization | CUDA | TensorRT-LLM |
@@ -488,21 +896,26 @@ Inference Systems Engineer | LLM Runtime Optimization | CUDA Kernels |
 Tensor Parallelism | Edge AI | Jetson | TensorRT-LLM | ML Systems
 ```
 
-The public proof matters more than the title. Publish benchmark graphs, latency profiles, memory reports, architecture diagrams, and small but real runtime components.
+The title matters less than public proof. Publish benchmark graphs, latency profiles, memory reports, architecture diagrams, profiler traces, and small runtime components.
 
 ---
 
-## Capstone
+## Official References
 
-Build one MLSys artifact that covers both inference and training mechanics:
+Use official docs and primary sources first:
 
-1. A small transformer training stack with DDP/FSDP benchmarks.
-2. An inference runtime with continuous batching, KV-cache accounting, and streaming output.
-3. One custom CUDA or Triton kernel used in the runtime or training path.
-4. A deployment target: Jetson, single workstation GPU, or rented multi-GPU node.
-5. A report with latency, throughput, memory, communication, and failure-mode analysis.
-
-The capstone is complete when another engineer can clone it, run the benchmarks, reproduce the charts, and understand which bottleneck you attacked.
+- [PyTorch Distributed Overview](https://docs.pytorch.org/tutorials/beginner/dist_overview.html)
+- [vLLM Documentation](https://docs.vllm.ai/)
+- [NVIDIA TensorRT-LLM Documentation](https://docs.nvidia.com/tensorrt-llm/)
+- [NVIDIA CUDA C++ Best Practices Guide](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/)
+- [NVIDIA NCCL Documentation](https://docs.nvidia.com/deeplearning/nccl/)
+- [DeepSpeed ZeRO Documentation](https://deepspeed.readthedocs.io/en/stable/zero3.html)
+- [Ray Train Documentation](https://docs.ray.io/en/latest/train/overview.html)
+- [NVIDIA Megatron-LM](https://github.com/NVIDIA/Megatron-LM)
+- [Triton Language Documentation](https://triton-lang.org/main/index.html)
+- [MLIR Documentation](https://mlir.llvm.org/docs/)
+- [Apache TVM Documentation](https://tvm.apache.org/docs/)
+- [Triton Inference Server Documentation](https://docs.nvidia.com/deeplearning/triton-inference-server/)
 
 ---
 
@@ -510,12 +923,13 @@ The capstone is complete when another engineer can clone it, run the benchmarks,
 
 You are ready to claim MLSys competency when you can:
 
-- explain transformer training and inference as shape, memory, and communication flows
-- write and profile at least one custom GPU kernel
-- debug a distributed training run that is limited by communication or memory
-- explain how continuous batching and paged KV cache affect serving throughput
-- use profiler traces instead of guesses
+- explain transformer training and inference as shape, memory, kernel, and communication flows
+- profile a workload before proposing an optimization
+- write and benchmark at least one custom GPU kernel
+- debug a distributed training run limited by memory, communication, or synchronization
+- explain how continuous batching and paged KV cache affect serving throughput and tail latency
 - connect runtime decisions to hardware constraints
+- operate a small training or inference system with logs, metrics, and recovery steps
 - ship a reproducible benchmark artifact
 
 The outcome is not a certificate. It is a body of systems work that proves you can make AI workloads run faster, cheaper, and more reliably.

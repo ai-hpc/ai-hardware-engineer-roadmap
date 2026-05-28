@@ -169,7 +169,7 @@ Use this order. It prevents chasing software routing while the wire-level clocks
 
 1. Prove Jetson internal audio routing.
 2. Prove LyraT microphones and codec work on the LyraT side.
-3. Make LyraT output a stable I2S mic stream — see [§9 reference firmware `lyrat_jp4_passthrough`](#reference-firmware-lyrat_jp4_passthrough-verified) and [§14 verified result](#verified-test-result--lyrat-side-2026-05-11) for a known-good control.
+3. Make LyraT output a stable I2S mic stream — see [§9 reference firmware `lyrat_jp4_passthrough`](#reference-firmware-lyrat_jp4_passthrough-verified) and [§14 verified result](#verified-test-result-lyrat-side-2026-05-11) for a known-good control.
 4. Verify `SCLK`, `LRCK`, and `ASDOUT` on a scope or logic analyzer.
 5. Enable Jetson 40-pin `I2S2` pinmux.
 6. Configure Jetson audio route from `I2S2` to `ADMAIF1`.
@@ -558,7 +558,7 @@ What this confirms about the LyraT side of the bring-up plan (Section 7, steps 1
 - ✅ I2S peripheral running as master, `BCLK`/`LRCK` clocking on JP4
 - ✅ DMA is moving 192 ± 1.3 % kB/s = `48000 Hz × 2 ch × 2 B` worth of samples per second (the small overshoot is `xTaskGetTickCount()` granularity in the 2 s reporting window, not clock drift)
 
-The Jetson side (steps 5–7) is verified separately below — see [§14 verified result — Jetson side](#verified-test-result--jetson-side-2026-05-11).
+The Jetson side (steps 5–7) is verified separately below — see [§14 verified result — Jetson side](#verified-test-result-jetson-side-2026-05-11).
 
 The LyraT-side artifact is a known-good control: if Jetson capture ever regresses after this firmware is flashed, the failure is on the Jetson software path (pinmux, ASoC routing, master/slave config), not the bus.
 

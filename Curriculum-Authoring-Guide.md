@@ -61,6 +61,71 @@ Every guide should make it easy to answer:
 - What role does this help with?
 - What phase or track should come next?
 
+### 5. Define what "done" means
+
+Every substantial course page should make completion observable. A learner should not finish a module by saying "I read it." They should finish with evidence:
+
+- code that runs
+- a build log
+- a profiler trace
+- a benchmark table
+- a debug capture
+- a design report
+- a deployment checklist
+- a system diagram tied to measurements
+
+If a page cannot name the artifact, the page is probably still only a topic list.
+
+---
+
+## Course Quality Standard
+
+Use this standard when reviewing old modules or adding new ones.
+
+| Standard | Weak page | Strong page |
+|----------|-----------|-------------|
+| Purpose | Lists topics | States the engineering problem and why it matters |
+| Structure | Long resource dump | Guides the learner through build, use, measure, ship |
+| Hardware relevance | Implied | Explicitly connects workload, runtime, memory, power, timing, or deployment to hardware |
+| Practice | "Try X" | Defines a concrete lab with commands, inputs, and expected outputs |
+| Measurement | Optional | Names the metrics that prove progress |
+| Completion | Vague | Defines an artifact another engineer can inspect |
+| Navigation | Isolated | Links prerequisites and next modules |
+| Role mapping | Generic | Names roles and daily work this prepares for |
+
+### Minimum viable course page
+
+Every substantial `Guide.md` should include:
+
+- one-sentence purpose
+- layer mapping
+- prerequisites
+- what comes after
+- role targets
+- why the module exists
+- course outcomes
+- unit map or learning path
+- build/lab work
+- metrics to collect
+- final artifact
+- exit criteria
+
+Short reference pages can be lighter, but they should still state why the page exists and what the learner should do with it.
+
+### Artifact ladder
+
+Learners should move from simple artifacts to portfolio-grade artifacts:
+
+| Level | Artifact quality |
+|-------|------------------|
+| 1 | Notes, diagrams, and command logs |
+| 2 | Working code, RTL, or configuration |
+| 3 | Reproducible build/test/benchmark script |
+| 4 | Measurement report with raw data and interpretation |
+| 5 | Reusable subsystem, lab, or case study another engineer can run |
+
+Most modules should target Level 3 or Level 4. Capstones should target Level 5.
+
 ---
 
 ## Standard Lesson Template
@@ -90,6 +155,10 @@ Ask for concrete metrics: latency, throughput, occupancy, bandwidth, power, accu
 ## Ship it
 
 Define the final artifact that proves the learner completed the unit.
+
+## Exit criteria
+
+List what the learner must be able to explain, build, measure, or debug before moving on.
 
 ---
 

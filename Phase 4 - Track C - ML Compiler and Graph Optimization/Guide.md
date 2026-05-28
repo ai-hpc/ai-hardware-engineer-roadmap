@@ -245,7 +245,7 @@ This track has two parts. **Part 1** covers compiler fundamentals (IR, graph opt
 
 This part was previously a Phase 5 specialization track. It now lives here because the skills (profiling, kernel authoring, quantization, runtime integration) are the direct application of Part 1's compiler fundamentals — and they're needed before the advanced Phase 5 specializations (HPC infrastructure, AI chip design).
 
-**Role target:** [Step 2 — DL Inference Optimization Engineer](../README.md#layer--job-title-quick-reference) · **MTS Kernels** (Member of Technical Staff, Kernels)
+**Role target:** DL Inference Optimization Engineer · **MTS Kernels** (Member of Technical Staff, Kernels)
 
 **Prerequisites for Part 2:** Part 1 (at least §1–§2 and §5), Phase 4 Track B (Jetson, TensorRT, CUDA).
 

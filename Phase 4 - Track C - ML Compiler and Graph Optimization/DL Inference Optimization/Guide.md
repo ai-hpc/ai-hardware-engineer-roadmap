@@ -1,6 +1,6 @@
 # DL Inference Optimization (Part 2 of Phase 4 Track C)
 
-**Role target:** [Step 2 — DL Inference Optimization Engineer](../../README.md#layer--job-title-quick-reference)
+**Role target:** DL Inference Optimization Engineer
 
 **Also aligns with:** Kernel-focused roles such as **Member of Technical Staff, Kernels** (e.g. AGI/LLM companies): designing and implementing high-performance kernels for training and inference, long-context optimization, and production deployment on NVIDIA GPUs and alternative accelerators (TPU, etc.).
 
