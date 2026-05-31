@@ -18,6 +18,7 @@ This phase is organized into **four lecture tracks** (each has its own folder an
 | 2 | **Industrial and Embedded Robotics** (ROS-I, embedded, Docker, Gazebo / Isaac Sim) | [Industrial and Embedded Robotics/Lecture-01.md](Industrial%20and%20Embedded%20Robotics/Lecture-01.md) |
 | 3 | **Advanced Perception and AI for Robotics** (applied ROS 2 perception loop, deep learning perception, robot learning) | [Advanced Perception and AI for Robotics/Lecture-01.md](Advanced%20Perception%20and%20AI%20for%20Robotics/Lecture-01.md) |
 | 4 | **Multi-Robot Systems and Swarm Robotics** | [Multi-Robot Systems and Swarm Robotics/Lecture-01.md](Multi-Robot%20Systems%20and%20Swarm%20Robotics/Lecture-01.md) |
+| ★ | **Special course — VLA Optimization and Action-Parity Harness** (deploy and validate Vision-Language-Action policies on real robots) | [VLA Optimization and Action-Parity Harness/README.md](VLA%20Optimization%20and%20Action-Parity%20Harness/README.md) |
 
 Each `Lecture-01.md` is a **full lecture**: learning objectives, worked conceptual sections, tables/diagrams where helpful, **self-check** questions, and links to the next/previous track.
 

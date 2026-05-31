@@ -512,6 +512,10 @@ nav:
       - "Lecture: Advanced ROS": Phase 5 - Advanced Topics and Specialization/4. Robotics/Advanced Robot Operating System/Lecture-01.md
       - "Lecture: Industrial & Embedded": Phase 5 - Advanced Topics and Specialization/4. Robotics/Industrial and Embedded Robotics/Lecture-01.md
       - "Lecture: Multi-Robot & Swarm": Phase 5 - Advanced Topics and Specialization/4. Robotics/Multi-Robot Systems and Swarm Robotics/Lecture-01.md
+      - "Special Course: VLA Optimization & Action-Parity Harness":
+        - Overview: Phase 5 - Advanced Topics and Specialization/4. Robotics/VLA Optimization and Action-Parity Harness/README.md
+        - "01: VLA Optimization for Real-Time Control": Phase 5 - Advanced Topics and Specialization/4. Robotics/VLA Optimization and Action-Parity Harness/Lecture-01.md
+        - "02: The Action-Parity Harness": Phase 5 - Advanced Topics and Specialization/4. Robotics/VLA Optimization and Action-Parity Harness/Lecture-02.md
     - "E: Autonomous Vehicles":
       - Guide: Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/Guide.md
       - 1. Fundamentals: Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/1. Fundamentals/Guide.md
