@@ -355,3 +355,15 @@ Most people learn one pillar. Some learn two. This roadmap is for the people who
 [⭐ Star this repo](https://github.com/ai-hpc/ai-hardware-engineer-roadmap) if you're on this path — it helps the next engineer find it.
 
 </div>
+
+---
+
+## Star History
+
+<a href="https://www.star-history.com/#ai-hpc/ai-hardware-engineer-roadmap&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ai-hpc/ai-hardware-engineer-roadmap&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=ai-hpc/ai-hardware-engineer-roadmap&type=Date" />
+    <img alt="Star History Chart for ai-hpc/ai-hardware-engineer-roadmap" src="https://api.star-history.com/svg?repos=ai-hpc/ai-hardware-engineer-roadmap&type=Date" />
+  </picture>
+</a>
