@@ -18,48 +18,109 @@ The endpoint is a single die that runs production AI workloads, hosts a real age
 
 ## The Three Pillars
 
-```
-                          ┌──────────────────────────────────────┐
-                          │      Physical AI Agent Chip          │
-                          │   one die  ·  Jetson + ESP32 fused   │
-                          │   AI brain + wireless + sensors      │
-                          │   + agent runtime — ships in product │
-                          └────────────────┬─────────────────────┘
-                                           │
-                  ┌────────────────────────┼────────────────────────┐
-                  ▼                        ▼                        ▼
-         ┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐
-         │   AI Inference   │   │   Agent Harness  │   │     Physical     │
-         │   Engineering    │   │     Systems      │   │     Hardware     │
-         ├──────────────────┤   ├──────────────────┤   ├──────────────────┤
-         │ GEMV/GEMM        │   │ Agent runtimes   │   │ Digital design   │
-         │ Quantization     │   │ Gateways/RPC     │   │ HDL → ASIC flow  │
-         │ KV/paged attn    │   │ Skills & tools   │   │ Computer arch    │
-         │ Multi-GPU TP/PP  │   │ Multi-agent loops│   │ Embedded Linux   │
-         │ Rooflines        │   │ Observability    │   │ Jetson (AI brain)│
-         │ Real models      │   │ Production SDLC  │   │ ESP32 (wireless) │
-         │ (Qwen3, 72B…)    │   │ OpenClaw, SDKs   │   │ Sensors / ISP    │
-         └──────────────────┘   └──────────────────┘   └──────────────────┘
+This roadmap is not three unrelated study tracks. It is a co-design loop. The
+inference workload tells you what the silicon must accelerate, the agent
+harness tells you what product behavior the runtime must support, and the
+hardware platform tells you what power, memory, I/O, security, and manufacturing
+constraints are real.
 
-           ┌─────────────────────────────────────────────────────────┐
-           │ Convergence on one die:                                  │
-           │  Jetson NPU/GPU/DLA  ─┐                                  │
-           │  ESP32 Wi-Fi/BLE/    ─┼──► Physical AI Agent Chip        │
-           │   Thread/Zigbee       │   (your tape-out target)         │
-           │  ISP + sensor MIPI   ─┘                                  │
-           └─────────────────────────────────────────────────────────┘
+```
+                               TARGET ARTIFACT
+┌────────────────────────────────────────────────────────────────────────────┐
+│                         Physical AI Agent Chip                             │
+│ Linux-capable CPU + NPU/GPU/DLA + SRAM/DRAM fabric + ISP/audio/sensors     │
+│ + Wi-Fi/BLE/Thread/Zigbee + secure boot/OTA + local agent runtime support  │
+└────────────────────────────────────┬───────────────────────────────────────┘
+                                     │
+        ┌────────────────────────────┼────────────────────────────┐
+        ▼                            ▼                            ▼
+┌───────────────────────┐  ┌───────────────────────┐  ┌───────────────────────┐
+│  AI Inference Systems │  │ Agent Harness Systems │  │ Physical HW Platform  │
+├───────────────────────┤  ├───────────────────────┤  ├───────────────────────┤
+│ Transformer execution │  │ Sessions and memory   │  │ Digital logic + RTL   │
+│ GEMV/GEMM kernels     │  │ Tool/skill execution  │  │ CPU/NPU/GPU/DLA arch  │
+│ Attention + KV cache  │  │ Gateway/RPC protocols │  │ SRAM/DRAM/DMA fabric  │
+│ Quantization formats  │  │ Planner/executor loop │  │ MIPI CSI-2 + ISP      │
+│ Tensor/pipeline para. │  │ Multi-agent control   │  │ Audio/GPIO/CAN/I2C    │
+│ Serving schedulers    │  │ Evals and guardrails  │  │ Embedded Linux/L4T    │
+│ CUDA/Triton kernels   │  │ Telemetry and tracing │  │ ESP32-class wireless  │
+│ Roofline profiling    │  │ Product update path   │  │ FPGA -> ASIC flow     │
+│ Real models: Qwen etc │  │ OpenClaw/SDKs/APIs    │  │ Board -> SoC thinking │
+└───────────┬───────────┘  └───────────┬───────────┘  └───────────┬───────────┘
+            │                          │                          │
+            └──────────────┬───────────┴───────────┬──────────────┘
+                           ▼                       ▼
+        ┌────────────────────────────────────────────────────────────────┐
+        │ Cross-layer contracts you learn to write                       │
+        ├────────────────────────────────────────────────────────────────┤
+        │ Workload contract: tokens/s, TTFT, context length, KV memory,  │
+        │ batch shape, precision, latency tail, power budget.            │
+        │ Runtime contract: APIs, cancellation, scheduling, security,    │
+        │ observability, OTA, failure recovery, agent state persistence. │
+        │ Hardware contract: MAC array, SRAM size, DMA plan, interconnect│
+        │ bandwidth, radio wake events, camera/audio I/O, boot chain.    │
+        └────────────────────────────────────────────────────────────────┘
+
+                              CONVERGENCE PATH
+┌────────────────────────────────────────────────────────────────────────────┐
+│ Jetson-class AI subsystem        -> NPU/GPU/DLA/CPU compute tile           │
+│ ESP32-class connectivity         -> Wi-Fi/BLE/Thread/Zigbee radio block    │
+│ Camera, audio, and sensors       -> MIPI CSI-2, ISP, codecs, low-power I/O │
+│ Agent runtime and serving stack  -> scheduler, memory manager, telemetry   │
+│ FPGA/RTL/HLS/MLIR experiments    -> accelerator spec and tape-out target   │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 1. AI Inference Engineering
-The workload your chip will run. You learn how decode is bandwidth-bound, how GEMV/GEMM kernels actually dispatch, how K-quants work, how to size a roofline, how to optimize Qwen3-4B on a Jetson and Qwen2.5-72B on 4×H100 — so when you design silicon, you know exactly what bytes-per-token your accelerator must move and what tile sizes the compiler will hand you.
+The workload your chip will run. This pillar teaches transformer execution from
+the bottom up: tokenization, embeddings, QKV projection, RoPE, attention, MLP,
+sampling, KV cache growth, quantization, batching, and serving. You learn why
+decode is often memory-bandwidth bound, why prefill and decode behave
+differently, and how GEMV/GEMM kernels, CUDA Graphs, FlashAttention, paged
+attention, tensor parallelism, and roofline analysis change the system.
+
+**Output of this pillar:** benchmark reports, kernel experiments, model-memory
+budgets, quantization choices, and workload contracts precise enough to drive an
+accelerator architecture.
 
 ### 2. AI Agent Harness Systems
-The software stack that lives *above* your chip. Agentic runtimes (OpenClaw, OpenAI Agents SDK), session models, gateway RPCs, tool calling, skills, multi-agent loops, evals, observability. A physical AI chip is the substrate that runs harnesses like these in a battery-powered product — knowing how they behave tells you which inference patterns to optimize for, what wake-on-event the radio block must support, and what state your boot ROM has to preserve.
+The software stack that lives *above* your chip. This pillar covers agentic
+runtimes, session models, gateway RPCs, tool calling, skills, multi-agent loops,
+RAG, evals, observability, policy controls, and product update flows. A physical
+AI chip does not just run matmuls. It runs user-facing loops with state,
+timeouts, cancellations, tool failures, network events, sensor interrupts, and
+safety constraints.
+
+**Output of this pillar:** a production-style agent harness with clear runtime
+interfaces, telemetry, evals, tool boundaries, scheduling requirements, and the
+operational behavior your chip must support.
 
 ### 3. Physical Hardware Engineering
-The substrate itself — both halves of it. **The AI brain** (digital design, computer architecture, CUDA, Jetson Orin platform work, custom carrier boards, L4T, TensorRT/DLA) and **the wireless stack** (ESP32, OpenThread, Zigbee, ESP-Hosted, RF integration). Plus the embedded Linux, RTL design, HLS, and AI-chip-design specialization that puts NPU + radio + ISP + Linux on one die. You don't get to a tape-out without standing on both halves of this stack.
+The substrate itself. This pillar starts with digital design, computer
+architecture, C/C++ systems work, embedded Linux, Jetson Orin, custom carrier
+boards, L4T, TensorRT/DLA, ESP32, OpenThread, Zigbee, ESP-Hosted, sensors,
+camera bring-up, audio, power, thermal, compliance, and manufacturing. Then it
+moves toward FPGA, HLS, MLIR/compiler work, RTL, SoC architecture, and AI chip
+design.
 
-**Why the combination?** A chip without a runtime is a brick. A runtime without an agent stack is a benchmark. An agent stack without inference cost discipline is a demo. An inference accelerator that can't talk to the world over Wi-Fi or BLE is a coprocessor someone else has to integrate. The three pillars are how you build a chip that **ships in a real physical product** — at the workload, the runtime, the radio, and the silicon at the same time.
+**Output of this pillar:** working boards, bring-up logs, Linux images, wireless
+integration, sensor pipelines, FPGA/RTL prototypes, and a credible chip spec
+with compute, memory, I/O, security, and manufacturing constraints.
+
+| Design question | Inference pillar answers | Agent pillar answers | Hardware pillar answers |
+|---|---|---|---|
+| How fast must the chip be? | TTFT, tok/s, batch shape, context length | User-visible latency, tool-loop timing | MACs, SRAM, DRAM bandwidth, clocks |
+| How much memory is enough? | Weights, KV cache, activations, quantization | Session state, tool buffers, logs | SRAM, LPDDR, DMA, cache hierarchy |
+| How does it talk to the world? | Streaming inference, multimodal inputs | Events, RPC, tools, wake-on-demand | Wi-Fi/BLE/Thread/Zigbee, MIPI, audio |
+| How does it ship safely? | Reproducible benchmarks, model updates | Evals, policy, observability, rollback | Secure boot, OTA, compliance, test |
+
+**Why the combination?** A chip without a runtime is a brick. A runtime without
+an agent stack is a benchmark. An agent stack without inference cost discipline
+is a demo. An inference accelerator that cannot talk to the physical world over
+wireless, camera, audio, and sensor interfaces is a coprocessor someone else has
+to integrate. The three pillars are how you build a chip that **ships in a real
+physical product**: workload, runtime, radio, sensors, board, compiler, and
+silicon aligned from the start.
 
 ---
 
