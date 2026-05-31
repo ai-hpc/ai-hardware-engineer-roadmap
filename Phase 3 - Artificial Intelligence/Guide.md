@@ -169,6 +169,7 @@ You are ready for Phase 4 when you can:
 
 - [CMU AI Courses Reference](CMU-AI-Courses.md)
 - [Maxime Labonne's LLM Course](https://github.com/mlabonne/llm-course) — free LLM roadmap with Colab notebooks covering LLM fundamentals, fine-tuning, quantization, RAG, evaluation, and deployment. Use it as a hands-on companion for Track B.
+- [LLM Visualization (bbycroft.net)](https://bbycroft.net/llm) — interactive 3D walk through a GPT-style model: every tensor, every matmul, attention, layer norm, MLP, softmax, output projection. The fastest way to convert "I read about transformers" into "I can see what each tensor is for." Pair with [Neural Networks → Transformer Fundamentals](1.%20Neural%20Networks/Transformer%20Fundamentals/Lecture-01.md).
 
 ---
 

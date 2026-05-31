@@ -6,6 +6,8 @@ This is the foundational lecture on the **transformer** architecture. It starts 
 
 Read this **before** the Phase 5 inference lectures. Those lectures assume you can read a tensor shape and know which projection corresponds to which letter in `Q, K, V`. This lecture teaches you that, with the math you actually need and with the common misconceptions called out explicitly.
 
+**Companion visualization:** as you read, keep [LLM Visualization (bbycroft.net/llm)](https://bbycroft.net/llm) open in a tab. It walks every tensor of a small GPT through the forward pass in 3D — embeddings, Q/K/V projections, the attention scores grid, softmax, the value-weighted sum, the residual add, layer norm, MLP, and the output projection. When this lecture says "Q is a 2D tensor of shape (T, d_k)," that page lets you literally see the cells move. Use it whenever a shape stops making intuitive sense.
+
 By the end you should be able to:
 
 * Explain why attention exists at all — what bottleneck it removes from older sequence models.
