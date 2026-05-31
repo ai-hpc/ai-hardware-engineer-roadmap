@@ -394,6 +394,7 @@ Use these lectures as the technical core for LLM and wireless-oriented edge work
 
 - [Edge LLM Inference Internals](Edge%20LLM%20Inference%20Internals/Lecture-01.md)
 - [Qwen Inference Optimization](Qwen%20Inference%20Optimization/README.md)
+- [Agent Tool-Dispatch Evaluation with BFCL](Agent%20Tool-Dispatch%20Evaluation%20with%20BFCL/Lecture-01.md) — measure whether a quantized edge LLM still calls the right tool
 - [AI-Driven Wireless Communication](AI-Driven%20Wireless%20Communication/Lecture-01.md)
 
 ---

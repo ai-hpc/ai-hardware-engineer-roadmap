@@ -496,6 +496,7 @@ nav:
     - "C: Edge AI":
       - Guide: Phase 5 - Advanced Topics and Specialization/3. Edge AI/Guide.md
       - "Lecture: Edge LLM Inference Internals": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Edge LLM Inference Internals/Lecture-01.md
+      - "Lecture: Agent Tool-Dispatch Evaluation (BFCL)": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Agent Tool-Dispatch Evaluation with BFCL/Lecture-01.md
       - "Lecture: AI-Driven Wireless Communication": Phase 5 - Advanced Topics and Specialization/3. Edge AI/AI-Driven Wireless Communication/Lecture-01.md
       - "Qwen Inference Optimization":
         - Overview: Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/README.md
