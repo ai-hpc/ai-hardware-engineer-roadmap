@@ -2,7 +2,9 @@
 
 ![AI Hardware Engineer Roadmap](Assets/images/physical-ai-chip.png)
 
-[Star this repo](https://github.com/ai-hpc/ai-hardware-engineer-roadmap) · [Read the full roadmap online](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/)
+[Star this repo](https://github.com/ai-hpc/ai-hardware-engineer-roadmap) · [Read the full roadmap online](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/) · [Join the Discord community](https://discord.gg/r8DKtDzrsm)
+
+*Building the path from AI Hardware → Inference → Agents → Physical AI → AI Chips.*
 
 </div>
 

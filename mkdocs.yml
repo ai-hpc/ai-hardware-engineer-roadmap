@@ -51,6 +51,9 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/ai-hpc
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/r8DKtDzrsm
+      name: Join the Inference Engineering Community on Discord
   seo:
     keywords: AI hardware engineer roadmap, AI chip design, CUDA programming, Jetson Orin Nano, FPGA development, ML compiler, ML systems engineering, AI infrastructure, distributed training, LLM serving, RISC-V AI accelerator, edge AI, embedded AI, TensorRT, OpenThread, Zigbee, AI agent systems
     image: Assets/images/physical-ai-chip.png
@@ -104,6 +107,7 @@ nav:
       - Track B — NVIDIA Jetson: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Guide.md
       - Track C — ML Compiler: Phase 4 - Track C - ML Compiler and Graph Optimization/Guide.md
     - Phase 5 — Specialization: Phase 5 - Advanced Topics and Specialization/Guide.md
+    - Join the Discord community: https://discord.gg/r8DKtDzrsm
   - Roles & Market: Roles and Market Analysis.md
 
   # ── Phase 1 ─────────────────────────────────────────────────
