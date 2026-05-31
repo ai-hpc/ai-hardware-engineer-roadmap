@@ -348,16 +348,6 @@ Most people learn one pillar. Some learn two. This roadmap is for the people who
 
 ---
 
-<div align="center" markdown="1">
-
-**Build the workload. Build the runtime. Build the radio. Build the silicon. Ship the physical AI chip.**
-
-[⭐ Star this repo](https://github.com/ai-hpc/ai-hardware-engineer-roadmap) if you're on this path — it helps the next engineer find it.
-
-</div>
-
----
-
 ## Star History
 
 <a href="https://www.star-history.com/#ai-hpc/ai-hardware-engineer-roadmap&Date">
@@ -367,3 +357,15 @@ Most people learn one pillar. Some learn two. This roadmap is for the people who
     <img alt="Star History Chart for ai-hpc/ai-hardware-engineer-roadmap" src="https://api.star-history.com/svg?repos=ai-hpc/ai-hardware-engineer-roadmap&type=Date" />
   </picture>
 </a>
+
+---
+
+<div align="center" markdown="1">
+
+**Build the workload. Build the runtime. Build the radio. Build the silicon. Ship the physical AI chip.**
+
+[⭐ Star this repo](https://github.com/ai-hpc/ai-hardware-engineer-roadmap) if you're on this path — it helps the next engineer find it.
+
+[<img src="https://cdn.simpleicons.org/discord/5865F2" alt="" width="14" height="14" align="absmiddle" /> Join the Community](https://discord.gg/r8DKtDzrsm) — the Inference Engineering Discord, for engineers building this stack end to end.
+
+</div>
