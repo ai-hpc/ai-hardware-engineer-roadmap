@@ -190,6 +190,12 @@ TP=8 has **higher absolute throughput** (better TPOT, more users served per repl
 
 For chat products, TP=4 is usually the cost-efficient pick. TP=8 is for cases where TP=4 cannot fit the workload (e.g., 128K context at large batch).
 
+### 4.3 When the TP size is not yours to choose — FP8 block alignment
+
+There is a hard constraint that overrides the cost/throughput reasoning above: **block-scaled FP8 weights require every tensor-parallel shard's dimension to be a whole number of quantization blocks.** If `dim / TP` is not a multiple of the FP8 block size, the engine fails to load.
+
+For Qwen 2.5 72B the FFN intermediate `29568 = 128 × 231` is *not* divisible by 128 after splitting across 2, 4, or 8 GPUs — so block-FP8 + TP=8 will not load until you drop to a TP that re-aligns (or use a framework build that pads). The mechanism and the fix-order are in [Lecture 03 §5.4](Lecture-03.md). The takeaway for *this* lecture: when you serve FP8, **validate that the model loads at your chosen TP before you reason about throughput** — quantization can force a smaller TP than the workload alone would pick.
+
 ---
 
 ## 5. Runtime-specific TP configuration

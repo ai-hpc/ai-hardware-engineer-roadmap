@@ -208,6 +208,24 @@ For Qwen 2.5 72B numbers are similar but ~5% slower at the same batch due to the
 
 vLLM's FP8 implementation is approaching TRT-LLM in 2026. Roughly 90% of TRT-LLM throughput for ~50% of the deployment friction (no engine compile step). For chat products where iteration matters, vLLM FP8 is often the practical pick.
 
+### 5.4 The FP8 block-scaling × tensor-parallel alignment trap
+
+This is the production footgun that catches teams the first time they combine FP8 with TP, so it is worth internalizing before Lecture 04.
+
+Modern FP8 weight quantization is **block-scaled** (a separate scale per block of weights — e.g., 128×128 — which is what keeps FP8 accurate). The scale grid is tied to the tensor's dimensions: a weight column dimension `N` must be a whole number of blocks, i.e., **`N` divisible by the block size**.
+
+Tensor parallelism slices those same dimensions across GPUs. When you shard a weight of output dim `N` across `TP` GPUs, each GPU gets `N / TP`. **If `N / TP` is not a multiple of the FP8 block size, the engine refuses to load** with an error like *"output size not divisible by block size."*
+
+Concretely, the FFN intermediate of Qwen 2.5 72B is `29568 = 128 × 231`, and `231 = 3 × 7 × 11` — so `29568 / TP` stays a multiple of 128 only for `TP ∈ {1, 3, 7, 11, …}`, **not** for the powers of two `{2, 4, 8}` everyone reaches for first. Block-scaled FP8 + TP=8 on this model will fail to load out of the box.
+
+The fixes, in order of preference:
+
+1. **Pick a TP that keeps every sharded dimension block-aligned** — often this means dropping from TP=8 to TP=4 (and if that still doesn't divide, TP=2). Smaller TP costs some throughput headroom (Lecture 04 §4) but is the cleanest fix.
+2. **Use a framework build that pads** the offending dimension up to the next block multiple (vLLM and TRT-LLM increasingly do this automatically; check your version).
+3. **Coarsen or change the scaling granularity** (per-channel/per-tensor instead of per-block) — trades a little accuracy for alignment freedom.
+
+The lesson: **with block-scaled FP8, your tensor-parallel size is no longer a free performance knob — it is constrained by arithmetic.** Verify load before you benchmark, and treat a TP change as a first-line fix for FP8 load failures.
+
 ---
 
 ## 6. KV cache quantization

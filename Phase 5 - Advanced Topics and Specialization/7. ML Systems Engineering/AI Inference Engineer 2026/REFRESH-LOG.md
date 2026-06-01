@@ -6,6 +6,12 @@ When a lecture is refreshed, update its `## Current as of YYYY-MM` line *and* ad
 
 ---
 
+## 2026-06 — Add the FP8 block-scaling × tensor-parallel alignment constraint
+
+Added the production footgun where **block-scaled FP8 weights require each tensor-parallel shard dimension to be a whole number of quantization blocks** — so a TP size that leaves `dim / TP` not divisible by the block size fails to load (Qwen 2.5 72B's FFN `29568 = 128 × 231` is not block-128-aligned under TP=2/4/8). New **Part 2 Lecture 03 §5.4** explains the mechanism and the fix-order (re-align TP → pad → coarsen scaling); **Part 2 Lecture 04 §4.3** cross-references it as a hard constraint that can override the cost-based TP choice. This is a durable architectural constraint (not a benchmark figure), surfaced by an 8×H200 Qwen 2.5 72B optimization analysis and consistent with vLLM/TRT-LLM block-FP8 behaviour.
+
+---
+
 ## 2026-06 — Correctness fix: Qwen 2.5 72B dimensions
 
 Corrected the Qwen 2.5 72B architecture numbers in **Part 2 Lecture 01** and the **Part 2 README**, plus a stray reference in **Part 3 Lecture 01**. Earlier drafts quoted Qwen 2.5 72B as **12288 hidden / 49152 FFN** — a common secondary-source misquote (12288 is GPT-3's width). The official `config.json` is **8192 hidden / 29568 FFN**, which makes Qwen 2.5 72B *dimensionally near-identical* to Llama 3.3 70B (same 8192 hidden, same GQA 64/8, ~3% wider FFN); the 72B-vs-70B gap is mostly the larger 152K vocab. Lecture 01 §2.1/§4.2 now lead with the correct figures and keep the "derive from the published config, sanity-check against the parameter count" lesson as a cautionary note instead of presenting the wrong numbers as fact. Also fixed DeepSeek V3's dense-FFN width in Part 3 Lecture 01 (18432, not 12288). Surfaced while building the [LLM Inference Visualizer](https://github.com/ai-hpc/llm-inference-viz), which renders the correct shapes.
