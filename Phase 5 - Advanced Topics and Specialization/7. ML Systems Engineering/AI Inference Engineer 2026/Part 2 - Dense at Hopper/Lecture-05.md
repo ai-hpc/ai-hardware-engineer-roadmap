@@ -105,6 +105,16 @@ For Llama 3.3 70B / Qwen 2.5 72B at 128K context with batch=8:
 
 **Without paging, long-context serving on Hopper is not practical.** vLLM, SGLang, TRT-LLM, and llama.cpp all implement paged KV.
 
+### 2.4 The shared kernel layer — FlashInfer
+
+A 2025 shift worth knowing: the paged-attention (and sampling) kernels are increasingly *not* each runtime's bespoke CUDA. **FlashInfer** ([arXiv:2501.01005](https://arxiv.org/abs/2501.01005), MLSys 2025; Apache-2.0, `flashinfer-ai`) is an open-source, JIT-compiled attention + sampling **kernel engine** that vLLM, SGLang, TensorRT-LLM, and MLC-LLM all build on. It provides:
+
+* **Paged / ragged attention kernels** for prefill *and* decode over block-sparse (page-table) KV layouts — i.e., the kernels that make PagedAttention fast, including the indirect block addressing referenced above.
+* **Sorting-free top-k / top-p sampling kernels** (the sampling step, not just attention).
+* **Customizable, JIT-compiled attention variants** (different masks, RoPE shapes, head geometries, FP8 KV) without hand-writing CUDA per case.
+
+Why this matters to you: a kernel-level win (a new attention variant, a Blackwell-tuned path) lands across *multiple* runtimes at once, and "which attention backend" becomes a config/version knob to pin and profile — not a black box. When you set `VLLM_ATTENTION_BACKEND=FLASHINFER` or SGLang's `--attention-backend flashinfer`, this is the engine you are selecting.
+
 ---
 
 ## 3. Prefix caching — RadixAttention and friends
@@ -326,6 +336,7 @@ Pass criterion: you have a chart that shows each feature's individual contributi
 
 * vLLM PagedAttention paper — [arXiv:2309.06180](https://arxiv.org/abs/2309.06180)
 * SGLang RadixAttention paper — [arXiv:2312.07104](https://arxiv.org/abs/2312.07104)
+* FlashInfer (attention/sampling kernel engine) — [arXiv:2501.01005](https://arxiv.org/abs/2501.01005) (MLSys 2025) · [github.com/flashinfer-ai/flashinfer](https://github.com/flashinfer-ai/flashinfer)
 * Speculative Decoding original — [arXiv:2211.17192](https://arxiv.org/abs/2211.17192)
 * EAGLE — [arXiv:2401.15077](https://arxiv.org/abs/2401.15077)
 * EAGLE-2 — [arXiv:2406.16858](https://arxiv.org/abs/2406.16858)

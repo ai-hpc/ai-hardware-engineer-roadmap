@@ -106,6 +106,7 @@ Up-to-date is the differentiator of this course. The discipline is baked in:
 * [`REFRESH-LOG.md`](REFRESH-LOG.md) tracks every dated update to lectures and benchmark data.
 * Versioned benchmark data: when a model or runtime ships a new version, prior benchmark numbers are kept in dated subfiles for archaeology; the latest pinned at the top of each lecture.
 * **Primary sources only** — model cards, technical reports, GitHub releases, official benchmark pages. Blog posts (which silently rot) are last-resort and dated.
+* **Live benchmark reference:** for current cross-stack numbers (tokens/s, perf/$, tokens/MW, interactivity) across hardware (H100 → B200 → GB200/GB300 NVL72, MI355X) and runtimes (vLLM / SGLang / TRT-LLM), use a continuously-updated public benchmark such as **[SemiAnalysis InferenceX](https://github.com/SemiAnalysisAI/InferenceX)** ([live dashboard](https://inferencex.com/), Apache-2.0) rather than any fixed number printed in a lecture — software-stack gains move these weekly. Treat the lecture numbers as *teaching anchors*; treat the live dashboard as *truth at time of deployment*.
 * **Refresh cadence:** six months default; three months if a major model class drops (e.g. DeepSeek V4, Llama 5, Qwen 4) or a hardware generation lands (B300 → Vera Rubin etc.).
 
 ---

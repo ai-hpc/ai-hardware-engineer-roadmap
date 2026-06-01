@@ -6,6 +6,14 @@ When a lecture is refreshed, update its `## Current as of YYYY-MM` line *and* ad
 
 ---
 
+## 2026-06 — Add FlashInfer (shared kernel engine) + InferenceX (live benchmark reference)
+
+- **FlashInfer** — added to **Part 2 Lecture 05 §2.4** as the shared, JIT-compiled attention + sampling kernel engine that vLLM / SGLang / TensorRT-LLM / MLC-LLM build on (paged/ragged attention, sorting-free sampling, customizable variants). Framed as the "which attention backend" knob (`VLLM_ATTENTION_BACKEND=FLASHINFER`, SGLang `--attention-backend flashinfer`). Source: [arXiv:2501.01005](https://arxiv.org/abs/2501.01005) (MLSys 2025), Apache-2.0, `flashinfer-ai`.
+- **SemiAnalysis InferenceX** — added to the course **README currency section** as the recommended *live* cross-stack benchmark reference (tokens/s, perf/$, tokens/MW across H100→GB300 NVL72 / MI355X, vLLM/SGLang/TRT-LLM). Apache-2.0; live dashboard at inferencex.com. The point: lecture numbers are teaching anchors, the dashboard is truth-at-deployment.
+- Reviewed the Together AI inference-optimization blog; its concepts (FP8/FP4, speculative decoding, MTP, distillation) are already covered with primary sources, so no blog numbers were imported (per the primary-source rule).
+
+---
+
 ## 2026-06 — Add the FP8 block-scaling × tensor-parallel alignment constraint
 
 Added the production footgun where **block-scaled FP8 weights require each tensor-parallel shard dimension to be a whole number of quantization blocks** — so a TP size that leaves `dim / TP` not divisible by the block size fails to load (Qwen 2.5 72B's FFN `29568 = 128 × 231` is not block-128-aligned under TP=2/4/8). New **Part 2 Lecture 03 §5.4** explains the mechanism and the fix-order (re-align TP → pad → coarsen scaling); **Part 2 Lecture 04 §4.3** cross-references it as a hard constraint that can override the cost-based TP choice. This is a durable architectural constraint (not a benchmark figure), surfaced by an 8×H200 Qwen 2.5 72B optimization analysis and consistent with vLLM/TRT-LLM block-FP8 behaviour.
@@ -114,6 +122,8 @@ Reference: DeepSeek V4 API pricing — V4-Flash $0.14 input / $0.28 output per M
 * "The Uniqueness of LLaMA3-70B Series with Per-Channel Quantization" — [arXiv:2408.15301](https://arxiv.org/abs/2408.15301)
 * Mooncake (P/D disaggregation) — [arXiv:2407.00079](https://arxiv.org/abs/2407.00079)
 * DistServe — [arXiv:2401.09670](https://arxiv.org/abs/2401.09670)
+* FlashInfer (attention/sampling kernel engine) — [arXiv:2501.01005](https://arxiv.org/abs/2501.01005) (MLSys 2025) · [github.com/flashinfer-ai/flashinfer](https://github.com/flashinfer-ai/flashinfer)
+* SemiAnalysis InferenceX (live cross-stack benchmark, Apache-2.0) — [github.com/SemiAnalysisAI/InferenceX](https://github.com/SemiAnalysisAI/InferenceX) · [inferencex.com](https://inferencex.com/)
 
 ---
 
