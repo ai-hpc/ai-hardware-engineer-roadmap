@@ -243,7 +243,7 @@ The deepest, most current technical content lives in these Phase 5 lectures — 
 | 5 | [Qwen2.5-72B Multi-GPU FP16](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/Lecture-04.md) | TP=8 partitioning, NCCL hot path, paged attention, YaRN, runtime recipes |
 | 6 | [Cross-Model & Production Serving](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/Lecture-05.md) | Speculative decoding pairings, edge/cloud routing, observability, capacity planning |
 | 7 | [Batched GEMM vs Normal GEMM](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/Lecture-06.md) | cuBLAS API forms, column-major dance, tensor cores, bit-exact reproducibility |
-| 8 | [AI-Driven Wireless Communication](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/AI-Driven%20Wireless%20Communication/Lecture-01.md) | Neural PHY, O-RAN xApps, SDR + DL, modem NPU silicon |
+| 8 | [AI Inference Engineer 2026 — special course](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/7.%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/README.md) | The full 2026 production inference stack as a 16-lecture arc: dense → MoE, Hopper → Blackwell, FP16 → FP8 → FP4, vLLM / SGLang / TensorRT-LLM, tensor parallelism, disaggregated prefill/decode, rooflines |
 
 Read them in order if you're new. Skip to whichever solves your current problem if you're not.
 
@@ -308,6 +308,7 @@ These projects exist for you to study, not just read about:
 | Project | Why it's here |
 |---------|---------------|
 | [**jetson-llm-runtime**](Projects/jetson-llm-runtime/README.md) &nbsp;·&nbsp; [`GeniePod/genie-ai-runtime` v1.0.0](https://github.com/GeniePod/genie-ai-runtime) | Custom Jetson LLM inference runtime — every GEMV/GEMM kernel, KV cache, paged-attention path, build flow. The scaffold in this folder graduated into the production runtime at `GeniePod/genie-ai-runtime`: 38 tok/s prefill, +115 % vs `llama-bench` on Orin Nano Super 8 GB, tensor-core MMQ, persistent KV, INT8 KV default, OpenAI-shape HTTP server. The inference pillar in code. |
+| [**llm-inference-viz**](https://github.com/ai-hpc/llm-inference-viz) | Interactive 3D visualization of dense decoder-only LLM inference — walk the forward pass, watch each stage land memory- vs compute-bound on an H200 roofline, and shard the model across GPUs with tensor parallelism. The inference mental model, made visible; companion to the AI Inference Engineer 2026 course. |
 | [**jetson-esp-hosted**](https://github.com/ai-hpc/jetson-esp-hosted) | Jetson-validated ESP-Hosted fork for SPI/Wi-Fi/BLE bring-up. The embedded pillar in code. |
 | [**tinygrad**](https://github.com/tinygrad/tinygrad) | ~10 K-line ML framework. The cleanest place to read framework → compiler → kernel → backend in one repo. |
 | [**openpilot**](https://github.com/commaai/openpilot) | Production ADAS stack. End-to-end perception, ML, and embedded software on one board. |
