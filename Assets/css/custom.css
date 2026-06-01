@@ -966,3 +966,106 @@
 [data-md-color-scheme="slate"] .md-typeset {
   color: rgba(236, 240, 248, 0.9);
 }
+
+/* ════════════════════════════════════════════════════════════════
+   Cleaner tables — brand-tinted (indigo), soft zebra, no heavy grey
+   ════════════════════════════════════════════════════════════════ */
+
+.md-typeset table:not([class]) {
+  border: 1px solid color-mix(in srgb, var(--md-primary-fg-color) 18%, transparent);
+}
+
+.md-typeset table:not([class]) th {
+  background: color-mix(in srgb, var(--md-primary-fg-color) 10%, var(--md-default-bg-color));
+  color: var(--md-default-fg-color);
+  border-bottom: 2px solid var(--md-primary-fg-color);
+}
+
+.md-typeset table:not([class]) td {
+  border-top: 1px solid color-mix(in srgb, var(--md-primary-fg-color) 12%, transparent);
+}
+
+/* gentle zebra striping for scan-ability (replaces flat grey) */
+.md-typeset table:not([class]) tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--md-primary-fg-color) 4.5%, transparent);
+}
+
+.md-typeset table:not([class]) tbody tr:hover td {
+  background: color-mix(in srgb, var(--md-primary-fg-color) 11%, transparent);
+}
+
+/* dark mode: tints read well over the slate background too */
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) th {
+  background: color-mix(in srgb, var(--md-primary-fg-color) 22%, var(--md-default-bg-color));
+}
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--md-primary-fg-color) 9%, transparent);
+}
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) tbody tr:hover td {
+  background: color-mix(in srgb, var(--md-primary-fg-color) 18%, transparent);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Richer code syntax highlighting (per-token colors)
+   Needs a language on the fence (```python / ```bash / ```cpp …);
+   ```text blocks stay monochrome by design.
+   ════════════════════════════════════════════════════════════════ */
+
+/* — Light scheme — */
+.md-typeset .highlight .c,  .md-typeset .highlight .ch, .md-typeset .highlight .cm,
+.md-typeset .highlight .c1, .md-typeset .highlight .cs { color: #6b7785; font-style: italic; }          /* comments  */
+
+.md-typeset .highlight .k,  .md-typeset .highlight .kc, .md-typeset .highlight .kd,
+.md-typeset .highlight .kn, .md-typeset .highlight .kp, .md-typeset .highlight .kr,
+.md-typeset .highlight .kt { color: #8250df; font-weight: 600; }                                        /* keywords  */
+
+.md-typeset .highlight .s,  .md-typeset .highlight .sa, .md-typeset .highlight .sb,
+.md-typeset .highlight .sc, .md-typeset .highlight .dl, .md-typeset .highlight .sd,
+.md-typeset .highlight .s2, .md-typeset .highlight .se, .md-typeset .highlight .sh,
+.md-typeset .highlight .si, .md-typeset .highlight .sx, .md-typeset .highlight .sr,
+.md-typeset .highlight .s1, .md-typeset .highlight .ss { color: #0a7a2f; }                              /* strings   */
+
+.md-typeset .highlight .m,  .md-typeset .highlight .mb, .md-typeset .highlight .mf,
+.md-typeset .highlight .mh, .md-typeset .highlight .mi, .md-typeset .highlight .mo,
+.md-typeset .highlight .il { color: #b35900; }                                                          /* numbers   */
+
+.md-typeset .highlight .nf, .md-typeset .highlight .fm { color: #1f6feb; font-weight: 600; }            /* functions */
+.md-typeset .highlight .nb, .md-typeset .highlight .bp { color: #0b7285; }                              /* builtins  */
+.md-typeset .highlight .nc, .md-typeset .highlight .nn,
+.md-typeset .highlight .ne { color: #b8860b; font-weight: 600; }                                        /* classes   */
+.md-typeset .highlight .nv, .md-typeset .highlight .vc, .md-typeset .highlight .vg,
+.md-typeset .highlight .vi { color: #953800; }                                                          /* variables */
+.md-typeset .highlight .o,  .md-typeset .highlight .ow { color: #cf222e; }                              /* operators */
+.md-typeset .highlight .nd { color: #8250df; }                                                          /* decorators*/
+
+/* — Dark scheme (brighter on the dark code background) — */
+[data-md-color-scheme="slate"] .md-typeset .highlight .c,  [data-md-color-scheme="slate"] .md-typeset .highlight .ch,
+[data-md-color-scheme="slate"] .md-typeset .highlight .cm, [data-md-color-scheme="slate"] .md-typeset .highlight .c1,
+[data-md-color-scheme="slate"] .md-typeset .highlight .cs { color: #8b98a5; }
+
+[data-md-color-scheme="slate"] .md-typeset .highlight .k,  [data-md-color-scheme="slate"] .md-typeset .highlight .kc,
+[data-md-color-scheme="slate"] .md-typeset .highlight .kd, [data-md-color-scheme="slate"] .md-typeset .highlight .kn,
+[data-md-color-scheme="slate"] .md-typeset .highlight .kp, [data-md-color-scheme="slate"] .md-typeset .highlight .kr,
+[data-md-color-scheme="slate"] .md-typeset .highlight .kt { color: #c792ea; }
+
+[data-md-color-scheme="slate"] .md-typeset .highlight .s,  [data-md-color-scheme="slate"] .md-typeset .highlight .sa,
+[data-md-color-scheme="slate"] .md-typeset .highlight .sb, [data-md-color-scheme="slate"] .md-typeset .highlight .sc,
+[data-md-color-scheme="slate"] .md-typeset .highlight .dl, [data-md-color-scheme="slate"] .md-typeset .highlight .sd,
+[data-md-color-scheme="slate"] .md-typeset .highlight .s2, [data-md-color-scheme="slate"] .md-typeset .highlight .se,
+[data-md-color-scheme="slate"] .md-typeset .highlight .sh, [data-md-color-scheme="slate"] .md-typeset .highlight .si,
+[data-md-color-scheme="slate"] .md-typeset .highlight .sx, [data-md-color-scheme="slate"] .md-typeset .highlight .sr,
+[data-md-color-scheme="slate"] .md-typeset .highlight .s1, [data-md-color-scheme="slate"] .md-typeset .highlight .ss { color: #addb67; }
+
+[data-md-color-scheme="slate"] .md-typeset .highlight .m,  [data-md-color-scheme="slate"] .md-typeset .highlight .mb,
+[data-md-color-scheme="slate"] .md-typeset .highlight .mf, [data-md-color-scheme="slate"] .md-typeset .highlight .mh,
+[data-md-color-scheme="slate"] .md-typeset .highlight .mi, [data-md-color-scheme="slate"] .md-typeset .highlight .mo,
+[data-md-color-scheme="slate"] .md-typeset .highlight .il { color: #ffab70; }
+
+[data-md-color-scheme="slate"] .md-typeset .highlight .nf, [data-md-color-scheme="slate"] .md-typeset .highlight .fm { color: #82aaff; }
+[data-md-color-scheme="slate"] .md-typeset .highlight .nb, [data-md-color-scheme="slate"] .md-typeset .highlight .bp { color: #56d4dd; }
+[data-md-color-scheme="slate"] .md-typeset .highlight .nc, [data-md-color-scheme="slate"] .md-typeset .highlight .nn,
+[data-md-color-scheme="slate"] .md-typeset .highlight .ne { color: #ffd580; }
+[data-md-color-scheme="slate"] .md-typeset .highlight .nv, [data-md-color-scheme="slate"] .md-typeset .highlight .vc,
+[data-md-color-scheme="slate"] .md-typeset .highlight .vg, [data-md-color-scheme="slate"] .md-typeset .highlight .vi { color: #f6c177; }
+[data-md-color-scheme="slate"] .md-typeset .highlight .o,  [data-md-color-scheme="slate"] .md-typeset .highlight .ow { color: #ff7b72; }
+[data-md-color-scheme="slate"] .md-typeset .highlight .nd { color: #c792ea; }
