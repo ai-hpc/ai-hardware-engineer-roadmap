@@ -30,6 +30,10 @@ By the end you should be able to read the `config.json` for either model and pre
 
 ---
 
+> 🧠 **See it in 3D.** This lecture's architecture is rendered to scale in the [**LLM Inference Visualizer**](https://github.com/ai-hpc/llm-inference-viz) — switch between Qwen 2.5 72B and Llama 3.3 70B, hover each stage (embedding → RMSNorm → GQA → RoPE → softmax → SwiGLU), and watch the roofline mark every op memory- or compute-bound.
+
+---
+
 ## 1. The shared architecture
 
 Both models implement the same canonical 2024+ decoder-only design:

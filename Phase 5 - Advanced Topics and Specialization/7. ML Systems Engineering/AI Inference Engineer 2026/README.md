@@ -30,6 +30,20 @@ This course is structured as **three parts** that can be read independently or a
 
 ---
 
+## 🧠 Interactive companion: LLM Inference Visualizer
+
+A 3D, hands-on companion to this course: **[LLM Inference Visualizer](https://github.com/ai-hpc/llm-inference-viz)** — walk the forward pass of a dense decoder-only transformer (**Qwen 2.5 7B/72B**, **Llama 3.3 70B**), see each stage land **memory-bound vs compute-bound** on an **NVIDIA H200 roofline**, and slice the model across **TP = 1/2/4/8** GPUs to watch the weights shard and the all-reduce cost grow.
+
+It makes the core lessons of this course tangible — especially:
+
+* **Part 1 · [Lecture 03 — Roofline, bandwidth, and the memory hierarchy](Part%201%20-%20Fundamentals/Lecture-03.md)** — the roofline chart, decode on the memory-bound side.
+* **Part 2 · [Lecture 01 — Anatomy of a 70B-class dense model](Part%202%20-%20Dense%20at%20Hopper/Lecture-01.md)** — GQA, RoPE, RMSNorm, SwiGLU rendered to scale on the Llama/Qwen pair.
+* **Part 2 · [Lecture 04 — Single-node multi-GPU serving (tensor parallelism)](Part%202%20-%20Dense%20at%20Hopper/Lecture-04.md)** — TP sharding and the all-reduce collectives, visualized.
+
+Run it locally: `git clone https://github.com/ai-hpc/llm-inference-viz && cd llm-inference-viz && npm install && npm run dev` → open `http://localhost:3002/llm`.
+
+---
+
 ## Course Map (3 parts, 16 lectures)
 
 ### 🧭 Part 1 — Fundamentals of AI Inference / MLSys (5 lectures)
