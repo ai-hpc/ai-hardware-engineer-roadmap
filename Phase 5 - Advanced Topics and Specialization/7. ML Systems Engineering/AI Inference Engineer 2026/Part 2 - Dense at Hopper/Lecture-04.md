@@ -239,12 +239,12 @@ For Llama 3.3 70B at FP16, TP=4, batch=32 on 4× H100:
 
 | Runtime | TPOT (mean) | Throughput tok/s/GPU |
 |---------|-------------|----------------------|
-| vLLM 0.7 | ~30 ms | ~310 |
-| SGLang 0.4 | ~29 ms | ~315 |
-| TRT-LLM 0.18 BF16 | ~26 ms | ~360 |
-| TRT-LLM 0.18 FP8 | ~16 ms | ~580 |
+| vLLM 0.22 | ~30 ms | ~310 |
+| SGLang 0.5 | ~29 ms | ~315 |
+| TRT-LLM 1.3 BF16 | ~26 ms | ~360 |
+| TRT-LLM 1.3 FP8 | ~16 ms | ~580 |
 
-Numbers approximate; replicate in your lab. TRT-LLM's lead is mostly kernel quality on Hopper (FA3, WGMMA, TMA) and FP8 maturity. vLLM is closing the gap quarter by quarter.
+Numbers approximate; replicate in your lab. TRT-LLM's lead is mostly kernel quality on Hopper (FA4, WGMMA, TMA) and FP8 maturity. vLLM is closing the gap quarter by quarter.
 
 ---
 
@@ -254,7 +254,7 @@ A profile-driven diagnosis:
 
 1. **Nsight Systems timeline** — look for NCCL kernel time as a fraction of step time.
 2. **Per-layer breakdown** — `nsys` shows attention matmul + all-reduce + FFN matmul + all-reduce per layer.
-3. **NCCL communication time** — is it overlapping with compute? On Hopper, vLLM 0.7+ and TRT-LLM use `cudaStream`-based overlap; older runtimes serialize.
+3. **NCCL communication time** — is it overlapping with compute? On Hopper, vLLM 0.22+ and TRT-LLM use `cudaStream`-based overlap; older runtimes serialize.
 
 Quick diagnostic:
 
@@ -278,7 +278,7 @@ A subtle but important optimization: **sequence parallelism** (SP) reduces the a
 Without SP, TP-partitioned models duplicate full activations across GPUs during RMSNorm and residual. SP partitions those operations too — each GPU holds only `seq/N` worth of activations.
 
 * **Wins for long-context workloads** — at 128K context, SP saves substantial HBM.
-* **vLLM 0.7+** integrates SP transparently when `--enable-sequence-parallelism` is set.
+* **vLLM 0.22+** integrates SP transparently when `--enable-sequence-parallelism` is set.
 * **TRT-LLM** has SP behind a flag.
 
 For TP=8 + SP, communication doubles (reduce-scatter + all-gather instead of all-reduce), but each communication is smaller. Net win for long-context workloads where the activation memory was the constraint.
@@ -291,7 +291,7 @@ Goal: produce TP=2 / 4 / 8 throughput numbers on the same hardware, with the all
 
 1. **Hardware** — 8× H100 SXM (HGX) or 8× H200 if you have access.
 2. **Model** — Llama 3.3 70B Instruct, FP16 (or FP8 if you have TRT-LLM).
-3. **Runtime** — vLLM 0.7+ V1.
+3. **Runtime** — vLLM 0.22+ V1.
 4. **Bench at three TP degrees** — TP=2, 4, 8. Same batch size (32), same prompt (1024), same output (256), same iterations (100, with 20 warmup).
 5. **Profile one TP=4 and one TP=8 run** with Nsight Systems. Identify NCCL fraction of step time.
 6. **Compute** per-GPU throughput, scaling efficiency, and per-replica throughput.
@@ -330,7 +330,7 @@ Cross-references:
 
 ## Current as of 2026-06
 
-NCCL 2.20+, vLLM 0.7+ V1, SGLang 0.4+, TRT-LLM 0.18+, NVLink 4, NVSwitch v3. Refresh when NCCL 3.0 / vLLM V1 stabilizes further / a new NVLink generation lands.
+NCCL 2.30+, vLLM 0.22+ V1, SGLang 0.5+, TRT-LLM 1.3+, NVLink 4, NVSwitch v3. Refresh when NCCL 3.0 / vLLM V1 stabilizes further / a new NVLink generation lands.
 
 ---
 

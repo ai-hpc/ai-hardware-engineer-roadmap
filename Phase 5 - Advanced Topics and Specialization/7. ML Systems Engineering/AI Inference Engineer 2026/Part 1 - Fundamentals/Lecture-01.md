@@ -239,7 +239,7 @@ The takeaway: you can predict the bandwidth-bound ceiling from the model card an
 
 A senior in this role ships, recurrently:
 
-* **Defended configurations.** Not "we use vLLM with batch=64" but "vLLM 0.7 with TP=4, batch=64, prefix cache on, AWQ-INT4, FP8 KV, parity verified at MMLU=82.1 vs FP16 reference 82.4 (Δ=0.3 pp within budget)."
+* **Defended configurations.** Not "we use vLLM with batch=64" but "vLLM 0.22 with TP=4, batch=64, prefix cache on, AWQ-INT4, FP8 KV, parity verified at MMLU=82.1 vs FP16 reference 82.4 (Δ=0.3 pp within budget)."
 * **Reproducible benchmarks.** A harness another engineer clones and gets the same numbers within ±5% on the same hardware class.
 * **Bottleneck explanations.** Profile traces with annotated dominant cost. "Decode is 78% of step time; of that, 91% is HBM weight read."
 * **Cost models.** $/MTok at the chosen configuration, with what would change at 2× scale and at 10× scale.
@@ -256,7 +256,7 @@ What a senior is *not* paid to do: pick the model. Pick the product. Choose the 
 Goal: a repo you will use throughout Parts 1–3. Cap of one day.
 
 1. **Pick one small model** (Qwen3-4B Instruct AWQ-INT4 is a good default — fits on a 16 GB GPU).
-2. **Pick one runtime** (vLLM 0.7+ recommended).
+2. **Pick one runtime** (vLLM 0.22+ recommended).
 3. **Build a benchmark CLI** that takes `--prompt-length`, `--output-length`, `--concurrency`, `--iters`, `--warmup` and emits a JSON line per run with: hardware (GPU model + driver + CUDA), software (runtime version), git commit, p50/p95/p99 TTFT, p50/p95/p99 TPOT, throughput, peak HBM.
 4. **Add a parity check** — for the workload class you care about (chat / agent / batch / embedding), pick one fixed eval set and emit a single accuracy number.
 5. **Wire to your `$/MTok` formula** in a `cost.py` that takes a $/hour and reads throughput from the benchmark output.
@@ -297,7 +297,7 @@ Cross-references in this roadmap:
 
 ## Current as of 2026-06
 
-Pinned: vLLM 0.7.x (V1 engine), SGLang 0.4.x, TensorRT-LLM 0.18.x, llama.cpp post-2026-04, H100 / H200 / B200 hardware. Update when V1 stabilizes or a runtime ships a breaking API change.
+Pinned: vLLM 0.22.x (V1 engine), SGLang 0.5.x, TensorRT-LLM 1.3.x, llama.cpp post-2026-04, H100 / H200 / B200 hardware. Update when V1 stabilizes or a runtime ships a breaking API change.
 
 ---
 

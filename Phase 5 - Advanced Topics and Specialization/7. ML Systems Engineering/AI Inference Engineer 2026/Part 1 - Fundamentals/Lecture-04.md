@@ -37,7 +37,7 @@ The precision floor has dropped twice in three years. The current stack:
 
 The key 2025–2026 shifts:
 
-* **FP8 is the new default activation precision** on Hopper-and-newer hardware where the kernels are mature. Most flagship inference deployments (TensorRT-LLM, vLLM 0.7+) ship FP8 first.
+* **FP8 is the new default activation precision** on Hopper-and-newer hardware where the kernels are mature. Most flagship inference deployments (TensorRT-LLM, vLLM 0.22+) ship FP8 first.
 * **FP4 native arithmetic on Blackwell** (Transformer Engine 2) doubles FP8 throughput. Microscaling format (MX-FP4) attaches per-block scale factors so the dynamic range is preserved.
 * **INT4 weight-only remains the dominant quantization for cost-sensitive serving** — AWQ, GPTQ, and GGUF-IQ-quants all live here. INT4 weights at FP16 (or FP8) activations is the practical recipe for 70B-class on 1–4 GPUs.
 * **KV cache quantization** is increasingly common at FP8 (and sometimes INT4 with calibration) because the KV cache dominates HBM at long context.
@@ -277,7 +277,7 @@ Goal: extend the benchmark harness from Lectures 01–03 with a quantization par
 
 1. **Reference run** — Qwen3-4B Instruct at BF16 (the published precision). Run a small eval set (MMLU-200, BFCL-50 if you have it). Record numbers + variance across two seeds.
 2. **Candidate A — AWQ-INT4** weights, FP16 activations, FP16 KV. Quantize using `auto-awq` with 256 calibration prompts that match your deployment distribution. Re-run eval. Compute Δ per category. Decide: within budget?
-3. **Candidate B — FP8** weights and activations (TensorRT-LLM or vLLM 0.7+ FP8 path, if you have Hopper). Re-run eval.
+3. **Candidate B — FP8** weights and activations (TensorRT-LLM or vLLM 0.22+ FP8 path, if you have Hopper). Re-run eval.
 4. **Candidate C — AWQ-INT4 weights, FP8 KV cache.** Re-run eval, especially at long context if applicable.
 5. **Produce a parity report** — one CSV per candidate, one summary markdown.
 

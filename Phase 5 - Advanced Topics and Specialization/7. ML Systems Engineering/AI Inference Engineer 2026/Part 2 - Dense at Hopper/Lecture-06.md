@@ -96,7 +96,7 @@ qk_flops = 2 × q_heads × q_seq × kv_seq × head_dim
 
 A single decode-step attention op is 2 GFLOPs. Compute-trivial. But the *KV read* for attention is 42 GB / decode step (per §1.1). So attention at long context is **purely bandwidth-bound**.
 
-For prefill (batch=1, prompt=128K), attention is O(prompt² × head_dim × heads) which becomes ~2 × 64 × 131072 × 131072 × 128 = 277 TFLOPs — comparable to the FFN cost. FlashAttention 3's O(N) memory complexity is essential here.
+For prefill (batch=1, prompt=128K), attention is O(prompt² × head_dim × heads) which becomes ~2 × 64 × 131072 × 131072 × 128 = 277 TFLOPs — comparable to the FFN cost. FlashAttention 4's O(N) memory complexity is essential here.
 
 ---
 
@@ -189,8 +189,8 @@ Not all attention heads have the same KV magnitude distribution:
 
 **Per-head scaling fixes this.** Each head gets its own FP8 scale factor.
 
-vLLM 0.7+: `kv_cache_dtype="fp8_e5m2"` with per-head scaling enabled by default.
-SGLang 0.4+: per-head FP8 KV via `--kv-cache-dtype fp8`.
+vLLM 0.22+: `kv_cache_dtype="fp8_e5m2"` with per-head scaling enabled by default.
+SGLang 0.5+: per-head FP8 KV via `--kv-cache-dtype fp8`.
 TRT-LLM: per-head FP8 KV is the default when `kv_cache_dtype=fp8`.
 
 ### 4.2 Parity at 128K
@@ -301,7 +301,7 @@ Activations:   FP16
 KV cache:      FP8 per-head (21 GB per request at 128K)
 HBM headroom:  ~85 GB for KV + activations → batch ~3 at 128K, batch ~12 at 32K
 
-Runtime:       vLLM 0.7+ V1
+Runtime:       vLLM 0.22+ V1
 Features:      continuous batching, paged KV v2, prefix cache, chunked prefill (4K chunks)
 Speculation:   off (small batch makes it less effective)
 ```
@@ -340,7 +340,7 @@ Expected:      max concurrent users at 128K context; per-GPU throughput lower th
 Goal: produce a long-context benchmark report for Llama 3.3 70B and Qwen 2.5 72B.
 
 1. **Hardware** — 4× H100 or H200; ideally both for comparison.
-2. **Runtime** — vLLM 0.7+ V1.
+2. **Runtime** — vLLM 0.22+ V1.
 3. **Configurations to bench** — for each model:
    * FP8 KV, no chunked prefill.
    * FP8 KV, chunked prefill.
@@ -384,7 +384,7 @@ Cross-references:
 
 ## Current as of 2026-06
 
-YaRN extension as published by both model teams. FP8 KV per-head as the production recipe. Chunked prefill as the default in vLLM 0.7+. Refresh when a fundamentally new long-context attention pattern (e.g., recurrent state, hybrid SSM) ships in either model family.
+YaRN extension as published by both model teams. FP8 KV per-head as the production recipe. Chunked prefill as the default in vLLM 0.22+. Refresh when a fundamentally new long-context attention pattern (e.g., recurrent state, hybrid SSM) ships in either model family.
 
 ---
 

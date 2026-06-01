@@ -256,7 +256,7 @@ The Hopper recipes from Part 2 (TP + continuous batching + paged KV + speculatio
 
 Goal: same as Lecture 02 from Part 2, but for Blackwell.
 
-1. **Print versions** — driver, CUDA (12.6+ for Blackwell), cuDNN, FA3 / FA4 (whichever is latest), TE 2.x.
+1. **Print versions** — driver R580+, CUDA 13.3+ (12.8 was the introduction), cuDNN 9.x, FA4, TE 2.15+.
 2. **Pick one FFN matmul shape** from DeepSeek V3.1 or Qwen3-MoE 235B-A22B per-expert FFN — e.g., `(64, 7168) × (7168, 2048)` for DeepSeek.
 3. **Measure** with `torch.matmul`:
    * BF16 reference.

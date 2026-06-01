@@ -52,7 +52,7 @@ Average effective tokens per pass: ~1.8-2.2 across diverse traffic.
 
 ### 1.3 Configuration
 
-vLLM 0.7+:
+vLLM 0.22+:
 
 ```python
 LLM(
@@ -198,9 +198,9 @@ Hardware:           NVL72 partition, 16× B200 (TP=2 × EP=8)
 Weights:            FP4 (MX-FP4 via TE2)
 Activations:        FP8
 KV cache:           BF16 (MLA-compressed; small, no precision drop needed)
-Attention:          MLA-aware kernels (SGLang or vLLM 0.7+)
+Attention:          MLA-aware kernels (SGLang or vLLM 0.22+)
 Speculation:        MTP k=3
-Serving:            SGLang 0.4+ V1
+Serving:            SGLang 0.5+ V1
 Features:           continuous batching, paged KV, RadixAttention prefix cache,
                     chunked prefill (8K chunks), XGrammar (if agent workload)
 Disaggregation:     enabled if cluster has > 16 GPUs available; SGLang P/D mode
@@ -217,7 +217,7 @@ Weights:            FP4 (MX-FP4)
 Activations:        FP8
 KV cache:           FP8 per-head (GQA, 4 KV heads, 94 layers — meaningful at long context)
 Speculation:        EAGLE-3 k=3 (with the model-specific draft head)
-Serving:            SGLang 0.4+ V1
+Serving:            SGLang 0.5+ V1
 Features:           continuous batching, paged KV, prefix cache, chunked prefill,
                     XGrammar
 Disaggregation:     usually not worth it at this scale; ship colocated

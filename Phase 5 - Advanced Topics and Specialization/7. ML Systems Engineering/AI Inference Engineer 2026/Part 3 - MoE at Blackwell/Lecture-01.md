@@ -119,7 +119,7 @@ At 128K context, DeepSeek V3.1 needs **~8 GB of KV cache per request**, versus ~
 
 * Extra matmul per decode step: `W_uK · c_t` and `W_uV · c_t`. Two small matmuls per layer per step.
 * On Blackwell at FP4, these are cheap — the compute fits comfortably in the spare cycles between the FFN matmul and the attention.
-* The runtime needs MLA-aware kernels — FlashAttention 3 with the MLA shape, or specialized kernels in SGLang's DeepSeek path.
+* The runtime needs MLA-aware kernels — FlashAttention 4 with the MLA shape, or specialized kernels in SGLang's DeepSeek path.
 
 vLLM, SGLang, and TensorRT-LLM all support MLA as of mid-2026, with SGLang having the most mature DeepSeek-specific kernels.
 
@@ -146,7 +146,7 @@ For DeepSeek V3.1:
 
 * Acceptance rate (rough): 60-80% at k=3 (sample-dependent).
 * Effective throughput: 1.6-2.5× decode speedup with no additional draft cost.
-* Works in vLLM 0.7+ (`speculative_config={"method": "deepseek_mtp"}`) and SGLang.
+* Works in vLLM 0.22+ (`speculative_config={"method": "deepseek_mtp"}`) and SGLang.
 
 ### 3.2 Why this matters for inference engineering
 

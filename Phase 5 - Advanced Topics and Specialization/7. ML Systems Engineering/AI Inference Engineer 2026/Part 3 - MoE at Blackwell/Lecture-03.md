@@ -258,7 +258,7 @@ Per token (61 layers): ~1.2-3 ms in gating-related ops
 
 Small. Usually not the bottleneck unless the runtime's gating implementation is unoptimized.
 
-The subtlety: gating is *frequent* and *latency-sensitive*. Even if individual cost is small, poor implementation can add 10-20% to total step time. vLLM 0.7+, SGLang 0.4+, and TRT-LLM all have optimized gating paths.
+The subtlety: gating is *frequent* and *latency-sensitive*. Even if individual cost is small, poor implementation can add 10-20% to total step time. vLLM 0.22+, SGLang 0.5+, and TRT-LLM all have optimized gating paths.
 
 ---
 
@@ -293,7 +293,7 @@ Goal: measure EP scaling and identify the all-to-all overhead crossover.
 
 1. **Hardware** — 2× B200, 4× B200, 8× B200 (or NVL72 partition).
 2. **Model** — Qwen3-MoE 235B-A22B FP4 (or FP8 if FP4 path not ready).
-3. **Runtime** — SGLang 0.4+ V1 (best DeepEP-style integration for non-DeepSeek MoE) or vLLM 0.7+.
+3. **Runtime** — SGLang 0.5+ V1 (best DeepEP-style integration for non-DeepSeek MoE) or vLLM 0.22+.
 4. **Bench at three EP degrees** — EP=2, EP=4, EP=8. Same batch=64, prompt=1024, output=256, iterations=100 with 20 warmup.
 5. **Profile one EP=4 run** with Nsight Systems. Identify all-to-all fraction of step time.
 6. **Plot** per-replica throughput, per-GPU throughput, and all-to-all overhead percentage.
@@ -333,7 +333,7 @@ Cross-references:
 
 ## Current as of 2026-06
 
-NCCL 2.20+, DeepEP latest, SGLang 0.4+ MoE path, vLLM 0.7+ V1 MoE support, NVL72. Refresh when DeepEP 2.x or successor lands.
+NCCL 2.30+, DeepEP latest, SGLang 0.5+ MoE path, vLLM 0.22+ V1 MoE support, NVL72. Refresh when DeepEP 2.x or successor lands.
 
 ---
 

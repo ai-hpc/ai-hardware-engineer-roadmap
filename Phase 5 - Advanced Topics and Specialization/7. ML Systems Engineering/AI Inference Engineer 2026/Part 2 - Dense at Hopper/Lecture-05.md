@@ -53,7 +53,7 @@ step t+2:  req5 prefill finishes → batch = [req2.t=14, req3.t=2, req4.t=7, req
 
 The subtle hard part: prefill is compute-bound, decode is memory-bound. Mixing them in the same step can stall the batch.
 
-vLLM 0.7+ V1 uses **chunked prefill** — prefill is split into chunks the size of a decode batch row. Prefill becomes "just another decode-shaped step." This keeps the batch balanced and the GPU at high utilization.
+vLLM 0.22+ V1 uses **chunked prefill** — prefill is split into chunks the size of a decode batch row. Prefill becomes "just another decode-shaped step." This keeps the batch balanced and the GPU at high utilization.
 
 ### 1.4 Throughput impact
 
@@ -158,7 +158,7 @@ LLM(model="...", enable_prefix_caching=True)
 
 SGLang: on by default via RadixAttention.
 
-TRT-LLM 0.18+: supported via `--use_paged_context_fmha`, `kv_cache_reuse=True` at runtime.
+TRT-LLM 1.3+: supported via `--use_paged_context_fmha`, `kv_cache_reuse=True` at runtime.
 
 ---
 
@@ -232,7 +232,7 @@ Speculation is the biggest "free" decode optimization on Hopper for chat workloa
 Combined for Llama 3.3 70B FP8 on 4× H100, chat workload:
 
 ```text
-baseline (vLLM 0.7, no advanced features):       ~250 tok/s/GPU
+baseline (vLLM 0.22, no advanced features):       ~250 tok/s/GPU
 + continuous batching:                           ~580 tok/s/GPU  (already on by default)
 + PagedAttention v2:                             ~610 tok/s/GPU  (3-5% from less fragmentation)
 + prefix cache:                                  ~700 tok/s/GPU  (15-20% for long system prompts)
@@ -300,7 +300,7 @@ A pragmatic order:
 
 Goal: isolate each feature's contribution to throughput and TTFT on a fixed workload.
 
-1. **Baseline** — Llama 3.3 70B FP8 on 4× H100, vLLM 0.7, default config except features-off.
+1. **Baseline** — Llama 3.3 70B FP8 on 4× H100, vLLM 0.22, default config except features-off.
 2. **Add continuous batching + PagedAttention** — measure throughput delta.
 3. **Add prefix cache** — measure TTFT delta on a workload with 1500-token system prompt + 100-token user turns.
 4. **Add chunked prefill** — measure TTFT delta on a workload with 8K-token prompts.
@@ -343,7 +343,7 @@ Cross-references:
 
 ## Current as of 2026-06
 
-Features pinned: vLLM 0.7 V1 (continuous batching, PagedAttention v2, prefix cache, EAGLE-2/3 supported), SGLang 0.4 (RadixAttention), TRT-LLM 0.18 (in-flight batching, KV reuse). Refresh when EAGLE-4 or successor lands, or when a fundamentally new scheduling method (post-continuous-batching) ships.
+Features pinned: vLLM 0.22 V1 (continuous batching, PagedAttention v2, prefix cache, EAGLE-2/3 supported), SGLang 0.5 (RadixAttention), TRT-LLM 1.3 (in-flight batching, KV reuse). Refresh when EAGLE-4 or successor lands, or when a fundamentally new scheduling method (post-continuous-batching) ships.
 
 ---
 

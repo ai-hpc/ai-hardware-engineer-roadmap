@@ -204,7 +204,7 @@ FP8 ≈ 1.7–1.8× throughput improvement. Parity drop on MMLU: ~0.2 pp (well w
 
 For Qwen 2.5 72B numbers are similar but ~5% slower at the same batch due to the slightly larger model.
 
-### 5.3 vLLM 0.7+ FP8 path
+### 5.3 vLLM 0.22+ FP8 path
 
 vLLM's FP8 implementation is approaching TRT-LLM in 2026. Roughly 90% of TRT-LLM throughput for ~50% of the deployment friction (no engine compile step). For chat products where iteration matters, vLLM FP8 is often the practical pick.
 
@@ -222,7 +222,7 @@ FP8 E5M2 (range ±57000) is the safe default for KV.
 * **Halves KV read bandwidth** during decode — meaningful at long context.
 * **Parity drop:** ~0.1–0.3 pp on most evals if per-head scaling is used.
 
-**Per-head scaling** matters. Per-tensor scaling can clip outlier heads (rare-token specialization heads). vLLM 0.7+, SGLang 0.4+, and TRT-LLM all support per-head FP8 KV.
+**Per-head scaling** matters. Per-tensor scaling can clip outlier heads (rare-token specialization heads). vLLM 0.22+, SGLang 0.5+, and TRT-LLM all support per-head FP8 KV.
 
 ### 6.2 INT4 KV cache
 

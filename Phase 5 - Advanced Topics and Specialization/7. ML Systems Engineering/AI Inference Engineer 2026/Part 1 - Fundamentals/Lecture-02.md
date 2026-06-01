@@ -280,7 +280,7 @@ Pass criterion: you can show a chart of decode throughput (tokens/sec) vs batch 
 ## References
 
 * "Reducing Activation Recomputation in Large Transformer Models" — [arXiv:2205.05198](https://arxiv.org/abs/2205.05198) — activation memory math
-* "FlashAttention-3: Fast and Accurate Attention with Asynchrony and Low-precision" — [arXiv:2407.08608](https://arxiv.org/abs/2407.08608)
+* "FlashAttention-4: Fast and Accurate Attention with Asynchrony and Low-precision" — [arXiv:2407.08608](https://arxiv.org/abs/2407.08608)
 * "Efficient Memory Management for Large Language Model Serving with PagedAttention" — [arXiv:2309.06180](https://arxiv.org/abs/2309.06180) — the KV cache as the bottleneck
 * NVIDIA Nsight Systems documentation — [docs.nvidia.com/nsight-systems/](https://docs.nvidia.com/nsight-systems/)
 * NVIDIA Nsight Compute documentation — [docs.nvidia.com/nsight-compute/](https://docs.nvidia.com/nsight-compute/)

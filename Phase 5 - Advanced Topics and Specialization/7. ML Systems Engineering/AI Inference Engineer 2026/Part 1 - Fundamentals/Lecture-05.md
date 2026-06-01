@@ -5,7 +5,7 @@
 The runtime is the layer between the model file and the GPU. It owns:
 
 * The scheduler that turns requests into kernel launches.
-* The kernel selection that decides whether attention is FlashAttention 3 or something older.
+* The kernel selection that decides whether attention is FlashAttention 4 or something older.
 * The memory manager that owns the KV cache.
 * The quantization integration that uses (or fails to use) the FP8 / FP4 / INT4 path on the hardware.
 * The API surface that the rest of the stack talks to.
@@ -114,7 +114,7 @@ vLLM's V0 engine (2023 → early 2025) accumulated complexity. The V1 engine (20
 * **FP4 / Blackwell** — TE2 FP4 path landing in 0.18+; the canonical Blackwell inference path will probably be TRT-LLM.
 * **In-flight batching** — NVIDIA's continuous-batching equivalent.
 * **Triton Inference Server integration** — production serving orchestration.
-* **All NVIDIA kernels** — FlashAttention 3, Hopper TMA, Blackwell WGMMA, all hand-tuned.
+* **All NVIDIA kernels** — FlashAttention 4, Hopper TMA, Blackwell WGMMA, all hand-tuned.
 
 ### 3.2 What it does badly
 
@@ -302,7 +302,7 @@ Cross-references:
 
 ## Current as of 2026-06
 
-Versions pinned: vLLM 0.7.x V1, SGLang 0.4.x, TensorRT-LLM 0.18.x, llama.cpp post-2026-04, MLX 0.21.x. Update when vLLM V1 ships as the unconditional default, or when a runtime ships a breaking API change, or when TRT-LLM's Blackwell FP4 path lands a stable release.
+Versions pinned: vLLM 0.22.x V1, SGLang 0.5.x, TensorRT-LLM 1.3.x, llama.cpp post-2026-04, MLX 0.31.x. Update when vLLM V1 ships as the unconditional default, or when a runtime ships a breaking API change, or when TRT-LLM's Blackwell FP4 path lands a stable release.
 
 ---
 

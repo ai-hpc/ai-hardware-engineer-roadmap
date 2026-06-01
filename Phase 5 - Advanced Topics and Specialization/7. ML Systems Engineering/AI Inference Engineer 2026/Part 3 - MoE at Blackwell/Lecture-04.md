@@ -274,7 +274,7 @@ Goal: produce the disaggregation cost-economics report.
 
 1. **Hardware** — NVL72 partition, ideally 16 GPUs (or 8× B200 cluster).
 2. **Model** — Qwen3-MoE 235B-A22B FP4 (DeepSeek if you have the cluster).
-3. **Runtime** — SGLang 0.4+ with disaggregation.
+3. **Runtime** — SGLang 0.5+ with disaggregation.
 4. **Baseline** — colocated continuous batching on 8× B200 with concurrency=64.
 5. **Candidate** — 4× B200 prefill + 4× B200 decode, same concurrency.
 6. **Measure** — throughput, p99 TTFT, p99 TPOT for chat-shape and long-context-shape workloads.
@@ -311,7 +311,7 @@ Cross-references:
 
 ## Current as of 2026-06
 
-Mooncake / DistServe / Splitwise as the canonical 2024–2025 papers. SGLang 0.4+ has production-quality disaggregation; vLLM V1 experimental. Refresh when major new P/D papers land or when vLLM stabilizes the disaggregation API.
+Mooncake / DistServe / Splitwise as the canonical 2024–2025 papers. SGLang 0.5+ has production-quality disaggregation; vLLM V1 experimental. Refresh when major new P/D papers land or when vLLM stabilizes the disaggregation API.
 
 ---
 

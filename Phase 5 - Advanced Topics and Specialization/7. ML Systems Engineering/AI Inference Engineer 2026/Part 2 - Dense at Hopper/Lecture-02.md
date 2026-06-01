@@ -11,7 +11,7 @@ This lecture covers:
 3. **Transformer Engine** — the FP8 mixed-precision system that defines Hopper's inference advantage.
 4. **TMA (Tensor Memory Accelerator)** — asynchronous global → shared memory copies that hide HBM latency.
 5. **WGMMA (Warp-Group Matrix Multiply Accumulate)** — Hopper's async tensor core operation.
-6. CUDA / cuDNN / FlashAttention-3 — the software stack that exposes the silicon.
+6. CUDA / cuDNN / FlashAttention-4 — the software stack that exposes the silicon.
 7. What this means for Llama 3.3 70B and Qwen 2.5 72B specifically.
 
 By the end you should be able to explain why H200 is "the same H100 with better memory" produces a 30–45% inference speedup on these models — and why TensorRT-LLM with FP8 unlocks the second half of the silicon's potential.
@@ -34,7 +34,7 @@ The H100 was the first NVIDIA chip with **native FP8 tensor cores**. This is the
 
 * **228 KB shared memory + L1** per SM (configurable split).
 * **Tensor Memory Accelerator (TMA)** — async DMA engine inside the SM (more in §4).
-* **Distributed Shared Memory (DSM)** — direct SM-to-SM access via shared memory, used by FlashAttention 3.
+* **Distributed Shared Memory (DSM)** — direct SM-to-SM access via shared memory, used by FlashAttention 4.
 * **Thread Block Clusters** — groups of cooperating thread blocks that can share data via DSM.
 
 These features collectively let kernels overlap matmul compute with memory movement and reach close to the 989 BF16 TFLOPs peak.
@@ -115,8 +115,8 @@ For decode (bandwidth-bound), FP8 weights produce a near-2× throughput improvem
 ### 3.4 TensorRT-LLM, vLLM, SGLang FP8 paths
 
 * **TensorRT-LLM** — earliest and most mature FP8 path. Uses NVIDIA's TE directly. Best parity, best throughput.
-* **vLLM 0.7+** — FP8 weight + activation supported via Marlin kernels (community) and TE integration. Approaching TRT-LLM throughput.
-* **SGLang 0.4+** — FP8 support landing; not as mature as the other two for dense models. Catching up on MoE where it focuses its effort.
+* **vLLM 0.22+** — FP8 weight + activation supported via Marlin kernels (community) and TE integration. Approaching TRT-LLM throughput.
+* **SGLang 0.5+** — FP8 support landing; not as mature as the other two for dense models. Catching up on MoE where it focuses its effort.
 
 For Llama 3.3 70B or Qwen 2.5 72B on Hopper, FP8 production deployment in mid-2026 generally means TRT-LLM unless you have a specific reason to use vLLM (multi-modal, multi-LoRA, OpenAI-API flexibility).
 
@@ -131,10 +131,10 @@ Pre-Hopper, loading a matmul tile required threads to issue `ld.global` instruct
 ### 4.1 Why it matters for inference
 
 * **FFN matmuls** are tiled. Each tile load is ~64–128 KB. Without TMA, this load blocks the SM. With TMA, it overlaps with the previous tile's compute.
-* **FlashAttention 3** uses TMA aggressively. It is the key reason FA3 is ~1.5–2× faster than FA2 on Hopper for the same operation.
+* **FlashAttention 4** uses TMA aggressively. It is the key reason FA3 is ~1.5–2× faster than FA2 on Hopper for the same operation.
 * **GEMM throughput** on H100 reaches ~90% of peak only when TMA + WGMMA are used together. Older kernels stuck at 60–70%.
 
-You do not write TMA code directly as an inference engineer. You ensure your runtime uses kernels that use it — vLLM 0.7+, SGLang 0.4+, TRT-LLM, FlashAttention 3 all do.
+You do not write TMA code directly as an inference engineer. You ensure your runtime uses kernels that use it — vLLM 0.22+, SGLang 0.5+, TRT-LLM, FlashAttention 4 all do.
 
 ---
 
@@ -162,7 +162,7 @@ The Hopper hardware features are only useful through the software stack:
 |-------|-----------|------------------------|
 | Driver | NVIDIA driver | R555+ for full Hopper feature set |
 | CUDA | CUDA toolkit | 12.6+ |
-| cuBLAS | matmul library | latest with CUDA 12.6 |
+| cuBLAS | matmul library | latest with CUDA 13.3 |
 | cuDNN | DNN primitives | 9.x (Hopper-optimized) |
 | FlashAttention | attention kernels | FA3 (3.0+) |
 | Transformer Engine | FP8 mixed precision | 1.10+ |
@@ -241,7 +241,7 @@ Pass criterion: you see 1.6–1.9× FP8 speedup over FP16 on the FFN shape, and 
 * NVIDIA H100 Tensor Core GPU Architecture whitepaper — [nvidia.com/en-us/data-center/h100/](https://www.nvidia.com/en-us/data-center/h100/)
 * NVIDIA H200 product page — [nvidia.com/en-us/data-center/h200/](https://www.nvidia.com/en-us/data-center/h200/)
 * NVIDIA Transformer Engine documentation — [docs.nvidia.com/deeplearning/transformer-engine/user-guide/](https://docs.nvidia.com/deeplearning/transformer-engine/user-guide/)
-* "FlashAttention-3: Fast and Accurate Attention with Asynchrony and Low-precision" — [arXiv:2407.08608](https://arxiv.org/abs/2407.08608)
+* "FlashAttention-4: Fast and Accurate Attention with Asynchrony and Low-precision" — [arXiv:2407.08608](https://arxiv.org/abs/2407.08608)
 * CUDA 12.x Hopper Programming Guide — [docs.nvidia.com/cuda/](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html)
 * NCCL documentation — [docs.nvidia.com/deeplearning/nccl/](https://docs.nvidia.com/deeplearning/nccl/)
 
@@ -254,7 +254,7 @@ Cross-references:
 
 ## Current as of 2026-06
 
-Stack versions pinned: driver R555+, CUDA 12.6+, FA3 3.0+, TE 1.10+. Refresh when CUDA 13 / FA4 / TE 2.x lands or when a Hopper successor (post-Blackwell) ships.
+Stack versions pinned: driver R580+, CUDA 13.0+, FA3 3.0+, TE 2.x. Refresh when CUDA 13 / FA4 / TE 2.x lands or when a Hopper successor (post-Blackwell) ships.
 
 ---
 
