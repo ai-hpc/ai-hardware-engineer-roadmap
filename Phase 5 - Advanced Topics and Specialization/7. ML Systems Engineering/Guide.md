@@ -752,6 +752,17 @@ Do not stop at "it runs." The milestone is complete when you can explain why it 
 
 ---
 
+## Featured Special Course
+
+- [**AI Inference Engineer 2026**](AI%20Inference%20Engineer%202026/README.md) — three-part deep dive on the modern production inference stack:
+  - **Part 1 — Fundamentals** (5 lectures): the mental model, transformer execution, roofline, the FP16→FP8→FP4→INT4 precision stack, the runtime landscape
+  - **Part 2 — Dense at Hopper** (6 lectures): Llama 3.3 70B ↔ Qwen 2.5 72B side-by-side on H100/H200, quantization recipes including the LLaMA-3-70B W8A8 anomaly, tensor parallelism, the modern serving stack, 128K context
+  - **Part 3 — MoE at Blackwell** (5 lectures, in development): DeepSeek V3.1 + Qwen3-MoE 235B-A22B on B200/GB200 NVL72
+
+Anchored on the most recent open-weights models and current runtime versions, with a [refresh log](AI%20Inference%20Engineer%202026/REFRESH-LOG.md) that tracks every version pin.
+
+---
+
 ## Edge MLSys Specialization
 
 For this roadmap, the strongest niche is **Edge MLSys + Inference Runtime Engineering**.

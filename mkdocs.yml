@@ -550,3 +550,21 @@ nav:
         - "05": Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Lectures/Lecture-05.md
     - "G: ML Systems Engineering":
       - Guide: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Guide.md
+      - "AI Inference Engineer 2026":
+        - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/README.md
+        - "Refresh Log": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/REFRESH-LOG.md
+        - "Part 1 — Fundamentals":
+          - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/README.md
+          - "01: The 2026 Inference Engineer's Mental Model": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-01.md
+          - "02: Transformer Execution — Tokens to Bits": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-02.md
+          - "03: Roofline, Bandwidth, Memory Hierarchy": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-03.md
+          - "04: The Precision Stack FP16→FP4": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-04.md
+          - "05: The Runtime Landscape": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-05.md
+        - "Part 2 — Dense at Hopper":
+          - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/README.md
+          - "01: Anatomy of a 70B Dense Model": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-01.md
+          - "02: Hopper Hardware Story": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-02.md
+          - "03: Quantizing Llama 3.3 70B and Qwen 2.5 72B": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-03.md
+          - "04: Tensor Parallelism on 8× Hopper": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-04.md
+          - "05: Modern Serving Stack": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-05.md
+          - "06: Long Context at 128K on Hopper": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-06.md
