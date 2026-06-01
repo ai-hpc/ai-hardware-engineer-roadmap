@@ -390,7 +390,8 @@ YaRN extension as published by both model teams. FP8 KV per-head as the producti
 
 ## End of Part 2
 
-You have completed the dense-at-Hopper portion of this course.
+You have completed the dense-at-Hopper portion of this course. The harness, precision recipes, TP-scaling discipline, and serving knobs from Part 2 all carry forward — Part 3 reuses them and extends the harness to sparse MoE on Blackwell.
 
-* Up: [AI Inference Engineer 2026](../README.md)
-* Next: [Part 3 — MoE at Blackwell](../Part%203%20-%20MoE%20at%20Blackwell/) (in development — DeepSeek V3.1 + Qwen3-MoE 235B-A22B anchors)
+* Next: [Part 3 — MoE at Blackwell](../Part%203%20-%20MoE%20at%20Blackwell/README.md) — DeepSeek V3.1 + Qwen3-MoE 235B-A22B anchors, EP, FP4, disaggregated P/D
+* Previous: [Lecture 05 — Modern serving stack](Lecture-05.md)
+* Up: [Part 2 — Dense at Hopper](README.md)
