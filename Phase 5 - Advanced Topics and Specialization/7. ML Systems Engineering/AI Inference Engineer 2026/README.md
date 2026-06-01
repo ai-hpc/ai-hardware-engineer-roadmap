@@ -26,6 +26,8 @@ This course is structured as **three parts** that can be read independently or a
 * Phase 3 — [Neural Networks → Transformer Fundamentals](../../../Phase%203%20-%20Artificial%20Intelligence/1.%20Neural%20Networks/Transformer%20Fundamentals/Lecture-01.md) — Q/K/V, attention, multi-head, the full block.
 * Comfort reading Rust or C++ for kernel work, Python for runtime and benchmark glue.
 
+**Wider context (optional companion):** this course is deliberately narrow — *production inference only*. For the surrounding LLM lifecycle it assumes or skips (pre-training, fine-tuning / preference alignment, RAG, agents, evaluation), the open-source **[mlabonne/llm-course](https://github.com/mlabonne/llm-course)** (Apache-2.0) is an excellent broad companion. It is more introductory on the inference/quantization/serving axis than this course — think of it as the map of the whole territory, with this course as the deep dive into the inference quadrant.
+
 **What comes after:** a reproducible inference benchmark repo for a model + runtime + hardware target of your choice, with a parity report against a published reference and a measured $/MTok cost line.
 
 ---

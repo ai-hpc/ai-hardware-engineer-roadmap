@@ -11,6 +11,7 @@ When a lecture is refreshed, update its `## Current as of YYYY-MM` line *and* ad
 - **FlashInfer** — added to **Part 2 Lecture 05 §2.4** as the shared, JIT-compiled attention + sampling kernel engine that vLLM / SGLang / TensorRT-LLM / MLC-LLM build on (paged/ragged attention, sorting-free sampling, customizable variants). Framed as the "which attention backend" knob (`VLLM_ATTENTION_BACKEND=FLASHINFER`, SGLang `--attention-backend flashinfer`). Source: [arXiv:2501.01005](https://arxiv.org/abs/2501.01005) (MLSys 2025), Apache-2.0, `flashinfer-ai`.
 - **SemiAnalysis InferenceX** — added to the course **README currency section** as the recommended *live* cross-stack benchmark reference (tokens/s, perf/$, tokens/MW across H100→GB300 NVL72 / MI355X, vLLM/SGLang/TRT-LLM). Apache-2.0; live dashboard at inferencex.com. The point: lecture numbers are teaching anchors, the dashboard is truth-at-deployment.
 - Reviewed the Together AI inference-optimization blog; its concepts (FP8/FP4, speculative decoding, MTP, distillation) are already covered with primary sources, so no blog numbers were imported (per the primary-source rule).
+- Reviewed **mlabonne/llm-course** (Apache-2.0, 79k★). It is broad and more introductory on the inference axis than this course (no technical gap to import — e.g., SmoothQuant is already covered in Part 1 Lecture 04). Added it to the README as an *optional wider-context companion* for the surrounding LLM lifecycle (training / fine-tuning / RAG / agents / eval) that this inference-only course skips.
 
 ---
 
