@@ -1,0 +1,22 @@
+{#-
+  Overrides Material's footer copyright slot to show a total-visitor count on the
+  SAME footer-meta bar as the social links (copyright sits left, social right).
+
+  Counter: no-signup visitorbadge.io. Caveat: sends each visitor's IP to that
+  third party and fails gracefully (broken image only) if the service is down.
+  To switch to privacy-friendly analytics, replace the <img> with a GoatCounter
+  script (needs a free site code).
+-#}
+<div class="md-copyright">
+  {% if config.copyright %}
+    <div class="md-copyright__highlight">{{ config.copyright }}</div>
+  {% endif %}
+  <a href="https://github.com/ai-hpc/ai-hardware-engineer-roadmap" target="_blank" rel="noopener" title="Total visitors" style="display:inline-flex;align-items:center;">
+    <img
+      src="https://api.visitorbadge.io/api/visitors?path=https%3A%2F%2Fai-hpc.github.io%2Fai-hardware-engineer-roadmap%2F&label=Total%20visitors&labelColor=%23303f9f&countColor=%233f51b5&style=flat"
+      alt="Total visitors"
+      loading="lazy"
+      referrerpolicy="no-referrer"
+      style="height:20px;vertical-align:middle;" />
+  </a>
+</div>
