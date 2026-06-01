@@ -876,3 +876,93 @@
   border-bottom-color: rgba(191, 219, 254, 0.98);
   box-shadow: none;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   Readability & typography refinements
+   Layered on top of the theme above; tweak/remove this block to revert.
+   Goal: cleaner, calmer, easier-to-read long-form prose.
+   ════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Crisp modern native font stack (replaces Helvetica/Arial) */
+  --md-text-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Inter", "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Comfortable body rhythm for long-form reading */
+.md-typeset {
+  font-size: 0.82rem;
+  line-height: 1.72;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.md-typeset p,
+.md-typeset li {
+  line-height: 1.72;
+}
+
+.md-typeset p {
+  margin: 0.85em 0;
+}
+
+.md-typeset ul,
+.md-typeset ol {
+  margin: 0.7em 0;
+}
+
+.md-typeset li + li {
+  margin-top: 0.32em;
+}
+
+.md-typeset li > ul,
+.md-typeset li > ol {
+  margin: 0.3em 0 0.16em;
+}
+
+/* Headings: a little more breathing room above for clearer section breaks */
+.md-typeset h2 {
+  margin-top: 2.4rem;
+}
+
+.md-typeset h3 {
+  margin-top: 1.85rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Clearer, calmer links */
+.md-typeset a {
+  text-underline-offset: 0.16em;
+  text-decoration-thickness: 0.07em;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+.md-typeset a:not(.md-button):hover {
+  text-decoration: underline;
+}
+
+/* Emphasis that scans without shouting */
+.md-typeset strong {
+  font-weight: 650;
+}
+
+/* Optimal reading measure on wide screens — prose only.
+   Tables, code blocks, and images keep full width. */
+@media screen and (min-width: 1240px) {
+  .md-content__inner > p,
+  .md-content__inner > ul,
+  .md-content__inner > ol,
+  .md-content__inner > blockquote {
+    max-width: 52rem;
+  }
+}
+
+/* Calmer table hover (subtle tint instead of an accent flash) */
+.md-typeset table:not([class]) tr:hover td {
+  background: var(--md-default-fg-color--lightest);
+}
+
+/* Dark-mode: keep body text comfortably legible (not washed out) */
+[data-md-color-scheme="slate"] .md-typeset {
+  color: rgba(236, 240, 248, 0.9);
+}
