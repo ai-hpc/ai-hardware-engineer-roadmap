@@ -63,13 +63,11 @@ The Blackwell stack for modern MoE — DeepSeek V3.1 (with MLA + MTP) and Qwen3-
 
 | # | Title |
 |---|-------|
-| 01 | Anatomy of a modern MoE — DeepSeek V3.1 and Qwen3-MoE 235B-A22B |
-| 02 | Blackwell hardware story — B200, B300, GB200 NVL72, Transformer Engine 2, FP4 |
-| 03 | Expert parallelism (EP) and the gating hot path |
-| 04 | Disaggregated prefill / decode — Mooncake, Splitwise, DistServe |
-| 05 | Production MoE serving — MTP speculation, constrained decode, cost model |
-
-*Part 3 is planned and will follow Part 1 + Part 2.*
+| 01 | [Anatomy of a modern MoE — DeepSeek V3.1 and Qwen3-MoE 235B-A22B](Part%203%20-%20MoE%20at%20Blackwell/Lecture-01.md) |
+| 02 | [Blackwell hardware story — B200, B300, GB200 NVL72, Transformer Engine 2, FP4](Part%203%20-%20MoE%20at%20Blackwell/Lecture-02.md) |
+| 03 | [Expert parallelism (EP) and the gating hot path](Part%203%20-%20MoE%20at%20Blackwell/Lecture-03.md) |
+| 04 | [Disaggregated prefill / decode — Mooncake, Splitwise, DistServe](Part%203%20-%20MoE%20at%20Blackwell/Lecture-04.md) |
+| 05 | [Production MoE serving — MTP speculation, constrained decode, cost model](Part%203%20-%20MoE%20at%20Blackwell/Lecture-05.md) |
 
 ---
 

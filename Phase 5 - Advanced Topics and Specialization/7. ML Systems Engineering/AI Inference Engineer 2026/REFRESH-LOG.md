@@ -6,6 +6,10 @@ When a lecture is refreshed, update its `## Current as of YYYY-MM` line *and* ad
 
 ---
 
+## 2026-06 — Part 3 published (course complete)
+
+All three parts now shipped. Part 3 (MoE at Blackwell) lands with five lectures: MoE anatomy (DeepSeek V3.1 + Qwen3-MoE 235B-A22B), Blackwell hardware (B200/B300/GB200 NVL72, TE2, FP4), expert parallelism + gating, disaggregated prefill/decode (Mooncake/Splitwise/DistServe), and the production serving recipe + `$/MTok` cost model.
+
 ## 2026-06 — Initial publication
 
 Course launched. Parts 1 and 2 complete; Part 3 outlined.
