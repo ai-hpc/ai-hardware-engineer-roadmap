@@ -180,7 +180,7 @@ So:
 * 61 total layers; first 3 are standard dense FFN, the remaining 58 use MoE.
 * Each MoE layer has 256 + 1 = 257 experts.
 * Each token routes to 8 of 256 routed experts plus the 1 shared expert.
-* Each expert is a SwiGLU FFN with intermediate size 2048 (much smaller than the dense FFN, which is ~12288 wide).
+* Each expert is a SwiGLU FFN with intermediate size 2048 (much smaller than DeepSeek V3's dense FFN, which is 18432 wide — ~9× larger).
 
 Param count per MoE layer:
 

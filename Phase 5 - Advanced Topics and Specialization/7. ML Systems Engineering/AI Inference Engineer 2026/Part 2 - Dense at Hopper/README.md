@@ -3,9 +3,9 @@
 The end-to-end production inference stack for 70B-class dense models on Hopper-class hardware (H100 / H200). Six lectures, anchored on a side-by-side comparison of two of the most-deployed dense models in 2025–2026:
 
 * **Llama 3.3 70B Instruct** — the canonical Western dense workhorse, 8192 hidden, 28672 FFN, GQA (64 Q / 8 KV), bias-free attention.
-* **Qwen 2.5 72B Instruct** — the canonical Chinese dense counterpart, **wider** at 12288 hidden / 49152 FFN, same GQA shape (64 Q / 8 KV), QKV bias present, multilingual tokenizer.
+* **Qwen 2.5 72B Instruct** — the canonical Chinese dense counterpart, dimensionally near-identical (8192 hidden, *slightly* wider 29568 FFN, same GQA 64 Q / 8 KV), differing in QKV bias (present) and a larger multilingual tokenizer (152K vocab). *(Beware secondary sources that misquote Qwen as 12288 / 49152 — Lecture 01 §2.1 shows why that fails a parameter-count check.)*
 
-Both models share the same family-shape (80 layers, 128K context, GQA, RoPE, RMSNorm, SwiGLU). They differ in dimensions, tokenizer, and one tiny architectural detail (QKV bias). The pair is the highest-information teaching anchor in the dense space because *every concept lands on two concrete deployable systems* with measurable cost differences.
+Both models share the same family-shape (80 layers, 128K context, GQA, RoPE, RMSNorm, SwiGLU) **and the same core dimensions**. They differ only in the tokenizer/vocab, a ~3% wider FFN, and one tiny architectural detail (QKV bias). The pair is the highest-information teaching anchor in the dense space because *every concept lands on two concrete deployable systems* — and the near-identical geometry isolates the differences that actually matter.
 
 By the end of Part 2 you should be able to ship either model to production on 4–8× H200, defend the precision recipe, defend the runtime choice, and produce reproducible benchmarks for TTFT / TPOT / throughput / $/MTok / parity-vs-reference.
 
@@ -34,7 +34,7 @@ A single benchmark repo, extending the harness from Part 1, that contains:
 
 You can do all of:
 
-* Sketch the inference graph difference between Llama 3.3 70B and Qwen 2.5 72B and explain why Qwen's wider FFN costs more bandwidth at decode despite identical KV cost per token.
+* Sketch the inference graphs of Llama 3.3 70B and Qwen 2.5 72B, show they are dimensionally near-identical (same 8192 hidden, same KV cost per token), and name where the real differences live — vocab/tokenizer, a ~3% wider FFN, and QKV bias.
 * Defend AWQ-INT4 over GPTQ for these models in two sentences, citing the relevant arXiv anomaly.
 * Walk the all-reduce step in tensor parallelism on 8× H100 and explain why ring vs tree NCCL matters.
 * Predict the TTFT change from enabling chunked prefill at 32K context on H200, then verify.
