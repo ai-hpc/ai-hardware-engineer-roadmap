@@ -1069,3 +1069,26 @@
 [data-md-color-scheme="slate"] .md-typeset .highlight .vg, [data-md-color-scheme="slate"] .md-typeset .highlight .vi { color: #f6c177; }
 [data-md-color-scheme="slate"] .md-typeset .highlight .o,  [data-md-color-scheme="slate"] .md-typeset .highlight .ow { color: #ff7b72; }
 [data-md-color-scheme="slate"] .md-typeset .highlight .nd { color: #c792ea; }
+
+/* ════════════════════════════════════════════════════════════════
+   Plain-text / ASCII-diagram blocks (```text or no language):
+   white (page) background + a thin colored border, instead of the
+   grey code fill. Real code blocks (```python, ```bash, …) keep the
+   subtle code background and the token colors above.
+   ════════════════════════════════════════════════════════════════ */
+
+.md-typeset .highlight.language-text,
+.md-typeset .highlight.language-text pre,
+.md-typeset .highlight.language-text pre > code {
+  background: var(--md-default-bg-color) !important;
+}
+
+.md-typeset .highlight.language-text > pre {
+  border: 1px solid color-mix(in srgb, var(--md-primary-fg-color) 30%, transparent);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.md-typeset .highlight.language-text > pre > code {
+  color: var(--md-default-fg-color);
+}
