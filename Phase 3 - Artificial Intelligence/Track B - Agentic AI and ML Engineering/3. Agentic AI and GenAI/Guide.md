@@ -124,7 +124,7 @@ The capstone: apply Modules 1–4 by building **genie-claw** — your own minima
 | [Lab 03](Lectures/Lab-03-Production-RAG.md) | Production RAG system |
 | [Lab 04](Lectures/Lab-04-TokenJuice-Output-Compaction.md) | TokenJuice output compaction |
 | [Lab 05](Lectures/Lab-05-OpenMeow-App-SDK-Dogfood.md) | OpenMeow App SDK dogfood (macOS) |
-| **Capstone** | **genie-claw** — a local-first agent harness wiring it all together |
+| [**Lab 06 · Capstone**](Lectures/Lab-06-Genie-Claw-Capstone.md) | **genie-claw** — build your own minimal agent harness end-to-end |
 
 </div>
 
