@@ -24,7 +24,7 @@ By the end you should be able to:
 
 ## 1. Platform Configuration — The First 50× Win
 
-Before anything else, lock down the platform. The Orin Nano 8 GB has three power modes; the difference between mode 0 (15 W) and mode 1 (7 W) is roughly **3× in tok/s** for memory-bandwidth-bound workloads.
+Before anything else, **lock down the platform**. The Orin Nano 8 GB has three power modes; the difference between mode 0 (15 W) and mode 1 (7 W) is roughly **3× in tok/s** for memory-bandwidth-bound workloads.
 
 ```bash
 # Step 1: maximum performance
@@ -155,7 +155,7 @@ This is a clean win because both matrices have the same quant type (both Q4_K in
 
 After fusion the per-token kernel count drops from ~470 to ~250. Still a lot. Each launch is ~5–10 µs on Orin.
 
-CUDA Graphs let you capture the entire decode-one-token computation once and re-launch as a single graph node:
+CUDA Graphs let you **capture the entire decode-one-token computation once** and re-launch as a single graph node:
 
 ```c++
 cudaGraph_t graph;
@@ -187,7 +187,7 @@ Constraints to know:
 
 ## 6. FlashAttention-Decode for the Attention Block
 
-The `flash_attention_decode_kernel` you saw in the build log is the canonical optimization for the attention step. The idea: instead of materializing the `[seq_len × seq_len]` attention-score matrix, tile across the KV cache and accumulate `softmax · V` on-chip.
+The `flash_attention_decode_kernel` you saw in the build log is the **canonical optimization** for the attention step. The idea: instead of materializing the `[seq_len × seq_len]` attention-score matrix, **tile across the KV cache** and accumulate `softmax · V` on-chip.
 
 For decode specifically the operation is:
 
@@ -236,7 +236,7 @@ Most production runtimes (vLLM, SGLang, TRT-LLM) ship INT8 KV as a one-flag opti
 
 ## 8. Speculative Decoding — The Last 1.5×
 
-The decoded sequence is autoregressive: every token depends on the previous. Speculative decoding breaks this by:
+The decoded sequence is **autoregressive**: every token depends on the previous. Speculative decoding breaks this by:
 
 1. Running a **small draft model** (say, Qwen3-0.5B at Q4) for the next K tokens.
 2. Running the **target model** (Qwen3-4B-Q4_K_M) on those K candidates **in parallel** (one forward pass with seq_len = K).

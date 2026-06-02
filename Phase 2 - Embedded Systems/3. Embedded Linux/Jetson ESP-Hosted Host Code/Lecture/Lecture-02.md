@@ -40,7 +40,7 @@ Lecture 5 explains why loadable modules and board description are separate conce
 
 Lecture 17 explains driver binding and the Linux device model, which is the right mental model for the `spidev` unbind step. The script is not “doing something hacky”; it is clearing a generic driver off a real SPI device so the intended driver can bind to the same kernel object.
 
-The important Embedded Linux idea here is that “loading a module” is not the same as “hardware is now usable.” A module can load successfully and still fail to bind the right device, fail to claim the right GPIOs, or fail later when it tries to register itself with Wi‑Fi or Bluetooth subsystems.
+The important Embedded Linux idea here is that **“loading a module” is not the same as “hardware is now usable.”** A module can load successfully and still fail to bind the right device, fail to claim the right GPIOs, or fail later when it tries to register itself with Wi‑Fi or Bluetooth subsystems.
 
 That is also why this lecture spends so much time on shell script policy. In real systems, a small wrapper script often carries the board truth: which bus is real, which GPIO numbering scheme the kernel expects, whether reset is safe to drive, and whether a generic placeholder driver like `spidev` must be removed first.
 
@@ -119,7 +119,7 @@ Why that mattered on real hardware:
 This is an Embedded Linux lesson many people miss:
 
 - reset is not “just another GPIO”
-- reset is a board-level control policy
+- reset is a **board-level control policy**
 
 You can still design a later automation path, but stable bring-up comes first.
 
@@ -154,7 +154,7 @@ The `Makefile` assembles:
   - `esp_debugfs.o`
   - `esp_log.o`
 
-That split is exactly what you want to see in a portable Embedded Linux driver:
+That split is exactly what you want to see in a **portable Embedded Linux driver**:
 
 - one transport-specific module slice
 - one mostly transport-agnostic Linux integration layer
@@ -198,7 +198,7 @@ Why this is necessary:
 - but the generic `spidev` driver may already own that SPI device
 - the real host module cannot use it cleanly until that generic binding is removed
 
-This is a classic Embedded Linux pattern:
+This is a **classic Embedded Linux pattern**:
 
 - first you prove the bus exists with a generic tool path
 - then you disable the generic owner so the real subsystem driver can claim it
@@ -239,7 +239,7 @@ The Jetson fork adds module parameters for:
 Why this matters:
 
 - the original board assumptions no longer have to be compiled in
-- board mapping becomes a load-time decision
+- board mapping becomes a **load-time decision**
 - debugging bus and GPIO problems becomes much faster
 
 That is exactly how Embedded Linux code should evolve when it leaves a single-board tutorial phase.

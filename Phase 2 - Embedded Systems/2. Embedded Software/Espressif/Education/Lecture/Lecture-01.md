@@ -86,14 +86,14 @@ Random tutorial learning usually gives you:
 - little structure
 - weak understanding of what comes next
 
-The official education page is better because it frames development as a path:
+The official education page is better because it frames development as a **path**:
 
 - basics first
 - board understanding next
 - examples after that
 - solution specialization later
 
-That is much closer to how a real embedded engineer should learn.
+That is much closer to how a real **embedded engineer** should learn.
 
 ---
 

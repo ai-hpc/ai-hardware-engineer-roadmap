@@ -4,9 +4,9 @@
 
 ---
 
-Modern agent products are no longer just chat boxes.
+Modern agent products are no longer just **chat boxes**.
 
-They are becoming workspaces:
+They are becoming **workspaces**:
 
 ```text
 agents
@@ -27,7 +27,7 @@ OpenCoven is a useful case study because it is organized around this idea:
 
 The important lesson is not one specific repository.
 
-The lesson is how to split an agent workspace into clean runtime pieces without collapsing everything into one unsafe monolith.
+The lesson is how to split an agent workspace into **clean runtime pieces** without collapsing everything into one unsafe monolith.
 
 ---
 
@@ -59,7 +59,7 @@ user
   -> tool calls
 ```
 
-That is too small for real engineering work.
+That is **too small** for real engineering work.
 
 Real builders move across:
 
@@ -73,7 +73,7 @@ Real builders move across:
 - multiple harnesses such as Codex and Claude Code
 - external clients such as desktop apps and dashboards
 
-The failure mode is fragmentation:
+The failure mode is **fragmentation**:
 
 ```text
 one tool owns the terminal
@@ -84,15 +84,15 @@ another owns desktop automation
 another owns session history
 ```
 
-The workspace becomes impossible to reason about.
+The workspace becomes **impossible to reason about**.
 
-OpenCoven's direction is to make these surfaces coherent while keeping the authority boundaries explicit.
+OpenCoven's direction is to make these surfaces coherent while keeping the **authority boundaries explicit**.
 
 ---
 
 ## 2. The OpenCoven ecosystem map
 
-OpenCoven is an organization/ecosystem, not one single runtime.
+OpenCoven is an **organization/ecosystem**, not one single runtime.
 
 The useful mental model:
 
@@ -123,7 +123,7 @@ Each boundary has a contract.
 No component should silently widen another component's authority.
 ```
 
-That is the main production lesson.
+That is the **main production lesson**.
 
 ---
 
@@ -164,13 +164,13 @@ Memory / trace layer
   - durable memories
 ```
 
-OpenCoven is interesting because its pieces map onto these layers instead of pretending one app should own everything.
+OpenCoven is interesting because its pieces map onto these layers instead of pretending **one app should own everything**.
 
 ---
 
 ## 4. Coven: the local harness substrate
 
-Coven is the clearest technical center of the OpenCoven ecosystem.
+Coven is the **clearest technical center** of the OpenCoven ecosystem.
 
 Its thesis:
 
@@ -178,7 +178,7 @@ Its thesis:
 One project. Any harness. Visible work.
 ```
 
-Coven runs coding agents and future harnesses inside explicit local project boundaries.
+Coven runs coding agents and future harnesses inside **explicit local project boundaries**.
 
 The first target harnesses are local CLI-style agents such as:
 
@@ -197,7 +197,7 @@ Core capabilities:
 | SQLite-backed history | session metadata and event logs survive restarts |
 | Rust authority layer | launch, cwd, input, kill, and path checks are revalidated in Rust |
 
-This is not "another chat UI."
+This is **not "another chat UI."**
 
 It is closer to:
 
@@ -209,7 +209,7 @@ local process supervisor + PTY manager + session/event database + safe project b
 
 ## 5. Coven command flow
 
-The user-facing loop is intentionally simple:
+The user-facing loop is **intentionally simple**:
 
 ```bash
 cd /path/to/project
@@ -234,15 +234,15 @@ coven run
   -> expose status and events through local socket API
 ```
 
-This gives agents a shared "room" to run in.
+This gives agents a shared **"room"** to run in.
 
-The user or another client can attach later instead of losing the work when a terminal closes.
+The user or another client can **attach later** instead of losing the work when a terminal closes.
 
 ---
 
 ## 6. The local API as the product contract
 
-Coven exposes a small local API over a Unix socket.
+Coven exposes a **small local API** over a Unix socket.
 
 The important endpoints:
 
@@ -264,7 +264,7 @@ The Rust daemon is the authority.
 Clients are presentation/integration layers.
 ```
 
-This matters because it prevents a UI or plugin from becoming the real policy engine by accident.
+This matters because it prevents a UI or plugin from becoming the **real policy engine by accident**.
 
 ---
 
@@ -287,7 +287,7 @@ That means Rust owns:
 
 TypeScript, UI clients, OpenClaw plugins, and wrappers may validate inputs for UX.
 
-But they do not get final authority.
+But they do not get **final authority**.
 
 Correct model:
 
@@ -302,7 +302,7 @@ Wrong model:
 The UI checked the path, so the daemon can trust it.
 ```
 
-For local agents that can edit repositories and run commands, this boundary is not optional.
+For local agents that can edit repositories and run commands, this boundary is **not optional**.
 
 ---
 
@@ -349,7 +349,7 @@ Coven supervises local harness sessions.
 The plugin adapts between them.
 ```
 
-Do not collapse these roles.
+**Do not collapse these roles.**
 
 ---
 
@@ -394,13 +394,13 @@ For external apps, the stable nouns are:
 - approvals
 - normalized events
 
-The app should build UI state from normalized events, not from provider-specific raw streams.
+The app should build UI state from **normalized events**, not from provider-specific raw streams.
 
 ---
 
 ## 10. desktop-use: keep OS automation outside the core
 
-Desktop automation is powerful and dangerous.
+Desktop automation is **powerful and dangerous**.
 
 OpenCoven's `desktop-use` repo takes a narrow-adapter approach.
 
@@ -493,7 +493,7 @@ observe
 
 This is the correct direction for desktop agents.
 
-An agent that controls a machine must be observable before it is autonomous.
+An agent that controls a machine must be **observable before it is autonomous**.
 
 ---
 
@@ -525,7 +525,7 @@ PsiClaw
   explores local desktop VLM training, evals, and operator UX
 ```
 
-This split is more important than any individual tool name.
+This split is **more important than any individual tool name**.
 
 It teaches a durable architecture principle:
 
@@ -537,7 +537,7 @@ Separate orchestration, harness execution, UI, desktop actuation, and model trai
 
 ## 13. Why this matters for AI hardware engineers
 
-This course is about AI hardware, but agent workspaces matter because they shape inference demand.
+This course is about AI hardware, but agent workspaces matter because they **shape inference demand**.
 
 OpenCoven-style systems create workloads that look different from simple chatbot inference:
 
@@ -561,7 +561,7 @@ For hardware and systems engineers, this affects:
 - UI perception workload design
 - safe command execution on developer machines
 
-A desktop companion agent is not just "one model call."
+A desktop companion agent is **not just "one model call."**
 
 It is a system of:
 
@@ -569,7 +569,7 @@ It is a system of:
 perception + planning + tools + approvals + traces + local process control
 ```
 
-That is why Jetson, Apple Silicon, workstation GPUs, and local inference runtimes matter.
+That is why **Jetson, Apple Silicon, workstation GPUs, and local inference runtimes** matter.
 
 ---
 
@@ -586,7 +586,7 @@ If an agent is modifying a project, the user should be able to inspect:
 - what action is currently pending
 - how to attach or stop it
 
-Invisible autonomy is a debugging and safety failure.
+**Invisible autonomy** is a debugging and safety failure.
 
 ### Principle 2: Keep boundaries boring
 
@@ -620,11 +620,11 @@ The daemon that launches processes must revalidate:
 - input target
 - path-sensitive requests
 
-Never outsource that to a UI.
+**Never outsource that to a UI.**
 
 ### Principle 4: Prefer adapters over core coupling
 
-OpenClaw should not absorb every runtime.
+OpenClaw should **not absorb every runtime**.
 
 Better:
 
@@ -634,13 +634,13 @@ OpenClaw plugin
   -> external daemon/binary
 ```
 
-That keeps failures, release cycles, and trust roots separate.
+That keeps **failures, release cycles, and trust roots** separate.
 
 ### Principle 5: Treat desktop actions as high risk
 
 Clicks, typing, keypresses, screenshots, file operations, and terminal commands need explicit policy.
 
-Even if the model is good, the action surface is high-impact.
+Even if the model is good, the action surface is **high-impact**.
 
 ---
 
@@ -682,9 +682,9 @@ Example workflow:
 7. The final trace is saved for future memory/eval.
 ```
 
-This is realistic engineering automation.
+This is **realistic engineering automation**.
 
-It keeps the agent productive without giving every component unlimited authority.
+It keeps the agent productive without giving every component **unlimited authority**.
 
 ---
 
@@ -746,7 +746,7 @@ Then answer:
 5. Which layer stores durable memory?
 6. Which layer should never import OpenClaw internals?
 
-If the answers are unclear, the architecture is not ready.
+If the answers are unclear, the architecture is **not ready**.
 
 ---
 

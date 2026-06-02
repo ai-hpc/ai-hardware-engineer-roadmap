@@ -60,7 +60,7 @@ AWQ ([arXiv:2306.00978](https://arxiv.org/abs/2306.00978)) is the default starti
 4. Output a quantized model + scale factors
 ```
 
-The key insight: pre-scaling weights moves "important" rows into the high-magnitude region of INT4's representable range, where quantization is finer. The activation side absorbs the inverse scale without precision loss because activations are computed at FP16 anyway.
+The key insight: **pre-scaling weights moves "important" rows into the high-magnitude region** of INT4's representable range, where quantization is finer. The activation side absorbs the inverse scale without precision loss because activations are computed at FP16 anyway.
 
 ### 2.1 Calibration data choice
 
@@ -99,7 +99,7 @@ Numbers approximate; replicate in your lab. **The mixed-calibration recipe is th
 | AWQ-INT4 group-128, English-only calibration | 85.3 | 81.5 | 86.6 | -0.8 / **-2.4** / -0.6 |
 | AWQ-INT4 group-128, English+Chinese calibration | 85.6 | 83.1 | 86.8 | -0.5 / -0.8 / -0.4 |
 
-The English-only calibration loses 2.4 pp on Chinese eval — well outside any reasonable parity budget. **This is the most common quantization mistake on Qwen models in production:** developers use English calibration data because it's what's available, and ship a model that silently underperforms on the language they specifically picked Qwen for.
+The English-only calibration **loses 2.4 pp on Chinese eval** — well outside any reasonable parity budget. **This is the most common quantization mistake on Qwen models in production:** developers use English calibration data because it's what's available, and ship a model that **silently underperforms** on the language they specifically picked Qwen for.
 
 ---
 
@@ -155,7 +155,7 @@ Want max cost-efficiency? ───────────────► AWQ-I
 
 ### 4.2 Does the anomaly apply to Qwen 2.5 72B?
 
-The same paper benchmarked Qwen models and found they tolerate W8A8 better than Llama-3 — no equivalent severe outlier pattern. So W8A8 on Qwen 2.5 72B is viable; W8A8 on Llama 3.3 70B is not without rotation.
+The same paper benchmarked Qwen models and found they **tolerate W8A8 better than Llama-3** — no equivalent severe outlier pattern. So **W8A8 on Qwen 2.5 72B is viable**; W8A8 on Llama 3.3 70B is **not without rotation**.
 
 **This is the most concrete architecture-specific quantization insight from the Llama vs Qwen comparison.** Both models look similar in their config.json, but Llama-3 has this one quirky property that changes which precision paths are practical.
 
@@ -163,7 +163,7 @@ The same paper benchmarked Qwen models and found they tolerate W8A8 better than 
 
 ## 5. FP8 on Hopper — the TensorRT-LLM path
 
-For maximum throughput on Hopper, FP8 weights + FP8 activations is the recipe. The mature path is TensorRT-LLM.
+For maximum throughput on Hopper, **FP8 weights + FP8 activations** is the recipe. The mature path is **TensorRT-LLM**.
 
 ### 5.1 The TRT-LLM build
 
@@ -206,7 +206,7 @@ For Qwen 2.5 72B numbers are similar but ~5% slower at the same batch due to the
 
 ### 5.3 vLLM 0.22+ FP8 path
 
-vLLM's FP8 implementation is approaching TRT-LLM in 2026. Roughly 90% of TRT-LLM throughput for ~50% of the deployment friction (no engine compile step). For chat products where iteration matters, vLLM FP8 is often the practical pick.
+vLLM's FP8 implementation is **approaching TRT-LLM** in 2026. Roughly **90% of TRT-LLM throughput** for ~50% of the deployment friction (no engine compile step). For chat products where iteration matters, **vLLM FP8 is often the practical pick**.
 
 ### 5.4 The FP8 block-scaling × tensor-parallel alignment trap
 
@@ -230,7 +230,7 @@ The lesson: **with block-scaled FP8, your tensor-parallel size is no longer a fr
 
 ## 6. KV cache quantization
 
-The KV cache is the second precision decision after weights, especially at long context.
+The KV cache is the **second precision decision** after weights, especially at long context.
 
 ### 6.1 FP8 KV cache
 
@@ -250,7 +250,7 @@ Aggressive. Cuts KV by 4×.
 * **Parity loss:** 1–3 pp on long-context evals (RULER, needle-in-haystack). On chat/agent at short context it's usually fine.
 * **Always validate at the actual context length the product will use.** Short-context parity does not predict long-context behavior.
 
-For Llama 3.3 70B / Qwen 2.5 72B at 128K context, FP8 KV is the production default. INT4 KV is a research-mode option.
+For Llama 3.3 70B / Qwen 2.5 72B at 128K context, **FP8 KV is the production default**. INT4 KV is a **research-mode option**.
 
 ---
 

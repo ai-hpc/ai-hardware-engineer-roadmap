@@ -76,7 +76,7 @@ The Qwen3-4B for Qwen2.5-72B pair is interesting **only** if you don't care abou
 
 ### 1.3 EAGLE and Medusa — inline alternatives
 
-Two-model speculative decoding has memory overhead (two models loaded). **Inline-speculative-decoding** variants avoid this:
+Two-model speculative decoding has **memory overhead** (two models loaded). **Inline-speculative-decoding** variants avoid this:
 
 * **Medusa** adds extra decoding heads to the target model. Each head predicts a different future token position; you verify all simultaneously.
 * **EAGLE / EAGLE-2** trains a small autoregressive draft head on top of the target's frozen activations. Less memory than a full draft model, higher α than naïve heads.
@@ -87,7 +87,7 @@ For Qwen2.5-72B in production, EAGLE-2 has shipped widely and gives 1.6–2.0× 
 
 ## 2. Edge↔Cloud Routing
 
-The product question: a user query arrives, do we answer on-device with Qwen3-4B or escalate to cloud Qwen2.5-72B?
+The product question: a user query arrives, do we answer **on-device** with Qwen3-4B or **escalate to cloud** Qwen2.5-72B?
 
 ### 2.1 Routing signals
 

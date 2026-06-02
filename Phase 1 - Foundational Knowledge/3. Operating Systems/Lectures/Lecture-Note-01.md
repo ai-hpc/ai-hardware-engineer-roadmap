@@ -13,7 +13,7 @@
 
 # Part 1 (L1): Modern OS Architecture & the Linux Kernel
 
-**Context:** The OS is the trusted referee: it owns hardware, enforces protection, and provides abstractions. User code runs at Ring 3 / EL0; kernel at Ring 0 / EL1. On Jetson, TensorRT runs at EL0 and reaches hardware only via the kernel.
+**Context:** The OS is the **trusted referee**: it owns hardware, enforces protection, and provides abstractions. User code runs at **Ring 3 / EL0**; kernel at **Ring 0 / EL1**. On Jetson, TensorRT runs at EL0 and reaches hardware only via the kernel.
 
 ---
 
@@ -37,7 +37,7 @@
 
 ## Linux Kernel: Monolithic + Modules
 
-Monolithic: core and drivers in one address space at Ring 0/EL1; fast in-kernel calls; a crashing driver can panic the system. Contrast: microkernels (QNX) run drivers in separate processes. Loadable modules (`.ko`) add drivers at runtime without rebuilding the kernel.
+**Monolithic:** core and drivers in one address space at Ring 0/EL1; fast in-kernel calls; a **crashing driver can panic the system**. Contrast: **microkernels** (QNX) run drivers in separate processes. **Loadable modules** (`.ko`) add drivers at runtime without rebuilding the kernel.
 
 **Subsystems:** kernel/ (scheduler, signals), mm/ (memory), drivers/ (GPU, V4L2, NVMe, PCIe), fs/ (VFS), net/, arch/. **Versioning:** mainline → stable → LTS (2–6 years). AI platforms pin to LTS (e.g. Jetson 5.10/6.1, Yocto 5.15/6.6) for BSP and driver stability.
 
@@ -57,7 +57,7 @@ Monolithic: core and drivers in one address space at Ring 0/EL1; fast in-kernel 
 
 # Part 2 (L2): Processes, task_struct & the Linux Process Model
 
-**Context:** Every runnable entity is a `task_struct`. Threads are tasks that share `mm_struct` and `files_struct`. Scheduler class, affinity, cgroups live in task_struct; tuning inference = tuning these fields.
+**Context:** Every runnable entity is a `task_struct`. **Threads are tasks** that share `mm_struct` and `files_struct`. Scheduler class, affinity, cgroups live in task_struct; **tuning inference = tuning these fields**.
 
 ---
 
@@ -75,7 +75,7 @@ Process = program in execution: **virtual CPU** (registers in task_struct), **vi
 
 ## Process States
 
-TASK_RUNNING (R), TASK_INTERRUPTIBLE (S), TASK_UNINTERRUPTIBLE (D — e.g. DMA, VIDIOC_DQBUF), TASK_KILLABLE, STOPPED (T), EXIT_ZOMBIE (Z). Persistent D = driver/hardware hang. Zombie = parent has not called wait().
+TASK_RUNNING (R), TASK_INTERRUPTIBLE (S), TASK_UNINTERRUPTIBLE (D — e.g. DMA, VIDIOC_DQBUF), TASK_KILLABLE, STOPPED (T), EXIT_ZOMBIE (Z). **Persistent D = driver/hardware hang**. **Zombie** = parent has not called wait().
 
 ---
 
@@ -87,7 +87,7 @@ TASK_RUNNING (R), TASK_INTERRUPTIBLE (S), TASK_UNINTERRUPTIBLE (D — e.g. DMA, 
 
 ## clone() and Threads
 
-`clone(CLONE_VM | CLONE_FILES | CLONE_SIGHAND)` = thread (shared mm, files). `getpid()` = tgid; `gettid()` = per-thread pid. Scheduler treats all tasks alike; per-task affinity and scheduling class.
+`clone(CLONE_VM | CLONE_FILES | CLONE_SIGHAND)` = **thread** (shared mm, files). `getpid()` = tgid; `gettid()` = per-thread pid. **Scheduler treats all tasks alike**; per-task affinity and scheduling class.
 
 ---
 
@@ -99,7 +99,7 @@ TASK_RUNNING (R), TASK_INTERRUPTIBLE (S), TASK_UNINTERRUPTIBLE (D — e.g. DMA, 
 
 ## Context Switch
 
-`switch_mm` (install new page table, CR3/TTBR0); `switch_to` (save/restore registers). ASID/PCID avoid full TLB flush. Cost ~1–10 µs. /proc/[pid]/sched, wchan, cgroup, oom_score for inspection.
+`switch_mm` (install new page table, CR3/TTBR0); `switch_to` (save/restore registers). **ASID/PCID avoid full TLB flush**. Cost **~1–10 µs**. /proc/[pid]/sched, wchan, cgroup, oom_score for inspection.
 
 ---
 

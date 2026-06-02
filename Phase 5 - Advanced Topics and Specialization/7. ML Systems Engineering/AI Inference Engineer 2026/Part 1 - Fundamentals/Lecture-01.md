@@ -2,11 +2,11 @@
 
 ## Overview
 
-An AI inference engineer in 2026 is not a model engineer, not a prompt engineer, and not a generalist MLOps practitioner. The role is narrower and more specific than any of those:
+An **AI inference engineer** in 2026 is not a model engineer, not a prompt engineer, and not a generalist MLOps practitioner. The role is narrower and more specific than any of those:
 
 > **Given a model, a workload, and a hardware target, ship the lowest-cost serving configuration that meets the latency and accuracy SLO — and *prove* it with measurements another engineer can reproduce.**
 
-Everything in this course follows from that sentence. The model is fixed (or chosen at the top of the project). The workload — chat, agent, batch, embedding — sets the metric that matters. The hardware target — single Jetson Orin Nano up to GB200 NVL72 — sets the physical ceiling. The job is the configuration in between, defended by reproducible numbers.
+Everything in this course follows from that sentence. The **model is fixed** (or chosen at the top of the project). The **workload** — chat, agent, batch, embedding — sets the metric that matters. The **hardware target** — single Jetson Orin Nano up to GB200 NVL72 — sets the physical ceiling. The job is the configuration in between, defended by **reproducible numbers**.
 
 This lecture builds that mental model in five passes:
 
@@ -22,7 +22,7 @@ By the end you should be able to look at a new model + workload + GPU triple and
 
 ## 1. The four inference shapes
 
-Every production inference workload reduces to one of four shapes. They have different bottlenecks and want different optimizations. Mis-identifying the shape is the most common reason expensive optimization work produces zero metric movement.
+Every production inference workload reduces to one of **four shapes**. They have different bottlenecks and want different optimizations. **Mis-identifying the shape** is the most common reason expensive optimization work produces zero metric movement.
 
 ### 1.1 Chat
 
@@ -84,7 +84,7 @@ Characteristics:
 
 * No autoregression; **prefill is the whole job**.
 * No KV cache.
-* Pure compute-bound matmul, ideal for tensor cores at low precision.
+* Pure **compute-bound matmul**, ideal for tensor cores at low precision.
 * Batch size limited by HBM (large activations).
 
 What you optimize: **tokens/sec, peak HBM, latency per batch.**
@@ -106,7 +106,7 @@ If you optimize batch-style (continuous batching, big batch sizes) for a chat pr
 
 ## 2. The metrics that decide whether the work was good
 
-A senior engineer is paid to optimize *the right metric* and to *defend the choice in numbers*. The five that matter:
+A senior engineer is paid to optimize *the right metric* and to *defend the choice in numbers*. The **five that matter**:
 
 ### 2.1 TTFT — Time to First Token
 
@@ -127,7 +127,7 @@ Wall-clock per decoded token after the first. Sometimes called inter-token laten
 
 ### 2.3 Throughput — tokens / sec / GPU
 
-The denominator of cost. Total output tokens emitted across all concurrent requests per second per GPU.
+The **denominator of cost**. Total output tokens emitted across all concurrent requests per second per GPU.
 
 * For batch: this *is* the optimization target.
 * For chat + agent: this is what determines $/MTok and how many users one GPU serves.
@@ -135,7 +135,7 @@ The denominator of cost. Total output tokens emitted across all concurrent reque
 
 ### 2.4 p50 / p95 / p99 latency
 
-The tail. The mean is a lie; the tail is the SLO.
+The tail. The **mean is a lie**; the tail is the SLO.
 
 * Most production SLOs are stated as "p95 TTFT < X ms" or "p99 TPOT < Y ms".
 * The gap between p50 and p99 tells you whether the scheduler is well-balanced or whether one stuck request poisons the rest.
@@ -165,7 +165,7 @@ Every optimization in this course (quantization, speculation, prefix cache, KV c
 
 ## 3. The diagnostic flow
 
-Bad inference engineering changes things first and measures after. Good inference engineering looks like this loop:
+**Bad inference engineering** changes things first and measures after. **Good inference engineering** looks like this loop:
 
 ```text
 observe ──► hypothesize ──► isolate ──► benchmark ──► profile ──► explain ──► change ──► verify
@@ -184,13 +184,13 @@ Concretely:
 7. **Change one thing.** Not three.
 8. **Verify.** Re-bench. If the metric did not move predictably from the hypothesis, the explanation was wrong — back to step 2.
 
-The number-one mistake is skipping step 6. If you cannot say *why* something is slow, you cannot say *what* to change.
+The **number-one mistake** is skipping step 6. If you cannot say *why* something is slow, you cannot say *what* to change.
 
 ---
 
 ## 4. Reading a model card to predict cost
 
-Before spinning up a GPU, you can extract the inference cost shape of any modern model from its `config.json` (or model card) alone. Five fields do almost all of the work.
+Before spinning up a GPU, you can extract the **inference cost shape** of any modern model from its `config.json` (or model card) alone. **Five fields** do almost all of the work.
 
 | Field | What it tells you |
 |-------|-------------------|
@@ -209,7 +209,7 @@ kv_bytes_per_token = 2 (K and V) × L × h_kv × head_dim × bytes_per_element
 ```
 
 For Llama 3.3 70B at FP16 KV: 2 × 80 × 8 × 128 × 2 = **327 KB/token**.
-At 128K context: 327 KB × 128 × 1024 ≈ **42 GB**. Per request. This is why long-context serving needs FP8 KV (cuts it in half) or INT4 KV (cuts it to ~10 GB).
+At 128K context: 327 KB × 128 × 1024 ≈ **42 GB**. Per request. This is why **long-context serving** needs FP8 KV (cuts it in half) or INT4 KV (cuts it to ~10 GB).
 
 **Approximate FLOPs per token (decode):**
 
@@ -219,7 +219,7 @@ flops_per_token ≈ 2 × P
 
 where P is the active parameter count (= total params for dense, = total/expert × experts_active for MoE). The factor of 2 captures multiply + accumulate.
 
-For a 70B dense model: ~140 GFLOPs/token at decode. On H200 (~990 BF16 TFLOPs peak), if you could keep the kernel at peak you would do ~7000 tokens/sec — but you cannot, because decode is bandwidth-bound, not compute-bound.
+For a 70B dense model: ~140 GFLOPs/token at decode. On H200 (~990 BF16 TFLOPs peak), if you could keep the kernel at peak you would do ~7000 tokens/sec — but you cannot, because **decode is bandwidth-bound**, not compute-bound.
 
 **Decode bandwidth ceiling (the real ceiling at batch=1):**
 
@@ -231,7 +231,7 @@ For Llama 3.3 70B at FP16 (140 GB) on H200 (4.8 TB/s): 4800 / 140 ≈ **34 token
 
 At INT4 (35 GB): 4800 / 35 ≈ **137 tokens/sec ceiling**. Real numbers: ~110 tok/s.
 
-The takeaway: you can predict the bandwidth-bound ceiling from the model card and the HBM spec alone. Anything you do above that ceiling came from batching (sharing the weight read across more tokens), speculation (more accepted tokens per weight read), or precision drop.
+The takeaway: you can **predict the bandwidth-bound ceiling** from the model card and the HBM spec alone. Anything you do above that ceiling came from **batching** (sharing the weight read across more tokens), **speculation** (more accepted tokens per weight read), or precision drop.
 
 ---
 
@@ -245,7 +245,7 @@ A senior in this role ships, recurrently:
 * **Cost models.** $/MTok at the chosen configuration, with what would change at 2× scale and at 10× scale.
 * **Parity gates.** A regression test that fails the build if any future optimization regresses the workload's metric eval set beyond budget.
 
-A junior in this role ships individual fixes. The structural difference is the reproducibility layer.
+A junior in this role ships individual fixes. The structural difference is the **reproducibility layer**.
 
 What a senior is *not* paid to do: pick the model. Pick the product. Choose the SLO. These come from above; the engineer defends what is achievable inside them.
 

@@ -14,7 +14,7 @@ Every piece of AI hardware — a Jetson inference node, a camera pipeline server
 | Abstraction layer | Presents uniform interfaces (files, sockets, virtual memory) over heterogeneous hardware |
 | Protection boundary | Isolates processes from each other and from kernel data structures; enforced in hardware |
 
-Without protection, a buggy camera driver corrupts kernel memory. Without abstraction, each application must know specific hardware register layouts.
+Without **protection**, a buggy camera driver corrupts kernel memory. Without **abstraction**, each application must know specific hardware register layouts.
 
 > **Key Insight:** These three roles are inseparable. Abstraction without protection would let any process break another's view of hardware. Protection without abstraction would force every developer to write device-specific code. All three together are what make Linux viable as a platform for complex AI systems with multiple concurrent workloads.
 
@@ -22,7 +22,7 @@ Without protection, a buggy camera driver corrupts kernel memory. Without abstra
 
 ## Privilege Levels
 
-When code runs on a CPU, the hardware enforces who is allowed to do what. This is the foundation of the OS protection boundary. Think of it as the CPU acting as a security guard: code in user space asks for services, the OS grants or denies them, and the hardware makes it impossible to bypass the check.
+When code runs on a CPU, the hardware enforces who is allowed to do what. This is the foundation of the OS **protection boundary**. Think of it as the CPU acting as a security guard: code in **user space** asks for services, the OS grants or denies them, and the hardware makes it impossible to bypass the check.
 
 ### x86 Rings
 
@@ -43,7 +43,7 @@ Mode switch: `SYSCALL` instruction → Ring 0; `SYSRET` → Ring 3.
 | EL2 | Hypervisor | KVM, Xen; controls VM-to-VM memory partitioning |
 | EL3 | Secure Monitor | ARM TrustZone, PSCI power management, BCT/BL31 signing |
 
-The two-level EL0/EL1 split is sufficient for most deployments. EL2 adds virtualization overhead; EL3 handles secure world and is always present on Cortex-A platforms. On Jetson Orin (Cortex-A78AE), the Linux kernel runs at EL1 and NVIDIA MB1/SC7 firmware occupies EL3.
+The two-level EL0/EL1 split is sufficient for most deployments. EL2 adds **virtualization overhead**; EL3 handles **secure world** and is always present on Cortex-A platforms. On Jetson Orin (Cortex-A78AE), the Linux kernel runs at EL1 and NVIDIA MB1/SC7 firmware occupies EL3.
 
 ```
 AArch64 Exception Level Stack
@@ -70,7 +70,7 @@ AArch64 Exception Level Stack
 
 Linux is a **monolithic kernel with loadable modules**: all core subsystems share a single address space at Ring 0 / EL1 with no IPC overhead between them. Drivers and filesystems compile as `.ko` modules inserted at runtime without rebuilding the kernel.
 
-The monolithic design delivers fast in-kernel calls at the cost of shared fate — a crashing driver can panic the whole system. Contrast with microkernels (QNX, seL4) where drivers are separate processes; slower IPC, but crash isolation.
+The monolithic design delivers fast in-kernel calls at the cost of **shared fate** — a crashing driver can panic the whole system. Contrast with **microkernels** (QNX, seL4) where drivers are separate processes; slower IPC, but **crash isolation**.
 
 ```
 Linux Kernel Internal Architecture (Monolithic)
@@ -116,7 +116,7 @@ Linux Kernel Internal Architecture (Monolithic)
 
 > **Common Pitfall:** When a camera driver crashes on Jetson, it can kernel-panic the entire system because all drivers share Ring 0 space. The fix is to test drivers with IOMMU protection enabled (`iommu=on` in the kernel command line) so that a misbehaving DMA operation hits a fault rather than scribbling over kernel memory.
 
-Now that we understand how the kernel is organized as a monolithic system, let's look at how the kernel manages versioning — and why AI platforms are conservative about which version they run.
+Now that we understand how the kernel is organized as a monolithic system, let's look at how the kernel manages **versioning** — and why AI platforms are conservative about which version they run.
 
 ---
 
@@ -132,7 +132,7 @@ Format: `major.minor.patch` — e.g., `6.1.57`
 
 ### Why AI Platforms Pin to LTS
 
-Board Support Packages couple tightly to a specific kernel ABI. Upgrading to mainline breaks downstream out-of-tree modules and vendor driver patches.
+**Board Support Packages** couple tightly to a specific kernel **ABI**. Upgrading to mainline breaks downstream **out-of-tree modules** and vendor driver patches.
 
 | Platform | Kernel base | Notable additions |
 |---|---|---|
@@ -150,7 +150,7 @@ With the kernel version context established, let's look at the two most importan
 
 ## /proc Virtual Filesystem
 
-`/proc` is a kernel interface that looks like a filesystem. Files have no disk representation; reads invoke kernel functions that format data on demand. Think of it as the kernel's "dashboard" — you read from it the same way you read a file, but what you get back is a live snapshot of kernel state.
+`/proc` is a **kernel interface** that looks like a filesystem. Files have **no disk representation**; reads invoke kernel functions that format data on demand. Think of it as the kernel's "dashboard" — you read from it the same way you read a file, but what you get back is a **live snapshot** of kernel state.
 
 | Path | Content |
 |---|---|
@@ -169,7 +169,7 @@ With the kernel version context established, let's look at the two most importan
 
 ## /sys (sysfs)
 
-sysfs exports kernel objects — devices, drivers, buses — as a directory tree. Structure mirrors the kernel object model rather than process hierarchy. While `/proc` is about processes and kernel state, `/sys` is about devices and the hardware model.
+**sysfs** exports kernel objects — devices, drivers, buses — as a directory tree. Structure mirrors the **kernel object model** rather than process hierarchy. While `/proc` is about processes and kernel state, `/sys` is about **devices and the hardware model**.
 
 | Path | Purpose |
 |---|---|
@@ -189,7 +189,7 @@ On Jetson, `/sys/class/thermal/` exposes CPU, GPU, and SoC thermal zones. Pollin
 
 ## Kernel Modules
 
-Modules run at Ring 0 and have full kernel access. They provide the standard integration path for device drivers without rebuilding the kernel.
+**Modules** run at Ring 0 and have full kernel access. They provide the standard integration path for **device drivers** without rebuilding the kernel.
 
 ```bash
 insmod my_driver.ko          # load from file; no dependency resolution
@@ -226,7 +226,7 @@ The module lifecycle follows a strict sequence when a device is discovered:
 4. **`probe()` runs**: the driver's probe function claims hardware resources, registers device nodes.
 5. **Device ready**: application code can now open `/dev/my_accel0` and issue ioctls.
 
-DKMS (Dynamic Kernel Module Support) rebuilds out-of-tree modules when the kernel is updated — used by the NVIDIA GPU driver on development hosts and custom FPGA PCIe drivers.
+**DKMS** (Dynamic Kernel Module Support) rebuilds out-of-tree modules when the kernel is updated — used by the **NVIDIA GPU driver** on development hosts and custom FPGA PCIe drivers.
 
 > **Common Pitfall:** Loading a module compiled against a different kernel version fails with `version magic mismatch`. Always compile modules against the exact kernel headers of the running kernel (`uname -r`). DKMS automates this rebuild, but manual module builds break silently after a `apt upgrade` that bumps the kernel version.
 
@@ -253,7 +253,7 @@ Understanding kernel architecture pays off when you navigate vendor-specific ker
 
 ### Jetson L4T
 
-NVIDIA's Linux for Tegra is a downstream LTS fork with patches for NVDLA, VIC (Video Image Compositor), ISP (Image Signal Processor), NvMedia, and Tegra PCIe IOMMU. L4T 35.x is based on 5.10; L4T 36.x rebased to 6.1. These patches are absent from mainline; they live in `drivers/gpu/`, `drivers/media/`, and `arch/arm64/` of the L4T tree.
+NVIDIA's **Linux for Tegra** is a **downstream LTS fork** with patches for NVDLA, VIC (Video Image Compositor), ISP (Image Signal Processor), NvMedia, and Tegra PCIe IOMMU. L4T 35.x is based on 5.10; L4T 36.x rebased to 6.1. These patches are **absent from mainline**; they live in `drivers/gpu/`, `drivers/media/`, and `arch/arm64/` of the L4T tree.
 
 ### openpilot Agnos
 
@@ -261,7 +261,7 @@ Comma's **AGNOS** is a **forked and custom-modified Linux** that runs on comma 3
 
 ### Yocto for Custom Boards
 
-Production inference nodes use Yocto to build minimal, reproducible kernel + rootfs images. Only required drivers are compiled; attack surface and boot time are minimized for safety-critical deployment.
+Production inference nodes use **Yocto** to build minimal, reproducible kernel + rootfs images. Only required drivers are compiled; **attack surface** and boot time are minimized for safety-critical deployment.
 
 ---
 

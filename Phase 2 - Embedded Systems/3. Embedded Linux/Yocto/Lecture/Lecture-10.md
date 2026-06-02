@@ -18,7 +18,7 @@ The image build proves the system fits together. The **SDK** gives application d
 
 ## 3. Lab 8 — Cross-compile "hello"
 
-Cross-compile a trivial C program against the SDK sysroot and run it on the target image.
+Cross-compile a trivial C program against the **SDK sysroot** and run it on the **target image**.
 
 **Done when:** you trust the SDK version string matches the image you flashed (no silent ABI skew).
 

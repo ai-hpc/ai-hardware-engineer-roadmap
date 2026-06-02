@@ -69,7 +69,7 @@ Even the smallest box (8 × L40S) has 237 GB free after weights. The constraint 
 
 ## 2. Tensor Parallelism: Split Each Layer Across GPUs
 
-Tensor parallel (TP) splits each matrix multiply across the GPUs that share the layer. Each GPU holds a slice of the weights and computes a slice of the output.
+Tensor parallel (TP) splits **each matrix multiply** across the GPUs that share the layer. Each GPU holds a **slice of the weights** and computes a slice of the output.
 
 ### 2.1 TP on QKV
 
@@ -201,7 +201,7 @@ The single biggest production runtime difference between "8-tokens-per-second" a
 
 ### 6.1 Why static batching fails
 
-Naive batching: collect a batch of N requests, run them together until the slowest finishes, then start the next batch. Two killers:
+Naive batching: collect a batch of N requests, run them together until the **slowest finishes**, then start the next batch. Two killers:
 
 - Requests have wildly different completion lengths.
 - Each batch step is bounded by the longest sequence's remaining tokens.
@@ -214,7 +214,7 @@ Treat each request as a sequence of decoding steps. At each step, **insert new r
 
 ### 6.3 Paged attention
 
-The naive KV-cache implementation allocates `[max_seq_len × n_kv_heads × head_dim]` per sequence up front — wastes memory on short sequences. Paged attention manages the KV cache as fixed-size **blocks** (typical: 16 tokens) and has a per-sequence **block table** mapping logical positions to physical blocks.
+The naive KV-cache implementation allocates `[max_seq_len × n_kv_heads × head_dim]` per sequence up front — **wastes memory on short sequences**. Paged attention manages the KV cache as fixed-size **blocks** (typical: 16 tokens) and has a per-sequence **block table** mapping logical positions to physical blocks.
 
 ```
 Logical KV for sequence A:  [block_3][block_7][block_9][block_2]

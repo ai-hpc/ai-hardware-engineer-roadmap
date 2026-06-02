@@ -27,7 +27,7 @@ Explore fast.
 Ship safely.
 ```
 
-Strong agent systems support both.
+Strong agent systems **support both**.
 
 ---
 
@@ -66,7 +66,7 @@ Agentic coding shifts the cost structure:
 | Tests become the asset | behavior contracts let internals change |
 | Specs are continuous | update intent as learning happens |
 
-The bottleneck moves from typing code to judging code:
+The bottleneck moves from **typing code to judging code**:
 
 ```text
 Do we know what is worth building?
@@ -79,9 +79,9 @@ Can we keep it safe?
 
 ## 2. Code as exploration
 
-"Implement to learn" is the key idea.
+**"Implement to learn"** is the key idea.
 
-Sometimes you do not know the right design until you build a rough version.
+Sometimes you do not know the right design until you build a **rough version**.
 
 This is especially true for:
 
@@ -94,7 +94,7 @@ This is especially true for:
 - deployment automation
 - developer experience
 
-Prototype code becomes a probe:
+Prototype code becomes a **probe**:
 
 ```text
 implementation -> feedback -> updated intent
@@ -110,15 +110,15 @@ You build a slice to discover:
 - performance bottlenecks
 - security assumptions
 
-Then you decide what to keep.
+Then you decide **what to keep**.
 
 ---
 
 ## 3. Cheap code still has expensive consequences
 
-Cheap generation does not make software free.
+Cheap generation does not make software **free**.
 
-It moves cost into:
+It **moves cost** into:
 
 - review
 - verification
@@ -137,11 +137,11 @@ Treat exploratory code as disposable.
 Treat tests and intent as assets.
 ```
 
-This is why "vibe coding" without contracts breaks down quickly.
+This is why **"vibe coding" without contracts** breaks down quickly.
 
-The agent can generate a feature in minutes.
+The agent can generate a feature **in minutes**.
 
-The team still owns the bugs for months.
+The team still owns the bugs **for months**.
 
 ---
 
@@ -181,13 +181,13 @@ SHIP
   -> monitor and maintain
 ```
 
-This is the agentic SDLC.
+This is the **agentic SDLC**.
 
 ---
 
 ## 5. Explore mode vs stabilize mode
 
-Do not use the same rules for every phase.
+Do not use the **same rules for every phase**.
 
 ### Explore mode
 
@@ -225,7 +225,7 @@ Example:
 
 ## 6. Tests as the stability layer
 
-When code is easy to rewrite, tests become more important.
+When code is easy to rewrite, tests become **more important**.
 
 Reason:
 
@@ -233,7 +233,7 @@ Reason:
 tests preserve behavior while agents rewrite implementation
 ```
 
-Useful agentic tests are often behavior-level:
+Useful agentic tests are often **behavior-level**:
 
 - user journey tests
 - API contract tests
@@ -264,15 +264,15 @@ What must remain true if the implementation changes?
 
 ## 7. Intent documentation
 
-Tests say what works.
+Tests say **what works**.
 
-Code says how it works.
+Code says **how it works**.
 
-Specs say what the system should do.
+Specs say **what the system should do**.
 
-Intent explains why.
+Intent explains **why**.
 
-Agents need intent because they do not have durable product judgment unless you write it down.
+Agents need intent because they do not have **durable product judgment** unless you write it down.
 
 Good intent docs include:
 
@@ -301,13 +301,13 @@ Must preserve:
 - stable event envelope stays versioned
 ```
 
-This is high-value context for future agents.
+This is **high-value context** for future agents.
 
 ---
 
 ## 8. Specs must evolve
 
-A static spec is often wrong after implementation begins.
+A static spec is **often wrong** after implementation begins.
 
 Agentic development reveals:
 
@@ -329,15 +329,15 @@ Every meaningful implementation discovery should update:
 - open risks
 ```
 
-This is not bureaucracy.
+This is **not bureaucracy**.
 
-It preserves learning.
+It **preserves learning**.
 
 ---
 
 ## 9. Human taste becomes the limiter
 
-When code arrives faster than external feedback, judgment becomes the bottleneck.
+When code arrives faster than external feedback, **judgment becomes the bottleneck**.
 
 Taste means knowing:
 
@@ -349,9 +349,9 @@ Taste means knowing:
 - when a test is too brittle
 - when security risk is being hand-waved
 
-Agents amplify taste.
+Agents **amplify taste**.
 
-They do not replace it.
+They do **not replace it**.
 
 Better engineers get more from agents because they:
 
@@ -397,7 +397,7 @@ Agent repeatedly forgets to run mkdocs build.
 
 ## 11. Dual-mode agent design
 
-A practical coding agent should support two explicit modes.
+A practical coding agent should support **two explicit modes**.
 
 ### Explore mode
 

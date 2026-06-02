@@ -8,7 +8,7 @@ Before any AI inference can happen, the hardware must be initialized, the kernel
 
 ## Linux Boot Sequence on ARM SoC
 
-Modern embedded AI boards (Jetson Orin, Zynq UltraScale+, i.MX8) follow this sequence. Each stage is a separate program that runs, initializes a layer of hardware, and then launches the next stage.
+Modern embedded AI boards (Jetson Orin, Zynq UltraScale+, i.MX8) follow this sequence. Each stage is a **separate program** that runs, initializes a layer of hardware, and then launches the next stage.
 
 | Stage | Responsible | Artifact loaded | Notes |
 |---|---|---|---|
@@ -77,7 +77,7 @@ ARM SoC Boot Chain — Jetson Example
 
 ## Secure Boot
 
-Trust chain from ROM to running kernel: each stage verifies the signature of the next before executing it.
+**Trust chain** from ROM to running kernel: each stage **verifies the signature** of the next before executing it.
 
 - BootROM verifies SPL/BL2 signature with a key burned into fuses
 - BL2 verifies BL31 and U-Boot/UEFI
@@ -86,7 +86,7 @@ Trust chain from ROM to running kernel: each stage verifies the signature of the
 
 **Jetson Secure Boot**: BCT (Boot Configuration Table) and BL31 are signed with NVIDIA's key by default; production deployment uses a customer RSA-2048/4096 or ECDSA key pair fused into OTP. `tegraflash` handles signing and flashing.
 
-Secure boot is mandatory for production AV platforms — prevents substitution of a malicious kernel image or modified inference binary at the bootloader stage.
+**Secure boot is mandatory** for production AV platforms — prevents substitution of a malicious kernel image or modified inference binary at the bootloader stage.
 
 > **Common Pitfall:** During development, it is tempting to disable secure boot for convenience. The danger is forgetting to re-enable it before shipping a product. A development image with secure boot disabled will accept any unsigned kernel — including one an attacker installs via physical access to the eMMC. Always develop with secure boot enabled using developer keys, and switch to production keys for release builds.
 
@@ -133,7 +133,7 @@ Now that we understand how the kernel gets loaded, let's look at how it discover
 
 **Hardware description** for SoCs without self-describing buses. PCIe is self-describing (devices report vendor/device IDs); I2C, SPI, UART, AXI, and MMIO peripherals are not — the kernel must be told they exist.
 
-The Device Tree replaces per-board `#ifdef` hacks in kernel source with a data file the bootloader passes to the kernel at runtime. U-Boot places the DTB address in a register before jumping to the kernel entry point.
+The Device Tree replaces per-board `#ifdef` hacks in kernel source with a **data file** the bootloader passes to the kernel at runtime. U-Boot places the **DTB address** in a register before jumping to the kernel entry point.
 
 Think of the Device Tree as a wiring diagram: it tells the kernel "there is a Sony IMX477 camera sensor connected to I2C bus 0 at address 0x1a, reset by GPIO 42, and its CSI output connects to CSI port 0."
 
@@ -275,7 +275,7 @@ When a DT node with `compatible = "vendor,my-accel"` appears (at boot or via ove
 
 ### Module Signing
 
-- `CONFIG_MODULE_SIG_FORCE` rejects unsigned modules; production Jetson and automotive ECU kernels enforce this
+- `CONFIG_MODULE_SIG_FORCE` **rejects unsigned modules**; production Jetson and automotive ECU kernels enforce this
 - Sign during build: `scripts/sign-file sha256 signing_key.pem signing_cert.pem my_driver.ko`
 - Custom FPGA PCIe driver must be signed before deployment on a secure-boot platform
 
@@ -297,7 +297,7 @@ DKMS is standard for the NVIDIA proprietary GPU driver on development hosts and 
 
 ## Kernel Command Line
 
-Passed by U-Boot (`bootargs` env variable) or UEFI. Readable at `/proc/cmdline`.
+Passed by U-Boot (`bootargs` env variable) or UEFI. **Readable at `/proc/cmdline`**.
 
 | Parameter | Effect |
 |---|---|

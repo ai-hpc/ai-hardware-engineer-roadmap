@@ -4,9 +4,9 @@
 
 ---
 
-This lecture is where the "Agent Skills" idea becomes concrete for GPU systems work.
+This lecture is where the **"Agent Skills"** idea becomes concrete for GPU systems work.
 
-The NVIDIA cuTile Python to cuTile.jl case study is important because the hard part is not generating code.
+The NVIDIA cuTile Python to cuTile.jl case study is important because the hard part is **not generating code**.
 
 The hard part is:
 
@@ -15,9 +15,9 @@ translating domain semantics correctly
 when the compiler will not catch many wrong translations
 ```
 
-That is exactly the class of work where naive agents fail.
+That is exactly the class of work where **naive agents fail**.
 
-They can produce plausible code, but plausible GPU kernel code is not enough.
+They can produce plausible code, but **plausible GPU kernel code is not enough**.
 
 You need:
 
@@ -54,13 +54,13 @@ By the end of this lecture, you should be able to:
 
 ## 1. Why this case study matters
 
-Most agent-skill examples are web or app-development workflows.
+Most agent-skill examples are **web or app-development workflows**.
 
 This one is different.
 
-It targets GPU kernel translation.
+It targets **GPU kernel translation**.
 
-That matters because GPU DSLs are full of subtle semantic traps:
+That matters because GPU DSLs are full of **subtle semantic traps**:
 
 - indexing base changes
 - memory layout changes
@@ -90,9 +90,9 @@ For GPU engineers, this is a high-value agent use case because the knowledge is:
 
 ## 2. What cuTile is
 
-NVIDIA CUDA Tile, or cuTile, is a tile-based GPU kernel programming model.
+**NVIDIA CUDA Tile**, or cuTile, is a tile-based GPU kernel programming model.
 
-Instead of manually coordinating every thread, warp, and shared-memory operation, the programmer works with tile-level operations:
+Instead of manually coordinating every thread, warp, and shared-memory operation, the programmer works with **tile-level operations**:
 
 ```text
 load tile
@@ -105,7 +105,7 @@ This does not eliminate low-level thinking.
 
 It raises the abstraction level enough that many kernels can be expressed in a more portable, structured way.
 
-cuTile.jl brings that style to Julia.
+**cuTile.jl** brings that style to Julia.
 
 That is valuable for Julia's scientific computing ecosystem:
 
@@ -141,7 +141,7 @@ High-level differences:
 
 None of these are conceptually impossible.
 
-Together, they create a translation surface where a single missed rule can corrupt results.
+Together, they create a translation surface where a **single missed rule can corrupt results**.
 
 Example:
 
@@ -162,13 +162,13 @@ a .* b
   -> element-wise multiply
 ```
 
-For kernel code, that difference is decisive.
+For kernel code, that difference is **decisive**.
 
 ---
 
 ## 4. Matmul as the teaching example
 
-Matrix multiplication is a useful translation example because it combines several hazards:
+**Matrix multiplication** is a useful translation example because it combines several hazards:
 
 - block/tile indices
 - K-loop over tiles
@@ -200,15 +200,15 @@ accumulator shape looks plausible
 but is transposed for the target layout
 ```
 
-This is exactly why a skill needs worked examples.
+This is exactly why a skill needs **worked examples**.
 
-The model should not rediscover matmul layout rules from scratch every time.
+The model should not **rediscover matmul layout rules** from scratch every time.
 
 ---
 
 ## 5. Softmax as the harder example
 
-Softmax adds algorithmic invariants, not just syntax.
+Softmax adds **algorithmic invariants**, not just syntax.
 
 The NVIDIA post describes three Julia strategies:
 
@@ -238,7 +238,7 @@ ct.exp(ct.sub(a, b)) -> exp.(a .- b)
 
 The hard part is not renaming functions.
 
-The hard part is preserving the mathematical invariant.
+The hard part is preserving the **mathematical invariant**.
 
 For systems work, this is the recurring theme:
 
@@ -251,7 +251,7 @@ semantics are expensive
 
 ## 6. TileGym's skill structure
 
-The project packages the translation workflow into a repository skill:
+The project packages the translation workflow into a **repository skill**:
 
 ```text
 .claude/skills/converting-cutile-to-julia/
@@ -292,13 +292,13 @@ The key design principle:
 put reusable domain knowledge beside the code it governs
 ```
 
-Do not leave it as a one-off prompt in chat history.
+Do not leave it as a **one-off prompt** in chat history.
 
 ---
 
 ## 7. What the validator catches
 
-The validator catches patterns before the GPU runs.
+The validator catches **patterns before the GPU runs**.
 
 Examples from the post include:
 
@@ -316,9 +316,9 @@ LLM generates candidate
   -> debugging guide routes fixes
 ```
 
-The model is not trusted blindly.
+The model is **not trusted blindly**.
 
-The skill creates a workflow around it.
+The skill creates a **workflow around it**.
 
 This is the same principle from Lecture 29:
 
@@ -348,7 +348,7 @@ julia/
     test_softmax.jl
 ```
 
-Good tests compare against CPU references with dtype-specific tolerances.
+Good tests compare against **CPU references** with dtype-specific tolerances.
 
 They also test boundary cases:
 
@@ -370,7 +370,7 @@ tolerances
 boundary tiles
 ```
 
-This makes the agent output reviewable by numbers, not vibes.
+This makes the agent output **reviewable by numbers, not vibes**.
 
 ---
 
@@ -400,11 +400,11 @@ prompt = reminder
 skill = executable domain process
 ```
 
-This is why agent skills are relevant to hardware and compiler work.
+This is why agent skills are relevant to **hardware and compiler work**.
 
-The model should not rediscover the same domain pitfalls repeatedly.
+The model should not rediscover the same **domain pitfalls** repeatedly.
 
-The project should accumulate them.
+The project should **accumulate them**.
 
 ---
 
@@ -430,9 +430,9 @@ later ports reuse the skill
 each kernel gets cheaper and safer
 ```
 
-This is how agentic systems improve without fine-tuning the model.
+This is how agentic systems improve **without fine-tuning the model**.
 
-They improve by versioning the workflow, rules, examples, and validators.
+They improve by **versioning the workflow, rules, examples, and validators**.
 
 ---
 
@@ -487,9 +487,9 @@ Runtime pieces:
 | session log | preserve translation reasoning and fixes |
 | final-answer hook | require validation evidence |
 
-The LLM writes candidate code.
+The LLM writes **candidate code**.
 
-The harness makes the work safe and reviewable.
+The harness makes the work **safe and reviewable**.
 
 ---
 
@@ -522,11 +522,11 @@ Could this silently transpose output?
 Could this be correct but much slower?
 ```
 
-Agentic kernel work still requires human domain review.
+Agentic kernel work still requires **human domain review**.
 
-The skill reduces review burden.
+The skill **reduces review burden**.
 
-It does not remove engineering responsibility.
+It does not remove **engineering responsibility**.
 
 ---
 

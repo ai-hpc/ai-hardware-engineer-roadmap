@@ -2,7 +2,7 @@
 
 ## Overview
 
-Optimization without measurement is folklore. Lecture 1 listed eight rungs of VLA optimization; every one of them can silently destroy a policy. This lecture is the measurement framework that decides what is safe to ship.
+**Optimization without measurement is folklore.** Lecture 1 listed eight rungs of VLA optimization; every one of them can **silently destroy a policy**. This lecture is the measurement framework that decides what is safe to ship.
 
 A useful action-parity harness answers four questions, in order, and refuses to answer the next one until the previous one passes:
 
@@ -11,7 +11,7 @@ A useful action-parity harness answers four questions, in order, and refuses to 
 3. **Closed-loop sim parity** — when the candidate actually drives the simulator, does it reach the same task success rate as the reference?
 4. **On-robot parity** — does the candidate behave the same on the real robot, under canary protection, across a held-out task set?
 
-Per-tick parity is cheap and necessary but not sufficient. Closed-loop sim parity is what catches the failures Lecture 1's quantization can cause. On-robot parity is what catches the failures that sim cannot model.
+Per-tick parity is **cheap and necessary but not sufficient**. Closed-loop sim parity is what catches the failures Lecture 1's quantization can cause. On-robot parity is what catches the failures that **sim cannot model**.
 
 By the end of this lecture you should be able to:
 
@@ -105,7 +105,7 @@ If your candidate passes step 4 budgets, it has passed Question 1. It has not ye
 
 ## 3. Trajectory parity (Question 2)
 
-Per-tick parity is misleading because tick errors compound. The same 5 mm per-tick error can integrate to 5 cm or to 5 mm depending on whether the policy self-corrects.
+Per-tick parity is misleading because **tick errors compound**. The same 5 mm per-tick error can integrate to 5 cm or to 5 mm depending on whether the policy **self-corrects**.
 
 ### 3.1 Open-loop replay
 
@@ -130,7 +130,7 @@ Budget the same way as in §2.3: take the reference-vs-reference drift envelope 
 
 ### 3.3 Why open-loop is not enough
 
-Open-loop replay assumes the candidate's actions do not change what it would see next tick. In a real rollout, every action changes the observation, and small per-tick errors get amplified by closed-loop dynamics. That is Question 3.
+Open-loop replay assumes the candidate's actions **do not change what it would see next tick**. In a real rollout, every action changes the observation, and small per-tick errors get **amplified by closed-loop dynamics**. That is Question 3.
 
 ---
 
@@ -173,7 +173,7 @@ The harness's pass/fail gate should not lie about confidence. If the budget is t
 
 ## 5. On-robot canary (Question 4)
 
-The cheapest sim is not the real robot. The harness must define a canary protocol that fails closed.
+The cheapest sim is **not the real robot**. The harness must define a canary protocol that **fails closed**.
 
 ### 5.1 Canary set
 
@@ -204,7 +204,7 @@ If any of these are missing, the harness should refuse to grade an on-robot cand
 
 ### 5.4 What "fails closed" means
 
-A bug in the harness, a missing seed, an undefined budget, a sim version mismatch — any of these should cause the gate to *fail* the candidate, never to silently pass. The default for unknown is "do not ship."
+A bug in the harness, a missing seed, an undefined budget, a sim version mismatch — any of these should cause the gate to *fail* the candidate, never to silently pass. The **default for unknown is "do not ship."**
 
 ---
 

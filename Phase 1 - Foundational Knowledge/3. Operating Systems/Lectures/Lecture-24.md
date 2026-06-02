@@ -12,12 +12,12 @@ Four platforms are covered: Jetson L4T, openpilot Agnos, Zephyr RTOS, and embedd
 
 ## Jetson L4T (Linux for Tegra)
 
-L4T is NVIDIA's downstream Linux distribution for Jetson SoCs. It tracks mainline LTS kernels with Tegra-specific patches.
+L4T is NVIDIA's **downstream Linux distribution** for Jetson SoCs. It tracks mainline LTS kernels with **Tegra-specific patches**.
 
 - **L4T 36.x = Linux 6.1 LTS**: shipped with JetPack 6.x for Jetson Orin
 - **L4T 35.x = Linux 5.10 LTS**: shipped with JetPack 5.x for Jetson AGX Orin and Xavier
 
-The Tegra-specific patches add drivers and Device Tree nodes that do not exist in mainline Linux. The goal is to expose all hardware accelerators (NVDLA, VIC, NVENC, NVDEC) through standard Linux interfaces (V4L2, DMA-BUF, device nodes) so that NVIDIA's SDK layers (TensorRT, Multimedia API) can use them with minimal OS coupling.
+The Tegra-specific patches add drivers and Device Tree nodes that do not exist in mainline Linux. The goal is to **expose all hardware accelerators** (NVDLA, VIC, NVENC, NVDEC) through **standard Linux interfaces** (V4L2, DMA-BUF, device nodes) so that NVIDIA's SDK layers (TensorRT, Multimedia API) can use them with minimal OS coupling.
 
 ### Key Downstream Drivers
 
@@ -93,9 +93,9 @@ sudo jetson_clocks
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 ```
 
-These three commands are required before running any latency benchmark on Jetson. Without them, the power management system may downclock the GPU or CPU during inference, producing inconsistent results.
+These three commands are **required before running any latency benchmark** on Jetson. Without them, the power management system may downclock the GPU or CPU during inference, producing inconsistent results.
 
-Kernel config options for inference latency: `CONFIG_PREEMPT` (low-latency desktop) or `CONFIG_PREEMPT_RT` (full RT patch). RT patch reduces worst-case scheduling latency from ~1 ms to ~100 µs.
+Kernel config options for inference latency: `CONFIG_PREEMPT` (low-latency desktop) or `CONFIG_PREEMPT_RT` (full RT patch). RT patch reduces worst-case scheduling latency from **~1 ms to ~100 µs**.
 
 > **Common Pitfall:** Running inference benchmarks without `jetson_clocks`. Jetson's default power mode uses adaptive frequency scaling: the GPU and CPU start at low frequencies and ramp up based on thermal headroom. The first several inference iterations run at reduced performance, making benchmark numbers appear lower than production performance. Always lock clocks before benchmarking; restore them after to prevent thermal damage during continuous operation.
 
@@ -105,13 +105,13 @@ Kernel config options for inference latency: `CONFIG_PREEMPT` (low-latency deskt
 - **Extlinux.conf**: bootloader config selects active slot (`LABEL primary` vs `LABEL secondary`)
 - **RPMB**: TrustZone secure world increments anti-rollback counter after successful capsule verification
 
-The Jetson OTA process combines the mechanisms from Lectures 21 and 22: A/B partitioning for rollback safety, RPMB for anti-rollback security, and the UEFI capsule format for standardized firmware delivery.
+The Jetson OTA process combines the mechanisms from Lectures 21 and 22: **A/B partitioning** for rollback safety, **RPMB** for anti-rollback security, and the **UEFI capsule format** for standardized firmware delivery.
 
 ---
 
 ## openpilot / Agnos OS
 
-Agnos is openpilot's purpose-built OS based on Ubuntu 20.04 LTS with a custom kernel targeting the comma 3/3X hardware.
+Agnos is openpilot's **purpose-built OS** based on Ubuntu 20.04 LTS with a custom kernel targeting the comma 3/3X hardware.
 
 - **Kernel**: 5.10 LTS with Qualcomm Snapdragon 845 (SDM845) downstream patches
 - **Hardware**: Snapdragon 845 CPU + Adreno 630 GPU + DSP; UFS storage; 4 cameras (3× road, 1× driver)
@@ -120,7 +120,7 @@ Like L4T on Jetson, Agnos uses a downstream kernel to expose Snapdragon hardware
 
 ### Process Architecture
 
-openpilot is structured as a collection of independent Linux processes communicating via cereal IPC. Each process runs at a defined scheduling priority:
+openpilot is structured as a collection of **independent Linux processes** communicating via cereal IPC. Each process runs at a **defined scheduling priority**:
 
 | Process | Function | Scheduler | IPC role |
 |---|---|---|---|
@@ -131,7 +131,7 @@ openpilot is structured as a collection of independent Linux processes communica
 | `sensord` | IMU + GPS data collection | SCHED_FIFO | cereal publisher |
 | `pandad` | panda MCU USB communication; CAN relay | SCHED_FIFO | cereal publisher/subscriber |
 
-The priority ordering matters: `modeld` at SCHED_FIFO 55 is the highest-priority user process, ensuring the neural network inference is never preempted by lower-priority work. `controlsd` at SCHED_FIFO 50 must complete its 10 ms loop before the actuator deadline, so it runs at the same priority level as `camerad` but after neural network output arrives.
+The **priority ordering matters**: `modeld` at SCHED_FIFO 55 is the highest-priority user process, ensuring the neural network inference is **never preempted** by lower-priority work. `controlsd` at SCHED_FIFO 50 must complete its 10 ms loop before the actuator deadline, so it runs at the same priority level as `camerad` but after neural network output arrives.
 
 > **Key Insight:** The scheduling priority assignment in openpilot directly reflects the physical deadline hierarchy of an autonomous driving system. The model inference (`modeld`) must complete before the controller (`controlsd`) can run with fresh predictions. The controller must complete before the CAN bus deadline (10 ms). Any priority inversion — where `controlsd` waits behind a lower-priority task — directly causes a missed actuator deadline and a potentially dangerous vehicle response.
 
@@ -155,7 +155,7 @@ encoderd reads same buffer[N] for H.265 encode
   → buffer returned to pool
 ```
 
-No copies of the video frame occur between these three processes. The frame travels from V4L2 DMA → shared memory buffer → GPU, all without CPU-side memcpy.
+**No copies of the video frame** occur between these three processes. The frame travels from V4L2 DMA → shared memory buffer → GPU, all without CPU-side memcpy.
 
 > **Key Insight:** The VisionIPC design achieves a complete separation of concerns: `camerad` handles camera hardware and buffer filling; `modeld` handles GPU inference; `encoderd` handles H.265 compression for recording. All three processes work on the same physical memory. The only communication between them is a small integer (the buffer index) passed via semaphore. This is the minimal possible IPC overhead for a zero-copy multi-consumer pipeline.
 
@@ -163,7 +163,7 @@ No copies of the video frame occur between these three processes. The frame trav
 
 ## Zephyr RTOS (Microcontroller)
 
-As we move from the main AI compute platform to the safety-critical MCU layer, the OS changes completely. Zephyr is used for safety-critical MCU firmware in the openpilot ecosystem.
+As we move from the main AI compute platform to the **safety-critical MCU layer**, the OS changes completely. Zephyr is used for **safety-critical MCU firmware** in the openpilot ecosystem.
 
 ### Kernel Architecture
 
@@ -176,7 +176,7 @@ Zephyr's design philosophy mirrors Linux's for RTOS: well-defined scheduling, ex
 
 ### Device Model and DTS
 
-Zephyr uses the same DTS (Device Tree Source) concept as Linux. Hardware is described in `.dts` files; drivers use the `compatible` string to match. The same mental model transfers from Linux kernel driver development.
+Zephyr uses the **same DTS (Device Tree Source) concept** as Linux. Hardware is described in `.dts` files; drivers use the `compatible` string to match. The same mental model transfers from Linux kernel driver development.
 
 This is a deliberate design choice: engineers who understand Linux DTS can work with Zephyr DTS immediately. The peripheral description format (`compatible = "st,stm32-can"`) works the same way — the driver that implements support for this compatible string is selected automatically.
 
@@ -189,7 +189,7 @@ This is a deliberate design choice: engineers who understand Linux DTS can work 
 
 ### panda MCU Role
 
-panda is an open-source CAN gateway (STM32-based) running Zephyr. It:
+panda is an **open-source CAN gateway** (STM32-based) running Zephyr. It:
 
 - Receives CAN frames from 3 vehicle CAN buses via hardware CAN transceivers
 - Filters and relays frames to openpilot host via USB (pandad)
@@ -224,7 +224,7 @@ Vehicle actuators (LKAS, ACC, brake)
 
 ## RT Tuning Checklist (Production)
 
-The RT tuning checklist brings together concepts from across all lectures: CPU scheduling, memory management, interrupt routing, and process configuration.
+The RT tuning checklist brings together concepts from across all lectures: **CPU scheduling, memory management, interrupt routing, and process configuration**.
 
 | Item | Setting | Purpose |
 |---|---|---|
@@ -253,7 +253,7 @@ The sequence for setting up an RT core for a real-time inference process:
 
 ### SCHED_DEADLINE for Periodic Tasks
 
-`SCHED_DEADLINE` is preferable to `SCHED_FIFO` for periodic tasks with known timing requirements:
+`SCHED_DEADLINE` is **preferable to `SCHED_FIFO`** for periodic tasks with known timing requirements:
 
 ```c
 struct sched_attr attr = {

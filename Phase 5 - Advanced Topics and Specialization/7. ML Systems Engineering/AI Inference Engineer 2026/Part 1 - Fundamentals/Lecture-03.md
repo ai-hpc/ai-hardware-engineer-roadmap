@@ -8,7 +8,7 @@ A roofline plot answers one specific question:
 
 > *Given a kernel's arithmetic intensity (FLOPs per byte read from HBM), what is the upper bound on its achievable throughput on this GPU?*
 
-The answer is: the minimum of (intensity × bandwidth) and (peak FLOPs). That ceiling is **physical** — no kernel can exceed it on that hardware. If your measured kernel is far below the ceiling, you have engineering room. If it is at the ceiling, the only way forward is changing the workload (precision drop, larger batches, prefix cache) or the hardware.
+The answer is: the **minimum of (intensity × bandwidth) and (peak FLOPs)**. That ceiling is **physical** — no kernel can exceed it on that hardware. If your measured kernel is far below the ceiling, you have engineering room. If it is at the ceiling, the only way forward is **changing the workload** (precision drop, larger batches, prefix cache) or the hardware.
 
 This lecture builds the roofline model from first principles:
 
@@ -24,7 +24,7 @@ By the end you should be able to plot the roofline for any GPU from its datashee
 
 ## 1. The memory hierarchy
 
-A GPU is a bandwidth pyramid. Closer to the SM means faster but smaller. Modern Hopper / Blackwell SMs look like this:
+A GPU is a **bandwidth pyramid**. Closer to the SM means faster but smaller. Modern Hopper / Blackwell SMs look like this:
 
 ```text
                  ┌─────────────────────────────┐
@@ -67,7 +67,7 @@ What lives at each level for LLM inference:
 * **NVLink** — cross-GPU all-reduce traffic in tensor parallelism, KV transfer in disaggregated P/D.
 * **PCIe / IB** — cross-node. Off the critical path for single-replica serving; on the critical path for distributed training and large-cluster inference.
 
-The roofline equation assumes HBM is the bandwidth bottleneck. That assumption is correct for >95% of LLM inference kernels at batch=1.
+The roofline equation assumes **HBM is the bandwidth bottleneck**. That assumption is correct for **>95% of LLM inference kernels** at batch=1.
 
 ---
 
@@ -107,7 +107,7 @@ peak ──┼───────────────────  ← com
          ridge point
 ```
 
-For LLM inference, the question is *always*: where is this kernel on this chart? If far below the ceiling, optimization is possible. If at the ceiling, the only progress is to **change the X coordinate** (raise arithmetic intensity by batching, fusion, or precision drop) or **the chart** (different GPU).
+For LLM inference, the question is *always*: **where is this kernel on this chart?** If far below the ceiling, optimization is possible. If at the ceiling, the only progress is to **change the X coordinate** (raise arithmetic intensity by batching, fusion, or precision drop) or **the chart** (different GPU).
 
 ---
 
@@ -124,9 +124,9 @@ Ridge points:
 * FP16: 989 × 10¹² / 3.35 × 10¹² = **~295 FLOPs/byte**
 * FP8: 1,979 × 10¹² / 3.35 × 10¹² = **~591 FLOPs/byte**
 
-A decode step at batch=1 has arithmetic intensity ≈ 2/bytes_per_param = ~1 FLOP/byte at FP16. That is ~300× below the ridge — deeply bandwidth-bound.
+A decode step at batch=1 has arithmetic intensity ≈ 2/bytes_per_param = ~1 FLOP/byte at FP16. That is ~300× below the ridge — **deeply bandwidth-bound**.
 
-A prefill of a 4K-token prompt with batch=1 has intensity in the hundreds of FLOPs/byte — at or above the ridge, compute-bound.
+A prefill of a 4K-token prompt with batch=1 has intensity in the hundreds of FLOPs/byte — at or above the ridge, **compute-bound**.
 
 ### 3.2 H200 SXM (141 GB HBM3e)
 
@@ -139,7 +139,7 @@ Ridge points:
 * FP16: 989 / 4.80 = **~206 FLOPs/byte** (43% lower than H100)
 * FP8: 1,979 / 4.80 = **~412 FLOPs/byte**
 
-H200 lowers the ridge point because bandwidth grew without FLOPs growing. **Bandwidth-bound kernels are 43% faster on H200 than H100** at the same precision. Compute-bound kernels are unchanged — H200's win is decode, not prefill. This is why H200 is the right pick for chat workloads and H100 is the right pick for embedding / batch.
+H200 lowers the ridge point because bandwidth grew without FLOPs growing. **Bandwidth-bound kernels are 43% faster on H200 than H100** at the same precision. Compute-bound kernels are unchanged — H200's win is **decode, not prefill**. This is why H200 is the right pick for **chat workloads** and H100 is the right pick for **embedding / batch**.
 
 ### 3.3 B200 SXM (192 GB HBM3e)
 
@@ -167,7 +167,7 @@ Ridge points:
 * FP16: 67 × 10¹² / 102 × 10⁹ = **~657 FLOPs/byte**
 * INT8: 134 × 10¹² / 102 × 10⁹ = **~1,314 FLOPs/byte**
 
-Notice the ridge point on Orin Nano is *much higher* than on Hopper — bandwidth is the relatively scarce resource. A 4B-class model decoding at batch=1 on Orin Nano hits the bandwidth wall extremely hard (this is the entire premise of the [Qwen Inference Optimization](../../../3.%20Edge%20AI/Qwen%20Inference%20Optimization/README.md) special course). Batching almost never helps on edge because each user is alone.
+Notice the ridge point on Orin Nano is *much higher* than on Hopper — **bandwidth is the relatively scarce resource**. A 4B-class model decoding at batch=1 on Orin Nano hits the **bandwidth wall** extremely hard (this is the entire premise of the [Qwen Inference Optimization](../../../3.%20Edge%20AI/Qwen%20Inference%20Optimization/README.md) special course). **Batching almost never helps on edge** because each user is alone.
 
 ### 3.5 Cross-GPU summary
 
@@ -212,7 +212,7 @@ Draw a vertical line at the kernel's intensity. The achievable ceiling is where 
 
 ### 4.3 Compare to measured
 
-Run the kernel, measure achieved TFLOPs/s. The ratio (achieved / ceiling) is the **efficiency**.
+Run the kernel, measure achieved TFLOPs/s. The ratio (**achieved / ceiling**) is the **efficiency**.
 
 * > 80%: the kernel is well-optimized; further work must change the kernel's intensity (precision drop, batching, fusion).
 * 30–80%: room for kernel improvement — bad memory access pattern, no Tensor Memory Accelerator usage, insufficient occupancy.

@@ -20,7 +20,7 @@ Before talking about:
 - Zigbee
 - voice
 
-you still need the embedded foundation underneath.
+you still need the **embedded foundation** underneath.
 
 ---
 
@@ -49,7 +49,7 @@ That list is a strong reminder:
 
 You do not need to relearn everything here from scratch if you already worked through Phase 1 and the main Embedded Software module.
 
-Instead, use the official Espressif list as a checklist:
+Instead, use the official Espressif list as a **checklist**:
 
 ### Already covered by our roadmap
 
@@ -78,13 +78,13 @@ When you see an ESP32 example, ask:
 - what part is board-specific?
 - where does FreeRTOS show up implicitly?
 
-That is how you turn examples into engineering understanding.
+That is how you turn examples into **engineering understanding**.
 
 ---
 
 ## What not to do
 
-Do not use Espressif’s higher-level examples to hide weak fundamentals.
+Do not use Espressif’s higher-level examples to hide **weak fundamentals**.
 
 If you do not understand:
 
@@ -102,7 +102,7 @@ And magic is fragile.
 
 ## The real lesson
 
-The official education path starts with basics because connected products fail on basic mistakes all the time:
+The official education path starts with basics because **connected products fail on basic mistakes** all the time:
 
 - wrong pins
 - wrong voltage assumptions

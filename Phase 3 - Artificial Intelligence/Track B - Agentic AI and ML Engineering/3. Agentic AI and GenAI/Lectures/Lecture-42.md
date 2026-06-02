@@ -4,11 +4,11 @@
 
 ---
 
-Agent runtime infrastructure is becoming product infrastructure.
+**Agent runtime infrastructure** is becoming product infrastructure.
 
-The important signal in OpenAI's April 2026 Agents SDK update is not only that the SDK can call tools.
+The important signal in OpenAI's April 2026 Agents SDK update is **not only that the SDK can call tools**.
 
-The important signal is that baseline agent platforms now need:
+The important signal is that **baseline agent platforms** now need:
 
 - filesystem workspaces
 - sandbox execution
@@ -33,9 +33,9 @@ model
   -> audit and recovery
 ```
 
-The model alone is no longer the product.
+The **model alone is no longer the product**.
 
-The harness is becoming part of the product.
+The **harness is becoming part of the product**.
 
 ---
 
@@ -87,17 +87,17 @@ workspace
   -> continue work safely
 ```
 
-That is no longer just model invocation.
+That is no longer **just model invocation**.
 
-It is a runtime system.
+It is a **runtime system**.
 
-The OpenAI Agents SDK update productizes that runtime layer for OpenAI model workflows.
+The OpenAI Agents SDK update **productizes that runtime layer** for OpenAI model workflows.
 
 ---
 
 ## 2. What changed in the Agents SDK
 
-OpenAI describes the updated Agents SDK as adding a more capable harness for agents that work with documents, files, and systems.
+OpenAI describes the updated Agents SDK as adding a **more capable harness** for agents that work with documents, files, and systems.
 
 The notable primitives:
 
@@ -113,7 +113,7 @@ The notable primitives:
 - snapshotting and rehydration
 - resumable state after interruptions
 
-These are the same primitives that show up in production coding agents.
+These are the **same primitives** that show up in production coding agents.
 
 The pattern:
 
@@ -136,7 +136,7 @@ agent systems need a harness, not just a chat loop
 
 ## 3. Native sandbox execution
 
-The updated Agents SDK supports sandbox execution natively.
+The updated Agents SDK supports **sandbox execution natively**.
 
 The sandbox gives the agent a controlled environment where it can:
 
@@ -159,7 +159,7 @@ Manifest
   -> artifacts and result state
 ```
 
-This is important because many useful agents need a workspace.
+This is important because many useful agents need a **workspace**.
 
 Examples:
 
@@ -170,9 +170,9 @@ Examples:
 - run tests
 - generate a report from mounted inputs
 
-Without a sandbox, teams often improvise their own filesystem and execution layer.
+Without a sandbox, teams often **improvise their own filesystem and execution layer**.
 
-That is risky and inconsistent.
+That is **risky and inconsistent**.
 
 ---
 
@@ -212,9 +212,9 @@ Good manifest design:
 - scope mounted storage to the task
 - keep secrets out of persisted workspace state
 
-This is the sandbox equivalent of an API schema.
+This is the sandbox equivalent of an **API schema**.
 
-It makes the agent's environment explicit and reviewable.
+It makes the agent's environment **explicit and reviewable**.
 
 ---
 
@@ -232,9 +232,9 @@ apply_patch:
   make structured file edits
 ```
 
-This is a major product signal.
+This is a **major product signal**.
 
-Agent platforms are converging on the same low-level tool set:
+Agent platforms are **converging on the same low-level tool set**:
 
 - inspect files
 - search files
@@ -257,11 +257,11 @@ many real tasks require execution:
 tests, scripts, linters, data transforms, builds, profilers
 ```
 
-But shell must be policy-gated.
+But shell must be **policy-gated**.
 
-A sandbox reduces blast radius.
+A sandbox reduces **blast radius**.
 
-It does not remove the need for approvals, allowlists, logs, and network controls.
+It does **not remove** the need for approvals, allowlists, logs, and network controls.
 
 ---
 
@@ -290,7 +290,7 @@ Security caveat:
 skills influence planning, tool use, and command execution
 ```
 
-Treat them as privileged code-adjacent behavior.
+Treat them as **privileged code-adjacent behavior**.
 
 ### AGENTS.md
 
@@ -315,7 +315,7 @@ global prompt
   -> task prompt
 ```
 
-You need clear priority and trust rules for each layer.
+You need clear **priority and trust rules** for each layer.
 
 ---
 
@@ -331,9 +331,9 @@ agent harness
   -> external system tools/resources
 ```
 
-MCP helps decouple the harness from every tool implementation.
+MCP helps **decouple the harness** from every tool implementation.
 
-But it creates a trust boundary.
+But it creates a **trust boundary**.
 
 Questions to ask:
 
@@ -346,9 +346,9 @@ Questions to ask:
 - Are outputs treated as untrusted?
 - Are calls logged?
 
-MCP is an interface.
+MCP is an **interface**.
 
-It is not a security policy by itself.
+It is **not a security policy** by itself.
 
 ---
 
@@ -364,7 +364,7 @@ Networks break.
 
 Runs need human review.
 
-The updated SDK emphasizes durable execution by separating state from the sandbox compute environment.
+The updated SDK emphasizes **durable execution** by separating state from the sandbox compute environment.
 
 The official article describes a model where externalized state allows a run to continue after a sandbox fails or expires, using snapshotting and rehydration.
 
@@ -385,7 +385,7 @@ compute is replaceable
 state is durable
 ```
 
-This matches the event-sourced session model in Lecture 24b.
+This matches the **event-sourced session model** in Lecture 24b.
 
 If the sandbox dies, the application should not lose:
 
@@ -400,7 +400,7 @@ If the sandbox dies, the application should not lose:
 
 ## 9. Separating harness from compute
 
-OpenAI explicitly frames harness/compute separation as a security, durability, and scale improvement.
+OpenAI explicitly frames **harness/compute separation** as a security, durability, and scale improvement.
 
 Security:
 
@@ -425,7 +425,7 @@ parallelize work across containers
 
 This should be a default design principle for agent platforms.
 
-Do not put everything in one process with one filesystem and one credential set.
+Do **not put everything in one process** with one filesystem and one credential set.
 
 Prefer:
 
@@ -437,9 +437,9 @@ compute sandbox:
   owns temporary execution, files, dependencies, artifacts
 ```
 
-The sandbox should be disposable.
+The sandbox should be **disposable**.
 
-The harness should be auditable.
+The harness should be **auditable**.
 
 ---
 
@@ -477,9 +477,9 @@ OpenClaw:
   broader local control plane for multi-channel, multi-node, user-owned agent operation
 ```
 
-The useful direction is not necessarily replacement.
+The useful direction is **not necessarily replacement**.
 
-It is integration and architectural learning.
+It is **integration and architectural learning**.
 
 An OpenClaw-style system can learn from the SDK's productized sandbox abstractions.
 
@@ -489,7 +489,7 @@ An OpenAI SDK app can learn from OpenClaw's explicit gateway, pairing, threat mo
 
 ## 11. What becomes baseline infrastructure
 
-This release is a useful market signal.
+This release is a useful **market signal**.
 
 The following are no longer "advanced extras" for serious agents:
 
@@ -509,7 +509,7 @@ MCP integration
 secrets separation
 ```
 
-If an agent platform lacks these, it is probably a prototype or a narrow wrapper.
+If an agent platform lacks these, it is probably a **prototype or a narrow wrapper**.
 
 Production users will expect:
 
@@ -525,7 +525,7 @@ Production users will expect:
 
 ## 12. Security implications
 
-Native sandboxing is useful, but it is not a complete security model.
+Native sandboxing is useful, but it is **not a complete security model**.
 
 Threats remain:
 
@@ -565,7 +565,7 @@ not a trust substitute
 
 ## 13. Evaluation plan
 
-To evaluate a durable sandboxed agent harness, do not only ask whether it can complete one task.
+To evaluate a durable sandboxed agent harness, do **not only ask whether it can complete one task**.
 
 Evaluate:
 

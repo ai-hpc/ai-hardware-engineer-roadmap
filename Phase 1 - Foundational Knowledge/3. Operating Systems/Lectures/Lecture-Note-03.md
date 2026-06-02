@@ -13,13 +13,13 @@
 
 # Part 1 (L5): Kernel Modules, Boot Process & Device Tree
 
-**Context:** Before inference runs, bootloader loads kernel + DTB; kernel parses Device Tree to discover SoC peripherals; drivers bind via compatible strings. Same driver binary supports multiple boards via different DTs.
+**Context:** Before inference runs, bootloader loads kernel + DTB; kernel parses **Device Tree** to discover SoC peripherals; drivers bind via **compatible strings**. Same driver binary supports **multiple boards via different DTs**.
 
 ---
 
 ## Linux Boot Sequence (ARM SoC)
 
-Power-on → BootROM → SPL (DRAM, clocks) → TF-A BL31 (EL3) → U-Boot/CBoot (kernel + DTB + initramfs) → kernel decompress → start_kernel() → init (systemd). Jetson: MB1, MB2, CBoot in place of SPL/U-Boot. Chain of trust: each stage verifies next signature.
+Power-on → BootROM → SPL (DRAM, clocks) → TF-A BL31 (EL3) → U-Boot/CBoot (kernel + DTB + initramfs) → kernel decompress → start_kernel() → init (systemd). Jetson: MB1, MB2, CBoot in place of SPL/U-Boot. **Chain of trust:** each stage verifies next signature.
 
 ---
 
@@ -31,7 +31,7 @@ Secure boot: ROM verifies SPL; SPL verifies kernel; kernel can verify rootfs/mod
 
 ## initramfs
 
-Compressed cpio; early userspace (busybox, udev, cryptsetup, init). Kernel mounts as root; runs /init; then real root and switch_root. Needed when root needs drivers or tools not in kernel (e.g. LUKS). Jetson: TNSPEC and extlinux in initramfs.
+Compressed cpio; **early userspace** (busybox, udev, cryptsetup, init). Kernel mounts as root; runs /init; then real root and switch_root. Needed when **root needs drivers or tools not in kernel** (e.g. LUKS). Jetson: TNSPEC and extlinux in initramfs.
 
 ---
 
@@ -45,7 +45,7 @@ Compressed cpio; early userspace (busybox, udev, cryptsetup, init). Kernel mount
 
 # Part 2 (L6): CPU Scheduling — CFS, EEVDF & Real-Time Classes
 
-**Context:** Scheduler decides which task runs next. Real-time classes (dl, rt) are checked before the fair class (CFS/EEVDF). One SCHED_FIFO task at priority 1 preempts all SCHED_NORMAL tasks. For deadlines (e.g. inference, CAN), use SCHED_FIFO or SCHED_DEADLINE.
+**Context:** Scheduler decides which task runs next. **Real-time classes (dl, rt) are checked before the fair class** (CFS/EEVDF). One SCHED_FIFO task at priority 1 preempts all SCHED_NORMAL tasks. For deadlines (e.g. inference, CAN), use **SCHED_FIFO or SCHED_DEADLINE**.
 
 ---
 
@@ -75,7 +75,7 @@ Replaces CFS. **lag** = CPU time owed vs ideal; **eligible** = not ahead of fair
 
 ## Tuning and Inspection
 
-sched_latency_ns, sched_min_granularity_ns (CFS). /proc/[pid]/sched (vruntime, slice). chrt for policy/priority. For deterministic latency, use RT class + isolcpus/PREEMPT_RT (see Lecture-Note 04).
+sched_latency_ns, sched_min_granularity_ns (CFS). /proc/[pid]/sched (vruntime, slice). **chrt** for policy/priority. For **deterministic latency**, use RT class + isolcpus/PREEMPT_RT (see Lecture-Note 04).
 
 ---
 

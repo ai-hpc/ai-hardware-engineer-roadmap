@@ -12,7 +12,7 @@ AI hardware engineers need to understand embedded storage because the wrong part
 
 ## Storage Hierarchy for Embedded AI Devices
 
-Three storage technologies appear in AI edge hardware, chosen by cost, form factor, and throughput requirements:
+Three storage technologies appear in AI edge hardware, chosen by **cost, form factor, and throughput** requirements:
 
 | Technology | Interface | Seq Read | Random IOPS | Form Factor |
 |---|---|---|---|---|
@@ -21,7 +21,7 @@ Three storage technologies appear in AI edge hardware, chosen by cost, form fact
 | UFS 4.0 | Serial MIPI M-PHY | ~4200 MB/s | ~130K | Soldered / socket |
 | NVMe Gen4 x4 | PCIe | ~7000 MB/s | ~1M | M.2 / BGA |
 
-The choice follows a cost-performance curve: eMMC is cheapest and slowest; NVMe is fastest and most expensive (and requires PCIe lanes from the SoC). UFS occupies the middle ground and is the standard for high-end mobile AI platforms.
+The choice follows a **cost-performance curve**: eMMC is cheapest and slowest; NVMe is fastest and most expensive (and requires PCIe lanes from the SoC). UFS occupies the **middle ground** and is the standard for high-end mobile AI platforms.
 
 ```
 Cost / Integration                     Performance
@@ -38,7 +38,7 @@ Cost / Integration                     Performance
 
 ## eMMC (embedded MultiMediaCard)
 
-eMMC implements the JEDEC JESD84 standard. The flash controller, wear leveling, ECC, and bad block management are all integrated inside the package. From the host's perspective, eMMC presents a simple block device with a fixed capacity.
+eMMC implements the **JEDEC JESD84 standard**. The flash controller, wear leveling, ECC, and bad block management are all **integrated inside the package**. From the host's perspective, eMMC presents a simple block device with a fixed capacity.
 
 ### Internal Partition Structure
 
@@ -69,7 +69,7 @@ Every eMMC device exposes fixed partitions that are separate from the user data 
 
 ### RPMB Security Properties
 
-RPMB prevents rollback attacks on firmware. The secure world (OP-TEE, ARM TrustZone) increments a write counter on each write; the eMMC controller rejects any write that does not carry a valid HMAC and a counter value ≥ current. Used in Jetson secure boot to store:
+RPMB prevents **rollback attacks on firmware**. The secure world (OP-TEE, ARM TrustZone) increments a write counter on each write; the eMMC controller rejects any write that does not carry a **valid HMAC** and a counter value ≥ current. Used in Jetson secure boot to store:
 
 - Firmware version counter (anti-rollback)
 - Encryption key material for full-disk encryption
@@ -88,13 +88,13 @@ RPMB prevents rollback attacks on firmware. The secure world (OP-TEE, ARM TrustZ
 
 ## UFS (Universal Flash Storage)
 
-UFS uses a serial, full-duplex MIPI M-PHY physical layer with a SCSI-based command set (UFS Transport Protocol). Key advantages over eMMC:
+UFS uses a **serial, full-duplex MIPI M-PHY** physical layer with a SCSI-based command set (UFS Transport Protocol). Key advantages over eMMC:
 
 - **Command queuing**: up to 32 commands in flight (vs eMMC single-command); critical for random I/O latency
 - **Full duplex**: simultaneous read and write; improves mixed workload throughput
 - **Lower CPU overhead**: command processing offloaded to UFS device controller
 
-UFS uses the same logical partition structure as eMMC (BOOT, RPMB, UDA). It is the standard on Qualcomm Snapdragon platforms. The comma 3X (openpilot primary hardware) uses a Snapdragon 845 with UFS storage for camera recording and OS.
+UFS uses the same logical partition structure as eMMC (BOOT, RPMB, UDA). It is the **standard on Qualcomm Snapdragon platforms**. The comma 3X (openpilot primary hardware) uses a Snapdragon 845 with UFS storage for camera recording and OS.
 
 > **Key Insight:** The most important practical difference between eMMC and UFS for an autonomous driving platform is command queuing. eMMC processes one command at a time. While the camera driver issues a write for frame N, any other I/O (OS, modeld reading model weights, logging) must wait. UFS can process 32 commands simultaneously, meaning camera writes, model reads, and log writes all proceed in parallel with no head-of-line blocking.
 
@@ -104,7 +104,7 @@ The improvement in random IOPS (~70K for UFS 3.1 vs ~15K for eMMC 5.1) directly 
 
 ## NVMe on Embedded Platforms
 
-For platforms where maximum storage throughput is required — large-scale dataset logging, high-frequency sensor recording, or training data capture — NVMe via PCIe is the correct choice.
+For platforms where **maximum storage throughput** is required — large-scale dataset logging, high-frequency sensor recording, or training data capture — **NVMe via PCIe** is the correct choice.
 
 Jetson Orin exposes an M.2 Key M slot connected to PCIe Gen4 x4 (~7 GB/s):
 
@@ -121,11 +121,11 @@ With the io_uring techniques from Lecture 19 and the PCIe architecture from Lect
 
 With the storage technologies understood, the next question is how to structure partitions for safe over-the-air updates. The partition layout determines what happens when an update fails.
 
-Over-the-air update strategy determines recovery behavior and downtime on failure.
+Over-the-air update strategy determines **recovery behavior and downtime** on failure.
 
 ### A/B Seamless Update
 
-Two full system partition sets (slot A and slot B). The inactive slot receives the update while the active slot runs normally.
+Two full system partition sets (**slot A and slot B**). The **inactive slot receives the update** while the active slot runs normally.
 
 ```
 /dev/mmcblk0p1  boot_a      (active)
@@ -160,13 +160,13 @@ On reboot: bootloader marks slot B as active, tries to boot. If boot count excee
 
 ### Recovery Partition Update
 
-Single active partition + a small recovery image. Update process: download new image → reboot into recovery → flash system partition → reboot into new system. No rollback without a backup image. Used in older Android devices and simple embedded systems.
+Single active partition + a small recovery image. Update process: download new image → reboot into recovery → flash system partition → reboot into new system. **No rollback without a backup image**. Used in older Android devices and simple embedded systems.
 
 > **Common Pitfall:** Recovery-partition updates have no automatic rollback. If the new image fails to boot, the device is stuck. For production autonomous driving deployments, this is unacceptable — a failed update must never result in a permanently bricked device in the field. A/B partitioning is the minimum requirement for any OTA-updatable AI edge device.
 
 ### OSTree: Git-Like Atomic Updates
 
-OSTree maintains a content-addressed object store of filesystem trees, analogous to git. Deployed updates are hard-linked from the object store; atomic switchover via a symlink update. Used in Automotive Grade Linux (AGL) and automotive ECU Linux platforms. Compatible with ext4 (hard links) and btrfs.
+OSTree maintains a **content-addressed object store** of filesystem trees, analogous to git. Deployed updates are hard-linked from the object store; **atomic switchover via a symlink update**. Used in Automotive Grade Linux (AGL) and automotive ECU Linux platforms. Compatible with ext4 (hard links) and btrfs.
 
 The OSTree model is conceptually elegant: each deployed OS version is a git commit hash. Rolling back to a previous version is as simple as updating a symlink. Differential updates (only changed files) are as compact as possible because unchanged files are already in the object store.
 
@@ -193,7 +193,7 @@ ls /dev/mmcblk0*                 # list all partition device nodes
 
 ## Wear Leveling and Write Amplification
 
-Flash storage degrades with Program/Erase (P/E) cycles. The Flash Translation Layer (FTL) manages longevity:
+Flash storage degrades with **Program/Erase (P/E) cycles**. The Flash Translation Layer (FTL) manages longevity:
 
 - **Dynamic wear leveling**: preferentially writes to least-worn blocks; effective for frequently updated data
 - **Static wear leveling**: periodically migrates cold data from worn blocks to fresh ones; prevents hot/cold imbalance
@@ -235,7 +235,7 @@ nvme smart-log /dev/nvme0            # temperature, available spare, wear indica
 cat /sys/class/mmc_host/mmc0/mmc0:0001/life_time  # eMMC wear level (0x01-0x0A)
 ```
 
-`await` in `iostat` output is the average I/O service time including queue wait. A rising `await` under camera recording load indicates the storage is saturated. `blktrace` identifies which process is responsible for latency spikes.
+`await` in `iostat` output is the **average I/O service time** including queue wait. A rising `await` under camera recording load indicates the **storage is saturated**. `blktrace` identifies which process is responsible for latency spikes.
 
 > **Common Pitfall:** Diagnosing storage saturation only with `iostat -x`. The `%util` field in iostat shows queue utilization, not device saturation — a modern NVMe SSD can be at 100% queue utilization while still having headroom if the queue depth is low. Always check `await` (average service time) and `r_await`/`w_await` separately. For eMMC specifically, check the life_time sysfs attribute monthly during development to validate that your write patterns are within the expected wear budget.
 

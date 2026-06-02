@@ -4,9 +4,9 @@
 
 ---
 
-An agent runtime becomes a platform only when external applications can use it without knowing private internals.
+An agent runtime becomes a **platform** only when external applications can use it without knowing private internals.
 
-That is the purpose of the OpenClaw App SDK.
+That is the purpose of the **OpenClaw App SDK**.
 
 The App SDK, published as `@openclaw/sdk`, is the public client API for applications that run **outside** the OpenClaw process:
 
@@ -72,7 +72,7 @@ After:
   App uses typed SDK methods backed by discoverable Gateway RPCs.
 ```
 
-That is how OpenClaw moves from "working internal system" to "external app platform."
+That is how OpenClaw moves from "working internal system" to **"external app platform."**
 
 ---
 
@@ -104,7 +104,7 @@ App SDK = remote client contract.
 Plugin SDK = in-process extension contract.
 ```
 
-This separation matters for auth, scopes, error handling, lifecycle, and compatibility.
+This separation matters for **auth, scopes, error handling, lifecycle, and compatibility**.
 
 ---
 
@@ -170,13 +170,13 @@ The SDK also exports types such as:
 - `OpenClawEvent`
 - related RPC and selection types
 
-The design goal is that app authors use these helpers instead of hand-writing Gateway frames.
+The design goal is that app authors use these helpers instead of **hand-writing Gateway frames**.
 
 ---
 
 ## 5. The SDK happy path
 
-The happy path is the minimum app flow that must be boringly reliable.
+The happy path is the **minimum app flow** that must be boringly reliable.
 
 ```text
 Connect
@@ -200,7 +200,7 @@ User clicks "Run"
   -> app shows final result
 ```
 
-If this path is unstable, every external app becomes a pile of special cases.
+If this path is unstable, every external app becomes a **pile of special cases**.
 
 ---
 
@@ -240,15 +240,15 @@ Important SDK behavior:
 - `Run.events()` can replay already-seen events for fast runs
 - `Run.wait()` maps Gateway lifecycle outcomes into stable SDK result shapes
 
-The app does not need to know the internal agent loop implementation.
+The app does not need to know the **internal agent loop implementation**.
 
 ---
 
 ## 7. Sessions
 
-Sessions are durable transcript holders.
+Sessions are **durable transcript holders**.
 
-They give apps stable context and session-affine behavior.
+They give apps **stable context** and session-affine behavior.
 
 Example:
 
@@ -279,7 +279,7 @@ Use isolated runs when the app wants clean one-shot work.
 
 ## 8. Event streaming and normalization
 
-External apps should not consume raw Gateway internals directly.
+External apps should not consume **raw Gateway internals** directly.
 
 The SDK normalizes Gateway events into a stable envelope:
 
@@ -325,7 +325,7 @@ The `raw` escape hatch is useful for advanced clients, but normal apps should pr
 
 ## 9. Why event leakage is dangerous
 
-If raw chat or runtime events leak through `run.events()`, the app becomes coupled to private implementation details.
+If raw chat or runtime events leak through `run.events()`, the app becomes **coupled to private implementation details**.
 
 Bad pattern:
 
@@ -345,7 +345,7 @@ Gateway event
 
 If internal events leak, clients break when the runtime changes.
 
-The SDK should be the compatibility layer.
+The SDK should be the **compatibility layer**.
 
 ---
 
@@ -379,9 +379,9 @@ wait() returns cancelled
 
 Important nuance:
 
-`Run.cancel()` is a request to stop work.
+`Run.cancel()` is a **request to stop work**.
 
-The true terminal state is confirmed by the runtime.
+The true terminal state is **confirmed by the runtime**.
 
 `Run.wait()` should return normalized statuses such as:
 
@@ -397,7 +397,7 @@ If the wait deadline expires while the run is still active, the SDK should retur
 
 ## 11. Current supported versus future SDK surface
 
-A mature SDK should not pretend missing Gateway RPCs exist.
+A mature SDK should not pretend **missing Gateway RPCs** exist.
 
 The current App SDK approach is explicit:
 
@@ -414,19 +414,19 @@ The current App SDK approach is explicit:
 | `oc.environments` | Explicitly unsupported until environment RPCs exist |
 | `oc.tools.invoke` | Explicitly unsupported until Gateway tool invocation exists |
 
-This is good API design.
+This is **good API design**.
 
-It prevents silent fallback to unsafe defaults.
+It prevents **silent fallback** to unsafe defaults.
 
 If a caller passes future-only fields such as workspace, runtime, environment, or approval parameters before the Gateway supports them, the SDK should throw before sending the request.
 
-That is safer than pretending the setting worked.
+That is **safer** than pretending the setting worked.
 
 ---
 
 ## 12. Blueprint: typed Gateway RPCs
 
-Every app-facing capability should become a typed Gateway RPC.
+Every app-facing capability should become a **typed Gateway RPC**.
 
 The implementation pattern:
 
@@ -540,13 +540,13 @@ Narrow RPC surfaces are easier to:
 - version
 - expose in native SDKs
 
-This is how the SDK grows without becoming unstable.
+This is how the SDK grows **without becoming unstable**.
 
 ---
 
 ## 15. Artifacts as app-visible outputs
 
-Apps need richer outputs than text transcripts.
+Apps need **richer outputs** than text transcripts.
 
 Artifacts represent:
 
@@ -585,7 +585,7 @@ Artifact APIs should be:
 - backed by SDK wrappers
 - covered by tests
 
-Large artifact content should not be shoved blindly into WebSocket frames.
+Large artifact content should not be shoved blindly into **WebSocket frames**.
 
 Use metadata, download handles, or chunked behavior where appropriate.
 
@@ -593,7 +593,7 @@ Use metadata, download handles, or chunked behavior where appropriate.
 
 ## 16. Environment discovery
 
-Apps need to know where work can run.
+Apps need to know **where work can run**.
 
 Environment discovery is read-only at first:
 
@@ -618,9 +618,9 @@ It should not initially do:
 - runtime selection
 - remote mutation
 
-That boundary is intentional.
+That boundary is **intentional**.
 
-Discovery is safer than control.
+Discovery is **safer than control**.
 
 The app can show users where work can run without being allowed to create or destroy environments.
 
@@ -643,9 +643,9 @@ The macOS app maps them to human-readable Apple device names using vendored JSON
 apps/macos/Sources/OpenClaw/Resources/DeviceModels/
 ```
 
-This is not a new runtime authority.
+This is **not a new runtime authority**.
 
-It is app-side reference metadata.
+It is **app-side reference metadata**.
 
 That distinction matters:
 
@@ -702,7 +702,7 @@ presentation metadata should be deterministic, pinned, licensed, and replaceable
 
 ### Nodes and media as remote peripherals
 
-Nodes are companion devices connected to the Gateway WebSocket with:
+Nodes are **companion devices** connected to the Gateway WebSocket with:
 
 ```json
 { "role": "node" }
@@ -721,7 +721,7 @@ The key rule:
 
 > nodes are peripherals, not gateways
 
-They do not run the Gateway service.
+They do not run the **Gateway service**.
 
 Messages from Telegram, WhatsApp, WebChat, or other channels still land on the Gateway. The Gateway owns the model, session routing, tool calls, and policy. Nodes expose device-local capabilities that the Gateway can invoke.
 
@@ -783,7 +783,7 @@ openclaw devices reject <requestId>
 openclaw nodes status
 ```
 
-This approval is the durable role contract.
+This approval is the **durable role contract**.
 
 Token rotation must stay inside that contract. A rotated token should not silently upgrade a node into a different role or broader command surface.
 
@@ -810,7 +810,7 @@ gateway-owned node pairing store:
 
 #### Node command policy
 
-A node command should pass two gates before invocation:
+A node command should pass **two gates** before invocation:
 
 ```text
 1. The node declared the command at connect time.
@@ -847,7 +847,7 @@ If the Gateway cannot recognize the node platform or device family, it should no
 
 #### Remote node host and `system.run`
 
-The headless node host is the pattern for remote execution.
+The **headless node host** is the pattern for remote execution.
 
 Use it when:
 
@@ -888,7 +888,7 @@ Exec approvals live on the node host:
 ~/.openclaw/exec-approvals.json
 ```
 
-That is intentional. The machine executing the command enforces the local approval and allowlist state.
+That is intentional. The machine executing the command enforces the **local approval and allowlist state**.
 
 The important security boundary:
 
@@ -939,7 +939,7 @@ For app developers, the rule is simple:
 
 ## 17. Controlled tool invocation
 
-Direct tool invocation is powerful and risky.
+Direct tool invocation is **powerful and risky**.
 
 A future SDK-facing method could mirror the existing HTTP tool invoke behavior as:
 
@@ -967,7 +967,7 @@ The important rule:
 
 > SDK tool invocation must reuse the same Gateway auth, tool policy, deny-list, approval semantics, and owner/actor semantics as the existing server path
 
-It must not become a shortcut around policy.
+It must not become a **shortcut around policy**.
 
 Tool invocation touches:
 
@@ -979,15 +979,15 @@ Tool invocation touches:
 - audit logs
 - security boundaries
 
-That is why it is harder than read-only methods.
+That is why it is **harder than read-only methods**.
 
 ---
 
 ## 18. Task ledger
 
-Event streams are transient.
+Event streams are **transient**.
 
-Apps also need durable task state.
+Apps also need **durable task state**.
 
 A task ledger API gives UIs a stable way to ask:
 
@@ -1018,7 +1018,7 @@ Do not make apps reconstruct durable state only from historical event streams.
 
 ## 19. Discovery and feature negotiation
 
-Gateway connections should advertise capabilities.
+Gateway connections should **advertise capabilities**.
 
 The SDK can inspect:
 
@@ -1037,9 +1037,9 @@ Then the app can decide:
 - whether the payload is too large
 - whether to show or hide UI features
 
-This avoids hard-coded version assumptions.
+This avoids **hard-coded version assumptions**.
 
-Feature detection beats guessing.
+**Feature detection** beats guessing.
 
 ---
 
@@ -1054,9 +1054,9 @@ Examples:
 - `operator.admin`
 - plugin-defined scopes
 
-Server-side checks are mandatory.
+**Server-side checks** are mandatory.
 
-The SDK is not a security boundary.
+The SDK is **not a security boundary**.
 
 Events should also be gated by visibility.
 
@@ -1077,7 +1077,7 @@ For app developers this means:
 
 ## 21. Idempotency
 
-Side-effecting methods need idempotency keys.
+Side-effecting methods need **idempotency keys**.
 
 Examples:
 
@@ -1109,13 +1109,13 @@ With idempotency:
 same request key -> same accepted operation
 ```
 
-Idempotency is part of the SDK contract, not an optimization.
+Idempotency is **part of the SDK contract**, not an optimization.
 
 ---
 
 ## 22. Dogfooding with OpenMeow
 
-OpenMeow-style dogfooding is valuable because it forces the SDK to behave like a real product dependency.
+OpenMeow-style dogfooding is valuable because it forces the SDK to behave like a **real product dependency**.
 
 The dogfood client should validate:
 
@@ -1135,7 +1135,7 @@ The app should not call private Gateway internals.
 
 It should use the same SDK surface an external developer would use.
 
-If the app needs a workaround, the SDK contract probably needs work.
+If the app needs a workaround, the **SDK contract** probably needs work.
 
 ---
 
@@ -1167,9 +1167,9 @@ Test these paths:
 - declared node command allowed versus denied by Gateway policy
 - node media event creates a structured attachment or artifact
 
-The goal is not just correctness.
+The goal is not just **correctness**.
 
-The goal is contract stability.
+The goal is **contract stability**.
 
 When the Gateway evolves, the SDK fixtures tell you whether external apps will break.
 
@@ -1237,13 +1237,13 @@ Answer:
 
 ## 26. Five apps that could use the App SDK
 
-The App SDK is useful when an application wants OpenClaw's agent runtime without embedding OpenClaw itself.
+The App SDK is useful when an application wants OpenClaw's agent runtime **without embedding OpenClaw itself**.
 
 Here are five realistic app patterns.
 
 ### 1. Personal desktop control center
 
-A macOS, Windows, or Linux desktop app that lets a user manage agents, sessions, models, approvals, nodes, screenshots, and long-running work.
+A macOS, Windows, or Linux **desktop app** that lets a user manage agents, sessions, models, approvals, nodes, screenshots, and long-running work.
 
 Core user flow:
 
@@ -1275,7 +1275,7 @@ The app is a remote operator UI. It should not run the agent loop locally.
 
 ### 2. AI lab dashboard for experiments
 
-A web dashboard for comparing prompts, models, agents, and tool behavior across repeated runs.
+A **web dashboard** for comparing prompts, models, agents, and tool behavior across repeated runs.
 
 Core user flow:
 
@@ -1307,7 +1307,7 @@ It should not parse CLI output or transcripts to reconstruct experiment state.
 
 ### 3. CI and code-review automation app
 
-A GitHub/GitLab-adjacent service that asks OpenClaw agents to review changes, inspect logs, run approved checks, and produce review artifacts.
+A GitHub/GitLab-adjacent **service** that asks OpenClaw agents to review changes, inspect logs, run approved checks, and produce review artifacts.
 
 Core user flow:
 
@@ -1339,7 +1339,7 @@ It cannot depend on a human watching a terminal.
 
 ### 4. Smart device and media companion
 
-A mobile or desktop companion app that exposes camera, screen, canvas, location, notifications, and device status to OpenClaw through nodes.
+A mobile or desktop **companion app** that exposes camera, screen, canvas, location, notifications, and device status to OpenClaw through nodes.
 
 Core user flow:
 
@@ -1368,7 +1368,7 @@ The node remains a peripheral; the Gateway remains the control plane.
 
 ### 5. Operations console for distributed agent infrastructure
 
-An admin app for teams running multiple Gateways, node hosts, models, agents, and execution environments.
+An **admin app** for teams running multiple Gateways, node hosts, models, agents, and execution environments.
 
 Core user flow:
 

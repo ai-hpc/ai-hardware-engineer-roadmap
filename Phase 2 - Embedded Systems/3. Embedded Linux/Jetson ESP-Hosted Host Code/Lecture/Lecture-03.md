@@ -21,7 +21,7 @@ This file is where the host turns:
 
 into a working transport endpoint for the ESP.
 
-That makes it the best file for learning how transport glue looks in a real Embedded Linux driver.
+That makes it the best file for learning how **transport glue** looks in a real Embedded Linux driver.
 
 ## Related Linux kernel concepts
 
@@ -35,7 +35,7 @@ Lecture 3 from the OS course gives the important interrupt model: hardware raise
 
 Lecture 17 explains how Linux matches a driver to an already-described device, and Lecture 18 explains event-driven I/O once the device is alive. Together they explain why this code first reuses `spi0.0` from the kernel device model and then turns handshake and data-ready GPIO edges into an interrupt-driven transport instead of polling blindly.
 
-The detail that matters most is that an IRQ is not “just a GPIO change notification.” In Linux, an IRQ is the kernel’s promise that when the hardware edge arrives, the driver will get scheduled through the interrupt path and can move the protocol forward with low latency.
+The detail that matters most is that an **IRQ is not “just a GPIO change notification.”** In Linux, an IRQ is the kernel’s promise that when the hardware edge arrives, the driver will get scheduled through the interrupt path and can move the protocol forward with **low latency**.
 
 That is why the validation focused on `/proc/interrupts` counts and not only on pin names. A correctly named GPIO that never produces an IRQ is operationally useless, while a line with rising counters proves that the electrical signal, the GPIO mapping, the IRQ translation, and the kernel handler path are all aligned.
 
@@ -100,12 +100,12 @@ Conceptually, it is responsible for:
 - requesting and configuring the handshake/data-ready GPIOs
 - mapping those GPIOs into IRQs
 
-This is the point where a “Linux board description” becomes an “active transport endpoint.”
+This is the point where a “Linux board description” becomes an **“active transport endpoint.”**
 
 That is an important Embedded Linux mental shift:
 
-- device tree and sysfs prove presence
-- transport init proves usability
+- device tree and sysfs prove **presence**
+- transport init proves **usability**
 
 The critical part of `spi_dev_init(...)` is worth reading literally:
 
@@ -156,11 +156,11 @@ The stronger success signal is:
 - they became IRQ sources
 - interrupt counters moved when the ESP booted
 
-That is how you should debug GPIO-based bring-up:
+That is how you should debug **GPIO-based bring-up**:
 
 - name -> request -> IRQ mapping -> actual edge activity
 
-If you stop at “the number looks right,” you have not really debugged anything.
+If you stop at “the number looks right,” you have **not really debugged anything**.
 
 ---
 
@@ -218,7 +218,7 @@ But the validated Jetson flow intentionally keeps the host capped at:
 
 Why this is important:
 
-- transport stability beat nominal peak speed during bring-up
+- **transport stability** beat nominal peak speed during bring-up
 - the driver now uses `clockspeed=` as both:
   - initial speed
   - runtime ceiling

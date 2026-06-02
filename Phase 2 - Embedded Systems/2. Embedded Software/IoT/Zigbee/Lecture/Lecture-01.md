@@ -73,7 +73,7 @@ You already have OpenThread in this IoT path, so the most useful comparison is d
 - **Thread** is an IPv6-first constrained IP network
 - **Zigbee** is a non-IP networking stack with its own application model
 
-That difference changes the whole engineering style.
+That difference changes the **whole engineering style**.
 
 With Thread, you think in terms of:
 
@@ -90,13 +90,13 @@ With Zigbee, you think in terms of:
 - bindings
 - trust center and network keys
 
-So even though the radios may look similar on a schematic, the software architecture is not the same.
+So even though the radios may look similar on a schematic, the **software architecture is not the same**.
 
 ---
 
 ## Why Zigbee belongs in Embedded Software
 
-Zigbee is not just a networking topic. It is deeply embedded-software-shaped.
+Zigbee is not just a networking topic. It is deeply **embedded-software-shaped**.
 
 You need to reason about:
 
@@ -107,7 +107,7 @@ You need to reason about:
 - security material in flash or secure storage
 - application behavior on tiny MCUs
 
-This is exactly the kind of system where firmware, networking, and product behavior are tightly coupled.
+This is exactly the kind of system where firmware, networking, and product behavior are **tightly coupled**.
 
 ---
 

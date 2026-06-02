@@ -235,7 +235,7 @@ You get timestamps, worst-case wakeup latency, and the kernel call stack from wa
 
 - **Microkernel:** drivers, filesystems, network run as separate user processes.
 - **Designed for RT from the start** (no “retrofit” like PREEMPT_RT).
-- Used in QNX CAR, medical, avionics. Often paired with a hypervisor: QNX for safety-critical control (brakes, steering), Linux for AI stack; hypervisor keeps them isolated on the same SoC.
+- Used in QNX CAR, medical, avionics. Often **paired with a hypervisor**: QNX for safety-critical control (brakes, steering), Linux for AI stack; hypervisor keeps them isolated on the same SoC.
 
 ---
 

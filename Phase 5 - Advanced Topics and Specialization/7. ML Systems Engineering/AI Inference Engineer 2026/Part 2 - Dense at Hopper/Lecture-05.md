@@ -9,7 +9,7 @@ A 70B dense model on Hopper, partitioned by TP and quantized by AWQ-INT4 or FP8,
 3. **Prefix caching / RadixAttention** — share KV entries across requests with overlapping prefixes.
 4. **Speculative decoding** — generate multiple tokens per forward pass via a draft model.
 
-Each one independently moved a major metric by 2–10× when it shipped (2023–2025). Together they define the 2026 serving baseline. A deployment that doesn't use them is shipping at 10–50× the cost it could.
+Each one independently moved a major metric by **2–10×** when it shipped (2023–2025). Together they define the **2026 serving baseline**. A deployment that doesn't use them is shipping at **10–50× the cost** it could.
 
 This lecture applies each to Llama 3.3 70B and Qwen 2.5 72B on 4–8× H100/H200, with concrete numbers and the runtime configs.
 
@@ -51,9 +51,9 @@ step t+2:  req5 prefill finishes → batch = [req2.t=14, req3.t=2, req4.t=7, req
 
 ### 1.3 Mixing prefill and decode
 
-The subtle hard part: prefill is compute-bound, decode is memory-bound. Mixing them in the same step can stall the batch.
+The subtle hard part: **prefill is compute-bound, decode is memory-bound**. Mixing them in the same step can stall the batch.
 
-vLLM 0.22+ V1 uses **chunked prefill** — prefill is split into chunks the size of a decode batch row. Prefill becomes "just another decode-shaped step." This keeps the batch balanced and the GPU at high utilization.
+vLLM 0.22+ V1 uses **chunked prefill** — prefill is split into chunks the size of a decode batch row. Prefill becomes "just another decode-shaped step." This keeps the batch balanced and the GPU at **high utilization**.
 
 ### 1.4 Throughput impact
 
@@ -75,9 +75,9 @@ The second breakthrough. The mental model:
 
 ### 2.1 The KV memory fragmentation problem
 
-Before paging, each request reserved KV memory contiguously. If you allocated 4096 tokens of KV and the request finished at token 312, the rest (3784 tokens × 320 KB ≈ 1.2 GB) was wasted until the request released.
+Before paging, each request reserved KV memory **contiguously**. If you allocated 4096 tokens of KV and the request finished at token 312, the rest (3784 tokens × 320 KB ≈ 1.2 GB) was **wasted** until the request released.
 
-Across many requests, HBM looks Swiss-cheese: full of holes. Effective capacity might be 50% of physical.
+Across many requests, HBM looks Swiss-cheese: full of holes. **Effective capacity might be 50% of physical.**
 
 ### 2.2 PagedAttention v1
 
@@ -119,7 +119,7 @@ Why this matters to you: a kernel-level win (a new attention variant, a Blackwel
 
 ## 3. Prefix caching — RadixAttention and friends
 
-The 2024 breakthrough. Many requests share prefixes — system prompts, RAG retrievals, conversation history. Recomputing KV for these prefixes is pure waste.
+The 2024 breakthrough. Many requests **share prefixes** — system prompts, RAG retrievals, conversation history. Recomputing KV for these prefixes is **pure waste**.
 
 ### 3.1 Simple prefix cache (vLLM)
 
@@ -156,7 +156,7 @@ For Qwen 2.5 72B on a customer-support chat product (long system prompt + tool c
 | vLLM hash prefix cache | 90 ms | 19% of full |
 | SGLang RadixAttention | 85 ms | 18% of full |
 
-For a one-paragraph system prompt the impact is smaller (~30-50% TTFT improvement). For long system prompts + tool catalogs (typical agent / chat) the impact is dramatic.
+For a one-paragraph system prompt the impact is smaller (~30-50% TTFT improvement). For **long system prompts + tool catalogs** (typical agent / chat) the impact is **dramatic**.
 
 ### 3.4 Configuration
 
@@ -203,7 +203,7 @@ For Qwen 2.5 72B target:
 * **Qwen 2.5 1.5B Instruct** as draft — ~75% acceptance.
 * **Qwen 2.5 3B Instruct** as draft — ~80% acceptance.
 
-The pattern: draft from the **same family** as target. Cross-family drafting (Llama draft, Qwen target) loses acceptance.
+The pattern: draft from the **same family** as target. **Cross-family drafting** (Llama draft, Qwen target) loses acceptance.
 
 ### 4.3 EAGLE / EAGLE-2 / EAGLE-3
 
@@ -233,7 +233,7 @@ For Llama 3.3 70B on 4× H100 FP8 chat workload (concurrency 32, prompt 1024, ou
 | Llama 3.2 1B draft + Llama 3.3 70B target | ~870 (1.5×) |
 | EAGLE-3 head | ~1450 (2.5×) |
 
-Speculation is the biggest "free" decode optimization on Hopper for chat workloads.
+Speculation is the **biggest "free" decode optimization** on Hopper for chat workloads.
 
 ---
 

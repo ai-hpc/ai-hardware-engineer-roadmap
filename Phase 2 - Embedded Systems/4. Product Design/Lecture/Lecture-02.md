@@ -34,7 +34,7 @@ This matters because it confirms a hard truth:
 
 - audio and physical quality are not optional in a home voice product
 
-If the object sounds weak or feels cheap, the user notices instantly.
+If the object sounds weak or feels cheap, the user **notices instantly**.
 
 So the first HomePod was right about one important thing:
 
@@ -44,7 +44,7 @@ So the first HomePod was right about one important thing:
 
 ## What HomePod got wrong
 
-The weakness was not the hardware. The weakness was that the assistant felt limited.
+The weakness was **not the hardware**. The weakness was that the **assistant felt limited**.
 
 The common complaints were:
 
@@ -58,7 +58,7 @@ This created a bad product asymmetry:
 - strong hardware
 - weaker everyday usefulness
 
-That is the exact trap a new AI speaker must avoid.
+That is the exact **trap** a new AI speaker must avoid.
 
 ---
 
@@ -81,7 +81,7 @@ It needs to be:
 
 ## The shared-space privacy lesson
 
-A home AI speaker lives in shared space.
+A home AI speaker lives in **shared space**.
 
 That changes the product rules.
 
@@ -108,7 +108,7 @@ Embedded consequence:
 
 ## The utility lesson
 
-People forgive some missing features if the device is useful every day.
+People forgive some missing features if the device is **useful every day**.
 
 That means the speaker should be reliably good at:
 
@@ -134,7 +134,7 @@ Optimize around:
 
 ## The ecosystem lesson
 
-The first HomePod also showed the danger of ecosystem prison.
+The first HomePod also showed the danger of **ecosystem prison**.
 
 If the product only feels strong inside one closed service world, its usefulness narrows quickly.
 

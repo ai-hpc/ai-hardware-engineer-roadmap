@@ -22,7 +22,7 @@ Three requirements for correct mutual exclusion:
 
 ## Spinlock (`spinlock_t`)
 
-Busy-waits (spins) on an atomic test-and-set instruction until the lock is available. Disables preemption on the local CPU while held.
+**Busy-waits (spins)** on an atomic test-and-set instruction until the lock is available. **Disables preemption** on the local CPU while held.
 
 ```c
 spin_lock(&lock);                        // acquire; disables preemption on local CPU
@@ -38,8 +38,8 @@ spin_unlock_irqrestore(&lock, flags);    // restores IRQ state + re-enables pree
 ```
 
 Key constraints:
-- Only for very short critical sections (<1µs); holding while sleeping is a kernel bug
-- On NUMA systems, contended spinlocks cause cache-line bouncing across sockets
+- Only for **very short critical sections** (<1µs); holding while sleeping is a kernel bug
+- On NUMA systems, contended spinlocks cause **cache-line bouncing** across sockets
 - Under `PREEMPT_RT`: `spinlock_t` becomes a sleeping `rtmutex`; `raw_spinlock_t` retains true spin behavior
 
 ```
@@ -65,7 +65,7 @@ Key constraints:
 
 ## Mutex (`struct mutex`)
 
-Task blocks (`TASK_UNINTERRUPTIBLE`) if lock is unavailable; scheduler runs other tasks. No CPU wasted spinning.
+Task **blocks** (`TASK_UNINTERRUPTIBLE`) if lock is unavailable; scheduler runs other tasks. **No CPU wasted spinning**.
 
 ```c
 mutex_lock(&mutex);                    // blocks until acquired; process context only
@@ -83,7 +83,7 @@ mutex_lock_interruptible(&mutex);      // returns -EINTR if signal received whil
 - Userspace equivalent: `pthread_mutex_t` backed by `futex` (fast path avoids syscall when uncontended)
 - Kernel `mutex` is not the same as `pthread_mutex_t`; different implementation and rules
 
-The transition from spinlock to mutex mirrors the CPU vs. scheduler trade-off: spinlocks waste CPU cycles but avoid context switch overhead. For critical sections longer than a few microseconds, putting the task to sleep is almost always cheaper.
+The transition from spinlock to mutex mirrors the **CPU vs. scheduler trade-off**: spinlocks waste CPU cycles but avoid context switch overhead. For critical sections **longer than a few microseconds**, putting the task to sleep is almost always cheaper.
 
 ### rtmutex — Priority Inheritance Mutex
 
@@ -99,7 +99,7 @@ The transition from spinlock to mutex mirrors the CPU vs. scheduler trade-off: s
 
 ## Read/Write Semaphore (`struct rw_semaphore`)
 
-Allows multiple concurrent readers **or** one exclusive writer; not both simultaneously. This is ideal when reads are far more frequent than writes — a common pattern for configuration tables and model weight structures.
+Allows **multiple concurrent readers** **or** **one exclusive writer**; not both simultaneously. This is ideal when **reads are far more frequent than writes** — a common pattern for configuration tables and model weight structures.
 
 ```c
 down_read(&rw_semaphore);          // shared read lock; multiple readers can hold concurrently
@@ -139,7 +139,7 @@ downgrade_write(&rw_semaphore);
 
 ## Seqlock (`seqlock_t`)
 
-Writers never block. Readers detect concurrent writes via a sequence counter and retry if needed. The seqlock trades occasional reader retries for zero writer blocking — the right choice when writers need guaranteed forward progress.
+**Writers never block**. Readers detect concurrent writes via a **sequence counter** and retry if needed. The seqlock trades **occasional reader retries** for **zero writer blocking** — the right choice when writers need guaranteed forward progress.
 
 ```c
 // Writer — always proceeds immediately, never blocks on readers
@@ -176,7 +176,7 @@ Linux kernel uses seqlocks for: `jiffies_64`, `timespec64` for clock reads, kern
 
 ## Completion (`struct completion`)
 
-One-shot synchronization: thread A waits for an event signaled by thread B. Cleaner than a semaphore for one-time events because its intent is explicit and it has no spurious-wakeup risk.
+**One-shot synchronization**: thread A waits for an event signaled by thread B. Cleaner than a semaphore for one-time events because its intent is **explicit** and it has **no spurious-wakeup risk**.
 
 ```c
 DECLARE_COMPLETION(dma_done);         // static declaration; starts in "not complete" state
@@ -201,7 +201,7 @@ With completions, the synchronization flow is unambiguous: the ISR signals "DMA 
 
 ## lockdep — Lock Dependency Validator
 
-All the synchronization primitives described above can be used incorrectly. `lockdep` is the kernel's runtime tool to catch those mistakes at development time, before they manifest as hard-to-reproduce deadlocks.
+All the synchronization primitives described above can be **used incorrectly**. `lockdep` is the kernel's **runtime tool to catch those mistakes** at development time, before they manifest as hard-to-reproduce **deadlocks**.
 
 `CONFIG_PROVE_LOCKING` enables lockdep, the kernel's runtime lock dependency validator:
 
@@ -221,7 +221,7 @@ cat /proc/lock_stat | head -40
 # Output shows: lock name, acquisition count, contention count, wait time histogram
 ```
 
-Always enable during driver development and regression testing. `lockdep` adds ~10% overhead; disable in production.
+**Always enable during driver development** and regression testing. `lockdep` adds ~10% overhead; **disable in production**.
 
 > **Key Insight:** `lockdep` detects potential deadlocks the *first time* a new lock ordering is observed — even if that specific execution order has never actually deadlocked. This is more powerful than waiting for an actual hang, which may only occur under rare timing conditions in production. Think of lockdep as a static analyzer that runs at runtime.
 

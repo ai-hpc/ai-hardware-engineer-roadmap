@@ -4,7 +4,7 @@
 
 Mixture-of-Experts changes the inference economics in one specific way: **total parameters and active parameters become two different numbers**, and the runtime's job is to use the second one well.
 
-A dense 72B model on Hopper does 72B params of work per token. A 235B-A22B MoE does 235B of params *worth of memory* but only 22B of *compute per token* — because the gating network routes each token to a small fraction of experts. The HBM pressure looks like a 235B model; the FLOPs look like a 22B model. This shifts the bandwidth/compute ratio sharply: MoE decode is *even more* bandwidth-bound than dense decode at the same active-param scale.
+A dense 72B model on Hopper does 72B params of work per token. A 235B-A22B MoE does 235B of params *worth of memory* but only 22B of *compute per token* — because the **gating network routes each token to a small fraction of experts**. The **HBM pressure looks like a 235B model**; the **FLOPs look like a 22B model**. This shifts the bandwidth/compute ratio sharply: MoE decode is *even more* bandwidth-bound than dense decode at the same active-param scale.
 
 This lecture walks the two anchor models side by side:
 
@@ -65,7 +65,7 @@ The compute pattern:
 * **The shared expert** (DeepSeek only) is a small Linear path that runs for *every* token. It absorbs the "common knowledge" that all tokens need.
 * **The output** is a weighted sum of the selected experts' outputs.
 
-What "active" means in the param count: only the experts the token actually touched count toward the per-token compute. The other 248 (or 120) experts sit in HBM but contribute nothing this step.
+What "active" means in the param count: **only the experts the token actually touched** count toward the per-token compute. The other 248 (or 120) experts **sit in HBM but contribute nothing** this step.
 
 ---
 
@@ -84,7 +84,7 @@ K_t = W_uK · c_t      (W_uK: d_c → h_kv × head_dim, low-rank up-projection)
 V_t = W_uV · c_t
 ```
 
-The latent `c_t` is the stored cache. K and V are recomputed on-the-fly each decode step. This is a memory/compute tradeoff: more compute (a small matmul per layer per step) for dramatically less KV memory.
+The latent `c_t` is the stored cache. K and V are recomputed on-the-fly each decode step. This is a **memory/compute tradeoff**: more compute (a small matmul per layer per step) for **dramatically less KV memory**.
 
 ### 2.2 KV bytes per token — MLA vs GQA
 
@@ -113,7 +113,7 @@ gqa_kv_bytes_per_token = 2 (K + V) × 61 × 8 × 128 × 2
 
 MLA is **~4× smaller** than equivalent GQA — and DeepSeek V3 has **more layers (61) than its dense competitors** so the absolute savings are larger.
 
-At 128K context, DeepSeek V3.1 needs **~8 GB of KV cache per request**, versus ~30 GB+ for a GQA equivalent. This is what makes long-context serving practical without aggressive KV quantization.
+At 128K context, DeepSeek V3.1 needs **~8 GB of KV cache per request**, versus ~30 GB+ for a GQA equivalent. This is what makes **long-context serving practical without aggressive KV quantization**.
 
 ### 2.3 What MLA costs
 
@@ -154,7 +154,7 @@ MTP makes DeepSeek's decode throughput on Blackwell roughly equivalent to a dens
 
 ### 3.3 Qwen3-MoE has no native MTP
 
-Qwen3-MoE 235B-A22B was not trained with the MTP objective. It uses standard EAGLE-3 (or Medusa) speculation via a separate draft model. Acceptance rates are similar (70-80% at k=4 with a 7B draft) but the engineering layer is different: a separate model, separate runtime path, separate fine-tuning.
+Qwen3-MoE 235B-A22B was **not trained with the MTP objective**. It uses standard EAGLE-3 (or Medusa) speculation via a **separate draft model**. Acceptance rates are similar (70-80% at k=4 with a 7B draft) but the engineering layer is different: a separate model, separate runtime path, separate fine-tuning.
 
 This is one of the cleanest "architectural choice → inference recipe" contrasts in the course.
 
@@ -240,7 +240,7 @@ The runtime has to:
 * **Move tokens to their selected experts** — this is the all-to-all communication problem when experts are partitioned across GPUs (Lecture 03).
 * **Compute only the active experts' FFN** — 8 of 256 (3.1%) for DeepSeek, 8 of 128 (6.25%) for Qwen3-MoE.
 
-A dense model has a simple "1 GPU, all the weights" mental model. An MoE has "all experts everywhere or partition them, and route tokens at runtime." The complexity moves from compute density to communication and scheduling.
+A dense model has a simple "1 GPU, all the weights" mental model. An MoE has "all experts everywhere or partition them, and route tokens at runtime." **The complexity moves from compute density to communication and scheduling.**
 
 ---
 
@@ -384,7 +384,7 @@ The headline numbers (mid-2026 ballpark; replicate in your lab):
 | Qwen3-MoE 235B-A22B FP4 | 8× B200 | 22B | ~1200 | ~$0.30 |
 | DeepSeek V3.1 FP4 + MTP | 16× B200 (NVL72) | 37B | ~1500 (effective with MTP) | ~$0.25 |
 
-MoE on Blackwell is the cost-economics winner once the cluster scale is available — but it requires the cluster scale. For a single-replica deployment, dense Hopper still wins.
+**MoE on Blackwell is the cost-economics winner** once the cluster scale is available — but it **requires the cluster scale**. For a single-replica deployment, **dense Hopper still wins**.
 
 ---
 

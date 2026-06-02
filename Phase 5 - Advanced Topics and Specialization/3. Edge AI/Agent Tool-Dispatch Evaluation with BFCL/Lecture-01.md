@@ -11,11 +11,11 @@
 
 > *A 4-bit Qwen on a Jetson is only useful if it still picks the right tool.*
 
-An on-device agent ships when two things are true: it fits the device, and it calls tools correctly. Phase 5's [Qwen Inference Optimization](../Qwen%20Inference%20Optimization/README.md) covers the first half — quantization, KV cache, decode optimization on Jetson. This lecture covers the second half — the measurement framework that decides whether each of those optimizations silently broke the agent.
+An on-device agent ships when two things are true: **it fits the device, and it calls tools correctly**. Phase 5's [Qwen Inference Optimization](../Qwen%20Inference%20Optimization/README.md) covers the first half — quantization, KV cache, decode optimization on Jetson. This lecture covers the second half — the **measurement framework** that decides whether each of those optimizations silently broke the agent.
 
 The standard benchmark is **BFCL** — the **Berkeley Function-Calling Leaderboard**. It is to LLM tool dispatch what LIBERO is to VLA action parity: a fixed, public, category-broken-down evaluation that lets you compare a candidate model (or a candidate runtime configuration) against a reference on exactly one axis — *does the function call match the ground truth*.
 
-This lecture treats BFCL as a hardware-quality gate, not a leaderboard chase: you build a tiny BFCL-style harness, run it against your edge model, and use the per-category accuracy table to gate your optimization ladder.
+This lecture treats BFCL as a **hardware-quality gate**, not a leaderboard chase: you build a tiny BFCL-style harness, run it against your edge model, and use the **per-category accuracy table** to gate your optimization ladder.
 
 **Layer mapping:** L3-L5. Sits between the inference runtime (L3-L4) and the agent harness above it (L5).
 
@@ -86,7 +86,7 @@ The point of running BFCL — or your own BFCL-shaped harness — is to be able 
 
 ## 2. What BFCL is, concretely
 
-The [Berkeley Function-Calling Leaderboard](https://gorilla.cs.berkeley.edu/leaderboard.html) is a public benchmark from the Gorilla project at UC Berkeley. Each test case is a `(user prompt, available functions, ground-truth call)` tuple. The model is shown the prompt and the function schemas (in the prompting style the model expects — system prompt, JSON, XML, etc.) and is graded on whether its emitted call matches the ground truth.
+The [Berkeley Function-Calling Leaderboard](https://gorilla.cs.berkeley.edu/leaderboard.html) is a **public benchmark** from the Gorilla project at UC Berkeley. Each test case is a `(user prompt, available functions, ground-truth call)` tuple. The model is shown the prompt and the function schemas (in the prompting style the model expects — system prompt, JSON, XML, etc.) and is graded on whether its emitted call matches the ground truth.
 
 ### 2.1 Categories
 
@@ -110,7 +110,7 @@ BFCL has two scoring modes, and they catch different bugs:
 * **AST scoring** — parse the model's emitted call as an abstract syntax tree, compare the function name and argument tree to the ground truth. Fast, deterministic, no live tools needed. Catches model errors but not parser errors. This is what you use in CI on every commit.
 * **Executable scoring** — actually invoke the tool, compare side effects or return values. Catches parser errors, dispatcher drift, schema mismatches, and tool implementation bugs. Slower and stateful. This is what you run before promoting a checkpoint.
 
-A model that scores 88% AST and 71% executable has a parser/dispatcher drift problem, not a model problem. A model that scores 71% AST and 71% executable has a model problem. Knowing which one you have is the difference between fixing it in an hour and chasing the wrong stage for a week.
+A model that scores 88% AST and 71% executable has a **parser/dispatcher drift problem**, not a model problem. A model that scores 71% AST and 71% executable has a **model problem**. Knowing which one you have is the difference between fixing it in an hour and chasing the wrong stage for a week.
 
 ### 2.3 Argument-match decomposition
 
@@ -145,7 +145,7 @@ None of those questions are answerable from a perplexity number, MMLU score, or 
 
 ## 4. A minimal BFCL-style harness
 
-You do not need to reimplement Berkeley's harness to get the engineering value. A 200-line Python script is enough to gate your own optimization ladder. The skeleton:
+You do not need to reimplement Berkeley's harness to get the engineering value. A **200-line Python script** is enough to gate your own optimization ladder. The skeleton:
 
 ```text
 harness/
@@ -183,7 +183,7 @@ Five design choices worth defending up front:
 
 ## 5. Executable scoring against a real `ToolDef` catalog
 
-AST scoring is enough to catch model regressions. Executable scoring catches the silent integration bugs that make production agents misbehave even when BFCL leaderboard numbers look fine.
+AST scoring is enough to catch model regressions. Executable scoring catches the **silent integration bugs** that make production agents misbehave even when BFCL leaderboard numbers look fine.
 
 The pattern, drawn from real edge-agent codebases:
 

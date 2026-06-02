@@ -26,7 +26,7 @@
 
 ## 2. ReAct (Reason + Act)
 
-ReAct interleaves reasoning and action in a loop: **Thought → Action → Observation → Thought → ...**
+**ReAct** interleaves reasoning and action in a loop: **Thought → Action → Observation → Thought → ...**
 
 This is the foundation of most production agents.
 
@@ -163,7 +163,7 @@ print(f"\nSteps taken: {len(agent.steps)}")
 
 ## 3. Plan-and-Execute
 
-For complex multi-step tasks, separate planning from execution. The planner creates a task list; the executor works through it.
+For complex multi-step tasks, **separate planning from execution**. The **planner** creates a task list; the **executor** works through it.
 
 ```python
 from dataclasses import dataclass, field
@@ -278,7 +278,7 @@ Keep tasks atomic — one action each. Maximum 10 tasks.""",
 
 ## 4. Reflexion — Self-Critique Loop
 
-After completing a task, the agent evaluates its own output and retries if needed.
+After completing a task, the agent **evaluates its own output** and retries if needed.
 
 ```python
 def reflexion_agent(task: str, max_retries: int = 3) -> str:

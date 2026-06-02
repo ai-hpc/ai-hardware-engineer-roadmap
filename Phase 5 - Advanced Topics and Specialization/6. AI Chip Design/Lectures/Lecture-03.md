@@ -2,7 +2,7 @@
 
 ## Overview
 
-LLVM IR is powerful but it has a fundamental limitation: it operates at one level of abstraction — roughly "C with vectors." When an ML compiler needs to reason about tensor operations, loop tiling, data layout, or hardware-specific memory hierarchies, LLVM IR is too low-level. You've already lowered away the information the optimizer needs. MLIR (Multi-Level Intermediate Representation) solves this by allowing **multiple levels of abstraction to coexist in the same IR**, connected by progressive lowering. The mental model is a **stack of languages**: at the top, you talk about "matrix multiply two tensors"; in the middle, you talk about "tile this loop nest and map tiles to processing elements"; at the bottom, you emit LLVM IR or hardware instructions. Each level is a **dialect** with its own operations, types, and optimization rules. For AI hardware engineers, MLIR is the framework that connects ML models to custom accelerator backends — it is the compiler infrastructure that TVM, Triton (via TTIR/TTGIR), IREE, and hardware vendor compilers are all converging on.
+LLVM IR is powerful but it has a fundamental limitation: it operates at **one level of abstraction** — roughly "C with vectors." When an ML compiler needs to reason about tensor operations, loop tiling, data layout, or hardware-specific memory hierarchies, LLVM IR is **too low-level**. You've already lowered away the information the optimizer needs. MLIR (Multi-Level Intermediate Representation) solves this by allowing **multiple levels of abstraction to coexist in the same IR**, connected by progressive lowering. The mental model is a **stack of languages**: at the top, you talk about "matrix multiply two tensors"; in the middle, you talk about "tile this loop nest and map tiles to processing elements"; at the bottom, you emit LLVM IR or hardware instructions. Each level is a **dialect** with its own operations, types, and optimization rules. For AI hardware engineers, MLIR is the framework that connects ML models to custom accelerator backends — it is the compiler infrastructure that TVM, Triton (via TTIR/TTGIR), IREE, and hardware vendor compilers are all converging on.
 
 ---
 
@@ -17,7 +17,7 @@ LLVM IR is powerful but it has a fundamental limitation: it operates at one leve
 | Custom operations | Must use intrinsics (opaque function calls) | Define operations with full semantics, verification, and canonicalization |
 | Extensibility | Adding a new concept requires modifying LLVM core | Dialects are modular — add new ones without touching existing code |
 
-**The key insight:** When you lower `matmul(A, B)` to LLVM IR loops, you lose the information that this is a matrix multiply. The LLVM vectorizer can vectorize the innermost loop, but it cannot tile the loop nest for cache locality or map it to a systolic array. MLIR keeps the high-level semantics alive long enough for hardware-aware optimizations to act on them.
+**The key insight:** When you lower `matmul(A, B)` to LLVM IR loops, you lose the information that this is a matrix multiply. The LLVM vectorizer can vectorize the innermost loop, but it cannot **tile the loop nest** for cache locality or **map it to a systolic array**. MLIR keeps the high-level semantics alive long enough for **hardware-aware optimizations** to act on them.
 
 ---
 
@@ -82,7 +82,7 @@ LLVM IR is powerful but it has a fundamental limitation: it operates at one leve
 
 ### 1. Operations
 
-An **operation** is the fundamental unit of computation in MLIR. Every node in the IR is an operation. Operations are fully extensible — any dialect can define new ones.
+An **operation** is the fundamental unit of computation in MLIR. Every node in the IR is an operation. Operations are **fully extensible** — any dialect can define new ones.
 
 ```mlir
 // An operation has:
@@ -186,7 +186,7 @@ vector<4x4xf32>                               // 2D vector (for matrix tiles)
 
 ## Progressive Lowering
 
-The core principle of MLIR: don't lower everything at once. Lower one level at a time, optimizing at each level.
+The core principle of MLIR: **don't lower everything at once**. Lower one level at a time, **optimizing at each level**.
 
 ```
 tosa.conv2d                           ← "convolution on tensors"
@@ -299,7 +299,7 @@ struct MatmulToLoopsPattern : public OpConversionPattern<linalg::MatmulOp> {
 
 ## Defining a Custom Dialect
 
-For a custom AI accelerator, you define your own dialect with operations that map to your hardware instructions.
+For a custom AI accelerator, you define your own dialect with operations that map directly to your **hardware instructions**.
 
 ```tablegen
 // MyAccel.td — TableGen dialect definition

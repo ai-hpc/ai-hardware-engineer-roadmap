@@ -18,7 +18,7 @@ to:
 
 > "How should I combine Arduino productivity with ESP-IDF control?"
 
-That is the mature engineering question.
+That is the **mature engineering question**.
 
 Official reference: [Arduino as an ESP-IDF component](https://docs.espressif.com/projects/arduino-esp32/en/latest/esp-idf_component.html)
 
@@ -36,7 +36,7 @@ Espressif also documents an important current compatibility detail:
 - Arduino Core ESP32 `3.3.8`
 - compatible with **ESP-IDF v5.5**
 
-That matters because version compatibility is part of real platform engineering.
+That matters because **version compatibility** is part of real platform engineering.
 
 ---
 
@@ -71,7 +71,7 @@ Espressif notes these are only supported through:
 - Arduino as an ESP-IDF component
 - or rebuilding static libraries
 
-So this workflow is not just a power-user bonus. For some targets, it is the correct support path.
+So this workflow is not just a power-user bonus. For some targets, it is the **correct support path**.
 
 ---
 
@@ -136,7 +136,7 @@ A healthy way to use the Espressif stack is:
 - when chip support requires it
 - when maintainability becomes a real concern
 
-This is much better than pretending a prototype and a product are the same thing.
+This is much better than pretending a **prototype** and a **product** are the same thing.
 
 ---
 
@@ -148,7 +148,7 @@ It is this:
 
 > A friendly API can sit on top of a serious embedded platform, and a good engineer knows when to stay at the friendly layer and when to go deeper.
 
-That is exactly the kind of judgment Phase 2 should build.
+That is exactly the kind of **judgment** Phase 2 should build.
 
 ---
 

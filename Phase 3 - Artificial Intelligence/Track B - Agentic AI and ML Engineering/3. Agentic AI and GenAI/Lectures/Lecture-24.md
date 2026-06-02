@@ -4,7 +4,7 @@
 
 ---
 
-A large language model on its own is a stateless function:
+A large language model on its own is a **stateless function**:
 
 ```text
 prompt + tools spec  ->  text + tool calls
@@ -44,7 +44,7 @@ By the end of this lecture, you should be able to:
 
 ## 1. Mental model: model is a CPU, harness is the OS
 
-A model alone is closer to a CPU than to a computer.
+A model alone is closer to a **CPU** than to a computer.
 
 A CPU executes instructions but cannot, by itself:
 
@@ -73,7 +73,7 @@ The same gap exists between a model and a useful agent:
 The model reasons.
 The harness runs.
 
-If your product behavior is unreliable, the cause is almost always in the harness, not in the model weights.
+If your product behavior is unreliable, the cause is **almost always in the harness**, not in the model weights.
 
 ---
 
@@ -103,7 +103,7 @@ The model emits a structured tool call. The harness must:
 - truncate noisy output without losing the signal
 - return a normalized tool result the model can read
 
-Without this layer the model can ask for tools but nothing happens.
+Without this layer the model can ask for tools but **nothing happens**.
 
 ### 2.2 State and memory
 
@@ -113,7 +113,7 @@ Three time horizons need separate machinery:
 - **Session state.** Conversation history for this run, plus working memory of files touched and decisions made.
 - **Cross-session memory.** Persistent facts the agent carries to the next conversation: user profile, project conventions, prior decisions.
 
-Models do not have memory; the harness fakes it by stuffing prior state into the next prompt or by exposing it as a tool.
+Models do not have memory; the **harness fakes it** by stuffing prior state into the next prompt or by exposing it as a tool.
 
 ### 2.3 Context construction
 
@@ -127,9 +127,9 @@ Every turn the harness assembles a fresh prompt:
 - conversation transcript, possibly compacted
 - provider-specific overlays (cache markers, beta headers)
 
-This is the most context-window-sensitive job in the whole system.
+This is the **most context-window-sensitive job** in the whole system.
 
-A harness that always sends the full transcript will bankrupt you and degrade output. A harness that compacts blindly will silently drop load-bearing detail.
+A harness that always sends the full transcript will **bankrupt you and degrade output**. A harness that compacts blindly will silently drop load-bearing detail.
 
 See [Lecture 21 - System Prompt Architecture](Lecture-21.md) for an in-depth look at one production approach.
 
@@ -156,7 +156,7 @@ It also decides:
 
 ### 2.5 Policy and permission
 
-The model has no conscience and no awareness of impact.
+The model has **no conscience and no awareness of impact**.
 
 The harness enforces:
 
@@ -173,7 +173,7 @@ See [Lecture 13 - Runtime Discipline & AI Runtime Security](Lecture-13.md).
 
 ### 2.6 Extensibility
 
-Real agents grow. Users add skills, organizations add MCP servers, products add channels.
+**Real agents grow.** Users add skills, organizations add MCP servers, products add channels.
 
 The harness needs a stable plug-in surface so:
 
@@ -181,7 +181,7 @@ The harness needs a stable plug-in surface so:
 - new skills become discoverable to the model
 - new transports (chat UI, terminal, IDE, voice) reuse the same core
 
-If extensions can only be added by editing the core, the harness will calcify within months.
+If extensions can only be added by editing the core, the harness will **calcify within months**.
 
 ---
 
@@ -191,7 +191,7 @@ The clearest way to see what a harness is is to look at three of them.
 
 ### 3.1 Claude Code
 
-A terminal harness wrapping the Anthropic Messages API.
+A **terminal harness** wrapping the Anthropic Messages API.
 
 Owns:
 
@@ -202,11 +202,11 @@ Owns:
 - a project-scoped CLAUDE.md auto-loaded as bootstrap context
 - background tasks, scheduled tasks, and hooks
 
-The model never opens a file or runs a process directly. The Claude Code harness does.
+The model **never opens a file or runs a process directly**. The Claude Code harness does.
 
 ### 3.2 Cursor
 
-An IDE harness wrapping multiple model providers.
+An **IDE harness** wrapping multiple model providers.
 
 Owns:
 
@@ -216,11 +216,11 @@ Owns:
 - MCP for external tool servers
 - inline diffs and an apply/revert loop tied to the editor's UI
 
-The harness here is the editor itself. Strip away the editor and there is no agent.
+The harness here is the **editor itself**. Strip away the editor and there is no agent.
 
 ### 3.3 OpenAI Codex (CLI)
 
-A coding-task harness wrapping OpenAI models.
+A **coding-task harness** wrapping OpenAI models.
 
 Owns:
 
@@ -249,7 +249,7 @@ extension     MCP + skills +  MCP + rules +   plugins
               hooks           skills
 ```
 
-Different surface, same six responsibilities.
+Different surface, **same six responsibilities**.
 
 ---
 
@@ -257,7 +257,7 @@ Different surface, same six responsibilities.
 
 This roadmap is about hardware. So why a lecture on software harnesses?
 
-Because the harness is what hits your hardware.
+Because **the harness is what hits your hardware**.
 
 When you build:
 
@@ -266,7 +266,7 @@ When you build:
 - a private vLLM cluster on H100s
 - a CUDA kernel optimized for batched decode
 
-your customer is almost certainly a harness, not a human typing.
+your customer is **almost certainly a harness**, not a human typing.
 
 Things only a harness can tell you, but that change your hardware design:
 
@@ -276,7 +276,7 @@ Things only a harness can tell you, but that change your hardware design:
 - **Streaming vs full-response.** A harness driving a chat UI streams; a harness driving a CI job buffers. Memory pressure on your inference server is different in each case.
 - **Locality.** A "local harness substrate" (see [Lecture 25](Lecture-25.md)) wants its model on the same machine. A gateway harness multiplexes many users across a cluster. Edge vs datacenter design diverges from this point.
 
-If you only think about FLOPs and bytes, you will optimize for the wrong workload.
+If you only think about FLOPs and bytes, you will **optimize for the wrong workload**.
 
 ---
 
@@ -340,7 +340,7 @@ Notice what is **not** in the model:
 - policy checks
 - session persistence
 
-All of that is the harness. The model only handles "given this prompt, produce text or tool calls."
+All of that is the **harness**. The model only handles "given this prompt, produce text or tool calls."
 
 ---
 
@@ -354,31 +354,31 @@ These appear in every team's first agent system.
 "Never run rm -rf without asking the user first."
 ```
 
-The model will obey 99 times. The 100th time it will not.
+The model will obey 99 times. The **100th time it will not**.
 
-Policy belongs in dispatch, not in prose.
+Policy belongs in **dispatch**, not in prose.
 
 ### 6.2 Letting the transcript grow forever
 
-Without compaction or summarization, the prompt grows linearly with turn count. Latency, cost, and degradation all rise together. After a few hours the agent becomes unusable and nobody knows why.
+Without compaction or summarization, the prompt **grows linearly with turn count**. Latency, cost, and degradation all rise together. After a few hours the agent becomes unusable and nobody knows why.
 
 Build compaction in from day one, even a naive one.
 
 ### 6.3 Hidden state
 
-If the harness mutates files, environment variables, or external services without recording the change in memory, the next turn's model will reason from a stale view of the world. It will then be "wrong" in confusing ways.
+If the harness mutates files, environment variables, or external services without recording the change in memory, the next turn's model will reason from a **stale view of the world**. It will then be "wrong" in confusing ways.
 
-Every side effect should appear in the next prompt or be retrievable on demand.
+**Every side effect** should appear in the next prompt or be retrievable on demand.
 
 ### 6.4 No replay
 
-A harness with no log of `(prompt, model output, tool calls, tool results)` per turn is impossible to debug. Treat the trace as a first-class artifact, not an afterthought.
+A harness with no log of `(prompt, model output, tool calls, tool results)` per turn is **impossible to debug**. Treat the trace as a **first-class artifact**, not an afterthought.
 
 ### 6.5 Too many tools
 
-Every tool spec costs tokens and confuses tool selection. A harness that exposes 80 tools at once will produce worse output than the same harness exposing 8 contextually relevant ones.
+Every tool spec **costs tokens and confuses tool selection**. A harness that exposes 80 tools at once will produce worse output than the same harness exposing 8 contextually relevant ones.
 
-Skill systems exist to solve this: load tools on demand.
+Skill systems exist to solve this: **load tools on demand**.
 
 ---
 

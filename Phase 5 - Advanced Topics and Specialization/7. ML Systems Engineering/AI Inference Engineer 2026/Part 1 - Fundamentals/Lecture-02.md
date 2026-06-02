@@ -49,7 +49,7 @@ Key cost shape:
 * The attention is a `(P, P)` softmax with a `(P, head_dim)` output — quadratic in P.
 * The FFN gate/up/down matmuls are `(P, d) @ (d, d_ff)` and `(P, d_ff) @ (d_ff, d)` — by far the FLOP-heaviest stage at long P.
 
-Prefill is **compute-bound** for any prompt longer than a few hundred tokens. Tensor cores hit close to peak. This is the regime that benefits from FP8 / FP4 throughput on Hopper / Blackwell.
+Prefill is **compute-bound** for any prompt longer than a few hundred tokens. Tensor cores hit close to peak. This is the regime that benefits from **FP8 / FP4 throughput** on Hopper / Blackwell.
 
 ### 1.2 Decode — emit one token at a time
 
@@ -66,11 +66,11 @@ loop while not done:
 
 Key cost shape:
 
-* Every projection is now `(1, d) @ (d, h × head_dim)` — a GEMV (matrix-vector), not a GEMM.
+* Every projection is now `(1, d) @ (d, h × head_dim)` — a **GEMV** (matrix-vector), not a GEMM.
 * The weight matrices are large (gigabytes) and *fully re-read from HBM* for each token. There is essentially no FLOP-per-byte to keep tensor cores busy.
-* Attention reads the *entire* KV cache (length P+t) for each new token. KV-read bandwidth grows linearly with context.
+* Attention reads the *entire* KV cache (length P+t) for each new token. **KV-read bandwidth** grows linearly with context.
 
-Decode is **bandwidth-bound** at batch=1 — almost all of the time is HBM read of the weights + KV. This is why decode TPOT tracks HBM bandwidth, not FLOPs.
+Decode is **bandwidth-bound** at batch=1 — almost all of the time is **HBM read** of the weights + KV. This is why decode TPOT tracks HBM bandwidth, not FLOPs.
 
 ### 1.3 The mental picture
 
@@ -94,13 +94,13 @@ If you decode for `B` concurrent requests at the same step, the weight read is *
 * Without batching: B × (read W + 1 matmul) = B weight reads
 * With batching: 1 × read W + B-row matmul (still bandwidth-bound but amortized)
 
-Effective throughput scales nearly linearly with B until the matmul reaches the compute ceiling or the KV cache fills HBM. This is the entire reason **continuous batching** (vLLM's headline feature) was the breakthrough of 2023: it raises decode throughput by 10–50× without changing the model.
+Effective throughput scales **nearly linearly with B** until the matmul reaches the compute ceiling or the KV cache fills HBM. This is the entire reason **continuous batching** (vLLM's headline feature) was the breakthrough of 2023: it raises decode throughput by 10–50× without changing the model.
 
 ---
 
 ## 2. The KV cache — anatomy
 
-The KV cache is the load-bearing data structure of decoder-only inference. Understand it cold.
+The KV cache is the **load-bearing data structure** of decoder-only inference. Understand it cold.
 
 ### 2.1 What it stores
 
@@ -139,9 +139,9 @@ Worked examples:
 2 × 80 × 8 × 128 × 2 ≈ 320 KB/token
 ```
 
-Both share GQA with 8 KV heads and the same depth → identical KV cost per token. This is *not* a coincidence; it is the GQA configuration both teams converged on. We will return to this in [Part 2 Lecture 01](../Part%202%20-%20Dense%20at%20Hopper/Lecture-01.md).
+Both share **GQA** with 8 KV heads and the same depth → identical KV cost per token. This is *not* a coincidence; it is the GQA configuration both teams converged on. We will return to this in [Part 2 Lecture 01](../Part%202%20-%20Dense%20at%20Hopper/Lecture-01.md).
 
-**DeepSeek V3.1 with MLA** — Multi-head Latent Attention compresses the KV cache by storing a small *latent* vector instead of full K/V. The bytes-per-token math is dramatically lower. We will compute it in Part 3.
+**DeepSeek V3.1 with MLA** — Multi-head Latent Attention compresses the KV cache by storing a small *latent* vector instead of full K/V. The bytes-per-token math is **dramatically lower**. We will compute it in Part 3.
 
 ### 2.3 KV cache cost at scale
 
@@ -154,7 +154,7 @@ At long context the KV cache becomes the dominant HBM consumer:
 | 65,536 | 21 GB | 10.5 GB | 5.3 GB |
 | 131,072 | 42 GB | 21 GB | 10.5 GB |
 
-**Per request.** At batch=16 with 32K context, the KV cache alone is 84 GB at FP16 — already over H100 80 GB capacity, forcing FP8 KV or smaller batch. This is why long-context serving forces precision drops on KV before it forces them on weights.
+**Per request.** At batch=16 with 32K context, the KV cache alone is 84 GB at FP16 — already over H100 80 GB capacity, forcing FP8 KV or smaller batch. This is why **long-context serving forces precision drops on KV** before it forces them on weights.
 
 ### 2.4 The bandwidth half of the KV cache
 
@@ -165,7 +165,7 @@ KV bandwidth per decode step = 2 (K and V) × L × h_kv × head_dim × seq_len �
                              = kv_bytes_per_token × seq_len
 ```
 
-For Llama 3.3 70B at 64K context, FP16 KV: 320 KB × 65,536 ≈ **20 GB per decode step**. On H200 (4.8 TB/s HBM3e) that read alone is ~4 ms — before any weight matmul, before any sampling. This is why **decode TPOT grows with context length** even though FLOPs do not.
+For Llama 3.3 70B at 64K context, FP16 KV: 320 KB × 65,536 ≈ **20 GB per decode step**. On H200 (4.8 TB/s HBM3e) that read alone is **~4 ms** — before any weight matmul, before any sampling. This is why **decode TPOT grows with context length** even though FLOPs do not.
 
 The fix is either KV precision drop (FP8 cuts the read time in half) or sparse / sliding-window attention (read fewer KV tokens).
 
@@ -188,7 +188,7 @@ The total cost per decode step at batch=1:
 * **FLOPs ≈ 2 × P** where P is parameter count.
 * **HBM bytes ≈ model_size_in_bytes + kv_read_bytes** ≈ P × bytes_per_param + seq × kv_bytes_per_token.
 
-The ratio (FLOPs / bytes) is the **arithmetic intensity**. For decode at batch=1 it is approximately:
+The ratio (FLOPs / bytes) is the **arithmetic intensity**. For **decode at batch=1** it is approximately:
 
 ```text
 arithmetic_intensity = 2 × P / (P × bytes_per_param) = 2 / bytes_per_param
@@ -204,9 +204,9 @@ Compare to the hardware ridge point (FLOPs/byte ceiling above which you become c
 | H200 SXM | 989 | 4.80 | ~206 |
 | B200 SXM | 2,250 | 8.0 | ~280 |
 
-Decode arithmetic intensity (1–4 FLOPs/byte) is **two orders of magnitude below** the ridge point. Decode is bandwidth-bound. Always. Until you batch.
+Decode arithmetic intensity (1–4 FLOPs/byte) is **two orders of magnitude below** the ridge point. Decode is **bandwidth-bound. Always. Until you batch.**
 
-**With batching B**, the FFN matmul becomes a `(B, d_ff)` × `(d_ff, d)` operation: arithmetic intensity scales roughly linearly with B until the GEMM is large enough to saturate tensor cores. This is the lever that moves decode from bandwidth-bound to compute-bound — typically around B = 64–256 for 70B-class models on Hopper.
+**With batching B**, the FFN matmul becomes a `(B, d_ff)` × `(d_ff, d)` operation: arithmetic intensity scales roughly linearly with B until the GEMM is large enough to saturate tensor cores. This is the lever that **moves decode from bandwidth-bound to compute-bound** — typically around B = 64–256 for 70B-class models on Hopper.
 
 ---
 

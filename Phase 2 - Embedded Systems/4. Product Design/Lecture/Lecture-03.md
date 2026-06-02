@@ -18,7 +18,7 @@ The later platform lesson is broader:
 
 That is a more mature product lesson.
 
-It is not just about winning reviews. It is about becoming part of everyday household behavior.
+It is not just about winning reviews. It is about becoming part of **everyday household behavior**.
 
 ---
 
@@ -49,7 +49,7 @@ For an embedded engineer, this changes real constraints:
 - LED behavior
 - surface layout
 
-This is not styling after the fact. It is engineering shaped by product intent.
+This is not styling after the fact. It is **engineering shaped by product intent**.
 
 ---
 
@@ -85,7 +85,7 @@ For an AI smart speaker, the most important user outcomes are:
 
 ## Lesson 3: setup is part of the product
 
-A home device is weaker immediately if setup feels like infrastructure work.
+A home device is weaker immediately if setup feels like **infrastructure work**.
 
 Good setup should feel:
 
@@ -94,7 +94,7 @@ Good setup should feel:
 - understandable
 - safe
 
-That means setup is not a small app detail. It is core product behavior.
+That means setup is not a small app detail. It is **core product behavior**.
 
 For an AI smart speaker, setup should cover:
 
@@ -151,7 +151,7 @@ Not:
 
 ## Lesson 5: privacy language is weaker than privacy architecture
 
-A product can say the word privacy all day and still feel weak if the architecture does not support the claim.
+A product can say the word privacy all day and still feel weak if the **architecture does not support the claim**.
 
 The stronger lesson is:
 
@@ -165,7 +165,7 @@ For a local-first AI speaker, that means:
 - bounded cloud dependence
 - visible physical controls
 
-That is product architecture, not brand language.
+That is **product architecture**, not brand language.
 
 ---
 
@@ -189,7 +189,7 @@ If your strongest product identity is:
 - room-safe
 - no camera by default
 
-then protect that identity.
+then **protect that identity**.
 
 ---
 

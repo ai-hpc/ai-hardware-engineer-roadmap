@@ -190,7 +190,7 @@ print(state.next)    # Next node to execute
 
 ## 4. Human-in-the-Loop
 
-Interrupt the graph before sensitive operations and wait for human approval.
+Interrupt the graph before **sensitive operations** and wait for **human approval**.
 
 ```python
 from langgraph.graph import StateGraph, END, START

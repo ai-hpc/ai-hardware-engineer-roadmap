@@ -8,7 +8,7 @@ Modern AI systems depend on moving large amounts of data — camera frames, mode
 
 ## DMA: Direct Memory Access
 
-**DMA** allows a device (NIC, NVMe controller, GPU PCIe DMA engine, camera ISP) to transfer data directly to or from system RAM without CPU participation in the data path. The CPU programs a descriptor specifying source address, destination address, transfer length, and flags; the device executes the transfer autonomously; completion is signaled via an interrupt or a status flag the driver polls.
+**DMA** allows a device (NIC, NVMe controller, GPU PCIe DMA engine, camera ISP) to transfer data directly to or from system RAM **without CPU participation** in the data path. The CPU programs a **descriptor** specifying source address, destination address, transfer length, and flags; the device executes the transfer autonomously; completion is signaled via an interrupt or a status flag the driver polls.
 
 Benefits: CPU is freed during bulk transfers; transfer latency overlaps with CPU computation; system throughput increases.
 
@@ -39,7 +39,7 @@ Completion interrupt notifies CPU when transfer is done.
 
 ## Cache Coherency Problem
 
-Modern CPUs cache data in L1/L2/L3. When a device writes to RAM (DMA write), the CPU may hold a stale cached copy. When a device reads from RAM (DMA read), the device may read stale data that the CPU has modified in cache but not yet written back. Two programming models address this:
+Modern CPUs cache data in L1/L2/L3. When a device writes to RAM (DMA write), the CPU may hold a **stale cached copy**. When a device reads from RAM (DMA read), the device may read stale data that the CPU has modified in cache but not yet written back. **Two programming models** address this:
 
 ```
 Cache Coherency Hazard (DMA write, device→CPU):
@@ -59,13 +59,13 @@ Solution B (Streaming DMA): driver explicitly invalidates cache before CPU reads
 `dma_alloc_coherent(dev, size, &dma_handle, GFP_KERNEL)`
 
 - Returns a physically contiguous CPU virtual address and a device-visible `dma_handle`
-- The memory allocated by `dma_alloc_coherent` is non-cacheable *only for that specific DMA buffer*, to ensure CPU and device always see the same data. When the CPU accesses this buffer, its data is not cached.
+- The memory allocated by `dma_alloc_coherent` is **non-cacheable** *only for that specific DMA buffer*, to ensure CPU and device always see the same data. When the CPU accesses this buffer, its data is not cached.
 - Importantly, the CPU *can still cache data for all other normal memory regions*—the non-cacheable setting applies only to the buffer returned by the coherent DMA allocation. All other (non-DMA) memory uses normal CPU caching and is unaffected.
 - Since CPU access to the coherent DMA buffer is uncached, reads and writes are slower; use this kind of memory for things like small control rings, descriptor tables, or status blocks where correctness is more important than speed.
 
 ### Streaming (Non-Coherent) DMA
 
-CPU uses cached memory; driver explicitly synchronizes. This is more complex but allows faster CPU access to the data when the CPU is not sharing the buffer with a device:
+CPU uses cached memory; driver **explicitly synchronizes**. This is more complex but allows faster CPU access to the data when the CPU is not sharing the buffer with a device:
 
 ```c
 /* CPU writes or updates buffer contents, preparing data for device */
@@ -81,7 +81,7 @@ dma_unmap_single(dev, dma, size, DMA_TO_DEVICE);
 
 `dma_map_single()` performs the required cache maintenance for DMA in the specified direction: it flushes (writes back and invalidates) CPU cache lines covering the buffer for `DMA_TO_DEVICE` (so the device sees all CPU updates), or invalidates cache for `DMA_FROM_DEVICE` (so the CPU doesn't see stale data after device writes). `dma_unmap_single()` restores CPU ownership and, depending on direction, may invalidate the cache again so the CPU will read any data written by the device.
 
-The mapping and unmapping calls perform the cache synchronization. Between `dma_map_single()` and `dma_unmap_single()`, the buffer "belongs" to the device — the CPU must not touch it.
+The mapping and unmapping calls perform the **cache synchronization**. Between `dma_map_single()` and `dma_unmap_single()`, the buffer "belongs" to the device — **the CPU must not touch it**.
 
 For fragmented memory, `dma_map_sg()` / `dma_unmap_sg()` operate on scatter-gather lists.
 
@@ -98,7 +98,7 @@ DMA directions:
 
 ## IOMMU (Input-Output Memory Management Unit)
 
-The **IOMMU** sits between PCIe (or AXI) devices and the system memory bus. It translates device-issued IOVAs (I/O Virtual Addresses) to physical addresses using device-specific page tables. Think of the IOMMU as a second MMU dedicated to devices — just as the CPU's MMU gives each process its own virtual address space, the IOMMU gives each device its own I/O virtual address space.
+The **IOMMU** sits between PCIe (or AXI) devices and the system memory bus. It translates device-issued **IOVAs** (I/O Virtual Addresses) to physical addresses using device-specific page tables. Think of the IOMMU as a **second MMU dedicated to devices** — just as the CPU's MMU gives each process its own virtual address space, the IOMMU gives each device its own I/O virtual address space.
 
 ```
 Without IOMMU:
@@ -132,7 +132,7 @@ Without IOMMU: a device (or compromised driver) can issue DMA to any physical ad
 
 ### IOMMU Groups
 
-An IOMMU group is a set of PCIe devices that share the same IOMMU translation hardware, meaning their memory accesses are managed together and cannot be separated at the IOMMU level. As a result, all devices in the same group must be treated as a unit when configuring access control—for example, when assigning devices to userspace (such as for passthrough to another software component or user process). It is not possible to give access to only one device in the group while restricting the others; access is always granted to the entire group together.
+An **IOMMU group** is a set of PCIe devices that share the same IOMMU translation hardware, meaning their memory accesses are managed together and **cannot be separated** at the IOMMU level. As a result, all devices in the same group must be treated as a unit when configuring access control—for example, when assigning devices to userspace (such as for passthrough to another software component or user process). It is not possible to give access to only one device in the group while restricting the others; access is always granted to the entire group together.
 
 ### Kernel API
 
@@ -145,7 +145,7 @@ These low-level calls are typically used by framework code (DMA subsystem, VFIO)
 
 ### VFIO
 
-**VFIO** (Virtual Function I/O) exposes IOMMU-backed device access to userspace without a kernel driver. Used by: DPDK (user-space NIC drivers), SPDK (user-space NVMe), FPGA userspace drivers, KVM GPU passthrough. The VFIO container maps groups to IOMMU domains and allows userspace DMA via `/dev/vfio/N`.
+**VFIO** (Virtual Function I/O) exposes IOMMU-backed device access to **userspace without a kernel driver**. Used by: DPDK (user-space NIC drivers), SPDK (user-space NVMe), FPGA userspace drivers, KVM GPU passthrough. The VFIO container maps groups to IOMMU domains and allows userspace DMA via `/dev/vfio/N`.
 
 ---
 
@@ -178,7 +178,7 @@ dma_buf_detach(buf, att);
 dma_buf_put(buf);
 ```
 
-The fd is a cross-process, cross-subsystem handle to the same physical buffer. Passing an fd via a Unix socket lets two separate processes share the same DMA buffer without any kernel copy.
+The fd is a **cross-process, cross-subsystem handle** to the same physical buffer. Passing an fd via a Unix socket lets two separate processes share the same DMA buffer **without any kernel copy**.
 
 ### Zero-Copy Pipeline
 
@@ -212,7 +212,7 @@ With the general DMA framework established, GPU memory management adds one more 
 
 ### VRAM and PCIe BAR
 
-GPU VRAM (GDDR6X on GeForce, HBM2e/HBM3 on datacenter GPUs) is accessed by the CPU through PCIe **Base Address Registers (BAR)**. The GPU exposes a BAR aperture; the CPU maps it as uncached MMIO.
+GPU VRAM (GDDR6X on GeForce, HBM2e/HBM3 on datacenter GPUs) is accessed by the CPU through PCIe **Base Address Registers (BAR)**. The GPU exposes a **BAR aperture**; the CPU maps it as uncached MMIO.
 
 ```
 CPU (System DRAM)                           GPU (VRAM)
@@ -242,7 +242,7 @@ CPU (System DRAM)                           GPU (VRAM)
 
 ### CUDA Unified Memory
 
-A single pointer is valid on both CPU and GPU. The CUDA driver and OS collaborate to migrate 64KB-granule pages on fault:
+A **single pointer is valid on both CPU and GPU**. The CUDA driver and OS collaborate to migrate 64KB-granule pages on fault:
 - GPU page fault → migrate from CPU to VRAM
 - CPU page fault → migrate from VRAM to CPU DRAM
 
@@ -267,13 +267,13 @@ cudaMallocManaged() allocation lifecycle:
 `cudaMemPrefetchAsync(ptr, size, device, stream)`: explicit prefetch before access; hides migration latency.
 `cudaMemAdvise()` hints: `cudaMemAdviseSetReadMostly` (replicate across devices), `cudaMemAdviseSetPreferredLocation` (preferred residency).
 
-Production inference code typically uses explicit `cudaMemcpy()` with pinned buffers for deterministic latency. Unified Memory is most useful for rapid prototyping and memory-constrained models that exceed VRAM.
+Production inference code typically uses explicit `cudaMemcpy()` with pinned buffers for **deterministic latency**. Unified Memory is most useful for **rapid prototyping** and memory-constrained models that exceed VRAM.
 
 > **Common Pitfall:** Using `cudaMallocManaged()` in production inference without `cudaMemPrefetchAsync()` causes unpredictable latency spikes at first access. The first kernel invocation triggers page migrations that can stall for milliseconds. Always prefetch Unified Memory regions before the timed inference path begins.
 
 ### nvmap on Jetson
 
-Jetson uses a unified memory architecture (CPU and GPU share DRAM). **nvmap** manages carveout (physically contiguous) and IOMMU-mapped allocations for IOMMU-less peripherals:
+Jetson uses a **unified memory architecture** (CPU and GPU share DRAM). **nvmap** manages carveout (physically contiguous) and IOMMU-mapped allocations for IOMMU-less peripherals:
 
 ```
 Jetson Unified Memory Architecture

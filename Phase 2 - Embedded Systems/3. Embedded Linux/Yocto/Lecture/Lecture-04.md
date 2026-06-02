@@ -8,7 +8,7 @@
 
 ## 1. Data flow (mental model)
 
-Metadata in layers (conf/, recipes-*) flows into BitBake, which parses recipes plus MACHINE, DISTRO, and images. That produces a task graph: fetch, unpack, patch, configure, compile, install, package, then image. Output artifacts include RPM/IPK/DEB packages, rootfs, kernel, bootloader, and SDK.
+**Metadata** in layers (conf/, recipes-*) flows into **BitBake**, which parses recipes plus MACHINE, DISTRO, and images. That produces a **task graph**: fetch, unpack, patch, configure, compile, install, package, then image. Output artifacts include RPM/IPK/DEB packages, rootfs, kernel, bootloader, and SDK.
 
 ## 2. Key objects
 
@@ -28,7 +28,7 @@ Metadata in layers (conf/, recipes-*) flows into BitBake, which parses recipes p
 
 ## 4. Lab 2 — Draw your layer stack
 
-On paper or a whiteboard, draw Poky/OE-Core at the bottom, your BSP layer when you have one, and your product layer on top. Mark which layer should own kernel tweaks, rootfs packages, systemd units, and version pins.
+On paper or a whiteboard, draw **Poky/OE-Core** at the bottom, your **BSP layer** when you have one, and your **product layer** on top. Mark which layer should own kernel tweaks, rootfs packages, systemd units, and version pins.
 
 **Done when:** you can explain where a change should live before you open an editor.
 

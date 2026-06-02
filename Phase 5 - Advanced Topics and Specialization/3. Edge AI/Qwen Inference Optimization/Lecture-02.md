@@ -80,7 +80,7 @@ Output is a 4-bit weight matrix plus per-channel scales. On Qwen, AWQ-4bit relia
 
 ### 2.3 GPTQ — Optimal Brain Quantization
 
-GPTQ takes a calibration set and quantizes weights **column by column**, updating remaining columns to compensate for quantization error in the column just quantized. The update uses the inverse Hessian of the layer's MSE loss with respect to weights.
+GPTQ takes a calibration set and quantizes weights **column by column**, updating remaining columns to compensate for quantization error in the column just quantized. The update uses the **inverse Hessian** of the layer's MSE loss with respect to weights.
 
 GPTQ-4bit gives near-AWQ quality. The format is uglier to kernel-dispatch on (group-wise scales, asymmetric zero points) but enjoys excellent ecosystem support — vLLM, TGI, exllamav2, and Marlin kernels all consume GPTQ natively.
 
@@ -187,7 +187,7 @@ The `g128` notation in benchmarks means group size 128 — quantization scales a
 
 ## 5. Calibration Set — The 90-Second Decision
 
-The calibration set is the corpus AWQ/GPTQ/imatrix use to measure activation statistics. Rules of thumb:
+The calibration set is the corpus AWQ/GPTQ/imatrix use to measure **activation statistics**. Rules of thumb:
 
 | Goal | Calibration set |
 |---|---|
@@ -339,7 +339,7 @@ A decision table tied to deployment goals:
 | Maximum quality, willing to pay bandwidth | Q6_K | Near-lossless, easy default |
 | Aggressive size goal (e.g., browser inference) | IQ4_XS or Q3_K_M | Accept ~1-pt eval drop |
 
-Once you ship a quant choice, the model **becomes that quant** in your users' eyes. Re-quantizing is cheap operationally but creates eval debt — users will notice subtle behavior changes when you swap formats, even at "the same effective bit-rate".
+Once you ship a quant choice, the model **becomes that quant** in your users' eyes. Re-quantizing is cheap operationally but creates **eval debt** — users will notice subtle behavior changes when you swap formats, even at "the same effective bit-rate".
 
 ---
 

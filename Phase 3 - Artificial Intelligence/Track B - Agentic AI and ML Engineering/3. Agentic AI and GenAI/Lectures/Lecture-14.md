@@ -36,7 +36,7 @@ Deterministic startup means:
 
 This does not mean model outputs become deterministic. LLMs may still produce different text.
 
-It means the **system around the model** starts predictably.
+It means the **system around the model** starts **predictably**.
 
 ---
 
@@ -104,7 +104,7 @@ load config
   -> accept traffic
 ```
 
-The system should not serve users until the full startup contract passes.
+The system should not serve users until the full **startup contract** passes.
 
 ---
 
@@ -170,7 +170,7 @@ Answers from an old version of the manual.
 
 With normal software, a missing dependency often causes an obvious error.
 
-With AI systems, missing dependencies can cause confident wrong behavior.
+With AI systems, missing dependencies can cause **confident wrong behavior**.
 
 That is the core risk.
 
@@ -178,7 +178,7 @@ That is the core risk.
 
 ## 4. The startup contract
 
-A startup contract is a written promise about what must be true before the system accepts traffic.
+A **startup contract** is a written promise about what must be true before the system accepts traffic.
 
 Example:
 
@@ -206,7 +206,7 @@ Do not rely on a README checklist alone.
 
 ## 5. Startup phases
 
-Use phases instead of random initialization.
+Use **phases** instead of random initialization.
 
 ### Phase 0 - process starts
 
@@ -444,7 +444,7 @@ If something changes, the diff is visible.
 
 ## 8. Config validation example
 
-Use structured config instead of loose environment access scattered through the codebase.
+Use **structured config** instead of loose environment access scattered through the codebase.
 
 ```python
 from pydantic import BaseModel, Field, HttpUrl
@@ -495,7 +495,7 @@ Important point:
 
 ## 9. Tool registry determinism
 
-The tool registry must be predictable.
+The **tool registry** must be predictable.
 
 Bad pattern:
 
@@ -600,7 +600,7 @@ If a model produces bad output, you need to know which prompt version was active
 
 ## 11. Retrieval determinism
 
-RAG startup must verify that retrieval is not silently broken.
+**RAG startup** must verify that retrieval is not silently broken.
 
 Check:
 
@@ -686,7 +686,7 @@ Professional rule:
 
 ## 13. Policy determinism
 
-Runtime security policies must load before tools are usable.
+**Runtime security policies** must load before tools are usable.
 
 Bad startup:
 
@@ -735,7 +735,7 @@ If the block test fails, the service should not start.
 
 ## 14. Model client determinism
 
-Model clients should not be created lazily without checks.
+**Model clients** should not be created lazily without checks.
 
 At startup, verify:
 
@@ -826,7 +826,7 @@ Startup should reject a graph that references a missing node.
 
 ## 16. Idempotent startup
 
-Startup should be safe to run more than once.
+Startup should be **safe to run more than once**.
 
 This matters because containers, systemd services, edge devices, and cloud platforms may restart processes.
 
@@ -873,7 +873,7 @@ Now you can group all startup logs from one process boot.
 
 ## 17. Degraded mode
 
-Sometimes a service can start with limited capability.
+Sometimes a service can start with **limited capability**.
 
 Example:
 
@@ -949,7 +949,7 @@ That tells you almost nothing.
 
 This roadmap cares about Jetson-class and embedded AI systems.
 
-Edge startup is harder because:
+**Edge startup** is harder because:
 
 - power may be unstable
 - network may be unavailable

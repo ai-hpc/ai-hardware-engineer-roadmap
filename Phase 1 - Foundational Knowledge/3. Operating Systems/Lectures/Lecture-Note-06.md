@@ -14,7 +14,7 @@
 
 # Part 1: Virtual Memory & the Linux Memory Model
 
-**Context:** Each process has a private virtual address space. The MMU translates VA→PA per page. Isolation, overcommit, and demand paging are central; page faults and swap are critical for RT (avoid in hot path).
+**Context:** Each process has a **private virtual address space**. The **MMU translates VA→PA** per page. Isolation, overcommit, and demand paging are central; **page faults and swap are critical for RT** (avoid in hot path).
 
 ---
 
@@ -45,7 +45,7 @@
 
 ## Copy-on-Write (COW)
 
-After `fork()`, parent and child share pages read-only. On first write, kernel allocates new page, copies content, installs writable PTE for writer. Makes `fork()` O(1); model weights shared read-only consume one physical copy.
+After `fork()`, parent and child **share pages read-only**. On first write, kernel allocates new page, copies content, installs writable PTE for writer. Makes `fork()` O(1); **model weights shared read-only consume one physical copy**.
 
 ---
 
@@ -58,7 +58,7 @@ After `fork()`, parent and child share pages read-only. On first write, kernel a
 
 # Part 2: Page Tables, TLBs & Huge Pages
 
-**Context:** Every access needs VA→PA translation. The TLB caches it; a miss triggers a multi-level page table walk (e.g. 4 reads, 300–400 ns). Larger pages reduce TLB pressure.
+**Context:** Every access needs VA→PA translation. The **TLB caches it**; a miss triggers a **multi-level page table walk** (e.g. 4 reads, 300–400 ns). **Larger pages reduce TLB pressure**.
 
 ---
 
@@ -94,7 +94,7 @@ After `fork()`, parent and child share pages read-only. On first write, kernel a
 
 # Part 3: Kernel Memory — Buddy, SLUB, vmalloc, CMA
 
-**Context:** Buddy manages physical pages; SLUB carves objects from pages; vmalloc gives virtual continuity without physical continuity; GFP and zones control where and how; CMA reserves contiguous regions for DMA.
+**Context:** **Buddy** manages physical pages; **SLUB** carves objects from pages; **vmalloc** gives virtual continuity without physical continuity; GFP and zones control where and how; **CMA** reserves contiguous regions for DMA.
 
 ---
 

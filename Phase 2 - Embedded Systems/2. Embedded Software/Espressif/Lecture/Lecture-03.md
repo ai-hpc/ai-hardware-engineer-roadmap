@@ -25,7 +25,7 @@ Your sketch
           -> actual hardware
 ```
 
-This layered model is the key to understanding why Espressif Arduino is more powerful than classic Arduino, and also why it eventually becomes more complex.
+This **layered model** is the key to understanding why Espressif Arduino is more powerful than classic Arduino, and also why it eventually becomes more complex.
 
 ---
 
@@ -42,13 +42,13 @@ That is why it is productive.
 
 But it does **not** erase the lower layers.
 
-When timing, memory, radio behavior, or peripherals behave strangely, the answer is often in the lower stack.
+When timing, memory, radio behavior, or peripherals behave strangely, the answer is often in the **lower stack**.
 
 ---
 
 ## What ESP-IDF changes in your thinking
 
-ESP-IDF is Espressif's native development framework.
+ESP-IDF is Espressif's **native development framework**.
 
 You do not need to master all of ESP-IDF to benefit from `arduino-esp32`, but you do need to know that it exists and shapes the system below your sketch.
 
@@ -68,7 +68,7 @@ This is why Espressif Arduino feels more like "embedded software on a vendor pla
 
 ## Why FreeRTOS matters here
 
-One reason Espressif Arduino is different from simpler Arduino environments is that the platform lives in a FreeRTOS-shaped system.
+One reason Espressif Arduino is different from simpler Arduino environments is that the platform lives in a **FreeRTOS-shaped system**.
 
 That means:
 
@@ -90,7 +90,7 @@ Once you know there is a real stack underneath, you can ask better questions:
 - Which limitations come from the chip, not the sketch?
 - Which behaviors change when I move from prototype code to production architecture?
 
-Those are the right questions for a serious embedded engineer.
+Those are the right questions for a **serious embedded engineer**.
 
 ---
 

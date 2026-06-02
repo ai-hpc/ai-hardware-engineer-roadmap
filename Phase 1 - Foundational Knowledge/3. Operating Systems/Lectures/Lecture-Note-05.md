@@ -13,7 +13,7 @@
 
 # Part 1: Lock-Free Programming — RCU, Atomics & Memory Ordering
 
-**Context:** Locks add cost even when uncontended: cache-line bouncing, context switches, priority inversion. On hot paths (camera pipeline, sensor fusion, model config), lock-free techniques use atomics and RCU to coordinate without mutual exclusion.
+**Context:** Locks add cost even when uncontended: **cache-line bouncing**, context switches, priority inversion. On hot paths (camera pipeline, sensor fusion, model config), **lock-free techniques use atomics and RCU** to coordinate without mutual exclusion.
 
 ---
 
@@ -24,13 +24,13 @@
 - **Priority inversion:** Low-priority holder delays high-priority waiter (see Part 2).
 - **Convoying:** Many threads queue behind one slow holder.
 
-Lock-free programming means coordinating between threads without using traditional locks (like mutexes). Instead, it relies on **atomic** hardware instructions (such as compare-and-swap, or CAS) and mechanisms like RCU. "Lock-free" doesn't mean there's no coordination—rather, the coordination is done using atomics, which generally provides more predictable and bounded costs compared to locks.
+**Lock-free programming** means coordinating between threads without using traditional locks (like mutexes). Instead, it relies on **atomic** hardware instructions (such as compare-and-swap, or CAS) and mechanisms like RCU. "Lock-free" doesn't mean there's no coordination—rather, the coordination is done using atomics, which generally provides **more predictable and bounded costs** compared to locks.
 
 ---
 
 ## C11/C++11 Memory Model
 
-Modern CPUs and compilers often rearrange (reorder) memory operations to improve performance, which can lead to one thread's updates not being visible to another thread right away, unless explicitly controlled. The C11/C++11 memory model describes how and when such reordering is allowed and gives tools (`std::atomic<T>` in C++ / `_Atomic T` in C) to specify the kind of visibility and ordering guarantees required between threads.
+Modern CPUs and compilers often **rearrange (reorder) memory operations** to improve performance, which can lead to one thread's updates not being visible to another thread right away, unless explicitly controlled. The **C11/C++11 memory model** describes how and when such reordering is allowed and gives tools (`std::atomic<T>` in C++ / `_Atomic T` in C) to specify the kind of visibility and ordering guarantees required between threads.
 
 
 | Memory Order           | What It Guarantees                                                                                                                         |
@@ -417,7 +417,7 @@ CAS is "atomic if equal, else update and retry", forming the foundation of safe,
 
 ## SPSC Ring Buffer (Lock-Free): In-Depth with MengRao's SPSC_Queue
 
-The lock-free SPSC ("Single Producer, Single Consumer") queue is an efficient queue for communication between exactly one producer thread and one consumer thread. Let's break down how it works, *inspired by and referencing the widely respected [MengRao/SPSC_Queue](https://github.com/MengRao/SPSC_Queue) implementation*, which is a gold standard for high-performance SPSC queues.
+The lock-free **SPSC** ("Single Producer, Single Consumer") queue is an efficient queue for communication between **exactly one producer thread and one consumer thread**. Let's break down how it works, *inspired by and referencing the widely respected [MengRao/SPSC_Queue](https://github.com/MengRao/SPSC_Queue) implementation*, which is a gold standard for high-performance SPSC queues.
 
 ### Key Properties
 
@@ -520,7 +520,7 @@ public:
 
 ## RCU (Read-Copy-Update)
 
-Linux kernel’s primary mechanism for read-mostly shared data. **O(1) read-side cost:** no locks, no atomics, no cache-line writes — only preempt disable/enable.
+Linux kernel’s **primary mechanism for read-mostly shared data**. **O(1) read-side cost:** no locks, no atomics, no cache-line writes — only preempt disable/enable.
 
 ### Reader side
 
@@ -621,7 +621,7 @@ Used in Folly (Meta), Java `java.util.concurrent`; `std::hazard_pointer` in C++2
 
 ## Deadlock: Definition & Coffman Conditions
 
-**Deadlock:** A set of processes are each waiting for a resource held by another in the set; no process can ever make progress.
+**Deadlock:** A set of processes are each waiting for a resource held by another in the set; **no process can ever make progress**.
 
 ```
   Process A holds L1, waiting for L2  ──►  Process B holds L2, waiting for L1
@@ -696,7 +696,7 @@ H is effectively running at L’s priority — **inverted**. Duration of inversi
 
 ### Mars Pathfinder (1997)
 
-Rover had periodic resets ~18 hours after landing. **Root cause:** unbounded priority inversion.
+Rover had **periodic resets** ~18 hours after landing. **Root cause:** unbounded priority inversion.
 
 
 | Task     | Priority | Role                                    |
@@ -714,7 +714,7 @@ Rover had periodic resets ~18 hours after landing. **Root cause:** unbounded pri
 
 ## Priority Inheritance (PI)
 
-When H blocks on a mutex held by L, the kernel **temporarily boosts L** to H’s priority until L releases the mutex. **Transitive PI:** if L is also blocked on another mutex held by X, the boost propagates to X so the whole chain can run and release.
+When H blocks on a mutex held by L, the kernel **temporarily boosts L** to H’s priority until L releases the mutex. **Transitive PI:** if L is also blocked on another mutex held by X, the boost **propagates to X** so the whole chain can run and release.
 
 ```
   BEFORE PI:                          AFTER PI:
@@ -739,7 +739,7 @@ pthread_mutex_init(&mutex, &attr);
 
 ## Priority Ceiling Protocol
 
-Each mutex has a **ceiling priority** = highest priority of any task that will ever acquire it. Any task that acquires it **immediately** runs at the ceiling for the duration — so a high-priority waiter never has to block (L is already at ceiling). Prevents inversion without runtime discovery; requires static analysis (all acquirers and their priorities known at design time).
+Each mutex has a **ceiling priority** = highest priority of any task that will ever acquire it. Any task that acquires it **immediately** runs at the ceiling for the duration — so a **high-priority waiter never has to block** (L is already at ceiling). Prevents inversion without runtime discovery; requires **static analysis** (all acquirers and their priorities known at design time).
 
 
 |                    | PI                            | Priority ceiling                    |
@@ -776,7 +776,7 @@ which lock already depends on the new lock.
 
 ## Watchdog Timers
 
-If a process does not kick the watchdog within the timeout, the system resets or enters a safe state — defense-in-depth against deadlocks that slip through. On Mars Pathfinder the watchdog **did** detect bc_dist missing its deadline; the real fix was enabling PI so the deadline was not missed. **Pitfall:** Treating watchdog reset as an acceptable “recovery” for priority inversion is wrong — e.g. on an ADAS controller it forces disengagement; the correct fix is to eliminate the inversion.
+If a process does not **kick the watchdog** within the timeout, the system resets or enters a safe state — **defense-in-depth** against deadlocks that slip through. On Mars Pathfinder the watchdog **did** detect bc_dist missing its deadline; the real fix was enabling PI so the deadline was not missed. **Pitfall:** Treating watchdog reset as an acceptable “recovery” for priority inversion is wrong — e.g. on an ADAS controller it forces disengagement; the correct fix is to eliminate the inversion.
 
 ---
 

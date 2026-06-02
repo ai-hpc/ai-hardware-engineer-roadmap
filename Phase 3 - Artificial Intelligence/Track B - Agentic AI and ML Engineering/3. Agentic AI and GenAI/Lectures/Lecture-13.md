@@ -20,7 +20,7 @@ to:
 
 That is the idea behind **runtime discipline**.
 
-Runtime discipline means you do not trust design documents, prompts, tests, or demos alone. You watch the live system, enforce live rules, and keep evidence of what happened.
+**Runtime discipline** means you do not trust design documents, prompts, tests, or demos alone. You **watch the live system**, enforce live rules, and keep evidence of what happened.
 
 For simple chatbots, this is useful.
 
@@ -63,7 +63,7 @@ That is powerful.
 
 But it also means the AI is no longer "just text generation."
 
-It is now a live actor inside your system.
+It is now a **live actor** inside your system.
 
 So runtime discipline asks four questions on every important step:
 
@@ -102,7 +102,7 @@ AI runtime security adds a new concern:
 
 > The model can choose different behavior at runtime based on context, memory, retrieved data, tool results, and previous messages.
 
-That makes the system partly non-deterministic.
+That makes the system partly **non-deterministic**.
 
 The same code path can produce different decisions depending on:
 
@@ -183,7 +183,7 @@ They appear when:
 - a workflow agent can call internal APIs
 - a voice assistant can control home or lab devices
 
-At that point, the model is operating under delegated authority.
+At that point, the model is operating under **delegated authority**.
 
 Delegated authority means:
 
@@ -199,7 +199,7 @@ The threats below are the ones to memorize. They show up repeatedly in real agen
 
 ### 5.1 Prompt injection
 
-Prompt injection happens when an attacker gives the model instructions that conflict with the system's intended rules.
+**Prompt injection** happens when an attacker gives the model instructions that conflict with the system's intended rules.
 
 Example:
 
@@ -227,7 +227,7 @@ Runtime lesson:
 
 ### 5.2 Tool and capability abuse
 
-Tool abuse happens when the model calls a legitimate tool in an unintended way.
+**Tool abuse** happens when the model calls a legitimate tool in an unintended way.
 
 Example:
 
@@ -264,7 +264,7 @@ Runtime lesson:
 
 ### 5.4 Agent goal hijacking
 
-Goal hijacking happens when the agent pursues a goal that looks related to the request but violates the real business intent.
+**Goal hijacking** happens when the agent pursues a goal that looks related to the request but violates the real business intent.
 
 Example:
 
@@ -284,7 +284,7 @@ Runtime lesson:
 
 ### 5.5 Memory and context poisoning
 
-Memory poisoning happens when unsafe or false information gets stored and later influences behavior.
+**Memory poisoning** happens when unsafe or false information gets stored and later influences behavior.
 
 Example:
 
@@ -301,7 +301,7 @@ Runtime lesson:
 
 ### 5.6 Emergent behavior and decision drift
 
-Decision drift means the system's behavior changes over time even if the code and model weights did not change.
+**Decision drift** means the system's behavior changes over time even if the code and model weights did not change.
 
 This can happen because:
 
@@ -340,7 +340,7 @@ Runtime lesson:
 
 ## 6. The runtime control loop
 
-A practical AI runtime security layer is a control loop.
+A practical AI runtime security layer is a **control loop**.
 
 ```text
 Observe -> Decide -> Enforce -> Record -> Improve
@@ -468,7 +468,7 @@ There are two main enforcement styles.
 
 ### Inline controls
 
-Inline controls sit directly in the execution path.
+**Inline controls** sit directly in the execution path.
 
 They can block, modify, or require approval before an action happens.
 
@@ -498,7 +498,7 @@ Tradeoff:
 
 ### Out-of-band controls
 
-Out-of-band controls observe logs, traces, or events after or alongside execution.
+**Out-of-band controls** observe logs, traces, or events after or alongside execution.
 
 They are useful for:
 
@@ -746,7 +746,7 @@ Runtime controls for RAG should track:
 
 ## 13. Example: coding-agent runtime discipline
 
-A coding agent is risky because it can act on a repository.
+A **coding agent** is risky because it can act on a repository.
 
 Minimum runtime boundaries:
 
@@ -826,7 +826,7 @@ When AI leaves the browser and touches real devices, runtime controls become saf
 
 ## 15. What good telemetry looks like
 
-Telemetry is the raw material of runtime security.
+**Telemetry** is the raw material of runtime security.
 
 Bad telemetry:
 

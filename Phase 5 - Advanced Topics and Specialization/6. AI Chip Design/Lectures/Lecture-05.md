@@ -39,7 +39,7 @@ The previous four lectures built up the foundation: LLVM IR as the universal low
 
 ## 1. Apache TVM
 
-TVM is the most mature open-source ML compiler. Its key innovation is **separating computation from schedule** — the same algorithm can be optimized differently for different hardware via schedule transformations.
+TVM is the **most mature open-source ML compiler**. Its key innovation is **separating computation from schedule** — the same algorithm can be optimized differently for different hardware via schedule transformations.
 
 ### Pipeline
 
@@ -133,7 +133,7 @@ print(func.get_source("ll"))
 
 ### Auto-Tuning: MetaSchedule
 
-The key insight of TVM's auto-tuning: instead of hand-writing schedules for every hardware target, search the space of valid schedules automatically.
+The key insight of TVM's auto-tuning: instead of hand-writing schedules for every hardware target, **search the space of valid schedules automatically**.
 
 ```python
 from tvm import meta_schedule as ms
@@ -326,7 +326,7 @@ Triton's `tl.dot` is lowered through TTIR → TTGIR → LLVM+NVVM, and on Hopper
 
 ## 3. tinygrad: The Minimal Compiler
 
-tinygrad takes a radically different approach: instead of LLVM/MLIR infrastructure, it implements a self-contained compiler in ~10K lines of Python.
+tinygrad takes a **radically different approach**: instead of LLVM/MLIR infrastructure, it implements a **self-contained compiler in ~10K lines of Python**.
 
 ### Pipeline
 
@@ -488,7 +488,7 @@ The ML compiler landscape is converging around a few key ideas:
 
 **3. Auto-tuning over hand-written kernels.** The search-based approach (TVM MetaSchedule, tinygrad BEAM, Triton auto-tuning) is replacing hand-optimized library kernels for an increasing fraction of workloads. The exception: critical-path kernels like attention, where hand-written implementations (FlashAttention) still dominate.
 
-**4. Hardware-software co-design.** The compiler's capabilities constrain the hardware design space, and vice versa. Designing an accelerator without understanding the compiler pipeline is like designing an ISA without understanding the software — you'll build features that the compiler can't use.
+**4. Hardware-software co-design.** The compiler's capabilities **constrain the hardware design space**, and vice versa. Designing an accelerator without understanding the compiler pipeline is like designing an ISA without understanding the software — you'll build features that the compiler can't use.
 
 ---
 

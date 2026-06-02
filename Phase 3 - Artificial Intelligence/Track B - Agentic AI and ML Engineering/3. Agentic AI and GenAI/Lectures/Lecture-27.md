@@ -26,7 +26,7 @@ The discipline sits at an awkward intersection. The skills come from three older
 
 You cannot do this job from a pure ML background. You also cannot do it from a pure pentest background. The work is **applying old security discipline to a new computational substrate** — one that takes natural language as code, and where the "code" can come from the user, the database, a screenshot, or yesterday's chat history.
 
-This lecture is structured as eight phases that take a competent engineer from foundations to publishable work. Each phase has a concrete build artifact. Skip the artifacts and you are reading; do the artifacts and you are training.
+This lecture is structured as **eight phases** that take a competent engineer from foundations to publishable work. Each phase has a concrete build artifact. Skip the artifacts and you are reading; do the artifacts and you are training.
 
 ---
 
@@ -56,7 +56,7 @@ A traditional web service has a clear data/code boundary. Inputs are strings; co
 | Web service | request body | your application code |
 | Agent runtime | user message + tool results + retrieved docs + memory | the model's interpretation of all of the above |
 
-An attacker who controls any input the model sees — a user message, a screenshot, a retrieved document, a tool's output — can in principle influence what the agent decides to do next. Filtering text does not solve this: the attack surface includes the model's own attention weights.
+An attacker who controls **any input the model sees** — a user message, a screenshot, a retrieved document, a tool's output — can in principle influence what the agent decides to do next. Filtering text does not solve this: the attack surface includes the model's own attention weights.
 
 That is what **prompt injection** actually is, generalized: the inability of an LLM to reliably distinguish "instructions from the principal" from "data the principal asked it to look at." Every other AI agent threat reduces to or compounds this primitive.
 
@@ -73,7 +73,7 @@ If your job description sounds like "make the LLM safer," you are working on the
 
 ## 2. Phase 0 — Foundations
 
-Before AI security, you need real security. There is no shortcut here. The interview signal that distinguishes serious agent-security candidates is whether they can already do classical security work.
+Before AI security, you need **real security**. There is no shortcut here. The interview signal that distinguishes serious agent-security candidates is whether they can already do classical security work.
 
 ### 2.1 Concepts to internalize
 
@@ -112,7 +112,7 @@ If you cannot read `/proc/<pid>/status` and explain every line, you are not read
 
 ## 3. Phase 1 — Agent internals: know what you are securing
 
-You cannot secure a system whose mechanics you do not understand. Phase 1 is the prerequisite reading from this very course.
+You cannot secure a system whose mechanics you do not understand. Phase 1 is the **prerequisite reading** from this very course.
 
 ### 3.1 Required prior lectures
 
@@ -128,7 +128,7 @@ Read or re-read, in order:
 - [Lecture 24 - What Is an AI Agent Harness?](Lecture-24.md) — the six concerns
 - [Lecture 24b - Session as Source of Truth](Lecture-24b.md) — event sourcing for forensics
 
-These are not optional context. They are the system you are securing.
+These are **not optional context**. They are the system you are securing.
 
 ### 3.2 Build a deliberately-bad agent
 
@@ -157,11 +157,11 @@ The goal of Phase 1 is to **know in your hands** what each layer of defense in P
 
 ## 4. Phase 2 — The four security domains of agent runtimes
 
-Every defense in depth stack for an agent breaks down along these four axes. They are independent — failing one does not necessarily fail the others — and that is the property defense-in-depth depends on.
+Every defense in depth stack for an agent breaks down along these **four axes**. They are independent — failing one does not necessarily fail the others — and that is the property defense-in-depth depends on.
 
 ### 4.1 Input security
 
-The model cannot reliably distinguish instructions from data. So the harness must.
+The model **cannot reliably distinguish instructions from data**. So the harness must.
 
 **Threats:**
 
@@ -179,7 +179,7 @@ The right mental shift: stop trying to make the input "safe" and instead **make 
 
 ### 4.2 Execution security
 
-Tool calls run code. Code on your runtime, code on a database, code in a browser. Treat all of it as untrusted.
+Tool calls run code. Code on your runtime, code on a database, code in a browser. Treat all of it as **untrusted**.
 
 **Sandboxing options, ordered by isolation strength:**
 
@@ -202,7 +202,7 @@ Tool calls run code. Code on your runtime, code on a database, code in a browser
 
 ### 4.3 Identity, sessions, and pairing
 
-An agent that serves multiple humans has the same multi-tenancy problems as any SaaS, plus new ones from shared model context.
+An agent that serves multiple humans has the same **multi-tenancy problems** as any SaaS, plus new ones from shared model context.
 
 **Required primitives:**
 
@@ -216,7 +216,7 @@ The OpenClaw pairing / scopes / channels architecture (Lectures 15–19) is the 
 
 ### 4.4 Output and side-effect control
 
-The agent will produce text and trigger tools. Both are exfiltration channels.
+The agent will produce text and trigger tools. **Both are exfiltration channels.**
 
 **Threats:**
 
@@ -236,7 +236,7 @@ The agent will produce text and trigger tools. Both are exfiltration channels.
 
 ## 5. Phase 3 — Build a secure agent runtime
 
-This is the phase where you stop reading and produce the first serious artifact.
+This is the phase where you stop reading and produce the **first serious artifact**.
 
 ### 5.1 Specification
 
@@ -292,7 +292,7 @@ Before declaring this artifact done, prove the following with code:
 
 ## 6. Phase 4 — The offensive mindset
 
-You will not build defenses worth shipping until you have personally broken several agent systems. This phase is non-negotiable.
+You will not build defenses worth shipping until you have **personally broken several agent systems**. This phase is non-negotiable.
 
 ### 6.1 Attack categories to practice
 
@@ -322,7 +322,7 @@ The shape of the journal should make it obvious that **the fix was at the runtim
 
 ## 7. Phase 5 — Security automation
 
-You cannot personally watch every agent run. The job becomes designing the systems that watch for you.
+You cannot personally watch every agent run. The job becomes **designing the systems that watch for you**.
 
 ### 7.1 Static checks
 
@@ -360,7 +360,7 @@ If a change breaks safety, the build fails. If a change breaks the safe tasks (f
 
 ## 8. Phase 6 — Advanced isolation and privacy
 
-The previous phases assumed cooperative-but-untrusted users. This phase assumes a hostile multi-tenant environment, regulatory data constraints, or a deployment where the operator themselves is not trusted.
+The previous phases assumed cooperative-but-untrusted users. This phase assumes a **hostile multi-tenant environment**, regulatory data constraints, or a deployment where the operator themselves is not trusted.
 
 ### 8.1 Isolation beyond Docker
 
@@ -375,7 +375,7 @@ The previous phases assumed cooperative-but-untrusted users. This phase assumes 
 
 ### 8.2 Hardware-rooted trust (the hardware-track tie-in)
 
-This is where the AI-hardware-engineer track diverges from generic agent security.
+This is where the AI-hardware-engineer track **diverges from generic agent security**.
 
 - **Secure boot on Jetson.** Fuse-locked roots of trust ensure the kernel and firmware are the ones you signed. If your edge VLA agent runs on a Jetson that booted unsigned firmware, no software-layer security claim survives.
 - **Encrypted unified memory.** Some Jetson SKUs and Thor support encrypted DRAM regions; useful when on-device models contain proprietary weights or process sensitive data.
@@ -405,7 +405,7 @@ These are advisory layers that compose with — never replace — the runtime en
 
 ## 9. Phase 7 — Real projects
 
-Theory ends here. The bar for a serious AI agent security engineer is shipped artifacts.
+Theory ends here. The bar for a serious AI agent security engineer is **shipped artifacts**.
 
 ### 9.1 Project A — Secure local agent
 

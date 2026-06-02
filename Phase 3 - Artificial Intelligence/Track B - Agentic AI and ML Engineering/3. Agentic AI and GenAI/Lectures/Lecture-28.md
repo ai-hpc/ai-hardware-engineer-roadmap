@@ -4,7 +4,7 @@
 
 ---
 
-This lecture is a close reading of the actual Pi repository: [github.com/badlogic/pi-mono](https://github.com/badlogic/pi-mono). Pi is the coding-agent substrate that sits beneath OpenClaw and several other agent products. Rather than describe the surface, this lecture pulls apart the repo and shows you how each design decision is wired in code: which packages exist, which tools are built in, how extensions register, how sessions are stored as branchable JSONL, what hot reload actually reloads, and what `No MCP` looks like as a real engineering stance with a concrete workaround.
+This lecture is a close reading of the actual Pi repository: [github.com/badlogic/pi-mono](https://github.com/badlogic/pi-mono). Pi is the **coding-agent substrate** that sits beneath OpenClaw and several other agent products. Rather than describe the surface, this lecture pulls apart the repo and shows you how each design decision is wired in code: which packages exist, which tools are built in, how extensions register, how sessions are stored as branchable JSONL, what hot reload actually reloads, and what `No MCP` looks like as a real engineering stance with a concrete workaround.
 
 Primary sources:
 
@@ -44,7 +44,7 @@ pi
 
 Authentication can also use `/login` for subscription-based providers; the CLI then runs as an interactive TUI. The package is one of five in the monorepo, all MIT-licensed, all under the `@mariozechner/*` npm scope.
 
-The repo description: *"Tools for building AI agents."* That is more accurate than calling Pi "a coding agent" — Pi is an *agent runtime kit*, of which the coding-agent CLI is the most visible product but not the only one.
+The repo description: *"Tools for building AI agents."* That is more accurate than calling Pi "a coding agent" — Pi is an **agent runtime kit**, of which the coding-agent CLI is the most visible product but not the only one.
 
 ---
 
@@ -63,7 +63,7 @@ pi-mono/
   scripts/                                             build / release scripts
 ```
 
-Read top-down, this is a stack: `ai` is the model abstraction, `agent` is the runtime that calls models and dispatches tools, `coding-agent` is the CLI that wires `agent` to a TUI, `tui` is the rendering library, `web-ui` is the equivalent surface for a browser. Each package is independently published; consumers can pick the layer they need.
+Read top-down, this is a **stack**: `ai` is the model abstraction, `agent` is the runtime that calls models and dispatches tools, `coding-agent` is the CLI that wires `agent` to a TUI, `tui` is the rendering library, `web-ui` is the equivalent surface for a browser. Each package is **independently published**; consumers can pick the layer they need.
 
 A consequence: **a non-coding-agent product (a Slack bot, a Telegram bot, OpenClaw itself) consumes `@mariozechner/pi-agent-core` and `@mariozechner/pi-ai` directly** and supplies its own front-end. The coding-agent CLI is one consumer of the runtime, not the only one.
 
@@ -151,7 +151,7 @@ That last category is important: **anything not built in is reachable through th
 
 ## 5. System prompt assembly
 
-Pi assembles its system prompt from layered files, with override and append semantics.
+Pi assembles its system prompt from **layered files**, with override and append semantics.
 
 ```
 priority order (highest to lowest):
@@ -169,13 +169,13 @@ priority order (highest to lowest):
 
 This is the prompt-assembly pattern from Lecture 21 (OpenClaw System Prompt Architecture) made even simpler: a small fixed default, replaceable, with append hooks for project-specific guidance, plus walk-up context files (`AGENTS.md`, `CLAUDE.md`) the way every recent agent has settled on.
 
-The `CLAUDE.md` filename being honored alongside `AGENTS.md` is a deliberate compatibility move: a workspace already configured for Claude Code drops cleanly into Pi without renaming files.
+The `CLAUDE.md` filename being honored alongside `AGENTS.md` is a deliberate **compatibility move**: a workspace already configured for Claude Code drops cleanly into Pi without renaming files.
 
 ---
 
 ## 6. The session model
 
-Sessions are JSONL files stored under `~/.pi/agent/sessions/`, organized by working directory. The on-disk shape is the simplest possible event log:
+Sessions are **JSONL files** stored under `~/.pi/agent/sessions/`, organized by working directory. The on-disk shape is the simplest possible event log:
 
 ```jsonl
 {"id":"a","parentId":null,"role":"user","content":"refactor this fn"}
@@ -226,7 +226,7 @@ These three primitives cover the realistic side-quest design space:
 - Go investigate something orthogonal without losing the main thread → `/clone`, work in the clone, come back.
 - Move between branches that already exist → `/tree`.
 
-A linear-only session log can do none of these without additional machinery.
+A **linear-only session log** can do none of these without additional machinery.
 
 ---
 
@@ -286,7 +286,7 @@ Two structural notes on this API:
 
 ## 9. The Agent runtime — `pi-agent-core`
 
-If the coding-agent CLI is the visible surface, `pi-agent-core` is the substrate. It is what OpenClaw, a Telegram bot, or your own front-end consumes when they want Pi-style agent behavior without the CLI.
+If the coding-agent CLI is the visible surface, `pi-agent-core` is the **substrate**. It is what OpenClaw, a Telegram bot, or your own front-end consumes when they want Pi-style agent behavior without the CLI.
 
 The exposed shape:
 

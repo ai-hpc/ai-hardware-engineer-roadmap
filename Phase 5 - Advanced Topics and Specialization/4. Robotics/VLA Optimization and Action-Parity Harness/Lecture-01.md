@@ -9,7 +9,7 @@ A Vision-Language-Action policy is, from the runtime's point of view, an unusual
 * it emits **a small burst of action tokens or denoising steps**, not a long generation
 * it has to **share a Jetson or workstation GPU** with perception, ROS 2, costmaps, and a teleop UI
 
-The job of this lecture is to convert a published VLA checkpoint — OpenVLA-7B, π₀ (3.3B), GR00T N1.5 (2-3B class), or a Qwen2-VL-class custom policy — into something that closes the control loop on real hardware without changing what the robot does. The companion measurement framework lives in [Lecture 2](Lecture-02.md); we will assume it exists and validates every step.
+The job of this lecture is to convert a published **VLA checkpoint** — OpenVLA-7B, π₀ (3.3B), GR00T N1.5 (2-3B class), or a Qwen2-VL-class custom policy — into something that **closes the control loop on real hardware** without changing what the robot does. The companion measurement framework lives in [Lecture 2](Lecture-02.md); we will assume it exists and validates every step.
 
 By the end you should be able to:
 
@@ -53,9 +53,9 @@ Strip the marketing away and a VLA control tick is:
 
 Three things to internalize:
 
-1. **Prefill dominates if the prompt is large.** Some OpenX-style policies serialize task description + N camera views + proprioceptive state into >1500 tokens of prefix every tick. Prefill becomes a compute-bound matmul; decode is a different, bandwidth-bound problem.
+1. **Prefill dominates if the prompt is large.** Some OpenX-style policies serialize task description + N camera views + proprioceptive state into >1500 tokens of prefix every tick. Prefill becomes a **compute-bound matmul**; decode is a different, **bandwidth-bound** problem.
 2. **Decode is short.** OpenVLA emits 7 discretized action tokens. π₀ runs a 10-step flow-matching head over a 50-step action chunk. RT-2-style emits a few action tokens per arm. You almost never decode more than ~32 tokens, so per-token decode tricks that help long-form LLMs (continuous batching, paged KV) help less here.
-3. **Vision tower is constant per tick and not text-shaped.** It does not benefit from KV cache. It is the most common surprise bottleneck after the LLM is quantized.
+3. **Vision tower is constant per tick and not text-shaped.** It does not benefit from KV cache. It is the most common **surprise bottleneck** after the LLM is quantized.
 
 ### 1.1 Concrete budget for OpenVLA-7B on Jetson AGX Orin (64 GB, MAXN)
 
@@ -91,7 +91,7 @@ Cheapest to most invasive, with the action-parity harness as the gate at every r
 | 7 | Distill to a smaller backbone (e.g. 7B → 2-3B class) | 2-3× across the board | high; full re-evaluation required |
 | 8 | Architecture surgery (drop a camera, smaller image, fewer action steps) | 1.5-3× | high; changes the policy class |
 
-The rule: take the cheapest rung that still meets the parity bar from [Lecture 2](Lecture-02.md), then stop. Most teams overshoot and ship a policy that drifts at the third rollout in a row.
+The rule: take the **cheapest rung** that still meets the parity bar from [Lecture 2](Lecture-02.md), then stop. Most teams overshoot and ship a policy that **drifts at the third rollout** in a row.
 
 ---
 
@@ -101,7 +101,7 @@ The rule: take the cheapest rung that still meets the parity bar from [Lecture 2
 
 * The vision tower is almost always shipped in bf16 / fp16. Stay in fp16 on Jetson — bf16 lacks tensor-core acceleration on Ampere / older Orin SKUs.
 * The LLM backbone in published VLAs is usually bf16. Convert weights once, offline. Validate with the parity harness on at least one episode before going further.
-* The action head, if it is a regression MLP or a diffusion head, is **the place you keep highest precision**. Errors here are not absorbed by softmax; they hit the actuator directly. Default fp16; only drop further if Lecture 2's per-axis error budget allows it.
+* The action head, if it is a regression MLP or a diffusion head, is **the place you keep highest precision**. Errors here are not absorbed by softmax; they **hit the actuator directly**. Default fp16; only drop further if Lecture 2's per-axis error budget allows it.
 
 ### 3.2 Static KV cache + CUDA Graphs
 
@@ -121,7 +121,7 @@ In ROS 2 land, the slowest path is often `sensor_msgs/Image` → host buffer →
 
 ## 4. Rung 2: TensorRT-ify the vision tower
 
-Once the LLM is small or quantized, the ViT becomes the visible cost. SigLIP-So400m at 384×384 × 2 cameras can be 60-90 ms on Jetson AGX Orin before this work.
+Once the LLM is small or quantized, the **ViT becomes the visible cost**. SigLIP-So400m at 384×384 × 2 cameras can be 60-90 ms on Jetson AGX Orin before this work.
 
 Recipe:
 
@@ -161,7 +161,7 @@ If you do enable it:
 
 This is the rung that is unique to VLAs and gets neglected because it looks like cheating.
 
-The observation: a robot's scene does not change at the rate of the camera frame. If the policy emits an N-step action chunk (π₀'s 50-step horizon, ALOHA-style chunked imitation, RT-2 with action chunking), you can:
+The observation: a robot's scene **does not change at the rate of the camera frame**. If the policy emits an N-step action chunk (π₀'s 50-step horizon, ALOHA-style chunked imitation, RT-2 with action chunking), you can:
 
 * run the full VLA every K-th tick (e.g. every 5th, at 10 Hz instead of 50 Hz)
 * execute the cached action chunk in between
@@ -188,7 +188,7 @@ The harness must validate that the verified outputs are bit-exact to the un-spec
 
 ## 9. Rung 7: distillation when quantization runs out
 
-If you have exhausted rungs 0-6 and still miss the control budget, the next step is to swap the backbone. The pattern:
+If you have exhausted rungs 0-6 and still miss the control budget, the next step is to **swap the backbone**. The pattern:
 
 * keep the vision tower frozen (it is doing the heavy perception work)
 * swap the 7B LLM for a 2-3B class one (Gemma-2-2B, Qwen2.5-3B, Llama-3.2-3B)

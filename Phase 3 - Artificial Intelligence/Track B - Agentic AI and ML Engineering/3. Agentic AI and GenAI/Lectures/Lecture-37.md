@@ -4,9 +4,9 @@
 
 ---
 
-Performance optimization is not a vibes problem.
+Performance optimization is **not a vibes problem**.
 
-For AI systems, the hard part is often not collecting data. It is turning a huge profiler trace into a specific diagnosis:
+For AI systems, the hard part is often not collecting data. It is turning a huge profiler trace into a **specific diagnosis**:
 
 ```text
 What was slow?
@@ -16,9 +16,9 @@ Did the new kernel actually help?
 Can we reproduce the slow op without the full model?
 ```
 
-TraceLens is useful because it treats profiler traces as structured data, not screenshots for humans to manually inspect.
+**TraceLens** is useful because it treats profiler traces as **structured data**, not screenshots for humans to manually inspect.
 
-It consumes traces from frameworks such as PyTorch and JAX, then produces summaries, comparisons, roofline-style metrics, collective communication analysis, and minimal operation reproducers.
+It consumes traces from frameworks such as PyTorch and JAX, then produces **summaries, comparisons, roofline-style metrics**, collective communication analysis, and minimal operation reproducers.
 
 For this course, TraceLens is the missing evidence layer between:
 
@@ -61,7 +61,7 @@ Modern AI workloads generate large traces:
 - collective communication
 - synchronization gaps
 
-Tools such as Perfetto are useful for visual inspection, but the manual workflow does not scale.
+Tools such as **Perfetto** are useful for visual inspection, but the **manual workflow does not scale**.
 
 The engineer ends up asking:
 
@@ -73,19 +73,19 @@ Did communication overlap with compute?
 Did a new software version shift time into a different op?
 ```
 
-Raw traces are too flat.
+Raw traces are **too flat**.
 
-They show events, but not enough intent.
+They show events, but **not enough intent**.
 
-TraceLens adds structure.
+TraceLens adds **structure**.
 
 ---
 
 ## 2. Trace2Tree: from flat trace to hierarchy
 
-The central idea is Trace2Tree.
+The central idea is **Trace2Tree**.
 
-TraceLens converts flat events into a tree:
+TraceLens converts **flat events into a tree**:
 
 ```text
 Python module / function
@@ -107,7 +107,7 @@ nn.Module: Linear
       -> matrix multiply kernel
 ```
 
-This matters because many expensive events are hidden at the Python level.
+This matters because many expensive events are **hidden at the Python level**.
 
 Common examples:
 
@@ -127,13 +127,13 @@ This exact module launched this exact framework op,
 which launched this exact kernel.
 ```
 
-That is the difference between tracing and diagnosis.
+That is the difference between **tracing and diagnosis**.
 
 ---
 
 ## 3. Top-down bottleneck analysis
 
-TraceLens reports are designed to move from coarse to precise.
+TraceLens reports are designed to move from **coarse to precise**.
 
 The useful progression is:
 
@@ -147,9 +147,9 @@ GPU timeline
 
 This is the right order.
 
-Do not start with kernel names.
+Do not start with **kernel names**.
 
-Start by asking how the system spent time.
+Start by asking **how the system spent time**.
 
 ---
 
@@ -187,7 +187,7 @@ high idle time
   -> inspect CPU dispatch, dataloader, synchronization, scheduling, dynamic shapes
 ```
 
-The ROCm blog's Llama FSDP example shows a GPU timeline where the GPU is mostly busy, but total communication is still a large fraction of the run. That distinction matters: communication can be present but hidden under compute, or it can be exposed and directly hurt wall time.
+The ROCm blog's Llama FSDP example shows a GPU timeline where the GPU is mostly busy, but **total communication** is still a large fraction of the run. That distinction matters: communication can be **present but hidden** under compute, or it can be **exposed and directly hurt** wall time.
 
 ---
 
@@ -204,7 +204,7 @@ After the timeline, group work by operation family:
 - multi-tensor apply
 - other backend kernels
 
-This tells you where to spend engineering effort.
+This tells you **where to spend engineering effort**.
 
 If GEMM and attention dominate most of the time, optimizing a small elementwise kernel will not move end-to-end performance unless it blocks fusion, causes copies, or sits on the critical path.
 
@@ -219,9 +219,9 @@ memory movement
 
 The point is not that other ops are irrelevant.
 
-The point is prioritization.
+The point is **prioritization**.
 
-Performance work should follow the trace.
+Performance work should **follow the trace**.
 
 ---
 
@@ -236,7 +236,7 @@ GPU kernel names change across:
 - hardware generations
 - autotuning choices
 
-Framework dispatch names are often more stable.
+**Framework dispatch names** are often more stable.
 
 Examples:
 
@@ -264,15 +264,15 @@ Did aten::mm improve for this shape?
 Did flash attention regress after the backend update?
 ```
 
-That abstraction is important when comparing CUDA and ROCm, or comparing two software versions on the same platform.
+That abstraction is important when comparing **CUDA and ROCm**, or comparing two software versions on the same platform.
 
 ---
 
 ## 7. Shape-level view: the real root cause
 
-Operator names are not enough.
+**Operator names are not enough.**
 
-The same operation can have very different performance depending on:
+The same operation can have **very different performance** depending on:
 
 - tensor dimensions
 - strides
@@ -287,7 +287,7 @@ The same operation can have very different performance depending on:
 
 TraceLens breaks down operations by unique input shape and arguments.
 
-This is where many real optimizations start.
+This is where **many real optimizations start**.
 
 Example:
 
@@ -309,9 +309,9 @@ Possible causes:
 - low occupancy
 - poor backend algorithm selection
 
-For agent workloads, this is especially useful because context length and output length change request by request.
+For agent workloads, this is especially useful because **context length and output length** change request by request.
 
-A model may be fast at one sequence length and slow at another.
+A model may be **fast at one sequence length and slow at another**.
 
 ---
 
@@ -329,7 +329,7 @@ It does not answer:
 Was that good?
 ```
 
-TraceLens estimates theoretical work from operator arguments.
+TraceLens estimates **theoretical work** from operator arguments.
 
 For GEMM:
 
@@ -360,9 +360,9 @@ unexpected bytes or copies nearby
 
 Important distinction:
 
-TraceLens estimates useful theoretical work from framework semantics.
+TraceLens estimates useful **theoretical work** from framework semantics.
 
-Hardware profilers measure what the GPU actually executed.
+Hardware profilers measure **what the GPU actually executed**.
 
 Use both:
 
@@ -374,7 +374,7 @@ Hardware counters:
   "What did the GPU actually do?"
 ```
 
-The gap between those two is often where the optimization lives.
+The gap between those two is often **where the optimization lives**.
 
 ---
 
@@ -396,7 +396,7 @@ One rank may enter the collective late because:
 - it had a CPU dispatch stall
 - it waited on a prior dependency
 
-If you only look at total collective duration, you may blame the network for workload imbalance.
+If you only look at total collective duration, you may **blame the network for workload imbalance**.
 
 TraceLens separates:
 
@@ -422,7 +422,7 @@ high total communication but low exposed communication
   -> communication exists but is mostly hidden under compute
 ```
 
-For hardware engineers, this matters because AI scaling bottlenecks are often misdiagnosed.
+For hardware engineers, this matters because **AI scaling bottlenecks are often misdiagnosed**.
 
 The right question is not:
 
@@ -441,7 +441,7 @@ and how much was rank skew?
 
 ## 10. Trace comparison: prove the delta
 
-Most performance work is comparative:
+Most performance work is **comparative**:
 
 ```text
 old kernel vs new kernel
@@ -457,7 +457,7 @@ TraceLens can compare reports and identify where time changed.
 
 For simple cases, matching happens at the same operator level.
 
-For more complex cases, TraceLens can use morphological comparison: it aligns trees and finds the lowest point where the call stacks diverge.
+For more complex cases, TraceLens can use **morphological comparison**: it aligns trees and finds the lowest point where the call stacks diverge.
 
 That is useful when two backends implement the same framework op differently.
 
@@ -479,15 +479,15 @@ This change regressed aten::mm by Y ms.
 This backend moved time from one subtree into another.
 ```
 
-That is the standard you should use for optimization claims.
+That is the **standard you should use** for optimization claims.
 
 ---
 
 ## 11. Event replay: isolate the slow operation
 
-Finding a slow operation is only half the job.
+Finding a slow operation is **only half the job**.
 
-You still need a reproducer.
+You still need a **reproducer**.
 
 Full model reproducers are often difficult to share because they include:
 
@@ -497,7 +497,7 @@ Full model reproducers are often difficult to share because they include:
 - distributed launch setup
 - complex environment state
 
-TraceLens event replay generates a minimal script from trace metadata:
+TraceLens **event replay** generates a minimal script from trace metadata:
 
 - operation type
 - tensor shapes
@@ -516,7 +516,7 @@ model team finds a slow op
   -> fix is validated against original trace
 ```
 
-This is how you turn model-level performance debugging into systems engineering.
+This is how you turn model-level performance debugging into **systems engineering**.
 
 ---
 
@@ -538,7 +538,7 @@ GPU:
   kernels, copies, collectives, idle time, roofline metrics
 ```
 
-TraceLens focuses on the lower layers, but it should be connected to the higher layers.
+TraceLens focuses on the **lower layers**, but it should be connected to the higher layers.
 
 For OpenClaw-style systems, a useful workflow is:
 
@@ -553,7 +553,7 @@ run representative agent workload
   -> attach report to deployment decision
 ```
 
-This pairs directly with Lecture 36.
+This pairs directly with **Lecture 36**.
 
 If you enable FP8 KV-cache, do not only report:
 
@@ -628,7 +628,7 @@ TraceLens_generate_perf_report_pftrace_hip_activity \
   --write_md
 ```
 
-Use these commands as starting points, not a complete profiling policy.
+Use these commands as **starting points**, not a complete profiling policy.
 
 For reliable comparisons, also pin:
 
@@ -647,7 +647,7 @@ For reliable comparisons, also pin:
 
 ## 14. Diagnostic playbook
 
-Use TraceLens reports to choose the next action.
+Use TraceLens reports to **choose the next action**.
 
 ### Case: high idle time
 
@@ -743,9 +743,9 @@ Next actions:
 
 ## 15. How this connects to agent reliability
 
-Earlier lectures focused on agent skills, structured tools, and verification.
+Earlier lectures focused on **agent skills, structured tools, and verification**.
 
-TraceLens applies the same idea to performance:
+TraceLens applies the **same idea to performance**:
 
 ```text
 claim:
@@ -760,7 +760,7 @@ required evidence:
   deployment decision
 ```
 
-This matters because agent systems invite vague performance claims:
+This matters because agent systems invite **vague performance claims**:
 
 - "The model is slow."
 - "The GPU is the bottleneck."
@@ -768,7 +768,7 @@ This matters because agent systems invite vague performance claims:
 - "FP8 is faster."
 - "The new backend regressed."
 
-TraceLens helps turn those into falsifiable statements:
+TraceLens helps turn those into **falsifiable statements**:
 
 ```text
 On this workload, aten::mm for this shape regressed by X ms.
@@ -777,7 +777,7 @@ On this model, attention kernel time dropped but copy time increased.
 On this backend, GPU idle time is dominated by CPU dispatch gaps.
 ```
 
-That is the engineering standard.
+That is the **engineering standard**.
 
 ---
 

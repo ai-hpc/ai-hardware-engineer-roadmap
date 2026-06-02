@@ -12,11 +12,11 @@ AI hardware engineers need to understand filesystems because edge AI devices (da
 
 ## Filesystem Role and VFS
 
-A filesystem organizes files into directories, provides persistence across power cycles, manages free space, and ensures metadata consistency after crashes.
+A filesystem organizes files into directories, provides **persistence across power cycles**, manages free space, and ensures **metadata consistency after crashes**.
 
 ### VFS (Virtual File System)
 
-Linux VFS is an abstraction layer that presents a uniform API regardless of the underlying filesystem implementation.
+Linux VFS is an **abstraction layer** that presents a **uniform API** regardless of the underlying filesystem implementation.
 
 The layered architecture looks like this:
 
@@ -54,7 +54,7 @@ Key data structures:
 - `struct dentry`: name-to-inode cache entry; forms the directory tree in memory
 - `struct file`: per-open-file state; current offset, flags; points to inode
 
-Key operations table: `struct file_operations` — `open`, `read`, `write`, `mmap`, `ioctl`, `fsync`, `llseek`. Every filesystem registers its own implementation of these callbacks. `mmap` is critical for AI workloads: memory-mapped dataset files avoid read() syscalls entirely.
+Key operations table: `struct file_operations` — `open`, `read`, `write`, `mmap`, `ioctl`, `fsync`, `llseek`. Every filesystem registers its **own implementation** of these callbacks. `mmap` is critical for AI workloads: **memory-mapped dataset files** avoid read() syscalls entirely.
 
 > **Key Insight:** When you call `open("/data/frames/frame0001.raw", O_RDONLY)` on an ext4 filesystem and then again on a btrfs filesystem, you get the same file descriptor, the same `read()` API, the same behavior from the application's perspective. VFS is the reason this works. What differs between filesystems is what happens underneath — how blocks are allocated, how crashes are handled, and how fast metadata operations complete.
 
@@ -62,9 +62,9 @@ Key operations table: `struct file_operations` — `open`, `read`, `write`, `mma
 
 ## ext4
 
-ext4 is the default Linux filesystem; backward-compatible with ext2/ext3.
+ext4 is the **default Linux filesystem**; backward-compatible with ext2/ext3.
 
-ext4 is a mature, well-tested filesystem that prioritizes reliability and broad hardware compatibility. It is the right choice for general-purpose Linux root partitions — including Jetson rootfs — where predictable behavior matters more than advanced features.
+ext4 is a mature, well-tested filesystem that prioritizes **reliability and broad hardware compatibility**. It is the right choice for general-purpose Linux root partitions — including Jetson rootfs — where predictable behavior matters more than advanced features.
 
 ### Key Features
 
@@ -83,9 +83,9 @@ ext4 is a mature, well-tested filesystem that prioritizes reliability and broad 
 | `data=journal` | Metadata + data | Best | Slowest |
 | `data=writeback` | Metadata only; data order not guaranteed | Weakest | Fastest |
 
-Mount with `mount -o data=ordered /dev/mmcblk0p1 /mnt`. For Jetson rootfs, `data=ordered` is the standard.
+Mount with `mount -o data=ordered /dev/mmcblk0p1 /mnt`. For Jetson rootfs, `data=ordered` is the **standard**.
 
-Default journal size: 128 MB (tunable via `tune2fs -J size=N`). Journal is a circular log; on crash, uncommitted transactions are discarded; committed but not checkpointed are replayed.
+Default journal size: 128 MB (tunable via `tune2fs -J size=N`). Journal is a **circular log**; on crash, uncommitted transactions are discarded; committed but not checkpointed are replayed.
 
 The crash recovery sequence for `data=ordered` mode:
 
@@ -100,7 +100,7 @@ The crash recovery sequence for `data=ordered` mode:
 
 ## btrfs
 
-btrfs is a Copy-on-Write B-tree filesystem with features designed for modern storage and system management. Where ext4 prioritizes simplicity and compatibility, btrfs prioritizes advanced features — particularly snapshots and checksums — that are critical for OTA update strategies.
+btrfs is a **Copy-on-Write B-tree filesystem** with features designed for modern storage and system management. Where ext4 prioritizes simplicity and compatibility, btrfs prioritizes **advanced features** — particularly snapshots and checksums — that are critical for OTA update strategies.
 
 ### Core Features
 
@@ -134,7 +134,7 @@ The A/B OTA flow with btrfs snapshots works as follows:
 4. **If the new rootfs fails to boot**: bootloader detects the failure (boot counter exceeds threshold) and mounts the old snapshot as the active rootfs. Full rollback with zero data movement.
 5. **After a successful boot**: the old snapshot can be deleted to reclaim space.
 
-`btrfs scrub start /`: verify all data blocks against stored checksums; background operation; critical for long-running edge AI devices where silent corruption is a concern.
+`btrfs scrub start /`: verify all data blocks against stored checksums; background operation; critical for long-running edge AI devices where **silent corruption** is a concern.
 
 > **Common Pitfall:** btrfs CoW creates extra write amplification for database-style workloads (many small, random updates to the same file regions). SQLite databases and RocksDB on btrfs can perform worse than on ext4 because each small write copies an entire B-tree leaf node. Use `chattr +C` (disable CoW for specific files or directories) for database files on btrfs, or place database files on a separate ext4 partition.
 
@@ -144,7 +144,7 @@ The A/B OTA flow with btrfs snapshots works as follows:
 
 With ext4 and btrfs understood, we turn to the filesystem designed specifically for the storage hardware used in AI edge devices: NAND flash in eMMC and UFS packages.
 
-F2FS is designed for NAND flash storage: eMMC, UFS, and NVMe SSDs. Developed by Samsung; merged into Linux 3.8.
+F2FS is designed for **NAND flash storage**: eMMC, UFS, and NVMe SSDs. Developed by Samsung; merged into Linux 3.8.
 
 ### Design Principles
 
@@ -161,15 +161,15 @@ Use cases: Android (since Android 9 default on eMMC/UFS), Chromebooks, embedded 
 
 ## overlayfs
 
-overlayfs is the mechanism that makes containers, OTA overlays, and read-only rootfs configurations work. Understanding it is required for working with Docker containers and Jetson OTA strategies.
+overlayfs is the mechanism that makes **containers, OTA overlays, and read-only rootfs** configurations work. Understanding it is required for working with Docker containers and Jetson OTA strategies.
 
-overlayfs overlays two directory trees into a unified view:
+overlayfs overlays **two directory trees** into a unified view:
 
 - **lower**: read-only base layer (one or more stacked layers)
 - **upper**: writable layer; receives all modifications
 - **workdir**: temporary directory on the same filesystem as `upper`; used for atomic rename operations
 
-On first write to a file from `lower`, the file is copied up to `upper` (copy-on-write). Subsequent writes go directly to `upper`.
+On first write to a file from `lower`, the file is **copied up to `upper`** (copy-on-write). Subsequent writes go directly to `upper`.
 
 ```
 Application sees /container/merged (unified view):
@@ -216,7 +216,7 @@ mount -t overlay overlay \
 
 overlayfs often uses tmpfs as its writable `upper` layer for ephemeral containers. But tmpfs has its own important standalone role: it is the foundation of all shared memory IPC in Linux.
 
-`tmpfs` uses anonymous pages (RAM + swap) for storage; no disk I/O for reads or writes.
+`tmpfs` uses anonymous pages (RAM + swap) for storage; **no disk I/O** for reads or writes.
 
 ```bash
 mount -t tmpfs -o size=1G tmpfs /dev/shm  # explicit tmpfs mount, 1 GB limit
@@ -232,9 +232,9 @@ mount -t tmpfs -o size=1G tmpfs /dev/shm  # explicit tmpfs mount, 1 GB limit
 
 ## TRIM and Flash Longevity
 
-Every time the OS deletes a file on a flash-backed filesystem, it knows those blocks are now free — but the flash hardware does not automatically learn this. TRIM bridges this gap.
+Every time the OS deletes a file on a flash-backed filesystem, it knows those blocks are now free — but the **flash hardware does not automatically learn this**. TRIM bridges this gap.
 
-`fstrim` notifies the SSD of freed block ranges so the controller can reclaim them during idle time.
+`fstrim` notifies the SSD of **freed block ranges** so the controller can reclaim them during idle time.
 
 - `discard` mount option: issue TRIM inline on every `unlink()` (higher latency per delete)
 - `systemd-fstrim.timer`: weekly `fstrim` sweep (preferred; batches TRIMs)

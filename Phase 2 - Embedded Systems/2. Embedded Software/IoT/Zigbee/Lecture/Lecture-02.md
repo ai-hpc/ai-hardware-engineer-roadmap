@@ -27,7 +27,7 @@ Its job is to:
 - anchor the network
 - often act as the **trust center**
 
-In practice, the coordinator is usually the gateway-like or mains-powered central node.
+In practice, the coordinator is usually the **gateway-like or mains-powered central node**.
 
 ### Router
 
@@ -38,7 +38,7 @@ Routers:
 - allow children to attach
 - stay awake instead of sleeping aggressively
 
-A router is infrastructure, not a battery-first endpoint.
+A router is **infrastructure**, not a battery-first endpoint.
 
 ### End Device
 
@@ -48,7 +48,7 @@ End devices:
 - usually communicate through a parent
 - are the natural place for battery-powered sensors and actuators
 
-Some end devices are sleepy, which matters a lot for power design later.
+Some end devices are **sleepy**, which matters a lot for power design later.
 
 ---
 
@@ -99,7 +99,7 @@ At a high level:
 4. parents are selected
 5. routing state develops as the network grows
 
-This is the basic bring-up flow you must hold in your head before touching SDK examples.
+This is the basic **bring-up flow** you must hold in your head before touching SDK examples.
 
 Key detail:
 
@@ -118,7 +118,7 @@ In many Zigbee deployments it also acts as the **trust center**, which means it 
 - key handling
 - network admission
 
-That is one reason coordinator design quality matters so much. If the coordinator is weakly implemented, the whole network suffers.
+That is one reason **coordinator design quality** matters so much. If the coordinator is weakly implemented, the whole network suffers.
 
 ---
 

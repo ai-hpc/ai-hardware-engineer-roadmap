@@ -19,7 +19,7 @@ By the end of this lecture you will be able to:
 
 ## 1. Document Loading
 
-The first stage of any RAG system is getting raw content into a usable format. LangChain provides `BaseLoader` implementations for dozens of file types. All loaders return a list of `Document` objects — each with `.page_content` (string) and `.metadata` (dict).
+The first stage of any **RAG system** is getting raw content into a usable format. LangChain provides `BaseLoader` implementations for dozens of file types. All loaders return a list of `Document` objects — each with `.page_content` (string) and `.metadata` (dict).
 
 ### 1.1 PDF Loading
 
@@ -99,11 +99,11 @@ def load_markdown_directory(directory: str):
 
 ## 2. Chunking Strategies
 
-Raw documents are almost always too long to embed as-is. Chunking splits them into pieces small enough for an embedding model while preserving enough context for retrieval.
+Raw documents are almost always too long to embed as-is. **Chunking** splits them into pieces small enough for an embedding model while **preserving enough context** for retrieval.
 
 ### 2.1 Fixed-Size Chunking
 
-The simplest approach: split every N characters with an overlap to prevent context from being cut at boundaries.
+The simplest approach: split every N characters with an **overlap** to prevent context from being cut at boundaries.
 
 ```python
 from langchain.text_splitter import CharacterTextSplitter
@@ -159,7 +159,7 @@ print(f"Chunk 0 preview: {chunks[0].page_content[:120]}")
 
 ### 2.3 Semantic Chunking
 
-Instead of splitting by character count, semantic chunking embeds consecutive sentences and splits whenever the cosine similarity between adjacent sentences drops below a threshold. This keeps topically coherent content together.
+Instead of splitting by character count, **semantic chunking** embeds consecutive sentences and splits whenever the **cosine similarity** between adjacent sentences drops below a threshold. This keeps topically coherent content together.
 
 ```python
 # pip install langchain-experimental sentence-transformers
@@ -190,7 +190,7 @@ for c in chunks[:3]:
 
 ## 3. Embedding Models
 
-An embedding model converts text into a dense vector (list of floats). Semantically similar texts produce vectors that are close in cosine distance.
+An **embedding model** converts text into a **dense vector** (list of floats). Semantically similar texts produce vectors that are close in **cosine distance**.
 
 ### 3.1 OpenAI your-embedding-model-id (API)
 
@@ -431,7 +431,7 @@ for r in results:
     print(f"  {r.page_content}")
 ```
 
-**Pinecone namespacing** allows tenant isolation — each namespace is a separate partition:
+**Pinecone namespacing** allows **tenant isolation** — each namespace is a separate partition:
 
 ```python
 # Pinecone: use namespace parameter to isolate tenants
@@ -443,7 +443,7 @@ results = vectorstore.similarity_search("bandwidth", k=2, namespace="customer_ac
 
 ## 6. Complete Indexing Pipeline
 
-Putting it all together into a reusable class:
+Putting it all together into a **reusable class**:
 
 ```python
 # pip install langchain langchain-community langchain-chroma

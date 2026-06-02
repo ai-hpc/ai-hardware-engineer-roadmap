@@ -39,7 +39,7 @@ Gating network: replicated on every GPU
 
 At a token's MoE layer, the gating network produces top-8 expert IDs. These IDs may be on any GPU. The token's hidden state must be **dispatched to the right GPUs**, the FFN run there, and the results **gathered back**.
 
-This is the all-to-all communication. Every GPU sends tokens to every other GPU according to which experts those tokens need.
+This is the **all-to-all communication**. Every GPU sends tokens to every other GPU according to which experts those tokens need.
 
 ### 1.1 The dispatch table
 
@@ -73,7 +73,7 @@ EP all-to-all: every rank sends *different-sized* buffers to *different* destina
 * **NVLink topology** — ideally all-to-all uses the fabric symmetrically.
 * **Message size** — small messages hit the latency floor; large messages saturate bandwidth.
 
-At low batch sizes, EP all-to-all is **latency-dominated**. At high batch sizes, it becomes bandwidth-dominated. Both regimes have different optimization knobs.
+At low batch sizes, EP all-to-all is **latency-dominated**. At high batch sizes, it becomes **bandwidth-dominated**. Both regimes have different optimization knobs.
 
 ---
 
@@ -125,7 +125,7 @@ Per layer: ~100-200 μs all-to-all
 Per token (61 layers): ~6-12 ms
 ```
 
-Larger batch amortizes the per-step all-to-all cost. **MoE strongly prefers higher batch sizes than dense.** Continuous batching is essential.
+Larger batch **amortizes the per-step all-to-all cost**. **MoE strongly prefers higher batch sizes than dense.** Continuous batching is essential.
 
 ---
 
@@ -192,7 +192,7 @@ Benchmark gains over default NCCL `alltoallv` on NVL72:
 * 1.5–2× faster all-to-all latency on small batches.
 * 1.2–1.5× faster on large batches (the bandwidth regime is already close to NVLink peak).
 
-SGLang and TRT-LLM integrate DeepEP for DeepSeek-family deployments. vLLM does so for the DeepSeek model path. For Qwen3-MoE 235B-A22B (which is not DeepSeek), the same techniques apply but the library integration varies.
+**SGLang and TRT-LLM integrate DeepEP** for DeepSeek-family deployments. vLLM does so for the DeepSeek model path. For Qwen3-MoE 235B-A22B (which is not DeepSeek), the same techniques apply but the **library integration varies**.
 
 ---
 
@@ -202,7 +202,7 @@ The single most subtle MoE inference issue.
 
 ### 5.1 The problem
 
-Not all experts are activated equally. Some experts get many tokens, some get few. The slowest expert sets the step time (a "straggler" pattern).
+**Not all experts are activated equally.** Some experts get many tokens, some get few. **The slowest expert sets the step time** (a "straggler" pattern).
 
 In training, MoE loss includes a **load-balancing auxiliary term** that penalizes uneven routing. At inference time, this is fixed — but training-time imbalance can persist as natural distribution bias.
 
@@ -256,9 +256,9 @@ Per layer: gating + topk + scatter overhead ≈ 20-50 μs
 Per token (61 layers): ~1.2-3 ms in gating-related ops
 ```
 
-Small. Usually not the bottleneck unless the runtime's gating implementation is unoptimized.
+Small. **Usually not the bottleneck** unless the runtime's gating implementation is unoptimized.
 
-The subtlety: gating is *frequent* and *latency-sensitive*. Even if individual cost is small, poor implementation can add 10-20% to total step time. vLLM 0.22+, SGLang 0.5+, and TRT-LLM all have optimized gating paths.
+The subtlety: gating is *frequent* and *latency-sensitive*. Even if individual cost is small, **poor implementation can add 10-20% to total step time**. vLLM 0.22+, SGLang 0.5+, and TRT-LLM all have optimized gating paths.
 
 ---
 
@@ -283,7 +283,7 @@ For **small batches** (concurrency < 16), EP overhead can exceed the bandwidth s
 * Qwen3-MoE 235B-A22B at concurrency 8 on 2× B200 (TP=2, EP=2): TPOT ~12 ms.
 * Same on 8× B200 (EP=8): TPOT ~10 ms — only 17% faster despite 4× the GPUs.
 
-For low-batch chat products, smaller-cluster deployments are often more cost-efficient.
+For low-batch chat products, **smaller-cluster deployments are often more cost-efficient**.
 
 ---
 

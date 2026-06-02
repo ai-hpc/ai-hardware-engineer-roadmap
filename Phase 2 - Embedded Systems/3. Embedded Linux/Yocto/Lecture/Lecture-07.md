@@ -12,11 +12,11 @@ Layers let teams **separate concerns**: BSP with hardware knowledge, corporate d
 
 ## 2. Creating a custom layer (pattern)
 
-Use the official bitbake-layers create-layer workflow for your release. You should end with conf/layer.conf, recipes-* trees, and optional README for layer intent and maintainers.
+Use the official **bitbake-layers create-layer** workflow for your release. You should end with conf/layer.conf, recipes-* trees, and optional README for layer intent and maintainers.
 
 ## 3. bbappend discipline
 
-If you did not write the upstream recipe, prefer .bbappend in your layer. Good: add a patch, tweak PACKAGECONFIG, add a runtime dependency, install a config via FILESPATH patterns. Bad: fork a recipe to change one variable you could append.
+If you did not write the upstream recipe, prefer **.bbappend** in your layer. Good: add a patch, tweak PACKAGECONFIG, add a runtime dependency, install a config via FILESPATH patterns. Bad: **fork a recipe** to change one variable you could append.
 
 ## 4. Lab 5 — Your own layer, minimal change
 

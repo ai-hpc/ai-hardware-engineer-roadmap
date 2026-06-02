@@ -4,7 +4,7 @@
 
 ---
 
-Agent engineers usually work above the model:
+**Agent engineers** usually work above the model:
 
 ```text
 prompt
@@ -15,7 +15,7 @@ prompt
   -> UI
 ```
 
-GPU and systems engineers need to understand what happens below the API:
+**GPU and systems engineers** need to understand what happens below the API:
 
 ```text
 tokens
@@ -26,7 +26,7 @@ tokens
   -> sampling
 ```
 
-The `angelos-p/llm-from-scratch` repository is useful because it strips the problem down to a workshop-sized GPT. The project walks through writing a tokenizer, transformer model, training loop, and generation code, then trains a small Shakespeare-style model on a laptop-class machine.
+The `angelos-p/llm-from-scratch` repository is useful because it strips the problem down to a **workshop-sized GPT**. The project walks through writing a tokenizer, transformer model, training loop, and generation code, then trains a small Shakespeare-style model on a laptop-class machine.
 
 The key lesson for this roadmap:
 
@@ -52,11 +52,11 @@ By the end of this lecture, you should be able to:
 
 ## 1. Why this belongs in an agent course
 
-Most agent failures are not caused by attention math.
+Most **agent failures** are not caused by attention math.
 
-They are caused by harness, tool, memory, policy, and product issues.
+They are caused by **harness, tool, memory, policy, and product issues**.
 
-Still, model mechanics matter because agents create unusual inference workloads:
+Still, model mechanics matter because agents create **unusual inference workloads**:
 
 - long context windows
 - many short turns
@@ -67,7 +67,7 @@ Still, model mechanics matter because agents create unusual inference workloads:
 - background cron runs
 - local/edge deployment
 
-If you do not understand the model under the API, you will misdiagnose performance.
+If you do not understand the model under the API, you will **misdiagnose performance**.
 
 Examples:
 
@@ -79,7 +79,7 @@ Examples:
 | batch serving helps throughput | multiple requests share GPU work more efficiently |
 | tool-heavy agents feel bursty | execution alternates between CPU/IO tools and GPU inference |
 
-Agent systems are runtime systems, but their runtime behavior is shaped by transformer inference.
+Agent systems are **runtime systems**, but their runtime behavior is shaped by **transformer inference**.
 
 ---
 
@@ -87,7 +87,7 @@ Agent systems are runtime systems, but their runtime behavior is shaped by trans
 
 The reference project is a hands-on workshop titled **Train Your Own LLM From Scratch**.
 
-It targets a small GPT-style model, not a production-scale frontier model.
+It targets a **small GPT-style model**, not a production-scale frontier model.
 
 The project has learners write:
 
@@ -109,7 +109,7 @@ This scale is intentionally small.
 
 That is the point.
 
-You can see every component without distributed training, tokenizer complexity, or cluster infrastructure hiding the basics.
+You can see **every component** without distributed training, tokenizer complexity, or cluster infrastructure hiding the basics.
 
 ---
 
@@ -163,13 +163,13 @@ Inference usually does prefill once and decode repeatedly.
 
 ## 4. Tokenization is not a detail
 
-The workshop uses character-level tokenization for Shakespeare.
+The workshop uses **character-level tokenization** for Shakespeare.
 
 Why?
 
 Because the dataset is small.
 
-A GPT-2-style BPE vocabulary has roughly 50k tokens. On a tiny dataset, many token patterns are too rare for a small model to learn useful structure.
+A GPT-2-style **BPE vocabulary** has roughly 50k tokens. On a tiny dataset, many token patterns are **too rare** for a small model to learn useful structure.
 
 Character-level tokenization gives a tiny vocabulary:
 
@@ -273,11 +273,11 @@ Important pieces:
 
 Training is not just inference repeated.
 
-Backward pass and optimizer state dominate memory.
+**Backward pass and optimizer state** dominate memory.
 
 For a small workshop model, that is manageable.
 
-For production-scale models, it becomes a distributed systems problem.
+For production-scale models, it becomes a **distributed systems problem**.
 
 ---
 
@@ -306,9 +306,9 @@ Important concepts:
 
 Agent implication:
 
-Every assistant response is a decode loop.
+Every assistant response is a **decode loop**.
 
-Streaming is just exposing that loop token-by-token or chunk-by-chunk.
+**Streaming** is just exposing that loop token-by-token or chunk-by-chunk.
 
 Tool use interrupts the loop:
 
@@ -319,7 +319,7 @@ model emits tool call
   -> model continues
 ```
 
-That is why agent latency is partly model latency and partly harness/tool latency.
+That is why agent latency is partly **model latency** and partly **harness/tool latency**.
 
 ---
 
@@ -335,13 +335,13 @@ The model processes the existing prompt/context:
 system prompt + history + retrieved context + user message
 ```
 
-This is usually compute-heavy and grows with context length.
+This is usually **compute-heavy** and grows with context length.
 
 ### Decode
 
-The model generates one new token at a time while reusing KV cache.
+The model generates one new token at a time while **reusing KV cache**.
 
-This is often memory-bandwidth-sensitive.
+This is often **memory-bandwidth-sensitive**.
 
 Agent runtime connection:
 
@@ -360,7 +360,7 @@ This directly connects to previous lectures on context hygiene, TokenJuice, syst
 
 ## 9. GPU/kernel-level view
 
-A small from-scratch model helps you map Python code to GPU work.
+A small from-scratch model helps you map **Python code to GPU work**.
 
 Common hot paths:
 
@@ -397,7 +397,7 @@ It gives you the mental map needed to understand them.
 
 Do not dismiss a 10M parameter GPT as a toy.
 
-It is a microscope.
+It is a **microscope**.
 
 Small models let you:
 
@@ -424,9 +424,9 @@ What does not transfer directly:
 - serving at high concurrency
 - frontier-model behavior
 
-Use small models to understand mechanisms.
+Use small models to understand **mechanisms**.
 
-Use large systems to understand scaling.
+Use large systems to understand **scaling**.
 
 ---
 
@@ -454,7 +454,7 @@ For model work, evidence changes shape:
 | generation change | sample outputs, temperature/top-k comparison |
 | performance change | tokens/sec, memory use, profiler trace |
 
-A model-focused skill should not accept "it trains" as enough.
+A model-focused skill should not accept **"it trains"** as enough.
 
 It should ask:
 
@@ -531,13 +531,13 @@ serving runtime
 agent harness
 ```
 
-This separation is the central architecture lesson.
+This separation is the **central architecture lesson**.
 
-The training script creates weights.
+The **training script** creates weights.
 
-The serving runtime turns weights into tokens.
+The **serving runtime** turns weights into tokens.
 
-The harness turns tokens and tools into work.
+The **harness** turns tokens and tools into work.
 
 ---
 

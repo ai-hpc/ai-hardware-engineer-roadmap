@@ -21,7 +21,7 @@ By the end of this lecture you will be able to:
 
 ### 1.1 Dense Retrieval (Semantic Search)
 
-Dense retrieval embeds the query and all documents into a shared vector space. Documents are ranked by cosine similarity (or dot product) to the query vector. It handles semantic equivalence well: "memory bandwidth" and "data transfer rate" may retrieve the same documents.
+**Dense retrieval** embeds the query and all documents into a shared **vector space**. Documents are ranked by **cosine similarity** (or dot product) to the query vector. It handles semantic equivalence well: "memory bandwidth" and "data transfer rate" may retrieve the same documents.
 
 ```python
 # pip install langchain langchain-chroma sentence-transformers
@@ -51,7 +51,7 @@ for doc, score in results:
 
 ### 1.2 BM25 (Sparse/Keyword Search)
 
-BM25 is a classical TF-IDF-derived ranking function. It excels at exact keyword matching.
+**BM25** is a classical TF-IDF-derived ranking function. It excels at **exact keyword matching**.
 
 ```python
 # pip install rank-bm25
@@ -83,7 +83,7 @@ for score, doc in ranked:
 
 ### 1.3 Hybrid Search (BM25 + Dense)
 
-Hybrid search combines both scores using Reciprocal Rank Fusion (RRF):
+**Hybrid search** combines both scores using **Reciprocal Rank Fusion (RRF)**:
 
 ```python
 # pip install langchain-community rank-bm25 sentence-transformers
@@ -155,7 +155,7 @@ for doc in retriever.retrieve("NVLink 4.0 bandwidth"):
 
 ## 2. Maximal Marginal Relevance (MMR)
 
-MMR selects documents that are relevant to the query AND diverse from each other. It prevents retrieving five near-identical chunks.
+**MMR** selects documents that are relevant to the query AND **diverse** from each other. It prevents retrieving five near-identical chunks.
 
 ```python
 from langchain_chroma import Chroma
@@ -201,7 +201,7 @@ for d in mmr:
 
 ## 3. Cross-Encoder Reranking
 
-Two-stage retrieval: first retrieve a broad candidate set (e.g., top-20 with fast dense search), then rerank with a slower but more accurate cross-encoder that reads query + document together.
+**Two-stage retrieval**: first retrieve a broad candidate set (e.g., top-20 with fast dense search), then rerank with a slower but more accurate **cross-encoder** that reads query + document together.
 
 ```python
 # pip install sentence-transformers
@@ -239,7 +239,7 @@ for i, doc in enumerate(reranked, 1):
     print(f"  {i}. {doc.page_content}")
 ```
 
-**Why reranking helps:** The bi-encoder (dense retrieval) encodes query and document independently. The cross-encoder attends to every token of both simultaneously, giving much better relevance scores at the cost of O(candidates) inference calls.
+**Why reranking helps:** The **bi-encoder** (dense retrieval) encodes query and document independently. The **cross-encoder** attends to every token of both simultaneously, giving much better relevance scores at the cost of O(candidates) inference calls.
 
 ---
 
@@ -247,7 +247,7 @@ for i, doc in enumerate(reranked, 1):
 
 ### 4.1 Query Expansion
 
-Simple expansion generates multiple phrasings of the query and merges results.
+Simple expansion generates **multiple phrasings** of the query and merges results.
 
 ```python
 import os
@@ -277,7 +277,7 @@ for q in queries:
 
 ### 4.2 HyDE (Hypothetical Document Embeddings)
 
-Instead of embedding the short query, generate a hypothetical document that would answer the question, then embed that. The hypothesis is much closer in vector space to actual documents.
+Instead of embedding the short query, generate a **hypothetical document** that would answer the question, then embed that. The hypothesis is much closer in vector space to actual documents.
 
 ```python
 import numpy as np

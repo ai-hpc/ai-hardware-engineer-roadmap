@@ -17,7 +17,7 @@ By the end of this lecture you will be able to:
 
 ## 1. How Transformers Generate Text
 
-An LLM does one thing: given a sequence of tokens, predict the next token. An agent is just a loop that keeps calling this function.
+An LLM does one thing: given a sequence of tokens, **predict the next token**. An **agent** is just a loop that keeps calling this function.
 
 ```
 Input tokens → [Transformer] → Logits → Sample → Output token
@@ -40,7 +40,7 @@ Input tokens → [Transformer] → Logits → Sample → Output token
 
 ## 2. Tokens and Context Windows
 
-Tokens ≠ words. Rule of thumb: **1 token ≈ 0.75 English words** (4 characters).
+**Tokens ≠ words**. Rule of thumb: **1 token ≈ 0.75 English words** (4 characters).
 
 ```python
 import os
@@ -66,7 +66,7 @@ print(response.input_tokens)  # → 10
 | Local/open-weight model | edge inference, privacy, offline demos | VRAM, quantization, throughput |
 | Embedding model | RAG indexing and retrieval | vector dimension, recall, index cost |
 
-Always verify current context limits in the provider documentation before designing a production agent around a specific window size.
+Always **verify current context limits** in the provider documentation before designing a production agent around a specific window size.
 
 **Why context size matters for agents:**
 - Multi-step reasoning accumulates tokens fast
@@ -137,7 +137,7 @@ print(f"Stop reason:   {response.stop_reason}")  # end_turn | tool_use | max_tok
 
 ## 5. Model Selection for Agent Tasks
 
-Not every task needs the most powerful model. Cost and latency add up in multi-step loops.
+Not every task needs the most powerful model. **Cost and latency** add up in **multi-step loops**.
 
 ```python
 # Router pattern: use fast/cheap model for simple steps
@@ -167,7 +167,7 @@ def route_model(task_type: str) -> str:
 
 ## 6. Streaming for Responsive Agents
 
-In agentic UIs, streaming dramatically improves perceived responsiveness.
+In agentic UIs, **streaming** dramatically improves **perceived responsiveness**.
 
 ```python
 import os

@@ -4,7 +4,7 @@
 
 ---
 
-OpenClaw currently lives mostly in the Node/TypeScript world.
+OpenClaw currently lives mostly in the **Node/TypeScript world**.
 
 That is a pragmatic choice:
 
@@ -13,7 +13,7 @@ That is a pragmatic choice:
 - npm packages cover almost every integration surface.
 - agent products move quickly.
 
-But the runtime layer is becoming strategic.
+But the runtime layer is becoming **strategic**.
 
 Bun's public Zig-to-Rust porting work is a useful signal. It does **not** mean Bun has already become a Rust runtime. The specific commit we are using as evidence is an initial Phase-A porting guide and helper script. The signal is narrower and more useful:
 
@@ -22,9 +22,9 @@ fast runtimes are not enough
 runtime ecosystems, maintainability, tooling, and packaging now matter as product strategy
 ```
 
-That matters for agent systems because an agent runtime is not a normal web server.
+That matters for agent systems because an agent runtime is **not a normal web server**.
 
-It is a long-running, tool-using, streaming, subprocess-heavy, policy-gated execution platform.
+It is a **long-running, tool-using, streaming, subprocess-heavy, policy-gated** execution platform.
 
 ---
 
@@ -45,7 +45,7 @@ By the end of this lecture, you should be able to:
 
 ## 1. What Bun is
 
-Bun is an alternative JavaScript runtime and tooling stack.
+Bun is an **alternative JavaScript runtime** and tooling stack.
 
 It tries to collapse several pieces into one distribution:
 
@@ -79,7 +79,7 @@ Important implementation detail:
 - Bun uses JavaScriptCore.
 - Bun has historically used a large amount of Zig.
 
-The runtime is not just "where JavaScript executes."
+The runtime is **not just "where JavaScript executes."**
 
 It shapes:
 
@@ -131,15 +131,15 @@ The unconfirmed overreach:
 "Bun has completed a Rust rewrite."
 ```
 
-Do not build architecture decisions on the overreach.
+Do not build architecture decisions on the **overreach**.
 
-Use this as a strategic signal, not a migration trigger.
+Use this as a **strategic signal**, not a migration trigger.
 
 ---
 
 ## 3. Why Zig made sense
 
-Zig is attractive for runtime infrastructure because it gives:
+Zig is attractive for **runtime infrastructure** because it gives:
 
 - low-level control
 - straightforward C interop
@@ -150,9 +150,9 @@ Zig is attractive for runtime infrastructure because it gives:
 
 For a runtime like Bun, those are real advantages.
 
-The tradeoff is ecosystem.
+The tradeoff is **ecosystem**.
 
-Zig's ecosystem and hiring pool are smaller than Rust's.
+Zig's ecosystem and hiring pool are **smaller than Rust's**.
 
 For a fast-moving runtime, that can matter as much as language design.
 
@@ -160,7 +160,7 @@ For a fast-moving runtime, that can matter as much as language design.
 
 ## 4. Why Rust might win long-term
 
-Rust is attractive for platform infrastructure because it offers:
+Rust is attractive for **platform infrastructure** because it offers:
 
 - memory safety without garbage collection
 - strong concurrency guarantees
@@ -170,7 +170,7 @@ Rust is attractive for platform infrastructure because it offers:
 - good supply-chain/security tooling
 - credibility in production systems
 
-The tradeoff is complexity.
+The tradeoff is **complexity**.
 
 Rust has:
 
@@ -179,7 +179,7 @@ Rust has:
 - compile-time cost
 - more up-front type and lifetime design
 
-But for long-term platform work, Rust often wins because maintainability and contributor scale matter.
+But for long-term platform work, Rust often wins because **maintainability and contributor scale** matter.
 
 The practical interpretation:
 
@@ -188,15 +188,15 @@ Zig can be excellent for a focused systems codebase.
 Rust can be better for a broad, long-lived runtime ecosystem.
 ```
 
-This is not ideology.
+This is **not ideology**.
 
-It is platform economics.
+It is **platform economics**.
 
 ---
 
 ## 5. Why this matters for agent systems
 
-Agent workloads differ from normal backend workloads.
+Agent workloads differ from **normal backend workloads**.
 
 They have:
 
@@ -214,7 +214,7 @@ They have:
 - approval and policy checks
 - crash recovery
 
-That makes the runtime a product surface.
+That makes the runtime a **product surface**.
 
 If the runtime mishandles:
 
@@ -226,11 +226,11 @@ If the runtime mishandles:
 - memory growth
 - native dependencies
 
-then the agent product feels unreliable even if the model is strong.
+then the agent product feels **unreliable** even if the model is strong.
 
-The model reasons.
+The model **reasons**.
 
-The runtime survives contact with the operating system.
+The runtime **survives contact with the operating system**.
 
 ---
 
@@ -245,7 +245,7 @@ pnpm
 native helpers where necessary
 ```
 
-This is the correct default because:
+This is the **correct default** because:
 
 - compatibility matters more than novelty
 - plugin ecosystems assume Node
@@ -285,9 +285,9 @@ For agent systems, measure:
 | Ecosystem compatibility | SDKs, plugins, auth libraries, package managers |
 | Security surface | sandboxing, supply chain, permission boundaries |
 
-Startup speed alone is not enough.
+Startup speed alone is **not enough**.
 
-A runtime can be fast and still be a poor control-plane substrate.
+A runtime can be fast and still be a **poor control-plane substrate**.
 
 ---
 
@@ -318,7 +318,7 @@ bun run
 
 ### Packaging direction
 
-Agent products often want a small local install footprint.
+Agent products often want a **small local install footprint**.
 
 Single-binary or tightly bundled toolchains are valuable for:
 
@@ -330,13 +330,13 @@ Single-binary or tightly bundled toolchains are valuable for:
 
 ### TypeScript-first developer experience
 
-If Bun can run enough of a project without extra transpilation layers, local iteration gets simpler.
+If Bun can run enough of a project without extra transpilation layers, **local iteration gets simpler**.
 
 ---
 
 ## 9. Where Bun is risky
 
-Do not assume Bun is a drop-in replacement for every Node workload.
+Do not assume Bun is a **drop-in replacement** for every Node workload.
 
 Risk areas:
 
@@ -349,15 +349,15 @@ Risk areas:
 - package manager differences
 - CI parity with production
 
-For a personal prototype, these may be acceptable.
+For a personal prototype, these may be **acceptable**.
 
-For an agent gateway, they must be measured.
+For an agent gateway, they **must be measured**.
 
 ---
 
 ## 10. Where Rust belongs
 
-Rust does not need to replace TypeScript to be useful.
+Rust does **not need to replace TypeScript** to be useful.
 
 Better split:
 
@@ -387,9 +387,9 @@ TypeScript gives product velocity.
 Rust gives OS-facing reliability.
 ```
 
-Do not rewrite just to rewrite.
+Do not **rewrite just to rewrite**.
 
-Move the parts where Rust's properties pay for themselves.
+Move the parts where Rust's properties **pay for themselves**.
 
 ---
 

@@ -17,7 +17,7 @@ Teams usually extend images with:
 
 - **IMAGE_INSTALL:append** — additive, review-friendly in many setups.
 
-Avoid editing Poky images directly; extend via bbappend or a custom image recipe in your layer.
+**Avoid editing Poky images directly**; extend via bbappend or a custom image recipe in your layer.
 
 ## 3. Image features (conceptual)
 

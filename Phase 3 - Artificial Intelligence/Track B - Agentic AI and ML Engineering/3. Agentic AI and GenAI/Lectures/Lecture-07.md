@@ -25,7 +25,7 @@ Early agent tutorials usually taught one pattern:
 3. Send the tool result back.
 4. Repeat until the model stops.
 
-That loop is still real, but production agent systems now have more structure. A modern agent stack usually has several layers:
+That loop is still real, but **production agent systems** now have more structure. A modern **agent stack** usually has several layers:
 
 | Layer | Simple meaning | Examples |
 |-------|----------------|----------|
@@ -122,13 +122,13 @@ class AgentResponse:
     tool_calls: list[ToolCall] = field(default_factory=list)
 ```
 
-This contract matters because provider APIs change faster than your product architecture should. Keep vendor-specific response formats inside adapters. Keep your product semantics stable.
+This contract matters because **provider APIs change faster** than your product architecture should. Keep **vendor-specific response formats** inside adapters. Keep your product semantics stable.
 
 ---
 
 ## 4. Own the Adapter Boundary
 
-A clean adapter converts provider-specific responses into your runtime contract.
+A clean **adapter** converts provider-specific responses into your **runtime contract**.
 
 ```python
 import os
@@ -200,7 +200,7 @@ The adapter can call OpenAI, Anthropic, a local model, or a routed gateway. The 
 
 ## 5. Tool Boundaries and MCP
 
-MCP is best understood as a standard way for an AI application to connect to external context and capabilities.
+**MCP** is best understood as a standard way for an AI application to connect to **external context and capabilities**.
 
 | MCP role | Plain English |
 |----------|---------------|
@@ -226,7 +226,7 @@ MCP does not remove the need for authorization. It makes the integration shape c
 
 ## 6. Handoffs and Subagents
 
-The most common design mistake in multi-agent systems is using one word, "agent," for three different things.
+The most common design mistake in **multi-agent systems** is using one word, "agent," for **three different things**.
 
 | Pattern | Who owns the user conversation after delegation? | Context model | Best for |
 |---------|-----------------------------------------------|---------------|----------|
@@ -240,7 +240,7 @@ Plain language:
 - **Subagent** means "take this bounded mission, work on it, and come back with a result."
 - **Handoff** means "you now own the next part of the conversation."
 
-If you do not define ownership explicitly, you will create duplicate work, token bloat, or dead-end flows where no agent knows who should answer the user.
+If you do not **define ownership explicitly**, you will create duplicate work, token bloat, or dead-end flows where no agent knows who should answer the user.
 
 ### 6.1 Choosing the right pattern
 
@@ -307,7 +307,7 @@ The bad version has no owner, no permissions, no stopping condition, and no veri
 
 ### 6.3 Context capsules beat full history dumps
 
-The second major failure mode is context management. Do not dump the full conversation into every subagent call.
+The second major failure mode is **context management**. Do not dump the full conversation into every subagent call.
 
 Use a filtered context capsule instead:
 
@@ -460,7 +460,7 @@ Use the smallest delegation mechanism that preserves correctness:
 
 ## 7. Streaming Is More Than Tokens
 
-For production agents, stream runtime events, not only generated text.
+For production agents, stream **runtime events**, not only generated text.
 
 Useful event types:
 
@@ -480,7 +480,7 @@ This makes the system easier to debug and safer to operate. If the UI only strea
 
 ## 8. Guardrails Belong Outside the Prompt
 
-Prompt instructions help, but they are not a security boundary. Runtime controls must sit outside the LLM.
+Prompt instructions help, but they are **not a security boundary**. **Runtime controls** must sit outside the LLM.
 
 Minimum control set:
 
@@ -527,7 +527,7 @@ MCP/tools: files, shell, browser, database, devices
 
 ## 10. Hardware and Systems Implications
 
-Agent runtime choices affect infrastructure demand:
+Agent runtime choices affect **infrastructure demand**:
 
 - More tool loops mean more small model calls, not just one large call.
 - Long sessions increase context, KV-cache pressure, and cost.

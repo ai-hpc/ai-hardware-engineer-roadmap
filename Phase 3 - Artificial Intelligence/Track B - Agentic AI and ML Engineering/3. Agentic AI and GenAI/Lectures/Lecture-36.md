@@ -4,7 +4,7 @@
 
 ---
 
-Long-context agents are memory systems.
+**Long-context agents** are memory systems.
 
 They keep:
 
@@ -16,9 +16,9 @@ They keep:
 - multimodal context
 - generated reasoning
 
-Underneath the API, the model server stores this context in a KV cache.
+Underneath the API, the model server stores this context in a **KV cache**.
 
-For standard full-attention decoder models, that cache can dominate GPU memory at long contexts, and every decode step must read a large fraction of it.
+For standard full-attention decoder models, that cache can **dominate GPU memory** at long contexts, and every decode step must read a large fraction of it.
 
 The core serving problem:
 
@@ -31,7 +31,7 @@ longer context
   -> lower concurrency
 ```
 
-vLLM's FP8 KV-cache work matters because it attacks that bottleneck directly.
+vLLM's **FP8 KV-cache** work matters because it attacks that bottleneck directly.
 
 ---
 
@@ -63,9 +63,9 @@ K = keys for previous tokens
 V = values for previous tokens
 ```
 
-At short context, model compute may dominate.
+At short context, **model compute** may dominate.
 
-At long context, decode often becomes memory-bound:
+At long context, decode often becomes **memory-bound**:
 
 ```text
 generated token
@@ -76,7 +76,7 @@ generated token
 
 If the cache is large, every token generation pays for moving a lot of data.
 
-This is why long-context agents can become slow even when the model's raw FLOPs look sufficient.
+This is why long-context agents can become slow even when the model's **raw FLOPs** look sufficient.
 
 ---
 
@@ -92,7 +92,7 @@ The model processes the entire input prompt:
 system prompt + history + retrieved context + user message
 ```
 
-This is time-to-first-token work.
+This is **time-to-first-token** work.
 
 Metric:
 
@@ -100,7 +100,7 @@ Metric:
 TTFT = time to first token
 ```
 
-For full attention, prefill cost can grow roughly quadratically with input length.
+For full attention, prefill cost can grow **roughly quadratically** with input length.
 
 ### Decode
 
@@ -112,7 +112,7 @@ Metric:
 ITL = inter-token latency
 ```
 
-For long contexts, ITL tends to grow roughly linearly with input length because each new token attends over the cache.
+For long contexts, ITL tends to grow **roughly linearly** with input length because each new token attends over the cache.
 
 Serving engineers must track both:
 
@@ -121,7 +121,7 @@ TTFT: how long until the user sees the first token?
 ITL: how fast do later tokens stream?
 ```
 
-An optimization can improve one and hurt the other.
+An optimization can **improve one and hurt the other**.
 
 ---
 
@@ -133,7 +133,7 @@ vLLM exposes:
 vllm serve meta-llama/Llama-3.1-8B --kv-cache-dtype fp8
 ```
 
-This stores KV cache in FP8 and runs attention's QK and ScoreV matrix multiplications in FP8 on the supported paths described by vLLM.
+This stores KV cache in **FP8** and runs attention's QK and ScoreV matrix multiplications in FP8 on the supported paths described by vLLM.
 
 The simplest mental model:
 
@@ -159,15 +159,15 @@ But the real result depends on:
 - quantization scales
 - model sensitivity
 
-FP8 is a strong default candidate for long-context decode-heavy workloads.
+FP8 is a **strong default candidate** for long-context decode-heavy workloads.
 
-It is not a universal win.
+It is **not a universal win**.
 
 ---
 
 ## 4. The accuracy problem vLLM found
 
-The vLLM team found a serious Hopper/FlashAttention-3 issue under stress testing.
+The vLLM team found a serious **Hopper/FlashAttention-3 issue** under stress testing.
 
 On a 128k needle-in-a-haystack task:
 
@@ -179,7 +179,7 @@ FP8 after fix:          89%
 
 The issue was not "FP8 is bad" in the abstract.
 
-It was accumulation precision during long-context attention.
+It was **accumulation precision** during long-context attention.
 
 In long-context inference:
 
@@ -191,7 +191,7 @@ has a contraction dimension corresponding to context length.
 
 At very large context lengths, imprecise intermediate accumulation caused severe numerical errors.
 
-vLLM and FlashAttention added a two-level accumulation strategy to restore accuracy.
+vLLM and FlashAttention added a **two-level accumulation** strategy to restore accuracy.
 
 Tradeoff:
 
@@ -208,7 +208,7 @@ low precision is a systems contract,
 not just a dtype flag
 ```
 
-Kernel details matter.
+**Kernel details matter.**
 
 ---
 
@@ -227,9 +227,9 @@ Interpretation:
 | slope | extra decode latency added by each cached token |
 | intercept | fixed per-token overhead independent of input length |
 
-FP8 is attractive when it lowers the slope enough to overcome any intercept overhead.
+FP8 is attractive when it **lowers the slope** enough to overcome any intercept overhead.
 
-That produces a break-even context length:
+That produces a **break-even context length**:
 
 ```text
 below break-even: BF16 may be faster
@@ -288,7 +288,7 @@ single-request ITL slope improvements can translate into real throughput gains,
 but the end-to-end gain is smaller than the raw slope reduction
 ```
 
-That is normal because real serving also includes scheduling, prefill, batching, and non-attention work.
+That is normal because real serving also includes **scheduling, prefill, batching, and non-attention work**.
 
 ---
 
@@ -299,7 +299,7 @@ Hybrid models may include both:
 - global attention layers
 - sliding-window attention layers
 
-Sliding-window layers attend only over a bounded recent window.
+**Sliding-window layers** attend only over a bounded recent window.
 
 Example:
 
@@ -307,9 +307,9 @@ Example:
 window size = 128
 ```
 
-For these layers, KV-cache size does not grow with full context length.
+For these layers, KV-cache size **does not grow** with full context length.
 
-Quantizing small bounded windows may add overhead without enough memory-traffic savings.
+Quantizing small bounded windows may **add overhead** without enough memory-traffic savings.
 
 vLLM added:
 
@@ -345,9 +345,9 @@ Do not quantize small bounded windows just because a global dtype flag exists.
 
 ## 8. Head dimension 256 caveat
 
-Large head dimensions change the tradeoff.
+**Large head dimensions** change the tradeoff.
 
-For a model with `head_dim = 256`, vLLM reports that FP8 improves decode ITL but can worsen TTFT because two-level accumulation increases register pressure.
+For a model with `head_dim = 256`, vLLM reports that FP8 **improves decode ITL** but can **worsen TTFT** because two-level accumulation increases register pressure.
 
 Example from gemma-4-E2B on H100:
 
@@ -367,9 +367,9 @@ decode improves
 prefill slows down
 ```
 
-If your workload is decode-heavy, FP8 may still help.
+If your workload is **decode-heavy**, FP8 may still help.
 
-If your workload is prefill-heavy, especially with very long prompts and short outputs, BF16 may be better.
+If your workload is **prefill-heavy**, especially with very long prompts and short outputs, BF16 may be better.
 
 Agent implication:
 
@@ -379,9 +379,9 @@ Agent implication:
 | long reasoning output | decode dominates |
 | chat with repeated long history | both matter |
 
-Do not optimize blindly.
+**Do not optimize blindly.**
 
-Measure the phase that dominates your workload.
+Measure the **phase that dominates** your workload.
 
 ---
 
@@ -413,9 +413,9 @@ FP8 slope:  2.06e-06
 break-even: ~13k tokens
 ```
 
-Hardware generation and attention backend are part of the configuration.
+**Hardware generation and attention backend** are part of the configuration.
 
-Do not assume H100 results transfer exactly to B200, or vice versa.
+Do not assume H100 results **transfer exactly** to B200, or vice versa.
 
 ---
 
@@ -437,7 +437,7 @@ High-level findings:
 - Qwen3-30B-A3B-Instruct-2507 recovered roughly 94-98% AUC at 256k depending on model setting.
 - Qwen3.5-27B matched aggregate AUC up to 1M in the reported setup.
 
-The post intentionally uses simple per-tensor uncalibrated scale `1.0` as a reproducible lower bound.
+The post intentionally uses simple per-tensor **uncalibrated scale** `1.0` as a reproducible lower bound.
 
 That matters because:
 
@@ -466,9 +466,9 @@ Calibrate if you see:
 - task-specific sensitivity
 - long-context retrieval failures
 
-vLLM specifically notes Kimi-K2.5 with FlashMLA as an example where uncalibrated FP8 showed consistent negative shift, making calibration worth considering.
+vLLM specifically notes **Kimi-K2.5 with FlashMLA** as an example where uncalibrated FP8 showed consistent negative shift, making calibration worth considering.
 
-Calibration is not free.
+**Calibration is not free.**
 
 It adds:
 
@@ -477,7 +477,7 @@ It adds:
 - deployment complexity
 - possible per-head/per-tensor scale management
 
-Use it when the accuracy evidence justifies it.
+Use it when the **accuracy evidence** justifies it.
 
 ---
 
@@ -539,9 +539,9 @@ hybrid small-window layers dominate
 
 ## 14. Benchmark plan for your agent server
 
-Do not rely only on public benchmark numbers.
+Do not rely only on **public benchmark numbers**.
 
-Run your own matrix:
+Run your **own matrix**:
 
 ```text
 models:
@@ -579,7 +579,7 @@ long-context retrieval correctness
 cost per task
 ```
 
-The winner is workload-dependent.
+The winner is **workload-dependent**.
 
 ---
 
@@ -609,15 +609,15 @@ vllm bench serve \
   --request-rate inf
 ```
 
-Treat commands as starting points.
+Treat commands as **starting points**.
 
-Pin vLLM version, GPU backend, model revision, and benchmark dataset before comparing results.
+Pin **vLLM version, GPU backend, model revision, and benchmark dataset** before comparing results.
 
 ---
 
 ## 16. Hardware engineer view
 
-FP8 KV-cache is a hardware/software co-design example.
+FP8 KV-cache is a **hardware/software co-design** example.
 
 The optimization involves:
 

@@ -8,7 +8,7 @@
 
 ## Start with the wrong mental model
 
-Many engineers treat product design as if it begins after the real engineering work is done.
+Many engineers treat **product design** as if it begins after the real engineering work is done.
 
 That wrong mental model sounds like this:
 
@@ -17,7 +17,7 @@ That wrong mental model sounds like this:
 - software team makes the features work
 - later someone "designs the product"
 
-That is not how good embedded products are made.
+That is **not how good embedded products are made**.
 
 In real systems, product design shows up much earlier in questions like:
 
@@ -61,7 +61,7 @@ It is also:
 
 That is why smart speakers are such a useful design exercise.
 
-They make it obvious that product design is part of system design.
+They make it obvious that **product design is part of system design**.
 
 ---
 
@@ -81,7 +81,7 @@ Examples:
 - portable tool
 - hidden module
 
-This choice changes everything downstream.
+This choice **changes everything downstream**.
 
 A living-room AI speaker should not feel like:
 
@@ -113,7 +113,7 @@ Examples:
 - pairing
 - reset
 
-A physical mute switch is not just a UI detail. It is a product claim implemented in hardware.
+A **physical mute switch** is not just a UI detail. It is a product claim implemented in hardware.
 
 ### 4. Environmental fit
 
@@ -152,7 +152,7 @@ That is product design too.
 
 ## Why engineers should care
 
-If you ignore product design, you often get a technically impressive but weak object.
+If you ignore product design, you often get a **technically impressive but weak object**.
 
 Typical failure modes:
 
@@ -181,7 +181,7 @@ Before building a real embedded product, ask:
 4. What should the device own locally?
 5. What external dependency would make the product feel weaker?
 
-If you cannot answer those, the engineering is still underspecified.
+If you cannot answer those, the engineering is still **underspecified**.
 
 ---
 

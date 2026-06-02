@@ -2,7 +2,7 @@
 
 ## Overview
 
-Blackwell (Compute Capability 10.0) is the inference silicon for 2025–2027 trillion-parameter MoE serving. It builds on Hopper but changes three things that matter for MoE inference:
+**Blackwell** (Compute Capability 10.0) is the inference silicon for **2025–2027 trillion-parameter MoE serving**. It builds on Hopper but changes **three things** that matter for MoE inference:
 
 1. **FP4 native arithmetic** via Transformer Engine 2 — doubles FP8 throughput, halves HBM bytes for weights.
 2. **NVLink 5 + larger NVLink domains (NVL72)** — interconnect for 72 GPUs in one coherent fabric, enabling EP at scale.
@@ -26,7 +26,7 @@ By the end you should be able to map DeepSeek V3.1 and Qwen3-MoE 235B-A22B onto 
 
 ### 1.1 The package
 
-Blackwell ships as a **dual-die** package. Each die is comparable to a full Hopper chip; they are connected via a chip-to-chip interconnect (NV-C2C) at 10 TB/s. To software, the dual-die package looks like one GPU with twice the SMs and twice the HBM stacks.
+Blackwell ships as a **dual-die** package. Each die is comparable to a full Hopper chip; they are connected via a chip-to-chip interconnect (NV-C2C) at **10 TB/s**. To software, the dual-die package **looks like one GPU** with twice the SMs and twice the HBM stacks.
 
 * **Total SMs (B200):** 208 (104 per die × 2)
 * **Total tensor cores:** 832 (4 per SM)
@@ -64,7 +64,7 @@ The bandwidth ratio vs Hopper:
 * H100 HBM3: 3.35 TB/s → B200: 8.0 TB/s — **2.4× more bandwidth**
 * H200 HBM3e: 4.80 TB/s → B200: 8.0 TB/s — **1.67× more bandwidth**
 
-For decode (bandwidth-bound), Blackwell is much faster at the same precision than Hopper, before FP4 even enters the discussion.
+For decode (bandwidth-bound), Blackwell is **much faster at the same precision** than Hopper, before FP4 even enters the discussion.
 
 ---
 
@@ -107,13 +107,13 @@ The GB200 superchip pairs **one Grace CPU** with **two Blackwell GPUs** (B200 di
 * NV-C2C links the CPU memory to the GPU memory at 900 GB/s in each direction.
 * **The GPU can read CPU memory directly** — pinned, large pages, no explicit copy.
 
-For MoE inference, this enables **CPU-resident expert offload**: experts that are rarely activated can live in CPU memory, fetched on demand. This is an active research topic; production runtimes are starting to use it but it's not the default.
+For MoE inference, this enables **CPU-resident expert offload**: experts that are rarely activated can live in CPU memory, fetched on demand. This is an **active research topic**; production runtimes are starting to use it but it's not the default.
 
 ### 3.2 Why GB200 matters
 
 The GB200 superchip is the **building block of NVL72**. One NVL72 rack has 36 GB200 superchips = 72 Blackwell GPUs + 36 Grace CPUs, all in one NVLink domain.
 
-For 671B MoE serving at scale, NVL72 is the practical target. Single-server (8× B200) deployments work for smaller MoEs and lower scales.
+For 671B MoE serving at scale, **NVL72 is the practical target**. Single-server (8× B200) deployments work for **smaller MoEs and lower scales**.
 
 ---
 
@@ -179,7 +179,7 @@ Each block of 32 consecutive elements shares a **shared scale factor** (typicall
 value_i = fp4_value_i × 2^(shared_scale)
 ```
 
-This gives FP4 effective dynamic range similar to FP8 — the scale provides 256 possible exponents per block, the FP4 mantissa provides 8 distinct values within that range.
+This gives FP4 **effective dynamic range similar to FP8** — the scale provides 256 possible exponents per block, the FP4 mantissa provides 8 distinct values within that range.
 
 The format is standardized by the Open Compute Project (OCP) under the name **MX-FP4** ([opencompute.org](https://www.opencompute.org/)).
 
@@ -219,7 +219,7 @@ In practice, real runtime efficiency reduces this to ~2.5×. Still very large.
 * **NVLink 5:** 100 GB/s per link, 18 links per GPU → 1.8 TB/s per GPU.
 * **NVLink Switch v4:** fully-connected within an NVL72 domain.
 
-This is **2× the per-GPU NVLink bandwidth of Hopper**. For all-to-all communication (the dominant cost in MoE EP), this directly translates to 2× faster expert dispatching.
+This is **2× the per-GPU NVLink bandwidth of Hopper**. For **all-to-all communication** (the dominant cost in MoE EP), this directly translates to **2× faster expert dispatching**.
 
 ### 6.2 All-to-all primitives
 
@@ -233,7 +233,7 @@ On NVL72, an `alltoall` with 64 GPUs and 1 MB per pair is ~1 ms. For MoE EP, thi
 
 ### 6.3 Latency
 
-Latency for a single 4 KB transfer between any pair of NVL72 GPUs is sub-microsecond. For very small transfers (a few hundred bytes — e.g. a single token's hidden state to one expert), the latency floor dominates over bandwidth. This is why batching helps MoE EP just as much as it helps dense decode.
+Latency for a single 4 KB transfer between any pair of NVL72 GPUs is **sub-microsecond**. For very small transfers (a few hundred bytes — e.g. a single token's hidden state to one expert), the **latency floor dominates over bandwidth**. This is why **batching helps MoE EP** just as much as it helps dense decode.
 
 ---
 

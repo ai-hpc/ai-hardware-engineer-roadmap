@@ -4,7 +4,7 @@
 
 ---
 
-OpenKnots is a useful case study for the product layer around agent systems.
+OpenKnots is a useful case study for the **product layer** around agent systems.
 
 Its organization tagline is:
 
@@ -12,7 +12,7 @@ Its organization tagline is:
 
 That sentence is the whole lesson.
 
-Models and runtimes matter, but users experience agents through interfaces:
+Models and runtimes matter, but users experience agents **through interfaces**:
 
 - IDE sidebars
 - code editors
@@ -33,7 +33,7 @@ agent runtime
   -> user trust
 ```
 
-If the interface hides state, permissions, traces, and uncertainty, the agent becomes hard to trust even when the model is strong.
+If the interface hides state, permissions, traces, and uncertainty, the agent becomes **hard to trust** even when the model is strong.
 
 ---
 
@@ -64,7 +64,7 @@ The previous lectures covered:
 | OpenCoven | local harness substrate and agent workspace |
 | OpenKnots | product interfaces and trust surfaces |
 
-This matters because production agent systems are not complete until users can:
+This matters because production agent systems are **not complete** until users can:
 
 - see what the agent is doing
 - inspect what context it used
@@ -75,7 +75,7 @@ This matters because production agent systems are not complete until users can:
 - understand failure states
 - configure tools and providers
 
-OpenKnots projects are mostly product surfaces around those concerns.
+OpenKnots projects are mostly **product surfaces** around those concerns.
 
 The durable lesson:
 
@@ -100,9 +100,9 @@ The important ones for this lecture:
 | `openclaw-chat-api` | docs chatbot API backed by RAG |
 | `chat-with-files` | educational starter for chatting with docs or GitHub repos |
 
-OpenKnots is not only building "one app."
+OpenKnots is not only building **"one app."**
 
-It is exploring a pattern:
+It is exploring a **pattern**:
 
 ```text
 OpenClaw gateway / agent runtime
@@ -155,13 +155,13 @@ The UI should make runtime state legible.
 The UI should not become the authority layer by accident.
 ```
 
-For example, an editor may show an "Approve" button, but the runtime still needs to enforce whether the action is allowed.
+For example, an editor may show an "Approve" button, but the runtime still needs to **enforce whether the action is allowed**.
 
 ---
 
 ## 4. OpenClaw VS Code extension: agent inside the IDE
 
-The OpenKnots `openclaw-extension` project is a VS Code companion for OpenClaw.
+The OpenKnots `openclaw-extension` project is a **VS Code companion** for OpenClaw.
 
 Its job is to make OpenClaw usable from the IDE sidebar:
 
@@ -196,9 +196,9 @@ IDE agents need tight context capture:
 active selection, open file, diagnostics, git diff, staged changes.
 ```
 
-But that context must be explicit.
+But that context must be **explicit**.
 
-Hidden context injection makes results hard to debug.
+**Hidden context injection** makes results hard to debug.
 
 ---
 
@@ -229,13 +229,13 @@ Good interface:
 read files A/B, proposed changes to C, and tests were not run."
 ```
 
-Trust comes from visible mechanics.
+Trust comes from **visible mechanics**.
 
 ---
 
 ## 6. OK Code: orchestration platform for coding agents
 
-The `okcode` repo frames itself as a desktop-first orchestration platform for interactive coding agents.
+The `okcode` repo frames itself as a **desktop-first orchestration platform** for interactive coding agents.
 
 Its architecture is useful because it separates responsibilities:
 
@@ -267,15 +267,15 @@ Provider-native output is not the UI contract.
 Shared orchestration events are the UI contract.
 ```
 
-That prevents every UI component from knowing provider-specific event quirks.
+That prevents every UI component from knowing **provider-specific event quirks**.
 
 ---
 
 ## 7. Event contracts and deterministic UI reducers
 
-Agent UIs need deterministic state transitions.
+Agent UIs need **deterministic state transitions**.
 
-The UI should not infer runtime truth from random text.
+The UI should not infer runtime truth from **random text**.
 
 Better:
 
@@ -307,15 +307,15 @@ Normalize once at the boundary.
 Render everywhere from stable events.
 ```
 
-For code editors, this is not optional.
+For code editors, this is **not optional**.
 
-Without event contracts, reconnects and partial failures become impossible to reason about.
+Without event contracts, reconnects and partial failures become **impossible to reason about**.
 
 ---
 
 ## 8. Knot Code: lightweight AI-native code editor
 
-The `code-editor` repo, branded as Knot Code, is an AI-native code editor powered by OpenClaw.
+The `code-editor` repo, branded as Knot Code, is an **AI-native code editor** powered by OpenClaw.
 
 Its product direction:
 
@@ -342,15 +342,15 @@ A coding-agent editor does not need to own the model cloud.
 It can own the interface and connect to a user-controlled gateway.
 ```
 
-This is a different product stance from cloud-first editors.
+This is a different product stance from **cloud-first editors**.
 
-It makes the Gateway boundary more important, because the editor is only as safe and useful as the runtime contract it consumes.
+It makes the **Gateway boundary** more important, because the editor is only as safe and useful as the runtime contract it consumes.
 
 ---
 
 ## 9. What "local-first" means here
 
-Local-first does not simply mean "runs on my laptop."
+Local-first does not simply mean **"runs on my laptop."**
 
 For agent interfaces, local-first means:
 
@@ -363,26 +363,26 @@ For agent interfaces, local-first means:
 - local state can survive app restarts
 - the user can work without vendor lock-in where possible
 
-Local-first does not eliminate risk.
+Local-first does **not eliminate risk**.
 
-It moves the risk boundary:
+It **moves the risk boundary**:
 
 ```text
 from cloud provider trust
 to local runtime, tool policy, and interface correctness
 ```
 
-So the interface must be clear about what is local, what is remote, and what is being sent to a model provider.
+So the interface must be **clear about what is local, what is remote**, and what is being sent to a model provider.
 
 ---
 
 ## 10. OpenTrust: evidence-backed memory and traceability
 
-OpenTrust is one of the most important OpenKnots projects for production agents.
+OpenTrust is one of the **most important** OpenKnots projects for production agents.
 
 It describes itself as a local-first OpenClaw traceability, workflows, and capability-intelligence system.
 
-Its goal is not "chat history search."
+Its goal is **not "chat history search."**
 
 Its goal is to answer operational questions:
 

@@ -131,7 +131,7 @@ cublasStatus_t cublasSgemmStridedBatched(
     int batchCount);
 ```
 
-A_i lives at `A + i * strideA`, with the same `m, k, lda` for every batch. This is what virtually all LLM inference uses — `Q`, `K`, `V` tensors are 3D contiguous tensors, the batch (head) dimension has a clean fixed stride.
+A_i lives at `A + i * strideA`, with the same `m, k, lda` for every batch. This is what **virtually all LLM inference uses** — `Q`, `K`, `V` tensors are 3D contiguous tensors, the batch (head) dimension has a clean fixed stride.
 
 Use this whenever you can. It's faster than the pointer-array form because cuBLAS can compute pointers from the stride at zero indirection cost.
 
@@ -151,7 +151,7 @@ They take separate `Atype`, `Btype`, `Ctype`, `computeType`, and `algo` paramete
 
 ## 3. Memory Layout — Column-Major, Row-Major, and the Transpose Dance
 
-cuBLAS is **column-major**. PyTorch/NumPy/C/Python are **row-major**. This is the single most common source of bugs.
+cuBLAS is **column-major**. PyTorch/NumPy/C/Python are **row-major**. This is the **single most common source of bugs**.
 
 A row-major `[M, K]` matrix in memory is byte-for-byte identical to a column-major `[K, M]` matrix. Same bytes; different interpretation. So when you call cuBLAS on row-major data, you give it:
 

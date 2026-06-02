@@ -13,7 +13,7 @@ A lot of agent education stops after:
 - memory
 - maybe orchestration
 
-But a real agent product also has to stay alive, stay safe, and stay operable.
+But a real agent product also has to **stay alive, stay safe, and stay operable**.
 
 OpenClaw is a useful case study because it documents:
 
@@ -47,7 +47,7 @@ By the end of this lecture you will be able to:
 
 OpenClaw's gateway runbook teaches an important lesson:
 
-many agent systems are not short-lived jobs.
+many agent systems are **not short-lived jobs**.
 
 They are:
 
@@ -56,7 +56,7 @@ They are:
 - message routers
 - control-plane endpoints
 
-That means the engineering mindset changes.
+That means the **engineering mindset** changes.
 
 You now care about:
 
@@ -106,9 +106,9 @@ Keeping the system reliable:
 - update configuration
 - monitor health
 
-Students often learn Day 1 only.
+Students often learn **Day 1** only.
 
-Real agent engineers must learn Day 2 as well.
+Real agent engineers must learn **Day 2** as well.
 
 ---
 
@@ -128,7 +128,7 @@ You need to know:
 - are agents loaded?
 - are background services healthy?
 
-This is the same idea as readiness vs liveness from the deterministic startup lecture.
+This is the same idea as **readiness vs liveness** from the deterministic startup lecture.
 
 Persistent agent systems need:
 
@@ -136,7 +136,7 @@ Persistent agent systems need:
 - runtime health checks
 - recoverability
 
-Without them, you only notice failure after users complain.
+Without them, you only notice failure **after users complain**.
 
 ---
 
@@ -151,7 +151,7 @@ It uses pairing for:
 
 This is a strong lesson because it shows:
 
-not every message sender or device should be trusted automatically.
+not every message sender or device should be **trusted automatically**.
 
 In plain English:
 
@@ -189,7 +189,7 @@ So "who can talk to the agent" is really:
 
 > who can spend the agent's attention and possibly trigger its authority
 
-That makes pairing a security boundary, not a UX detail.
+That makes pairing a **security boundary**, not a UX detail.
 
 ---
 
@@ -208,7 +208,7 @@ Example:
 - on host
 - in a sandboxed container
 
-This is an execution-environment boundary.
+This is an **execution-environment boundary**.
 
 ### Tool policy
 
@@ -220,13 +220,13 @@ Example:
 - `write` denied
 - `exec` denied
 
-This is an availability boundary.
+This is an **availability boundary**.
 
 ### Elevated execution
 
 Elevated execution is a special path for `exec`-style work outside the normal sandbox rules.
 
-This is an escape-hatch boundary.
+This is an **escape-hatch boundary**.
 
 The big teaching point is:
 
@@ -264,7 +264,7 @@ Or you might think:
 
 But the agent might still have powerful non-exec tools.
 
-So the correct mental model is layered:
+So the correct mental model is **layered**:
 
 | Layer | Question |
 |---|---|
@@ -297,7 +297,7 @@ That means:
 - identity still matters
 - logging still matters
 
-This is highly relevant for local-first assistants and edge AI systems.
+This is highly relevant for **local-first assistants** and **edge AI systems**.
 
 Many teams wrongly assume:
 
@@ -338,7 +338,7 @@ Using the OpenClaw case study, a mature persistent agent system should have:
 - broken-channel diagnostics
 - safe degraded behavior
 
-This is much closer to infrastructure engineering than to toy prompt engineering.
+This is much closer to **infrastructure engineering** than to toy prompt engineering.
 
 ---
 
@@ -396,7 +396,7 @@ Fill in this table:
 | How do you inspect health? | gateway status + logs + channel probe |
 | How do you restart safely? | supervised service restart |
 
-The value of this exercise is that it forces you to think like an operator, not only like a prompt writer.
+The value of this exercise is that it forces you to think like an **operator**, not only like a prompt writer.
 
 ---
 

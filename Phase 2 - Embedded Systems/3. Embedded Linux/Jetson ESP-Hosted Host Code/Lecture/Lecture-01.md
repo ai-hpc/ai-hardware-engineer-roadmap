@@ -30,13 +30,13 @@ Use these earlier OS lectures as the conceptual base under this case study:
 - [OS Lecture 1 — Modern OS Architecture & the Linux Kernel](../../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Lectures/Lecture-01.md)
 - [OS Lecture 5 — Kernel Modules, Boot Process & Device Tree](../../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Lectures/Lecture-05.md)
 
-Lecture 1 from the OS course explains the kernel as the layer that owns hardware and exposes clean abstractions to userspace. That is exactly what this host stack is doing: it hides a custom ESP-over-SPI link and instead gives Linux normal objects like `wlan0` and `hci0`.
+Lecture 1 from the OS course explains the kernel as the layer that **owns hardware and exposes clean abstractions** to userspace. That is exactly what this host stack is doing: it hides a custom ESP-over-SPI link and instead gives Linux normal objects like `wlan0` and `hci0`.
 
 Lecture 5 matters here because this code only makes sense after boot has already described the board and loaded the right driver path. The ESP-Hosted host code is not inventing hardware from scratch; it is sitting on top of a kernel that already knows about SPI devices, modules, and board description.
 
 Another way to say it is: userspace does not get to “talk to GPIO 471” or “talk to SPI mode 2” directly as a networking model. The kernel driver absorbs those low-level details and publishes higher-level subsystem objects, so userspace can work with Wi‑Fi and Bluetooth concepts instead of transport wiring.
 
-This is why `wlan0` and `hci0` are such important milestones in the bring-up story. They prove not just that bytes moved over SPI, but that the kernel accepted the driver’s integration with real Linux subsystems and exposed the expected interfaces upward.
+This is why `wlan0` and `hci0` are such important **milestones in the bring-up story**. They prove not just that bytes moved over SPI, but that the kernel accepted the driver’s integration with **real Linux subsystems** and exposed the expected interfaces upward.
 
 The Linux-facing interfaces to keep in mind in this lecture are:
 
@@ -77,7 +77,7 @@ In this codebase, that becomes:
 - board bring-up policy:
   - `jetson_orin_nano_init.sh`
 
-That is the first Embedded Linux lesson:
+That is the first **Embedded Linux lesson**:
 
 - the Linux-facing code is not the same thing as
 - the hardware-facing transport code
@@ -134,7 +134,7 @@ static int esp_add_network_ifaces(struct esp_adapter *adapter)
 }
 ```
 
-That is the whole course in miniature:
+That is the **whole course in miniature**:
 
 - one remote chip
 - one transport
@@ -207,7 +207,7 @@ On the validated Jetson path, the important runtime stages were:
 
 That sequence matters.
 
-For Embedded Linux debugging, “module inserted successfully” is not enough.
+For Embedded Linux debugging, **“module inserted successfully” is not enough**.
 
 You want to know:
 

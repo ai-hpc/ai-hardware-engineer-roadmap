@@ -26,7 +26,7 @@
 
 ## 2. In-Context Memory (Working Memory)
 
-The simplest form — everything in the current message list.
+The simplest form — everything in the current **message list**.
 
 ```python
 import anthropic
@@ -62,7 +62,7 @@ class ConversationAgent:
 
 ### Context Compression
 
-When context grows too large, summarize old turns:
+When context grows too large, **summarize old turns**:
 
 ```python
 def compress_history(messages: list, keep_recent: int = 6) -> list:
@@ -101,7 +101,7 @@ def compress_history(messages: list, keep_recent: int = 6) -> list:
 
 ## 3. External Long-Term Memory (Vector Store)
 
-Store facts, user preferences, and past results in a vector database for retrieval across sessions.
+Store facts, user preferences, and past results in a **vector database** for retrieval across sessions.
 
 ```python
 import chromadb
@@ -216,7 +216,7 @@ Focus on: user preferences, decisions made, facts learned.""",
 
 ## 4. Episodic Memory (Past Interactions)
 
-Store and retrieve complete past task executions — useful for learning from experience.
+Store and retrieve complete **past task executions** — useful for **learning from experience**.
 
 ```python
 import sqlite3

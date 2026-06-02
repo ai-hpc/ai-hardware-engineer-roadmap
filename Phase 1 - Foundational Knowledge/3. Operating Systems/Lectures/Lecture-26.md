@@ -19,7 +19,7 @@ eBPF is not "a tracing tool." It is a **general-purpose in-kernel virtual machin
 | `r6`–`r9` | Callee-saved (preserved across helper calls) |
 | `r10` | Frame pointer (read-only; points to 512-byte stack) |
 
-The eBPF ISA has 11 registers — deliberately similar to ARM64's calling convention. This makes JIT compilation to ARM (Jetson, mobile SoCs) very efficient: eBPF registers map nearly 1:1 to hardware registers.
+The eBPF ISA has **11 registers** — deliberately similar to ARM64's calling convention. This makes JIT compilation to ARM (Jetson, mobile SoCs) very efficient: eBPF registers map **nearly 1:1 to hardware registers**.
 
 ### Instruction Set
 
@@ -45,7 +45,7 @@ eBPF Instruction Format (64-bit):
 
 ### JIT Compilation
 
-The kernel JIT-compiles eBPF bytecode to native machine instructions at load time:
+The kernel JIT-compiles eBPF bytecode to **native machine instructions** at load time:
 
 | Architecture | JIT Quality | Notes |
 |---|---|---|
@@ -54,13 +54,13 @@ The kernel JIT-compiles eBPF bytecode to native machine instructions at load tim
 | ARM32 | Good | Older embedded, some Cortex-A devices |
 | RISC-V | Good | Growing support; relevant for open-source AI chips |
 
-After JIT, eBPF programs run at **native instruction speed** — not interpreted. The overhead per probe hit is typically 50–200 ns, dominated by the function call trampoline, not the eBPF instructions.
+After JIT, eBPF programs run at **native instruction speed** — not interpreted. The overhead per probe hit is typically **50–200 ns**, dominated by the function call trampoline, not the eBPF instructions.
 
 ---
 
 ## The Verifier: Why eBPF Is Safe
 
-Before any eBPF program executes, the kernel verifier performs **static analysis** on every possible execution path. This is what makes eBPF safe for production — a buggy eBPF program is rejected at load time, never at runtime.
+Before any eBPF program executes, the kernel verifier performs **static analysis** on every possible execution path. This is what makes eBPF safe for production — a buggy eBPF program is **rejected at load time, never at runtime**.
 
 ### Verification Checks
 
@@ -130,7 +130,7 @@ BPF maps are **shared data structures** between eBPF programs (kernel side) and 
 
 ### Ring Buffer (BPF_MAP_TYPE_RINGBUF)
 
-The ring buffer is the preferred mechanism for streaming events from kernel to user space. It uses a single shared buffer (not per-CPU), supports variable-length records, and has excellent cache behavior.
+The ring buffer is the **preferred mechanism for streaming events** from kernel to user space. It uses a **single shared buffer** (not per-CPU), supports variable-length records, and has excellent cache behavior.
 
 ```c
 // Kernel side (eBPF program)
@@ -187,7 +187,7 @@ while (!stop) {
 
 ### CO-RE: Compile Once, Run Everywhere
 
-The problem: kernel data structures change between versions. A `struct task_struct` field might be at offset 1248 in kernel 5.10 and offset 1264 in kernel 6.1. Without CO-RE, you'd need to compile eBPF programs per kernel version.
+The problem: **kernel data structures change between versions**. A `struct task_struct` field might be at offset 1248 in kernel 5.10 and offset 1264 in kernel 6.1. Without CO-RE, you'd need to compile eBPF programs per kernel version.
 
 CO-RE solves this with **BTF (BPF Type Format)** — a compact type metadata embedded in the kernel that describes the layout of all structures at runtime.
 
@@ -202,7 +202,7 @@ u32 pid = BPF_CORE_READ(task, tgid);
 
 ### Complete libbpf Program: Tracing V4L2 ioctl Latency
 
-This example measures the latency of every V4L2 ioctl call from `camerad` — the camera pipeline process in openpilot.
+This example measures the **latency of every V4L2 ioctl call** from `camerad` — the camera pipeline process in openpilot.
 
 **BPF program (`ioctl_lat.bpf.c`):**
 
@@ -349,7 +349,7 @@ gcc -o ioctl_lat ioctl_lat.c -lbpf -lelf -lz
 
 ## eBPF Program Types & Hook Points
 
-eBPF programs attach to different kernel subsystems. Each program type has a specific context structure and set of available helpers.
+eBPF programs attach to **different kernel subsystems**. Each program type has a specific context structure and set of available helpers.
 
 ### Tracing Program Types
 
@@ -387,7 +387,7 @@ kprobe overhead:     ~100–200 ns per hit
 fentry/fexit overhead: ~10–50 ns per hit  (4–10× faster)
 ```
 
-`fentry`/`fexit` use **BPF trampolines** — the kernel patches the function prologue to call the eBPF program directly, avoiding the `int3` breakpoint mechanism that kprobes use. Always prefer `fentry`/`fexit` on kernels ≥ 5.5.
+`fentry`/`fexit` use **BPF trampolines** — the kernel patches the function prologue to call the eBPF program directly, avoiding the `int3` breakpoint mechanism that kprobes use. **Always prefer `fentry`/`fexit` on kernels ≥ 5.5.**
 
 ```c
 // fentry — trace entry to the v4l2_ioctl kernel function
@@ -518,7 +518,7 @@ tracepoint:cma:cma_alloc_finish {
 
 ## XDP: Programmable Packet Processing
 
-**XDP (eXpress Data Path)** runs eBPF programs at the **NIC driver level**, before the kernel allocates `sk_buff` structures. This enables packet processing at millions of packets per second with zero memory allocation overhead.
+**XDP (eXpress Data Path)** runs eBPF programs at the **NIC driver level**, before the kernel allocates `sk_buff` structures. This enables packet processing at **millions of packets per second** with zero memory allocation overhead.
 
 ### XDP Actions
 
@@ -531,7 +531,7 @@ tracepoint:cma:cma_alloc_finish {
 
 ### XDP for AV Telemetry Filtering
 
-In autonomous vehicle deployments, the compute unit receives high-bandwidth sensor data (cameras, LiDAR, radar) over Ethernet. XDP can filter and prioritize this traffic without kernel overhead:
+In autonomous vehicle deployments, the compute unit receives **high-bandwidth sensor data** (cameras, LiDAR, radar) over Ethernet. XDP can filter and prioritize this traffic **without kernel overhead**:
 
 ```c
 SEC("xdp")
@@ -565,7 +565,7 @@ int xdp_sensor_filter(struct xdp_md *ctx) {
 
 ## sched_ext: Custom Schedulers with eBPF
 
-Since Linux 6.12, **sched_ext** allows writing CPU schedulers as eBPF programs — a revolutionary capability for AI workload optimization.
+Since Linux 6.12, **sched_ext** allows writing **CPU schedulers as eBPF programs** — a revolutionary capability for AI workload optimization.
 
 ```c
 // Define scheduling callbacks as eBPF programs

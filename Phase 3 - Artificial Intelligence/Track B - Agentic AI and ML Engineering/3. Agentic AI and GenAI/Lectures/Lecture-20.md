@@ -10,7 +10,7 @@ Cron looks simple from the outside:
 
 > run something at a scheduled time
 
-But in an agent system, scheduling is not just a timer.
+But in an agent system, scheduling is **not just a timer**.
 
 The scheduled job may need:
 
@@ -24,7 +24,7 @@ The scheduled job may need:
 - failure notifications
 - cleanup
 
-OpenClaw is a useful case study because its cron system is not just classic Unix cron. It is a scheduler for agent work.
+OpenClaw is a useful case study because its cron system is not just classic Unix cron. It is a **scheduler for agent work**.
 
 The better mental model is:
 
@@ -36,7 +36,7 @@ OpenClaw cron:
   schedule -> run agent task -> manage session -> deliver output -> retry -> log -> clean up
 ```
 
-This lecture teaches the scheduling layer that sits between "always-on gateway" and "agent execution."
+This lecture teaches the **scheduling layer** that sits between "always-on gateway" and "agent execution."
 
 ---
 
@@ -56,13 +56,13 @@ By the end of this lecture you will be able to:
 
 ## 1. Cron from first principles
 
-Cron is a scheduler.
+Cron is a **scheduler**.
 
 Its job is to answer one question:
 
 > when should this task run?
 
-Classic Unix cron has a background daemon that reads job definitions and launches shell commands at matching times.
+Classic Unix cron has a **background daemon** that reads job definitions and launches shell commands at matching times.
 
 Example:
 
@@ -112,7 +112,7 @@ Students often treat cron expressions like harmless text.
 
 They are not.
 
-They are a small scheduling language with edge cases:
+They are a **small scheduling language** with edge cases:
 
 - timezone interpretation
 - seconds vs no seconds
@@ -143,7 +143,7 @@ That is a system-design lesson:
 
 > schedule syntax must be treated as executable configuration
 
-Invalid or surprising schedules should be caught early, before the job becomes durable state.
+Invalid or surprising schedules should be **caught early**, before the job becomes durable state.
 
 ---
 
@@ -157,7 +157,7 @@ It persists:
 - runtime state in `~/.openclaw/cron/jobs-state.json`
 - run history under `~/.openclaw/cron/runs/`
 
-That matters because a scheduled task should survive a Gateway restart.
+That matters because a scheduled task should **survive a Gateway restart**.
 
 OpenClaw cron also creates background task records, so a scheduled agent run can be inspected as operational work, not just as a hidden timer callback.
 
@@ -179,7 +179,7 @@ The runtime shape is:
 [ Run log + retry/failure policy ]
 ```
 
-This is why it is closer to a small workflow system than to a plain crontab.
+This is why it is closer to a **small workflow system** than to a plain crontab.
 
 ---
 
@@ -253,7 +253,7 @@ An isolated cron job is more like:
 start a clean background agent task and send the result somewhere
 ```
 
-That is why scheduled agent work needs session design.
+That is why scheduled agent work needs **session design**.
 
 ---
 
@@ -270,7 +270,7 @@ OpenClaw cron supports several session targets.
 
 The most important one is `isolated`.
 
-An isolated cron run gets a fresh transcript/session id for each run. It does not inherit ambient conversation context such as channel routing, queue policy, elevation, origin, or stale runtime bindings.
+An isolated cron run gets a **fresh transcript/session id** for each run. It does not inherit ambient conversation context such as channel routing, queue policy, elevation, origin, or stale runtime bindings.
 
 It may still carry safe preferences such as:
 
@@ -300,7 +300,7 @@ For those, use `session:<id>`.
 
 ## 7. Delivery is part of the job
 
-A scheduled agent run is not complete until someone can see the result or the system intentionally suppresses it.
+A scheduled agent run is **not complete** until someone can see the result or the system intentionally suppresses it.
 
 OpenClaw's delivery modes are:
 
@@ -317,7 +317,7 @@ CLI mapping:
 --no-deliver   # delivery.mode = none
 ```
 
-The important detail is "fallback."
+The important detail is **"fallback."**
 
 For isolated jobs, chat delivery is shared between:
 
@@ -328,7 +328,7 @@ So `--announce` does not mean "always duplicate the message." It means:
 
 > if the agent did not already send the result to the target, deliver the final reply
 
-This prevents common silent failures.
+This prevents common **silent failures**.
 
 Example:
 
@@ -347,7 +347,7 @@ openclaw cron add \
 
 ## 8. Failure delivery
 
-Scheduled automation must report failures.
+Scheduled automation must **report failures**.
 
 Otherwise cron turns into:
 
@@ -377,9 +377,9 @@ Configuration shape:
 }
 ```
 
-This is operational design, not UI polish.
+This is **operational design**, not UI polish.
 
-For autonomous scheduled jobs, failure delivery is a control-plane requirement.
+For autonomous scheduled jobs, failure delivery is a **control-plane requirement**.
 
 ---
 
@@ -407,9 +407,9 @@ Recurring jobs use a recurring failure backoff pattern:
 30s -> 1m -> 5m -> 15m -> 60m
 ```
 
-The backoff resets after the next successful run.
+The backoff **resets** after the next successful run.
 
-This is a major difference from a simple prompt loop.
+This is a major difference from a **simple prompt loop**.
 
 Without backoff:
 
@@ -423,7 +423,7 @@ OpenClaw also has provider preflight behavior for isolated jobs that target loca
 
 ## 10. Model selection for isolated cron
 
-Scheduled tasks need predictable model behavior.
+Scheduled tasks need **predictable model behavior**.
 
 OpenClaw resolves isolated cron model selection in this order:
 
@@ -494,7 +494,7 @@ Retention controls:
 }
 ```
 
-This matters because isolated cron jobs create sessions and transcripts. Without retention, automation creates state forever.
+This matters because isolated cron jobs create sessions and transcripts. Without retention, automation creates **state forever**.
 
 The production pattern is:
 
@@ -534,7 +534,7 @@ openclaw cron run <job-id> --due
 
 when you want "run only if currently due" behavior.
 
-Manual run support is important because scheduled work must be debuggable on demand.
+Manual run support is important because scheduled work must be **debuggable on demand**.
 
 ---
 
@@ -551,15 +551,15 @@ For isolated jobs, OpenClaw includes cleanup behavior such as:
 
 This is an important design point.
 
-A scheduled run should not leave hidden long-lived resources behind.
+A scheduled run should not leave **hidden long-lived resources** behind.
 
-If a daily report opens browser tabs or starts MCP child processes, the scheduler should have a cleanup path. Otherwise, scheduled automation slowly becomes system drift.
+If a daily report opens browser tabs or starts MCP child processes, the scheduler should have a cleanup path. Otherwise, scheduled automation slowly becomes **system drift**.
 
 ---
 
 ## 14. Debugging ladder
 
-Use a boring command ladder before guessing.
+Use a **boring command ladder** before guessing.
 
 ```bash
 openclaw status
@@ -624,7 +624,7 @@ This is a general production lesson:
 
 > configuration validation should be closest to the write boundary, not deferred to the runtime loop
 
-Runtime code can still defend itself, but it should not be the first place a user learns that their schedule string was invalid.
+Runtime code can still defend itself, but it should not be the **first place** a user learns that their schedule string was invalid.
 
 ---
 
@@ -660,9 +660,9 @@ What happens:
 9. The run is logged.
 10. Failures follow job/global/primary failure delivery rules.
 
-This is not just "scheduled prompting."
+This is not just **"scheduled prompting."**
 
-It is scheduled agent work with routing, isolation, delivery, retry, and auditability.
+It is scheduled agent work with **routing, isolation, delivery, retry, and auditability**.
 
 ---
 
@@ -685,7 +685,7 @@ For each job, answer:
 - How long should run logs be retained?
 - Should a skipped run alert anyone?
 
-That is the professional version of "add a cron job."
+That is the **professional version** of "add a cron job."
 
 ---
 

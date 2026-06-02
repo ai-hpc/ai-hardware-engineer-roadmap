@@ -30,7 +30,7 @@ When BitBake reports failure:
 
 ## 4. Lab 9 — Break it on purpose
 
-Remove a dependency in a *throwaway* layer copy, rebuild, and practice tracing the log back to root cause. Revert the change.
+Remove a **dependency** in a *throwaway* layer copy, rebuild, and practice **tracing the log back to root cause**. Revert the change.
 
 **Done when:** you can articulate *why* the failure belongs to fetch vs compile vs packaging.
 

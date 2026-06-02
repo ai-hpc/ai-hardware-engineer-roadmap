@@ -15,7 +15,7 @@
 
 # Part 1: Linux Driver Model & Device Tree
 
-**Context:** Hardware is diverse; the driver model gives a single framework: buses enumerate devices, match them to drivers, call probe/remove. On embedded SoCs, hardware is described in the **Device Tree** (DTS → DTB) passed at boot; platform devices are created from it.
+**Context:** Hardware is diverse; the **driver model** gives a single framework: buses enumerate devices, **match them to drivers**, call probe/remove. On embedded SoCs, hardware is described in the **Device Tree** (DTS → DTB) passed at boot; platform devices are created from it.
 
 ---
 
@@ -23,7 +23,7 @@
 
 - **Bus** (`struct bus_type`): Enumerates devices and matches them to drivers (PCIe, USB, I2C, SPI, **platform**).
 - **Device** (`struct device`): One hardware instance. **Driver** (`struct device_driver`): Code that manages a device type. Bus holds device and driver lists; **match** runs; on match it calls **driver->probe(device)**; on unbind/remove, **driver->remove(device)**.
-- Driver gets resources (MMIO, IRQ, clocks) from the device object, not hardcoded — same driver binary for different boards via different Device Tree.
+- Driver gets resources (MMIO, IRQ, clocks) from the **device object, not hardcoded** — **same driver binary for different boards** via different Device Tree.
 
 ---
 
@@ -39,7 +39,7 @@
 
 # Part 2: Character Drivers, Interrupt-Driven I/O & V4L2
 
-**Context:** A character driver exposes a file in `/dev/`; userspace uses read, write, ioctl, mmap, poll. Interrupt-driven I/O lets hardware signal when data is ready instead of polling. V4L2 is the standard subsystem for cameras and video.
+**Context:** A **character driver** exposes a file in `/dev/`; userspace uses read, write, ioctl, mmap, poll. **Interrupt-driven I/O** lets hardware signal when data is ready instead of polling. **V4L2** is the standard subsystem for cameras and video.
 
 ---
 
@@ -76,7 +76,7 @@
 
 # Part 3: Modern I/O — io_uring, DMA-BUF & Zero-Copy
 
-**Context:** Traditional read/write pays syscall and copy cost per operation. At high IOPS or high bandwidth, io_uring reduces syscalls; DMA-BUF and zero-copy techniques avoid copies between kernel and devices.
+**Context:** Traditional read/write pays **syscall and copy cost per operation**. At high IOPS or high bandwidth, **io_uring reduces syscalls**; **DMA-BUF and zero-copy** techniques avoid copies between kernel and devices.
 
 ---
 
@@ -98,7 +98,7 @@
 
 # Part 4: PCIe, NVMe & GPU Driver Architecture
 
-**Context:** PCIe is the standard interconnect for GPUs, NVMe, NICs, FPGAs. Topology (root complex → root ports → switches → endpoints) and lane count determine bandwidth. NVMe runs on PCIe; GPU drivers sit on top of PCIe and expose CUDA/OpenCL.
+**Context:** **PCIe** is the standard interconnect for GPUs, NVMe, NICs, FPGAs. **Topology** (root complex → root ports → switches → endpoints) and **lane count determine bandwidth**. NVMe runs on PCIe; GPU drivers sit on top of PCIe and expose CUDA/OpenCL.
 
 ---
 

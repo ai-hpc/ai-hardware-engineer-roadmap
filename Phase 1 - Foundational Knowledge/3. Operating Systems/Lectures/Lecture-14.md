@@ -2,13 +2,13 @@
 
 ## Overview
 
-The kernel needs to manage every byte of physical RAM: deciding which process or subsystem owns which pages, how to efficiently carve large pages into smaller objects, and how to guarantee that DMA-capable devices get physically contiguous memory. The core challenge is fragmentation — over time, repeated allocations and frees leave RAM as a patchwork of gaps that cannot satisfy a large contiguous request even when total free memory is ample. The mental model for this lecture is a hierarchy of allocators: the **buddy allocator** manages physical pages, **SLUB** carves those pages into objects, **vmalloc** provides virtually-contiguous fallback, and **CMA** reserves a contiguous region at boot for DMA. For an AI hardware engineer, these allocators directly determine whether a camera ISP driver can get its DMA buffers, whether a custom kernel driver leaks memory, and whether the inference process survives a memory pressure event on an embedded system.
+The kernel needs to manage every byte of physical RAM: deciding which process or subsystem owns which pages, how to efficiently carve large pages into smaller objects, and how to guarantee that DMA-capable devices get physically contiguous memory. The core challenge is **fragmentation** — over time, repeated allocations and frees leave RAM as a patchwork of gaps that cannot satisfy a large contiguous request even when total free memory is ample. The mental model for this lecture is a hierarchy of allocators: the **buddy allocator** manages physical pages, **SLUB** carves those pages into objects, **vmalloc** provides virtually-contiguous fallback, and **CMA** reserves a contiguous region at boot for DMA. For an AI hardware engineer, these allocators directly determine whether a camera ISP driver can get its DMA buffers, whether a custom kernel driver leaks memory, and whether the inference process survives a memory pressure event on an embedded system.
 
 ---
 
 ## Physical Memory: The Buddy Allocator
 
-The **buddy allocator** is the Linux kernel's primary physical page manager. It is the foundation on which all other kernel allocators are built. Free memory is tracked in 11 free lists indexed by order (2^0 through 2^10 pages). `alloc_pages(gfp_flags, order)` returns 2^order physically contiguous pages; `__get_free_pages()` returns the kernel virtual address directly.
+The **buddy allocator** is the Linux kernel's primary physical page manager. It is the foundation on which all other kernel allocators are built. Free memory is tracked in 11 **free lists** indexed by order (2^0 through 2^10 pages). `alloc_pages(gfp_flags, order)` returns 2^order physically contiguous pages; `__get_free_pages()` returns the kernel virtual address directly.
 
 ```
 Buddy Allocator Free Lists
@@ -34,7 +34,7 @@ alloc_pages(GFP_KERNEL, 9)
 
 ### Fragmentation
 
-Over time, free pages become non-contiguous. High-order allocations fail even when total free memory is sufficient because no single 2^N contiguous block exists. `/proc/buddyinfo` shows the count of free blocks at each order per zone per NUMA node. `echo 3 > /proc/sys/vm/drop_caches` reclaims clean page cache and slab objects (use with care in production; does not solve fragmentation).
+Over time, free pages become **non-contiguous**. High-order allocations fail even when total free memory is sufficient because no single 2^N contiguous block exists. `/proc/buddyinfo` shows the count of free blocks at each order per zone per NUMA node. `echo 3 > /proc/sys/vm/drop_caches` reclaims clean page cache and slab objects (use with care in production; does not solve fragmentation).
 
 > **Key Insight:** Fragmentation is why CMA exists. By boot time, before any process has had a chance to fragment memory, CMA carves out a guaranteed-contiguous region. If you wait until an AI accelerator driver needs DMA buffers, the contiguous pages may no longer be available.
 
@@ -44,7 +44,7 @@ Over time, free pages become non-contiguous. High-order allocations fail even wh
 
 ## SLUB Allocator
 
-The buddy allocator works in units of pages (4KB minimum). Most kernel data structures — network socket descriptors, inode objects, driver private data — are far smaller than a page. The **SLUB allocator** (default since kernel 2.6.23) bridges this gap by managing sub-page allocations. Objects of the same type and size are grouped into **slabs**. Each slab is one or more contiguous pages. SLUB provides:
+The buddy allocator works in units of pages (4KB minimum). Most kernel data structures — network socket descriptors, inode objects, driver private data — are far smaller than a page. The **SLUB allocator** (default since kernel 2.6.23) bridges this gap by managing **sub-page allocations**. Objects of the same type and size are grouped into **slabs**. Each slab is one or more contiguous pages. SLUB provides:
 
 ```
 SLUB Allocator Structure
@@ -90,7 +90,7 @@ kmem_cache_destroy(cache);  /* call only when module unloads */
 
 ### kmalloc
 
-`kmalloc(size, gfp_flags)` is the general-purpose kernel allocator. It selects among size-based SLUB caches covering power-of-2 sizes: 8, 16, 32, 64, 128, 256, 512, 1K, 2K, 4K, 8K bytes. `kzalloc(size, gfp)` zero-fills. `kfree(ptr)` returns to the owning slab cache.
+`kmalloc(size, gfp_flags)` is the **general-purpose kernel allocator**. It selects among size-based SLUB caches covering power-of-2 sizes: 8, 16, 32, 64, 128, 256, 512, 1K, 2K, 4K, 8K bytes. `kzalloc(size, gfp)` zero-fills. `kfree(ptr)` returns to the owning slab cache.
 
 Think of `kmalloc` as the kernel equivalent of `malloc()` — you don't need to manage a pool manually, but you accept some overhead from the generality. For sizes above 8KB, `kmalloc` delegates to the buddy allocator and returns a physically contiguous allocation.
 
@@ -107,7 +107,7 @@ Think of `kmalloc` as the kernel equivalent of `malloc()` — you don't need to 
 
 ## vmalloc
 
-With the buddy and SLUB allocators covered, there is one more scenario: a large kernel buffer that does not need to be physically contiguous for DMA, but must be virtually contiguous for easy CPU access. `vmalloc(size)` allocates virtually contiguous but physically non-contiguous memory. The kernel sets up page tables in the `vmalloc` VA region, mapping individual pages. It is slower than `kmalloc` due to page table construction and TLB flushing on setup and teardown.
+With the buddy and SLUB allocators covered, there is one more scenario: a large kernel buffer that does not need to be physically contiguous for DMA, but must be virtually contiguous for easy CPU access. `vmalloc(size)` allocates **virtually contiguous but physically non-contiguous** memory. The kernel sets up page tables in the `vmalloc` VA region, mapping individual pages. It is slower than `kmalloc` due to page table construction and TLB flushing on setup and teardown.
 
 ```
 vmalloc virtual address space
@@ -134,7 +134,7 @@ CPU sees one contiguous buffer; DMA engine cannot use it directly.
 
 ## Memory Zones
 
-The physical address space is partitioned into **zones** based on accessibility constraints imposed by hardware. Not all physical RAM is equally usable for all purposes — legacy ISA devices, 32-bit PCIe devices, and modern 64-bit devices each have different DMA address range limits.
+The physical address space is partitioned into **zones** based on **accessibility constraints** imposed by hardware. Not all physical RAM is equally usable for all purposes — legacy ISA devices, 32-bit PCIe devices, and modern 64-bit devices each have different DMA address range limits.
 
 ```
 Physical Address Space → Memory Zones
@@ -167,7 +167,7 @@ Physical Address Space → Memory Zones
 
 ## GFP Flags (Get Free Pages)
 
-GFP flags (Get Free Pages) are passed to every allocation function and control two things: which memory zone to allocate from, and what the allocator is allowed to do when memory is tight (sleep, reclaim, swap).
+**GFP flags** (Get Free Pages) are passed to every allocation function and control two things: which **memory zone** to allocate from, and what the allocator is allowed to do when memory is tight (sleep, reclaim, swap).
 
 GFP flags control the allocation context and zone selection:
 
@@ -182,7 +182,7 @@ GFP flags control the allocation context and zone selection:
 | `__GFP_NOWARN` | Suppress OOM warning on allocation failure |
 | `__GFP_COMP` | Return compound page (required for huge page backing) |
 
-Key constraint: never use `GFP_KERNEL` in interrupt context or while holding a spinlock; it may sleep waiting for reclaim. Use `GFP_ATOMIC` in these paths and handle `NULL` return.
+Key constraint: **never use `GFP_KERNEL` in interrupt context** or while holding a spinlock; it may sleep waiting for reclaim. Use `GFP_ATOMIC` in these paths and handle `NULL` return.
 
 The GFP flag decision tree for driver authors:
 1. Am I in interrupt context or holding a spinlock? → `GFP_ATOMIC`
@@ -196,7 +196,7 @@ The GFP flag decision tree for driver authors:
 
 ## CMA (Contiguous Memory Allocator)
 
-With fragmentation in mind, CMA provides a clean solution: reserve a physically contiguous region at boot time, before any fragmentation occurs, and make it available to DMA devices on demand. CMA reserves physically contiguous regions at boot time within `ZONE_MOVABLE`. Normal movable pages can use this memory until a device requests it; at that point, the kernel migrates the movable pages out of the reserved region.
+With fragmentation in mind, CMA provides a clean solution: **reserve a physically contiguous region at boot time**, before any fragmentation occurs, and make it available to DMA devices on demand. CMA reserves physically contiguous regions at boot time within `ZONE_MOVABLE`. Normal movable pages can use this memory until a device requests it; at that point, the kernel migrates the movable pages out of the reserved region.
 
 ```
 System Boot
@@ -261,7 +261,7 @@ CMA users on Jetson:
 
 ## OOM Killer
 
-When all reclaim paths (page cache eviction, swap, slab shrinkers) fail, the OOM killer selects and terminates a process. Understanding the OOM killer is critical for embedded AI systems where there is no swap and multiple processes compete for limited RAM.
+When all reclaim paths (page cache eviction, swap, slab shrinkers) fail, the **OOM killer** selects and terminates a process. Understanding the OOM killer is critical for **embedded AI systems** where there is no swap and multiple processes compete for limited RAM.
 
 Selection: `badness(task)` scores each process proportional to its RSS and swap usage. Adjustable per-process:
 ```bash
@@ -270,7 +270,7 @@ echo +500  > /proc/$(pidof bloated_loader)/oom_score_adj  # prefer killing
 ```
 Range: -1000 (never kill) to +1000 (kill first). Score -1000 disables OOM kill entirely for that process.
 
-Setting `oom_score_adj = -1000` on the inference daemon is standard practice on embedded systems. The inference daemon represents the primary system function — killing it during memory pressure is worse than killing a background data loader or log aggregator.
+Setting `oom_score_adj = -1000` on the inference daemon is **standard practice on embedded systems**. The inference daemon represents the primary system function — killing it during memory pressure is worse than killing a background data loader or log aggregator.
 
 ---
 

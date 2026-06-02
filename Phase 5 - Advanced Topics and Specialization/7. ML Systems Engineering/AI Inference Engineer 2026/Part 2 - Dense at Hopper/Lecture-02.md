@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Hopper architecture (Compute Capability 9.0) is the silicon every 2024–2026 production inference deployment runs on by default. Understanding what it provides — and what its successor (Blackwell) inherits and changes — is the foundation of every Part 2 lecture.
+The **Hopper architecture** (Compute Capability 9.0) is the silicon every 2024–2026 production inference deployment runs on by default. Understanding what it provides — and what its successor (Blackwell) inherits and changes — is the **foundation of every Part 2 lecture**.
 
 This lecture covers:
 
@@ -37,13 +37,13 @@ The H100 was the first NVIDIA chip with **native FP8 tensor cores**. This is the
 * **Distributed Shared Memory (DSM)** — direct SM-to-SM access via shared memory, used by FlashAttention 4.
 * **Thread Block Clusters** — groups of cooperating thread blocks that can share data via DSM.
 
-These features collectively let kernels overlap matmul compute with memory movement and reach close to the 989 BF16 TFLOPs peak.
+These features collectively let kernels **overlap matmul compute with memory movement** and reach close to the 989 BF16 TFLOPs peak.
 
 ---
 
 ## 2. H200 — same compute, better memory
 
-H200 is the same H100 die — same SM count, same FLOPs, same NVLink, same NVSwitch. The differences:
+H200 is the **same H100 die** — same SM count, same FLOPs, same NVLink, same NVSwitch. The differences:
 
 | Spec | H100 SXM5 | H200 SXM5 | Δ |
 |------|-----------|-----------|---|
@@ -72,7 +72,7 @@ H100 is still the workhorse for batch / training. **H200 is the workhorse for ch
 
 **The single most important Hopper software feature for inference.**
 
-Transformer Engine (TE) is NVIDIA's mixed-precision library that uses FP8 tensor cores while keeping FP16/BF16 accumulators and statistics, producing FP16-quality output with FP8 throughput.
+Transformer Engine (TE) is NVIDIA's mixed-precision library that uses **FP8 tensor cores** while keeping FP16/BF16 accumulators and statistics, producing **FP16-quality output with FP8 throughput**.
 
 ### 3.1 The two FP8 formats
 
@@ -81,8 +81,8 @@ Transformer Engine (TE) is NVIDIA's mixed-precision library that uses FP8 tensor
 | **E4M3** | 1 | 4 | 3 | ±448 | weights, activations (default) |
 | **E5M2** | 1 | 5 | 2 | ±57,344 | gradients, KV cache |
 
-E4M3 has more mantissa (precision) and less range. Used where precision matters: weights, forward-pass activations.
-E5M2 has more range and less precision. Used where range matters: backward-pass gradients, KV cache (values can be large).
+**E4M3** has more mantissa (precision) and less range. Used where precision matters: weights, forward-pass activations.
+**E5M2** has more range and less precision. Used where range matters: backward-pass gradients, KV cache (values can be large).
 
 ### 3.2 Per-tensor scaling
 
@@ -126,7 +126,7 @@ For Llama 3.3 70B or Qwen 2.5 72B on Hopper, FP8 production deployment in mid-20
 
 Hopper introduced an **async DMA engine inside each SM** that loads global memory into shared memory without blocking compute.
 
-Pre-Hopper, loading a matmul tile required threads to issue `ld.global` instructions and synchronize — the SM was waiting on HBM. TMA fires the load, the SM goes back to computing the *previous* tile, and the load completes asynchronously.
+Pre-Hopper, loading a matmul tile required threads to issue `ld.global` instructions and synchronize — the SM was **waiting on HBM**. TMA fires the load, the SM goes back to computing the *previous* tile, and the load **completes asynchronously**.
 
 ### 4.1 Why it matters for inference
 
@@ -140,7 +140,7 @@ You do not write TMA code directly as an inference engineer. You ensure your run
 
 ## 5. WGMMA — Warp-Group Matrix Multiply Accumulate
 
-The Hopper async tensor-core instruction. Replaces the older WMMA / MMA instructions from Volta / Ampere.
+The **Hopper async tensor-core instruction**. Replaces the older WMMA / MMA instructions from Volta / Ampere.
 
 Key properties:
 

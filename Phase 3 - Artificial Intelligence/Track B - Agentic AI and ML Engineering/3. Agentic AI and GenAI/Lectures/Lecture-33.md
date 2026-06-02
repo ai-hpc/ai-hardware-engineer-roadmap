@@ -4,11 +4,11 @@
 
 ---
 
-Computer-use agents are visually impressive.
+**Computer-use agents** are visually impressive.
 
 They can look at screenshots, click buttons, type into fields, and operate software like a human.
 
-That does not mean vision is the right primary interface for agents.
+That does not mean **vision** is the right primary interface for agents.
 
 The Reflex benchmark gives a useful data point:
 
@@ -31,7 +31,7 @@ Structured tools are the primary interface when you control the system.
 
 For OpenClaw-style architecture, this is not a small optimization.
 
-It is a tool-design principle.
+It is a **tool-design principle**.
 
 ---
 
@@ -51,7 +51,7 @@ By the end of this lecture, you should be able to:
 
 ## 1. The benchmark in plain terms
 
-Reflex tested two ways for Claude Sonnet to operate the same admin panel.
+Reflex tested **two ways** for Claude Sonnet to operate the same admin panel.
 
 Task:
 
@@ -92,15 +92,15 @@ Result:
 
 The API path completed in 8 calls every time.
 
-The vision path initially missed work because not all pending reviews were visible on screen. It needed a 14-step UI walkthrough to complete successfully.
+The vision path **initially missed work** because not all pending reviews were visible on screen. It needed a 14-step UI walkthrough to complete successfully.
 
-That walkthrough is itself engineering cost.
+That walkthrough is itself **engineering cost**.
 
 ---
 
 ## 2. Why vision is expensive
 
-A vision agent pays for perception every step.
+A vision agent pays for **perception every step**.
 
 Each loop looks like:
 
@@ -134,13 +134,13 @@ call tool
   -> verify result
 ```
 
-The agent reads the data directly instead of re-deriving it from pixels.
+The agent **reads the data directly** instead of re-deriving it from pixels.
 
 ---
 
 ## 3. Interface bandwidth hierarchy
 
-Use the highest-bandwidth interface available.
+Use the **highest-bandwidth interface** available.
 
 ```text
 Structured API / typed tool call       best
@@ -168,7 +168,7 @@ If a task can be expressed as a function, do not do it through screenshots.
 
 ## 4. Structured tools are more than cheaper
 
-Cost is only one dimension.
+Cost is only **one dimension**.
 
 Structured tools also improve:
 
@@ -186,7 +186,7 @@ click the button below the order status field
 
 ### Composability
 
-Tool calls can be chained, retried, validated, and logged.
+Tool calls can be **chained, retried, validated, and logged**.
 
 ### Verifiability
 
@@ -208,7 +208,7 @@ accept_review
 update_order_status
 ```
 
-Vision exposes whatever the agent can see and click.
+Vision exposes **whatever the agent can see and click**.
 
 ### Auditability
 
@@ -226,9 +226,9 @@ Screenshots require reconstruction.
 
 The benchmark's first vision attempt missed pending reviews below the visible fold.
 
-That is not primarily a model-intelligence problem.
+That is not primarily a **model-intelligence problem**.
 
-It is an interface problem.
+It is an **interface problem**.
 
 The UI showed a partial rendered state.
 
@@ -253,7 +253,7 @@ review status
 order status
 ```
 
-The same application logic existed underneath both paths.
+The **same application logic** existed underneath both paths.
 
 Only one path exposed it directly.
 
@@ -263,7 +263,7 @@ Only one path exposed it directly.
 
 Do not remove computer use entirely.
 
-Vision is useful when:
+**Vision is useful** when:
 
 - you do not control the target system
 - there is no API
@@ -289,15 +289,15 @@ vision agent repeatedly operates an internal app you control
 even though the app can expose handlers or endpoints
 ```
 
-Vision is an exploration and fallback layer.
+Vision is an **exploration and fallback layer**.
 
-It should not be the default execution layer for owned systems.
+It should not be the **default execution layer** for owned systems.
 
 ---
 
 ## 7. OpenClaw architecture implication
 
-OpenClaw's Gateway/tool direction is aligned with this benchmark.
+OpenClaw's **Gateway/tool direction** is aligned with this benchmark.
 
 The preferred path:
 
@@ -335,13 +335,13 @@ The stable principle:
 Agents should behave like infrastructure when infrastructure interfaces exist.
 ```
 
-They should behave like humans only when forced to.
+They should behave like humans **only when forced to**.
 
 ---
 
 ## 8. Tool schema layer
 
-A structured-first agent platform needs a tool schema layer.
+A structured-first agent platform needs a **tool schema layer**.
 
 Example:
 
@@ -377,15 +377,15 @@ tool schema
 
 This is the opposite of screenshot automation.
 
-The model expresses intent through a narrow typed action.
+The model expresses intent through a **narrow typed action**.
 
-The runtime decides whether the action is allowed.
+The runtime decides **whether the action is allowed**.
 
 ---
 
 ## 9. Auto-generating tools
 
-The Reflex article matters partly because Reflex 0.9 can expose event handlers as HTTP endpoints, reducing the engineering cost of the API surface.
+The Reflex article matters partly because Reflex 0.9 can **expose event handlers as HTTP endpoints**, reducing the engineering cost of the API surface.
 
 General pattern:
 
@@ -397,7 +397,7 @@ CLI specs -> tool wrappers
 typed app handlers -> agent-callable endpoints
 ```
 
-The decision flips when API generation is cheap.
+The decision flips when **API generation is cheap**.
 
 Old assumption:
 
@@ -445,7 +445,7 @@ implicit UI permissions
 harder-to-parse evidence
 ```
 
-Structured tools are easier to secure because the action is explicit before execution.
+Structured tools are **easier to secure** because the action is explicit before execution.
 
 You can ask:
 
@@ -457,11 +457,11 @@ Which object changed?
 What was the before/after state?
 ```
 
-With screenshots, the action is often a low-level click.
+With screenshots, the action is often a **low-level click**.
 
-The semantic meaning must be reconstructed.
+The **semantic meaning** must be reconstructed.
 
-That is weaker for audit and incident response.
+That is weaker for **audit and incident response**.
 
 ---
 
@@ -473,7 +473,7 @@ Lecture 29 argued:
 No evidence, no completion.
 ```
 
-Structured tools make evidence easier.
+Structured tools make **evidence easier**.
 
 Example:
 
@@ -506,9 +506,9 @@ Vision evidence is heavier:
 - natural-language descriptions
 - brittle UI state
 
-Use vision when necessary.
+Use vision **when necessary**.
 
-Do not choose it when structured evidence is available.
+Do not choose it when **structured evidence** is available.
 
 ---
 
@@ -540,7 +540,7 @@ Then build update_customer, list_reviews, approve_review, update_order tools.
 Then stop using computer_use for that workflow.
 ```
 
-The result is faster, cheaper, safer, and more reviewable.
+The result is **faster, cheaper, safer, and more reviewable**.
 
 ---
 

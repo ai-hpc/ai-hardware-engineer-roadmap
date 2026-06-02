@@ -32,7 +32,7 @@ The official education page groups solutions around areas like:
 - low power
 - gateways
 
-This is a much better structure than learning random demos.
+This is a much better structure than learning **random demos**.
 
 ---
 
@@ -47,7 +47,7 @@ Espressif highlights items like:
 For our roadmap, that means:
 
 - these are not first-day tools
-- they are direction markers for later product-specific work
+- they are **direction markers** for later product-specific work
 
 If you are voice-oriented, `ESP-SR` matters.
 If you are camera-oriented, `ESP-WHO` matters.
@@ -66,7 +66,7 @@ The education page highlights a broad set of connectivity directions, including:
 - OpenThread
 - gateway / bridge directions
 
-This is exactly where our roadmap should connect the Espressif track to the IoT track.
+This is exactly where our roadmap should connect the **Espressif track** to the **IoT track**.
 
 In practice:
 
@@ -84,7 +84,7 @@ Espressif also points learners toward:
 - camera solutions
 - LCD solutions
 
-This matters because many learners think "ESP32 = only simple sensors."
+This matters because many learners think **"ESP32 = only simple sensors."**
 
 The official education page shows a broader view:
 
@@ -117,13 +117,13 @@ Some of the strongest designs are:
 - event-driven
 - protocol-specific
 
-So product direction should affect framework and architecture choices very early.
+So **product direction** should affect framework and architecture choices very early.
 
 ---
 
 ## Gateway thinking
 
-One especially useful direction on the official page is gateway thinking:
+One especially useful direction on the official page is **gateway thinking**:
 
 - protocol bridge
 - cloud path

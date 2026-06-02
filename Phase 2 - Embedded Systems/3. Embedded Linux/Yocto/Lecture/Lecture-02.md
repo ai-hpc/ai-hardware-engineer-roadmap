@@ -8,9 +8,9 @@
 
 ## 1. Skills you should already have
 
-- Comfortable on the Linux command line (paths, environment variables, `grep`, basic scripting).
+- Comfortable on the **Linux command line** (paths, environment variables, `grep`, basic scripting).
 - Basic embedded concepts: bootloader → kernel → root filesystem; what a **device tree** is at a high level.
-- Git workflows (clone, branch, commit). Yocto *is* a Git-heavy ecosystem.
+- **Git workflows** (clone, branch, commit). Yocto *is* a Git-heavy ecosystem.
 
 ## 2. Host machine expectations
 

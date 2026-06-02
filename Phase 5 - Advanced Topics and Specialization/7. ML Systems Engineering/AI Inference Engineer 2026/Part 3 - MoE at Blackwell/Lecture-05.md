@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is the capstone of the course. The previous Part 3 lectures established the architecture (Lecture 01), the silicon (Lecture 02), the parallelism (Lecture 03), and the serving topology (Lecture 04). This lecture brings them together into a defended, production-shippable inference deployment for DeepSeek V3.1 and Qwen3-MoE 235B-A22B on Blackwell, with a `$/MTok` cost model that another engineer can reproduce.
+This is the **capstone of the course**. The previous Part 3 lectures established the architecture (Lecture 01), the silicon (Lecture 02), the parallelism (Lecture 03), and the serving topology (Lecture 04). This lecture brings them together into a **defended, production-shippable inference deployment** for DeepSeek V3.1 and Qwen3-MoE 235B-A22B on Blackwell, with a `$/MTok` cost model that another engineer can reproduce.
 
 Topics:
 
@@ -38,7 +38,7 @@ MTP decode (k=3):
   → 1 forward pass for up to 3 tokens
 ```
 
-The model's MTP heads produce the predictions. The verification logic (does the predicted token match the standard output) lives in the inference runtime. The acceptance rate determines the effective speedup.
+The model's MTP heads produce the predictions. The **verification logic** (does the predicted token match the standard output) lives in the inference runtime. The **acceptance rate determines the effective speedup**.
 
 ### 1.2 Acceptance rates
 
@@ -85,7 +85,7 @@ For DeepSeek V3.1 at FP4 on 16× B200 NVL72 partition, chat workload:
 | MTP k=2 | ~10,000 (1.5×) |
 | MTP k=3 | ~13,000 (2.0×) |
 
-MTP is the largest single throughput win on DeepSeek's deployment stack.
+MTP is the **largest single throughput win** on DeepSeek's deployment stack.
 
 ---
 
@@ -95,7 +95,7 @@ Qwen3-MoE 235B-A22B has no native MTP. The 2026 production speculation path is *
 
 ### 2.1 EAGLE-3 mechanics
 
-Unlike a separate draft LLM, EAGLE-3 trains a **lightweight speculation head** that sits on top of the target model. The head reuses the target's hidden states and predicts next-k tokens.
+Unlike a separate draft LLM, EAGLE-3 trains a **lightweight speculation head** that sits on top of the target model. The head **reuses the target's hidden states** and predicts next-k tokens.
 
 * No separate draft model HBM cost.
 * Acceptance rates 75-85% across categories.
@@ -132,7 +132,7 @@ Comparable to DeepSeek + MTP at a similar effective speedup ratio.
 
 ## 3. Constrained decoding at MoE scale
 
-Structured output (tool calls, JSON, code) requires the model to emit specifically-shaped sequences. **Constrained decoding** uses a grammar (or regex / FSM) to restrict the sampler to legal tokens only.
+Structured output (tool calls, JSON, code) requires the model to emit **specifically-shaped sequences**. **Constrained decoding** uses a grammar (or regex / FSM) to restrict the sampler to **legal tokens only**.
 
 ### 3.1 XGrammar vs Outlines
 
@@ -141,7 +141,7 @@ Structured output (tool calls, JSON, code) requires the model to emit specifical
 | XGrammar | compile grammar to FSM, apply at logit level | SGLang (native), vLLM (integration) |
 | Outlines | regex / Pydantic, slower for complex grammars | vLLM, llama.cpp |
 
-XGrammar is the fastest production option in mid-2026. SGLang ships it natively.
+**XGrammar is the fastest production option** in mid-2026. SGLang ships it natively.
 
 ### 3.2 BFCL parity at MoE FP4
 
@@ -230,7 +230,7 @@ Expected $/MTok:    ~$0.25-0.40
 
 ## 5. The cost model
 
-Deriving `$/MTok` is the final exit-criterion deliverable.
+Deriving `$/MTok` is the **final exit-criterion deliverable**.
 
 ### 5.1 The formula
 
@@ -291,7 +291,7 @@ A naive deployment at FP8 + greedy decoding + concurrency 16 + EP=2 might cost $
 
 ## 6. The capstone benchmark — what your repo must contain
 
-The final deliverable of this course. Your benchmark repo contains:
+The **final deliverable** of this course. Your benchmark repo contains:
 
 ### 6.1 Reproducibility layer
 

@@ -15,7 +15,7 @@ screen model
   -> planner/executor
 ```
 
-That works, but it creates a fragmented perception stack:
+That works, but it creates a **fragmented perception stack**:
 
 - more inference hops
 - more orchestration code
@@ -24,7 +24,7 @@ That works, but it creates a fragmented perception stack:
 - weaker cross-modal consistency
 - higher cost under sustained workloads
 
-NVIDIA Nemotron 3 Nano Omni is interesting because it argues for a different role:
+**NVIDIA Nemotron 3 Nano Omni** is interesting because it argues for a different role:
 
 ```text
 one efficient multimodal model
@@ -60,7 +60,7 @@ By the end of this lecture, you should be able to:
 
 ## 1. Why multimodal chains are hard
 
-Agentic systems increasingly need to reason across:
+Agentic systems increasingly need to **reason across** modalities:
 
 - screenshots
 - documents
@@ -88,23 +88,23 @@ This creates three problems.
 
 ### Cost
 
-Every hop costs inference time and orchestration overhead.
+Every hop costs **inference time and orchestration overhead**.
 
 ### Context drift
 
-Each model compresses its input differently. Important cross-modal details can be lost.
+Each model compresses its input differently. Important **cross-modal details** can be lost.
 
 ### Engineering complexity
 
 The harness must stitch together timestamps, frames, transcripts, OCR boxes, image regions, and textual summaries.
 
-Unified multimodal models try to reduce this fragmentation.
+**Unified multimodal models** try to reduce this fragmentation.
 
 ---
 
 ## 2. What Nemotron 3 Nano Omni is
 
-NVIDIA describes Nemotron 3 Nano Omni as an open model for unified video, audio, image, and text reasoning.
+NVIDIA describes Nemotron 3 Nano Omni as an **open model** for unified video, audio, image, and text reasoning.
 
 The important system framing:
 
@@ -122,7 +122,7 @@ multimodal inputs
   -> tool/action layer
 ```
 
-That matters because a multimodal model should not automatically own all agent authority.
+That matters because a multimodal model should **not automatically own all agent authority**.
 
 It should usually answer:
 
@@ -132,7 +132,7 @@ What evidence supports that?
 What context should the planner receive?
 ```
 
-The executor should still be controlled by structured tools, policies, and approval gates.
+The executor should still be controlled by **structured tools, policies, and approval gates**.
 
 ---
 
@@ -158,9 +158,9 @@ large total capability
   -> higher throughput potential
 ```
 
-MoE is a serving tradeoff.
+**MoE is a serving tradeoff**.
 
-It can reduce active compute but introduces routing, expert placement, memory, and kernel complexity.
+It can reduce active compute but introduces **routing, expert placement, memory, and kernel complexity**.
 
 For hardware engineers, this is not just a model design detail.
 
@@ -197,19 +197,19 @@ video + audio + documents
   -> expensive attention if handled naively
 ```
 
-A hybrid architecture is trying to preserve reasoning while reducing the cost of sustained long-context perception.
+A **hybrid architecture** is trying to preserve reasoning while reducing the cost of sustained long-context perception.
 
-You should still benchmark the actual workload.
+You should still **benchmark the actual workload**.
 
-Architecture claims are useful, but serving measurements decide deployment.
+Architecture claims are useful, but **serving measurements decide deployment**.
 
 ---
 
 ## 5. Video: 3D convolution and efficient video sampling
 
-Video is not just a sequence of images.
+Video is **not just a sequence of images**.
 
-The model needs motion and temporal structure.
+The model needs **motion and temporal structure**.
 
 NVIDIA describes two relevant mechanisms:
 
@@ -249,9 +249,9 @@ so perception layers must compress them before planning/action loops
 
 ## 6. Audio and visual encoders
 
-The NVIDIA post describes audio integration built around NVIDIA Parakeet and specialized datasets, moving beyond simple transcription.
+The NVIDIA post describes audio integration built around **NVIDIA Parakeet** and specialized datasets, moving beyond simple transcription.
 
-It also describes visual processing using C-RADIOv4-H for high-resolution image understanding and OCR-sensitive detail.
+It also describes visual processing using **C-RADIOv4-H** for high-resolution image understanding and OCR-sensitive detail.
 
 System view:
 
@@ -273,9 +273,9 @@ Does the model only transcribe/caption?
 Or does it preserve enough multimodal structure for reasoning?
 ```
 
-For agentic systems, captioning alone is often insufficient.
+For agentic systems, **captioning alone is often insufficient**.
 
-You need grounded context:
+You need **grounded context**:
 
 - what was visible
 - when it happened
@@ -287,7 +287,7 @@ You need grounded context:
 
 ## 7. Training scale and openness
 
-NVIDIA says the release includes access to weights, datasets, and training recipes.
+NVIDIA says the release includes access to **weights, datasets, and training recipes**.
 
 The blog reports:
 
@@ -315,7 +315,7 @@ For enterprise and research users, open weights and recipes matter because they 
 - reproducibility work
 - local or on-premise variants
 
-License and data terms still need review before commercial deployment.
+**License and data terms** still need review before commercial deployment.
 
 ---
 
@@ -337,11 +337,11 @@ The blog reports that, at fixed interactivity thresholds:
 - video reasoning can sustain up to about 9.2x higher effective system capacity than alternative open omni models
 - multi-document reasoning can sustain up to about 7.4x higher effective system capacity than alternative open omni models
 
-The phrase "fixed interactivity threshold" is important.
+The phrase **"fixed interactivity threshold"** is important.
 
-It means the comparison holds per-user responsiveness constant and measures how much total work the system can sustain.
+It means the comparison holds **per-user responsiveness constant** and measures how much total work the system can sustain.
 
-This is a better serving metric for agents than raw maximum throughput alone.
+This is a better serving metric for agents than **raw maximum throughput** alone.
 
 Agent users care about:
 
@@ -365,9 +365,9 @@ raw multimodal input
   -> execution policy and audit
 ```
 
-Do not collapse everything into the multimodal model.
+**Do not collapse everything** into the multimodal model.
 
-Keep roles separate:
+**Keep roles separate**:
 
 | Role | Responsibility |
 |---|---|
@@ -410,7 +410,7 @@ Potential use cases:
 | voice + screen assistant | unified state from spoken request and visible UI |
 | robotics/edge AI | scene/audio context for downstream planner |
 
-The planner should receive structured context, not raw unbounded video tokens.
+The planner should receive **structured context**, not raw unbounded video tokens.
 
 Example output shape:
 
@@ -457,7 +457,7 @@ structured API/tool call
   -> raw vision clicking loop
 ```
 
-Nemotron 3 Nano Omni belongs in the perception layer.
+Nemotron 3 Nano Omni belongs in the **perception layer**.
 
 It should help the agent understand what is in multimodal inputs.
 
@@ -467,7 +467,7 @@ It should not be the reason the agent clicks around blindly when a structured AP
 
 ## 12. What to benchmark before adopting
 
-Before choosing any multimodal model, measure your actual workload.
+Before choosing any multimodal model, **measure your actual workload**.
 
 Benchmark:
 
@@ -502,7 +502,7 @@ failure mode
 
 ## 13. Hardware engineer view
 
-For GPU and edge engineers, Nemotron 3 Nano Omni highlights several workload trends:
+For GPU and edge engineers, Nemotron 3 Nano Omni highlights several **workload trends**:
 
 - hybrid MoE serving
 - active-parameter efficiency
@@ -527,7 +527,7 @@ What is the failure mode on smaller GPUs?
 
 This is why multimodal agents are a hardware-relevant topic.
 
-They stress memory, bandwidth, scheduling, and serving engines differently from text-only chat.
+They stress **memory, bandwidth, scheduling, and serving engines** differently from text-only chat.
 
 ---
 

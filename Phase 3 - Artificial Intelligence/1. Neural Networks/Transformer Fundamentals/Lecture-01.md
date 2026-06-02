@@ -32,11 +32,11 @@ hidden_0 ─► [RNN cell] ─► hidden_1 ─► [RNN cell] ─► hidden_2 ─
             x_0                         x_1                         x_T
 ```
 
-Every token's information had to be packed into the same fixed-size hidden state, then passed to the next step. By the time the model reached `x_T`, information about `x_0` had to survive `T` rounds of overwriting.
+Every token's information had to be packed into the same **fixed-size hidden state**, then passed to the next step. By the time the model reached `x_T`, information about `x_0` had to survive `T` rounds of overwriting.
 
 This is the **fixed-context bottleneck**. For short sequences it works fine. For long sequences (translation of a paragraph, summarization, code) it falls apart — the gradient of the early tokens with respect to a late prediction vanishes, and the model literally forgets the start of the sequence.
 
-LSTMs and GRUs added gates that helped but didn't eliminate the problem. The architectures still funneled everything through a single hidden vector.
+LSTMs and GRUs added **gates** that helped but didn't eliminate the problem. The architectures still funneled everything through a single hidden vector.
 
 ### 1.2 The attention insight
 
@@ -66,7 +66,7 @@ No hidden-state bottleneck. No information has to survive a chain of overwrites.
 
 ## 2. Queries, Keys, and Values
 
-This is the part of the transformer most worth slowing down for. Once Q/K/V clicks, the rest of the architecture is mechanical. Until it clicks, every diagram looks like alphabet soup.
+This is the part of the transformer most worth slowing down for. Once **Q/K/V** clicks, the rest of the architecture is mechanical. Until it clicks, every diagram looks like alphabet soup.
 
 ### 2.1 The three roles
 
@@ -113,7 +113,7 @@ Concrete example: the word **"bank"** in "river bank":
 * As a **key**, "bank" is offering itself as a possible match target — "I'm the word you might attend to if your query is about money or geography."
 * As a **value**, "bank" carries the information another token will pull when it attends to it — the word-sense, the part-of-speech, the semantic content.
 
-These three roles need three different vector subspaces. A single shared embedding would conflate them and force the model to compromise. By giving the model **three independent learned projections** of the same input, you give it the flexibility to use one subspace for matching and a different subspace for content delivery.
+These three roles need three different **vector subspaces**. A single shared embedding would conflate them and force the model to compromise. By giving the model **three independent learned projections** of the same input, you give it the flexibility to use one subspace for matching and a different subspace for content delivery.
 
 ### 2.4 How Q, K, V are actually produced
 
@@ -150,7 +150,7 @@ Three dimensions appear in the formulas: `d_model`, `d_k`, `d_v`. Two constraint
 * `d_k` for Q and `d_k` for K **must match** — because the attention score is the inner product `q · k`, which only exists when the two vectors live in the same space.
 * `d_v` is **free**. V can be any width. The output of attention has shape `[N, d_v]` — it inherits V's dimension.
 
-In practice, **all production transformers set `d_v = d_k`.** Why? Because the next operation after attention is usually a linear projection back to `d_model` (the residual stream dimension), and keeping `d_v = d_k` makes the bookkeeping clean and the parameter count predictable.
+In practice, **all production transformers set `d_v = d_k`.** Why? Because the next operation after attention is usually a **linear projection** back to `d_model` (the residual stream dimension), and keeping `d_v = d_k` makes the bookkeeping clean and the parameter count predictable.
 
 For multi-head attention with `H` heads, the per-head dimension is `d_k = d_v = d_model / H`. For Qwen3-4B: `d_model = 2560, H = 32`, so `d_k = d_v = 80`. Wait — actually Qwen specifically uses `head_dim = 128` (it doesn't follow the strict `d_model / H` rule), giving the Q projection an output of `n_heads · head_dim = 32 · 128 = 4096`, which is then projected back down. The point: these dimensions are design choices, and modern models tune them independently.
 

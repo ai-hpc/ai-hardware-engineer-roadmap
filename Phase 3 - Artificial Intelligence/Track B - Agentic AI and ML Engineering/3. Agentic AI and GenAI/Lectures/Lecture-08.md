@@ -182,7 +182,7 @@ print(result)
 
 ## 3. Pipeline Pattern
 
-Simple sequential hand-off between agents:
+Simple **sequential hand-off** between agents:
 
 ```python
 from dataclasses import dataclass
@@ -265,7 +265,7 @@ print(final_guide[:500])
 
 ## 4. Adversarial Peer-to-Peer (Debate Pattern)
 
-Two agents debate; a judge picks the winner or synthesizes:
+Two agents **debate**; a **judge** picks the winner or synthesizes:
 
 ```python
 def debate_agents(question: str, rounds: int = 2) -> str:

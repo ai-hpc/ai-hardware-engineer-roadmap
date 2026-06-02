@@ -15,7 +15,7 @@ Zigbee is often deployed in products that control:
 - sensors
 - building devices
 
-So the security model is not decorative. It is core system behavior.
+So the **security model** is not decorative. It is **core system behavior**.
 
 Official reference: [Silicon Labs Zigbee security concepts](https://docs.silabs.com/zigbee/9.0.0/zigbee-security/02-concepts)
 
@@ -36,7 +36,7 @@ You do not need every detail of the spec on day one, but you do need the right m
 - joining is controlled
 - the trust center is central to admission and security policy
 
-That means secure onboarding is part of firmware and gateway design, not an afterthought.
+That means **secure onboarding** is part of firmware and gateway design, not an afterthought.
 
 ---
 
@@ -58,7 +58,7 @@ The exact user experience may differ across products, but the engineering princi
 
 ## Sleepy end devices
 
-One of Zigbee's big value points is battery-powered operation.
+One of Zigbee's big value points is **battery-powered operation**.
 
 Sleepy end devices:
 
@@ -69,7 +69,7 @@ Sleepy end devices:
 
 This is similar in spirit to sleepy children in Thread, even though the stacks are different.
 
-The key embedded consequence is that low power is never free. You pay for it with:
+The key embedded consequence is that **low power is never free**. You pay for it with:
 
 - parent dependence
 - polling behavior
@@ -80,7 +80,7 @@ The key embedded consequence is that low power is never free. You pay for it wit
 
 ## OTA updates
 
-OTA is especially important for IoT products because deployed devices do not stay static.
+**OTA** is especially important for IoT products because deployed devices do not stay static.
 
 For Zigbee products, OTA matters because you may need to:
 
@@ -104,7 +104,7 @@ When you design a Zigbee product, you are really choosing among several competin
 - secure onboarding
 - field maintenance
 
-That is why Zigbee work is real embedded-systems engineering and not just wireless configuration.
+That is why Zigbee work is **real embedded-systems engineering** and not just wireless configuration.
 
 ---
 

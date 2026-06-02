@@ -24,7 +24,7 @@ This distinction is important and often skipped.
 
 ### Chip
 
-The chip is the actual SoC.
+The chip is the actual **SoC**.
 
 Example:
 
@@ -39,7 +39,7 @@ The module packages the chip with things like:
 - RF design
 - certification support
 
-This is what many real products use.
+This is what **many real products** use.
 
 ### Development board
 
@@ -50,7 +50,7 @@ The development board gives you:
 - power support
 - a fast start
 
-If you blur these three together, you make poor hardware decisions later.
+If you blur these three together, you make **poor hardware decisions** later.
 
 Espressif’s education page explicitly points learners to understanding these differences first.
 
@@ -64,7 +64,7 @@ Espressif’s study plan also calls out:
 - run mode
 - download mode
 
-That matters because "board does not flash" is often not a software problem.
+That matters because "board does not flash" is often **not a software problem**.
 
 It is often:
 
@@ -72,7 +72,7 @@ It is often:
 - wrong USB/serial assumptions
 - wrong board setup
 
-So even first bring-up is still embedded engineering.
+So even first **bring-up** is still embedded engineering.
 
 ---
 
@@ -113,7 +113,7 @@ That progression is correct because it moves from:
 - to connectivity
 - to peripherals
 
-This is much better than starting with a giant showcase demo.
+This is much better than starting with a **giant showcase demo**.
 
 ---
 

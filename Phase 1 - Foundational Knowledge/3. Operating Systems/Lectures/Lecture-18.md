@@ -8,7 +8,7 @@ The previous lecture established how the kernel discovers hardware and binds dri
 
 ## Character Device Driver
 
-A **character device** exposes a file-like interface in `/dev/`. Userspace opens, reads, writes, and issues ioctls on it just like a regular file. Under the hood, each operation dispatches to a driver-defined function. This is the standard interface for custom AI accelerators, FPGA control planes, and any hardware that does not fit a more specialized subsystem.
+A **character device** exposes a **file-like interface** in `/dev/`. Userspace opens, reads, writes, and issues ioctls on it just like a regular file. Under the hood, each operation dispatches to a driver-defined function. This is the **standard interface for custom AI accelerators**, FPGA control planes, and any hardware that does not fit a more specialized subsystem.
 
 ```
 Character Device: Kernel ↔ Userspace Interface
@@ -75,7 +75,7 @@ static long mydev_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 }
 ```
 
-The `_IO`, `_IOR`, `_IOW` macros encode the magic number, command number, direction, and argument size into a single 32-bit value. The kernel uses this encoding to validate the argument size automatically.
+The `_IO`, `_IOR`, `_IOW` macros encode the **magic number, command number, direction, and argument size** into a single 32-bit value. The kernel uses this encoding to **validate the argument size** automatically.
 
 - Never dereference `(void *)arg` directly in kernel; always use `copy_from_user()` / `copy_to_user()`
 - `copy_*_user` returns bytes not copied on error; check return value
@@ -86,7 +86,7 @@ The `_IO`, `_IOR`, `_IOW` macros encode the magic number, command number, direct
 
 ## mmap in Drivers
 
-The **mmap** file operation maps kernel or device memory directly into userspace virtual address space. This enables zero-copy access to DMA output buffers — userspace reads inference results at memory speed without a syscall per access.
+The **mmap** file operation maps kernel or device memory directly into userspace virtual address space. This enables **zero-copy access** to DMA output buffers — userspace reads inference results at memory speed without a syscall per access.
 
 ```c
 static int mydev_mmap(struct file *f, struct vm_area_struct *vma)
@@ -99,7 +99,7 @@ static int mydev_mmap(struct file *f, struct vm_area_struct *vma)
 }
 ```
 
-`pgprot_noncached()` marks the mapped pages as uncached — essential for MMIO regions and DMA output buffers where the CPU must always read from RAM rather than its cache.
+`pgprot_noncached()` marks the mapped pages as **uncached** — essential for MMIO regions and DMA output buffers where the CPU must always read from RAM rather than its cache.
 
 - `remap_pfn_range()`: maps contiguous physical range; used for DMA buffers and MMIO
 - `vm_insert_page()`: maps individual pages; used for vmalloc-backed buffers
@@ -111,7 +111,7 @@ static int mydev_mmap(struct file *f, struct vm_area_struct *vma)
 
 ## Interrupt-Driven I/O
 
-Polling the hardware to check if new data is ready wastes CPU cycles and increases latency. **Interrupt-driven I/O** lets the hardware signal the CPU precisely when data is ready, allowing the CPU to do useful work in the meantime.
+Polling the hardware to check if new data is ready **wastes CPU cycles** and increases latency. **Interrupt-driven I/O** lets the hardware signal the CPU precisely when data is ready, allowing the CPU to do useful work in the meantime.
 
 ```
 Interrupt-Driven Data Flow:
@@ -153,11 +153,11 @@ static irqreturn_t mydev_isr(int irq, void *data)
 }
 ```
 
-The ISR returns `IRQ_NONE` if the status register shows the interrupt came from a different device sharing the same IRQ line. This is required for `IRQF_SHARED` interrupt lines — the kernel will call all registered handlers until one claims it.
+The ISR returns `IRQ_NONE` if the status register shows the interrupt came from a **different device sharing the same IRQ line**. This is required for `IRQF_SHARED` interrupt lines — the kernel will call all registered handlers until one claims it.
 
 ### Top Half / Bottom Half Split
 
-ISRs run with interrupts disabled on the executing CPU. Long work must be deferred to a context where sleeping and blocking are permitted:
+ISRs run with **interrupts disabled** on the executing CPU. Long work must be **deferred** to a context where sleeping and blocking are permitted:
 
 | Mechanism | Context | Use |
 |-----------|---------|-----|
@@ -184,7 +184,7 @@ wake_up_interruptible(&wq);
 wait_event_interruptible(wq, dev->data_ready);
 ```
 
-The `wait_event_interruptible()` macro checks the condition and returns immediately if true, or puts the thread to sleep if false. When the ISR calls `wake_up_interruptible()`, all sleeping threads are woken and re-check the condition.
+The `wait_event_interruptible()` macro **checks the condition** and returns immediately if true, or puts the thread to sleep if false. When the ISR calls `wake_up_interruptible()`, all sleeping threads are woken and **re-check the condition**.
 
 - `wait_event_interruptible()` returns `-ERESTARTSYS` if signal received; caller should return `-EINTR` to userspace
 - `wait_event_interruptible_timeout()`: add deadline for polling fallback
@@ -207,7 +207,7 @@ static __poll_t mydev_poll(struct file *f, poll_table *wait)
 }
 ```
 
-`poll_wait()` registers the driver's wait queue with the kernel's polling infrastructure without actually sleeping. When `epoll_wait()` is called in userspace, the kernel will wake the epoll thread when `wake_up_interruptible()` is called on this wait queue.
+`poll_wait()` registers the driver's wait queue with the kernel's polling infrastructure **without actually sleeping**. When `epoll_wait()` is called in userspace, the kernel will wake the epoll thread when `wake_up_interruptible()` is called on this wait queue.
 
 Userspace `epoll_wait()` returns when `EPOLLIN` is set; enables event-driven data pipelines without busy-polling.
 
@@ -217,7 +217,7 @@ With the low-level interrupt and polling infrastructure established, the V4L2 su
 
 ## V4L2 (Video4Linux2)
 
-**V4L2** is the kernel subsystem for cameras and video capture devices. It standardizes the API for frame capture, format negotiation, and buffer management across all camera hardware. Header: `<linux/videodev2.h>`.
+**V4L2** is the kernel subsystem for **cameras and video capture devices**. It standardizes the API for frame capture, format negotiation, and buffer management across all camera hardware. Header: `<linux/videodev2.h>`.
 
 ```
 V4L2 Pipeline Architecture
@@ -277,7 +277,7 @@ VIDIOC_STREAMOFF    → stop streaming
 | `V4L2_MEMORY_USERPTR` | User allocates; driver pins | Conditional |
 | `V4L2_MEMORY_DMABUF` | Import external DMA-BUF fd | Yes (GPU imports same buf) |
 
-`V4L2_MEMORY_DMABUF` is the key to zero-copy camera→GPU pipelines. The GPU creates a DMA-BUF buffer, exports it as an fd, and the V4L2 driver fills it directly via DMA. The GPU then reads inference input from the same physical pages — no data is ever copied.
+`V4L2_MEMORY_DMABUF` is the key to **zero-copy camera→GPU pipelines**. The GPU creates a DMA-BUF buffer, exports it as an fd, and the V4L2 driver fills it directly via DMA. The GPU then reads inference input from the same physical pages — no data is ever copied.
 
 ### Media Controller
 
@@ -309,7 +309,7 @@ IMX sensors → NVCSI → ISP (NvCamSrc) → V4L2/ISP API
     --> modeld (neural network inference)
 ```
 
-This is the production pipeline in openpilot. Frames flow from the physical sensor through the ISP, into DMA-BUF backed buffers, shared via VisionIPC to the inference model — with no CPU copy at any stage.
+This is the **production pipeline in openpilot**. Frames flow from the physical sensor through the ISP, into DMA-BUF backed buffers, shared via VisionIPC to the inference model — with **no CPU copy at any stage**.
 
 > **Key Insight:** The V4L2 `VIDIOC_QBUF`/`VIDIOC_DQBUF` buffer exchange is the synchronization protocol of the camera pipeline. The camera driver owns the buffer between QBUF and DQBUF; userspace owns it otherwise. Violating this ownership (reading a buffer while the driver is filling it) causes torn frames and non-deterministic corruption.
 

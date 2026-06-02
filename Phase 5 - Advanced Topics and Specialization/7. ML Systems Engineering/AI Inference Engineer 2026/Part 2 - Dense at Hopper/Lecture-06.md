@@ -2,7 +2,7 @@
 
 ## Overview
 
-Both Llama 3.3 70B and Qwen 2.5 72B publish 128K context windows. At 128K the cost shape of inference changes — what dominated TPOT at 4K (weight bandwidth) is joined or overtaken by **KV bandwidth** and **prefill compute**. Long-context serving is a distinct engineering problem with its own precision recipes, scheduling choices, and parity bars.
+Both Llama 3.3 70B and Qwen 2.5 72B publish **128K context windows**. At 128K the cost shape of inference changes — what dominated TPOT at 4K (weight bandwidth) is joined or overtaken by **KV bandwidth** and **prefill compute**. **Long-context serving is a distinct engineering problem** with its own precision recipes, scheduling choices, and parity bars.
 
 This final Part 2 lecture covers:
 
@@ -36,7 +36,7 @@ At 128K context, per request:
 | FP8 KV | 21 GB |
 | INT4 KV | 10.5 GB |
 
-This is for **one request**. At batch=8 with FP16 KV: 336 GB. That fits on 4× H100 80G (320 GB total) only by aggressive paging — and leaves nothing for weights or activations.
+This is for **one request**. At batch=8 with FP16 KV: 336 GB. That fits on 4× H100 80G (320 GB total) only by **aggressive paging** — and leaves nothing for weights or activations.
 
 **At 128K context, batch size is HBM-limited far before it is compute-limited.**
 
@@ -65,7 +65,7 @@ TPOT ≈ kv_read_time + weight_read_time + compute + overhead
      ≈ 25 ms per token
 ```
 
-versus ~12 ms at 4K context. **TPOT roughly doubles at 128K** because the KV bandwidth becomes a co-dominant cost.
+versus ~12 ms at 4K context. **TPOT roughly doubles at 128K** because the **KV bandwidth becomes a co-dominant cost**.
 
 ### 1.2 Prefill cost at 128K
 
@@ -94,7 +94,7 @@ qk_flops = 2 × q_heads × q_seq × kv_seq × head_dim
          ≈ 2.1 × 10^9 FLOPs
 ```
 
-A single decode-step attention op is 2 GFLOPs. Compute-trivial. But the *KV read* for attention is 42 GB / decode step (per §1.1). So attention at long context is **purely bandwidth-bound**.
+A single decode-step attention op is 2 GFLOPs. **Compute-trivial.** But the *KV read* for attention is 42 GB / decode step (per §1.1). So attention at long context is **purely bandwidth-bound**.
 
 For prefill (batch=1, prompt=128K), attention is O(prompt² × head_dim × heads) which becomes ~2 × 64 × 131072 × 131072 × 128 = 277 TFLOPs — comparable to the FFN cost. FlashAttention 4's O(N) memory complexity is essential here.
 
@@ -106,7 +106,7 @@ Both Llama 3.3 70B and Qwen 2.5 72B were *trained* at shorter context (4K-32K ba
 
 ### 2.1 What YaRN does
 
-YaRN rescales RoPE frequencies so the model can attend over longer ranges without retraining from scratch. The result: a model trained at 8K can serve at 128K with only ~few epochs of fine-tuning.
+YaRN **rescales RoPE frequencies** so the model can attend over longer ranges **without retraining from scratch**. The result: a model trained at 8K can serve at 128K with only ~few epochs of fine-tuning.
 
 The runtime impact is minimal:
 
@@ -128,7 +128,7 @@ Published benchmarks (RULER, NIAH):
 | Llama 3.3 70B | ~96 | ~92 | ~89 | ~80 (sharper drop) |
 | Qwen 2.5 72B | ~96 | ~93 | ~91 | ~85 |
 
-Qwen 2.5 72B's long-context behavior at 128K is generally stronger than Llama 3.3 70B in published RULER numbers, though both meaningfully degrade vs. their short-context performance. For products that rely on accurate retrieval at 100K+, this is a model-selection signal independent of inference engineering.
+Qwen 2.5 72B's long-context behavior at 128K is **generally stronger than Llama 3.3 70B** in published RULER numbers, though both meaningfully degrade vs. their short-context performance. For products that rely on accurate retrieval at 100K+, this is a **model-selection signal** independent of inference engineering.
 
 ---
 
@@ -202,7 +202,7 @@ For Llama 3.3 70B with FP8 KV at 64K and 128K:
 | RULER 64K | 89.5 | 86.2 (-3.3) | 89.0 (-0.5) |
 | RULER 128K | 80.1 | 75.3 (-4.8) | 79.4 (-0.7) |
 
-Per-tensor FP8 KV loses 3-5 pp at long context. Per-head loses 0.5-0.7 pp. Per-head is the production recipe.
+Per-tensor FP8 KV loses 3-5 pp at long context. Per-head loses 0.5-0.7 pp. **Per-head is the production recipe.**
 
 For Qwen 2.5 72B numbers are similar; both models behave well under per-head FP8 KV.
 
@@ -285,7 +285,7 @@ For a long-context product:
 3. **Run each candidate recipe (FP8 KV, INT4 KV, chunked prefill on/off).**
 4. **Compute Δ per length.**
 
-The pattern: short-context evals like MMLU don't catch long-context regressions. **Always validate long-context-specifically.**
+The pattern: **short-context evals like MMLU don't catch long-context regressions**. **Always validate long-context-specifically.**
 
 ---
 

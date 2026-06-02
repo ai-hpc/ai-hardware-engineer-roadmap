@@ -15,7 +15,7 @@ Most people meet `arduino-esp32` through examples like:
 - BLE example
 - I2C sensor read
 
-Those examples are useful, but the real skill is learning to see them as parts of a complete embedded system.
+Those examples are useful, but the **real skill** is learning to see them as parts of a **complete embedded system**.
 
 This lecture is about that shift.
 
@@ -30,7 +30,7 @@ When you use:
 - `Serial`
 - GPIO APIs
 
-you are not just calling friendly functions. You are making decisions about:
+you are not just calling friendly functions. You are making **decisions** about:
 
 - pin use
 - timing
@@ -69,7 +69,7 @@ So when adding libraries, ask:
 
 ## Connectivity is where Espressif becomes especially valuable
 
-One reason `arduino-esp32` matters more than many classic Arduino cores is that Espressif chips are connectivity-heavy.
+One reason `arduino-esp32` matters more than many classic Arduino cores is that Espressif chips are **connectivity-heavy**.
 
 That means the platform is especially useful for:
 
@@ -87,7 +87,7 @@ This is why the Espressif course belongs next to the IoT course family in the ro
 
 ## System design question: what kind of product am I building?
 
-When working with Espressif boards, try to classify the product early.
+When working with Espressif boards, try to **classify the product early**.
 
 ### Type 1: quick proof-of-concept
 
@@ -133,7 +133,7 @@ Even in Arduino-style projects, try to keep these habits:
 - treat libraries as dependencies, not magic
 - think about failure cases, not only happy-path demos
 
-These habits make migration much easier later.
+These habits make **migration much easier** later.
 
 ---
 

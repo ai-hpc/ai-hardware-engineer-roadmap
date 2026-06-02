@@ -26,13 +26,13 @@
 | Exception (fault) | CPU error | Yes | Page fault, div-by-zero |
 | Exception (abort) | Unrecoverable | Yes | Machine check |
 
-Fault: re-execute instruction after fix. Trap: advance after handler. Abort: no return.
+**Fault:** re-execute instruction after fix. **Trap:** advance after handler. **Abort:** no return.
 
 ---
 
 ## Interrupt Controllers
 
-**ARM GIC v3:** SGI (0–15, IPI), PPI (16–31, per-CPU), SPI (32–1019, devices). Priority 0–255; PMR masks. **x86 APIC:** Local APIC + I/O APIC; IDT; TPR. **MSI/MSI-X (PCIe):** Message-signaled interrupts; MSI-X gives per-queue vectors and CPU affinity — used by NVMe, GPU, NICs for scalability.
+**ARM GIC v3:** SGI (0–15, IPI), PPI (16–31, per-CPU), SPI (32–1019, devices). Priority 0–255; PMR masks. **x86 APIC:** Local APIC + I/O APIC; IDT; TPR. **MSI/MSI-X (PCIe):** Message-signaled interrupts; MSI-X gives **per-queue vectors and CPU affinity** — used by NVMe, GPU, NICs for scalability.
 
 ---
 
@@ -50,7 +50,7 @@ Fault: re-execute instruction after fix. Trap: advance after handler. Abort: no 
 
 # Part 2 (L4): System Calls, vDSO & eBPF
 
-**Context:** User code reaches kernel only via syscalls (toll booth). Cost: mode switch, Spectre/Meltdown mitigations, TLB effects (~100–400 ns round-trip). vDSO avoids syscall for time; eBPF observes kernel without changing code.
+**Context:** User code reaches kernel only via **syscalls** (toll booth). Cost: mode switch, Spectre/Meltdown mitigations, TLB effects (**~100–400 ns round-trip**). **vDSO** avoids syscall for time; **eBPF** observes kernel without changing code.
 
 ---
 
@@ -62,13 +62,13 @@ x86-64: SYSCALL → entry_SYSCALL_64 → sys_call_table[rax] → SYSRET. ARM64: 
 
 ## Syscall Overhead
 
-Mode switch ~50–150 ns; mitigations (KPTI, IBRS, retpoline) add ~50–200 ns on x86; ARM64 lighter. At 200 fps × 4 ioctls = 1600/s × 300 ns ≈ 0.5 ms/s; batching and zero-copy (mmap, io_uring) reduce crossings.
+**Mode switch ~50–150 ns**; mitigations (KPTI, IBRS, retpoline) add ~50–200 ns on x86; ARM64 lighter. At 200 fps × 4 ioctls = 1600/s × 300 ns ≈ 0.5 ms/s; **batching and zero-copy** (mmap, io_uring) reduce crossings.
 
 ---
 
 ## vDSO
 
-Kernel maps a read-only page with time (and a few other) helpers. `clock_gettime(CLOCK_MONOTONIC)`, `gettimeofday()` can resolve in userspace (~10–20 ns) without SYSCALL. Use CLOCK_MONOTONIC for timing and sensor fusion; CLOCK_REALTIME can jump (NTP).
+Kernel maps a **read-only page** with time (and a few other) helpers. `clock_gettime(CLOCK_MONOTONIC)`, `gettimeofday()` can resolve **in userspace** (~10–20 ns) without SYSCALL. Use CLOCK_MONOTONIC for timing and sensor fusion; **CLOCK_REALTIME can jump** (NTP).
 
 ---
 
@@ -80,7 +80,7 @@ Kernel maps a read-only page with time (and a few other) helpers. `clock_gettime
 
 ## eBPF
 
-Programs run in kernel (verified, JIT); attach to kprobes, tracepoints, uprobes, XDP. Observability without modifying kernel or app: profile syscalls, scheduler, driver paths. bpftrace, BCC, libbpf; production-safe instrumentation.
+Programs run in kernel (**verified, JIT**); attach to kprobes, tracepoints, uprobes, XDP. **Observability without modifying kernel or app**: profile syscalls, scheduler, driver paths. bpftrace, BCC, libbpf; **production-safe instrumentation**.
 
 ---
 

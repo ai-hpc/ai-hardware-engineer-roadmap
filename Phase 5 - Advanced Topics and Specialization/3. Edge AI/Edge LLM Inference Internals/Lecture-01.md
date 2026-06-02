@@ -25,7 +25,7 @@ By the end you should be able to:
 
 ## 1. GEMM vs GEMV — Why Decode Is a Different Animal
 
-A transformer forward pass is a chain of linear projections sandwiched between attention and FFN. Mathematically the same op runs in both prefill and decode:
+A transformer forward pass is a chain of **linear projections** sandwiched between attention and FFN. Mathematically the same op runs in both prefill and decode:
 
 ```
 y = W · x
@@ -122,7 +122,7 @@ attn = softmax( Q · Kᵀ / √d_k ) · V
 
 ### 3.1 Fused QKV — the standard runtime trick
 
-Three separate GEMVs over the same input `x` read `x` three times and pay three kernel-launch latencies. Real runtimes fuse them:
+Three separate GEMVs over the same input `x` read `x` three times and pay three **kernel-launch latencies**. Real runtimes fuse them:
 
 ```
 [W_Q | W_K | W_V]    # concatenated along output dim
@@ -145,7 +145,7 @@ Modern LLMs (Llama 3, Mistral, Gemma, Phi-3) use **Grouped-Query Attention (GQA)
 | GQA           | `n_heads` | `n_heads / g` (e.g. 8) | `d · n_kv / n_heads` |
 | MQA           | `n_heads` | `1`                 | `d_head` |
 
-This is purely a **bandwidth** trick. The Q projection stays full size; K and V shrink by the GQA ratio. The KV cache (per token, per layer) shrinks correspondingly — which matters more for long-context decode than the projection itself.
+This is purely a **bandwidth** trick. The Q projection stays full size; K and V shrink by the GQA ratio. The KV cache (per token, per layer) shrinks correspondingly — which matters more for **long-context decode** than the projection itself.
 
 ### 3.3 Shared / removed projections — research, not deployment
 
@@ -181,7 +181,7 @@ for each block of 256 weights:
    FMA into accumulator
 ```
 
-Dequant happens **in registers**, not in DRAM. That is the whole point — you read 4.5 bits per weight from DRAM and synthesize 16-bit values on chip. Bandwidth wins.
+Dequant happens **in registers**, not in DRAM. That is the whole point — you read 4.5 bits per weight from DRAM and **synthesize 16-bit values on chip**. Bandwidth wins.
 
 **Why this matters for your trace:** `type=12` (Q4_K) reads `~0.56 bytes/weight`; `type=14` (Q6_K) reads `~0.81 bytes/weight`. The same GEMV will be ~44% slower at Q6_K vs Q4_K on a bandwidth-bound device, perplexity be damned. Choose the lowest-bit format that meets your quality bar — usually Q4_K_M for 7B-class, Q5_K_M for 3B-class — and only escalate to Q6_K if you actually see regression on your eval set.
 

@@ -121,7 +121,7 @@ uvicorn agent_api:app --host 0.0.0.0 --port 8000 --reload
 
 ## 2. Streaming with Server-Sent Events (SSE)
 
-SSE lets the client receive tokens as they are generated, making long responses feel interactive.
+**SSE** lets the client receive tokens as they are generated, making long responses feel **interactive**.
 
 ```python
 # pip install sse-starlette
@@ -186,7 +186,7 @@ print()
 
 ## 3. Semantic Caching with Redis + Embeddings
 
-Semantic caching stores (query_embedding → answer) pairs. On a new query, if it is within a similarity threshold of a cached query, return the cached answer without calling the LLM.
+**Semantic caching** stores (query_embedding → answer) pairs. On a new query, if it is within a **similarity threshold** of a cached query, return the cached answer without calling the LLM.
 
 ```python
 # pip install redis sentence-transformers numpy
@@ -282,7 +282,7 @@ async def cached_chat(message: str) -> tuple[str, bool]:
 
 ## 4. Model Routing
 
-Route cheap/simple queries to a fast model and complex queries to a more capable one.
+Route cheap/simple queries to a **fast model** and complex queries to a **more capable one**.
 
 ```python
 import os

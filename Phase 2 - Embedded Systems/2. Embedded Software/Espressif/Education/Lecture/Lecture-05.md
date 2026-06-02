@@ -26,7 +26,7 @@ Examples currently shown on the official page include projects like:
 
 Those examples are very different from each other, and that is the point.
 
-They show the breadth of the ecosystem.
+They show the **breadth of the ecosystem**.
 
 ---
 
@@ -110,7 +110,7 @@ Likely areas:
 
 ## A good personal study plan
 
-Here is a clean way to use Espressif’s official education path inside this roadmap:
+Here is a **clean way** to use Espressif’s official education path inside this roadmap:
 
 ### Stage 1: fundamentals
 
@@ -173,7 +173,7 @@ Then add one sentence:
 
 - "What I will deliberately ignore for now so I do not spread myself too thin"
 
-That sentence is important. Good study plans include deliberate omission.
+That sentence is important. Good study plans include **deliberate omission**.
 
 ---
 

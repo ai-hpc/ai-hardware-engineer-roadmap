@@ -16,7 +16,7 @@
 
 ## 1. What Is Tool Use?
 
-Tool use lets the LLM call external functions — search the web, run code, query a database, control a browser. The model doesn't execute code; it outputs a structured JSON call that your application executes.
+**Tool use** lets the LLM call external functions — search the web, run code, query a database, control a browser. The model doesn't execute code; it outputs a **structured JSON call** that your application executes.
 
 ```
 User message
@@ -34,7 +34,7 @@ Tool result sent back to LLM as "tool" role message
 
 ## 2. Defining Tools
 
-Tool schemas are the most important thing to get right. Vague descriptions cause wrong calls; wrong input types cause parse errors.
+**Tool schemas** are the most important thing to get right. Vague descriptions cause wrong calls; wrong input types cause parse errors.
 
 ```python
 import anthropic
@@ -204,7 +204,7 @@ print(answer)
 
 ## 4. Parallel Tool Calls
 
-When multiple independent tools are needed, Claude can call them simultaneously — reducing round-trips.
+When multiple independent tools are needed, Claude can call them **simultaneously** — reducing **round-trips**.
 
 ```python
 # Claude may return multiple tool_use blocks in one response
@@ -254,7 +254,7 @@ async def process_tool_calls(tool_blocks: list) -> list:
 
 ## 5. Error Handling
 
-Agents must handle tool failures gracefully — the LLM can recover if you give it good error messages.
+Agents must **handle tool failures gracefully** — the LLM can recover if you give it good error messages.
 
 ```python
 def safe_tool_call(tool_name: str, tool_input: dict, tool_id: str) -> dict:
@@ -291,7 +291,7 @@ def safe_tool_call(tool_name: str, tool_input: dict, tool_id: str) -> dict:
 
 ## 6. Tool Safety Patterns
 
-Some tools are dangerous (delete files, send emails, execute shell commands). Add confirmation gates.
+Some tools are **dangerous** (delete files, send emails, execute shell commands). Add **confirmation gates**.
 
 ```python
 DANGEROUS_TOOLS = {"delete_file", "send_email", "execute_shell", "git_push"}

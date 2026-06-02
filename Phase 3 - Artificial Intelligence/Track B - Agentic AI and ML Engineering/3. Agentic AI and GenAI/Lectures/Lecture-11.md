@@ -19,7 +19,7 @@ By the end of this lecture you will be able to:
 
 ## 1. LLM-as-Judge
 
-The "LLM-as-judge" pattern uses a capable LLM to evaluate the output of another LLM call. It is cheaper and faster than human annotation while correlating well with human judgment for well-designed rubrics.
+The **"LLM-as-judge"** pattern uses a capable LLM to evaluate the output of another LLM call. It is **cheaper and faster than human annotation** while correlating well with human judgment for well-designed rubrics.
 
 ```python
 # pip install openai
@@ -108,7 +108,7 @@ def batch_evaluate(test_cases: list[dict], max_workers: int = 4) -> list[dict]:
 
 ## 2. RAGAS Metrics
 
-RAGAS (Retrieval Augmented Generation Assessment) defines four complementary metrics for RAG systems. All are computed without needing ground-truth answers for the first two.
+**RAGAS** (Retrieval Augmented Generation Assessment) defines **four complementary metrics** for RAG systems. All are computed without needing ground-truth answers for the first two.
 
 ```python
 # pip install ragas langchain-openai datasets
@@ -212,7 +212,7 @@ def compute_faithfulness_manual(answer: str, context: str, llm) -> float:
 
 ## 3. Tracing with LangSmith
 
-LangSmith records every LangChain invocation with full input/output, timing, and token counts. When no API key is available, we can mock the tracing interface.
+**LangSmith** records every LangChain invocation with full **input/output, timing, and token counts**. When no API key is available, we can mock the tracing interface.
 
 ```python
 # With a real LangSmith account:
@@ -238,7 +238,7 @@ setup_tracing()
 
 ### 3.1 Manual Run Logging (Mock)
 
-When LangSmith is not available, log runs to a local JSONL file:
+When LangSmith is not available, log runs to a **local JSONL file**:
 
 ```python
 import json

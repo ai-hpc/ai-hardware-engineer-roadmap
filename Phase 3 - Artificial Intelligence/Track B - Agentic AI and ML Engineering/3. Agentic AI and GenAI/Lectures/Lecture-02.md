@@ -15,7 +15,7 @@
 
 ## 1. System Prompts
 
-The system prompt is the agent's constitution. It runs before every conversation turn and defines persona, capabilities, constraints, and output format.
+The **system prompt** is the agent's constitution. It runs before every conversation turn and defines **persona, capabilities, constraints, and output format**.
 
 ```python
 import anthropic
@@ -65,7 +65,7 @@ def ask(question: str) -> str:
 
 ## 2. Few-Shot Prompting
 
-Provide 2–5 input/output examples to demonstrate the exact format you need.
+Provide **2–5 input/output examples** to demonstrate the exact format you need.
 
 ```python
 FEW_SHOT_SYSTEM = """Extract hardware specs from text. Return JSON only.
@@ -94,7 +94,7 @@ response = client.messages.create(
 
 ## 3. Structured Output — JSON Mode
 
-For agents that must parse LLM output programmatically, enforce JSON structure.
+For agents that must parse LLM output programmatically, **enforce JSON structure**.
 
 ### Method A: Prompt-based (reliable with Claude)
 
@@ -171,7 +171,7 @@ print(spec.model_dump())
 
 ## 4. Chain-of-Thought (CoT)
 
-For complex reasoning tasks, ask the model to think step by step before answering.
+For complex reasoning tasks, ask the model to **think step by step** before answering.
 
 ```python
 COT_SYSTEM = """You are a hardware performance analyst.
@@ -277,7 +277,7 @@ response = client.messages.create(
 
 ## 6. Prompt Injection Defense
 
-When building agents that process external data (web pages, user files, emails), guard against prompt injection.
+When building agents that process external data (web pages, user files, emails), guard against **prompt injection**.
 
 ```python
 def safe_user_content(user_data: str) -> str:

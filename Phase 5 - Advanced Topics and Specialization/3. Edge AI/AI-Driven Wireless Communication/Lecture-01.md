@@ -2,7 +2,7 @@
 
 ## Overview
 
-The classical wireless stack — channel coding, modulation, channel estimation, equalization, decoding — is built from hand-derived mathematical blocks (LDPC, Polar, MMSE, Viterbi) that have been tuned over decades against tractable channel models (AWGN, Rayleigh, 3GPP TDL). In real deployments the channel is none of these: it is a moving stew of multipath, hardware impairments, blockers, interference, and traffic. AI-driven wireless replaces or augments these classical blocks with learned models that fit the *actual* channel and *actual* hardware in front of them.
+The classical wireless stack — channel coding, modulation, channel estimation, equalization, decoding — is built from **hand-derived mathematical blocks** (LDPC, Polar, MMSE, Viterbi) that have been tuned over decades against tractable channel models (AWGN, Rayleigh, 3GPP TDL). In real deployments the channel is none of these: it is a moving stew of **multipath, hardware impairments, blockers, interference, and traffic**. AI-driven wireless replaces or augments these classical blocks with **learned models** that fit the *actual* channel and *actual* hardware in front of them.
 
 This lecture is written for the AI **hardware** engineer, not the communications theorist. The question is not "which loss function should we use" — it is **"where in the radio chain does an NPU/DSP/FPGA actually sit, what data crosses that boundary, and how tight is the latency budget?"** We cover three layers:
 
@@ -56,7 +56,7 @@ The key insight: **the closer to the antenna, the harder the latency budget**. A
 
 ### A.1 Neural channel estimation — the canonical case study
 
-In 5G NR the UE/gNB inserts known **DMRS (Demodulation Reference Signal)** pilots into the resource grid. The classical estimator does least-squares on the pilot REs, then interpolates (linear, MMSE, Wiener) onto the data REs. The MMSE estimator is optimal if you know the channel covariance — which you don't, so deployed receivers use simplified Wiener filters tuned for "average" 3GPP channel profiles.
+In 5G NR the UE/gNB inserts known **DMRS (Demodulation Reference Signal)** pilots into the resource grid. The classical estimator does **least-squares** on the pilot REs, then interpolates (linear, MMSE, Wiener) onto the data REs. The MMSE estimator is optimal if you know the channel covariance — which you don't, so deployed receivers use simplified Wiener filters tuned for "average" 3GPP channel profiles.
 
 A learned estimator treats the pilot-grid → full-grid problem as **image super-resolution**:
 
@@ -102,7 +102,7 @@ With the network above and `channels=64`:
 
 → **≈ 640 M MACs per slot, × 2000 slots/s = 1.28 TMACs/s = 2.56 TOPS** for a single 100 MHz carrier on a single UE.
 
-A Qualcomm Hexagon NPU (X75 modem class) delivers ~10–15 TOPS at INT8 in a phone power envelope. So this estimator fits — but only with INT8, structured pruning, and tile-friendly layouts. A naive FP16 deployment would not.
+A Qualcomm Hexagon NPU (X75 modem class) delivers ~10–15 TOPS at INT8 in a phone power envelope. So this estimator fits — but only with **INT8, structured pruning, and tile-friendly layouts**. A naive FP16 deployment would not.
 
 **Where this lives on silicon:**
 - **UE side:** modem NPU (Hexagon Tensor, Samsung's Exynos NPU, Apple's RF baseband neural blocks). Tightly coupled to the LDPC/Polar decoder via on-die SRAM.
@@ -112,7 +112,7 @@ A Qualcomm Hexagon NPU (X75 modem class) delivers ~10–15 TOPS at INT8 in a pho
 
 Soft demappers convert equalized symbols into **log-likelihood ratios (LLRs)** for the channel decoder. The exact LLR for QAM-256 in colored interference is messy; classical receivers use a Gaussian approximation that loses 0.3–0.8 dB in realistic conditions.
 
-A neural demapper is tiny — usually an MLP with two hidden layers of 64–128 units, run **per resource element**. It is highly parallel (no temporal dependency), maps cleanly onto vector engines, and is the most common "first real ML PHY block" deployed.
+A neural demapper is tiny — usually an **MLP** with two hidden layers of 64–128 units, run **per resource element**. It is highly parallel (no temporal dependency), maps cleanly onto vector engines, and is the most common "first real ML PHY block" deployed.
 
 ```python
 class NeuralDemapper(nn.Module):
@@ -152,7 +152,7 @@ The hardware question is **where the camera/sensor features fuse with the RF fea
 
 ### A.4 End-to-end autoencoder PHY (research only — but important)
 
-In this paradigm, the Tx (encoder) and Rx (decoder) are **co-trained neural networks**. The "channel" is a differentiable layer (AWGN noise, multipath impulse response, possibly hardware impairments). The constellation, pulse shape, and receiver are all learned jointly.
+In this paradigm, the Tx (encoder) and Rx (decoder) are **co-trained neural networks**. The "channel" is a **differentiable layer** (AWGN noise, multipath impulse response, possibly hardware impairments). The constellation, pulse shape, and receiver are all learned jointly.
 
 ```
 bits ──► [NN encoder] ──► waveform ──► [channel] ──► [NN decoder] ──► bits
@@ -182,7 +182,7 @@ It is also the cleanest demonstration of **hardware-software co-design** in radi
 
 ## Part B — RAN-Level ML and the O-RAN RIC
 
-The 3GPP PHY processes a slot in microseconds. The MAC scheduler runs every 1 ms. RRM (resource management) decisions happen on tens of milliseconds. Above that — load balancing, energy savings, mobility, anomaly detection — there is a **seconds-to-minutes** loop that is the natural home of "infrastructure ML".
+The 3GPP PHY processes a slot in **microseconds**. The MAC scheduler runs every 1 ms. RRM (resource management) decisions happen on tens of milliseconds. Above that — load balancing, energy savings, mobility, anomaly detection — there is a **seconds-to-minutes** loop that is the natural home of "infrastructure ML".
 
 O-RAN formalized this with the **RIC (RAN Intelligent Controller)**:
 
@@ -230,7 +230,7 @@ This is where ML pipelines look most like conventional MLOps — Kubeflow, Airfl
 
 ### B.3 ML for energy savings — the load-bearing use case
 
-Operators care about wireless ML mostly because it reduces opex. Cell carriers consume 40–60% of RAN energy. ML-driven cell shutdown decisions, based on predicted traffic and mobility, are deployed at scale (Vodafone, DT, NTT, KDDI all have running production rApps).
+Operators care about wireless ML mostly because it **reduces opex**. Cell carriers consume **40–60% of RAN energy**. ML-driven cell shutdown decisions, based on predicted traffic and mobility, are deployed at scale (Vodafone, DT, NTT, KDDI all have running production rApps).
 
 The model is usually unimpressive — gradient-boosted trees or a small LSTM on per-cell traffic timeseries. The **systems** problem is non-trivial:
 - Latency for waking a cell back up is 100–500 ms (RF PA warmup, sync).
@@ -243,7 +243,7 @@ This is a perfect case where the AI hardware engineer's job is **not** to add TO
 
 ## Part C — SDR + Deep Learning
 
-Software-defined radio (SDR) is the right teaching platform: it lets you put a real PyTorch model on real IQ samples. The minimum viable bench:
+**Software-defined radio (SDR)** is the right teaching platform: it lets you put a real PyTorch model on real **IQ samples**. The minimum viable bench:
 
 | Hardware | Sample rate | Use |
 |---|---|---|
@@ -320,7 +320,7 @@ The realistic pitfalls:
 
 ### C.3 RF fingerprinting — the security-adjacent use case
 
-Two transmitters running the *same* standard produce subtly different IQ tails because of unique RF impairments (PA nonlinearity, oscillator phase noise, mixer leakage). Models trained on **raw IQ** can distinguish individual devices — useful for authentication ("is this really my device?") and adversarial ("is this device the one that was advertised?").
+Two transmitters running the *same* standard produce subtly different IQ tails because of **unique RF impairments** (PA nonlinearity, oscillator phase noise, mixer leakage). Models trained on **raw IQ** can distinguish individual devices — useful for authentication ("is this really my device?") and adversarial ("is this device the one that was advertised?").
 
 The hardware story: this works well on **Jetson Orin Nano** sitting next to an SDR, because the classifier is small and the **bottleneck is RF, not compute**. It is a clean roadmap project that exercises the entire embedded-AI stack.
 

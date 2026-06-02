@@ -8,7 +8,7 @@
 
 ## 1. The Bluetooth side is a separate Linux subsystem
 
-Wi-Fi and Bluetooth ride over the same host transport, but Linux does not treat them as the same thing.
+Wi-Fi and Bluetooth ride over the **same host transport**, but Linux does not treat them as the same thing.
 
 For BLE, the important file is:
 
@@ -32,7 +32,7 @@ Lecture 1 is useful here because HCI is another example of the kernel exposing a
 
 Lecture 17 matters because the Bluetooth side also follows the same object-registration pattern as the Wi-Fi side, just in a different subsystem. The important shift is from “a transport packet arrived” to “the kernel accepted that packet as HCI traffic and handed it to the Bluetooth stack.”
 
-The HCI abstraction matters because Bluetooth in Linux is built around a host/controller split. The controller may be on USB, UART, SDIO, or in this case SPI, but once the driver feeds packets into the HCI layer, BlueZ can manage discovery and connections without caring about the underlying bus details.
+The HCI abstraction matters because Bluetooth in Linux is built around a **host/controller split**. The controller may be on USB, UART, SDIO, or in this case SPI, but once the driver feeds packets into the HCI layer, **BlueZ** can manage discovery and connections without caring about the underlying bus details.
 
 That is why BLE validation cannot stop at “`hci0` exists.” A visible controller only proves registration; scanning successfully proves that HCI commands, events, and data packets are flowing correctly across the transport and back into the Linux Bluetooth stack.
 
@@ -69,7 +69,7 @@ That is why the validated Jetson logs and tools showed:
 - `hci0`
 - `Bus: SPI`
 
-This is not cosmetic. It means Linux Bluetooth tooling now sees a standard controller interface.
+This is not cosmetic. It means Linux Bluetooth tooling now sees a **standard controller interface**.
 
 The key block in `esp_bt.c` is short and very literal:
 
@@ -120,7 +120,7 @@ This is the crucial handoff:
 - transport packet from ESP
 - becomes HCI traffic in Linux
 
-That is exactly how a custom hardware path gets translated into a standard subsystem view.
+That is exactly how a custom hardware path gets **translated into a standard subsystem view**.
 
 The handoff in `main.c` is direct:
 
@@ -159,7 +159,7 @@ That last point matters for **ESP32-C6**:
 - this path is **BLE-only**
 - do not expect classic Bluetooth audio profiles from this configuration
 
-That is a practical product constraint, not just a code detail.
+That is a **practical product constraint**, not just a code detail.
 
 The capability reporting comes from `main.c` and is worth scanning once in real code:
 
@@ -195,7 +195,7 @@ And the proof points were:
 - the controller bus reported `SPI`
 - BLE scan discovered nearby devices
 
-That means the BLE path was not just registered. It was functional.
+That means the BLE path was not just registered. It was **functional**.
 
 This is important:
 

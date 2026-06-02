@@ -4,9 +4,9 @@
 
 ---
 
-Agent security needs a threat model.
+Agent security needs a **threat model**.
 
-Not just a warning that "prompt injection is bad."
+Not just a warning that **"prompt injection is bad."**
 
 A real agent threat model answers:
 
@@ -20,7 +20,7 @@ Which control stops it?
 Which test proves the control still works?
 ```
 
-OpenClaw's trust site provides a useful case study because it maps agent threats onto MITRE ATLAS tactics.
+OpenClaw's trust site provides a useful case study because it maps agent threats onto **MITRE ATLAS tactics**.
 
 The published draft model lists:
 
@@ -34,7 +34,7 @@ The published draft model lists:
 
 The point is not the exact number.
 
-The point is the method:
+The point is the **method**:
 
 ```text
 agent architecture
@@ -89,7 +89,7 @@ Agent systems add new surfaces:
 - web-fetch and external content
 - model-mediated decisions
 
-The core difference:
+The **core difference**:
 
 ```text
 In a normal app, user input is data.
@@ -107,13 +107,13 @@ That means untrusted text can try to shape:
 - which external URL is fetched
 - which message is sent
 
-This is why prompt injection belongs in the threat model, but it is only one category.
+This is why **prompt injection** belongs in the threat model, but it is **only one category**.
 
 ---
 
 ## 2. MITRE ATLAS framing
 
-MITRE ATLAS is a knowledge base for adversarial tactics and techniques against AI systems.
+**MITRE ATLAS** is a knowledge base for adversarial tactics and techniques against AI systems.
 
 OpenClaw uses that style to organize threats by tactics such as:
 
@@ -126,7 +126,7 @@ OpenClaw uses that style to organize threats by tactics such as:
 - exfiltration
 - impact
 
-That gives security reviews a stable structure.
+That gives security reviews a **stable structure**.
 
 Instead of saying:
 
@@ -144,7 +144,7 @@ Control: untrusted-content wrapping, allowlist, session isolation, tool policy
 Test: injected channel message cannot trigger privileged tool call
 ```
 
-That is reviewable.
+That is **reviewable**.
 
 ---
 
@@ -180,9 +180,9 @@ impact:
   execute commands, destroy data, exhaust resources, commit fraud
 ```
 
-The details matter less than the coverage.
+The details matter less than the **coverage**.
 
-A credible agent threat model must cover:
+A **credible agent threat model** must cover:
 
 ```text
 how attackers get in
@@ -198,7 +198,7 @@ how they cause impact
 
 ## 4. Critical attack chains
 
-Threats rarely happen in isolation.
+Threats **rarely happen in isolation**.
 
 The OpenClaw model includes attack chains that combine multiple threats into end-to-end paths.
 
@@ -236,17 +236,17 @@ financial fraud
   -> induces unauthorized action
 ```
 
-This is how to review agent security.
+This is how to **review agent security**.
 
-Do not only review single bugs.
+Do not only review **single bugs**.
 
-Review kill chains.
+Review **kill chains**.
 
 ---
 
 ## 5. Trust boundaries
 
-OpenClaw identifies five practical trust boundaries.
+OpenClaw identifies **five practical trust boundaries**.
 
 ### Supply chain
 
@@ -395,7 +395,7 @@ Controls:
 
 ## 6. Asset-first threat modeling
 
-A useful threat model starts with assets.
+A useful threat model **starts with assets**.
 
 For OpenClaw-style systems, assets include:
 
@@ -428,15 +428,15 @@ Can a node access it?
 Can it survive token rotation?
 ```
 
-This turns abstract security into concrete design review.
+This turns **abstract security into concrete design review**.
 
 ---
 
 ## 7. Prompt injection is a privilege escalation attempt
 
-A common mistake is treating prompt injection as "bad model behavior."
+A common mistake is treating prompt injection as **"bad model behavior."**
 
-In an agent system, prompt injection should be analyzed like a privilege escalation attempt.
+In an agent system, prompt injection should be analyzed like a **privilege escalation attempt**.
 
 Example:
 
@@ -447,9 +447,9 @@ attacker-controlled text
   -> tool accesses protected asset
 ```
 
-The vulnerability is not that the model saw bad text.
+The vulnerability is **not that the model saw bad text**.
 
-The vulnerability is that untrusted text was allowed to influence a privileged action.
+The vulnerability is that **untrusted text was allowed to influence a privileged action**.
 
 Good controls enforce:
 
@@ -462,13 +462,13 @@ untrusted content cannot override policy
 untrusted content cannot approve actions
 ```
 
-That rule belongs in system prompts, tool routers, approval flows, and tests.
+That rule belongs in **system prompts, tool routers, approval flows, and tests**.
 
 ---
 
 ## 8. Skill supply chain controls
 
-Skills are one of the highest-risk surfaces because they package reusable behavior.
+Skills are one of the **highest-risk surfaces** because they package reusable behavior.
 
 A malicious skill can try to:
 
@@ -499,7 +499,7 @@ runtime review:
   which tools did the skill cause the agent to call?
 ```
 
-Lecture 39's skill evaluation loop fits directly here.
+**Lecture 39's skill evaluation loop** fits directly here.
 
 For security-sensitive skills, add adversarial evals:
 
@@ -514,13 +514,13 @@ skill is asked to send private transcript content
 
 ## 9. Tool execution controls
 
-Tool execution is where agent risk becomes real-world risk.
+Tool execution is where **agent risk becomes real-world risk**.
 
-The model can be wrong.
+The model can be **wrong**.
 
-The tool still executes.
+The tool still **executes**.
 
-Therefore the tool layer must enforce policy independently of model intent.
+Therefore the tool layer must **enforce policy independently of model intent**.
 
 Required controls:
 
@@ -552,17 +552,17 @@ That means an approval should bind:
 - relevant file operand where possible
 - requester/session context
 
-If any of those mutate after approval, deny or re-approve.
+If any of those **mutate after approval**, deny or re-approve.
 
 ---
 
 ## 10. Session isolation and memory poisoning
 
-Long-lived agents remember things.
+**Long-lived agents** remember things.
 
-That creates value and risk.
+That creates **value and risk**.
 
-Memory poisoning occurs when untrusted input writes durable state that later influences privileged actions.
+**Memory poisoning** occurs when untrusted input writes durable state that later influences privileged actions.
 
 Example:
 
@@ -586,7 +586,7 @@ Controls:
 - expose memory review and deletion
 - log memory writes
 
-Session isolation matters because one peer or channel should not inherit another peer's context or tool authority.
+**Session isolation** matters because one peer or channel should not inherit another peer's context or tool authority.
 
 ---
 
@@ -605,9 +605,9 @@ Agent systems can exfiltrate through many channels:
 - node commands
 - copied transcripts
 
-Do not only block obvious "send secret" requests.
+Do not only block obvious **"send secret"** requests.
 
-Design for data-flow control:
+Design for **data-flow control**:
 
 ```text
 source:
@@ -630,7 +630,7 @@ no external sink without explicit user intent and policy check
 
 ## 12. Turning the model into tests
 
-A threat model is only useful if it produces tests.
+A threat model is only useful if it **produces tests**.
 
 For each threat, write:
 
@@ -669,7 +669,7 @@ evidence:
   tool log, final response, policy decision
 ```
 
-This is how the matrix becomes engineering work.
+This is how the matrix becomes **engineering work**.
 
 ---
 
@@ -709,17 +709,17 @@ exfiltration:
   credentials are redacted in tool output
 ```
 
-Run these in CI and before release.
+Run these in **CI and before release**.
 
-Security claims without regression tests decay quickly.
+Security claims without **regression tests decay quickly**.
 
 ---
 
 ## 14. Applying this to OpenCoven and local agents
 
-The same model applies beyond OpenClaw.
+The same model applies **beyond OpenClaw**.
 
-For local agent workspaces such as OpenCoven-style systems, threat boundaries shift but do not disappear.
+For local agent workspaces such as OpenCoven-style systems, threat boundaries **shift but do not disappear**.
 
 Relevant boundaries:
 
@@ -757,7 +757,7 @@ tool authority second
 model behavior third
 ```
 
-Do not rely on the model to enforce the boundary.
+**Do not rely on the model to enforce the boundary.**
 
 ---
 
@@ -782,7 +782,7 @@ Use this checklist for any agent system:
 - Convert each high-risk chain into tests.
 - Re-run tests after skills, tools, model, or gateway changes.
 
-The review is incomplete until the tests exist.
+The review is **incomplete until the tests exist**.
 
 ---
 
@@ -818,7 +818,7 @@ Residual risk:
 
 Then implement at least one test case or eval case for the highest-risk threat.
 
-If you cannot test the control, treat it as unproven.
+If you cannot test the control, treat it as **unproven**.
 
 ---
 

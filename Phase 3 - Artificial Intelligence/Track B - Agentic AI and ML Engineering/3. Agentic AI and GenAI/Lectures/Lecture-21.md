@@ -4,7 +4,7 @@
 
 ---
 
-Modern agent systems are not controlled by one short prompt.
+Modern agent systems are not controlled by **one short prompt**.
 
 They are controlled by a **prompt assembly system**.
 
@@ -43,7 +43,7 @@ By the end of this lecture, you should be able to:
 
 ## 1. Simple mental model
 
-Think of a serious agent as a field engineer.
+Think of a serious agent as a **field engineer**.
 
 Before the engineer starts work, you do not just say:
 
@@ -85,7 +85,7 @@ OpenClaw builds it.
 
 ## 2. Why OpenClaw owns the system prompt
 
-A provider default prompt is useful for a generic chat product.
+A provider default prompt is useful for a **generic chat product**.
 
 It is not enough for a product that has:
 
@@ -102,7 +102,7 @@ It is not enough for a product that has:
 - gateway commands
 - user-specific persona files
 
-OpenClaw owns the prompt so that behavior is consistent across models and providers.
+OpenClaw owns the prompt so that behavior is **consistent across models and providers**.
 
 The system can say:
 
@@ -113,7 +113,7 @@ The system can say:
 - "This is what bootstrap context was injected."
 - "This is what safety means in this runtime."
 
-The provider still matters, but the product owns the agent contract.
+The provider still matters, but the product owns the **agent contract**.
 
 ---
 
@@ -154,7 +154,7 @@ Each section has one job.
 
 ## 4. Tooling section
 
-The Tooling section teaches the model how work should be done inside this runtime.
+The Tooling section teaches the model **how work should be done** inside this runtime.
 
 It covers patterns such as:
 
@@ -173,13 +173,13 @@ This section is important because tool-using agents often fail in boring ways:
 - they spawn too many agents for simple work
 - they update a plan repeatedly without doing work
 
-The Tooling section converts product expectations into model-facing habits.
+The Tooling section converts product expectations into **model-facing habits**.
 
 ---
 
 ## 5. Execution Bias section
 
-Execution Bias is the "finish the work" section.
+Execution Bias is the **"finish the work"** section.
 
 It gives compact follow-through guidance:
 
@@ -189,9 +189,9 @@ It gives compact follow-through guidance:
 - check mutable state live instead of assuming
 - verify before finalizing
 
-This section exists because many models default to advice.
+This section exists because many models default to **advice**.
 
-A production engineering agent often needs action.
+A production engineering agent often needs **action**.
 
 Compare:
 
@@ -205,7 +205,7 @@ OpenClaw-style behavior:
 
 Execution Bias does not mean reckless automation.
 
-It means the agent should carry work through the runtime loop when it has enough permission and context.
+It means the agent should **carry work through the runtime loop** when it has enough permission and context.
 
 ---
 
@@ -233,7 +233,7 @@ Hard enforcement must come from:
 
 If a command must never run, do not merely write "do not run it" in a prompt.
 
-Block it in the tool layer.
+Block it in the **tool layer**.
 
 ---
 
@@ -266,7 +266,7 @@ List available skills compactly.
 Load the matching skill on demand.
 ```
 
-This avoids token bloat and keeps unrelated skills from polluting the run.
+This avoids **token bloat** and keeps unrelated skills from polluting the run.
 
 Skills have their own sizing budget:
 
@@ -304,7 +304,7 @@ This is a useful pattern for any self-modifying agent system:
 
 > self-update should be schema-driven, narrow, logged, and guarded
 
-Do not give an agent raw config file mutation and hope the prompt keeps it safe.
+Do not give an agent **raw config file mutation** and hope the prompt keeps it safe.
 
 ---
 
@@ -322,7 +322,7 @@ The Documentation section tells the agent where local OpenClaw docs live and enc
 
 This is a subtle but important production pattern.
 
-For a tool-rich local assistant, local docs are often more accurate than memory.
+For a tool-rich local assistant, local docs are often **more accurate than memory**.
 
 The prompt should point the model to the local source of truth:
 
@@ -363,7 +363,7 @@ Project Context
   MEMORY.md -> durable compact memory
 ```
 
-This is powerful, but it has a cost.
+This is powerful, but it has a **cost**.
 
 Large bootstrap files increase:
 
@@ -402,7 +402,7 @@ memory_search
 memory_get
 ```
 
-This keeps normal runs small.
+This keeps normal runs **small**.
 
 Recent daily memory may be prepended once in special bare `/new` or `/reset` turns, but it is not the default for every run.
 
@@ -442,9 +442,9 @@ Use full mode for the main interactive agent.
 
 ### Minimal mode
 
-Minimal mode is used for sub-agents.
+Minimal mode is used for **sub-agents**.
 
-It keeps the essential runtime contract but omits context that would bloat or confuse a delegated worker.
+It keeps the **essential runtime contract** but omits context that would bloat or confuse a delegated worker.
 
 It omits sections like:
 
@@ -476,7 +476,7 @@ The idea is:
 
 ### None mode
 
-None mode returns only the base identity line.
+None mode returns only the **base identity line**.
 
 Use it rarely.
 
@@ -499,7 +499,7 @@ A sub-agent should know project rules and tool rules.
 
 It usually does not need the full user profile, memory, heartbeat behavior, or self-update instructions.
 
-This keeps delegated work cheaper and less noisy.
+This keeps delegated work **cheaper and less noisy**.
 
 ---
 
@@ -513,9 +513,9 @@ It avoids injecting a live clock into every prompt.
 
 Why?
 
-Because a live timestamp changes every run.
+Because a live timestamp **changes every run**.
 
-Changing every run can hurt prompt caching.
+Changing every run can **hurt prompt caching**.
 
 So OpenClaw keeps the prompt-cache boundary stable and tells the model how to get exact time when needed.
 
@@ -550,7 +550,7 @@ Provider plugins can:
 - inject a stable prefix above the prompt-cache boundary
 - inject a dynamic suffix below the prompt-cache boundary
 
-This gives model-family tuning without losing product control.
+This gives **model-family tuning** without losing product control.
 
 Example:
 
@@ -589,7 +589,7 @@ But for model-family behavior, provider contributions are preferred.
 
 Why?
 
-Because provider contributions can be cache-aware and scoped to the model family.
+Because provider contributions can be **cache-aware** and scoped to the model family.
 
 Use the right layer:
 
@@ -645,7 +645,7 @@ It is a compact runtime signal so the model knows where it is operating.
 
 ## 19. Diagnostics: inspecting context
 
-When an agent behaves strangely, inspect what it actually received.
+When an agent behaves strangely, inspect **what it actually received**.
 
 OpenClaw supports commands such as:
 
@@ -664,7 +664,7 @@ Use these to inspect:
 
 This is critical for debugging.
 
-Many "model problems" are actually context problems:
+Many "model problems" are actually **context problems**:
 
 - a bootstrap file is too large
 - a stale memory file is injected
@@ -672,7 +672,7 @@ Many "model problems" are actually context problems:
 - a provider overlay is too strong
 - a sub-agent received full context instead of minimal context
 
-Inspect the prompt assembly before blaming the model.
+Inspect the prompt assembly **before blaming the model**.
 
 ---
 
@@ -727,9 +727,9 @@ Notice what is **not** in the prompt:
 - raw policy implementation
 - secrets
 
-The prompt gives the model the operating contract.
+The prompt gives the model the **operating contract**.
 
-The runtime enforces the dangerous boundaries.
+The runtime enforces the **dangerous boundaries**.
 
 ---
 
@@ -737,7 +737,7 @@ The runtime enforces the dangerous boundaries.
 
 ### Mistake 1: putting everything in the system prompt
 
-Large prompts feel powerful, but they become slow and noisy.
+Large prompts feel powerful, but they become **slow and noisy**.
 
 Use retrieval, skills, memory search, and local docs instead.
 
@@ -745,7 +745,7 @@ Use retrieval, skills, memory search, and local docs instead.
 
 If a tool action is dangerous, gate it in the tool layer.
 
-Prompt wording is not a permission system.
+Prompt wording is **not a permission system**.
 
 ### Mistake 3: giving sub-agents full context
 
@@ -790,7 +790,7 @@ Answer these:
 6. Which provider-specific guidance should be a small overlay?
 7. How will you inspect prompt size and truncation?
 
-If you cannot answer these, your agent system is not yet operationally mature.
+If you cannot answer these, your agent system is **not yet operationally mature**.
 
 ---
 

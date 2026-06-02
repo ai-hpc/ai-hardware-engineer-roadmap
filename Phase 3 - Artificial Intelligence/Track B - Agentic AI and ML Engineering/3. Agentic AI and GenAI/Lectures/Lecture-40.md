@@ -4,11 +4,11 @@
 
 ---
 
-ZAYA1-8B is interesting for this course for three reasons:
+**ZAYA1-8B** is interesting for this course for three reasons:
 
-1. It is a small mixture-of-experts reasoning model with less than 1B active parameters.
-2. It was trained end-to-end on an AMD MI300X stack.
-3. Its strongest results depend on model-harness co-design through Markovian RSA test-time compute.
+1. It is a small **mixture-of-experts** reasoning model with less than 1B active parameters.
+2. It was trained **end-to-end on an AMD MI300X stack**.
+3. Its strongest results depend on **model-harness co-design** through Markovian RSA test-time compute.
 
 It is also interesting for a fourth reason:
 
@@ -16,7 +16,7 @@ It is also interesting for a fourth reason:
 The agentic benchmarks are not the headline strength.
 ```
 
-That makes it a good model-selection case study.
+That makes it a good **model-selection case study**.
 
 Do not read ZAYA1-8B as:
 
@@ -50,7 +50,7 @@ By the end of this lecture, you should be able to:
 
 ## 1. What ZAYA1-8B is
 
-ZAYA1-8B is a Zyphra mixture-of-experts language model.
+ZAYA1-8B is a **Zyphra mixture-of-experts** language model.
 
 According to Zyphra's Hugging Face model card:
 
@@ -61,7 +61,7 @@ license: Apache-2.0
 specialization: math, reasoning, coding
 ```
 
-The active parameter count is the key.
+The **active parameter count** is the key.
 
 In a dense model:
 
@@ -75,21 +75,21 @@ In an MoE model:
 each token activates selected experts
 ```
 
-So the inference cost can be closer to the active parameter count, while model capacity is distributed across a larger pool of total parameters.
+So the **inference cost** can be closer to the active parameter count, while model capacity is distributed across a larger pool of total parameters.
 
-This is why ZAYA1-8B is framed as an intelligence-density model:
+This is why ZAYA1-8B is framed as an **intelligence-density model**:
 
 ```text
 maximize useful capability per active parameter and per FLOP
 ```
 
-That is a hardware-relevant design target.
+That is a **hardware-relevant design target**.
 
 ---
 
 ## 2. Why AMD training matters
 
-Zyphra says ZAYA1-8B was pretrained, midtrained, and supervised fine-tuned on an AMD Instinct MI300 stack.
+Zyphra says ZAYA1-8B was pretrained, midtrained, and supervised fine-tuned on an **AMD Instinct MI300 stack**.
 
 The published Zyphra post describes a cluster with:
 
@@ -104,7 +104,7 @@ Why this matters:
 Most LLM infrastructure assumes NVIDIA CUDA first.
 ```
 
-An AMD-trained model with strong published reasoning and coding results is evidence that serious model training is not inherently locked to one vendor stack.
+An AMD-trained model with strong published reasoning and coding results is evidence that serious model training is **not inherently locked to one vendor stack**.
 
 For a hardware engineer, the questions are:
 
@@ -116,9 +116,9 @@ What kernels and compiler paths were missing?
 What parts are reusable by other teams?
 ```
 
-The existence of the model does not prove AMD is automatically a drop-in replacement for every training workload.
+The existence of the model does **not prove AMD is automatically a drop-in replacement** for every training workload.
 
-It proves the alternate path is technically viable at this scale when the team invests across the stack.
+It proves the **alternate path is technically viable** at this scale when the team invests across the stack.
 
 ---
 
@@ -133,7 +133,7 @@ Zyphra highlights several architecture choices:
 
 The course-level takeaway is not to memorize each mechanism.
 
-The takeaway is that ZAYA1-8B is not just a small generic transformer.
+The takeaway is that ZAYA1-8B is **not just a small generic transformer**.
 
 It is an architecture built around:
 
@@ -151,15 +151,15 @@ This connects to earlier lectures:
 - Lecture 36: memory and serving costs
 - Lecture 38: long-context training systems
 
-Small models that compete on reasoning usually require systems co-design.
+Small models that compete on reasoning usually require **systems co-design**.
 
-Architecture alone is not enough.
+**Architecture alone is not enough.**
 
 ---
 
 ## 4. Benchmark claims: read carefully
 
-Zyphra reports strong performance on math and coding benchmarks.
+Zyphra reports **strong performance** on math and coding benchmarks.
 
 The Hugging Face model card reports in-class scores such as:
 
@@ -173,7 +173,7 @@ GPQA-Diamond:    71.0
 MMLU-Pro:        74.2
 ```
 
-It also reports weaker relative agentic scores:
+It also reports **weaker relative agentic scores**:
 
 ```text
 BFCL-v4: 39.22
@@ -188,7 +188,7 @@ Zyphra states the comparison numbers are run on Zyphra's evaluation harness.
 
 That does not make them useless.
 
-It means you should treat them as vendor-reported until independently reproduced in your target environment.
+It means you should treat them as **vendor-reported** until independently reproduced in your target environment.
 
 Good benchmark reading separates:
 
@@ -217,9 +217,9 @@ RSA-boosted result:
   extra test-time compute using Markovian RSA
 ```
 
-Do not compare these casually.
+**Do not compare these casually.**
 
-An RSA-boosted score uses more inference compute.
+An RSA-boosted score uses **more inference compute**.
 
 That compute may be acceptable for:
 
@@ -252,7 +252,7 @@ Which single headline score is highest?
 
 ## 6. Markovian RSA
 
-Zyphra's Markovian RSA is a test-time compute method.
+Zyphra's **Markovian RSA** is a test-time compute method.
 
 It combines two ideas:
 
@@ -268,7 +268,7 @@ fixed-duration reasoning chunks
 only tail context carried forward
 ```
 
-The goal is to keep the context window bounded while allowing extended reasoning.
+The goal is to keep the **context window bounded** while allowing extended reasoning.
 
 Simplified flow:
 
@@ -281,9 +281,9 @@ prompt
   -> repeat
 ```
 
-This is different from one huge chain of thought.
+This is different from **one huge chain of thought**.
 
-The context does not grow without bound.
+The context **does not grow without bound**.
 
 That matters because long reasoning traces otherwise collide with context limits and memory costs.
 
@@ -293,7 +293,7 @@ The critical Zyphra claim:
 ZAYA1-8B was trained to understand and respond to the Markovian RSA process.
 ```
 
-They report that applying the same method to another small model produced less uplift.
+They report that applying the same method to another small model produced **less uplift**.
 
 That is the key systems insight:
 
@@ -305,7 +305,7 @@ The model and inference harness were co-designed.
 
 ## 7. Why this matters for agents
 
-Agent builders should not treat ZAYA1-8B as a default general-purpose agent model.
+Agent builders should **not treat ZAYA1-8B as a default general-purpose agent model**.
 
 The benchmark profile says:
 
@@ -356,7 +356,7 @@ use the right interface and model for the job
 
 ## 8. Deployment caveat
 
-ZAYA1-8B is not currently a generic drop-in for standard vLLM.
+ZAYA1-8B is **not currently a generic drop-in** for standard vLLM.
 
 The Hugging Face model card recommends Zyphra's fork:
 
@@ -380,7 +380,7 @@ vllm serve Zyphra/ZAYA1-8B --port 8010 \
 
 This matters operationally.
 
-A model that requires a forked runtime has extra deployment risk:
+A model that requires a **forked runtime** has extra deployment risk:
 
 - upgrade lag
 - plugin compatibility issues
@@ -391,13 +391,13 @@ A model that requires a forked runtime has extra deployment risk:
 
 That does not mean "do not use it."
 
-It means benchmark the model and the runtime together.
+It means **benchmark the model and the runtime together**.
 
 ---
 
 ## 9. Hardware engineer view
 
-ZAYA1-8B is useful for thinking about model efficiency.
+ZAYA1-8B is useful for thinking about **model efficiency**.
 
 Key hardware questions:
 
@@ -424,19 +424,19 @@ AMD stack:
   Which parts rely on custom Zyphra infrastructure versus upstream ROCm?
 ```
 
-The model is small in active compute.
+The model is **small in active compute**.
 
-It is not necessarily trivial to serve optimally.
+It is **not necessarily trivial to serve optimally**.
 
-MoE models often trade dense compute for routing, memory residency, batching, and expert-placement complexity.
+MoE models often trade dense compute for **routing, memory residency, batching, and expert-placement complexity**.
 
 ---
 
 ## 10. How to evaluate it for OpenClaw
 
-Do not evaluate ZAYA1-8B with a generic chat benchmark first.
+Do **not evaluate ZAYA1-8B with a generic chat benchmark** first.
 
-Evaluate the role you would actually use it for.
+Evaluate the **role you would actually use it for**.
 
 Suggested task buckets:
 

@@ -12,7 +12,7 @@ AI hardware engineers need to understand this stack because containerized infere
 
 ## Containers vs Virtual Machines
 
-Containers share the host kernel. Isolation is provided by Linux namespaces (visibility) and cgroups (resource limits). There is no hypervisor, no guest kernel, and no hardware emulation.
+Containers **share the host kernel**. Isolation is provided by Linux namespaces (visibility) and cgroups (resource limits). There is **no hypervisor**, no guest kernel, and no hardware emulation.
 
 | Property | Container | VM |
 |---|---|---|
@@ -22,7 +22,7 @@ Containers share the host kernel. Isolation is provided by Linux namespaces (vis
 | Isolation | Namespace + cgroups | Full hardware virtualization |
 | GPU access | Direct (passthrough) | Requires GPU virtualization (vGPU) |
 
-For inference deployment, containers provide near-bare-metal GPU performance with reproducible software environments.
+For inference deployment, containers provide **near-bare-metal GPU performance** with **reproducible software environments**.
 
 > **Key Insight:** The reason containers achieve near-zero overhead compared to VMs is that there is no hypervisor between the container and the hardware. A GPU kernel inside a container is executed by the same physical GPU SMs that execute a native GPU kernel — there is no translation or emulation layer. The container's GPU access is just the host's `/dev/nvidia0` device node mounted into the container's filesystem namespace.
 
@@ -30,7 +30,7 @@ For inference deployment, containers provide near-bare-metal GPU performance wit
 
 ## Linux Namespaces
 
-Seven namespace types isolate different aspects of the system environment. Each namespace is a kernel object; processes that share a namespace see the same view of that resource.
+**Seven namespace types** isolate different aspects of the system environment. Each namespace is a **kernel object**; processes that share a namespace see the same view of that resource.
 
 | Namespace | Isolates | Key detail |
 |---|---|---|
@@ -64,7 +64,7 @@ ip netns exec myns ip addr               # run command inside namespace
 nsenter -t <PID> --net --pid bash        # enter existing process's namespaces
 ```
 
-These commands are what container runtimes do programmatically. `unshare` creates new namespaces; `nsenter` joins existing ones. When you `docker exec` into a running container, Docker calls `nsenter` to run your command in the container's existing namespace set.
+These commands are what container runtimes do programmatically. `unshare` **creates new namespaces**; `nsenter` **joins existing ones**. When you `docker exec` into a running container, Docker calls `nsenter` to run your command in the container's existing namespace set.
 
 > **Key Insight:** Namespaces do not provide security boundaries by themselves — they only control visibility. A process in a PID namespace cannot see host PIDs, but if it escapes its mount namespace (via a vulnerability), it can read host files. Real container security requires combining namespaces with seccomp filters, AppArmor profiles, and proper user namespace configuration.
 
@@ -72,9 +72,9 @@ These commands are what container runtimes do programmatically. `unshare` create
 
 ## cgroups v2 (Unified Hierarchy)
 
-Namespaces control visibility. cgroups control resource consumption. Together they define the complete container isolation model.
+Namespaces control **visibility**. cgroups control **resource consumption**. Together they define the complete container isolation model.
 
-cgroups v2 replaced the per-subsystem hierarchy of v1 with a single unified hierarchy at `/sys/fs/cgroup/`. Controllers are enabled per-cgroup and inherited by children.
+cgroups v2 replaced the per-subsystem hierarchy of v1 with a **single unified hierarchy** at `/sys/fs/cgroup/`. Controllers are enabled per-cgroup and inherited by children.
 
 ### Controller Reference
 
@@ -110,9 +110,9 @@ echo "0"   > /sys/fs/cgroup/inference/memory.swap.max
 echo $$    > /sys/fs/cgroup/inference/cgroup.procs
 ```
 
-After these commands, any process started from this shell runs with the cgroup constraints applied. The kernel enforces the limits transparently — the process does not need to be modified.
+After these commands, any process started from this shell runs with the cgroup constraints applied. The kernel **enforces the limits transparently** — the process does not need to be modified.
 
-Kubernetes uses cgroups v2 for all resource enforcement. The kubelet creates a cgroup hierarchy per-Pod and per-container; the container runtime writes resource limits into the appropriate cgroup files.
+Kubernetes uses cgroups v2 for **all resource enforcement**. The kubelet creates a cgroup hierarchy per-Pod and per-container; the container runtime writes resource limits into the appropriate cgroup files.
 
 > **Common Pitfall:** Setting `memory.max` without setting `memory.swap.max`. If swap is available and memory.max is hit, the kernel moves pages to swap instead of triggering an OOM kill. For an inference container, this causes catastrophic latency spikes (swap I/O is orders of magnitude slower than RAM). Always set both `memory.max` and `memory.swap.max` to the same value (or set `memory.swap.max` to 0 to disable swap entirely for the cgroup).
 
@@ -147,16 +147,16 @@ The full container launch sequence:
 
 ## NVIDIA Container Runtime
 
-GPU access from inside a container requires special handling because CUDA libraries and device nodes must be version-matched to the host driver. The NVIDIA Container Runtime solves this elegantly.
+GPU access from inside a container requires special handling because **CUDA libraries and device nodes must be version-matched** to the host driver. The NVIDIA Container Runtime solves this elegantly.
 
-`nvidia-container-toolkit` is an OCI runtime hook that runs before the container process starts. It:
+`nvidia-container-toolkit` is an **OCI runtime hook** that runs before the container process starts. It:
 
 1. **Reads `NVIDIA_VISIBLE_DEVICES` env var** (or `--gpus` flag): determines which physical GPUs or MIG instances to expose to this container.
 2. **Mounts the selected `/dev/nvidia*` device nodes** into the container's mount namespace: `/dev/nvidia0`, `/dev/nvidiactl`, `/dev/nvidia-uvm`. The container now sees these devices as if they were local.
 3. **Injects CUDA libraries** (`libcuda.so.X`, `libnvrtc.so`, `libnvidia-ml.so`) from the host into the container at well-known paths (`/usr/local/lib/...` or via `ldconfig` entries). The injected libraries match the host driver version exactly.
 4. **Sets up `/proc/driver/nvidia` and capability files**: these are required by `libcuda.so` to query GPU capabilities.
 
-The container image does not need to contain CUDA; only the CUDA application code is packaged. Host driver version is exposed as-is. This allows a single container image to run on hosts with different driver versions, as long as the driver is compatible with the required CUDA toolkit version.
+The container image **does not need to contain CUDA**; only the CUDA application code is packaged. Host driver version is exposed as-is. This allows a single container image to run on hosts with **different driver versions**, as long as the driver is compatible with the required CUDA toolkit version.
 
 ```bash
 # Run any CUDA application without CUDA installed in the image
@@ -175,13 +175,13 @@ The `NVIDIA_DRIVER_CAPABILITIES` variable controls which library sets are inject
 
 ## Multi-Instance GPU (MIG)
 
-MIG is available on A100, H100, and Jetson Orin. It partitions one physical GPU into up to 7 independent GPU Instances (GIs), each with dedicated:
+MIG is available on A100, H100, and Jetson Orin. It partitions one physical GPU into up to **7 independent GPU Instances (GIs)**, each with dedicated:
 
 - Compute (SM partition)
 - Memory (HBM slice with dedicated bandwidth)
 - On-chip caches and decoders
 
-Each GI appears as an independent GPU to CUDA. There is no time-sharing; GIs run truly in parallel.
+Each GI appears as an **independent GPU** to CUDA. There is **no time-sharing**; GIs run truly in parallel.
 
 ```
 A100 80GB with MIG enabled:
@@ -216,7 +216,7 @@ On Jetson Orin, MIG enables running multiple inference models (perception, occup
 
 When MIG hardware is not available (older GPUs, edge devices), CUDA MPS provides a software-level sharing mechanism.
 
-CUDA MPS (Multi-Process Service) allows multiple CUDA processes to share a GPU through a single MPS server process:
+CUDA MPS (Multi-Process Service) allows **multiple CUDA processes to share a GPU** through a single MPS server process:
 
 - Processes submit work via the MPS server; it serializes and batches submissions
 - Reduces context switch overhead compared to time-sharing without MPS

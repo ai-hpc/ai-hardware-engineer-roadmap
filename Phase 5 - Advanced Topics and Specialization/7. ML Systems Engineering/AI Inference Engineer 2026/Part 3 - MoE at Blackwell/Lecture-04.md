@@ -4,7 +4,7 @@
 
 The serving stack from Part 2 Lecture 05 (continuous batching, paged KV, prefix cache, speculation) treats every GPU as homogeneous — every GPU does prefill *and* decode. The 2024–2025 generation of inference research showed this is suboptimal: **prefill is compute-bound, decode is bandwidth-bound, and they have different ideal GPUs and different ideal precisions.**
 
-**Disaggregated prefill / decode (P/D disaggregation)** dedicates one pool of GPUs to prefill and another to decode, transferring the populated KV cache between them. Each pool is optimized for its phase. The result: 2–3× $/MTok improvement at the cost of cluster complexity.
+**Disaggregated prefill / decode (P/D disaggregation)** dedicates one pool of GPUs to prefill and another to decode, transferring the populated KV cache between them. Each pool is optimized for its phase. The result: **2–3× $/MTok improvement** at the cost of cluster complexity.
 
 This lecture covers:
 
@@ -28,7 +28,7 @@ For Llama 3.3 70B FP8 chat workload on 4× H200, colocated continuous batching:
 * During a long prefill (4K-token prompt, ~250 ms on TP=4), the GPU is at high tensor-core utilization (~70%) but low HBM read utilization (~30%).
 * During subsequent decode steps (per-token bandwidth-bound), the GPU is at high HBM utilization (~80%) but low tensor-core utilization (~5%).
 
-In each phase, ~70% of the *other* dimension is wasted. The GPU is paying for both compute and bandwidth but only fully using one at a time.
+In each phase, **~70% of the *other* dimension is wasted**. The GPU is paying for both compute and bandwidth but **only fully using one at a time**.
 
 ### 1.1 The disaggregation insight
 
@@ -54,7 +54,7 @@ If H100s are 2/3 the cost of H200s and prefill is compute-bound:
 * **Colocated:** all GPUs are H200 (~$3/hour). 70% efficiency = effective $4.3/hour.
 * **Disaggregated:** prefill pool is H100 ($2/hour, near 95% utilization); decode pool is H200 (95% utilization). Average $2.5/hour effective.
 
-Roughly **30-40% $/MTok improvement**. Real measurements from Mooncake show similar numbers.
+Roughly **30-40% $/MTok improvement**. Real measurements from **Mooncake** show similar numbers.
 
 For MoE on Blackwell, the gain is larger because:
 
@@ -104,7 +104,7 @@ From the paper:
 * p99 TTFT improved ~40%.
 * Long-context (128K) workloads benefit most.
 
-These are workload-specific. Mooncake's gains assume chat-shape traffic with substantial prefix sharing.
+These are **workload-specific**. Mooncake's gains assume **chat-shape traffic with substantial prefix sharing**.
 
 ---
 
@@ -168,7 +168,7 @@ Between two GPUs in the same NVLink domain (NVL72):
 * 500 MB transfer: ~0.3 ms
 * 2.6 GB transfer: ~1.5 ms
 
-Both are small relative to the prefill time (which is hundreds of milliseconds for long prompts). KV transfer cost is **not the bottleneck** within a single NVLink domain.
+Both are **small relative to the prefill time** (which is hundreds of milliseconds for long prompts). KV transfer cost is **not the bottleneck** within a single NVLink domain.
 
 Between two GPUs across NVLink domains (different NVL72 racks):
 
@@ -186,7 +186,7 @@ A well-designed disaggregated system pipelines:
 2. Decode GPU receives layer 1 → ready to use as soon as full prefill arrives.
 3. By the time prefill finishes layer 61, layers 1–60 are already on the decode GPU.
 
-Effective KV transfer time ≈ time of last layer's transfer, not all layers — order-of-magnitude smaller than naive.
+Effective KV transfer time ≈ **time of last layer's transfer, not all layers** — order-of-magnitude smaller than naive.
 
 This is the SGLang / Mooncake approach. Implementations differ.
 
@@ -219,7 +219,7 @@ If your workload has:
 
 → disaggregation likely wins 20-50% on $/MTok.
 
-If your workload is short-prompt agent loops or pure batch, **stay colocated** — the engineering complexity isn't worth it.
+If your workload is **short-prompt agent loops or pure batch**, **stay colocated** — the engineering complexity isn't worth it.
 
 ---
 

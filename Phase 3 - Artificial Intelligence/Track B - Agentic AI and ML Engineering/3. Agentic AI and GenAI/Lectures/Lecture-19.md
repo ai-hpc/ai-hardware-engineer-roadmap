@@ -6,7 +6,7 @@
 
 ## Why this lecture exists
 
-The agent loop is the core execution engine of an agent system.
+The agent loop is the **core execution engine** of an agent system.
 
 Once you understand the loop, the surrounding pieces become easier to reason about:
 
@@ -24,7 +24,7 @@ The short definition:
 
 It is not only an LLM call.
 
-It is a stateful, tool-using, streaming workflow pipeline.
+It is a **stateful, tool-using, streaming workflow pipeline**.
 
 ---
 
@@ -109,7 +109,7 @@ The same loop can start from several places.
 | Cron | `openclaw cron run <job-id>` | scheduled job triggers an agent run |
 | Hook | webhook, Gmail, message hook | event-driven trigger starts or modifies a run |
 
-The important design choice is that these entry points should converge into one runtime path.
+The important design choice is that these entry points should **converge into one runtime path**.
 
 That gives the product consistent behavior:
 
@@ -123,7 +123,7 @@ That gives the product consistent behavior:
 
 ## 4. Intake and validation
 
-At the boundary, the gateway validates the request and resolves run metadata.
+At the boundary, the gateway **validates the request** and resolves run metadata.
 
 It needs to determine:
 
@@ -148,7 +148,7 @@ This reflects an async-first design:
 
 > accepting a run is not the same as finishing a run
 
-The Gateway can accept work, queue it, stream progress, and let clients wait separately.
+The Gateway can **accept work, queue it, stream progress**, and let clients wait separately.
 
 ---
 
@@ -173,21 +173,21 @@ session B: run 1 -> run 2
 session C: run 1
 ```
 
-Each session lane is serial.
+Each session lane is **serial**.
 
-Different session lanes can still make progress independently, subject to global concurrency controls.
+Different session lanes can still make progress **independently**, subject to global concurrency controls.
 
-This explains why isolated cron and subagent sessions matter: they let background work proceed without blocking the user's main session lane.
+This explains why isolated cron and subagent sessions matter: they let background work proceed without **blocking the user's main session lane**.
 
 ---
 
 ## 6. Session write locks
 
-Queueing handles logical order.
+Queueing handles **logical order**.
 
-Locks handle actual file/state mutation.
+Locks handle **actual file/state mutation**.
 
-OpenClaw protects transcript writes with a process-aware session write lock.
+OpenClaw protects transcript writes with a **process-aware session write lock**.
 
 That matters because multiple processes may exist:
 
@@ -201,7 +201,7 @@ The rule:
 
 > any transcript write, rewrite, compaction, or truncation must acquire the same session write lock
 
-By default, the lock should not be reentrant. Code that intentionally nests the same lock must opt in explicitly.
+By default, the lock should **not be reentrant**. Code that intentionally nests the same lock must opt in explicitly.
 
 This is a strong production lesson:
 
@@ -223,7 +223,7 @@ Typical preparation includes:
 - preparing environment variables
 - preparing the session manager
 
-This is where "agent behavior" becomes more than a prompt.
+This is where "agent behavior" becomes **more than a prompt**.
 
 The model sees the world through:
 
@@ -234,7 +234,7 @@ The model sees the world through:
 - session history
 - policy and runtime settings
 
-Bad preparation leads to confusing agent behavior later.
+**Bad preparation** leads to confusing agent behavior later.
 
 ---
 
@@ -242,7 +242,7 @@ Bad preparation leads to confusing agent behavior later.
 
 The model does not see one string called "the prompt."
 
-It sees assembled context.
+It sees **assembled context**.
 
 OpenClaw-style prompt material includes:
 
@@ -290,7 +290,7 @@ Conceptually, this phase does:
 - enforce abort and timeout behavior
 - return final payloads and usage metadata
 
-This is the "thinking" phase, but it is still runtime-controlled.
+This is the "thinking" phase, but it is still **runtime-controlled**.
 
 The model may:
 
@@ -301,7 +301,7 @@ The model may:
 - trigger model switch behavior
 - fail with provider or network errors
 
-The loop wraps that uncertainty in a stable contract.
+The loop wraps that uncertainty in a **stable contract**.
 
 ---
 
@@ -330,7 +330,7 @@ assistant:delta "The file shows..."
 lifecycle:end
 ```
 
-Streaming matters because long-running agent work should not feel like a black box.
+Streaming matters because long-running agent work should not feel like a **black box**.
 
 It also gives operators a way to debug where a run got stuck:
 
@@ -343,7 +343,7 @@ It also gives operators a way to debug where a run got stuck:
 
 ## 11. Tool execution
 
-When the model requests a tool, the loop becomes an action engine.
+When the model requests a tool, the loop becomes an **action engine**.
 
 The basic tool path:
 
@@ -371,13 +371,13 @@ That introduces a reply-shaping issue:
 
 if a messaging tool already sent the useful answer, the final assistant confirmation may be redundant.
 
-OpenClaw tracks messaging tool sends so duplicate confirmations can be suppressed.
+OpenClaw tracks messaging tool sends so **duplicate confirmations** can be suppressed.
 
 ---
 
 ## 12. Hooks as interception points
 
-Hooks let the product intercept the loop.
+Hooks let the product **intercept the loop**.
 
 OpenClaw has internal Gateway hooks and plugin hooks. The important concept is that hooks can run at different lifecycle points.
 
@@ -418,7 +418,7 @@ The production lesson:
 
 ## 13. Reply shaping
 
-At the end of a run, the runtime decides what is user-visible.
+At the end of a run, the runtime decides what is **user-visible**.
 
 Final payload assembly may include:
 
@@ -434,9 +434,9 @@ Then the runtime applies cleanup rules:
 - emit a fallback tool error reply if no renderable output remains and the user has not already seen a reply
 - avoid replaying stale acknowledgement-only text when a better descendant result exists
 
-This phase exists because models often produce text that is not the right final user output.
+This phase exists because models often produce text that is **not the right final user output**.
 
-The agent loop must shape output into product behavior.
+The agent loop must shape output into **product behavior**.
 
 ---
 
@@ -451,9 +451,9 @@ After the run, the system writes:
 - usage information
 - lifecycle state
 
-Persistence must happen under the session write lock.
+Persistence must happen under the **session write lock**.
 
-This protects the transcript from races and gives future turns a coherent history.
+This protects the transcript from **races** and gives future turns a coherent history.
 
 The practical rule:
 
@@ -491,7 +491,7 @@ Important distinction:
 
 > `agent.wait` timeout does not necessarily stop the agent run
 
-It only means the waiter stopped waiting.
+It only means the **waiter stopped waiting**.
 
 This is the same concept as watching a background job: your terminal can time out while the job continues.
 
@@ -514,7 +514,7 @@ detect context pressure
 
 On retry, the runtime must reset in-memory buffers and tool summaries so output does not duplicate.
 
-This matters because compaction is not just a storage task.
+This matters because compaction is **not just a storage task**.
 
 It affects:
 
@@ -547,7 +547,7 @@ The lesson:
 
 > timeout semantics must say what gets cancelled and what only stops waiting
 
-Without that distinction, operators misread system behavior.
+Without that distinction, operators **misread system behavior**.
 
 ---
 
@@ -578,9 +578,9 @@ That gives clients a final state and helps `agent.wait`, UI, cron, and logs agre
 
 Now the previous lecture on cron becomes easier.
 
-Cron does not do the agent work itself.
+Cron does not do the **agent work** itself.
 
-Cron schedules the work:
+Cron **schedules the work**:
 
 ```text
 cron schedule
@@ -627,9 +627,9 @@ The loop might behave like this:
 14. The chat channel sends the final response.
 ```
 
-The user experiences one reply.
+The user experiences **one reply**.
 
-The system executed a controlled transaction-like runtime path.
+The system executed a **controlled transaction-like runtime path**.
 
 ---
 
@@ -654,7 +654,7 @@ Fill in this table:
 | Timeout model | wait timeout separate from runtime timeout |
 | Persistence | transcript, tool outputs, usage, run metadata |
 
-The value of this exercise is that it forces you to treat the agent as infrastructure, not as a single API call.
+The value of this exercise is that it forces you to treat the agent as **infrastructure**, not as a single API call.
 
 ---
 

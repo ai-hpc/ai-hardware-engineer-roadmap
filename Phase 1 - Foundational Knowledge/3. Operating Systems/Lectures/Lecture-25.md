@@ -2,9 +2,9 @@
 
 ## Overview
 
-The previous 24 lectures covered how Linux works: processes, scheduling, memory management, drivers, filesystems, containers, and real-time tuning. This capstone lecture asks: how do you *build* the Linux image that runs on your AI hardware target? The answer is Yocto — the industry-standard build system for embedded Linux. Every platform covered in this course (Jetson, openpilot Agnos, custom FPGA boards, automotive ECUs) uses either Yocto or a Yocto-derived toolchain to produce reproducible, minimal, production-grade Linux images.
+The previous 24 lectures covered how Linux works: processes, scheduling, memory management, drivers, filesystems, containers, and real-time tuning. This capstone lecture asks: how do you *build* the Linux image that runs on your AI hardware target? The answer is Yocto — the **industry-standard build system for embedded Linux**. Every platform covered in this course (Jetson, openpilot Agnos, custom FPGA boards, automotive ECUs) uses either Yocto or a Yocto-derived toolchain to produce **reproducible, minimal, production-grade** Linux images.
 
-The mental model to carry here is that Yocto is a **factory** for Linux distributions. You describe what you want (machine hardware, packages, filesystem layout), and Yocto assembles, cross-compiles, and packages it into a flashable image. Unlike installing Ubuntu and removing packages, Yocto starts from nothing — only what you explicitly include ends up on the target. This minimizes attack surface, reduces OTA update size, and guarantees reproducibility: the same inputs always produce bit-identical outputs.
+The mental model to carry here is that Yocto is a **factory** for Linux distributions. You describe what you want (machine hardware, packages, filesystem layout), and Yocto assembles, cross-compiles, and packages it into a flashable image. Unlike installing Ubuntu and removing packages, Yocto **starts from nothing** — only what you explicitly include ends up on the target. This **minimizes attack surface**, reduces OTA update size, and guarantees reproducibility: the same inputs always produce bit-identical outputs.
 
 This lecture is structured as two projects that build on each other:
 - **Project 1**: Build a minimal general-purpose image on QEMU (x86-64) — no hardware required
@@ -52,7 +52,7 @@ Yocto Conceptual Map
 
 ### Goal
 
-Build a bootable minimal Linux image for `qemux86-64` and run it in QEMU. No physical hardware needed. This teaches the full Yocto workflow in a safe environment before touching real hardware.
+Build a bootable minimal Linux image for `qemux86-64` and run it in QEMU. **No physical hardware needed**. This teaches the **full Yocto workflow** in a safe environment before touching real hardware.
 
 ### Step 1: Install Prerequisites
 
@@ -69,7 +69,7 @@ sudo apt-get install -y \
 sudo locale-gen en_US.UTF-8
 ```
 
-The build requires approximately 50–100 GB of free disk space and 8 GB of RAM (16 GB recommended). BitBake parallelizes across all available CPU cores by default.
+The build requires approximately **50–100 GB of free disk space** and 8 GB of RAM (16 GB recommended). BitBake parallelizes across all available CPU cores by default.
 
 ### Step 2: Clone Poky (Yocto Reference Distribution)
 
@@ -186,7 +186,7 @@ build-qemu/
     └── sysroots/qemux86-64/          ← target sysroot for SDK
 ```
 
-The `work/` directory contains the unpacked, patched, compiled, and installed files for every package. When debugging a package build failure, this is where you look.
+The `work/` directory contains the unpacked, patched, compiled, and installed files for every package. **When debugging a package build failure, this is where you look.**
 
 ### Step 8: Customize — Add a Package
 
@@ -217,7 +217,7 @@ Build a production-quality AI image for the Jetson Orin Nano 8GB developer kit t
 - OpenCV with CUDA support
 - systemd, SSH, Python 3
 
-This image can replace the default NVIDIA JetPack install with a reproducible, customizable, minimal Yocto-based alternative. Used in production for edge AI appliances.
+This image can replace the default NVIDIA JetPack install with a **reproducible, customizable, minimal** Yocto-based alternative. Used in production for edge AI appliances.
 
 ### Architecture: meta-tegra
 
@@ -232,7 +232,7 @@ meta-my-jetson-image/    ← YOUR layer: custom recipes, image definition
 poky/meta/               ← Core (gcc, glibc, busybox, systemd)
 ```
 
-**meta-tegra** is maintained by the Open Embedded for Tegra (OE4T) community. It tracks NVIDIA's L4T releases and provides the kernel, U-Boot, Device Tree, and board-specific drivers.
+**meta-tegra** is maintained by the Open Embedded for Tegra (OE4T) community. It **tracks NVIDIA's L4T releases** and provides the kernel, U-Boot, Device Tree, and board-specific drivers.
 
 ### Step 1: Prepare the Workspace
 
@@ -348,7 +348,7 @@ EOF
 
 ### Step 4: Create a Custom Image Recipe
 
-Create your own layer and image recipe to keep customizations clean and version-controlled:
+Create your own layer and image recipe to keep customizations **clean and version-controlled**:
 
 ```bash
 mkdir -p ../meta-my-jetson-image/recipes-core/images
@@ -435,7 +435,7 @@ ls tmp/deploy/images/jetson-orin-nano-devkit/
 # bootloader/                                               ← CBoot, MB1, TOS
 ```
 
-The `tegraflash.tar.gz` bundle contains everything `tegraflash.py` needs to flash the board. The DTB `p3767-0005` is the Orin Nano 8GB module identifier.
+The `tegraflash.tar.gz` bundle contains **everything `tegraflash.py` needs to flash the board**. The DTB `p3767-0005` is the Orin Nano 8GB module identifier.
 
 ```
 tegraflash bundle contents:
@@ -519,7 +519,7 @@ chrt -p 1
 
 ### Step 9: Customization Patterns
 
-Once the base image works, these are the common customizations for AI deployment:
+Once the base image works, these are the **common customizations for AI deployment**:
 
 ```bash
 # ── Disable unnecessary services (reduce boot time and attack surface) ────────

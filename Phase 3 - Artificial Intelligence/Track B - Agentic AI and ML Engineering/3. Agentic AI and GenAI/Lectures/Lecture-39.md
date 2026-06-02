@@ -4,9 +4,9 @@
 
 ---
 
-Skills are code-adjacent infrastructure.
+Skills are **code-adjacent infrastructure**.
 
-If a skill changes how an agent behaves, it needs tests.
+If a skill changes how an agent behaves, it **needs tests**.
 
 Agent Skills gives agents portable, version-controlled workflows through folders such as:
 
@@ -19,7 +19,7 @@ my-skill/
   evals/
 ```
 
-But a `SKILL.md` file can look good and still fail in practice.
+But a `SKILL.md` file can **look good and still fail** in practice.
 
 The right question is not:
 
@@ -33,7 +33,7 @@ The right question is:
 Does this skill measurably improve the agent on the task it claims to support?
 ```
 
-`agent-skills-eval` is a test runner for that question.
+`agent-skills-eval` is a **test runner** for that question.
 
 It runs the same eval prompt twice:
 
@@ -42,9 +42,9 @@ with_skill
 without_skill
 ```
 
-Then a judge model grades both outputs against expected behavior and assertions.
+Then a **judge model** grades both outputs against expected behavior and assertions.
 
-That gives you evidence-backed pass/fail rather than subjective prompt review.
+That gives you **evidence-backed pass/fail** rather than subjective prompt review.
 
 ---
 
@@ -65,7 +65,7 @@ By the end of this lecture, you should be able to:
 
 ## 1. Why skill evaluation matters
 
-Agent skills package procedural knowledge.
+Agent skills package **procedural knowledge**.
 
 Examples:
 
@@ -77,9 +77,9 @@ Examples:
 - follow a security review checklist
 - translate kernels between DSLs
 
-This is powerful because skills are reusable.
+This is powerful because skills are **reusable**.
 
-It is dangerous because skills can silently degrade.
+It is dangerous because skills can **silently degrade**.
 
 A bad skill can:
 
@@ -91,7 +91,7 @@ A bad skill can:
 - hide stale instructions
 - make a task worse than baseline
 
-Without evaluation, every skill PR becomes a taste debate.
+Without evaluation, every skill PR becomes a **taste debate**.
 
 With evaluation, the conversation becomes:
 
@@ -102,7 +102,7 @@ The judge evidence points to missing tool-call criteria.
 The report includes both outputs and timing.
 ```
 
-That is a better review standard.
+That is a **better review standard**.
 
 ---
 
@@ -117,9 +117,9 @@ same prompt
   -> judge compares both against assertions
 ```
 
-This matters because absolute output quality is not enough.
+This matters because **absolute output quality is not enough**.
 
-You want to know skill lift:
+You want to know **skill lift**:
 
 ```text
 output with skill passes
@@ -142,9 +142,9 @@ The baseline mode prevents a common mistake:
 The skill produced a good answer, therefore the skill is useful.
 ```
 
-Maybe the model already produced the same answer without the skill.
+Maybe the model already produced the same answer **without the skill**.
 
-The eval needs to measure the delta.
+The eval needs to **measure the delta**.
 
 ---
 
@@ -239,9 +239,9 @@ Example `evals/evals.json`:
 }
 ```
 
-The assertions are the contract.
+The assertions are the **contract**.
 
-If they are vague, the eval will be vague.
+If they are vague, the eval will be **vague**.
 
 ---
 
@@ -269,9 +269,9 @@ Important artifacts:
 - `report/index.html`: static report for review
 - JSON/JSONL events: useful for dashboards or CI history
 
-This artifact-first design is important.
+This **artifact-first design** is important.
 
-You can diff runs over time.
+You can **diff runs over time**.
 
 You can attach reports to pull requests.
 
@@ -290,7 +290,7 @@ The judge sees:
 
 Then it grades pass/fail with evidence.
 
-This is useful, but it is not perfect.
+This is useful, but it is **not perfect**.
 
 LLM judges can:
 
@@ -311,13 +311,13 @@ Mitigations:
 - keep raw artifacts
 - rerun flaky evals before blocking a release
 
-The judge is a tool, not an authority.
+The judge is a **tool, not an authority**.
 
 ---
 
 ## 7. Tool-call assertions
 
-Many useful skills are not pure text-generation skills.
+Many useful skills are **not pure text-generation skills**.
 
 OpenClaw-style skills often affect tool behavior:
 
@@ -329,9 +329,9 @@ OpenClaw-style skills often affect tool behavior:
 - create issues
 - update docs
 
-For those, text-only grading is weak.
+For those, **text-only grading is weak**.
 
-You want deterministic tool-call assertions:
+You want **deterministic tool-call assertions**:
 
 ```text
 Did the agent call the expected tool?
@@ -341,11 +341,11 @@ Did it avoid a destructive command?
 Did it include the required idempotency key?
 ```
 
-Use LLM judging for semantic quality.
+Use LLM judging for **semantic quality**.
 
-Use deterministic assertions for protocol behavior.
+Use deterministic assertions for **protocol behavior**.
 
-That split is critical:
+That split is **critical**:
 
 ```text
 semantic correctness:
@@ -392,7 +392,7 @@ Run:
 OPENAI_API_KEY=... npx agent-skills-eval --config agent-skills-eval.yaml
 ```
 
-In CI, do not rely only on console output.
+In CI, do **not rely only on console output**.
 
 Persist:
 
@@ -401,7 +401,7 @@ Persist:
 - generated report
 - JSONL event logs
 
-Those artifacts are the evidence.
+Those artifacts are the **evidence**.
 
 ---
 
@@ -436,15 +436,15 @@ No skill behavior change without at least one eval proving the intended behavior
 No regression accepted without an explicit note explaining why.
 ```
 
-This mirrors how code should be tested.
+This mirrors **how code should be tested**.
 
 ---
 
 ## 10. Designing good skill evals
 
-A good eval is narrow.
+A good eval is **narrow**.
 
-It tests one behavior.
+It tests **one behavior**.
 
 Bad eval:
 
@@ -473,9 +473,9 @@ Good skill evals should cover:
 - tool-call behavior
 - regression case from a real bug
 
-Do not make the eval suite huge at first.
+Do **not make the eval suite huge** at first.
 
-Start with the three cases most likely to break user trust.
+Start with the three cases **most likely to break user trust**.
 
 ---
 
@@ -541,9 +541,9 @@ Fix:
 
 ## 12. How this connects to earlier lectures
 
-Lecture 29 introduced skills as workflow discipline.
+Lecture 29 introduced skills as **workflow discipline**.
 
-This lecture adds the missing test loop:
+This lecture adds the **missing test loop**:
 
 ```text
 skill design
@@ -554,9 +554,9 @@ skill design
   -> skill revision
 ```
 
-Lecture 30 argued that tests are the durable asset in agentic software development.
+Lecture 30 argued that tests are the **durable asset** in agentic software development.
 
-Skill evals are the tests for agent behavior.
+Skill evals are the **tests for agent behavior**.
 
 Lecture 35 showed skills for GPU kernel translation.
 
@@ -564,7 +564,7 @@ Lecture 35 showed skills for GPU kernel translation.
 
 Lecture 37 used traces as evidence for performance claims.
 
-Skill evals are evidence for prompt/workflow claims.
+Skill evals are **evidence for prompt/workflow claims**.
 
 Same principle:
 
@@ -617,9 +617,9 @@ Deterministic assertions needed:
 Decision:
 ```
 
-If the skill does not beat baseline, do not ship it as-is.
+If the skill does **not beat baseline**, do not ship it as-is.
 
-Either improve the skill or admit the skill is unnecessary.
+Either **improve the skill** or admit the skill is unnecessary.
 
 ---
 

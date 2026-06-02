@@ -2,7 +2,7 @@
 
 ## Overview
 
-Every AI compiler — TVM, Triton, tinygrad, XLA, torch.compile — eventually needs to turn high-level tensor operations into machine instructions that run on a specific chip. LLVM is the infrastructure that makes this possible without writing a full compiler from scratch for every new hardware target. The core challenge this lecture addresses is: how does LLVM represent programs in a way that is both hardware-independent (so optimizations apply everywhere) and hardware-aware (so the final code exploits specific chip features)? The mental model to carry forward is that LLVM is a **universal translation layer**: frontends (C, Rust, CUDA, ML compilers) lower their programs into LLVM IR, LLVM optimizes the IR, and then a target-specific backend generates native code. For an AI chip designer, understanding LLVM IR means you can write a backend for your custom accelerator and immediately inherit decades of compiler optimizations — without reimplementing constant folding, dead code elimination, or loop unrolling.
+Every AI compiler — TVM, Triton, tinygrad, XLA, torch.compile — eventually needs to turn high-level tensor operations into **machine instructions** that run on a specific chip. LLVM is the infrastructure that makes this possible **without writing a full compiler from scratch** for every new hardware target. The core challenge this lecture addresses is: how does LLVM represent programs in a way that is both hardware-independent (so optimizations apply everywhere) and hardware-aware (so the final code exploits specific chip features)? The mental model to carry forward is that LLVM is a **universal translation layer**: frontends (C, Rust, CUDA, ML compilers) lower their programs into LLVM IR, LLVM optimizes the IR, and then a target-specific backend generates native code. For an AI chip designer, understanding LLVM IR means you can write a backend for your custom accelerator and immediately inherit decades of compiler optimizations — without reimplementing constant folding, dead code elimination, or loop unrolling.
 
 ---
 
@@ -55,7 +55,7 @@ LLVM IR is a **typed, SSA-based, low-level virtual instruction set**. Each of th
 
 ### Static Single Assignment (SSA)
 
-Every variable is assigned exactly once. Instead of mutating variables, you create new ones.
+Every variable is **assigned exactly once**. Instead of mutating variables, you create new ones.
 
 ```llvm
 ; NOT SSA (imperative style — LLVM doesn't allow this):
@@ -67,7 +67,7 @@ Every variable is assigned exactly once. Instead of mutating variables, you crea
 %x2 = mul i32 %x1, 2     ; %x2 = 16, assigned once
 ```
 
-**Why SSA?** It makes optimization trivially correct. If `%x1` is defined exactly once, every use of `%x1` sees the same value — no need to track which assignment reaches which use. This enables constant propagation, dead code elimination, and common subexpression elimination to be simple graph transformations.
+**Why SSA?** It makes optimization trivially correct. If `%x1` is defined exactly once, every use of `%x1` sees the same value — no need to track which assignment reaches which use. This enables **constant propagation, dead code elimination, and common subexpression elimination** to be simple graph transformations.
 
 When control flow merges (e.g., after an if-else), SSA uses **phi nodes** to select which value to use:
 
@@ -186,7 +186,7 @@ entry:
 | AArch64 (NEON) | `ld1` → `fmul` → `faddp` → `faddp` |
 | NVPTX (CUDA) | `ld.global.v4.f32` → `fma.rn.f32` (×4) |
 
-The same LLVM IR produces optimal code for three completely different architectures. This is the power of the three-phase design.
+The **same LLVM IR** produces optimal code for three completely different architectures. This is the power of the **three-phase design**.
 
 ---
 
@@ -285,7 +285,7 @@ For a custom AI accelerator, you define your own address space mapping to descri
 
 ## Intrinsics: Hardware-Specific Operations
 
-Intrinsics are LLVM's mechanism for exposing hardware-specific operations that have no equivalent in generic IR. They look like function calls but compile to specific instructions.
+Intrinsics are LLVM's mechanism for exposing **hardware-specific operations** that have no equivalent in generic IR. They look like function calls but compile to **specific instructions**.
 
 ```llvm
 ; Fused multiply-add (maps to FMA instruction)

@@ -8,7 +8,7 @@ The CPU scheduler decides which task runs next and for how long. In a simple wor
 
 ## Scheduler Class Hierarchy
 
-Linux scheduler classes are checked in strict priority order — a higher class always preempts a lower one:
+Linux scheduler classes are checked in **strict priority order** — a higher class **always preempts** a lower one:
 
 ```
 Scheduler Class Priority Hierarchy
@@ -37,7 +37,7 @@ Scheduler Class Priority Hierarchy
          ↑ Higher class always preempts lower class ↑
 ```
 
-A single `SCHED_FIFO` task at priority 1 preempts every CFS/EEVDF task on the system. There is no cooperative override — the kernel enforces it unconditionally.
+A single `SCHED_FIFO` task at priority 1 **preempts every CFS/EEVDF task** on the system. There is **no cooperative override** — the kernel enforces it unconditionally.
 
 > **Key Insight:** The scheduler class check happens at every wakeup and preemption point. When `controlsd` (SCHED_FIFO, priority 50) wakes up because a CAN frame arrived, the kernel immediately preempts whatever `SCHED_NORMAL` task was running — even if that task is in the middle of a Python interpreter loop. This unconditional preemption is what makes real-time scheduling deterministic.
 
@@ -55,7 +55,7 @@ Each task accumulates **virtual runtime** weighted by its scheduling weight:
 vruntime += actual_runtime x (NICE_0_WEIGHT / task_weight)
 ```
 
-Think of vruntime as a debt tracker: tasks with more CPU time accumulated have higher debt. The scheduler always gives CPU time to the task with the least debt (lowest vruntime). Nice values change the debt accumulation rate: a nice -5 task accumulates debt 3x slower than a nice 0 task, so it gets 3x more CPU share.
+Think of vruntime as a **debt tracker**: tasks with more CPU time accumulated have higher debt. The scheduler always gives CPU time to the task with the **least debt** (lowest vruntime). **Nice values** change the debt accumulation rate: a nice -5 task accumulates debt 3x slower than a nice 0 task, so it gets 3x more CPU share.
 
 Tasks are stored in a **red-black tree** keyed by `vruntime`. The scheduler always picks the leftmost node (minimum vruntime): O(log n) insert/delete, O(1) pick-next.
 
@@ -89,7 +89,7 @@ CFS Red-Black Tree (sorted by vruntime)
 /proc/sys/kernel/sched_min_granularity_ns  # minimum slice (default 0.75 ms)
 ```
 
-With 8 tasks at nice 0: each gets 6 ms / 8 = 0.75 ms. CFS weakness: a newly woken latency-sensitive task may wait up to `sched_latency_ns` if many tasks have lower vruntime.
+With 8 tasks at nice 0: each gets 6 ms / 8 = 0.75 ms. **CFS weakness**: a newly woken latency-sensitive task may **wait up to `sched_latency_ns`** if many tasks have lower vruntime.
 
 > **Common Pitfall:** A freshly woken inference thread can be delayed up to `sched_latency_ns` (6 ms by default) under CFS if other tasks have lower vruntime. This is the classic CFS "wakeup latency" problem. If `modeld` wakes up after waiting for a camera frame and 7 other tasks have lower vruntime, it waits up to 6 ms before running. This is why inference threads that need deterministic latency should use `SCHED_FIFO` or `SCHED_DEADLINE` rather than relying on CFS.
 
@@ -184,9 +184,9 @@ Smaller `sched_slice` means the task gets a shorter virtual-time slice per round
 
 `rt_sched_class`; static priority 1–99 (99 = highest).
 
-- Runs until it voluntarily blocks, calls `sched_yield()`, or is preempted by a higher-priority RT task
-- No time slice within a priority level — a misbehaving task at prio 99 starves everything below it
-- Suitable for tasks with well-understood, bounded CPU usage: CAN bus writes, IMU read loops
+- Runs until it **voluntarily blocks**, calls `sched_yield()`, or is preempted by a higher-priority RT task
+- **No time slice** within a priority level — a misbehaving task at prio 99 starves everything below it
+- Suitable for tasks with **well-understood, bounded CPU usage**: CAN bus writes, IMU read loops
 
 ```bash
 chrt -f 50 ./controlsd                   # launch with SCHED_FIFO priority 50
@@ -201,7 +201,7 @@ cat /proc/sys/kernel/sched_rt_runtime_us   # default 950000 (950 ms)
 cat /proc/sys/kernel/sched_rt_period_us    # default 1000000 (1 s) — 95% CPU cap for all RT tasks
 ```
 
-RT tasks are collectively throttled to 95% of CPU by default — non-RT tasks retain at least 5%. Setting `sched_rt_runtime_us = -1` disables throttling entirely; used in AV/robotics setups where all RT tasks have known bounded runtime and starvation of non-RT is acceptable.
+RT tasks are collectively **throttled to 95% of CPU** by default — non-RT tasks retain at least 5%. Setting `sched_rt_runtime_us = -1` **disables throttling entirely**; used in AV/robotics setups where all RT tasks have known bounded runtime and starvation of non-RT is acceptable.
 
 > **Common Pitfall:** A runaway `SCHED_FIFO` task at high priority that never blocks will starve all lower-priority tasks, including the shell, SSH daemon, and monitoring tools. This can make the system impossible to recover without a hard reboot. Always test `SCHED_FIFO` tasks for correctness (they must block periodically on I/O or `nanosleep`) before running at high priority on a production system. The 5% RT throttling (`sched_rt_runtime_us`) exists as a safety net — disabling it requires confidence that all RT tasks are well-behaved.
 
@@ -211,9 +211,9 @@ RT tasks are collectively throttled to 95% of CPU by default — non-RT tasks re
 
 Same as SCHED_FIFO plus a time slice.
 
-- Within the same priority level, tasks round-robin after their slice expires
+- Within the same priority level, tasks **round-robin** after their slice expires
 - Slice length: `/proc/sys/kernel/sched_rr_timeslice_ms` (default 100 ms)
-- Useful when multiple equal-priority RT tasks must share time without cooperative yielding
+- Useful when **multiple equal-priority RT tasks** must share time without cooperative yielding
 
 ---
 
@@ -296,7 +296,7 @@ runqlat -m 10                            # histogram in milliseconds, 10 second 
 | `policy` | Scheduler policy integer: 0=NORMAL, 1=FIFO, 2=RR, 6=DEADLINE |
 | `prio` | Effective priority: 100=RT prio 99; 120=nice 0; 139=nice 19 |
 
-High `nr_involuntary_switches` on `modeld` indicates CFS preemption — first signal to elevate to `SCHED_FIFO` or `SCHED_DEADLINE`.
+High `nr_involuntary_switches` on `modeld` indicates **CFS preemption** — first signal to elevate to `SCHED_FIFO` or `SCHED_DEADLINE`.
 
 > **Key Insight:** `nr_involuntary_switches` in `/proc/[pid]/sched` is the diagnostic canary for CFS preemption problems. If this counter grows quickly while `modeld` is running inference, it means the scheduler is forcibly removing `modeld` from the CPU before it finishes — because other tasks have lower vruntime or higher priority. The fix is to elevate `modeld` to `SCHED_FIFO` or `SCHED_DEADLINE`. Check this field first before reaching for more complex profiling tools.
 

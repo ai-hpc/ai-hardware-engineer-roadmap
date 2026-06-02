@@ -8,7 +8,7 @@
 
 ## 1. What Yocto expects you to know
 
-At this stage you are not required to be a kernel maintainer. You are responsible for:
+At this stage you are **not required to be a kernel maintainer**. You are responsible for:
 
 - Selecting the right **kernel provider** / recipe for your BSP.
 - Carrying **board device trees** and any **kernel config fragments** your hardware needs.

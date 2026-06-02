@@ -12,7 +12,7 @@ AI hardware engineers need to understand PCIe topology and GPU driver internals 
 
 ## PCIe Topology
 
-PCIe (Peripheral Component Interconnect Express) is the standard high-speed interconnect for GPUs, NVMe SSDs, FPGAs, and NICs in AI hardware systems.
+PCIe (Peripheral Component Interconnect Express) is the standard **high-speed interconnect** for GPUs, NVMe SSDs, FPGAs, and NICs in AI hardware systems.
 
 **Hierarchy**: Root Complex (CPU/SoC) → Root Ports → PCIe Switches → Endpoints (GPU, NVMe, NIC, FPGA)
 
@@ -24,7 +24,7 @@ PCIe (Peripheral Component Interconnect Express) is the standard high-speed inte
 | Gen4 | 16 GT/s (~2 GB/s/lane) | ~64 GB/s |
 | Gen5 | 32 GT/s (~4 GB/s/lane) | ~128 GB/s |
 
-The topology of a typical AI server looks like this. The position of a device in the tree directly determines the bandwidth available for peer-to-peer transfers.
+The topology of a typical AI server looks like this. The **position of a device in the tree** directly determines the bandwidth available for peer-to-peer transfers.
 
 ```
 CPU (Root Complex)
@@ -62,7 +62,7 @@ The boot-time discovery sequence works as follows:
 
 ### Base Address Registers (BARs)
 
-BARs declare what memory and I/O regions a device needs. The kernel allocates physical addresses and programs them during PCI enumeration.
+BARs declare what **memory and I/O regions** a device needs. The kernel allocates physical addresses and programs them during PCI enumeration.
 
 - Kernel maps BAR into virtual address space via `ioremap()`; accessed with `readl()`/`writel()`
 - **GPU BAR0**: device registers and control (16 MB–256 MB)
@@ -72,13 +72,13 @@ BARs declare what memory and I/O regions a device needs. The kernel allocates ph
 
 ### PCIe DMA
 
-Devices perform DMA to system RAM as bus masters. The kernel provides `dma_map_sg()` for scatter-gather mappings. The IOMMU translates bus addresses to physical addresses, providing isolation and protection.
+Devices perform DMA to system RAM as **bus masters**. The kernel provides `dma_map_sg()` for scatter-gather mappings. The IOMMU translates bus addresses to physical addresses, providing **isolation and protection**.
 
 > **Common Pitfall:** When enabling PCIe peer-to-peer DMA, the IOMMU must either be configured to permit the P2P transaction or bypassed via ACS (Access Control Services) disable. By default, many systems route all DMA through the IOMMU, which may serialize P2P traffic through the Root Complex even when a direct switch-level path exists. Check `lspci -vvv` for ACS capability and the current ACS enable bit.
 
 ### PCIe Peer-to-Peer (P2P)
 
-Devices on the same PCIe switch can DMA directly to each other without data transiting system RAM:
+Devices on the same PCIe switch can **DMA directly to each other** without data transiting system RAM:
 
 - Requires `pci_p2pmem_alloc_sgl()` and IOMMU bypass or ACS (Access Control Services) disabled
 - GPUDirect Storage uses P2P: NVMe SSD → GPU memory without CPU involvement
@@ -98,9 +98,9 @@ NVMe SSD → PCIe Switch → GPU
 
 ## NVMe
 
-With PCIe topology established, NVMe is the storage protocol that runs on top of PCIe for flash SSDs. It was designed from the ground up for flash characteristics — unlike SATA, which was designed for spinning disks.
+With PCIe topology established, NVMe is the **storage protocol that runs on top of PCIe** for flash SSDs. It was designed from the ground up for flash characteristics — unlike SATA, which was designed for spinning disks.
 
-NVMe (Non-Volatile Memory Express) is the PCIe-native storage protocol designed for flash SSDs.
+NVMe (Non-Volatile Memory Express) is the **PCIe-native storage protocol** designed for flash SSDs.
 
 - **Latency**: ~100 µs (vs ~5 ms for SATA SSD, ~5–10 ms for HDD)
 - **Queue depth**: up to 64K queues × 64K commands per queue
@@ -116,13 +116,13 @@ NVMe (Non-Volatile Memory Express) is the PCIe-native storage protocol designed 
 - `blk-mq`: multi-queue block layer; per-CPU software queues map to NVMe hardware queues
 - `io_uring` or `libaio` submit directly to blk-mq; bypass page cache with `O_DIRECT`
 
-The relationship between NVMe and io_uring (from Lecture 19) is direct: io_uring SQEs are translated into blk-mq requests, which are dispatched to NVMe hardware queues. Each NVMe hardware queue maps to one MSI-X interrupt vector and one CPU core, so completions interrupt exactly the core that submitted the I/O.
+The relationship between NVMe and io_uring (from Lecture 19) is direct: io_uring SQEs are translated into **blk-mq requests**, which are dispatched to NVMe hardware queues. Each NVMe hardware queue maps to one MSI-X interrupt vector and one CPU core, so completions interrupt **exactly the core that submitted the I/O**.
 
 ---
 
 ## GPU Driver Architecture (NVIDIA)
 
-The GPU driver is split into two layers: a kernel-mode driver that manages hardware, and a user-mode library that manages CUDA contexts and streams. Understanding this split explains why CUDA API calls sometimes involve ioctls and sometimes do not.
+The GPU driver is split into **two layers**: a **kernel-mode driver** that manages hardware, and a **user-mode library** that manages CUDA contexts and streams. Understanding this split explains why CUDA API calls sometimes involve ioctls and sometimes do not.
 
 ### Kernel-Mode Driver (KMD)
 
@@ -193,7 +193,7 @@ The broader GPU driver ecosystem extends beyond NVIDIA's proprietary stack.
 | `nouveau` | NVIDIA | Reverse-engineered; limited perf | `mesa` (no CUDA) |
 | `nvidia-open` | NVIDIA (Turing+) | Open KMD; proprietary firmware | CUDA (same as proprietary) |
 
-All open drivers use the Linux **DRM (Direct Rendering Manager)** subsystem. DRM provides the kernel framework for GPU command submission, GEM buffer objects, and KMS (Kernel Mode Setting) for display.
+All open drivers use the Linux **DRM (Direct Rendering Manager)** subsystem. DRM provides the kernel framework for **GPU command submission**, GEM buffer objects, and KMS (Kernel Mode Setting) for display.
 
 > **Key Insight:** `nvidia-open` (open since 2022 for Turing and later) uses an open-source kernel module that performs the same hardware interface as the proprietary `nvidia.ko`, but the GSP firmware blob remains proprietary. This allows Linux distributions to build the kernel module from source (improving security auditing and Secure Boot compatibility) while NVIDIA retains control of the GPU's internal firmware.
 
@@ -203,9 +203,9 @@ The transition to open-source infrastructure also means that `nvidia-open` parti
 
 ## FPGA as PCIe Endpoint
 
-FPGAs appear in AI hardware pipelines as pre-processing accelerators (radar signal processing, sensor fusion) or as inference accelerators for custom neural network architectures.
+FPGAs appear in AI hardware pipelines as **pre-processing accelerators** (radar signal processing, sensor fusion) or as **inference accelerators** for custom neural network architectures.
 
-Xilinx/AMD XDMA IP core exposes FPGA as a PCIe DMA device:
+Xilinx/AMD XDMA IP core exposes FPGA as a **PCIe DMA device**:
 
 - H2C (Host-to-Card) and C2H (Card-to-Host) DMA channels
 - Device nodes: `/dev/xdma0_h2c_0`, `/dev/xdma0_c2h_0`

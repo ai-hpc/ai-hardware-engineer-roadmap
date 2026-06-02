@@ -4,11 +4,11 @@
 
 ---
 
-The MLSys 2026 FlashInfer AI Kernel Generation Contest is a compact map of where AI systems work is going.
+The **MLSys 2026 FlashInfer AI Kernel Generation Contest** is a compact map of where AI systems work is going.
 
-It asks participants to create high-performance GPU kernels for modern LLM inference operations on NVIDIA Blackwell B200 GPUs.
+It asks participants to create **high-performance GPU kernels** for modern LLM inference operations on NVIDIA Blackwell B200 GPUs.
 
-The important part is not only the kernel work.
+The important part is **not only the kernel work**.
 
 The contest explicitly welcomes:
 
@@ -25,7 +25,7 @@ GPU kernel optimization
   + AI-assisted systems engineering
 ```
 
-This is the layer below ordinary agent apps.
+This is the **layer below ordinary agent apps**.
 
 It is where agent workloads become:
 
@@ -64,7 +64,7 @@ create optimized CUDA kernels for cutting-edge LLM operations
 for NVIDIA Blackwell B200 GPUs
 ```
 
-The evaluation platform is FlashInfer-Bench.
+The evaluation platform is **FlashInfer-Bench**.
 
 Submissions compete on:
 
@@ -94,11 +94,11 @@ Participants can use:
 - cuTile
 - other kernel programming systems
 
-That tool list is the real signal.
+That tool list is the **real signal**.
 
-The frontier of inference engineering is not one API.
+The frontier of inference engineering is **not one API**.
 
-It is a stack of DSLs, compilers, profilers, runtimes, and benchmark harnesses.
+It is a **stack of DSLs, compilers, profilers, runtimes, and benchmark harnesses**.
 
 ---
 
@@ -114,7 +114,7 @@ workflows
 agent orchestration
 ```
 
-But production agents create inference demand.
+But production agents create **inference demand**.
 
 That demand becomes:
 
@@ -140,19 +140,19 @@ agent workload
   -> GPU architecture
 ```
 
-If you want to build serious agent infrastructure, you need to understand the lower layers.
+If you want to build serious agent infrastructure, you need to understand the **lower layers**.
 
 Not every agent engineer writes CUDA.
 
-But the best systems engineers know which kernel bottleneck they are paying for.
+But the best systems engineers know **which kernel bottleneck they are paying for**.
 
 ---
 
 ## 3. Track A: Fused FP8 MoE
 
-Mixture-of-experts models activate only a subset of experts per token.
+**Mixture-of-experts** models activate only a subset of experts per token.
 
-That saves compute, but it creates systems problems:
+That saves compute, but it creates **systems problems**:
 
 - dynamic routing
 - irregular memory access
@@ -163,7 +163,7 @@ That saves compute, but it creates systems problems:
 - top-k expert selection
 - FP8 quantization and dequantization
 
-The contest's Track A focuses on fused MoE kernels with FP8 support.
+The contest's Track A focuses on **fused MoE kernels with FP8 support**.
 
 The optimization target:
 
@@ -198,15 +198,15 @@ This connects directly to modern MoE models:
 - Qwen MoE variants
 - small active-parameter models such as Lecture 40's ZAYA1-8B
 
-MoE is not "free sparsity."
+MoE is **not "free sparsity."**
 
-It is a routing and memory-layout problem.
+It is a **routing and memory-layout problem**.
 
 ---
 
 ## 4. Track B: Sparse Attention
 
-Dense attention scales poorly with sequence length.
+**Dense attention** scales poorly with sequence length.
 
 The basic cost pattern:
 
@@ -216,9 +216,9 @@ full attention:
   KV cache traffic grows with context
 ```
 
-Sparse attention reduces work by selecting a subset of relevant tokens or blocks.
+**Sparse attention** reduces work by selecting a subset of relevant tokens or blocks.
 
-The contest's Track B targets DeepSeek Sparse Attention with separate indexer and attention kernels.
+The contest's Track B targets **DeepSeek Sparse Attention** with separate indexer and attention kernels.
 
 That split matters:
 
@@ -242,7 +242,7 @@ Sparse attention bottlenecks:
 - interaction with paged KV cache
 - FP8 data paths
 
-Sparse attention is hard because it trades arithmetic for control flow and memory indirection.
+Sparse attention is hard because it **trades arithmetic for control flow and memory indirection**.
 
 The key question:
 
@@ -258,15 +258,15 @@ This connects to:
 - long-context agent sessions
 - DeepSeek-style inference systems
 
-For long-context agents, sparse attention is a direct path to lower memory traffic.
+For long-context agents, sparse attention is a **direct path to lower memory traffic**.
 
-But it must be profiled, not assumed.
+But it must be **profiled, not assumed**.
 
 ---
 
 ## 5. Track C: Gated Delta Net
 
-Gated Delta Net is a sequence-modeling approach used in Qwen3-Next.
+**Gated Delta Net** is a sequence-modeling approach used in Qwen3-Next.
 
 The contest includes decode and prefill kernels.
 
@@ -276,7 +276,7 @@ This matters because GDN-style systems represent a broader shift:
 not every future long-context model will be standard dense attention
 ```
 
-State-space, recurrent, delta-rule, and hybrid models try to reduce attention cost by maintaining compact state.
+State-space, recurrent, delta-rule, and hybrid models try to reduce attention cost by **maintaining compact state**.
 
 The GPU problems change:
 
@@ -291,7 +291,7 @@ The GPU problems change:
 
 Track C is therefore not just "one more kernel."
 
-It is a signal that inference runtimes must support model families beyond standard transformers.
+It is a signal that inference runtimes must support **model families beyond standard transformers**.
 
 For systems engineers, that means:
 
@@ -299,7 +299,7 @@ For systems engineers, that means:
 runtime design must be model-architecture aware
 ```
 
-An inference runtime optimized only for dense attention may underperform on hybrid architectures.
+An inference runtime optimized only for dense attention may **underperform on hybrid architectures**.
 
 ---
 
@@ -307,7 +307,7 @@ An inference runtime optimized only for dense attention may underperform on hybr
 
 The contest targets NVIDIA Blackwell B200 GPUs.
 
-That matters because kernel optimization is hardware-specific.
+That matters because kernel optimization is **hardware-specific**.
 
 Questions change by architecture:
 
@@ -321,7 +321,7 @@ Questions change by architecture:
 - TMA or async copy behavior
 - occupancy tradeoffs
 
-Optimizing for B200 is not the same as optimizing for A100 or H100.
+Optimizing for B200 is **not the same** as optimizing for A100 or H100.
 
 A kernel that wins on one generation may lose on another because:
 
@@ -331,7 +331,7 @@ A kernel that wins on one generation may lose on another because:
 - compiler lowering changes
 - occupancy limits change
 
-That is why official evaluation on bare metal matters.
+That is why **official evaluation on bare metal** matters.
 
 The contest page notes that Modal scores are reference-only because clock frequency cannot be locked, while official evaluations run on bare-metal machines.
 
@@ -361,7 +361,7 @@ kernel spec
 
 This is the right structure for kernel work.
 
-A kernel is not useful because it compiles.
+A kernel is **not useful because it compiles**.
 
 It must:
 
@@ -395,7 +395,7 @@ expert-crafted seed kernels with agent-assisted evolution
 fully agent-generated solutions
 ```
 
-These are different workflows.
+These are **different workflows**.
 
 ### Human plus agent
 
@@ -432,7 +432,7 @@ The contest page requires agent solutions to open-source scripts that reproduce 
 
 That is important.
 
-For AI-generated systems code, the artifact is not only the final kernel.
+For AI-generated systems code, the artifact is **not only the final kernel**.
 
 The artifact is also:
 
@@ -440,7 +440,7 @@ The artifact is also:
 the generation process
 ```
 
-That process must be reproducible.
+That process must be **reproducible**.
 
 ---
 
@@ -461,9 +461,9 @@ A serious kernel optimization loop looks like this:
 10. Repeat.
 ```
 
-Do not change five things at once.
+**Do not change five things at once.**
 
-Kernel work is full of traps:
+Kernel work is **full of traps**:
 
 - a faster kernel may be numerically wrong
 - a change may help one shape and hurt another
@@ -579,9 +579,9 @@ But for this contest, the real skill is knowing when to drop down a level.
 
 ### 11.1 FlashInfer
 
-FlashInfer is the center of gravity for this contest.
+FlashInfer is the **center of gravity** for this contest.
 
-It is an LLM serving kernel library focused on high-performance inference primitives:
+It is an LLM serving kernel library focused on **high-performance inference primitives**:
 
 - attention
 - paged KV-cache operations
@@ -629,7 +629,7 @@ Common mistake:
 optimizing against the wrong mental model
 ```
 
-FlashInfer kernels are already specialized. You need to understand what the baseline is doing before assuming an optimization opportunity exists.
+FlashInfer kernels are **already specialized**. You need to understand what the baseline is doing **before assuming an optimization opportunity exists**.
 
 For example, if a sparse attention kernel is slow, the bottleneck may not be the attention math. It may be:
 
@@ -640,13 +640,13 @@ For example, if a sparse attention kernel is slow, the bottleneck may not be the
 - scale loading
 - page table indirection
 
-FlashInfer is where LLM theory becomes concrete runtime layout.
+FlashInfer is where **LLM theory becomes concrete runtime layout**.
 
 ---
 
 ### 11.2 CUDA
 
-CUDA is the most direct and controllable path.
+CUDA is the **most direct and controllable** path.
 
 Use CUDA when you need:
 
@@ -674,7 +674,7 @@ Gated Delta Net:
   specialized state update and decode loop scheduling
 ```
 
-CUDA gives you control, but it also gives you enough rope.
+CUDA gives you control, but it also **gives you enough rope**.
 
 Common CUDA failure modes:
 
@@ -699,15 +699,15 @@ CUDA debugging discipline:
 5. test multiple shapes, not one cherry-picked shape
 ```
 
-Use CUDA when you need a hand-tuned final kernel or when you need to understand exactly why a higher-level kernel is losing.
+Use CUDA when you need a **hand-tuned final kernel** or when you need to understand exactly why a higher-level kernel is losing.
 
 ---
 
 ### 11.3 Triton
 
-Triton is a Python-like language for writing GPU kernels.
+Triton is a **Python-like language** for writing GPU kernels.
 
-It is valuable because it shortens the edit-test-profile loop.
+It is valuable because it **shortens the edit-test-profile loop**.
 
 Use Triton when you need:
 
@@ -744,9 +744,9 @@ Where Triton can struggle:
 - complex Tensor Core scheduling
 - cases where generated code choices are opaque
 
-Triton is not "slower CUDA."
+Triton is **not "slower CUDA."**
 
-It is a different abstraction boundary.
+It is a **different abstraction boundary**.
 
 For agentic kernel search, a practical path is:
 
@@ -761,9 +761,9 @@ Triton prototype
 
 ### 11.4 TileLang
 
-TileLang is a tile-oriented DSL for writing high-performance AI kernels.
+TileLang is a **tile-oriented DSL** for writing high-performance AI kernels.
 
-The key abstraction is that you describe computation in terms of tiles, rather than manually managing every thread-level operation.
+The key abstraction is that you describe computation **in terms of tiles**, rather than manually managing every thread-level operation.
 
 This is useful because AI kernels usually have tiled structure:
 
@@ -800,9 +800,9 @@ that reduce the number of ways to write invalid code
 
 TileLang can be a better target for automated exploration because the search space is closer to the math.
 
-But you still need profiling.
+But you **still need profiling**.
 
-A tile abstraction can hide:
+A tile abstraction can **hide**:
 
 - bad memory layout
 - excessive register use
@@ -816,9 +816,9 @@ Use TileLang as a rapid kernel-generation layer, then validate with FlashInfer-B
 
 ### 11.5 CuTe DSL
 
-CuTe DSL is NVIDIA's Python DSL around CUTLASS/CuTe concepts.
+CuTe DSL is NVIDIA's **Python DSL around CUTLASS/CuTe** concepts.
 
-CuTe is fundamentally about tensor layouts and tiled tensor algebra.
+CuTe is fundamentally about **tensor layouts and tiled tensor algebra**.
 
 This matters because many high-performance kernels are layout problems.
 
@@ -867,7 +867,7 @@ Blackwell optimization is heavily about feeding tensor cores
 and moving data through the memory hierarchy correctly.
 ```
 
-CuTe DSL gives you a way to express that more directly than Triton in some cases, while staying higher level than hand-written CUDA.
+CuTe DSL gives you a way to express that **more directly than Triton** in some cases, while staying **higher level than hand-written CUDA**.
 
 For contest work, CuTe DSL is most relevant to Track A FP8 MoE and any GEMM-like subproblem.
 
@@ -875,7 +875,7 @@ For contest work, CuTe DSL is most relevant to Track A FP8 MoE and any GEMM-like
 
 ### 11.6 cuTile
 
-cuTile is NVIDIA's Python implementation of the CUDA Tile programming model.
+cuTile is NVIDIA's **Python implementation of the CUDA Tile** programming model.
 
 The official docs describe cuTile as a Python-based DSL where kernels operate on tiles, using functions such as:
 
@@ -896,7 +896,7 @@ tiles:
   immutable kernel-local tensor-like values with compile-time shapes
 ```
 
-This is a major abstraction shift.
+This is a **major abstraction shift**.
 
 Instead of writing:
 
@@ -919,7 +919,7 @@ Why cuTile matters:
 - it can be easier to modify than deep CUDA/CUTLASS templates
 - it is aligned with agent-assisted kernel translation work
 
-This connects directly to Lecture 35, where cuTile Python to cuTile.jl translation was used as a concrete Agent Skills example.
+This connects directly to **Lecture 35**, where cuTile Python to cuTile.jl translation was used as a concrete Agent Skills example.
 
 For the MLSys contest:
 
@@ -942,11 +942,11 @@ Validate:
 
 ### 11.7 OpenEvolve
 
-OpenEvolve is not a GPU kernel language.
+OpenEvolve is **not a GPU kernel language**.
 
-It is an evolutionary coding agent framework.
+It is an **evolutionary coding agent framework**.
 
-Its role in this contest is search.
+Its role in this contest is **search**.
 
 A normal kernel workflow:
 
@@ -1006,17 +1006,17 @@ It should include:
 
 This is where the contest's agent-generated-kernel track becomes serious.
 
-The best agent is not the one that writes the prettiest CUDA.
+The best agent is **not the one that writes the prettiest CUDA**.
 
-It is the one that can run a disciplined generate-test-profile-select loop.
+It is the one that can run a **disciplined generate-test-profile-select loop**.
 
 ---
 
 ### 11.8 Modal
 
-Modal is a serverless cloud platform for running compute-intensive workloads.
+Modal is a **serverless cloud platform** for running compute-intensive workloads.
 
-In this contest context, Modal is useful for iteration and reference execution.
+In this contest context, Modal is useful for **iteration and reference execution**.
 
 Use Modal for:
 
@@ -1046,17 +1046,17 @@ Good Modal workflow:
 5. promote promising candidates to bare-metal validation
 ```
 
-Do not overfit to Modal timing noise.
+Do **not overfit to Modal timing noise**.
 
-Use it to reduce the number of bad candidates, not to prove final speed.
+Use it to reduce the number of bad candidates, **not to prove final speed**.
 
 ---
 
 ### 11.9 Blackwell B200
 
-Blackwell B200 is the target hardware.
+Blackwell B200 is the **target hardware**.
 
-That determines what optimizations matter.
+That determines **what optimizations matter**.
 
 Official NVIDIA docs identify B200 as compute capability 10.0 in the Blackwell tuning guide and describe the architecture as targeting generative AI and accelerated computing.
 
@@ -1072,7 +1072,7 @@ The practical B200 concerns for this contest:
 - register pressure and occupancy balance
 - support for newer CUDA features
 
-Do not assume Hopper instincts transfer perfectly.
+Do **not assume Hopper instincts transfer perfectly**.
 
 Questions to ask on B200:
 
@@ -1098,7 +1098,7 @@ The key lesson:
 hardware generation is part of the algorithm.
 ```
 
-An inference kernel is not just math. It is math mapped onto a specific machine.
+An inference kernel is **not just math**. It is **math mapped onto a specific machine**.
 
 ---
 
@@ -1174,7 +1174,7 @@ Required guardrails:
 - code diffs reviewed
 - shape coverage maintained
 
-This is where agent skills matter.
+This is where **agent skills matter**.
 
 A good kernel-optimization skill should encode:
 
@@ -1258,7 +1258,7 @@ They are rarer than AI application roles because they require:
 - hardware awareness
 - benchmark integrity
 
-If you want to move from AI application work into AI systems work, this contest is a strong practice target.
+If you want to move from AI application work into AI systems work, this contest is a **strong practice target**.
 
 ---
 
@@ -1293,7 +1293,7 @@ runtime thinking:
   kernels as part of the serving stack
 ```
 
-This is a bridge from agent engineering to AI hardware/software co-design.
+This is a **bridge from agent engineering to AI hardware/software co-design**.
 
 ---
 
@@ -1351,9 +1351,9 @@ Day 7:
   write results and next plan
 ```
 
-The goal is not to win immediately.
+The goal is **not to win immediately**.
 
-The goal is to build a disciplined kernel optimization loop.
+The goal is to build a **disciplined kernel optimization loop**.
 
 ---
 

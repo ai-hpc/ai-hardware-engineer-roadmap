@@ -2,7 +2,7 @@
 
 ## Overview
 
-A 70B-class dense model in FP16 is ~140 GB. No single GPU in the Hopper generation holds it without quantization — H100 has 80 GB, H200 has 141 GB. To serve it at higher precision than INT4, or to serve at larger batch / longer context, the model is split across multiple GPUs in a single node, joined by NVLink.
+A 70B-class dense model in FP16 is **~140 GB**. No single GPU in the Hopper generation holds it without quantization — H100 has 80 GB, H200 has 141 GB. To serve it at higher precision than INT4, or to serve at larger batch / longer context, the model is **split across multiple GPUs** in a single node, joined by NVLink.
 
 The dominant 2026 split is **tensor parallelism (TP)** — the canonical approach pioneered by Megatron-LM. This lecture covers TP end-to-end for the anchor pair:
 
@@ -20,7 +20,7 @@ By the end you should be able to set up TP on 8× H100/H200 for either Llama 3.3
 
 ## 1. Tensor parallelism — the partitioning
 
-TP splits *individual matrix multiplications* across GPUs. For each Linear layer, the weight matrix is partitioned and each GPU computes a slice of the output. The slices are joined by all-reduce.
+TP splits *individual matrix multiplications* across GPUs. For each Linear layer, the weight matrix is **partitioned** and each GPU computes a slice of the output. The slices are joined by **all-reduce**.
 
 ### 1.1 Attention partition
 
@@ -65,9 +65,9 @@ Again, the FFN ends with an all-reduce.
 
 ### 1.3 Total all-reduces per layer
 
-For each transformer layer, **two all-reduces** — one after attention output projection, one after FFN down projection. For an 80-layer model that's 160 all-reduces per token at decode.
+For each transformer layer, **two all-reduces** — one after attention output projection, one after FFN down projection. For an 80-layer model that's **160 all-reduces per token** at decode.
 
-This is the single largest performance consideration in TP serving.
+This is the **single largest performance consideration** in TP serving.
 
 ---
 
@@ -124,7 +124,7 @@ message_size = 2048 × 8192 × 2 = 32 MB per layer per all-reduce
 total bytes per prompt = 80 × 2 × 32 MB = 5.1 GB cross-GPU traffic per prefill
 ```
 
-This is significant. Prefill TP=8 spends ~25% of step time in NCCL all-reduces.
+This is significant. Prefill TP=8 spends **~25% of step time in NCCL all-reduces**.
 
 ---
 
@@ -137,7 +137,7 @@ The physical fabric for 8× H100 / H200 in standard HGX configurations:
 * **Each pair of GPUs has 900 GB/s effective bandwidth.**
 * **Latency** — sub-microsecond for small messages.
 
-This fabric is the reason TP=8 is practical at all. Without NVLink, TP across 8 GPUs through PCIe (128 GB/s aggregate to host, 64 GB/s peer-to-peer if not blocked) would be 10–14× slower.
+This fabric is the reason **TP=8 is practical at all**. Without NVLink, TP across 8 GPUs through PCIe (128 GB/s aggregate to host, 64 GB/s peer-to-peer if not blocked) would be **10–14× slower**.
 
 ### 3.1 NVLink Switch chiplets and the H200 NVL configuration
 
@@ -161,7 +161,7 @@ For Llama 3.3 70B / Qwen 2.5 72B:
 Ideal: 4× more GPUs → 4× more throughput.
 Real: 4× more GPUs → 2.5–3.5× more throughput at this hardware/model.
 
-The gap is communication. The plot looks like:
+The gap is **communication**. The plot looks like:
 
 ```text
    per-replica throughput
@@ -188,7 +188,7 @@ A common metric mistake: comparing TP=4 vs TP=8 in **per-replica throughput**.
 
 TP=8 has **higher absolute throughput** (better TPOT, more users served per replica) but **worse $/MTok** if each H200 has a fixed cost.
 
-For chat products, TP=4 is usually the cost-efficient pick. TP=8 is for cases where TP=4 cannot fit the workload (e.g., 128K context at large batch).
+For chat products, **TP=4 is usually the cost-efficient pick**. TP=8 is for cases where TP=4 cannot fit the workload (e.g., 128K context at large batch).
 
 ### 4.3 When the TP size is not yours to choose — FP8 block alignment
 
@@ -250,7 +250,7 @@ For Llama 3.3 70B at FP16, TP=4, batch=32 on 4× H100:
 | TRT-LLM 1.3 BF16 | ~26 ms | ~360 |
 | TRT-LLM 1.3 FP8 | ~16 ms | ~580 |
 
-Numbers approximate; replicate in your lab. TRT-LLM's lead is mostly kernel quality on Hopper (FA4, WGMMA, TMA) and FP8 maturity. vLLM is closing the gap quarter by quarter.
+Numbers approximate; replicate in your lab. TRT-LLM's lead is mostly **kernel quality on Hopper** (FA4, WGMMA, TMA) and FP8 maturity. vLLM is closing the gap quarter by quarter.
 
 ---
 
@@ -281,7 +281,7 @@ For very large all-reduces, NCCL implements it as reduce-scatter (gather partial
 
 A subtle but important optimization: **sequence parallelism** (SP) reduces the activation memory cost of TP by partitioning the sequence dimension across GPUs during non-matmul operations (RMSNorm, residual add, etc.).
 
-Without SP, TP-partitioned models duplicate full activations across GPUs during RMSNorm and residual. SP partitions those operations too — each GPU holds only `seq/N` worth of activations.
+Without SP, TP-partitioned models **duplicate full activations** across GPUs during RMSNorm and residual. SP partitions those operations too — each GPU holds only `seq/N` worth of activations.
 
 * **Wins for long-context workloads** — at 128K context, SP saves substantial HBM.
 * **vLLM 0.22+** integrates SP transparently when `--enable-sequence-parallelism` is set.

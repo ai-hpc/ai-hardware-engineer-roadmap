@@ -10,7 +10,7 @@
 
 The earlier lectures were about lessons.
 
-This lecture turns those lessons into a concrete product direction.
+This lecture turns those lessons into a **concrete product direction**.
 
 The example product is:
 
@@ -60,7 +60,7 @@ It should not feel like:
 - a gamer gadget
 - a mini PC on display
 
-This immediately shapes mechanical and industrial choices.
+This immediately shapes **mechanical and industrial choices**.
 
 ---
 
@@ -83,7 +83,7 @@ Why these choices matter:
 - physical mute gives hardware truth to the privacy claim
 - hidden I/O reduces visible clutter
 
-This is product design turning into hardware layout.
+This is **product design turning into hardware layout**.
 
 ---
 
@@ -127,7 +127,7 @@ Why this works:
 
 ## Step 5: make trust visible
 
-For a home AI device, trust cannot depend only on the phone app.
+For a home AI device, trust cannot depend **only on the phone app**.
 
 The product needs visible truth.
 
@@ -140,7 +140,7 @@ That means:
 
 If users need to guess whether the device is live, the product is weak.
 
-That is why a physical mute switch is not a tiny UX detail. It is a core product architecture decision.
+That is why a **physical mute switch** is not a tiny UX detail. It is a **core product architecture decision**.
 
 ---
 
@@ -177,7 +177,7 @@ The product is a home AI appliance first, not an audiophile showcase.
 
 ## Step 7: decide the intelligence boundary
 
-A good V1 product should not feel like a shell around someone else's brain.
+A good V1 product should not feel like a **shell around someone else's brain**.
 
 For a local-first AI speaker, a strong split is:
 
@@ -212,7 +212,7 @@ not:
 
 ## Step 8: define the V1 non-goals
 
-Strong products are often defined as much by what they refuse as by what they include.
+Strong products are often defined as much by **what they refuse** as by what they include.
 
 For this AI smart-speaker V1, good non-goals are:
 
@@ -266,7 +266,7 @@ The better question is:
 
 - if we build this, what kind of object will it become in the user's home?
 
-That is the real bridge between embedded engineering and product design.
+That is the real bridge between **embedded engineering and product design**.
 
 ---
 

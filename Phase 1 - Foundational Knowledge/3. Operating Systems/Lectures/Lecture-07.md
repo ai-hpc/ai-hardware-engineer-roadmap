@@ -8,7 +8,7 @@ The core problem this lecture addresses is: how do you make Linux respond to ext
 
 ## Real-Time Definitions
 
-Real-time does not mean fast. It means **bounded worst-case latency** — a deadline that must always be met.
+Real-time does **not mean fast**. It means **bounded worst-case latency** — a deadline that must always be met.
 
 - **Soft RT**: missing a deadline degrades quality (e.g., dropped audio frame, delayed video render)
 - **Hard RT**: missing a deadline is a system failure (e.g., motor overshoot, brake actuation too late)
@@ -37,7 +37,7 @@ Think of each preemption model as controlling how many "no interrupt" zones exis
 
 ## PREEMPT_RT Internals
 
-The PREEMPT_RT patch series achieves full preemptibility through three core mechanisms: converting spinlocks to sleeping locks, moving interrupt handlers into schedulable threads, and making softirq processing preemptible. Each mechanism attacks a different source of latency.
+The PREEMPT_RT patch series achieves **full preemptibility** through three core mechanisms: converting **spinlocks to sleeping locks**, moving **interrupt handlers into schedulable threads**, and making **softirq processing preemptible**. Each mechanism attacks a different source of latency.
 
 ### Spinlock Conversion
 
@@ -101,7 +101,7 @@ This is a conceptual shift. In standard Linux, interrupts are sacred — they pr
 
 ## Measuring Scheduling Latency
 
-To verify that your RT configuration achieves the required latency bounds, you need a measurement tool. `cyclictest` is the standard tool for measuring RT scheduling latency.
+To verify that your RT configuration achieves the required latency bounds, you need a measurement tool. **`cyclictest`** is the standard tool for measuring **RT scheduling latency**.
 
 ```bash
 # Basic: 1 thread, SCHED_FIFO priority 99, nanosleep, 1ms interval, 10000 loops
@@ -111,7 +111,7 @@ cyclictest -t1 -p 99 -n -i 1000 -l 10000
 cyclictest --histogram=200 -D 60s -p 99 -n
 ```
 
-The histogram mode is critical for safety analysis. You are not just interested in average latency — you need to know the entire distribution, especially the tail. A single data point in the 400µs bucket can fail a 300µs requirement.
+The **histogram mode** is critical for safety analysis. You are not just interested in average latency — you need to know the **entire distribution, especially the tail**. A single data point in the 400µs bucket can fail a 300µs requirement.
 
 Targets by application domain:
 
@@ -150,7 +150,7 @@ hwlatdetect --duration=60s --threshold=20
 # If this reports violations, the platform firmware must be tuned — software alone cannot fix SMI latency
 ```
 
-`hwlatdetect` works by monopolizing a CPU and measuring gaps between hardware timer reads. Any gap larger than the polling interval indicates something invisible (an SMI) stole CPU time.
+`hwlatdetect` works by **monopolizing a CPU** and measuring gaps between hardware timer reads. Any gap larger than the polling interval indicates **something invisible (an SMI) stole CPU time**.
 
 > **Common Pitfall:** On many x86 server platforms, ECC memory scrubbing generates SMIs every few seconds. On some BIOS versions this cannot be disabled and adds 100–300µs spikes. This must be discovered during bring-up, not after ASIL certification testing begins.
 
@@ -186,7 +186,7 @@ isolcpus=2,3 nohz_full=2,3 rcu_nocbs=2,3 irqaffinity=0,1
 - `rcu_nocbs=`: offloads RCU callbacks to `rcuoc` kthreads running on non-isolated CPUs
 - `irqaffinity=`: routes all hardware IRQs away from isolated CPUs
 
-These four parameters work together. `isolcpus` removes the CPU from the scheduler. `nohz_full` stops the kernel from interrupting it every millisecond. `rcu_nocbs` stops RCU from firing callbacks on it. `irqaffinity` stops hardware interrupts from landing on it. Together, they create a nearly bare-metal execution environment for your RT task.
+These four parameters **work together**. `isolcpus` removes the CPU from the scheduler. `nohz_full` stops the kernel from interrupting it every millisecond. `rcu_nocbs` stops RCU from firing callbacks on it. `irqaffinity` stops hardware interrupts from landing on it. Together, they create a **nearly bare-metal execution environment** for your RT task.
 
 ### Runtime Tuning
 
@@ -259,7 +259,7 @@ QNX represents the alternative design point: rather than retrofitting a general-
 - Adaptive partitioning scheduler: CPU time budget reserved per partition with guaranteed minimums even under overload
 - Relevance: QNX + hypervisor pairing (e.g., on NXP S32G, TI TDA4VM) isolates safety-certified RTOS from Linux ADAS stack on the same SoC
 
-In practice, modern AV platforms often run both: QNX handles safety-critical real-time control (brakes, steering), while Linux runs the AI inference stack. A hypervisor provides hardware isolation between the two.
+In practice, modern AV platforms often run **both**: QNX handles **safety-critical real-time control** (brakes, steering), while Linux runs the **AI inference stack**. A **hypervisor** provides hardware isolation between the two.
 
 ---
 

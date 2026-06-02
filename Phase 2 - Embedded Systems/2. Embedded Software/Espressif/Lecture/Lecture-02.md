@@ -8,7 +8,7 @@
 
 ## Why this lecture matters
 
-Before writing code, you need to know what platform you are actually standing on.
+Before writing code, you need to know **what platform you are actually standing on**.
 
 For `arduino-esp32`, that means three things:
 
@@ -40,7 +40,7 @@ Important note from Espressif:
   - **Arduino as an ESP-IDF component**
   - or rebuilding the static libraries
 
-That distinction matters because not every chip supports the simplest Arduino flow equally.
+That distinction matters because **not every chip supports the simplest Arduino flow equally**.
 
 Official references: [README supported chips](https://github.com/espressif/arduino-esp32), [Getting Started](https://docs.espressif.com/projects/arduino-esp32/en/latest/getting_started.html), [Libraries](https://docs.espressif.com/projects/arduino-esp32/en/latest/libraries.html)
 
@@ -74,13 +74,13 @@ This is best when you need:
 - advanced peripherals or middleware
 - more production-like firmware organization
 
-This distinction is one of the most important practical lessons in the Espressif ecosystem.
+This distinction is one of the **most important practical lessons** in the Espressif ecosystem.
 
 ---
 
 ## What “first board bring-up” should look like
 
-Your first success should be deliberately boring.
+Your first success should be **deliberately boring**.
 
 Do not start with:
 
@@ -117,7 +117,7 @@ After the first upload, verify these basics:
 - a GPIO output or serial print behaves as expected
 - board-specific features like LED pin or USB CDC match the selected board profile
 
-This sounds trivial, but it prevents many hours of confusion later.
+This sounds trivial, but it prevents **many hours of confusion** later.
 
 ---
 

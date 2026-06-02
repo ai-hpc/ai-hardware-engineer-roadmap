@@ -8,7 +8,7 @@ Every piece of hardware connected to a Linux system — whether a USB camera, a 
 
 ## Linux Driver Model: Core Abstractions
 
-The Linux device model provides a unified framework across all buses. Three primary structures, defined in `include/linux/device.h`, represent the hardware and software entities:
+The Linux device model provides a **unified framework** across all buses. Three primary structures, defined in `include/linux/device.h`, represent the hardware and software entities:
 
 ```
 Linux Driver Model: Match → Probe → Manage
@@ -37,7 +37,7 @@ Bus Core (e.g., platform_bus)
 | Device | `struct device` | One instance of physical or virtual hardware |
 | Driver | `struct device_driver` | Code that manages a specific device type |
 
-The bus core compares each driver's `id_table` (PCI/USB) or `of_match_table` (Device Tree `compatible`) against each registered device. On a match, the bus calls `driver->probe(device)`. On removal or driver unbind, it calls `driver->remove(device)`.
+The bus core compares each driver's `id_table` (PCI/USB) or `of_match_table` (Device Tree `compatible`) against each registered device. **On a match**, the bus calls `driver->probe(device)`. On removal or driver unbind, it calls `driver->remove(device)`.
 
 > **Key Insight:** The probe/remove lifecycle means a driver never hardcodes its device's resource addresses. The bus framework passes the `platform_device` to `probe()`, and the driver queries its resources (MMIO, IRQ, clocks) from that object. This makes the same driver binary usable across multiple hardware variants that differ only in their Device Tree descriptions.
 
@@ -45,7 +45,7 @@ The bus core compares each driver's `id_table` (PCI/USB) or `of_match_table` (De
 
 ## Platform Devices
 
-PCIe and USB devices are **self-describing**: they carry vendor IDs, device IDs, and capability registers that the bus can read automatically. SoC peripherals have no such mechanism — there is no way to dynamically discover a UART controller at address 0xFE200000.
+PCIe and USB devices are **self-describing**: they carry vendor IDs, device IDs, and capability registers that the bus can read automatically. SoC peripherals have **no such mechanism** — there is no way to dynamically discover a UART controller at address 0xFE200000.
 
 SoC peripherals (UART, I2C controller, camera CSI, AI accelerator, FPGA AXI slave) are not self-describing; the bus cannot enumerate them. They are registered as **platform devices** using descriptions from Device Tree or ACPI.
 
@@ -88,13 +88,13 @@ module_platform_driver(mydev_driver);
 
 `module_platform_driver()` expands to `module_init` / `module_exit` wrappers that call `platform_driver_register()` and `platform_driver_unregister()`.
 
-`MODULE_DEVICE_TABLE(of, mydev_of_match)` embeds the match table in the module binary. `udevd` uses this to automatically load the module when a matching Device Tree node is discovered — without requiring manual `modprobe`.
+`MODULE_DEVICE_TABLE(of, mydev_of_match)` embeds the match table in the module binary. `udevd` uses this to **automatically load the module** when a matching Device Tree node is discovered — without requiring manual `modprobe`.
 
 ---
 
 ## Device Tree (DTS)
 
-**Device Tree** is a hardware description language for embedded SoCs. The source format (`.dts`) is compiled by `dtc` into a binary blob (`.dtb`). The bootloader (U-Boot, EDK II) passes the DTB physical address to the kernel at boot (in a CPU register: `x0` on ARM64, `r2` on ARM32). The kernel parses it to discover all platform devices.
+**Device Tree** is a **hardware description language** for embedded SoCs. The source format (`.dts`) is compiled by `dtc` into a binary blob (`.dtb`). The bootloader (U-Boot, EDK II) passes the DTB physical address to the kernel at boot (in a CPU register: `x0` on ARM64, `r2` on ARM32). The kernel parses it to discover all platform devices.
 
 ```
 DTS → DTB → Kernel boot flow:
@@ -144,7 +144,7 @@ soc {
 };
 ```
 
-The `compatible` property lists IDs from most-specific to least-specific. The driver's `of_match_table` is checked against all entries; the first match wins. This allows one driver to support multiple hardware revisions.
+The `compatible` property lists IDs from **most-specific to least-specific**. The driver's `of_match_table` is checked against all entries; the **first match wins**. This allows one driver to support multiple hardware revisions.
 
 ### Key DTS Properties
 
@@ -167,7 +167,7 @@ The `compatible` property lists IDs from most-specific to least-specific. The dr
 
 The base DTB describes the SoC itself. For boards that support multiple hardware configurations — different camera sensors, optional peripherals, add-on modules — rebuilding the full DTB for each variant is impractical. **Overlays** solve this: they are incremental patches applied on top of the base DTB.
 
-Overlays are incremental additions to the base DTB, applied at runtime (via `/sys/kernel/config/device-tree/overlays/`) or by the bootloader. They add, modify, or delete nodes without recompiling the full DTB.
+Overlays are **incremental additions** to the base DTB, applied at runtime (via `/sys/kernel/config/device-tree/overlays/`) or by the bootloader. They add, modify, or delete nodes **without recompiling the full DTB**.
 
 ```bash
 # Compile overlay source to binary
@@ -188,7 +188,7 @@ Used in Jetson Xavier/Orin for camera carrier board (sensor module) configuratio
 
 ## probe() Function: Resource Setup Pattern
 
-The `probe()` function is the driver's initialization entry point. Its job is to claim all hardware resources, initialize the device, and register it with any higher-level subsystems (V4L2, IIO, etc.). The key pattern is using `devm_*` (managed resource) functions for every allocation:
+The `probe()` function is the driver's **initialization entry point**. Its job is to claim all hardware resources, initialize the device, and register it with any higher-level subsystems (V4L2, IIO, etc.). The key pattern is using `devm_*` (**managed resource**) functions for every allocation:
 
 ```c
 static int mydev_probe(struct platform_device *pdev)
@@ -225,7 +225,7 @@ static int mydev_probe(struct platform_device *pdev)
 }
 ```
 
-If any `devm_*` call fails and the function returns a negative error code, all previously acquired managed resources are automatically released in reverse order. No `goto err_cleanup` labels needed.
+If any `devm_*` call fails and the function returns a negative error code, all previously acquired managed resources are **automatically released in reverse order**. No `goto err_cleanup` labels needed.
 
 The step-by-step sequence of a successful probe:
 
@@ -243,7 +243,7 @@ The step-by-step sequence of a successful probe:
 
 ## devm_* Managed Resources
 
-The `devres` framework is what makes the `devm_*` pattern work. Each `devm_*` call registers a cleanup action with the device's resource list. When the device is unbound from its driver or when `probe()` returns an error, the framework walks the resource list in reverse order and calls each cleanup function.
+The `devres` framework is what makes the `devm_*` pattern work. Each `devm_*` call **registers a cleanup action** with the device's resource list. When the device is unbound from its driver or when `probe()` returns an error, the framework walks the resource list **in reverse order** and calls each cleanup function.
 
 `devres` framework automatically releases resources when the device is unbound from its driver or when `probe()` returns an error:
 
@@ -265,7 +265,7 @@ Custom managed resources: `devm_add_action(dev, fn, data)` registers an arbitrar
 
 ## sysfs Attributes
 
-Once a driver is probed, it can expose hardware state to userspace through the **sysfs** virtual filesystem. sysfs attributes appear as files under `/sys/bus/platform/devices/` and can be read or written with standard file operations.
+Once a driver is probed, it can expose **hardware state to userspace** through the **sysfs** virtual filesystem. sysfs attributes appear as files under `/sys/bus/platform/devices/` and can be read or written with standard file operations.
 
 ```c
 static ssize_t utilization_show(struct device *dev,
@@ -285,7 +285,7 @@ ATTRIBUTE_GROUPS(mydev);
 
 sysfs attributes appear at `/sys/bus/platform/devices/mydevice.0/utilization`. Userspace reads with `cat`; write with `echo`. Must be re-entrant; protect shared state with a mutex or spinlock.
 
-sysfs attributes are ABI — once exported to userspace, removing or renaming them breaks userspace consumers. Export only stable, meaningful values. Use `debugfs` (below) for internal debug state that may change between kernel versions.
+sysfs attributes are **ABI** — once exported to userspace, removing or renaming them **breaks userspace consumers**. Export only stable, meaningful values. Use `debugfs` (below) for internal debug state that may change between kernel versions.
 
 With sysfs covered, the next piece is how the kernel notifies userspace when devices appear or disappear.
 
@@ -293,7 +293,7 @@ With sysfs covered, the next piece is how the kernel notifies userspace when dev
 
 ## udev: Userspace Device Management
 
-The kernel emits **uevent** netlink messages on device add/remove. `udevd` receives them, matches `/etc/udev/rules.d/` rules, and acts:
+The kernel emits **uevent** netlink messages on **device add/remove**. `udevd` receives them, matches `/etc/udev/rules.d/` rules, and acts:
 
 - Creates `/dev/` device nodes with correct owner and permissions
 - Loads firmware via `request_firmware()` mechanism

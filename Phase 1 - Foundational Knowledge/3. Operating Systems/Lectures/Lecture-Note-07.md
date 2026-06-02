@@ -13,13 +13,13 @@
 
 # Part 1: DMA, IOMMU & GPU Memory Management
 
-**Context:** Devices move data to/from RAM without CPU copies. The CPU must not see stale data (cache coherency). The IOMMU translates device addresses and restricts access; DMA-BUF shares one buffer across CPU, GPU, camera, display.
+**Context:** Devices move data to/from RAM **without CPU copies**. The CPU must not see **stale data** (cache coherency). The **IOMMU** translates device addresses and restricts access; **DMA-BUF** shares one buffer across CPU, GPU, camera, display.
 
 ---
 
 ## DMA (Direct Memory Access)
 
-- Device (NIC, NVMe, GPU, camera ISP) transfers data to/from system RAM autonomously. CPU programs descriptor (src, dst, length); device runs transfer; completion via IRQ or poll.
+- Device (NIC, NVMe, GPU, camera ISP) transfers data to/from system RAM **autonomously**. CPU programs **descriptor** (src, dst, length); device runs transfer; completion via IRQ or poll.
 - **Without DMA:** Device → CPU copy → RAM. **With DMA:** Device → DMA engine → RAM; CPU is free after submitting descriptor.
 
 ---
@@ -60,13 +60,13 @@
 
 # Part 2: NUMA Topology & HPC Memory Optimization
 
-**Context:** On multi-socket machines, memory attached to socket 0 is "local" to CPUs on socket 0 and "remote" to socket 1. Remote access has higher latency and lower bandwidth; placement of data and threads matters.
+**Context:** On multi-socket machines, memory attached to socket 0 is **"local"** to CPUs on socket 0 and **"remote"** to socket 1. Remote access has **higher latency and lower bandwidth**; placement of data and threads matters.
 
 ---
 
 ## NUMA Architecture
 
-- Each socket (NUMA node) has local DRAM (lower latency, full bandwidth). Access to another node's DRAM goes over interconnect (QPI/UPI, Infinity Fabric) — ~2× latency, ~half bandwidth.
+- Each socket (NUMA node) has **local DRAM** (lower latency, full bandwidth). Access to another node's DRAM goes over **interconnect** (QPI/UPI, Infinity Fabric) — **~2× latency, ~half bandwidth**.
 - **Discovery:** `numactl --hardware`, `lstopo`, `numastat`, `/sys/devices/system/node/nodeN/distance`. Distance matrix: local = 10; remote often 20–40.
 
 ---
@@ -95,7 +95,7 @@
 
 ## Multi-GPU & CPU–GPU Affinity
 
-- GPUs are attached to one socket's PCIe root. CPU↔GPU traffic from the other socket crosses interconnect. Use `nvidia-smi topo -m` to see topology; bind process and memory to the node that owns the GPU(s) used.
+- GPUs are attached to **one socket's PCIe root**. CPU↔GPU traffic from the other socket **crosses interconnect**. Use `nvidia-smi topo -m` to see topology; **bind process and memory to the node that owns the GPU(s) used**.
 
 ---
 

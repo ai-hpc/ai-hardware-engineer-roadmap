@@ -2,7 +2,7 @@
 
 ## Overview
 
-The runtime is the layer between the model file and the GPU. It owns:
+The **runtime** is the layer between the model file and the GPU. It owns:
 
 * The scheduler that turns requests into kernel launches.
 * The kernel selection that decides whether attention is FlashAttention 4 or something older.
@@ -10,7 +10,7 @@ The runtime is the layer between the model file and the GPU. It owns:
 * The quantization integration that uses (or fails to use) the FP8 / FP4 / INT4 path on the hardware.
 * The API surface that the rest of the stack talks to.
 
-Picking the right runtime is the single largest engineering decision after picking the model. A wrong choice costs 2–5× in throughput, blocks features (paged KV, prefix cache, FP8), or limits the hardware you can target. A right choice means most of the hard kernel and scheduler work is already done.
+Picking the right runtime is the **single largest engineering decision** after picking the model. A **wrong choice costs 2–5× in throughput**, blocks features (paged KV, prefix cache, FP8), or limits the hardware you can target. A right choice means most of the hard kernel and scheduler work is already done.
 
 This lecture covers the 2026 landscape:
 
@@ -45,7 +45,7 @@ By the end you should have a runtime decision matrix for any workload × hardwar
 
 ### 1.2 V0 → V1 engine
 
-vLLM's V0 engine (2023 → early 2025) accumulated complexity. The V1 engine (2025-onwards) is a rewrite that:
+vLLM's V0 engine (2023 → early 2025) accumulated complexity. The **V1 engine** (2025-onwards) is a rewrite that:
 
 * Cleans up the scheduler-kernel boundary.
 * Improves CUDA Graph integration on decode.
@@ -251,7 +251,7 @@ Where they differ:
 * **Kernels** — vLLM uses Triton + C++; SGLang uses its own kernels; TRT-LLM uses NVIDIA kernels; llama.cpp uses GGML kernels.
 * **Quantization** — each has its own integration of AWQ / GPTQ / FP8 / GGUF.
 
-A senior engineer can read any runtime's source and locate each box. Junior engineers learn one runtime; seniors learn *the boxes* and apply them to whichever runtime they're handed.
+A senior engineer can read any runtime's source and locate each box. **Junior engineers learn one runtime; seniors learn *the boxes*** and apply them to whichever runtime they're handed.
 
 ---
 

@@ -4,9 +4,9 @@
 
 ---
 
-Efficient local RAG is not about using the largest model you can fit.
+**Efficient local RAG** is not about using the largest model you can fit.
 
-It is about spending memory and compute where they improve answer quality.
+It is about spending memory and compute **where they improve answer quality**.
 
 A strong edge RAG stack looks like:
 
@@ -39,9 +39,9 @@ retrieval precision + small fast generator
 beats weak retrieval + huge generator
 ```
 
-Most RAG failures are not model-size failures.
+Most RAG failures are **not model-size failures**.
 
-They are retrieval, chunking, context, and memory-budget failures.
+They are **retrieval, chunking, context, and memory-budget failures**.
 
 ---
 
@@ -93,7 +93,7 @@ runtime:
 
 This is not the only valid stack.
 
-It is a strong default because it keeps each component small enough to reason about.
+It is a **strong default** because it keeps each component small enough to reason about.
 
 The goal is:
 
@@ -109,7 +109,7 @@ good retrieval quality
 
 ## 2. Generator: Qwen3.5-4B
 
-Qwen3.5-4B is a 4B-class Qwen model available on Hugging Face.
+Qwen3.5-4B is a **4B-class Qwen model** available on Hugging Face.
 
 The model card includes examples for Transformers, vLLM, SGLang, and Docker model runner usage.
 
@@ -139,13 +139,13 @@ That means you should validate:
 - memory use at your target context length
 - answer quality on your documents
 
-Do not assume all Qwen3.5-4B variants behave identically.
+Do **not assume all Qwen3.5-4B variants behave identically**.
 
 ---
 
 ## 3. Quantization strategy
 
-For edge RAG, INT4-class quantization is usually the right starting point.
+For edge RAG, **INT4-class quantization** is usually the right starting point.
 
 Common formats:
 
@@ -172,7 +172,7 @@ Typical active VRAM planning range:
 | 8K | 5-7 GB |
 | 16K | 8-10 GB |
 
-These are planning numbers, not guarantees.
+These are **planning numbers, not guarantees**.
 
 Measure on your exact stack:
 
@@ -198,7 +198,7 @@ Use:
 ibm-granite/granite-embedding-97m-multilingual-r2
 ```
 
-IBM's model card describes it as a 97M-parameter dense embedding model with:
+IBM's model card describes it as a **97M-parameter dense embedding model** with:
 
 - 384-dimensional embeddings
 - up to 32,768-token context
@@ -220,15 +220,15 @@ Why it is a strong edge fit:
 
 The 311M version may improve quality in larger server deployments.
 
-For edge RAG, the 97M model is usually the better default.
+For edge RAG, the 97M model is usually the **better default**.
 
 ---
 
 ## 5. Retrieval matters more than generator size
 
-A small generator can answer well if the prompt contains the right evidence.
+A small generator can answer well **if the prompt contains the right evidence**.
 
-A large generator can still fail if retrieval is poor.
+A large generator can **still fail if retrieval is poor**.
 
 Bad retrieval causes:
 
@@ -258,15 +258,15 @@ embed query
   -> generate answer
 ```
 
-Do not dump all retrieved chunks into the generator.
+Do **not dump all retrieved chunks** into the generator.
 
-Small models need high signal.
+Small models need **high signal**.
 
 ---
 
 ## 6. Chunking strategy
 
-Chunking often matters more than model selection.
+Chunking often matters **more than model selection**.
 
 Recommended starting ranges:
 
@@ -295,7 +295,7 @@ Why not giant chunks?
 giant chunks reduce retrieval precision
 ```
 
-If every chunk contains too many topics, vector search cannot identify the exact relevant passage.
+If every chunk contains too many topics, vector search **cannot identify the exact relevant passage**.
 
 Bad chunking symptoms:
 
@@ -357,11 +357,11 @@ pgvector:
 
 ## 8. Reranking
 
-Reranking is often the highest-leverage quality improvement.
+Reranking is often the **highest-leverage quality improvement**.
 
-Vector search gets candidates.
+Vector search gets **candidates**.
 
-The reranker picks the best evidence.
+The reranker picks the **best evidence**.
 
 Recommended pattern:
 
@@ -396,7 +396,7 @@ rerank before increasing generator size
 
 ## 9. Context management for small models
 
-Small models are sensitive to noisy prompts.
+Small models are **sensitive to noisy prompts**.
 
 Recommended final prompt structure:
 
@@ -438,13 +438,13 @@ Compression can be:
 - keep code snippets intact
 - deduplicate repeated passages
 
-Small models reward discipline.
+Small models **reward discipline**.
 
 ---
 
 ## 10. Prompt design
 
-Use strict grounded prompts.
+Use **strict grounded prompts**.
 
 Example:
 
@@ -539,9 +539,9 @@ L4/Hopper/Blackwell server optimization
 latency-sensitive production inference
 ```
 
-The runtime choice changes the whole system.
+The runtime choice **changes the whole system**.
 
-Benchmark before committing.
+**Benchmark before committing.**
 
 ---
 
@@ -588,7 +588,7 @@ But on Jetson, also consider unified memory pressure:
 - Qdrant memory
 - buffers and temporary tensors
 
-For Jetson, do not run every component on GPU.
+For Jetson, do **not run every component on GPU**.
 
 Often:
 
@@ -655,7 +655,7 @@ The server stack should measure:
 
 ### KV-cache quantization
 
-KV cache can dominate long-context decode memory.
+KV cache can **dominate long-context decode memory**.
 
 Options:
 
@@ -682,7 +682,7 @@ Agents often reuse:
 
 Cache stable prefixes when runtime supports it.
 
-This avoids recomputing the same prompt prefix repeatedly.
+This avoids **recomputing the same prompt prefix** repeatedly.
 
 ### Speculative decoding
 
@@ -695,7 +695,7 @@ small draft model
 
 For a 4B verifier, a 0.5B-1B draft can improve throughput if acceptance rate is high.
 
-Speculative decoding is not free.
+Speculative decoding is **not free**.
 
 Measure:
 
@@ -708,7 +708,7 @@ Measure:
 
 ## 15. Evaluation plan
 
-Efficient RAG needs both retrieval and generation evals.
+Efficient RAG needs **both retrieval and generation evals**.
 
 Measure retrieval:
 
@@ -766,7 +766,7 @@ Avoid:
 - ignoring retrieval metrics
 - running embedding, vector DB, reranker, and generator all on the GPU without measuring pressure
 
-The best engineering insight:
+The **best engineering insight**:
 
 ```text
 efficient RAG is mostly memory bandwidth and context-quality engineering,

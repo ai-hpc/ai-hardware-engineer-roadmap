@@ -4,9 +4,9 @@
 
 ---
 
-Modern coding agents can generate code quickly.
+Modern coding agents can **generate code quickly**.
 
-That is not the same as doing engineering work correctly.
+That is not the same as **doing engineering work correctly**.
 
 The useful mental model:
 
@@ -36,7 +36,7 @@ By the end of this lecture, you should be able to:
 
 ## 1. Why agents fail in practice
 
-Agents often fail because they skip invisible engineering work:
+Agents often fail because they skip **invisible engineering work**:
 
 | Missing discipline | Failure mode |
 |---|---|
@@ -54,7 +54,7 @@ can produce output
 but may skip assumptions, tests, and review shape
 ```
 
-Agent skills exist to make the missing process explicit.
+Agent skills exist to make the **missing process explicit**.
 
 ---
 
@@ -92,9 +92,9 @@ Skill-shaped instruction:
 7. Finalize only with evidence.
 ```
 
-The first version gives advice.
+The first version gives **advice**.
 
-The second version creates a loop.
+The second version creates a **loop**.
 
 ---
 
@@ -135,19 +135,19 @@ Tool policy = authority boundary
 Artifact = durable evidence
 ```
 
-Do not ask a skill to do the job of policy.
+Do not ask a skill to do the **job of policy**.
 
 A skill can say "ask before deleting files."
 
-The runtime should still deny unsafe delete tools unless policy allows them.
+The runtime should still **deny unsafe delete tools** unless policy allows them.
 
 ---
 
 ## 4. Process over prose
 
-Agents can summarize rules without applying them.
+Agents can summarize rules **without applying them**.
 
-So a skill should prefer action steps over essays.
+So a skill should prefer **action steps over essays**.
 
 Weak:
 
@@ -176,7 +176,7 @@ If the agent cannot act on it, it is reference material, not a skill.
 
 ## 5. Anti-rationalization tables
 
-Agents are good at plausible excuses.
+Agents are good at **plausible excuses**.
 
 Examples:
 
@@ -189,15 +189,15 @@ Examples:
 | "The tool output is probably good enough." | Mutable state must be checked live before finalizing. |
 | "This is local only, so security does not matter." | Local agents often hold secrets and filesystem authority. Apply least privilege. |
 
-This is cheap and effective.
+This is **cheap and effective**.
 
-The goal is to pre-write the response to the shortcuts the model is likely to take.
+The goal is to **pre-write the response** to the shortcuts the model is likely to take.
 
 ---
 
 ## 6. Verification is mandatory
 
-A skill should end with evidence.
+A skill should end with **evidence**.
 
 Evidence examples:
 
@@ -217,15 +217,15 @@ Rule:
 No evidence, no completion.
 ```
 
-This matters more for long-running agents.
+This matters more for **long-running agents**.
 
-Small shortcuts compound over long sessions.
+Small shortcuts **compound over long sessions**.
 
 ---
 
 ## 7. Progressive disclosure
 
-Do not load every workflow into every run.
+Do not load **every workflow into every run**.
 
 That creates:
 
@@ -252,13 +252,13 @@ Bug fix request
   -> do not load deployment, frontend, and release skills unless needed
 ```
 
-This is especially important for on-device AI where context, latency, memory, and thermal budget matter.
+This is especially important for **on-device AI** where context, latency, memory, and thermal budget matter.
 
 ---
 
 ## 8. Scope discipline
 
-A reliable coding agent must keep changes reviewable.
+A reliable coding agent must keep changes **reviewable**.
 
 Before editing:
 
@@ -278,9 +278,9 @@ Before final answer:
 - provide verification evidence
 ```
 
-Reviewability is not a cosmetic concern.
+Reviewability is **not a cosmetic concern**.
 
-It is how humans keep authority over generated work.
+It is how humans **keep authority over generated work**.
 
 ---
 
@@ -328,13 +328,13 @@ Use when fixing a bug, regression, failing test, or runtime error.
 - No unrelated files were changed.
 ```
 
-This is compact enough to load and specific enough to audit.
+This is **compact enough to load** and specific enough to audit.
 
 ---
 
 ## 10. Hardware bring-up skill
 
-Agent skills are useful for embedded and hardware work because bring-up is full of mutable state.
+Agent skills are useful for embedded and hardware work because bring-up is **full of mutable state**.
 
 Example:
 
@@ -385,7 +385,7 @@ change five variables, then no one knows which one mattered
 
 ## 11. On-device AI skill
 
-On-device agents have additional constraints:
+On-device agents have **additional constraints**:
 
 - memory pressure
 - thermal budget

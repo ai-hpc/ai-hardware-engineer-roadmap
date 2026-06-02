@@ -10,11 +10,11 @@ Qdrant and pgvector solve the same broad problem:
 Given a query embedding, find the stored vectors that are most similar.
 ```
 
-They are not the same kind of system.
+They are **not the same kind of system**.
 
-Qdrant is a dedicated vector search engine.
+Qdrant is a **dedicated vector search engine**.
 
-pgvector is a PostgreSQL extension that adds vector search to Postgres.
+pgvector is a **PostgreSQL extension** that adds vector search to Postgres.
 
 The practical rule:
 
@@ -25,7 +25,7 @@ Use Qdrant when retrieval performance and vector-search features are the main co
 
 The same logic applies to embedding models.
 
-There is no universal "best embedding model."
+There is **no universal "best embedding model."**
 
 There is a best model for:
 
@@ -88,7 +88,7 @@ retrieval data:
   chunks, embeddings, metadata, indexes, scores, citations
 ```
 
-The LLM does not search your raw documents directly.
+The LLM does **not search your raw documents directly**.
 
 A typical pipeline is:
 
@@ -127,7 +127,7 @@ Each stored item is usually a "point" or row:
 }
 ```
 
-The metadata matters as much as the vector.
+The **metadata matters as much as the vector**.
 
 Example query:
 
@@ -152,13 +152,13 @@ from trusted sources,
 and recent enough to answer safely?
 ```
 
-That is why vector search and filtering need to be designed together.
+That is why **vector search and filtering need to be designed together**.
 
 ---
 
 ## 2. What is Qdrant?
 
-Qdrant is a standalone vector database and search engine.
+Qdrant is a **standalone vector database and search engine**.
 
 It is designed around collections of points:
 
@@ -191,7 +191,7 @@ Useful features:
 - client libraries
 - local, cloud, private-cloud, and edge deployment patterns
 
-Qdrant is a good fit when retrieval is a product-critical path.
+Qdrant is a good fit when retrieval is a **product-critical path**.
 
 Examples:
 
@@ -224,15 +224,15 @@ The source system stores:
 full document + permissions + owner + audit history + business state
 ```
 
-That separation is normal.
+That separation is **normal**.
 
 ---
 
 ## 3. What is pgvector?
 
-pgvector is an extension for PostgreSQL.
+pgvector is an **extension for PostgreSQL**.
 
-It adds vector types, distance operators, and approximate indexes to Postgres.
+It adds **vector types, distance operators, and approximate indexes** to Postgres.
 
 The key design idea:
 
@@ -265,7 +265,7 @@ LIMIT 8;
 
 `<=>` is cosine distance.
 
-The biggest advantage is architectural simplicity:
+The biggest advantage is **architectural simplicity**:
 
 ```text
 same database
@@ -300,7 +300,7 @@ LIMIT 8;
 
 That query is the reason pgvector exists.
 
-You can combine vector similarity with normal relational conditions in one SQL path.
+You can combine **vector similarity with normal relational conditions** in one SQL path.
 
 ---
 
@@ -319,7 +319,7 @@ You can combine vector similarity with normal relational conditions in one SQL p
 | Strength | Search features and vector-native performance | Simplicity and relational integration |
 | Risk | Data sync with source DB | Postgres can become overloaded |
 
-The decision is not ideological.
+The decision is **not ideological**.
 
 Ask:
 
@@ -344,13 +344,13 @@ Qdrant is usually the cleaner architecture.
 
 ## 5. Dense, sparse, and multi-vector retrieval
 
-Vector search is not one thing.
+Vector search is **not one thing**.
 
-There are several retrieval representations.
+There are **several retrieval representations**.
 
 ### Dense vectors
 
-Dense vectors are fixed-length arrays of floats.
+**Dense vectors** are fixed-length arrays of floats.
 
 Example:
 
@@ -390,9 +390,9 @@ A dense model might retrieve generic "invalid state" content and miss the exact 
 
 ### Sparse vectors
 
-Sparse vectors are high-dimensional vectors where most values are zero.
+**Sparse vectors** are high-dimensional vectors where most values are zero.
 
-They are closer to keyword and lexical retrieval.
+They are closer to **keyword and lexical retrieval**.
 
 Examples:
 
@@ -416,7 +416,7 @@ Bad at:
 
 ### Multi-vector retrieval
 
-Multi-vector systems store multiple vectors for one document or chunk.
+**Multi-vector systems** store multiple vectors for one document or chunk.
 
 Examples:
 
@@ -441,7 +441,7 @@ Cost:
 
 ### Hybrid retrieval
 
-Hybrid retrieval combines dense and sparse signals.
+**Hybrid retrieval** combines dense and sparse signals.
 
 Simple pattern:
 
@@ -461,7 +461,7 @@ sparse catches exact terms
 reranker chooses final evidence
 ```
 
-For technical docs, codebases, and enterprise manuals, hybrid retrieval is often better than dense-only retrieval.
+For technical docs, codebases, and enterprise manuals, hybrid retrieval is **often better than dense-only retrieval**.
 
 ---
 
@@ -479,11 +479,11 @@ approximate search:
 
 Exact search has perfect recall but becomes expensive as the corpus grows.
 
-Approximate nearest neighbor search trades some recall for speed.
+Approximate nearest neighbor search **trades some recall for speed**.
 
 ### HNSW
 
-HNSW means Hierarchical Navigable Small World.
+HNSW means **Hierarchical Navigable Small World**.
 
 At a practical level:
 
@@ -518,11 +518,11 @@ ef_search:
   candidate list size during query
 ```
 
-Increasing `ef_search` usually improves recall but increases latency.
+Increasing `ef_search` usually **improves recall but increases latency**.
 
 ### IVFFlat
 
-IVFFlat means inverted file flat.
+IVFFlat means **inverted file flat**.
 
 At a practical level:
 
@@ -576,7 +576,7 @@ Use IVFFlat when:
 
 ## 7. Filtering is where systems diverge
 
-RAG needs filters.
+RAG **needs filters**.
 
 Examples:
 
@@ -589,7 +589,7 @@ only product = Jetson Orin
 only updated after 2026-01-01
 ```
 
-Bad filtering can break retrieval.
+**Bad filtering can break retrieval.**
 
 The hard case:
 
@@ -610,7 +610,7 @@ integrated filtered ANN:
   search the vector index with filter awareness
 ```
 
-Post-filtering can silently reduce recall.
+Post-filtering can **silently reduce recall**.
 
 Example:
 
@@ -621,9 +621,9 @@ approximate index returns 10 candidates
 after filtering, only 1 candidate remains
 ```
 
-That is not a language-model problem.
+That is **not a language-model problem**.
 
-That is a retrieval planning problem.
+That is a **retrieval planning problem**.
 
 Qdrant's payload indexes are designed to make filtered vector search a first-class retrieval path.
 
@@ -631,7 +631,7 @@ pgvector uses SQL filtering, partial indexes, partitioning, iterative scans, and
 
 Both can work.
 
-But when your product depends heavily on filtered ANN retrieval, test this explicitly.
+But when your product depends heavily on filtered ANN retrieval, **test this explicitly**.
 
 ---
 
@@ -778,7 +778,7 @@ Risks:
 
 ## 10. Embedding model selection
 
-An embedding model maps text to a vector.
+An embedding model **maps text to a vector**.
 
 Different models optimize for different tradeoffs:
 
@@ -796,7 +796,7 @@ local deployability
 cloud API convenience
 ```
 
-The first mistake is asking:
+The **first mistake** is asking:
 
 ```text
 What is the best embedding model?
@@ -812,7 +812,7 @@ What is the best embedding model for this corpus and deployment budget?
 
 ## 11. Granite embeddings
 
-Granite embeddings are IBM embedding models for retrieval and search.
+Granite embeddings are **IBM embedding models** for retrieval and search.
 
 The useful local/edge target from Lecture 44:
 
@@ -858,7 +858,7 @@ not a universal winner for every retrieval task.
 
 ### BGE-M3
 
-`BAAI/bge-m3` is a strong open model when you want one model that supports:
+`BAAI/bge-m3` is a **strong open model** when you want one model that supports:
 
 - dense retrieval
 - sparse retrieval
@@ -882,7 +882,7 @@ usually more runtime cost than compact embedding models
 
 ### Multilingual E5
 
-`intfloat/multilingual-e5-large` is a mature multilingual dense embedding model.
+`intfloat/multilingual-e5-large` is a **mature multilingual dense embedding model**.
 
 Use E5 when:
 
@@ -899,7 +899,7 @@ strong baseline, but shorter context than long-context embedding models
 
 ### Nomic Embed
 
-Nomic embedding models are useful open-weight baselines, especially for local development and reproducible experiments.
+Nomic embedding models are useful **open-weight baselines**, especially for local development and reproducible experiments.
 
 Use Nomic-style models when:
 
@@ -932,11 +932,11 @@ Use them when:
 
 ## 13. API-based embedding alternatives
 
-API embeddings are useful when you want quality and simplicity more than local control.
+API embeddings are useful when you want **quality and simplicity more than local control**.
 
 ### OpenAI embeddings
 
-OpenAI's embedding models are simple to operate through an API.
+OpenAI's embedding models are **simple to operate** through an API.
 
 Use them when:
 
@@ -1002,7 +1002,7 @@ Use this as a starting point, not a law.
 | SQL-only prototype | Any embedding model + pgvector |
 | Retrieval product/API | Embedding model + Qdrant + reranker |
 
-The real answer should come from your evaluation set.
+The real answer should come from your **evaluation set**.
 
 ---
 
@@ -1049,7 +1049,7 @@ dedicated vector service vs SQL-integrated vector search
 
 ## 16. Storage and memory math
 
-Embedding dimension affects storage directly.
+Embedding dimension **affects storage directly**.
 
 Approximate raw vector storage:
 
@@ -1100,15 +1100,15 @@ For max-quality server retrieval:
 larger embeddings may be worth the storage and memory cost.
 ```
 
-Measure both.
+**Measure both.**
 
 ---
 
 ## 17. How to evaluate embedding models
 
-Do not choose from vibes.
+Do **not choose from vibes**.
 
-Build a retrieval evaluation set.
+Build a **retrieval evaluation set**.
 
 Minimum dataset:
 
@@ -1169,15 +1169,15 @@ Changing top-k changes the benchmark.
 Changing filters changes the benchmark.
 ```
 
-Only compare one major variable at a time.
+Only compare **one major variable at a time**.
 
 ---
 
 ## 18. Reranking
 
-Embedding retrieval is first-stage retrieval.
+Embedding retrieval is **first-stage retrieval**.
 
-Reranking is second-stage retrieval.
+Reranking is **second-stage retrieval**.
 
 Pattern:
 
@@ -1210,7 +1210,7 @@ if recall@20 is good but answer quality is weak,
 add reranking before changing the generator.
 ```
 
-If recall@20 is bad, reranking will not save you.
+If recall@20 is bad, reranking **will not save you**.
 
 Fix:
 
@@ -1224,7 +1224,7 @@ Fix:
 
 ## 19. Migration rule: never mix embeddings casually
 
-Vectors from different embedding models do not live in the same comparable space.
+Vectors from different embedding models do **not live in the same comparable space**.
 
 Bad migration:
 
@@ -1236,7 +1236,7 @@ same index
 same distance metric
 ```
 
-This corrupts retrieval.
+This **corrupts retrieval**.
 
 Correct migration:
 
@@ -1276,13 +1276,13 @@ chunker_version
 source_hash
 ```
 
-Without this, debugging retrieval regressions becomes guesswork.
+Without this, debugging retrieval regressions becomes **guesswork**.
 
 ---
 
 ## 20. Security and permissions
 
-Vector databases can leak data if filtering is wrong.
+Vector databases can **leak data if filtering is wrong**.
 
 Common failure:
 
@@ -1292,9 +1292,9 @@ vector search retrieves private chunks
 LLM summarizes private chunks to unauthorized user
 ```
 
-Do not rely on the LLM to enforce access control.
+Do **not rely on the LLM to enforce access control**.
 
-Access control belongs before generation:
+Access control belongs **before generation**:
 
 ```text
 authorized document ids
@@ -1329,7 +1329,7 @@ use SQL WHERE clauses, row-level security if appropriate,
 partial indexes, and partitioning where needed
 ```
 
-Never send unauthorized chunks to the model and expect a prompt to save you.
+**Never send unauthorized chunks** to the model and expect a prompt to save you.
 
 ---
 
@@ -1499,7 +1499,7 @@ My p95 retrieval latency target is:
 My migration plan is:
 ```
 
-If you cannot justify the choice with measurements, you are still guessing.
+If you cannot justify the choice with measurements, you are **still guessing**.
 
 ---
 

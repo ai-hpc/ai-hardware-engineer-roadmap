@@ -8,7 +8,7 @@
 
 ## Why this lecture feels hard
 
-This is the lecture where Zigbee often stops feeling simple.
+This is the lecture where Zigbee often **stops feeling simple**.
 
 Up to now, the story is easy:
 
@@ -521,7 +521,7 @@ It is more like:
 - support commands
 - manage relationships between devices
 
-That is why Zigbee feels more like building a structured device model than just pushing bits through a transport.
+That is why Zigbee feels more like building a **structured device model** than just pushing bits through a transport.
 
 ---
 

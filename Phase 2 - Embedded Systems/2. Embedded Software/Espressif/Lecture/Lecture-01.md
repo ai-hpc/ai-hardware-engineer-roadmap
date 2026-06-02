@@ -15,7 +15,7 @@ That sentence matters because it prevents two common mistakes:
 - it is **not** just "Arduino support for one ESP32 board"
 - it is **not** a separate operating system or separate SDK universe from Espressif
 
-It is a compatibility and development layer that gives you the Arduino programming model on top of Espressif chips and Espressif's software stack.
+It is a **compatibility and development layer** that gives you the **Arduino programming model** on top of Espressif chips and Espressif's software stack.
 
 Official references: [project README](https://github.com/espressif/arduino-esp32), [online documentation](https://docs.espressif.com/projects/arduino-esp32/en/latest/)
 
@@ -65,7 +65,7 @@ At the surface, it gives you the familiar Arduino model:
 - sketch-centric workflow
 - familiar Arduino APIs
 
-But on Espressif hardware, that surface sits on top of a more serious platform than classic 8-bit Arduino boards.
+But on Espressif hardware, that surface sits on top of a **more serious platform** than classic 8-bit Arduino boards.
 
 That means the learning opportunity is bigger:
 
@@ -94,7 +94,7 @@ That matters because later you will want to:
 - control memory and timing more tightly
 - move into product firmware
 
-If you understand that Arduino and ESP-IDF are connected, the transition becomes much easier.
+If you understand that **Arduino and ESP-IDF are connected**, the transition becomes much easier.
 
 ---
 
@@ -111,7 +111,7 @@ It belongs in **Embedded Software** because it helps you reason about:
 - portability vs control
 - prototyping vs productization
 
-That is exactly the kind of engineering judgment Phase 2 is supposed to build.
+That is exactly the kind of **engineering judgment** Phase 2 is supposed to build.
 
 ---
 

@@ -8,11 +8,11 @@
 
 Pick one as a certificate you can demo.
 
-**A. Productized minimal image:** custom layer, custom image, serial console login, SSH optional, documented flash steps.
+**A. Productized minimal image:** custom layer, custom image, **serial console login**, SSH optional, documented flash steps.
 
-**B. Carry a hardware fix:** device tree tweak for a peripheral you can test, with before/after photos or logs.
+**B. Carry a hardware fix:** **device tree** tweak for a peripheral you can test, with before/after photos or logs.
 
-**C. Reproducible release bundle:** repo manifest or pinned submodule set, README for exact checkout, CI job that emits image plus SDK plus license manifest.
+**C. Reproducible release bundle:** **repo manifest** or pinned submodule set, README for exact checkout, CI job that emits image plus SDK plus license manifest.
 
 ---
 

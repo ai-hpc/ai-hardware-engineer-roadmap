@@ -8,7 +8,7 @@ Multi-socket servers are the standard platform for large-scale AI training and h
 
 ## NUMA Architecture
 
-**NUMA** (Non-Uniform Memory Access) is the memory topology of multi-socket servers. Each CPU socket (NUMA node) has a directly attached DRAM bank accessible at local latency and full bandwidth. Accessing DRAM attached to a different socket requires traversing the socket interconnect (Intel QPI/UPI, AMD Infinity Fabric, IBM X-Bus), incurring additional latency and reduced bandwidth.
+**NUMA** (Non-Uniform Memory Access) is the memory topology of multi-socket servers. Each CPU socket (**NUMA node**) has a directly attached DRAM bank accessible at **local latency and full bandwidth**. Accessing DRAM attached to a different socket requires traversing the socket interconnect (Intel QPI/UPI, AMD Infinity Fabric, IBM X-Bus), incurring additional latency and reduced bandwidth.
 
 ```
 2-Socket NUMA Server Topology
@@ -40,7 +40,7 @@ Socket 0 (NUMA Node 0)          Socket 1 (NUMA Node 1)
 | Remote DRAM (1 QPI hop) | ~150–200 ns | ~100 GB/s |
 | Remote DRAM (2 hops, 4-socket) | ~250+ ns | ~60 GB/s |
 
-A process running on socket 0 that accesses data allocated on socket 1 pays the remote penalty on every cache miss — 2× to 3× the latency and half the bandwidth of local access.
+A process running on socket 0 that accesses data allocated on socket 1 pays the **remote penalty** on every cache miss — 2× to 3× the latency and half the bandwidth of local access.
 
 > **Key Insight:** NUMA penalties are silent. There is no error, no warning, no visible failure — the program just runs slower. A 2× bandwidth reduction on model weight access directly translates to 2× longer matrix multiply time. `numastat -p` is the tool that makes this invisible problem visible.
 
@@ -55,9 +55,9 @@ numastat                 # per-node allocation hit/miss counters (system-wide)
 cat /sys/devices/system/node/node0/distance   # raw NUMA distance factors
 ```
 
-Distance matrix: local access is 10 (normalized); remote 1-hop typically 20–40; 2-hop 60–80.
+**Distance matrix**: local access is 10 (normalized); remote 1-hop typically 20–40; 2-hop 60–80.
 
-A distance of 20 means cross-socket access has roughly 2× the latency of local access. This number directly predicts performance loss for NUMA-unaware workloads.
+A distance of 20 means cross-socket access has roughly **2× the latency** of local access. This number directly predicts performance loss for NUMA-unaware workloads.
 
 ---
 
@@ -67,7 +67,7 @@ Linux provides several allocation policies that control which NUMA node a new pa
 
 ### Default: First-Touch
 
-The kernel allocates a page on the NUMA node of the CPU that first **faults** (accesses) it. This is efficient when the initializing thread is the consuming thread. It becomes a problem when a main thread on node 0 initializes a data structure later consumed exclusively by threads on node 1.
+The kernel allocates a page on the NUMA node of the CPU that first **faults** (accesses) it. This is efficient when the **initializing thread is the consuming thread**. It becomes a problem when a main thread on node 0 initializes a data structure later consumed exclusively by threads on node 1.
 
 ```
 First-Touch Bug Pattern (common in AI frameworks):
@@ -120,7 +120,7 @@ mbind(addr, len, MPOL_BIND, &node0_mask, max_node, MPOL_MF_MOVE);
 
 `MPOL_MF_MOVE`: migrate existing pages in the VMA to the target node immediately.
 
-The `mbind()` call with `MPOL_MF_MOVE` is powerful: it moves already-allocated pages to the target node. This allows correcting a first-touch placement bug without restarting the process.
+The `mbind()` call with `MPOL_MF_MOVE` is powerful: it moves **already-allocated pages** to the target node. This allows correcting a first-touch placement bug **without restarting the process**.
 
 ---
 
@@ -142,7 +142,7 @@ numactl --preferred=1 ./data_loader
 numactl --interleave=0,1 ./matmul_benchmark
 ```
 
-Using `--cpunodebind` and `--membind` together ensures both CPU execution and memory allocation happen on the same node — collocating compute and data to avoid cross-socket transfers.
+Using `--cpunodebind` and `--membind` together ensures both CPU execution and memory allocation happen on the **same node** — collocating compute and data to avoid cross-socket transfers.
 
 ---
 
@@ -168,7 +168,7 @@ The `numa_node_of_cpu(sched_getcpu())` pattern is the runtime equivalent of aski
 
 ## AutoNUMA Balancing
 
-The kernel's automatic NUMA balancer periodically scans process page tables, temporarily removes present bits from PTEs, and re-faults pages to observe which CPU accesses which pages. "Hot" pages migrate to the NUMA node of the accessing CPU.
+The kernel's **automatic NUMA balancer** periodically scans process page tables, temporarily removes present bits from PTEs, and re-faults pages to observe which CPU accesses which pages. **"Hot" pages migrate** to the NUMA node of the accessing CPU.
 
 ```
 AutoNUMA mechanism:
@@ -192,7 +192,7 @@ AutoNUMA mechanism:
 
 ## Multi-GPU NUMA Affinity
 
-GPU topology interacts directly with NUMA topology. In a 2-socket server, GPU cards are connected to one socket's PCIe root complex. Every CPU-to-GPU memory transfer from a remote socket crosses the socket interconnect, adding 60–100 ns of latency per cache line.
+GPU topology interacts directly with NUMA topology. In a 2-socket server, GPU cards are connected to **one socket's PCIe root complex**. Every CPU-to-GPU memory transfer from a remote socket crosses the socket interconnect, adding **60–100 ns of latency** per cache line.
 
 ```bash
 nvidia-smi topo -m    # GPU-GPU and CPU-GPU interconnect topology
@@ -226,7 +226,7 @@ With the NUMA concepts in place, there are two primary optimization patterns dep
 
 ### Binding (Latency-Bound Inference)
 
-Pin all model weight allocations and the inference process to the NUMA node local to the GPU. Use first-touch by the pinned worker thread, or `mbind(MPOL_BIND)` after allocation.
+Pin all model weight allocations and the inference process to the **NUMA node local to the GPU**. Use first-touch by the pinned worker thread, or `mbind(MPOL_BIND)` after allocation.
 
 ```bash
 echo 256 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages
@@ -237,7 +237,7 @@ The `MPOL_BIND` policy ensures that if node 0 is out of memory, the allocation f
 
 ### Interleaving (Bandwidth-Bound Training)
 
-For GEMM operations that exceed single-node memory bandwidth, interleave the weight matrix across all nodes. Aggregate bandwidth = N × per-node bandwidth.
+For GEMM operations that exceed single-node memory bandwidth, **interleave the weight matrix across all nodes**. Aggregate bandwidth = N × per-node bandwidth.
 
 ```bash
 numactl --interleave=all ./training_process

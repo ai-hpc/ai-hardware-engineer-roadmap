@@ -8,7 +8,7 @@ The core problem this lecture addresses is: how does every process get its own p
 
 ## Virtual Address Space
 
-Each process has a private **virtual address space** isolated from all other processes. The MMU translates virtual addresses to physical addresses per-page using the page table tree. No process can directly access another's physical memory without explicit kernel-mediated sharing.
+Each process has a private **virtual address space** isolated from all other processes. The **MMU** translates virtual addresses to physical addresses per-page using the **page table tree**. No process can directly access another's physical memory without explicit kernel-mediated sharing.
 
 Key properties:
 - **Isolation**: a bad pointer in one process cannot corrupt another's memory
@@ -80,7 +80,7 @@ Key properties:
 
 ## Page Table Walk
 
-The MMU translates a virtual address to a physical address by walking a tree of page tables in memory. On x86-64 with 4KB pages and 4-level paging:
+The MMU translates a virtual address to a physical address by **walking a tree of page tables** in memory. On x86-64 with 4KB pages and **4-level paging**:
 
 ```
   4-Level Page Table Walk (x86-64, 48-bit VA):
@@ -111,13 +111,13 @@ The MMU translates a virtual address to a physical address by walking a tree of 
   TLB caches the final PGD→physical mapping to avoid repeated walks
 ```
 
-The TLB (Translation Lookaside Buffer) caches recent virtual→physical translations. A TLB miss requires a full 4-level walk through RAM — 4 memory accesses. TLB shootdowns (flushing remote CPUs' TLBs after a mapping change) require inter-processor interrupts and add ~10–30µs on large SMP systems.
+The **TLB** (Translation Lookaside Buffer) caches recent virtual→physical translations. A **TLB miss** requires a full 4-level walk through RAM — 4 memory accesses. **TLB shootdowns** (flushing remote CPUs' TLBs after a mapping change) require inter-processor interrupts and add ~10–30µs on large SMP systems.
 
 ---
 
 ## mm_struct — Process Memory Descriptor
 
-`struct mm_struct` describes a process's complete virtual address space. One instance per process; all threads of a process share the same `mm_struct`.
+`struct mm_struct` describes a process's **complete virtual address space**. **One instance per process**; all threads of a process share the same `mm_struct`.
 
 | Field | Meaning |
 |---|---|
@@ -135,7 +135,7 @@ The TLB (Translation Lookaside Buffer) caches recent virtual→physical translat
 
 ## vm_area_struct (VMA)
 
-A VMA represents one contiguous, uniformly-mapped region of virtual address space. Think of it as a "chapter" in the address space book — each chapter has a start and end, a set of permissions, and an optional backing file.
+A **VMA** represents **one contiguous, uniformly-mapped region** of virtual address space. Think of it as a "chapter" in the address space book — each chapter has a start and end, a set of **permissions**, and an optional **backing file**.
 
 | Field | Meaning |
 |---|---|
@@ -163,7 +163,7 @@ A VMA represents one contiguous, uniformly-mapped region of virtual address spac
 
 ## mmap() — Creating Mappings
 
-`mmap()` is the system call that creates VMAs. It is used for file-backed mappings, anonymous memory, and shared memory between processes.
+`mmap()` is the system call that **creates VMAs**. It is used for **file-backed mappings**, **anonymous memory**, and **shared memory** between processes.
 
 ```c
 // File-backed, shared — changes visible to all processes mapping same file
@@ -183,7 +183,7 @@ void *p = mmap(NULL, length, PROT_READ|PROT_WRITE,
                MAP_PRIVATE|MAP_ANONYMOUS|MAP_HUGETLB, -1, 0);
 ```
 
-`mmap()` creates the VMA descriptor but does **not** allocate physical pages. Pages are allocated on first access via demand paging.
+`mmap()` creates the VMA descriptor but does **not** allocate physical pages. Pages are allocated **on first access** via **demand paging**.
 
 > **Key Insight:** The fact that `mmap()` returns immediately without allocating physical pages is what enables overcommit. The kernel makes a virtual promise — "here is address space" — and only fulfills the physical backing when each page is first touched. This is efficient but dangerous for real-time: the first access to any unmapped page causes a page fault.
 
@@ -205,7 +205,7 @@ Page table entry (PTE) is initially absent. On first access, the CPU raises a **
 | Minor (soft) | Page in memory but PTE absent (COW, demand-zero) | ~1µs |
 | Major (hard) | Page must be read from disk (file-backed or swap) | 1–10ms |
 
-Major faults are fatal to real-time latency guarantees. `mlockall()` prevents them entirely.
+**Major faults are fatal** to real-time latency guarantees. `mlockall()` prevents them entirely.
 
 > **Common Pitfall:** Many developers call `mlockall()` and assume all page faults are eliminated. But `mlockall(MCL_FUTURE)` only prevents *future* pages from being evicted — pages that have never been faulted in are still demand-paged on first access. You must pre-touch all buffers after `mlockall()` to eliminate minor faults as well. A missed pre-touch is a latency spike waiting to happen.
 
@@ -213,7 +213,7 @@ Major faults are fatal to real-time latency guarantees. `mlockall()` prevents th
 
 ## Copy-on-Write (COW)
 
-After `fork()`, parent and child share all pages mapped read-only. On first write to a shared page:
+After `fork()`, parent and child **share all pages mapped read-only**. On **first write** to a shared page:
 
 1. Hardware page fault triggered (write to read-only PTE)
 2. Kernel allocates a new page frame
@@ -230,7 +230,7 @@ After `fork()`, parent and child share all pages mapped read-only. On first writ
   (read-only shared)                 (writable, new allocation)
 ```
 
-COW makes `fork()` O(1) — the address space size does not matter; only written pages are physically duplicated. Model weights shared read-only via COW after `fork()` consume only one physical copy.
+COW makes `fork()` **O(1)** — the address space size does not matter; **only written pages** are physically duplicated. Model weights shared read-only via COW after `fork()` consume **only one physical copy**.
 
 > **Key Insight:** COW is why forking a process with a 1GB model loaded in memory does not require 1GB of additional RAM. Both parent and child share the same physical pages for the model weights. Only pages that one process actually modifies (like stack frames and heap allocations) get duplicated. This is the mechanism that lets openpilot restart `modeld` without doubling physical RAM usage.
 
@@ -281,7 +281,7 @@ pmap -x <pid>                  # formatted smaps output
 | Swap | Pages evicted to swap currently |
 | AnonHugePages | Anonymous pages backed by 2MB transparent huge pages |
 
-PSS is the correct metric for per-process memory accounting in multi-process systems where shared libraries would otherwise be double-counted by RSS.
+**PSS is the correct metric** for per-process memory accounting in multi-process systems where shared libraries would otherwise be **double-counted by RSS**.
 
 ```
   RSS vs PSS for shared libraries:

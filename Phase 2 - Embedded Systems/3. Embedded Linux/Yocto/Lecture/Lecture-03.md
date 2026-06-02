@@ -35,7 +35,7 @@ Embedded products need an OS that is:
 | Multi-product reuse | Strong (layers, distros, configs) | Possible; often more manual |
 | When vendors ship layers | Often the expected integration path | Less common (but not never) |
 
-Neither is always better. If your silicon vendor maintains a mature Yocto layer, that often decides the default.
+Neither is always better. If your **silicon vendor** maintains a mature Yocto layer, that often decides the default.
 
 ## 4. Lab 1 — Write your product requirements in Yocto terms
 

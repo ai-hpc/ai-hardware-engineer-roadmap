@@ -4,7 +4,7 @@
 
 If the roofline (Lecture 03) is the *static* ceiling of a GPU, **precision is the lever that moves where on the roofline a kernel sits.** Cutting weight precision in half cuts the bytes read from HBM in half, doubles arithmetic intensity, and — if the kernel was bandwidth-bound — roughly doubles throughput.
 
-The catch: every precision drop is a potential parity drop. Quantization is the engineering discipline of taking a precision floor down without taking accuracy with it. The engineer who quantizes without a parity gate is shipping incidents.
+The catch: every precision drop is a **potential parity drop**. **Quantization** is the engineering discipline of taking a precision floor down without taking accuracy with it. The engineer who quantizes without a **parity gate** is shipping incidents.
 
 This lecture covers:
 
@@ -44,7 +44,7 @@ The key 2025–2026 shifts:
 
 ### 1.1 The hardware support gate
 
-A precision format is only useful if the GPU has native tensor cores for it. The matrix:
+A precision format is only useful if the GPU has **native tensor cores** for it. The matrix:
 
 | Format | Ampere (A100, RTX 3000) | Hopper (H100/H200) | Ada (L40S, RTX 4000) | Blackwell (B200, RTX 5000) |
 |--------|--------------------------|--------------------|----------------------|----------------------------|
@@ -63,7 +63,7 @@ A precision format is only useful if the GPU has native tensor cores for it. The
 
 ## 2. The three quantization axes — weights, activations, KV cache
 
-These are three separate engineering decisions with three separate parity costs.
+These are **three separate engineering decisions** with three separate parity costs.
 
 ### 2.1 Weights
 
@@ -94,7 +94,7 @@ Quantizing KV cuts:
 
 Sensitivity is **per-head and per-position** — KV cache quantization at INT4 typically requires per-block calibration. FP8 KV is usually safe with per-tensor or per-head scaling.
 
-Note the bandwidth cost of KV grows linearly with context. **At 128K context the KV cache read is often a larger HBM cost than the weight read.** This is why FP8 KV is increasingly standard for long-context serving even when weights stay at INT4.
+Note the bandwidth cost of KV **grows linearly with context**. **At 128K context the KV cache read is often a larger HBM cost than the weight read.** This is why FP8 KV is increasingly standard for long-context serving even when weights stay at INT4.
 
 ### 2.4 The three-axis recipe table
 
@@ -216,7 +216,7 @@ Two specific anomalies worth knowing:
 
 The paper *"The Uniqueness of LLaMA3-70B Series with Per-Channel Quantization"* ([arXiv:2408.15301](https://arxiv.org/abs/2408.15301)) showed that Llama-3-70B (and by extension 3.3-70B, which is architecturally identical) has unusually severe activation outliers in specific MLP channels. Standard SmoothQuant W8A8 produces a 2–4 pp drop on MMLU; W4A8 is worse.
 
-The fix: use QuaRot or SpinQuant (rotation-based) — they handle the outliers correctly. Or stay at W4A16 (AWQ-INT4 weights + FP16 activations), which dodges the activation-quantization problem entirely.
+The fix: use **QuaRot or SpinQuant** (rotation-based) — they handle the outliers correctly. Or stay at **W4A16** (AWQ-INT4 weights + FP16 activations), which dodges the activation-quantization problem entirely.
 
 Part 2 Lecture 03 walks through this anomaly with concrete numbers on Llama 3.3 70B.
 
@@ -232,7 +232,7 @@ A small number of attention heads in some models specialize in rare-token positi
 
 ## 5. The parity validation methodology
 
-The non-negotiable discipline. Every precision drop needs a gate.
+The **non-negotiable discipline**. Every precision drop needs a gate.
 
 ### 5.1 The parity contract
 

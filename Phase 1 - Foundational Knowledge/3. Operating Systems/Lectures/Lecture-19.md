@@ -2,23 +2,23 @@
 
 ## Overview
 
-Every time your program asks the OS to read or write data, it pays a tax: a context switch into kernel mode, a data copy between kernel and user memory, and often a wait for slow hardware. At modest data rates this tax is invisible. At AI-system scale — millions of I/O operations per second, gigabytes per second of camera frames, continuous GPU inference — this overhead consumes a significant fraction of available CPU. This lecture addresses that problem.
+Every time your program asks the OS to read or write data, it pays a tax: a **context switch into kernel mode**, a **data copy** between kernel and user memory, and often a wait for slow hardware. At modest data rates this tax is invisible. At AI-system scale — millions of I/O operations per second, gigabytes per second of camera frames, continuous GPU inference — this overhead consumes a significant fraction of available CPU. This lecture addresses that problem.
 
 The mental model to carry through this lecture is the **copy chain**: data originates in hardware (a sensor, a NIC, a storage device), and the goal is to get it to the GPU without the CPU ever touching it unnecessarily. Every copy, every syscall, and every context switch is a potential elimination target. io_uring eliminates syscall overhead for storage I/O. DMA-BUF eliminates copies between kernel subsystems. Zero-copy techniques like `sendfile`, DPDK, and VisionIPC eliminate copies at every remaining stage.
 
-AI hardware engineers need to understand these mechanisms because the bottleneck in a real-time perception pipeline is often not the GPU — it is the data path feeding the GPU. A camera frame that spends 0.7 ms being copied across the PCIe bus is a frame that arrived 0.7 ms late to inference.
+AI hardware engineers need to understand these mechanisms because the bottleneck in a real-time perception pipeline is often **not the GPU — it is the data path feeding the GPU**. A camera frame that spends 0.7 ms being copied across the PCIe bus is a frame that arrived 0.7 ms late to inference.
 
 ---
 
 ## Traditional I/O Limitations
 
-The legacy POSIX I/O model imposes overhead that becomes a bottleneck in high-throughput AI data pipelines.
+The legacy **POSIX I/O model** imposes overhead that becomes a **bottleneck** in high-throughput AI data pipelines.
 
 - `read()`/`write()`: each operation requires at least 2 syscalls (initiate + complete) plus a kernel-to-userspace data copy
 - `select()`/`poll()`: O(n) scanning of file descriptor sets; degrades linearly with fd count
 - `epoll`: eliminates O(n) scan but still requires one syscall per event notification; context switch cost accumulates at high IOPS
 
-At 1M IOPS (NVMe throughput), syscall overhead alone can consume 30–50% of CPU cycles.
+At 1M IOPS (NVMe throughput), syscall overhead alone can consume **30–50% of CPU cycles**.
 
 > **Key Insight:** The POSIX I/O API was designed for correctness and portability, not for throughput. Each `read()` call is a round-trip: the CPU drops what it is doing, enters kernel mode, copies data, then returns. At high IOPS the CPU spends more time on this overhead than on actual work.
 
@@ -28,7 +28,7 @@ Think of it like a warehouse where every single box must be personally handed to
 
 ## io_uring (Linux 5.1+)
 
-io_uring replaces per-operation syscalls with shared memory ring buffers visible to both kernel and userspace simultaneously.
+io_uring replaces per-operation syscalls with **shared memory ring buffers** visible to both kernel and userspace simultaneously.
 
 ### Ring Buffer Architecture
 
@@ -37,7 +37,7 @@ Two rings reside in memory mapped into both kernel and userspace:
 - **SQE ring (Submission Queue Entry)**: application writes operation descriptors here; kernel reads them
 - **CQE ring (Completion Queue Entry)**: kernel writes completion status here; application polls without a syscall
 
-The key insight is that both the application and the kernel can read and write these rings directly — no syscall crossing required for normal operation.
+The key insight is that both the application and the kernel can **read and write these rings directly** — no syscall crossing required for normal operation.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -69,7 +69,7 @@ Understanding each step in this sequence is essential for tuning io_uring perfor
 4. **Kernel writes a CQE to the CQ ring**: the completion result (bytes read, error code) is placed in the next available CQ slot. This is a write into shared memory — no interrupt to userspace required.
 5. **Application polls the CQ ring**: the app checks the CQ head pointer. If a new CQE is present, it reads the result directly. **No syscall required for completion.**
 
-With `IORING_SETUP_SQPOLL`, a dedicated kernel thread continuously drains the SQ ring. The submit path becomes zero-syscall. The application only polls the CQ ring.
+With `IORING_SETUP_SQPOLL`, a dedicated kernel thread continuously drains the SQ ring. The submit path becomes **zero-syscall**. The application only polls the CQ ring.
 
 > **Common Pitfall:** Forgetting to call `io_uring_cqe_seen()` after processing a completion entry. This advances the CQ ring head pointer. Without it, the ring fills up, new completions are dropped (unless `IORING_FEAT_NODROP` is set, which applies backpressure instead), and the application stalls.
 
@@ -126,7 +126,7 @@ The `io_uring_submit()` call is batched: all SQEs prepared since the last submit
 
 With io_uring handling syscall overhead for storage, the next bottleneck is copying data between kernel subsystems — for example, between a camera driver and a GPU. DMA-BUF solves this.
 
-DMA-BUF provides a file descriptor abstraction for memory buffers that multiple kernel subsystems and userspace can share without copying.
+DMA-BUF provides a **file descriptor abstraction** for memory buffers that multiple kernel subsystems and userspace can **share without copying**.
 
 - One subsystem allocates a buffer and exports it as an fd via `dma_buf_export()` → `dma_buf_fd()`
 - Another subsystem imports the fd via `dma_buf_get()` and maps it into its own DMA address space
@@ -168,7 +168,7 @@ Think of a DMA-BUF fd as a key to a locker. The camera driver puts data in the l
 
 Now we combine io_uring and DMA-BUF into the full zero-copy pipeline. This section shows the concrete benefit: eliminating 1–2 memory copies from every camera frame.
 
-Traditional pipeline: Camera → DMA → kernel buffer → copy to userspace → copy to GPU (2 extra copies).
+Traditional pipeline: Camera → DMA → kernel buffer → copy to userspace → copy to GPU (**2 extra copies**).
 
 Zero-copy pipeline via DMA-BUF:
 
@@ -186,7 +186,7 @@ Latency reduction: eliminates 1–2 CPU-GPU memcpy operations. At PCIe Gen3 band
 
 ## splice and sendfile: Kernel-to-Kernel Zero-Copy
 
-Once data is in the kernel, `splice` and `sendfile` allow it to be moved between kernel subsystems without ever surfacing in userspace.
+Once data is in the kernel, `splice` and `sendfile` allow it to be moved between kernel subsystems **without ever surfacing in userspace**.
 
 Both calls move data between file descriptors without copying to userspace:
 
@@ -204,7 +204,7 @@ Use case: camera recording server sending H.264 frames over HTTP without a users
 
 For inference-serving scenarios where network I/O must match GPU throughput, even kernel network stack overhead becomes unacceptable. DPDK eliminates it entirely.
 
-DPDK (Data Plane Development Kit) bypasses the kernel network stack entirely:
+DPDK (Data Plane Development Kit) **bypasses the kernel network stack** entirely:
 
 - User-space PMD (Poll Mode Driver) owns the NIC; no kernel driver, no interrupts
 - Huge pages (2 MB/1 GB) for packet buffers: eliminates TLB misses at line rate
@@ -222,7 +222,7 @@ Tools: `dpdk-testpmd` for benchmarking; `rte_mbuf` for zero-copy packet buffers;
 
 The final piece of the zero-copy puzzle is passing video frames between processes without copying. VisionIPC demonstrates this at a production level.
 
-openpilot replaces socket-based video transfer with shared memory:
+openpilot replaces socket-based video transfer with **shared memory**:
 
 - `vipc_server` allocates a pool of shared memory buffers at startup via `mmap(MAP_SHARED)`
 - `camerad` (producer): fills a buffer, posts the buffer index to consumers via semaphore

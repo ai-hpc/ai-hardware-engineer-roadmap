@@ -77,7 +77,7 @@ Both:
 * Are bidirectional-positional via RoPE, **causally masked** for decoding.
 * Tie or do not tie the LM head with input embeddings — Llama 3.3 70B does **not** tie (separate output matrix), Qwen 2.5 72B does **not** tie either. (The 4B-class Qwen3 *does* tie, but 72B does not.)
 
-This is the architecture every 7B–72B dense LLM ships today. Mastering it = portable.
+This is the architecture **every 7B–72B dense LLM ships today**. Mastering it = portable.
 
 ---
 
@@ -95,7 +95,7 @@ Layer 40 output: large values (~50)
 Layer 80 output: exploding or vanishing
 ```
 
-Without normalization, gradients explode or vanish and training fails for deep stacks.
+Without normalization, **gradients explode or vanish** and training fails for deep stacks.
 
 ### The formula
 
@@ -147,7 +147,7 @@ LayerNorm:  center (subtract mean) + scale
 RMSNorm:    scale only
 ```
 
-Result: simpler, ~10% faster, essentially the same quality for deep decoders. All modern dense LLMs (Llama, Qwen, Mistral, Gemma) use RMSNorm for this reason.
+Result: **simpler, ~10% faster, essentially the same quality** for deep decoders. All modern dense LLMs (Llama, Qwen, Mistral, Gemma) use RMSNorm for this reason.
 
 ### What this means for inference engineering
 
@@ -188,7 +188,7 @@ Identical. This means:
 * **KV cache per token is identical** between the two models (320 KB/token at FP16, per Part 1 Lecture 02).
 * **Attention computation per token is identical** — the attention matmul depends on Q × K^T at (h_q, head_dim) shape, same for both.
 
-For a long-context workload, the two models have the same KV memory pressure. The differentiator is the FFN cost.
+For a long-context workload, the two models have the **same KV memory pressure**. The differentiator is the **FFN cost**.
 
 ### 2.3 QKV bias
 
@@ -239,7 +239,7 @@ kv_bytes_per_token = 2 × L × num_kv_heads × head_dim × bytes
 | 32,768  | 10.5 GB         | 5.25 GB | 2.6 GB  |
 | 131,072 | 42 GB           | 21 GB   | 10.5 GB |
 
-**Per request.** This is the same for both models. Long-context serving forces the FP8-KV decision regardless of which model you pick from this pair.
+**Per request.** This is the same for both models. **Long-context serving forces the FP8-KV decision** regardless of which model you pick from this pair.
 
 ---
 
@@ -375,7 +375,7 @@ For Llama 3.3 70B at 32K context, FP8 weights + FP8 KV on 2× H100 NVL is the co
 
 ### 6.4 Tokenizer-driven cost difference
 
-For an English-only chat product the two models have nearly identical $/MTok at the same recipe. For a Chinese-language product Qwen 2.5 72B emits ~25% fewer tokens for the same response — meaning the *effective* $/MTok is ~25% lower. This is the largest engineering difference between the two for many product contexts.
+For an English-only chat product the two models have **nearly identical $/MTok** at the same recipe. For a Chinese-language product Qwen 2.5 72B emits **~25% fewer tokens** for the same response — meaning the *effective* $/MTok is ~25% lower. This is the **largest engineering difference** between the two for many product contexts.
 
 ---
 

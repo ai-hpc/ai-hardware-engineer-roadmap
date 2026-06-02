@@ -54,7 +54,7 @@ Lecture 3 introduced MLIR's architecture: dialects, operations, progressive lowe
 
 ## 1. The Linalg Dialect: Structured Linear Algebra
 
-`linalg` is the most important dialect for AI compilation. It represents tensor computations as **structured operations** — operations whose access patterns are fully described by affine maps, enabling systematic tiling, fusion, and hardware mapping.
+`linalg` is the most important dialect for AI compilation. It represents tensor computations as **structured operations** — operations whose access patterns are fully described by **affine maps**, enabling systematic tiling, fusion, and hardware mapping.
 
 ### Named Operations
 
@@ -84,7 +84,7 @@ Linalg provides named ops for common AI workloads:
 
 ### linalg.generic: The Universal Operation
 
-Any operation expressible as a loop nest with affine access patterns can be written as `linalg.generic`. This includes matmul, conv, attention, normalization — everything.
+Any operation expressible as a **loop nest with affine access patterns** can be written as `linalg.generic`. This includes matmul, conv, attention, normalization — everything.
 
 ```mlir
 // ReLU: output[i] = max(input[i], 0)
@@ -192,7 +192,7 @@ scf.for %i = ... {
 
 ### Tensor Dialect
 
-Operates on immutable tensor values. No memory allocation, no side effects. Enables functional optimization.
+Operates on **immutable tensor values**. No memory allocation, no side effects. Enables functional optimization.
 
 ```mlir
 // Extract a subtensor (like NumPy slicing)
@@ -219,7 +219,7 @@ Operates on immutable tensor values. No memory allocation, no side effects. Enab
 
 ### MemRef Dialect
 
-Memory-backed references. Explicit allocation, loads, stores. Required for actual code generation.
+**Memory-backed references.** Explicit allocation, loads, stores. Required for actual code generation.
 
 ```mlir
 // Allocate memory
@@ -267,7 +267,7 @@ linalg.generic {relu} ins(%buf_C) outs(%buf_C)     // IN-PLACE: reuses %buf_C
 
 ## 3. The Affine Dialect: Polyhedral Optimization
 
-The `affine` dialect represents loop nests where bounds and access patterns are **affine expressions** (linear combinations of loop variables and constants). This enables powerful **polyhedral analysis** — the compiler can reason mathematically about data dependencies, loop transformations, and optimal tiling.
+The `affine` dialect represents loop nests where bounds and access patterns are **affine expressions** (linear combinations of loop variables and constants). This enables powerful **polyhedral analysis** — the compiler can reason mathematically about **data dependencies**, loop transformations, and optimal tiling.
 
 ```mlir
 // Simple affine loop nest for matrix multiply
@@ -332,7 +332,7 @@ mlir-opt --affine-loop-tile --affine-loop-interchange --affine-loop-unroll input
 
 ## 4. The Vector Dialect: Hardware Vector Mapping
 
-The `vector` dialect bridges the gap between abstract loop operations and hardware SIMD/vector instructions. It represents **fixed-size, multi-dimensional vector operations** — the abstraction that maps to AVX-512, NEON/SVE, GPU warp operations, or accelerator matrix units.
+The `vector` dialect bridges the gap between abstract loop operations and **hardware SIMD/vector instructions**. It represents **fixed-size, multi-dimensional vector operations** — the abstraction that maps to AVX-512, NEON/SVE, GPU warp operations, or accelerator matrix units.
 
 ```mlir
 // Transfer data from memref to vector (tile load)
@@ -386,7 +386,7 @@ The vector dialect is designed to lower naturally to different hardware:
 
 ## 5. The GPU Dialect: Mapping to Parallel Hardware
 
-The `gpu` dialect provides operations for expressing GPU execution — thread/block hierarchy, shared memory, barriers — in a target-independent way.
+The `gpu` dialect provides operations for expressing GPU execution — **thread/block hierarchy, shared memory, barriers** — in a target-independent way.
 
 ```mlir
 // Launch a GPU kernel

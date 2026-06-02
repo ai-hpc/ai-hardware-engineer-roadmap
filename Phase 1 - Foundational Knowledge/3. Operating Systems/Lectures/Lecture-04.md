@@ -8,7 +8,7 @@ Every time user-space code needs the kernel to do something — open a file, all
 
 ## The System Call Interface
 
-**System calls** are the only sanctioned path for user-space code to request kernel services. User space cannot directly access hardware registers, allocate physical memory, or change scheduler policy — it asks the kernel via the syscall ABI.
+**System calls** are the only sanctioned path for user-space code to request kernel services. User space **cannot** directly access hardware registers, allocate physical memory, or change scheduler policy — it asks the kernel via the **syscall ABI**.
 
 ### Call Path — x86-64
 
@@ -66,7 +66,7 @@ strace -T -e mmap,ioctl ./camerad  # trace specific calls with per-call duration
 | TLB and cache effects (KPTI flushes user-space TLB entries) | 20–100 ns |
 | Total round-trip (minimal kernel work) | 100–400 ns |
 
-ARM64 mitigations (CSV2, SSBS) are lighter than x86. At 200 fps across 2 cameras, each frame requiring 4 V4L2 ioctls = 1600 syscalls/s × 300 ns = 0.5 ms/s pure mode-switch overhead. Batching and zero-copy (`mmap`, `io_uring`) reduce crossing frequency.
+ARM64 mitigations (CSV2, SSBS) are **lighter than x86**. At 200 fps across 2 cameras, each frame requiring 4 V4L2 ioctls = 1600 syscalls/s × 300 ns = 0.5 ms/s pure **mode-switch overhead**. **Batching and zero-copy** (`mmap`, `io_uring`) reduce crossing frequency.
 
 > **Key Insight:** Spectre and Meltdown mitigations (KPTI, IBRS, retpoline) roughly doubled syscall overhead on x86 compared to pre-2018 systems. The kernel flushes or isolates page table entries on each user↔kernel transition to prevent speculative execution from leaking kernel memory. ARM64 mitigations are architecturally lighter — one reason embedded AI platforms often prefer ARM for latency-sensitive workloads. If you are porting code from x86 benchmarks, do not assume syscall overhead is similar.
 
@@ -87,7 +87,7 @@ Think of the vDSO as a memo that the kernel leaves in your address space: "Here 
 | `gettimeofday()` | ~200 ns | ~10–20 ns |
 | `getcpu()` | ~150 ns | ~5 ns |
 
-Calling through glibc automatically uses vDSO when available — no application change required. Use `CLOCK_MONOTONIC` for inter-process timing (not subject to NTP adjustments); use `CLOCK_MONOTONIC_RAW` for hardware-only monotonic counter.
+Calling through glibc **automatically uses vDSO** when available — no application change required. Use `CLOCK_MONOTONIC` for inter-process timing (not subject to NTP adjustments); use `CLOCK_MONOTONIC_RAW` for hardware-only monotonic counter.
 
 ```bash
 # Verify vDSO is mapped
@@ -162,7 +162,7 @@ Syscall Path for V4L2 Camera Buffer Dequeue
 
 ### epoll
 
-O(1) per-event multiplexing across many file descriptors. Used in openpilot's `cereal` messaging layer to multiplex CAN frames, camera V4L2 events, IMU data, and model output events.
+**O(1) per-event multiplexing** across many file descriptors. Used in openpilot's `cereal` messaging layer to multiplex CAN frames, camera V4L2 events, IMU data, and model output events.
 
 ```c
 int epfd = epoll_create1(EPOLL_CLOEXEC);
@@ -174,7 +174,7 @@ int n = epoll_wait(epfd, events, MAX_EVENTS, timeout_ms);
 /* blocks until at least one fd is ready; returns number of ready events */
 ```
 
-Edge-triggered mode (`EPOLLET`) is preferred for latency-sensitive paths — one wakeup per edge, no repeated notifications for unread data.
+**Edge-triggered mode** (`EPOLLET`) is preferred for latency-sensitive paths — **one wakeup per edge**, no repeated notifications for unread data.
 
 ### prctl
 
@@ -202,7 +202,7 @@ sched_setattr(0, &attr, 0);        /* 0 = self; requires CAP_SYS_NICE */
 
 ### perf_event_open
 
-Accesses hardware performance counters from userspace. Used by `perf stat`, Nsight Systems, and VTune.
+Accesses **hardware performance counters** from userspace. Used by `perf stat`, Nsight Systems, and VTune.
 
 ```c
 struct perf_event_attr pe = {
@@ -220,7 +220,7 @@ On Jetson, ARM PMU counters measure LLC miss rate during DNN inference — guide
 
 ### memfd_create
 
-Creates an anonymous file-backed memory region — usable as shared memory without a filesystem path. Used in openpilot's `msgq` for zero-copy IPC between `modeld` and `controlsd`.
+Creates an **anonymous file-backed memory region** — usable as shared memory without a filesystem path. Used in openpilot's `msgq` for **zero-copy IPC** between `modeld` and `controlsd`.
 
 ```c
 int fd = memfd_create("shared_tensor", MFD_CLOEXEC);
@@ -346,7 +346,7 @@ seccomp Decision Flow
 
 ## Linux Capabilities
 
-Root privilege is split into ~40 fine-grained grants. Drop capabilities after setup.
+Root privilege is split into **~40 fine-grained grants**. **Drop capabilities** after setup.
 
 | Capability | Grants |
 |---|---|

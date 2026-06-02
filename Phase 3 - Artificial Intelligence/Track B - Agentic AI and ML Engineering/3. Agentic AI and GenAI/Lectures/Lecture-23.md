@@ -14,7 +14,7 @@ App SDK / CLI / UI / node
   -> OpenClaw control plane
 ```
 
-The Gateway RPC is the stable protocol boundary that lets clients, SDKs, automation, and nodes talk to OpenClaw without scraping private runtime internals.
+The Gateway RPC is the **stable protocol boundary** that lets clients, SDKs, automation, and nodes talk to OpenClaw without scraping private runtime internals.
 
 The core idea:
 
@@ -40,7 +40,7 @@ By the end of this lecture, you should be able to:
 
 ## 1. What the Gateway RPC is
 
-The Gateway RPC is a WebSocket-based control plane.
+The Gateway RPC is a **WebSocket-based control plane**.
 
 It is used by:
 
@@ -70,7 +70,7 @@ Gateway RPC = OpenClaw's command bus
 
 It is not just a chat stream.
 
-It is the control plane for the whole runtime.
+It is the **control plane for the whole runtime**.
 
 ---
 
@@ -141,7 +141,7 @@ event   = Gateway tells you something happened
 
 ## 3. Why WebSocket instead of plain REST
 
-REST works well for simple request/response APIs.
+REST works well for **simple request/response APIs**.
 
 Agent systems need more:
 
@@ -154,7 +154,7 @@ Agent systems need more:
 - reconnect behavior
 - per-client event filtering
 
-WebSocket gives OpenClaw one long-lived bidirectional channel:
+WebSocket gives OpenClaw one **long-lived bidirectional channel**:
 
 ```text
 client -> Gateway: requests
@@ -174,7 +174,7 @@ on the same protocol family.
 
 ## 4. Connect handshake
 
-The first frame must be a connect request.
+The first frame must be a **connect request**.
 
 Example shape:
 
@@ -218,15 +218,15 @@ The important parts:
 - device identity
 - signed nonce
 
-The signed nonce matters because the server needs to know the client controls the device key.
+The **signed nonce** matters because the server needs to know the client controls the device key.
 
-Without nonce signing, a copied device ID would be too easy to fake.
+Without nonce signing, a copied device ID would be **too easy to fake**.
 
 ---
 
 ## 5. The `hello-ok` response
 
-A successful handshake returns `hello-ok`.
+A **successful handshake** returns `hello-ok`.
 
 Conceptually it contains:
 
@@ -290,7 +290,7 @@ feature detection beats version guessing
 
 ## 6. Startup unavailable state
 
-During startup, the Gateway may not be ready.
+During startup, the Gateway **may not be ready**.
 
 It can return a retryable unavailable error such as:
 
@@ -314,7 +314,7 @@ Client behavior:
 - retry connection
 - surface "Gateway starting" in UI
 
-This is part of deterministic startup behavior.
+This is part of **deterministic startup behavior**.
 
 ---
 
@@ -329,7 +329,7 @@ node
 
 ### Operator
 
-An operator is a control-plane client.
+An operator is a **control-plane client**.
 
 Examples:
 
@@ -350,7 +350,7 @@ Operators ask the Gateway to:
 
 ### Node
 
-A node is a capability host.
+A node is a **capability host**.
 
 Examples:
 
@@ -375,15 +375,15 @@ operator = controls Gateway
 node     = exposes device capability to Gateway
 ```
 
-Nodes are not gateways.
+Nodes are **not gateways**.
 
 ---
 
 ## 8. Scopes
 
-Roles say what kind of client this is.
+Roles say **what kind of client** this is.
 
-Scopes say what that client is allowed to do.
+Scopes say **what that client is allowed to do**.
 
 Common operator scopes:
 
@@ -422,7 +422,7 @@ node.invoke   -> role/scope check plus node command policy
 
 ## 9. Device identity and pairing
 
-Device identity exists so the Gateway can recognize clients over time.
+Device identity exists so the Gateway can **recognize clients over time**.
 
 A connecting client may present:
 
@@ -444,7 +444,7 @@ openclaw devices reject <requestId>
 
 Once approved, the Gateway can issue a device token.
 
-The client should persist the device token and reuse it for reconnects.
+The client should **persist the device token** and reuse it for reconnects.
 
 Why this matters:
 
@@ -477,7 +477,7 @@ new device ID
 
 Pairing auto-approval should be centered on direct local loopback connects.
 
-Same-host tailnet or LAN connects should still be treated as remote unless explicitly trusted by configuration.
+Same-host tailnet or LAN connects should still be **treated as remote** unless explicitly trusted by configuration.
 
 There are a few device-less operator exceptions, but they should be narrow:
 
@@ -494,7 +494,7 @@ The rule:
 
 ## 10. Device token lifecycle
 
-Device tokens are first-class credentials.
+Device tokens are **first-class credentials**.
 
 The Gateway can rotate or revoke them:
 
@@ -512,7 +512,7 @@ Safe behavior:
 - token mutation cannot target a device role that pairing approval never granted
 - non-admin callers cannot rotate or revoke a broader operator token than they already hold
 
-This gives OpenClaw a cleaner security model than long-lived shared tokens everywhere.
+This gives OpenClaw a **cleaner security model** than long-lived shared tokens everywhere.
 
 ### Persisting device tokens
 
@@ -636,7 +636,7 @@ gateway.auth.allowTailscale = true
 gateway.auth.mode = "trusted-proxy"
 ```
 
-These modes are for deployments where an upstream layer already authenticates identity.
+These modes are for deployments where an **upstream layer already authenticates identity**.
 
 Private-ingress mode:
 
@@ -648,7 +648,7 @@ skips shared-secret connect auth.
 
 Use it only behind trusted private ingress.
 
-Do not expose private-ingress mode on public or untrusted networks.
+Do not expose private-ingress mode on **public or untrusted networks**.
 
 ### Bootstrap handoff tokens
 
@@ -661,7 +661,7 @@ wss:// with appropriate trust
 loopback / local pairing path
 ```
 
-Do not blindly persist handoff tokens from an untrusted public connection.
+Do not blindly persist handoff tokens from an **untrusted public connection**.
 
 The client should handle auth failures with recovery logic.
 
@@ -694,7 +694,7 @@ or
 wss:// with pinned tlsFingerprint
 ```
 
-Public `wss://` without pinning does not qualify for automatic token promotion.
+Public `wss://` without pinning **does not qualify** for automatic token promotion.
 
 If the retry fails:
 
@@ -703,7 +703,7 @@ stop automatic reconnect loop
 surface operator action guidance
 ```
 
-Do not spin forever with bad credentials.
+Do not spin forever with **bad credentials**.
 
 Recovery hints may include:
 
@@ -727,7 +727,7 @@ review_auth_configuration
 
 ## 12. Device auth migration diagnostics
 
-All connections should sign the server-provided `connect.challenge` nonce.
+All connections should **sign the server-provided** `connect.challenge` nonce.
 
 Legacy clients may still use pre-challenge signing behavior.
 
@@ -765,9 +765,9 @@ Legacy v2 signatures may remain accepted for compatibility, but paired-device me
 
 ## 13. TLS and pinning
 
-Gateway WebSocket connections can use TLS.
+Gateway WebSocket connections can use **TLS**.
 
-Clients may optionally pin the Gateway certificate fingerprint.
+Clients may optionally **pin the Gateway certificate fingerprint**.
 
 Relevant configuration/CLI concepts:
 
@@ -787,13 +787,13 @@ or
 wss:// with pinned fingerprint
 ```
 
-Without pinning, a public `wss://` endpoint is encrypted but not trusted enough for aggressive credential fallback.
+Without pinning, a public `wss://` endpoint is **encrypted but not trusted** enough for aggressive credential fallback.
 
 ---
 
 ## 14. Feature discovery
 
-`hello-ok.features` is the discovery surface.
+`hello-ok.features` is the **discovery surface**.
 
 It advertises:
 
@@ -826,13 +826,13 @@ Assume:
 method exists only if hello-ok advertises it
 ```
 
-This makes clients safer across version skew.
+This makes clients safer across **version skew**.
 
 ---
 
 ## 15. Size limits and payload safety
 
-Before connect, frames are capped tightly.
+Before connect, frames are **capped tightly**.
 
 The provided summary describes a pre-connect cap of:
 
@@ -872,9 +872,9 @@ Use:
 
 ## 16. Events and broadcast scoping
 
-Events are not broadcast blindly to everyone.
+Events are **not broadcast blindly** to everyone.
 
-They are scope-gated.
+They are **scope-gated**.
 
 Examples:
 
@@ -893,7 +893,7 @@ The secure rule:
 
 > if a client should not see a session, run, task, artifact, approval, or secret-adjacent event, do not broadcast it to that client
 
-The Gateway also keeps ordering monotonic per socket.
+The Gateway also keeps ordering **monotonic per socket**.
 
 That means each client gets its own sequence view after filtering.
 
@@ -903,9 +903,9 @@ This matters because scope filtering could otherwise make event ordering ambiguo
 
 ## 17. Common RPC families
 
-The Gateway has many method families.
+The Gateway has many **method families**.
 
-Think in categories.
+Think in **categories**.
 
 | Family | Examples | Purpose |
 |---|---|---|
@@ -941,7 +941,7 @@ typed method
 
 ## 18. Idempotency
 
-Side-effecting methods need idempotency keys.
+Side-effecting methods need **idempotency keys**.
 
 Why?
 
@@ -975,17 +975,17 @@ Methods that should use idempotency:
 - patch config
 - schedule cron job
 
-Idempotency is not polish.
+Idempotency is **not polish**.
 
-It is required for reliable distributed clients.
+It is required for **reliable distributed clients**.
 
 ---
 
 ## 19. TypeBox schemas and generated clients
 
-Gateway RPC shapes should be schema-owned.
+Gateway RPC shapes should be **schema-owned**.
 
-OpenClaw uses TypeBox-style schemas for canonical protocol shapes.
+OpenClaw uses **TypeBox-style schemas** for canonical protocol shapes.
 
 The workflow:
 
@@ -1013,7 +1013,7 @@ The engineering goal:
 
 ## 20. Secret safety
 
-Diagnostics and discovery must not leak secrets.
+Diagnostics and discovery must **not leak secrets**.
 
 Do not expose:
 
@@ -1056,9 +1056,9 @@ Nodes declare:
 - commands
 - permissions
 
-The Gateway treats these as claims.
+The Gateway treats these as **claims**.
 
-Claims are not enough.
+Claims are **not enough**.
 
 The Gateway still enforces server-side policy:
 
@@ -1087,7 +1087,7 @@ But again:
 
 ## 22. Model listing views
 
-Model listing is a useful example of one method with multiple views.
+Model listing is a useful example of **one method with multiple views**.
 
 `models.list` accepts a `view`.
 
@@ -1097,7 +1097,7 @@ Model listing is a useful example of one method with multiple views.
 | `configured` | picker-sized configured models |
 | `all` | full Gateway catalog for diagnostics |
 
-This is better than creating three unrelated methods.
+This is better than creating **three unrelated methods**.
 
 It gives clients a clear contract:
 
@@ -1113,7 +1113,7 @@ diagnostics:
 
 ## 23. Reconnect and timeouts
 
-Clients need predictable timeout behavior.
+Clients need **predictable timeout behavior**.
 
 Typical values from the source material:
 
@@ -1148,7 +1148,7 @@ Client behavior:
 
 ## 24. Extending the RPC surface
 
-When adding a new method, use this checklist.
+When adding a new method, use this **checklist**.
 
 ### 1. Define the method purpose
 
@@ -1166,7 +1166,7 @@ artifacts.get
 artifacts.download
 ```
 
-Keep the method narrow.
+Keep the method **narrow**.
 
 ### 2. Add schema
 
@@ -1208,7 +1208,7 @@ Never include raw secret values in status, diagnostics, or discovery.
 
 ### 8. Add SDK wrappers and generated native models
 
-The public API is not complete until clients can use it safely.
+The public API is **not complete** until clients can use it safely.
 
 ---
 
@@ -1245,9 +1245,9 @@ Gateway protocol = wire contract
 App SDK          = developer-friendly wrapper
 ```
 
-App authors should normally use the SDK.
+App authors should normally use the **SDK**.
 
-SDK authors and platform engineers must understand the Gateway protocol.
+SDK authors and platform engineers must understand the **Gateway protocol**.
 
 ---
 

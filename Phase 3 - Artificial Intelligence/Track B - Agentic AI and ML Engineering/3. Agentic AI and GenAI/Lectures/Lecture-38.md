@@ -4,15 +4,15 @@
 
 ---
 
-Long-context agents create long-context model requirements.
+**Long-context agents** create long-context model requirements.
 
-Serving long contexts is one problem.
+**Serving** long contexts is one problem.
 
-Training models to handle long contexts is another.
+**Training** models to handle long contexts is another.
 
 Lecture 36 covered vLLM FP8 KV-cache for long-context inference. This lecture covers the training-side complement: AutoSP.
 
-AutoSP is a compiler-based system that automatically transforms ordinary transformer training code into sequence-parallel training code across multiple GPUs. The goal is direct:
+**AutoSP** is a compiler-based system that automatically transforms ordinary transformer training code into **sequence-parallel** training code across multiple GPUs. The goal is direct:
 
 ```text
 write standard transformer training code
@@ -29,7 +29,7 @@ The important idea is:
 distributed training strategies are moving into compiler passes
 ```
 
-That has consequences for model scientists, systems engineers, and hardware engineers.
+That has consequences for **model scientists, systems engineers, and hardware engineers**.
 
 ---
 
@@ -64,7 +64,7 @@ It stores:
 - communication buffers
 - recomputation metadata
 
-For long-context training, activation memory becomes severe.
+For long-context training, **activation memory** becomes severe.
 
 The token dimension grows:
 
@@ -76,7 +76,7 @@ The token dimension grows:
 
 That increases memory pressure inside attention and MLP blocks.
 
-Data parallelism alone does not solve this.
+**Data parallelism alone** does not solve this.
 
 With ordinary data parallelism, every GPU still sees the full sequence for its local microbatch:
 
@@ -87,11 +87,11 @@ GPU 2: full sequence
 GPU 3: full sequence
 ```
 
-Adding more data-parallel GPUs increases total throughput, but it does not reduce per-GPU sequence activation memory.
+Adding more data-parallel GPUs increases total throughput, but it does **not reduce per-GPU sequence activation memory**.
 
-ZeRO and FSDP help shard parameters, gradients, and optimizer state.
+**ZeRO and FSDP** help shard parameters, gradients, and optimizer state.
 
-They do not automatically shard the token dimension.
+They do **not automatically shard the token dimension**.
 
 For 100k+ context training, that difference matters.
 
@@ -99,7 +99,7 @@ For 100k+ context training, that difference matters.
 
 ## 2. Sequence parallelism
 
-Sequence parallelism shards the sequence dimension across devices.
+**Sequence parallelism** shards the sequence dimension across devices.
 
 Instead of:
 
@@ -119,9 +119,9 @@ GPU 2: tokens 50000..74999
 GPU 3: tokens 75000..99999
 ```
 
-This increases the effective context length you can train because activation memory is spread across GPUs.
+This increases the **effective context length** you can train because activation memory is spread across GPUs.
 
-But transformer layers are not embarrassingly parallel across sequence.
+But transformer layers are **not embarrassingly parallel** across sequence.
 
 Attention, normalization, projections, masks, position IDs, and backward gradients all need correct data movement.
 
@@ -136,9 +136,9 @@ Hand-written SP requires:
 - validating numerical correctness
 - composing with data parallelism and optimizer sharding
 
-That is invasive systems work.
+That is **invasive systems work**.
 
-AutoSP tries to move that work into the compiler.
+AutoSP tries to move that work **into the compiler**.
 
 ---
 
@@ -146,7 +146,7 @@ AutoSP tries to move that work into the compiler.
 
 AutoSP automatically converts standard transformer training code into multi-GPU sequence-parallel code.
 
-The PyTorch blog describes it as integrated with DeepSpeed through DeepCompile, a compiler ecosystem for distributed training optimizations.
+The PyTorch blog describes it as integrated with **DeepSpeed through DeepCompile**, a compiler ecosystem for distributed training optimizations.
 
 The user-facing workflow is intentionally small:
 
@@ -190,7 +190,7 @@ loss = model(
 )
 ```
 
-The compiler pass handles the sequence-parallel code transformation.
+The **compiler pass** handles the sequence-parallel code transformation.
 
 This is the same trend we saw in Lecture 35:
 
@@ -205,9 +205,9 @@ Here, the machinery is a compiler pass.
 
 ## 4. Why this matters for model scientists
 
-Without AutoSP, long-context research often requires rewriting the training stack.
+Without AutoSP, long-context research often requires **rewriting the training stack**.
 
-Researchers who want to test model behavior at 64k, 128k, or longer contexts may be forced to become distributed-systems engineers first.
+Researchers who want to test model behavior at 64k, 128k, or longer contexts may be forced to become **distributed-systems engineers** first.
 
 AutoSP changes the workflow:
 
@@ -226,17 +226,17 @@ after:
   benchmark and validate
 ```
 
-This does not remove the need for performance engineering.
+This does not remove the need for **performance engineering**.
 
-It changes where the complexity lives.
+It changes **where the complexity lives**.
 
-The complexity moves from every model implementation into a reusable compiler system.
+The complexity moves from every model implementation into a **reusable compiler system**.
 
 ---
 
 ## 5. DeepSpeed-Ulysses as the target SP strategy
 
-AutoSP targets DeepSpeed-Ulysses-style sequence parallelism.
+AutoSP targets **DeepSpeed-Ulysses-style** sequence parallelism.
 
 The PyTorch blog notes two important points:
 
@@ -245,9 +245,9 @@ The PyTorch blog notes two important points:
 
 That second point is operationally important.
 
-If a model has 32 heads, Ulysses cannot scale sequence parallelism past that head-count limit.
+If a model has 32 heads, Ulysses cannot scale sequence parallelism past that **head-count limit**.
 
-This means AutoSP does not remove topology and architecture constraints.
+This means AutoSP does **not remove topology and architecture constraints**.
 
 It automates a specific strategy with known tradeoffs.
 
@@ -258,13 +258,13 @@ AutoSP is not magic distributed training.
 AutoSP is compiler-generated Ulysses-style sequence parallelism plus long-context-aware checkpointing.
 ```
 
-That is still valuable because the hand-written version is difficult and error-prone.
+That is still valuable because the hand-written version is **difficult and error-prone**.
 
 ---
 
 ## 6. Sequence-aware activation checkpointing
 
-Activation checkpointing saves memory by discarding selected intermediate activations during forward pass and recomputing them during backward pass.
+**Activation checkpointing** saves memory by discarding selected intermediate activations during forward pass and recomputing them during backward pass.
 
 Generic activation checkpointing asks:
 
@@ -273,9 +273,9 @@ Which activations should we store?
 Which should we recompute?
 ```
 
-AutoSP adds a long-context-specific strategy called sequence-aware activation checkpointing, or SAC.
+AutoSP adds a long-context-specific strategy called **sequence-aware activation checkpointing**, or SAC.
 
-The reason is that long-context workloads change the compute/memory balance.
+The reason is that long-context workloads change the **compute/memory balance**.
 
 At long sequence length:
 
@@ -299,9 +299,9 @@ SAC disabled
   -> may OOM at longer contexts
 ```
 
-This is a deployment decision, not a checkbox.
+This is a **deployment decision**, not a checkbox.
 
-Use SAC when it enables the context length you need or substantially reduces memory pressure.
+Use SAC when it **enables the context length you need** or substantially reduces memory pressure.
 
 ---
 
@@ -309,7 +309,7 @@ Use SAC when it enables the context length you need or substantially reduces mem
 
 AutoSP composes with ZeRO 0/1 according to the PyTorch post.
 
-That is important because sequence parallelism and ZeRO solve different memory problems.
+That is important because sequence parallelism and ZeRO solve **different memory problems**.
 
 ```text
 ZeRO/FSDP:
@@ -342,23 +342,23 @@ sequence parallel group
   -> increases maximum context length
 ```
 
-The challenge is making those parallel dimensions compose without breaking correctness or performance.
+The challenge is making those parallel dimensions **compose without breaking correctness or performance**.
 
-AutoSP's value is that it handles that composition for its supported cases rather than requiring every user to implement it manually.
+AutoSP's value is that it **handles that composition** for its supported cases rather than requiring every user to implement it manually.
 
 ---
 
 ## 8. Compiler pass requirements
 
-AutoSP needs to see the model graph.
+AutoSP needs to **see the model graph**.
 
 The blog calls out two key limitations.
 
-First, the transformer must be compiled as one compilable artifact.
+First, the transformer must be compiled as **one compilable artifact**.
 
 If a project compiles many small functions separately and stitches them together, AutoSP cannot globally analyze and propagate sequence-sharding information through the whole model.
 
-Second, graph breaks are disallowed inside the compilable artifact.
+Second, **graph breaks are disallowed** inside the compilable artifact.
 
 Graph breaks complicate:
 
@@ -368,9 +368,9 @@ Graph breaks complicate:
 - backward-pass correctness
 - activation checkpointing
 
-This is a compiler reality.
+This is a **compiler reality**.
 
-If the compiler cannot see the whole computation, it cannot safely transform the whole computation.
+If the compiler cannot see the whole computation, it cannot **safely transform** the whole computation.
 
 For users, the implication is concrete:
 
@@ -390,13 +390,13 @@ AutoSP-hostile code:
 
 This is not just an AutoSP issue.
 
-It is a general rule for compiler-based distributed training.
+It is a **general rule** for compiler-based distributed training.
 
 ---
 
 ## 9. Performance portability
 
-The AutoSP paper argues that putting SP into the compiler can improve performance portability across hardware.
+The AutoSP paper argues that putting SP into the compiler can improve **performance portability** across hardware.
 
 The reason:
 
@@ -416,9 +416,9 @@ This matters for:
 - cloud portability
 - future interconnect generations
 
-Do not overstate this.
+**Do not overstate this.**
 
-Compiler portability does not mean every backend is automatically optimal.
+Compiler portability does **not mean every backend is automatically optimal**.
 
 It means the abstraction boundary is better:
 
@@ -430,13 +430,13 @@ trace/profiler validates the actual result
 
 This pairs directly with Lecture 37.
 
-Use TraceLens or equivalent profiler analysis to verify whether the generated SP code is actually efficient on your hardware.
+Use **TraceLens** or equivalent profiler analysis to verify whether the generated SP code is **actually efficient** on your hardware.
 
 ---
 
 ## 10. What to measure
 
-For AutoSP, benchmark both capability and cost.
+For AutoSP, benchmark **both capability and cost**.
 
 Capability metrics:
 
@@ -481,13 +481,13 @@ E communication exposure,
 and loss difference within threshold F.
 ```
 
-That is the engineering standard.
+That is the **engineering standard**.
 
 ---
 
 ## 11. Where AutoSP sits in the long-context stack
 
-Long-context systems have both training and inference paths.
+Long-context systems have **both training and inference paths**.
 
 ```text
 training:
@@ -506,11 +506,11 @@ serving:
   request concurrency
 ```
 
-AutoSP belongs to the training side.
+AutoSP belongs to the **training side**.
 
-vLLM FP8 KV-cache belongs to the serving side.
+vLLM FP8 KV-cache belongs to the **serving side**.
 
-TraceLens belongs to evidence and diagnosis across both.
+TraceLens belongs to **evidence and diagnosis** across both.
 
 Together:
 
@@ -534,13 +534,13 @@ For agent systems, these are connected because persistent agents create demand f
 - extended planning state
 - larger evaluation prompts
 
-Training and serving must both adapt.
+**Training and serving** must both adapt.
 
 ---
 
 ## 12. Hardware engineer view
 
-AutoSP exposes the hardware bottlenecks behind long-context training.
+AutoSP exposes the **hardware bottlenecks** behind long-context training.
 
 Key questions:
 
@@ -567,9 +567,9 @@ Scheduling:
   Is communication overlapped with useful compute?
 ```
 
-This is why long-context training is a full-stack problem.
+This is why long-context training is a **full-stack problem**.
 
-It is not solved only by bigger HBM.
+It is **not solved only by bigger HBM**.
 
 It needs:
 
@@ -646,7 +646,7 @@ loss diverges from baseline
   -> sharding, mask, communication, or numerical issue
 ```
 
-The right response is not to guess.
+The right response is **not to guess**.
 
 Use:
 
@@ -661,7 +661,7 @@ Use:
 
 ## Mini-lab: AutoSP evaluation plan
 
-You do not need an 8-GPU node to design the experiment.
+You do **not need an 8-GPU node** to design the experiment.
 
 Write an evaluation plan for a Llama-style transformer.
 

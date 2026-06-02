@@ -28,7 +28,7 @@ Real agent systems need to handle:
 
 That is where **OpenClaw** becomes a useful case study.
 
-OpenClaw is not just "an app that calls an LLM." It is a **control plane** for persistent agents.
+OpenClaw is not just "an app that calls an LLM." It is a **control plane** for **persistent agents**.
 
 This lecture uses OpenClaw to teach a more realistic system model:
 
@@ -104,7 +104,7 @@ When people first see a gateway-style system, they often ask:
 
 > Why not let every client call the model directly?
 
-Because direct calls break down once you need shared behavior.
+Because direct calls break down once you need **shared behavior**.
 
 A gateway gives you one place for:
 
@@ -129,7 +129,7 @@ That leads to:
 - difficult debugging
 - poor auditability
 
-The gateway solves this by centralizing the agent runtime.
+The gateway solves this by **centralizing the agent runtime**.
 
 ---
 
@@ -146,7 +146,7 @@ Based on the local OpenClaw docs, the core design is:
 
 ### Gateway
 
-The gateway is the long-lived daemon process.
+The gateway is the **long-lived daemon process**.
 
 It:
 
@@ -192,7 +192,7 @@ Channels deliver messages in and out. They are not the same as agents.
 
 ### Agents
 
-An agent is the "brain" that handles a conversation or workflow.
+An **agent** is the "brain" that handles a conversation or workflow.
 
 In OpenClaw, one gateway can host:
 
@@ -231,7 +231,7 @@ If you only study notebook demos, your mental model stays too small.
 
 ## 5. The OpenClaw agent loop
 
-OpenClaw documents the agent loop explicitly.
+OpenClaw documents the **agent loop** explicitly.
 
 The high-level shape is:
 
@@ -267,7 +267,7 @@ It is the full runtime path from inbound event to durable result.
 
 ## 6. Why session serialization matters
 
-OpenClaw's docs emphasize that runs are serialized per session.
+OpenClaw's docs emphasize that runs are **serialized per session**.
 
 That means one session should not have many overlapping agent runs mutating it at the same time.
 
@@ -305,7 +305,7 @@ This is a key production lesson:
 
 ## 7. One gateway, many surfaces
 
-OpenClaw is useful because it shows how one agent runtime can support many communication surfaces.
+OpenClaw is useful because it shows how **one agent runtime** can support **many communication surfaces**.
 
 A single agent can be reachable through:
 
@@ -373,7 +373,7 @@ That is real agent engineering.
 
 ## 9. Why OpenClaw is a strong teaching example
 
-OpenClaw is useful for this roadmap because it is not limited to one narrow pattern.
+OpenClaw is useful for this roadmap because it is **not limited to one narrow pattern**.
 
 It combines:
 

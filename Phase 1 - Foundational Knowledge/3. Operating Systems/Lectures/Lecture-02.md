@@ -14,7 +14,7 @@ A **process** is a program in execution. It combines three orthogonal components
 - **Virtual memory**: address space — text, data, heap, stack, and memory-mapped regions, described by `mm_struct`
 - **Resources**: file descriptor table, signal handlers, sockets, cgroup membership — all reachable from `task_struct`
 
-Threads are processes that share `mm_struct` and `files_struct` but have independent stacks and register state. Linux makes no kernel distinction between "process" and "thread" — both are represented by `task_struct`.
+**Threads** are processes that share `mm_struct` and `files_struct` but have independent stacks and register state. Linux makes **no kernel distinction** between "process" and "thread" — both are represented by `task_struct`.
 
 > **Key Insight:** Linux has no separate "thread" concept at the kernel level. A thread is simply a task that shares its `mm_struct` (address space) with another task. This design simplifies the scheduler but means every thread has its own `task_struct`, its own PID (visible via `gettid()`), and its own scheduler entity. When you pin CPU affinity for a thread, you are writing to that thread's `task_struct.cpus_mask`.
 
@@ -70,7 +70,7 @@ task_struct — The kernel's representation of a running task
 
 ## Process States
 
-Understanding process states is essential for debugging. The state field in `task_struct` tells you exactly what the kernel thinks a process is doing at any moment. This is the information visible in the `ps` command's `STAT` column.
+Understanding **process states** is essential for debugging. The state field in `task_struct` tells you exactly what the kernel thinks a process is doing at any moment. This is the information visible in the `ps` command's `STAT` column.
 
 | State | Macro | Wakeable by signal? | `ps` letter | Example cause |
 |---|---|---|---|---|
@@ -82,7 +82,7 @@ Understanding process states is essential for debugging. The state field in `tas
 | Zombie | `EXIT_ZOMBIE` | — | Z | Exited; awaiting parent `wait()` call |
 | Dead | `TASK_DEAD` | — | — | Fully reclaimed after parent reaps |
 
-`D` state in `ps` indicates a process blocked inside a kernel I/O path. Persistent `D` state is a driver hang indicator — common during V4L2 buffer dequeue failures or NVMe timeout.
+`D` state in `ps` indicates a process **blocked inside a kernel I/O path**. Persistent `D` state is a **driver hang indicator** — common during V4L2 buffer dequeue failures or NVMe timeout.
 
 ```
 Process State Machine
@@ -119,7 +119,7 @@ Process State Machine
 
 ## fork / exec / wait
 
-The fork/exec/wait trio is the fundamental mechanism for creating new processes in Unix. Understanding this sequence is also key to understanding why openpilot's multi-process architecture works efficiently.
+The **fork/exec/wait** trio is the fundamental mechanism for creating new processes in Unix. Understanding this sequence is also key to understanding why openpilot's **multi-process architecture** works efficiently.
 
 ### fork() and Copy-on-Write
 
@@ -159,13 +159,13 @@ The sequence when `fork()` is called:
 5. **On first write**: a page fault fires. The kernel allocates a new physical page, copies the content, and updates only the writing task's page table. This is the actual "copy" — deferred until necessary.
 6. **Code pages are never copied**: read-only text segments (the program's executable code) are genuinely shared forever, never duplicated.
 
-CoW makes `fork()` fast even for large processes. openpilot's multi-process architecture relies on this: `camerad`, `modeld`, `plannerd`, and `controlsd` each fork from a common base without duplicating megabytes of shared library code.
+CoW makes `fork()` **fast even for large processes**. openpilot's multi-process architecture relies on this: `camerad`, `modeld`, `plannerd`, and `controlsd` each fork from a common base without duplicating megabytes of shared library code.
 
 ### exec() and wait()
 
-`execve()` replaces the current address space with a new ELF binary. File descriptors without `O_CLOEXEC` survive across exec. `waitpid()` reaps a zombie child, reclaiming its `task_struct`. Without `wait()`, zombies accumulate and eventually exhaust PID space.
+`execve()` **replaces the current address space** with a new ELF binary. File descriptors without `O_CLOEXEC` survive across exec. `waitpid()` reaps a **zombie child**, reclaiming its `task_struct`. Without `wait()`, zombies accumulate and eventually exhaust PID space.
 
-If a parent exits before reaping, orphan children are reparented to PID 1 (systemd), which calls `wait()` internally.
+If a parent exits before reaping, **orphan children** are reparented to PID 1 (systemd), which calls `wait()` internally.
 
 ```
 The fork / exec / wait lifecycle
@@ -202,7 +202,7 @@ The fork / exec / wait lifecycle
 
 ## clone() and Threads
 
-`clone()` is the underlying syscall behind both `fork()` and `pthread_create()`. The flags argument determines what the new task shares with its parent.
+`clone()` is the underlying syscall behind **both** `fork()` and `pthread_create()`. The **flags argument** determines what the new task shares with its parent.
 
 | Flag | Effect |
 |---|---|
@@ -266,7 +266,7 @@ cat /proc/[pid]/cgroup              # cgroup membership path for a process
 cat /sys/fs/cgroup/[path]/cpu.stat  # throttled_usec, nr_throttled — detect throttling
 ```
 
-Kubernetes uses cgroup v2 to enforce CPU and memory limits on inference pods. A pod with `cpu.max = 200000 1000000` (20% of one core) will have `modeld` throttled if it exceeds that budget.
+Kubernetes uses **cgroup v2** to enforce CPU and memory limits on inference pods. A pod with `cpu.max = 200000 1000000` (20% of one core) will have `modeld` **throttled** if it exceeds that budget.
 
 > **Key Insight:** `cpu.stat`'s `throttled_usec` field is the smoking gun for cgroup-induced latency. If your inference pod shows consistent 2–3 ms latency spikes and `throttled_usec` is climbing, the Kubernetes CPU limit is the bottleneck — not the model, not the GPU, not the scheduler. This is the first file to check after `perf` and `bpftrace` show CPU stalls in the inference thread.
 
@@ -280,7 +280,7 @@ Now that we understand how the kernel tracks tasks and their resources, let's lo
 
 `context_switch()` is in `kernel/sched/core.c`. It performs two distinct operations:
 
-1. **`switch_mm_irqs_off()`** — install the new process's virtual address space. On x86 this writes CR3 (the page table base register); on ARM64 it writes TTBR0_EL1. This is the step that makes the new process's memory visible and hides the old process's memory. Every memory access after this point goes through the new page table.
+1. **`switch_mm_irqs_off()`** — install the new process's **virtual address space**. On x86 this writes CR3 (the page table base register); on ARM64 it writes TTBR0_EL1. This is the step that makes the new process's memory visible and hides the old process's memory. Every memory access after this point goes through the new page table.
 
 2. **`switch_to()`** — save the outgoing task's callee-saved registers (rbx, rbp, r12–r15 on x86; x19–x28, fp, lr on ARM64) and stack pointer to its `task_struct`, then restore the incoming task's saved registers. When `switch_to()` returns, the CPU is executing in the context of the new task.
 
@@ -312,7 +312,7 @@ Context Switch Timeline
                                     └──────────────┘
 ```
 
-**TLB cost**: ARM64 uses ASID-tagged TLBs — switching between tasks with valid ASIDs avoids a full TLB flush. x86 uses PCID for the same purpose. Context switch overhead: 1–10 µs depending on cache state and whether the TLB must be flushed. For a 1 kHz control loop (`controlsd` at 100 Hz CAN output), scheduler jitter must stay well below 1 ms.
+**TLB cost**: ARM64 uses **ASID-tagged TLBs** — switching between tasks with valid ASIDs avoids a full TLB flush. x86 uses **PCID** for the same purpose. Context switch overhead: 1–10 µs depending on cache state and whether the TLB must be flushed. For a 1 kHz control loop (`controlsd` at 100 Hz CAN output), scheduler jitter must stay well below 1 ms.
 
 > **Key Insight:** The TLB (Translation Lookaside Buffer) is a hardware cache that stores recent virtual-to-physical address translations. Without ASID tags, every context switch would require flushing the TLB entirely — that is, invalidating all cached translations — because the new process has a completely different address space. ASID tags let the hardware distinguish "translation for process A" from "translation for process B," so old entries remain valid and the new process can hit the TLB immediately. This is why ASID exhaustion (when all 256 or 65536 ASID slots fill up) forces a TLB flush and adds latency.
 

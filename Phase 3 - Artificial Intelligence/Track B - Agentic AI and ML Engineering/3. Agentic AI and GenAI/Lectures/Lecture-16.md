@@ -6,7 +6,7 @@
 
 ## Why this lecture exists
 
-Once you move beyond a single chat window, agent design becomes a routing problem.
+Once you move beyond a single chat window, agent design becomes a **routing problem**.
 
 You must decide:
 
@@ -22,7 +22,7 @@ This lecture uses OpenClaw to teach one of the most important practical lessons 
 
 > session design is product design
 
-If session boundaries are wrong, the whole agent experience becomes unsafe or confusing.
+If session boundaries are wrong, the whole agent experience becomes **unsafe or confusing**.
 
 ---
 
@@ -89,11 +89,11 @@ One gateway can host multiple agents.
 
 A **session** is the context bucket for a conversation or workflow.
 
-It decides which messages share memory and transcript history.
+It decides which messages **share memory** and transcript history.
 
 This distinction is essential.
 
-One user may contact the same agent through many channels, but whether those conversations share context is a design choice.
+One user may contact the same agent through many channels, but whether those conversations share context is a **design choice**.
 
 ---
 
@@ -114,9 +114,9 @@ That question depends on:
 - thread
 - configured bindings
 
-This is why OpenClaw uses explicit bindings.
+This is why OpenClaw uses **explicit bindings**.
 
-Instead of letting the model decide, the host configuration decides.
+Instead of letting the model decide, the **host configuration** decides.
 
 That is the right design.
 
@@ -126,7 +126,7 @@ The model should not choose:
 - which workspace it is using
 - which account should answer
 
-Those are control-plane decisions.
+Those are **control-plane decisions**.
 
 ---
 
@@ -138,9 +138,9 @@ The easiest explanation is:
 
 > a session key is the label on the conversation bucket
 
-Messages with the same bucket label share context.
+Messages with the same bucket label **share context**.
 
-Messages with different bucket labels stay isolated.
+Messages with different bucket labels **stay isolated**.
 
 Examples from the OpenClaw model:
 
@@ -164,7 +164,7 @@ It means the system can say:
 
 OpenClaw's session docs are very clear here:
 
-If many people can message the bot, default shared-DM behavior can leak context.
+If many people can message the bot, default shared-DM behavior can **leak context**.
 
 That is a big teaching point.
 
@@ -183,7 +183,7 @@ Both share one DM session.
 The assistant now carries Alice's context into Bob's chat.
 ```
 
-This is not just awkward. It can be a privacy issue.
+This is not just awkward. It can be a **privacy issue**.
 
 That is why OpenClaw supports DM scope settings like:
 
@@ -191,7 +191,7 @@ That is why OpenClaw supports DM scope settings like:
 - per-peer isolation
 - per-channel-peer isolation
 
-For a serious product, session scoping is a security and UX feature.
+For a serious product, session scoping is a **security and UX feature**.
 
 ---
 
@@ -207,9 +207,9 @@ OpenClaw's routing rules show that agent assignment can depend on:
 - guild
 - role
 
-That means routing is not merely technical plumbing.
+That means routing is not merely **technical plumbing**.
 
-It is product behavior.
+It is **product behavior**.
 
 Example:
 
@@ -260,7 +260,7 @@ Cons:
 
 - weaker continuity
 
-This is why session design is a product tradeoff, not a default you should ignore.
+This is why session design is a **product tradeoff**, not a default you should ignore.
 
 ---
 
@@ -312,9 +312,9 @@ That is the right default for collaborative systems.
 
 Why?
 
-Because threads often represent separate sub-conversations.
+Because threads often represent **separate sub-conversations**.
 
-If they all collapse into one bucket, the agent becomes noisy and unreliable.
+If they all collapse into one bucket, the agent becomes **noisy and unreliable**.
 
 This is the same lesson you should apply when building:
 
@@ -331,7 +331,7 @@ OpenClaw's channel-routing docs make an important point:
 
 > the model does not choose the channel
 
-That choice belongs to the host system.
+That choice belongs to the **host system**.
 
 This is a good professional rule.
 
@@ -348,7 +348,7 @@ The control plane should decide:
 - which session to mutate
 - which agent is in scope
 
-This reduces a whole class of failure where the model invents the wrong operational path.
+This reduces a whole class of failure where the model **invents the wrong operational path**.
 
 ---
 

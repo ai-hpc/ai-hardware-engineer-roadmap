@@ -33,7 +33,7 @@ Lecture 17 is the right background because `wiphy`, `wireless_dev`, and `net_dev
 
 Lecture 1 matters because userspace never sees the transport details directly. `nmcli` and `iw` work only because the driver turns the ESP into standard Linux wireless abstractions instead of exposing “some SPI radio” as a custom API.
 
-The useful mental model is that `cfg80211` is a contract between your driver and the Linux wireless stack. The driver has to describe what the radio can do, create the objects Linux expects, and implement the operations Linux will call for scan, connect, disconnect, and regulatory handling.
+The useful mental model is that `cfg80211` is a **contract between your driver and the Linux wireless stack**. The driver has to describe what the radio can do, create the objects Linux expects, and implement the operations Linux will call for scan, connect, disconnect, and regulatory handling.
 
 That is why `wlan0` appearing is a strong signal. It means the code has progressed far beyond transport bring-up and into successful subsystem registration, where the kernel now believes there is a manageable wireless interface that userspace tools can operate on normally.
 
@@ -64,7 +64,7 @@ The logic is:
 4. host initializes the Linux-facing interface layer
 5. the Wi-Fi side gets registered
 
-This is what turns “working protocol” into “working Linux network interface.”
+This is what turns **“working protocol” into “working Linux network interface.”**
 
 Here is the exact orchestration in `main.c`:
 
@@ -119,7 +119,7 @@ That is the moment where the code requests a normal Linux wireless interface.
 That one call is a great Embedded Linux lesson:
 
 - the transport does not expose raw packets to userspace directly
-- the driver translates the remote radio into a standard Linux interface model
+- the driver **translates the remote radio into a standard Linux interface model**
 
 That is why `nmcli`, `iw`, and other tools can work.
 
@@ -221,7 +221,7 @@ struct wireless_dev *esp_cfg80211_add_iface(struct wiphy *wiphy,
 }
 ```
 
-That is the Embedded Linux pattern worth learning:
+That is the **Embedded Linux pattern worth learning**:
 
 - build a standard subsystem object locally
 - synchronize it with the remote device through command messages
@@ -265,7 +265,7 @@ you are indirectly testing:
 - command message flow to the ESP
 - event and response handling back into Linux
 
-So a Wi-Fi scan is not “just a user command.” It is a full end-to-end test of:
+So a Wi-Fi scan is not “just a user command.” It is a **full end-to-end test** of:
 
 - Linux subsystem registration
 - transport reliability

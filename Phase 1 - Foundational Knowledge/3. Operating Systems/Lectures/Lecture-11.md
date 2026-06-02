@@ -26,7 +26,7 @@ A **deadlock** is a state where a set of processes are each waiting for a resour
 
 ## Coffman Conditions
 
-All four conditions must hold simultaneously for a deadlock to be possible. Breaking any single one prevents deadlock.
+**All four conditions must hold simultaneously** for a deadlock to be possible. **Breaking any single one prevents deadlock.**
 
 | Condition | Definition |
 |---|---|
@@ -95,7 +95,7 @@ Recovery options after detection:
 
 ## Priority Inversion
 
-Priority inversion occurs when a high-priority task `H` is effectively blocked by a medium-priority task `M` through an indirect chain involving a shared resource.
+**Priority inversion** occurs when a high-priority task `H` is **effectively blocked by a medium-priority task** `M` through an indirect chain involving a **shared resource**.
 
 ### Mechanism
 
@@ -119,7 +119,7 @@ The inversion unfolds in four steps:
   Duration of inversion: unbounded (as long as M runs)
 ```
 
-Effective priority of `H` is inverted to below `M`'s level for the entire duration of `M`'s execution. Duration of inversion is **unbounded** without PI.
+Effective priority of `H` is **inverted to below `M`'s level** for the entire duration of `M`'s execution. Duration of inversion is **unbounded** without PI.
 
 > **Key Insight:** Priority inversion does not require any bug in the individual tasks. L, M, and H are all behaving correctly according to their own logic. The failure is systemic: the interaction of correct behaviors produces an emergent incorrect outcome. This is why it is so dangerous — code review alone cannot catch it.
 
@@ -127,7 +127,7 @@ Effective priority of `H` is inverted to below `M`'s level for the entire durati
 
 ## Mars Pathfinder Case Study (1997)
 
-The Mars Pathfinder rover experienced periodic system resets approximately 18 hours after landing on the Martian surface. This case study is required reading in every safety-critical system design course because the bug was discovered 140 million km away.
+The Mars Pathfinder rover experienced **periodic system resets** approximately 18 hours after landing on the Martian surface. This case study is **required reading** in every safety-critical system design course because the bug was discovered 140 million km away.
 
 **Root cause: unbounded priority inversion**
 
@@ -192,7 +192,7 @@ pthread_mutex_init(&mutex, &attr);
 
 ## Priority Ceiling Protocol
 
-Each mutex is assigned a **ceiling priority** = highest priority of any task that will ever acquire it. Any task acquiring the mutex immediately runs at the ceiling priority for the duration of ownership.
+Each mutex is assigned a **ceiling priority** = highest priority of any task that will ever acquire it. Any task acquiring the mutex **immediately runs at the ceiling priority** for the duration of ownership.
 
 - Prevents priority inversion entirely without needing runtime priority discovery
 - Requires static analysis: all potential lock acquirers and their priorities must be known at design time
@@ -250,7 +250,7 @@ Enable during all development, CI, and regression testing. `lockdep` adds ~10% r
 
 ## Watchdog Timers as Last Resort
 
-Hardware or software watchdog: if a process does not kick the watchdog within the timeout period, the system resets or enters a safe state. Provides defense-in-depth against deadlocks that escape lockdep in deployed hardware.
+Hardware or software **watchdog**: if a process does not **kick the watchdog** within the timeout period, the system resets or enters a safe state. Provides **defense-in-depth** against deadlocks that escape lockdep in deployed hardware.
 
 The Mars Pathfinder watchdog worked correctly; it correctly detected `bc_dist` missing its deadline. The root problem was the missing PI configuration that caused `bc_dist` to miss the deadline in the first place.
 

@@ -203,7 +203,7 @@ Two problems for inference:
 1. The `p_i` vectors are learned per-position — sequences longer than the training context have no defined behavior.
 2. Position information mixes into the residual stream and is consumed by every downstream op including FFN — wasting bandwidth on dimensions whose only job is to say "where am I."
 
-RoPE does the opposite: **rotate Q and K only**, in place, by an angle proportional to position. The 2D rotation matrix is the high school one:
+RoPE does the opposite: **rotate Q and K only**, in place, by an angle proportional to position. The **2D rotation matrix** is the high school one:
 
 ```
 R(mθ) = [ cos(mθ)  -sin(mθ) ]
@@ -267,7 +267,7 @@ The rotation is applied to **pairs** of coordinates along the head dimension. Tw
    pair (0, d/2), (1, d/2+1), (2, d/2+2), …, (d/2-1, d-1)
 ```
 
-If your kernel was written for the original layout and you point it at a Qwen model, the math runs, no error fires, and the first ~5–10 generated tokens look plausible because position 0–10 angles are tiny and the corruption is small. Past that, the model goes off the rails. This is the canonical "passes unit tests, fails integration tests" RoPE bug.
+If your kernel was written for the original layout and you point it at a Qwen model, the math runs, **no error fires**, and the first ~5–10 generated tokens look plausible because position 0–10 angles are tiny and the corruption is small. Past that, the model goes off the rails. This is the canonical **"passes unit tests, fails integration tests"** RoPE bug.
 
 Verify by inspecting which two elements of `head_dim` your kernel multiplies by the same `cos`. If they are adjacent (indices `2i` and `2i+1`), you've got the original layout — wrong for Qwen.
 
@@ -439,7 +439,7 @@ def ffn(x, W_gate, W_up, W_down):
     return h @ W_down               # [intermediate] → [d]
 ```
 
-Three GEMVs per layer, intermediate dimension is **2.7× d_model** (Qwen3-4B: 2560 → 6912; Qwen2.5-72B: 8192 → 29568). That ratio is fixed by the choice to keep FFN-vs-attention parameter balance close to 2:1.
+**Three GEMVs per layer**, intermediate dimension is **2.7× d_model** (Qwen3-4B: 2560 → 6912; Qwen2.5-72B: 8192 → 29568). That ratio is fixed by the choice to keep FFN-vs-attention parameter balance close to 2:1.
 
 The FFN is the **larger** of the two blocks by parameter count:
 

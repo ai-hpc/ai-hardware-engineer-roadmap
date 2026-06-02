@@ -57,7 +57,7 @@ These passes work on LLVM IR and are **target-independent** — they improve the
 
 **1. Loop Vectorization (LoopVectorize)**
 
-This is the single most important pass for AI kernel performance on CPUs. It transforms scalar loops into vector operations that use SIMD hardware.
+This is the **single most important pass** for AI kernel performance on CPUs. It transforms scalar loops into **vector operations** that use SIMD hardware.
 
 ```llvm
 ; BEFORE vectorization — processes one element at a time
@@ -89,7 +89,7 @@ loop.vec:
   br i1 %cmp, label %loop.vec, label %exit
 ```
 
-The vectorizer needs to prove that iterations are independent (no loop-carried dependencies) and that memory accesses don't alias. This is why `restrict` pointers and alignment annotations matter so much for AI kernel performance.
+The vectorizer needs to prove that iterations are **independent** (no loop-carried dependencies) and that memory accesses **don't alias**. This is why `restrict` pointers and alignment annotations matter so much for AI kernel performance.
 
 **2. Loop Unrolling (LoopUnroll)**
 
@@ -168,7 +168,7 @@ loop:
 
 ## Alias Analysis: The Gatekeeper of Optimization
 
-Many critical optimizations (vectorization, load elimination, code motion) require the compiler to prove that two pointers don't refer to the same memory. This is **alias analysis**.
+Many critical optimizations (vectorization, load elimination, code motion) require the compiler to prove that **two pointers don't refer to the same memory**. This is **alias analysis**.
 
 ```llvm
 ; Can the compiler vectorize this loop?
@@ -193,7 +193,7 @@ define void @fused_relu(ptr noalias %input, ptr noalias %output, i64 %n) {
 
 ## The Backend: From LLVM IR to Machine Code
 
-The backend (code generator) transforms LLVM IR into native instructions for a specific target. This is where AI hardware engineers spend most of their time when building a compiler for a custom chip.
+The backend (code generator) transforms LLVM IR into **native instructions** for a specific target. This is where AI hardware engineers spend **most of their time** when building a compiler for a custom chip.
 
 ### Backend Pipeline
 
@@ -268,7 +268,7 @@ The scheduler uses this model to interleave loads with computes — while one MA
 
 ### Stage 3: Register Allocation
 
-Maps unlimited virtual registers to the finite physical register file. For AI accelerators with large register files (GPUs have 65536 registers per SM), register pressure is often the bottleneck — running out of registers forces values to spill to memory, which is catastrophic for performance.
+Maps unlimited virtual registers to the finite physical register file. For AI accelerators with large register files (GPUs have 65536 registers per SM), **register pressure is often the bottleneck** — running out of registers forces values to **spill to memory**, which is catastrophic for performance.
 
 | Algorithm | Speed | Code Quality | Used When |
 |---|---|---|---|

@@ -23,7 +23,7 @@ Lock-free algorithms use atomic hardware primitives to achieve safe concurrent a
 
 ## C++11/C11 Memory Model
 
-CPUs and compilers reorder instructions for performance. Without explicit ordering rules, a write in thread A may not be visible to thread B for an arbitrary time. The C11/C++11 memory model defines ordering guarantees via `std::atomic<T>` / `_Atomic T`:
+CPUs and compilers **reorder instructions** for performance. Without explicit ordering rules, a write in thread A **may not be visible** to thread B for an arbitrary time. The **C11/C++11 memory model** defines ordering guarantees via `std::atomic<T>` / `_Atomic T`:
 
 | Memory Order | Guarantee |
 |---|---|
@@ -55,7 +55,7 @@ CPUs and compilers reorder instructions for performance. Without explicit orderi
 
 ## Hardware Memory Models
 
-Different CPU architectures have different default ordering guarantees. Understanding this matters when reading Linux kernel code that uses bare memory barriers instead of C11 atomics.
+Different CPU architectures have **different default ordering guarantees**. Understanding this matters when reading Linux kernel code that uses **bare memory barriers** instead of C11 atomics.
 
 | Architecture | Memory Model | Barrier Requirement |
 |---|---|---|
@@ -68,13 +68,13 @@ Linux kernel barrier macros:
 - `smp_rmb()`: read (load) barrier only
 - `smp_wmb()`: write (store) barrier only
 
-On ARM64 (Jetson Orin, Cortex-A78AE), every acquire/release operation translates to explicit `LDAR`/`STLR` instructions. Code that runs correctly on x86-64 TSO without barriers may silently fail on ARM64 without them. Always use C11 atomics or kernel barrier macros rather than plain loads/stores for shared variables.
+On ARM64 (Jetson Orin, Cortex-A78AE), every acquire/release operation translates to explicit `LDAR`/`STLR` instructions. Code that runs correctly on x86-64 TSO without barriers **may silently fail on ARM64** without them. **Always use C11 atomics or kernel barrier macros** rather than plain loads/stores for shared variables.
 
 ---
 
 ## Atomic Operations
 
-Map to single indivisible hardware instructions: `LOCK ADD`/`XADD`/`CMPXCHG` on x86, `LDADD`/`CAS` on ARMv8.1 LSE.
+Map to **single indivisible hardware instructions**: `LOCK ADD`/`XADD`/`CMPXCHG` on x86, `LDADD`/`CAS` on ARMv8.1 LSE.
 
 ```c
 atomic_t counter = ATOMIC_INIT(0);      // initialize to zero
@@ -92,7 +92,7 @@ atomic_add_return(n, &counter);         // add n, return new value; useful for r
 
 ## Compare-and-Swap (CAS)
 
-Foundation of most lock-free data structures. CAS atomically tests a value and replaces it only if it matches — providing a "conditional write" without a lock.
+**Foundation of most lock-free data structures.** CAS atomically tests a value and **replaces it only if it matches** — providing a "conditional write" without a lock.
 
 ```cpp
 std::atomic<int> val{0};
@@ -121,7 +121,7 @@ bool ok = val.compare_exchange_strong(expected, 1,
 
 ### ABA Problem
 
-CAS sees the same value but the object was replaced: pointer A → B → A between load and CAS; CAS succeeds incorrectly.
+CAS sees the **same value but the object was replaced**: pointer A → B → A between load and CAS; **CAS succeeds incorrectly**.
 
 ```
   ABA Problem:
@@ -143,7 +143,7 @@ Solutions:
 
 ## SPSC Ring Buffer (Lock-Free)
 
-Single-producer / single-consumer ring buffer requires only `acquire`/`release` atomics on head and tail indices. No locks, no cache-line bouncing on payload data.
+**Single-producer / single-consumer** ring buffer requires only `acquire`/`release` atomics on head and tail indices. **No locks, no cache-line bouncing** on payload data.
 
 ```c
 #define N 256  // must be power of 2 for efficient modulo via bitmask
@@ -166,7 +166,7 @@ if (head != t) {                  // check if there is an item to consume
 
 The acquire-release pair on tail is the synchronization point: the producer releases ownership of the data by updating tail; the consumer acquires ownership by reading tail. No lock needed because there is exactly one writer and one reader.
 
-Throughput: limited only by memory bandwidth; no lock overhead. Used in openpilot VisionIPC for zero-copy camera frame passing from capture process to inference process at 30Hz.
+**Throughput**: limited only by memory bandwidth; **no lock overhead**. Used in openpilot VisionIPC for **zero-copy camera frame passing** from capture process to inference process at 30Hz.
 
 > **Key Insight:** The SPSC ring buffer is the canonical example of why `memory_order_acquire`/`release` exist. A `relaxed` store of tail would be atomic, but the consumer might see the updated tail *before* seeing the data written to `buf[tail%N]`. The release/acquire pair creates an explicit ordering guarantee: "the data in buf is ready by the time you see the tail increment."
 
@@ -174,7 +174,7 @@ Throughput: limited only by memory bandwidth; no lock overhead. Used in openpilo
 
 ## RCU (Read-Copy-Update)
 
-Linux kernel's primary mechanism for read-mostly shared data structures. Achieves O(1) read-side overhead: no locks, no atomics, no cache-line writes. RCU is conceptually the most powerful mechanism in this lecture.
+Linux kernel's primary mechanism for **read-mostly shared data structures**. Achieves **O(1) read-side overhead**: no locks, no atomics, no cache-line writes. RCU is conceptually the most powerful mechanism in this lecture.
 
 The librarian analogy from the overview maps directly to RCU: readers pick up the book (pointer) without asking; the librarian replaces it by placing the new edition on the shelf, then waiting until everyone reading the old edition finishes before removing it.
 
@@ -239,7 +239,7 @@ A **grace period** is the interval after `rcu_assign_pointer()` until every CPU 
 
 ### rcu_nocbs= Kernel Parameter
 
-`rcu_nocbs=<cpulist>` offloads `call_rcu` callbacks to `rcuoc` kthreads running on non-isolated CPUs. Eliminates RCU callback invocations from isolated RT or inference cores, removing a source of unpredictable latency jitter.
+`rcu_nocbs=<cpulist>` **offloads `call_rcu` callbacks** to `rcuoc` kthreads running on non-isolated CPUs. Eliminates RCU callback invocations from isolated RT or inference cores, removing a source of **unpredictable latency jitter**.
 
 > **Key Insight:** RCU's power comes from moving all overhead to the writer side. Readers are completely free: no lock, no atomic, no memory barrier. This is why RCU scales perfectly with reader count — adding more readers adds exactly zero overhead. The writer pays a grace period, but writers are rare on read-mostly structures like routing tables, process lists, and model configurations.
 
@@ -262,7 +262,7 @@ Used in kernel drivers for RX data buffers between ISR (producer) and process co
 
 ## Hazard Pointers
 
-Userspace alternative to RCU for lock-free memory reclamation:
+**Userspace alternative to RCU** for lock-free memory reclamation:
 - Reader **publishes** the pointer it is about to dereference into a per-thread hazard pointer slot
 - Before freeing, the reclaimer scans all hazard pointer slots for the pointer
 - If found, deferral is required; if not found, free is safe

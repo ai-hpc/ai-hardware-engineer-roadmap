@@ -8,7 +8,7 @@ Hardware does not wait for software to ask it questions — it signals the CPU a
 
 ## Interrupts vs Exceptions
 
-Both interrupts and exceptions cause the CPU to stop what it is doing and run kernel code, but they differ in origin and timing.
+Both **interrupts** and **exceptions** cause the CPU to stop what it is doing and run kernel code, but they differ in **origin and timing**.
 
 | Type | Origin | Synchronous? | Example |
 |---|---|---|---|
@@ -17,7 +17,7 @@ Both interrupts and exceptions cause the CPU to stop what it is doing and run ke
 | Exception (fault) | CPU detects error during instruction | Yes (sync) | Page fault, divide-by-zero, GP fault |
 | Exception (abort) | Unrecoverable hardware error | Yes (sync) | Machine check, double fault |
 
-Faults re-execute the faulting instruction after the handler resolves the error (e.g., page fault installs a PTE). Traps advance to the next instruction after the handler returns (e.g., syscall). Aborts do not return.
+**Faults** re-execute the faulting instruction after the handler resolves the error (e.g., page fault installs a PTE). **Traps** advance to the next instruction after the handler returns (e.g., syscall). **Aborts** do not return.
 
 > **Key Insight:** The distinction between "fault" and "trap" has a critical practical consequence. A page fault is a fault — the hardware re-executes the faulting memory access after the kernel installs a valid page table entry, so the user program never knows it happened. A system call is a trap — the kernel executes the service and returns to the instruction *after* the `SYSCALL` instruction. Getting this wrong in a custom exception handler means either re-executing an instruction that shouldn't be repeated, or skipping one that should.
 
@@ -35,7 +35,7 @@ Used on Jetson Orin, Qualcomm SoCs, NXP i.MX.
 | PPI (Per-CPU Private) | 16–31 | Per-core timers, PMU (performance monitoring) |
 | SPI (Shared Peripheral) | 32–1019 | All external device interrupts: cameras, GPUs, NVMe, CAN |
 
-Priority levels: 0 (highest) to 255 (lowest). CPU interface register `PMR` (Priority Mask Register) masks interrupts below a threshold — used during spinlock-held sections.
+**Priority levels**: 0 (highest) to 255 (lowest). CPU interface register `PMR` (Priority Mask Register) masks interrupts below a threshold — used during spinlock-held sections.
 
 ```c
 gic_send_sgi(target_cpu, sgi_id);  /* trigger IPI from kernel/smp.c */
@@ -54,7 +54,7 @@ gic_send_sgi(target_cpu, sgi_id);  /* trigger IPI from kernel/smp.c */
 
 Legacy wire-based IRQs share physical lines, limiting parallelism. PCIe **MSI** (Message Signaled Interrupts) replaces line assertion with a **memory write to a special MMIO address** — the CPU's APIC/GIC interprets the write as an interrupt.
 
-Think of legacy IRQ lines as a single shared phone line — only one caller at a time. MSI-X gives each device queue its own dedicated phone line with a dedicated recipient CPU.
+Think of legacy IRQ lines as a single **shared phone line** — only one caller at a time. **MSI-X** gives each device queue its own **dedicated phone line** with a dedicated recipient CPU.
 
 | Feature | MSI | MSI-X |
 |---|---|---|
@@ -79,7 +79,7 @@ cat /proc/interrupts | grep nvme     # per-queue NVMe completion counts
 
 ## Interrupt Handling Flow
 
-The full path from hardware event to kernel handler is deterministic and takes the same path every time. Understanding this path helps you instrument the right points for latency measurement.
+The full path from hardware event to kernel handler is **deterministic** and takes the same path every time. Understanding this path helps you instrument the right points for **latency measurement**.
 
 ```
 Hardware Interrupt Flow — Full Path
@@ -139,7 +139,7 @@ The numbered sequence in detail:
 | Top half (hardirq / ISR) | IRQs disabled on local CPU | No | Acknowledge hardware; schedule deferred work; must complete in < 1 µs ideal |
 | Bottom half | IRQs re-enabled | Depends on mechanism | Process data; wake waiters; do actual work |
 
-The ISR must be minimal: acknowledge the interrupt controller, save a pointer to received data, and schedule a bottom half. All I/O processing happens in bottom halves.
+The **ISR must be minimal**: acknowledge the interrupt controller, save a pointer to received data, and schedule a bottom half. All I/O processing happens in **bottom halves**.
 
 > **Key Insight:** The reason the top half must be short is that while it runs, the local CPU cannot receive any other interrupts (they are disabled). If a camera frame ISR takes 100 µs to process a frame, no other interrupts on that CPU can be acknowledged during that window — including the scheduler tick, which means other RT tasks cannot be woken. Long ISRs create latency bubbles that appear as mysterious delays in completely unrelated processes.
 
@@ -147,7 +147,7 @@ The ISR must be minimal: acknowledge the interrupt controller, save a pointer to
 
 ## Bottom-Half Mechanisms
 
-There are three main bottom-half mechanisms in Linux, with different tradeoffs between latency, flexibility, and compatibility. Choosing the right one matters for driver correctness and performance.
+There are three main **bottom-half mechanisms** in Linux, with different tradeoffs between latency, flexibility, and compatibility. Choosing the right one matters for **driver correctness and performance**.
 
 ### Softirqs
 
@@ -168,7 +168,7 @@ raise_softirq(NET_RX_SOFTIRQ);   /* schedule NET_RX softirq from ISR */
 
 ### Workqueues
 
-Deferred work executed in kernel threads (`kworker/N:M`). Process context — can sleep, allocate memory, take mutexes.
+Deferred work executed in **kernel threads** (`kworker/N:M`). **Process context** — can sleep, allocate memory, take mutexes.
 
 ```c
 INIT_WORK(&work, handler_fn);         /* initialize work item; binds handler function */
@@ -233,7 +233,7 @@ echo 8 > /proc/irq/42/smp_affinity   # pin IRQ 42 to CPU 3
 systemctl stop irqbalance             # prevent irqbalance from overriding manual settings
 ```
 
-Pinning a GPU MSI-X completion vector to the same core as the CUDA stream management thread eliminates cross-core wakeup latency of 10–50 µs. Camera frame-done IRQs should be pinned away from RT inference cores to prevent ISR execution interfering with deadline tasks.
+Pinning a GPU MSI-X completion vector to the same core as the CUDA stream management thread eliminates **cross-core wakeup latency** of 10–50 µs. Camera frame-done IRQs should be **pinned away from RT inference cores** to prevent ISR execution interfering with deadline tasks.
 
 > **Common Pitfall:** `irqbalance` is a daemon that automatically redistributes IRQs across CPUs to balance load. It will override any manual `smp_affinity` settings periodically. Always stop `irqbalance` before manually pinning IRQs on a production inference system. Use `irqbalance --banirq=N` to exclude specific IRQs from balancing if you need partial manual control.
 
@@ -250,7 +250,7 @@ For network and high-bandwidth devices, firing one interrupt per packet is unsus
 3. **`poll()` runs in softirq context**, drains the queue in a loop (up to budget packets).
 4. **Queue drained** → re-enable interrupts for this queue.
 
-This amortizes the interrupt overhead across many packets. The tradeoff is latency: the first packet after re-enabling interrupts may wait until the next interrupt.
+This **amortizes the interrupt overhead** across many packets. The tradeoff is **latency**: the first packet after re-enabling interrupts may wait until the next interrupt.
 
 Tradeoff: coalescing adds latency (up to `ethtool -C eth0 rx-usecs`) but dramatically reduces interrupt overhead at high packet rates. Relevant for multi-camera Ethernet (GigE Vision) and RDMA NIC configurations in AI server racks.
 

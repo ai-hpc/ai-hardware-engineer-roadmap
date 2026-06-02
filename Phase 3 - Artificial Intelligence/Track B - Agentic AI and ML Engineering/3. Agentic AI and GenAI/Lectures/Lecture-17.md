@@ -6,7 +6,7 @@
 
 ## Why this lecture exists
 
-As soon as you run more than one agent in one product, isolation becomes a core design problem.
+As soon as you run more than one agent in one product, **isolation** becomes a core design problem.
 
 You need to decide:
 
@@ -62,9 +62,9 @@ One agent is a full scoped unit with its own:
 
 That is a much stronger definition than most tutorials use.
 
-This matters because once you accept that definition, you stop designing agents as loose prompt templates.
+This matters because once you accept that definition, you stop designing agents as **loose prompt templates**.
 
-You start designing them as isolated application units.
+You start designing them as **isolated application units**.
 
 ---
 
@@ -94,7 +94,7 @@ Typical workspace files include:
 
 This is a useful pattern even outside OpenClaw.
 
-It teaches that agent behavior should not live only in code. It should also have structured operating files.
+It teaches that agent behavior should not live only in code. It should also have **structured operating files**.
 
 ---
 
@@ -117,12 +117,12 @@ This is exactly the kind of nuance students miss when they think:
 
 No.
 
-Isolation requires explicit sandboxing or equivalent runtime controls.
+Isolation requires **explicit sandboxing** or equivalent runtime controls.
 
 This is a powerful teaching example because it forces students to distinguish:
 
-- convenience boundary
-- security boundary
+- **convenience boundary**
+- **security boundary**
 
 Those are not the same thing.
 
@@ -144,7 +144,7 @@ The place for agent-specific runtime data such as auth profiles and configuratio
 
 The place where conversation history and routing state live.
 
-This separation is good engineering because it prevents everything from collapsing into one unclear folder.
+This separation is **good engineering** because it prevents everything from collapsing into one unclear folder.
 
 When students build their own agents, they should copy this separation:
 
@@ -175,7 +175,7 @@ Collisions can happen in:
 - tool configuration
 - file outputs
 
-If you want separate agents, give them separate homes.
+If you want separate agents, give them **separate homes**.
 
 Example bad design:
 
@@ -218,7 +218,7 @@ OpenClaw is especially useful here because it shows several memory ideas:
 
 This is exactly how modern agent systems behave:
 
-memory is not one thing.
+memory is **not one thing**.
 
 There is:
 
@@ -232,9 +232,9 @@ The production lesson is:
 
 > every memory path should be explicit
 
-If cross-agent memory is allowed, it should be configured intentionally.
+If cross-agent memory is allowed, it should be **configured intentionally**.
 
-If it is not intentional, it should not happen by accident.
+If it is not intentional, it should not happen **by accident**.
 
 ---
 
@@ -244,7 +244,7 @@ OpenClaw's `active-memory` concept is very educational.
 
 The idea is simple:
 
-Instead of waiting for the main agent to decide when to search memory, a bounded memory sub-agent runs before the main reply and surfaces relevant memory.
+Instead of waiting for the main agent to decide when to search memory, a **bounded memory sub-agent** runs before the main reply and surfaces relevant memory.
 
 This teaches two important lessons.
 
@@ -271,7 +271,7 @@ It is:
 
 That is good design.
 
-If you add helper agents, they should have tight scope and purpose.
+If you add helper agents, they should have **tight scope and purpose**.
 
 ---
 
@@ -385,7 +385,7 @@ For each one, define:
 
 This exercise should make one thing clear:
 
-multi-agent design is mostly about boundaries and responsibilities.
+multi-agent design is mostly about **boundaries and responsibilities**.
 
 ---
 
