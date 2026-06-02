@@ -884,22 +884,27 @@
    ════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Crisp modern native font stack (replaces Helvetica/Arial) */
-  --md-text-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Inter", "Helvetica Neue", Arial, sans-serif;
+  /* Inter — purpose-built for on-screen reading — with a native fallback stack.
+     Inter is loaded by Material via mkdocs.yml (font.text: Inter). */
+  --md-text-font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 /* Comfortable body rhythm — ChatGPT-style generous spacing for long-form reading */
 .md-typeset {
   font-size: 0.83rem;
   line-height: 1.9;
+  font-weight: 350;            /* lighter normal weight for a cleaner read */
+  letter-spacing: 0.003em;     /* a hair of tracking keeps thin text crisp */
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
+/* Keep body prose (paragraphs, lists) light; headings/bold/tables set their own weight */
 .md-typeset p,
 .md-typeset li {
   line-height: 1.9;
+  font-weight: 350;
 }
 
 .md-typeset p {

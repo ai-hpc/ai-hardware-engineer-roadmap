@@ -28,7 +28,9 @@ theme:
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
-  font: false
+  font:
+    text: Inter
+    code: JetBrains Mono
   features:
     - navigation.tabs
     - navigation.tabs.sticky
