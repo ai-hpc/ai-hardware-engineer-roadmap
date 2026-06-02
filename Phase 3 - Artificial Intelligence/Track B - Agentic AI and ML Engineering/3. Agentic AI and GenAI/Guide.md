@@ -26,48 +26,35 @@
 
 **Course currency note:** exact model names, context windows, SDK features, and pricing change quickly. This module teaches stable interfaces and system patterns: model APIs, tool protocols, runtime loops, workflow graphs, gateways, telemetry, and policy boundaries. Always check provider documentation before copying model IDs or prices into a real deployment.
 
+<div class="lecture-map" markdown>
+
 | # | Lecture | # | Lecture |
 |---|---------|---|---------|
-| [01](Lectures/Lecture-01.md) | LLM Fundamentals | [07](Lectures/Lecture-07.md) | Agent SDKs |
-| [02](Lectures/Lecture-02.md) | Prompt Engineering | [08](Lectures/Lecture-08.md) | Multi-Agent Systems |
-| [03](Lectures/Lecture-03.md) | Tool Use | [09](Lectures/Lecture-09.md) | RAG — Ingestion |
-| [04](Lectures/Lecture-04.md) | Agent Architecture | [10](Lectures/Lecture-10.md) | RAG — Retrieval |
-| [05](Lectures/Lecture-05.md) | Memory Systems | [11](Lectures/Lecture-11.md) | Evaluation |
-| [06](Lectures/Lecture-06.md) | LangGraph | [12](Lectures/Lecture-12.md) | Production |
-|  |  | [13](Lectures/Lecture-13.md) | Runtime Discipline |
-|  |  | [14](Lectures/Lecture-14.md) | Deterministic Startup |
-|  |  | [15](Lectures/Lecture-15.md) | OpenClaw Gateway |
-|  |  | [16](Lectures/Lecture-16.md) | Routing and Sessions |
-|  |  | [17](Lectures/Lecture-17.md) | Isolation and Memory |
-|  |  | [18](Lectures/Lecture-18.md) | Operations and Security |
-|  |  | [19](Lectures/Lecture-19.md) | Agent Loop |
-|  |  | [20](Lectures/Lecture-20.md) | Cron and Scheduled Agent Runs |
-|  |  | [21](Lectures/Lecture-21.md) | System Prompt Architecture |
-|  |  | [22](Lectures/Lecture-22.md) | App SDK and Typed RPCs |
-|  |  | [23](Lectures/Lecture-23.md) | Gateway RPC Protocol |
-|  |  | [24](Lectures/Lecture-24.md) | Agent Harness |
-|  |  | [24b](Lectures/Lecture-24b.md) | Event-Sourced Agent State |
-|  |  | [25](Lectures/Lecture-25.md) | OpenCoven Workspace |
-|  |  | [26](Lectures/Lecture-26.md) | OpenKnots Interfaces |
-|  |  | [27](Lectures/Lecture-27.md) | Agent Security Engineer |
-|  |  | [28](Lectures/Lecture-28.md) | Pi Minimal Agent |
-|  |  | [29](Lectures/Lecture-29.md) | Agent Skills |
-|  |  | [30](Lectures/Lecture-30.md) | Agentic SDLC |
-|  |  | [31](Lectures/Lecture-31.md) | Runtime Strategy |
-|  |  | [32](Lectures/Lecture-32.md) | LLM From Scratch |
-|  |  | [33](Lectures/Lecture-33.md) | Structured Tools |
-|  |  | [34](Lectures/Lecture-34.md) | Multimodal Sub-Agents |
-|  |  | [35](Lectures/Lecture-35.md) | GPU Kernel Translation |
-|  |  | [36](Lectures/Lecture-36.md) | FP8 KV-Cache |
-|  |  | [37](Lectures/Lecture-37.md) | TraceLens |
-|  |  | [38](Lectures/Lecture-38.md) | AutoSP |
-|  |  | [39](Lectures/Lecture-39.md) | Agent Skills Eval |
-|  |  | [40](Lectures/Lecture-40.md) | ZAYA1-8B |
-|  |  | [41](Lectures/Lecture-41.md) | OpenClaw Threat Model |
-|  |  | [42](Lectures/Lecture-42.md) | OpenAI Agents SDK |
-|  |  | [43](Lectures/Lecture-43.md) | MLSys Kernel Contest |
-|  |  | [44](Lectures/Lecture-44.md) | Efficient Local RAG |
-|  |  | [45](Lectures/Lecture-45.md) | Vector Stores and Embeddings |
+| [01](Lectures/Lecture-01.md) | LLM Fundamentals | [24](Lectures/Lecture-24.md) | Agent Harness |
+| [02](Lectures/Lecture-02.md) | Prompt Engineering | [24b](Lectures/Lecture-24b.md) | Event-Sourced Agent State |
+| [03](Lectures/Lecture-03.md) | Tool Use | [25](Lectures/Lecture-25.md) | OpenCoven Workspace |
+| [04](Lectures/Lecture-04.md) | Agent Architecture | [26](Lectures/Lecture-26.md) | OpenKnots Interfaces |
+| [05](Lectures/Lecture-05.md) | Memory Systems | [27](Lectures/Lecture-27.md) | Agent Security Engineer |
+| [06](Lectures/Lecture-06.md) | LangGraph | [28](Lectures/Lecture-28.md) | Pi Minimal Agent |
+| [07](Lectures/Lecture-07.md) | Agent SDKs | [29](Lectures/Lecture-29.md) | Agent Skills |
+| [08](Lectures/Lecture-08.md) | Multi-Agent Systems | [30](Lectures/Lecture-30.md) | Agentic SDLC |
+| [09](Lectures/Lecture-09.md) | RAG — Ingestion | [31](Lectures/Lecture-31.md) | Runtime Strategy |
+| [10](Lectures/Lecture-10.md) | RAG — Retrieval | [32](Lectures/Lecture-32.md) | LLM From Scratch |
+| [11](Lectures/Lecture-11.md) | Evaluation | [33](Lectures/Lecture-33.md) | Structured Tools |
+| [12](Lectures/Lecture-12.md) | Production | [34](Lectures/Lecture-34.md) | Multimodal Sub-Agents |
+| [13](Lectures/Lecture-13.md) | Runtime Discipline | [35](Lectures/Lecture-35.md) | GPU Kernel Translation |
+| [14](Lectures/Lecture-14.md) | Deterministic Startup | [36](Lectures/Lecture-36.md) | FP8 KV-Cache |
+| [15](Lectures/Lecture-15.md) | OpenClaw Gateway | [37](Lectures/Lecture-37.md) | TraceLens |
+| [16](Lectures/Lecture-16.md) | Routing and Sessions | [38](Lectures/Lecture-38.md) | AutoSP |
+| [17](Lectures/Lecture-17.md) | Isolation and Memory | [39](Lectures/Lecture-39.md) | Agent Skills Eval |
+| [18](Lectures/Lecture-18.md) | Operations and Security | [40](Lectures/Lecture-40.md) | ZAYA1-8B |
+| [19](Lectures/Lecture-19.md) | Agent Loop | [41](Lectures/Lecture-41.md) | OpenClaw Threat Model |
+| [20](Lectures/Lecture-20.md) | Cron and Scheduled Agent Runs | [42](Lectures/Lecture-42.md) | OpenAI Agents SDK |
+| [21](Lectures/Lecture-21.md) | System Prompt Architecture | [43](Lectures/Lecture-43.md) | MLSys Kernel Contest |
+| [22](Lectures/Lecture-22.md) | App SDK and Typed RPCs | [44](Lectures/Lecture-44.md) | Efficient Local RAG |
+| [23](Lectures/Lecture-23.md) | Gateway RPC Protocol | [45](Lectures/Lecture-45.md) | Vector Stores and Embeddings |
+
+</div>
 
 **Labs:** [Lab 01 — Research Agent](Lectures/Lab-01-Research-Agent.md) · [Lab 02 — Multi-Agent Pipeline](Lectures/Lab-02-Multi-Agent-Pipeline.md) · [Lab 03 — Production RAG](Lectures/Lab-03-Production-RAG.md) · [Lab 04 — TokenJuice Output Compaction](Lectures/Lab-04-TokenJuice-Output-Compaction.md) · [Lab 05 — OpenMeow App SDK Dogfood](Lectures/Lab-05-OpenMeow-App-SDK-Dogfood.md)
 

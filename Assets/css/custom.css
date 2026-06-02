@@ -967,6 +967,17 @@
   background: var(--md-default-fg-color--lightest);
 }
 
+/* Compact lecture-map / index tables — noticeably smaller font + tighter cells.
+   Wrap a table in <div class="lecture-map" markdown> … </div> to opt in. */
+.md-typeset .lecture-map table:not([class]) {
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+.md-typeset .lecture-map table:not([class]) th,
+.md-typeset .lecture-map table:not([class]) td {
+  padding: 0.26rem 0.55rem;
+}
+
 /* Dark-mode: keep body text comfortably legible (not washed out) */
 [data-md-color-scheme="slate"] .md-typeset {
   color: rgba(236, 240, 248, 0.9);
