@@ -1,28 +1,22 @@
-# Lecture 21 - OpenClaw Case Study: System Prompt Architecture
+# Lecture 21 - Agent Skills: Workflow Discipline for Reliable Coding Agents
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 20](Lecture-20.md) | **Next:** [Lecture 22](Lecture-22.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 20](Lecture-20.md) | **Next:** [Lecture 22](Lecture-22.md)
 
 ---
 
-Modern agent systems are not controlled by **one short prompt**.
+Modern coding agents can **generate code quickly**.
 
-They are controlled by a **prompt assembly system**.
+That is not the same as **doing engineering work correctly**.
 
-That system decides:
+The useful mental model:
 
-- what identity the agent receives
-- what tools it knows how to use
-- what workspace context is injected
-- what safety guidance is present
-- what provider-specific tuning is added
-- what should stay stable for prompt caching
-- what should stay out of the prompt and be enforced by runtime policy
+```text
+Agents optimize for "done."
+Senior engineers optimize for correct, reviewable, and safe.
+Agent skills encode the missing senior-engineering process.
+```
 
-This lecture uses OpenClaw's system prompt design as the case study.
-
-The important lesson is:
-
-> a production agent should not depend on a random provider default prompt; it should have an owned, inspectable, versioned prompt assembled by the application runtime
+This lecture uses Addy Osmani's Agent Skills work as a reference pattern and adapts it to OpenClaw-style harnesses, local-first agents, on-device AI, and hardware bring-up workflows.
 
 ---
 
@@ -30,795 +24,555 @@ The important lesson is:
 
 By the end of this lecture, you should be able to:
 
-1. Explain why OpenClaw owns the system prompt instead of using provider defaults.
-2. Describe the major sections of an OpenClaw-style system prompt.
-3. Understand full, minimal, and none prompt modes.
-4. Explain how bootstrap files become Project Context.
-5. Understand why skills are listed compactly and loaded on demand.
-6. Separate advisory prompt safety from hard runtime enforcement.
-7. Design a cache-aware provider overlay.
-8. Inspect prompt size and context injection when debugging an agent.
+1. Explain why agent skills are workflows, not knowledge dumps.
+2. Design a skill with triggers, checkpoints, evidence, and exit criteria.
+3. Use anti-rationalization tables to prevent shortcut behavior.
+4. Apply progressive disclosure so agents load only relevant workflows.
+5. Separate soft skill guidance from hard runtime enforcement.
+6. Map skills into OpenClaw-style prompts, hooks, tools, sessions, and artifacts.
+7. Write skills for coding, hardware bring-up, and on-device AI work.
 
 ---
 
-## 1. Simple mental model
+## 1. Why agents fail in practice
 
-Think of a serious agent as a **field engineer**.
+Agents often fail because they skip **invisible engineering work**:
 
-Before the engineer starts work, you do not just say:
-
-```text
-Be helpful.
-```
-
-You give them an operating binder:
-
-```text
-Who you are.
-How to talk to users.
-How to use tools.
-Which workspace you are in.
-What files contain project context.
-What policies you must follow.
-When to ask for help.
-How to report completion.
-```
-
-In OpenClaw, the **system prompt** is that operating binder.
-
-It is assembled before each agent run.
-
-```text
-agent request
-  -> resolve agent/session/workspace
-  -> assemble OpenClaw-owned system prompt
-  -> inject bootstrap context and skills list
-  -> apply provider-specific small overlays
-  -> run model
-```
-
-The model does not invent the operating binder.
-
-OpenClaw builds it.
-
----
-
-## 2. Why OpenClaw owns the system prompt
-
-A provider default prompt is useful for a **generic chat product**.
-
-It is not enough for a product that has:
-
-- tools
-- sessions
-- workspaces
-- sub-agents
-- cron jobs
-- long-running processes
-- provider plugins
-- local docs
-- memory files
-- sandbox behavior
-- gateway commands
-- user-specific persona files
-
-OpenClaw owns the prompt so that behavior is **consistent across models and providers**.
-
-The system can say:
-
-- "This is how OpenClaw agents use tools."
-- "This is where local docs live."
-- "This is the workspace."
-- "This is how sub-agents should be used."
-- "This is what bootstrap context was injected."
-- "This is what safety means in this runtime."
-
-The provider still matters, but the product owns the **agent contract**.
-
----
-
-## 3. The fixed prompt spine
-
-OpenClaw uses compact, structured sections.
-
-The exact wording may evolve, but the architecture is stable.
-
-An OpenClaw-style prompt looks like this:
-
-```text
-Identity
-Tooling
-Execution Bias
-Safety
-Skills
-OpenClaw Self-Update
-Workspace
-Documentation
-Project Context
-Sandbox
-Current Date & Time
-Reply Tags
-Heartbeats
-Runtime
-Reasoning
-Provider additions
-```
-
-The point is not to make the prompt long.
-
-The point is to make it **predictable**.
-
-Each section has one job.
-
----
-
-## 4. Tooling section
-
-The Tooling section teaches the model **how work should be done** inside this runtime.
-
-It covers patterns such as:
-
-- use structured tools instead of pretending to act
-- prefer `cron` for future follow-ups instead of sleep loops
-- use process tools for long-running commands and logs
-- use sub-agents for larger parallel work
-- do not poll sub-agents in tight loops
-- use `update_plan` only when it is enabled and useful
-
-This section is important because tool-using agents often fail in boring ways:
-
-- they say they did something but did not call the tool
-- they start a long process and lose the logs
-- they sleep inside a command instead of scheduling future work
-- they spawn too many agents for simple work
-- they update a plan repeatedly without doing work
-
-The Tooling section converts product expectations into **model-facing habits**.
-
----
-
-## 5. Execution Bias section
-
-Execution Bias is the **"finish the work"** section.
-
-It gives compact follow-through guidance:
-
-- act within the current turn when the request is actionable
-- continue until done or genuinely blocked
-- recover when a tool result is weak
-- check mutable state live instead of assuming
-- verify before finalizing
-
-This section exists because many models default to **advice**.
-
-A production engineering agent often needs **action**.
-
-Compare:
-
-```text
-Weak behavior:
-"You could run the tests."
-
-OpenClaw-style behavior:
-"Run the tests, inspect the failure, patch the issue, rerun verification, then summarize."
-```
-
-Execution Bias does not mean reckless automation.
-
-It means the agent should **carry work through the runtime loop** when it has enough permission and context.
-
----
-
-## 6. Safety section
-
-The Safety section is intentionally brief.
-
-It tells the model not to bypass oversight, escalate privileges improperly, hide risky behavior, or seek control outside the user intent.
-
-But this is a key production lesson:
-
-> prompt safety is advisory; runtime enforcement is mandatory
-
-The system prompt can ask the model to behave safely.
-
-Hard enforcement must come from:
-
-- tool policy
-- exec approvals
-- sandboxing
-- filesystem boundaries
-- channel allowlists
-- identity and permission checks
-- audit logs
-
-If a command must never run, do not merely write "do not run it" in a prompt.
-
-Block it in the **tool layer**.
-
----
-
-## 7. Skills section
-
-OpenClaw can inject a compact list of available skills.
-
-The prompt does not paste every skill into the context.
-
-It lists:
-
-- skill name
-- short description
-- location
-
-Then the model is instructed to read the relevant `SKILL.md` only when needed.
-
-That is the correct architecture.
-
-Bad pattern:
-
-```text
-Paste every skill file into every run.
-```
-
-Good pattern:
-
-```text
-List available skills compactly.
-Load the matching skill on demand.
-```
-
-This avoids **token bloat** and keeps unrelated skills from polluting the run.
-
-Skills have their own sizing budget:
-
-- global default: `skills.limits.maxSkillsPromptChars`
-- per-agent override: `agents.list[].skillsLimits.maxSkillsPromptChars`
-
-This is separate from other runtime context limits.
-
-That separation matters because a skills list and a workspace bootstrap file are different kinds of context.
-
----
-
-## 8. OpenClaw Self-Update section
-
-OpenClaw can expose tools for safely inspecting and changing its own configuration.
-
-The prompt teaches a controlled path:
-
-```text
-config.schema.lookup
-config.patch
-config.apply
-update.run
-```
-
-The model should inspect the schema before changing config.
-
-It should patch narrowly.
-
-It should apply through the supported gateway tool.
-
-It should not rewrite protected execution policy keys casually.
-
-This is a useful pattern for any self-modifying agent system:
-
-> self-update should be schema-driven, narrow, logged, and guarded
-
-Do not give an agent **raw config file mutation** and hope the prompt keeps it safe.
-
----
-
-## 9. Workspace and documentation sections
-
-The Workspace section tells the agent where it is operating.
-
-It usually reflects:
-
-```text
-agents.defaults.workspace
-```
-
-The Documentation section tells the agent where local OpenClaw docs live and encourages consulting them first.
-
-This is a subtle but important production pattern.
-
-For a tool-rich local assistant, local docs are often **more accurate than memory**.
-
-The prompt should point the model to the local source of truth:
-
-```text
-If you need OpenClaw behavior, inspect local docs first.
-Then act.
-```
-
----
-
-## 10. Project Context and bootstrap files
-
-OpenClaw appends selected workspace files under Project Context.
-
-These are bootstrap files such as:
-
-- `AGENTS.md`
-- `SOUL.md`
-- `TOOLS.md`
-- `IDENTITY.md`
-- `USER.md`
-- `HEARTBEAT.md`
-- `BOOTSTRAP.md`
-- `MEMORY.md`
-
-The goal is simple:
-
-> important identity and project context should be present without requiring the model to remember to read it
-
-Example:
-
-```text
-Project Context
-  AGENTS.md -> project rules
-  SOUL.md -> personality and voice
-  TOOLS.md -> custom workspace tool guidance
-  USER.md -> user preferences
-  MEMORY.md -> durable compact memory
-```
-
-This is powerful, but it has a **cost**.
-
-Large bootstrap files increase:
-
-- prompt size
-- compaction pressure
-- latency
-- cache invalidation risk
-- irrelevant context exposure
-
-So OpenClaw trims injection.
-
-Documented defaults include:
-
-- per-file max: `agents.defaults.bootstrapMaxChars`, default `12000`
-- total injected max: `agents.defaults.bootstrapTotalMaxChars`, default `60000`
-- truncation warning: `agents.defaults.bootstrapPromptTruncationWarning`, default `once`
-
-The practical rule:
-
-> bootstrap files should be concise operating context, not a dumping ground
-
----
-
-## 11. Memory files
-
-`MEMORY.md` can be injected as bootstrap context.
-
-Daily memory files under `memory/*.md` are different.
-
-They are not normally injected by default.
-
-They are accessed on demand through memory tools such as:
-
-```text
-memory_search
-memory_get
-```
-
-This keeps normal runs **small**.
-
-Recent daily memory may be prepended once in special bare `/new` or `/reset` turns, but it is not the default for every run.
-
-This is the right tradeoff:
-
-- durable compact memory can be prompt context
-- large daily logs should be retrieved only when relevant
-
----
-
-## 12. Prompt modes
-
-OpenClaw supports multiple prompt modes.
-
-### Full mode
-
-Full mode is the default.
-
-It includes the main sections:
-
-- Tooling
-- Execution Bias
-- Safety
-- Skills
-- OpenClaw Self-Update
-- Workspace
-- Documentation
-- Project Context
-- Sandbox
-- Current Date and Time
-- Reply Tags
-- Heartbeats
-- Runtime
-- Reasoning
-
-Use full mode for the main interactive agent.
-
-### Minimal mode
-
-Minimal mode is used for **sub-agents**.
-
-It keeps the **essential runtime contract** but omits context that would bloat or confuse a delegated worker.
-
-It omits sections like:
-
-- Skills
-- Memory Recall
-- OpenClaw Self-Update
-- Model Aliases
-- User Identity
-- Reply Tags
-- Messaging
-- Silent Replies
-- Heartbeats
-
-It keeps sections like:
-
-- Tooling
-- Safety
-- Workspace
-- Sandbox
-- Current Date and Time
-- Runtime
-- injected context
-
-In minimal mode, injected prompts are labeled **Subagent Context** instead of **Group Chat Context**.
-
-The idea is:
-
-> a sub-agent needs enough context to do its bounded task, not the entire personality and memory system of the main assistant
-
-### None mode
-
-None mode returns only the **base identity line**.
-
-Use it rarely.
-
-It is useful for tests or cases where the caller wants almost no runtime prompt material.
-
----
-
-## 13. Sub-agent bootstrap behavior
-
-Sub-agent sessions inject less context.
-
-OpenClaw limits sub-agent bootstrap to:
-
-- `AGENTS.md`
-- `TOOLS.md`
-
-This is intentional.
-
-A sub-agent should know project rules and tool rules.
-
-It usually does not need the full user profile, memory, heartbeat behavior, or self-update instructions.
-
-This keeps delegated work **cheaper and less noisy**.
-
----
-
-## 14. Time handling and prompt-cache stability
-
-The Current Date and Time section is designed carefully.
-
-It includes timezone and time-format guidance.
-
-It avoids injecting a live clock into every prompt.
-
-Why?
-
-Because a live timestamp **changes every run**.
-
-Changing every run can **hurt prompt caching**.
-
-So OpenClaw keeps the prompt-cache boundary stable and tells the model how to get exact time when needed.
-
-When the exact timestamp matters, use:
-
-```text
-session_status
-```
-
-Relevant config keys:
-
-- `agents.defaults.userTimezone`
-- `agents.defaults.timeFormat`
-
-This is a strong production lesson:
-
-> do not put high-churn values into the stable prompt unless the model truly needs them every turn
-
----
-
-## 15. Provider tuning and cache-aware overlays
-
-Provider plugins are allowed to contribute small additions.
-
-They should not replace the whole OpenClaw system prompt.
-
-Provider plugins can:
-
-- replace named core sections such as `interaction_style`
-- replace `tool_call_style`
-- replace `execution_bias`
-- inject a stable prefix above the prompt-cache boundary
-- inject a dynamic suffix below the prompt-cache boundary
-
-This gives **model-family tuning** without losing product control.
-
-Example:
-
-```text
-OpenClaw core prompt:
-  stable runtime behavior
-
-Provider overlay:
-  small model-family guidance for GPT-5, Claude, local models, etc.
-```
-
-The OpenAI GPT-5 family overlay is described as keeping core execution rules small while adding guidance such as:
-
-- persona latching
-- concise output
-- tool discipline
-- parallel lookup
-- deliverable coverage
-- verification
-- missing context handling
-- terminal-tool hygiene
-
-The architecture rule is:
-
-> provider tuning should be a small overlay, not a hostile takeover of the product prompt
-
----
-
-## 16. Legacy hooks versus provider contributions
-
-OpenClaw still supports a legacy `before_prompt_build` hook.
-
-It can inject or mutate prompt material globally.
-
-But for model-family behavior, provider contributions are preferred.
-
-Why?
-
-Because provider contributions can be **cache-aware** and scoped to the model family.
-
-Use the right layer:
-
-| Need | Better mechanism |
+| Missing discipline | Failure mode |
 |---|---|
-| Workspace-specific context | Bootstrap files |
-| Global prompt mutation | `before_prompt_build` hook |
-| Model-family tuning | Provider contribution |
-| Runtime security | Tool policy and sandbox |
-| User personality | `SOUL.md` |
+| Spec | the agent solves the wrong problem |
+| Constraints | the agent changes files or behavior outside scope |
+| Tests | the agent declares success without proof |
+| Reviewability | the final diff is too broad to trust |
+| Runtime evidence | code compiles but fails in the real environment |
+| Safety boundary | the prompt says "be careful" but tools still allow damage |
 
----
-
-## 17. Reply Tags and Heartbeats
-
-Reply Tags are optional provider-specific syntax guidance.
-
-They help models format replies in a way the runtime can parse or route.
-
-Heartbeats are also optional.
-
-When enabled, OpenClaw can include heartbeat prompt and acknowledgement behavior.
-
-But heartbeats are omitted from normal runs when:
-
-- heartbeats are disabled for the default agent
-- `agents.defaults.heartbeat.includeSystemPromptSection` is false
-
-This keeps the prompt clean when heartbeat behavior is not active.
-
----
-
-## 18. Runtime and Reasoning sections
-
-The Runtime section provides a compact one-line summary of the execution environment.
-
-It can include:
-
-- host
-- OS
-- Node.js version
-- selected model
-- repo root if detected
-- thinking level
-
-The Reasoning section explains visibility level and can hint at a `/reasoning` toggle.
-
-This is not meant to be verbose.
-
-It is a compact runtime signal so the model knows where it is operating.
-
----
-
-## 19. Diagnostics: inspecting context
-
-When an agent behaves strangely, inspect **what it actually received**.
-
-OpenClaw supports commands such as:
+This resembles a fast junior engineer:
 
 ```text
-/context list
-/context detail
+can produce output
+but may skip assumptions, tests, and review shape
 ```
 
-Use these to inspect:
-
-- which files were injected
-- raw size versus injected size
-- whether truncation happened
-- tool schema overhead
-- which context source dominates the prompt
-
-This is critical for debugging.
-
-Many "model problems" are actually **context problems**:
-
-- a bootstrap file is too large
-- a stale memory file is injected
-- a project rule is missing
-- a provider overlay is too strong
-- a sub-agent received full context instead of minimal context
-
-Inspect the prompt assembly **before blaming the model**.
+Agent skills exist to make the **missing process explicit**.
 
 ---
 
-## 20. Example: smart speaker engineering agent
+## 2. What an agent skill actually is
 
-Imagine an OpenClaw-powered smart speaker assistant for a Jetson-based product lab.
-
-The agent may need to:
-
-- inspect hardware notes
-- schedule follow-up tests
-- run shell commands
-- spawn a sub-agent to research codecs
-- remember user preferences
-- avoid unsafe GPIO or power commands
-- summarize logs
-
-An OpenClaw-style system prompt might assemble this:
+A useful skill is not:
 
 ```text
-Tooling:
-  Use process tools for long-running audio tests.
-  Use cron for future lab reminders.
-  Spawn sub-agents for isolated research.
-
-Execution Bias:
-  Run available checks before answering.
-  Verify file paths and hardware state live.
-
-Safety:
-  Do not bypass exec policy.
-  Do not change protected power or network settings without approval.
-
-Workspace:
-  /home/lab/smart-speaker
-
-Project Context:
-  AGENTS.md: lab rules
-  TOOLS.md: audio test commands
-  USER.md: preferred report format
-  MEMORY.md: concise project memory
-
-Runtime:
-  Jetson Orin Nano, Linux, local model provider, reasoning medium
+"Follow best practices."
 ```
 
-Notice what is **not** in the prompt:
+A useful skill is:
 
-- every past lab log
-- every available skill file
-- every daily memory file
-- raw policy implementation
-- secrets
+```text
+a small workflow
+with specific steps
+and a concrete completion signal
+```
 
-The prompt gives the model the **operating contract**.
+Weak instruction:
 
-The runtime enforces the **dangerous boundaries**.
+```text
+Use TDD where appropriate.
+```
 
----
+Skill-shaped instruction:
 
-## 21. Common design mistakes
+```text
+1. Identify the behavior contract.
+2. Write the smallest failing test.
+3. Run it and capture the failure.
+4. Implement the smallest fix.
+5. Run the targeted test and capture the pass.
+6. Run the relevant broader check.
+7. Finalize only with evidence.
+```
 
-### Mistake 1: putting everything in the system prompt
+The first version gives **advice**.
 
-Large prompts feel powerful, but they become **slow and noisy**.
-
-Use retrieval, skills, memory search, and local docs instead.
-
-### Mistake 2: relying on prompt safety alone
-
-If a tool action is dangerous, gate it in the tool layer.
-
-Prompt wording is **not a permission system**.
-
-### Mistake 3: giving sub-agents full context
-
-Sub-agents should receive bounded context for bounded work.
-
-Full identity and memory can distract them.
-
-### Mistake 4: putting live timestamps above the cache boundary
-
-High-churn values reduce cache stability.
-
-Expose exact time through tools when needed.
-
-### Mistake 5: letting provider plugins replace the product prompt
-
-Provider overlays should tune.
-
-They should not own the product contract.
+The second version creates a **loop**.
 
 ---
 
-## 22. Design exercise
+## 3. Where skills sit in the agent stack
 
-Design a system prompt strategy for a local AI hardware lab assistant.
+Skills are one layer in the harness:
 
-The assistant can:
+```text
+Model
+  -> system prompt
+  -> skill router
+  -> active skill workflow
+  -> tools
+  -> hooks and policy
+  -> logs and artifacts
+  -> final answer
+```
 
-- answer questions
-- inspect local Markdown docs
-- run safe shell commands
-- schedule follow-ups
-- use a sub-agent for research
-- remember hardware inventory
+In OpenClaw language:
 
-Answer these:
+```text
+Gateway
+  -> agent loop
+  -> prompt assembly
+  -> skills / bootstrap context
+  -> tool execution
+  -> hooks and approvals
+  -> session log
+  -> artifacts and delivery
+```
 
-1. Which sections belong in the full prompt?
-2. Which sections should be omitted from sub-agent minimal prompts?
-3. Which files should be bootstrap-injected?
-4. Which information should be retrieved on demand instead of injected?
-5. Which safety requirements must be enforced by tools rather than prompt text?
-6. Which provider-specific guidance should be a small overlay?
-7. How will you inspect prompt size and truncation?
+Important distinction:
 
-If you cannot answer these, your agent system is **not yet operationally mature**.
+```text
+Skill = workflow instruction
+Hook = deterministic interception
+Tool policy = authority boundary
+Artifact = durable evidence
+```
+
+Do not ask a skill to do the **job of policy**.
+
+A skill can say "ask before deleting files."
+
+The runtime should still **deny unsafe delete tools** unless policy allows them.
+
+---
+
+## 4. Process over prose
+
+Agents can summarize rules **without applying them**.
+
+So a skill should prefer **action steps over essays**.
+
+Weak:
+
+```text
+Be careful with production changes.
+```
+
+Better:
+
+```text
+Before editing production code:
+1. Identify the production boundary.
+2. Identify rollback path.
+3. List files allowed to change.
+4. List tests or runtime checks required.
+5. Stop if required evidence cannot be produced.
+```
+
+Skill design rule:
+
+```text
+If the agent cannot act on it, it is reference material, not a skill.
+```
+
+---
+
+## 5. Anti-rationalization tables
+
+Agents are good at **plausible excuses**.
+
+Examples:
+
+| Shortcut claim | Required rebuttal |
+|---|---|
+| "This is too small for a spec." | Small changes still need acceptance criteria. Write the smallest possible spec. |
+| "I will add tests later." | Later usually means never. Add the minimal verification now. |
+| "The code compiles, so it works." | Compilation is one signal, not behavior proof. Run the relevant check. |
+| "This nearby refactor is useful." | Useful is not requested. Keep the diff scoped unless scope expansion is approved. |
+| "The tool output is probably good enough." | Mutable state must be checked live before finalizing. |
+| "This is local only, so security does not matter." | Local agents often hold secrets and filesystem authority. Apply least privilege. |
+
+This is **cheap and effective**.
+
+The goal is to **pre-write the response** to the shortcuts the model is likely to take.
+
+---
+
+## 6. Verification is mandatory
+
+A skill should end with **evidence**.
+
+Evidence examples:
+
+| Task type | Evidence |
+|---|---|
+| Code change | test output, lint output, build output |
+| UI change | screenshot, visual diff, responsive check |
+| API change | schema diff, contract test, compatibility note |
+| Runtime change | health check, log excerpt, smoke test |
+| Security change | denied-path test, permission audit, policy check |
+| Documentation change | docs build, link check, rendered preview |
+| Hardware bring-up | kernel log, bus scan, command output, waveform capture |
+
+Rule:
+
+```text
+No evidence, no completion.
+```
+
+This matters more for **long-running agents**.
+
+Small shortcuts **compound over long sessions**.
+
+---
+
+## 7. Progressive disclosure
+
+Do not load **every workflow into every run**.
+
+That creates:
+
+- token bloat
+- weaker attention
+- slower inference
+- more compaction pressure
+- irrelevant instruction conflicts
+
+Better pattern:
+
+```text
+small router
+  -> load only relevant skill
+  -> load deeper references only when needed
+```
+
+Example:
+
+```text
+Bug fix request
+  -> load test-driven-bugfix
+  -> maybe load runtime-debug
+  -> do not load deployment, frontend, and release skills unless needed
+```
+
+This is especially important for **on-device AI** where context, latency, memory, and thermal budget matter.
+
+---
+
+## 8. Scope discipline
+
+A reliable coding agent must keep changes **reviewable**.
+
+Before editing:
+
+```text
+- list intended files
+- list non-goals
+- identify protected areas
+- ask before broadening scope
+```
+
+Before final answer:
+
+```text
+- list files changed
+- state whether scope expanded
+- explain why any expansion was necessary
+- provide verification evidence
+```
+
+Reviewability is **not a cosmetic concern**.
+
+It is how humans **keep authority over generated work**.
+
+---
+
+## 9. Skill anatomy
+
+A practical `SKILL.md` should be short and structured:
+
+```markdown
+---
+name: test-driven-bugfix
+description: Use for bug fixes where behavior must be proven with tests or runtime evidence.
+---
+
+# Test-Driven Bug Fix
+
+## When to use
+
+Use when fixing a bug, regression, failing test, or runtime error.
+
+## Workflow
+
+1. Reproduce the bug or failing behavior.
+2. Record the exact failure output.
+3. Identify the smallest behavior contract.
+4. Add or update the minimal failing test.
+5. Run the test and confirm failure.
+6. Implement the smallest fix.
+7. Run the targeted test and confirm pass.
+8. Run the relevant broader check.
+9. Review the diff for unrelated changes.
+
+## Anti-rationalization
+
+| Claim | Response |
+|---|---|
+| "This is obvious." | Obvious fixes still need evidence. |
+| "There is no test harness." | Use the smallest available runtime or command-level check. |
+| "The failure is intermittent." | Capture logs and state what was and was not reproduced. |
+
+## Exit criteria
+
+- Failure was reproduced or explicitly marked unreproducible.
+- Fix is scoped to the bug.
+- Verification command and result are recorded.
+- No unrelated files were changed.
+```
+
+This is **compact enough to load** and specific enough to audit.
+
+---
+
+## 10. Hardware bring-up skill
+
+Agent skills are useful for embedded and hardware work because bring-up is **full of mutable state**.
+
+Example:
+
+```markdown
+---
+name: hardware-bringup-debug
+description: Use for Jetson, ESP32, I2S, SPI, UART, kernel, driver, and device-tree debugging.
+---
+
+# Hardware Bring-Up Debug
+
+## Workflow
+
+1. Identify board, OS image, kernel version, and exact hardware path.
+2. Record the expected signal or interface contract.
+3. Capture current observable state.
+4. Separate host, wiring, firmware, driver, and userspace hypotheses.
+5. Test one hypothesis at a time.
+6. Do not change kernel, device tree, firmware, and userspace simultaneously.
+7. Preserve raw command outputs for evidence.
+8. Summarize blocker and next physical or software check.
+
+## Anti-rationalization
+
+| Claim | Response |
+|---|---|
+| "It is probably wiring." | Prove host and software state before blaming wiring. |
+| "It is probably software." | Check voltage, pinmux, and physical bus assumptions. |
+| "Let's rebuild everything." | Change one layer at a time or the result is not diagnosable. |
+```
+
+This applies directly to:
+
+- Jetson I2S microphone capture
+- ESP32-C6 RCP/NCP bring-up
+- OpenThread attach debugging
+- Zigbee coordinator testing
+- camera sensor bring-up
+- audio codec device-tree work
+
+The skill prevents the classic failure:
+
+```text
+change five variables, then no one knows which one mattered
+```
+
+---
+
+## 11. On-device AI skill
+
+On-device agents have **additional constraints**:
+
+- memory pressure
+- thermal budget
+- local privacy
+- smaller context windows
+- intermittent network
+- model fallback behavior
+- hardware permissions
+
+Example:
+
+```markdown
+---
+name: on-device-agent-change
+description: Use when modifying an agent that runs on a laptop, Jetson, phone, or local gateway.
+---
+
+# On-Device Agent Change
+
+## Workflow
+
+1. Identify target device and runtime limits.
+2. Identify local-only data and privacy boundaries.
+3. Check startup path and readiness gates.
+4. Keep prompt/context additions minimal.
+5. Prefer deterministic checks over model judgment.
+6. Validate behavior with network unavailable if relevant.
+7. Record CPU/GPU/memory impact when measurable.
+
+## Exit criteria
+
+- startup remains deterministic
+- local permissions are unchanged or explicitly reviewed
+- context growth is bounded
+- fallback behavior is documented
+- verification was run on or representative of the target device
+```
+
+This fits OpenClaw, Jetson, and local-first assistant systems.
+
+---
+
+## 12. Runtime enforcement pattern
+
+Use two layers:
+
+```text
+1. Soft guidance: skill workflow
+2. Hard enforcement: harness policy
+```
+
+Examples:
+
+| Workflow requirement | Runtime enforcement |
+|---|---|
+| Run tests before finalizing | final-answer hook checks for test evidence |
+| Do not edit outside scope | filesystem policy or diff checker |
+| Ask before dangerous command | exec approval gate |
+| Keep secrets out of logs | log redaction and denylisted paths |
+| Use small context | prompt budget and context inspectors |
+| Preserve evidence | artifact API or session attachment |
+
+Prompts help behavior.
+
+They do not enforce authority.
+
+---
+
+## 13. Evidence ledger
+
+For production agents, keep a run-level evidence ledger:
+
+```text
+task id
+skill used
+files touched
+tools called
+approval decisions
+tests run
+logs captured
+artifacts created
+scope changes
+known gaps
+```
+
+This supports:
+
+- review
+- debugging
+- incident response
+- auditability
+- future skill improvement
+
+OpenClaw-style systems can store this across:
+
+- session transcript
+- run events
+- artifacts
+- Gateway RPC task state
+- external dashboards
+
+Principle:
+
+```text
+If the agent claims success, the system should know why.
+```
+
+---
+
+## 14. Practical implementation checklist
+
+Start with five skills:
+
+| Skill | Why it matters |
+|---|---|
+| `spec-first` | prevents wrong-target implementation |
+| `small-plan` | forces reviewable chunks |
+| `test-driven-bugfix` | creates behavior evidence |
+| `runtime-safety-review` | catches tool, permission, and data risks |
+| `hardware-bringup-debug` | prevents multi-variable debugging chaos |
+
+For each skill, define:
+
+```text
+name
+description
+when to use
+workflow
+anti-rationalization table
+exit criteria
+evidence format
+references, if needed
+```
+
+Then add:
+
+- a small router
+- a final-answer evidence check
+- a diff-scope check
+- a way to inspect which skill ran
+- skill versioning for reproducibility
+
+---
+
+## Mini-lab
+
+Create one local skill for a painful workflow.
+
+Recommended choices:
+
+- Jetson audio debug
+- ESP32-C6 radio bring-up
+- OpenClaw plugin debugging
+- App SDK smoke test
+- model runtime regression
+- documentation build failure
+
+Test it manually:
+
+1. Give the agent a task that should trigger the skill.
+2. Check whether it follows the workflow.
+3. Check whether it produces evidence.
+4. Check whether the final answer is reviewable.
+5. Revise the skill where the agent skipped or rationalized.
 
 ---
 
 ## Key takeaways
 
-- OpenClaw owns and assembles the system prompt for each agent run.
-- The system prompt is a runtime contract, not a generic chat instruction.
-- Provider plugins should add small cache-aware overlays, not replace the full prompt.
-- Full mode is for main agents; minimal mode is for bounded sub-agents; none mode is for rare low-prompt cases.
-- Bootstrap files provide Project Context, but they must stay concise.
-- Skills should be listed compactly and loaded on demand.
-- Exact time should come from tools when needed so the stable prompt remains cache-friendly.
-- Prompt safety is advisory; hard safety belongs in runtime controls.
-- Context inspection is a first-class debugging skill.
+- Agent skills turn senior-engineering discipline into reusable workflows.
+- A useful skill is process, not prose.
+- Skills need checkpoints, anti-rationalization, and exit criteria.
+- Verification must produce evidence.
+- Progressive disclosure keeps context small and relevant.
+- Scope discipline makes agent output reviewable.
+- Skills do not replace hooks, approvals, sandboxing, or tool policy.
 
 ---
 
 ## References
 
-- OpenClaw system prompt: [https://openclaw.knidal.com/system-prompt](https://openclaw.knidal.com/system-prompt)
-- Case-study source repo: [OpenClaw](https://github.com/openclaw/openclaw)
-- Related OpenClaw concepts:
-  - agent loop
-  - cron jobs
-  - sessions and workspaces
-  - skills
-  - runtime configuration
+- Addy Osmani, "Agent Skills": [https://addyosmani.com/blog/agent-skills/](https://addyosmani.com/blog/agent-skills/)
+- Agent Skills repository: [https://github.com/addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)
+- Lecture 35 - OpenClaw Agent Loop: [Lecture-35.md](Lecture-35.md)
+- Lecture 37 - System Prompt Architecture: [Lecture-37.md](Lecture-37.md)
+- Lecture 41 - Pi: [Lecture-41.md](Lecture-41.md)
 
 ---
 
-*Next: [Lecture 22 - OpenClaw Case Study: App SDK Dogfooding and Typed Gateway RPCs](Lecture-22.md)*
+*Next: [Lecture 22](Lecture-22.md)*

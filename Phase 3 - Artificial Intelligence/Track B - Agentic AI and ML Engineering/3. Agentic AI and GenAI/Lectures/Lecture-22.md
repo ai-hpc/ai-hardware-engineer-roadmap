@@ -1,27 +1,50 @@
-# Lecture 22 - OpenClaw Case Study: App SDK Dogfooding and Typed Gateway RPCs
+# Lecture 22 - Agent Skills Eval: Benchmarking SKILL.md Files
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 21](Lecture-21.md) | **Next:** [Lecture 23](Lecture-23.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 21](Lecture-21.md) | **Next:** [Lecture 23](Lecture-23.md)
 
 ---
 
-An agent runtime becomes a **platform** only when external applications can use it without knowing private internals.
+Skills are **code-adjacent infrastructure**.
 
-That is the purpose of the **OpenClaw App SDK**.
+If a skill changes how an agent behaves, it **needs tests**.
 
-The App SDK, published as `@openclaw/sdk`, is the public client API for applications that run **outside** the OpenClaw process:
+Agent Skills gives agents portable, version-controlled workflows through folders such as:
 
-- dashboards
-- desktop clients
-- mobile clients
-- IDE extensions
-- CI jobs
-- admin tools
-- integration tests
-- companion apps such as OpenMeow
+```text
+my-skill/
+  SKILL.md
+  references/
+  scripts/
+  assets/
+  evals/
+```
 
-This lecture explains the current blueprint:
+But a `SKILL.md` file can **look good and still fail** in practice.
 
-> make `@openclaw/sdk` usable by real external apps through typed Gateway RPCs, instead of forcing apps to scrape CLI output, transcripts, or runtime internals
+The right question is not:
+
+```text
+Does this skill read well?
+```
+
+The right question is:
+
+```text
+Does this skill measurably improve the agent on the task it claims to support?
+```
+
+`agent-skills-eval` is a **test runner** for that question.
+
+It runs the same eval prompt twice:
+
+```text
+with_skill
+without_skill
+```
+
+Then a **judge model** grades both outputs against expected behavior and assertions.
+
+That gives you **evidence-backed pass/fail** rather than subjective prompt review.
 
 ---
 
@@ -29,1413 +52,599 @@ This lecture explains the current blueprint:
 
 By the end of this lecture, you should be able to:
 
-1. Explain the difference between the App SDK and the Plugin SDK.
-2. Describe the App SDK happy path for real external applications.
-3. Understand why Gateway WebSocket RPC is the correct platform boundary.
-4. Explain how agents, sessions, runs, artifacts, tools, environments, and tasks fit into the app-facing architecture.
-5. Understand what the current SDK supports today versus what remains explicit future surface.
-6. Design a narrow typed RPC surface without mixing unrelated responsibilities.
-7. Explain how dogfooding with a real app stabilizes SDK contracts.
-8. Explain how nodes expose remote device and media capabilities without becoming gateways.
-9. Separate authoritative runtime state from deterministic presentation metadata.
-10. Build a testing strategy around normalized events, waits, cancellation, and unsupported feature errors.
+1. Explain why skills need regression tests.
+2. Understand the `with_skill` versus `without_skill` baseline pattern.
+3. Write basic `evals/evals.json` cases for a skill.
+4. Interpret judge-graded pass/fail results.
+5. Use deterministic assertions for tool-call skills.
+6. Understand the artifact layout produced by `agent-skills-eval`.
+7. Design CI gates for OpenClaw-style skill repositories.
+8. Identify common failure modes in LLM-judged skill evaluation.
 
 ---
 
-## 1. Big picture
+## 1. Why skill evaluation matters
 
-The architecture is:
-
-```text
-External app / OpenMeow
-        |
-        v
-@openclaw/sdk
-        |
-        v
-Gateway WebSocket RPC
-        |
-        +-- agents / sessions / runs     # happy-path app control
-        +-- artifacts.*                  # rich outputs: files/images/logs/etc.
-        +-- tools.invoke                 # controlled tool execution
-        +-- environments.*               # discover where work can run
-        +-- task ledger                  # durable app-visible run/task state
-```
-
-This is the important shift:
-
-```text
-Before:
-  App knows internal Gateway/session/runtime details.
-
-After:
-  App uses typed SDK methods backed by discoverable Gateway RPCs.
-```
-
-That is how OpenClaw moves from "working internal system" to **"external app platform."**
-
----
-
-## 2. App SDK versus Plugin SDK
-
-OpenClaw has two different extension surfaces.
-
-Do not mix them.
-
-| SDK | Where Code Runs | Use It For |
-|---|---|---|
-| App SDK | Outside OpenClaw | External apps, dashboards, scripts, CI jobs, IDE clients |
-| Plugin SDK | Inside OpenClaw | Providers, channels, hooks, tools, runtime plugins |
-
-The App SDK connects to a Gateway.
-
-The Plugin SDK extends the Gateway/runtime from inside.
-
-Wrong mental model:
-
-```text
-"SDK is SDK; app code and plugin code can share the same assumptions."
-```
-
-Correct mental model:
-
-```text
-App SDK = remote client contract.
-Plugin SDK = in-process extension contract.
-```
-
-This separation matters for **auth, scopes, error handling, lifecycle, and compatibility**.
-
----
-
-## 3. What ships in `@openclaw/sdk`
-
-The main entry is:
-
-```ts
-OpenClaw
-```
-
-It owns:
-
-- transport
-- connection
-- request/response calls
-- event handling
-- high-level resource helpers
-
-Basic connection example:
-
-```ts
-import { OpenClaw } from "@openclaw/sdk";
-
-const oc = new OpenClaw({
-  url: "ws://127.0.0.1:14565",
-  token: process.env.OPENCLAW_GATEWAY_TOKEN,
-  requestTimeoutMs: 30_000,
-});
-
-await oc.connect();
-```
-
-The default transport is:
-
-```ts
-GatewayClientTransport
-```
-
-Tests can pass a custom transport implementing the SDK transport interface, so integration logic can be tested without a real WebSocket server.
-
----
-
-## 4. The current high-level SDK helpers
-
-The SDK exposes resource helpers.
-
-| Helper | Purpose |
-|---|---|
-| `oc.agents` | List agents, get agent handles, start runs from agents |
-| `oc.runs` / `Run` | Create, get, wait, cancel, and stream runs |
-| `oc.sessions` / `Session` | Create sessions, send messages, patch, compact, abort |
-| `oc.models` | List models and inspect model auth status |
-| `oc.tools` | List tool catalog and effective tools |
-| `oc.approvals` | List and resolve approval requests |
-| `oc.rawEvents()` | Inspect raw Gateway frames for advanced cases |
-
-The SDK also exports types such as:
-
-- `AgentRunParams`
-- `RunResult`
-- `RunStatus`
-- `OpenClawEvent`
-- related RPC and selection types
-
-The design goal is that app authors use these helpers instead of **hand-writing Gateway frames**.
-
----
-
-## 5. The SDK happy path
-
-The happy path is the **minimum app flow** that must be boringly reliable.
-
-```text
-Connect
-  -> Discover
-  -> Create or resume session
-  -> Start run
-  -> Stream events
-  -> Wait for result
-  -> Cancel if needed
-  -> Surface approvals
-```
-
-This path matters because most external apps need exactly this loop:
-
-```text
-User clicks "Run"
-  -> app sends task
-  -> assistant streams output
-  -> tools emit progress
-  -> approvals may be requested
-  -> app shows final result
-```
-
-If this path is unstable, every external app becomes a **pile of special cases**.
-
----
-
-## 6. Running an agent
-
-A typical high-level app flow:
-
-```ts
-const agent = await oc.agents.get("default");
-
-const run = await agent.run({
-  message: "Summarize the current project status.",
-  sessionKey: "main",
-  model: "openai/gpt-5.5",
-  timeoutMs: 30_000,
-});
-
-for await (const event of run.events()) {
-  if (event.type === "assistant.delta") {
-    process.stdout.write(String(event.data));
-  }
-
-  if (event.type === "run.completed") {
-    break;
-  }
-}
-
-const result = await run.wait();
-```
-
-Important SDK behavior:
-
-- provider-qualified model refs such as `openai/gpt-5.5` are split into provider and model overrides before being sent to the Gateway
-- SDK `timeoutMs` is milliseconds
-- Gateway timeout values may be sent as seconds
-- `Run.events()` filters events to one run
-- `Run.events()` can replay already-seen events for fast runs
-- `Run.wait()` maps Gateway lifecycle outcomes into stable SDK result shapes
-
-The app does not need to know the **internal agent loop implementation**.
-
----
-
-## 7. Sessions
-
-Sessions are **durable transcript holders**.
-
-They give apps **stable context** and session-affine behavior.
-
-Example:
-
-```ts
-const session = await oc.sessions.create({
-  agentId: "default",
-  label: "Hardware debug session",
-});
-
-const run = await session.send({
-  message: "Review the latest UART bring-up notes.",
-});
-```
-
-Session handles can support operations such as:
-
-- send
-- abort
-- patch
-- compact
-- inspect metadata
-
-Use sessions when the app wants durable conversation state.
-
-Use isolated runs when the app wants clean one-shot work.
-
----
-
-## 8. Event streaming and normalization
-
-External apps should not consume **raw Gateway internals** directly.
-
-The SDK normalizes Gateway events into a stable envelope:
-
-```ts
-type OpenClawEvent = {
-  version: 1;
-  id: string;
-  ts: number;
-  type: OpenClawEventType;
-  runId?: string;
-  sessionId?: string;
-  sessionKey?: string;
-  taskId?: string;
-  agentId?: string;
-  data: unknown;
-  raw?: GatewayEvent;
-};
-```
-
-Common mapped event types include:
-
-- `run.started`
-- `run.completed`
-- `run.failed`
-- `run.cancelled`
-- `run.timed_out`
-- `assistant.delta`
-- `assistant.message`
-- `thinking.delta`
-- `tool.call.*`
-- `approval.requested`
-- `approval.resolved`
-- `session.created`
-- `session.updated`
-- `session.compacted`
-- `task.updated`
-- `artifact.updated`
-- `raw`
-
-The `raw` escape hatch is useful for advanced clients, but normal apps should prefer stable SDK event types.
-
----
-
-## 9. Why event leakage is dangerous
-
-If raw chat or runtime events leak through `run.events()`, the app becomes **coupled to private implementation details**.
-
-Bad pattern:
-
-```text
-UI reducer handles internal provider chunks, chat frames, and lifecycle frames directly.
-```
-
-Good pattern:
-
-```text
-Gateway event
-  -> SDK normalizer
-  -> stable OpenClawEvent
-  -> app adapter
-  -> UI reducer
-```
-
-If internal events leak, clients break when the runtime changes.
-
-The SDK should be the **compatibility layer**.
-
----
-
-## 10. Wait and cancellation semantics
-
-Run lifecycle must be consistent across three surfaces:
-
-```text
-Run.cancel()
-Run.events()
-Run.wait()
-```
-
-The SDK should avoid contradictory states.
-
-Bad state:
-
-```text
-cancel() returns cancelled
-events emit run.completed
-wait() returns timed_out
-```
-
-Good state:
-
-```text
-cancel requested
-events eventually emit run.cancelled
-wait() returns cancelled
-```
-
-Important nuance:
-
-`Run.cancel()` is a **request to stop work**.
-
-The true terminal state is **confirmed by the runtime**.
-
-`Run.wait()` should return normalized statuses such as:
-
-- `completed`
-- `failed`
-- `cancelled`
-- `timed_out`
-- `accepted`
-
-If the wait deadline expires while the run is still active, the SDK should return an accepted or still-active result rather than pretending the run itself failed.
-
----
-
-## 11. Current supported versus future SDK surface
-
-A mature SDK should not pretend **missing Gateway RPCs** exist.
-
-The current App SDK approach is explicit:
-
-| Namespace | Current Shape |
-|---|---|
-| `oc.agents` | App-facing helper surface for agents and agent handles |
-| `oc.runs` | Run creation, wait, cancel, stream |
-| `oc.sessions` | Durable session management and sending |
-| `oc.models` | Model listing and auth status |
-| `oc.tools` | Tool catalog and effective tools |
-| `oc.approvals` | Approval listing and resolution |
-| `oc.tasks` | Explicitly unsupported until Gateway APIs exist |
-| `oc.artifacts` | Explicitly unsupported until artifact RPCs exist |
-| `oc.environments` | Explicitly unsupported until environment RPCs exist |
-| `oc.tools.invoke` | Explicitly unsupported until Gateway tool invocation exists |
-
-This is **good API design**.
-
-It prevents **silent fallback** to unsafe defaults.
-
-If a caller passes future-only fields such as workspace, runtime, environment, or approval parameters before the Gateway supports them, the SDK should throw before sending the request.
-
-That is **safer** than pretending the setting worked.
-
----
-
-## 12. Blueprint: typed Gateway RPCs
-
-Every app-facing capability should become a **typed Gateway RPC**.
-
-The implementation pattern:
-
-```text
-1. Protocol schema
-   src/gateway/protocol/schema/*.ts
-
-2. Protocol exports + validators
-   src/gateway/protocol/index.ts
-   src/gateway/protocol/schema/protocol-schemas.ts
-
-3. Gateway method handler
-   src/gateway/server-methods/*.ts
-
-4. Method discovery
-   src/gateway/server-methods-list.ts
-
-5. Scope gate
-   src/gateway/method-scopes.ts
-
-6. SDK wrapper
-   packages/sdk/src/client.ts
-   packages/sdk/src/types.ts
-   packages/sdk/src/index.ts
-
-7. Generated native protocol models
-   apps/macos/Sources/OpenClawProtocol/GatewayModels.swift
-   apps/shared/OpenClawKit/Sources/OpenClawProtocol/GatewayModels.swift
-
-8. Docs + changelog
-   docs/concepts/openclaw-sdk.md
-   docs/gateway/protocol.md
-   CHANGELOG.md
-```
-
-The exact file names may evolve, but the architecture rule is stable:
-
-> schema first, server handler second, discovery third, SDK wrapper fourth, generated native models and docs before calling it public
-
----
-
-## 13. Gateway RPC framing
-
-Gateway RPC uses WebSocket JSON frames.
-
-Request:
-
-```json
-{
-  "type": "req",
-  "id": "req-1",
-  "method": "runs.create",
-  "params": {}
-}
-```
-
-Response:
-
-```json
-{
-  "type": "res",
-  "id": "req-1",
-  "ok": true,
-  "payload": {}
-}
-```
-
-Event:
-
-```json
-{
-  "type": "event",
-  "family": "runs",
-  "name": "run.delta",
-  "payload": {}
-}
-```
-
-This gives SDKs:
-
-- request-response correlation
-- streaming events
-- typed errors
-- feature discovery
-- transport limits
-- auth and scope enforcement
-- compatibility checks
-
----
-
-## 14. Capability boundary rule
-
-Keep RPC families narrow.
-
-```text
-environments.* = read-only discovery
-artifacts.*    = read-only output access/download
-tools.invoke   = controlled execution with policy/approval
-tasks.*        = durable task state
-sessions/runs  = core app execution path
-```
-
-Do not bundle these into one broad "SDK platform" method.
-
-Narrow RPC surfaces are easier to:
-
-- review
-- test
-- secure
-- document
-- version
-- expose in native SDKs
-
-This is how the SDK grows **without becoming unstable**.
-
----
-
-## 15. Artifacts as app-visible outputs
-
-Apps need **richer outputs** than text transcripts.
-
-Artifacts represent:
-
-- generated files
-- images
-- logs
-- downloaded documents
-- reports
-- tool output bundles
-
-A clean artifact API surface looks like:
-
-```text
-artifacts.list
-artifacts.get
-artifacts.download
-```
-
-Why this matters:
-
-```text
-Without artifacts:
-  App parses transcript text to find output files.
-
-With artifacts:
-  App asks the Gateway for structured output metadata and downloads.
-```
-
-Artifact APIs should be:
-
-- typed
-- read-only unless mutation is explicitly needed
-- scope-gated
-- payload-limit aware
-- discoverable in `hello-ok.features.methods`
-- backed by SDK wrappers
-- covered by tests
-
-Large artifact content should not be shoved blindly into **WebSocket frames**.
-
-Use metadata, download handles, or chunked behavior where appropriate.
-
----
-
-## 16. Environment discovery
-
-Apps need to know **where work can run**.
-
-Environment discovery is read-only at first:
-
-```text
-environments.list
-environments.status
-```
-
-It can expose:
-
-- Gateway-local runtime candidates
-- node candidates
-- capabilities
-- health
-- availability
-- labels
-
-It should not initially do:
-
-- provisioning
-- create/delete
-- runtime selection
-- remote mutation
-
-That boundary is **intentional**.
-
-Discovery is **safer than control**.
-
-The app can show users where work can run without being allowed to create or destroy environments.
-
-### Device model database as UI metadata
-
-A concrete companion-app example is the OpenClaw macOS device model database.
-
-In the Instances UI, raw Apple model identifiers such as:
-
-```text
-iPad16,6
-Mac16,6
-```
-
-are not friendly for users.
-
-The macOS app maps them to human-readable Apple device names using vendored JSON files under:
-
-```text
-apps/macos/Sources/OpenClaw/Resources/DeviceModels/
-```
-
-This is **not a new runtime authority**.
-
-It is **app-side reference metadata**.
-
-That distinction matters:
-
-```text
-Stable device identity:
-  model identifier, node id, instance id, capability fields
-
-Friendly UI label:
-  "iPad Pro ..." or "MacBook Pro ..."
-```
-
-Do not use friendly names for auth, policy, routing, or compatibility decisions.
-
-Use them for display.
-
-OpenClaw vendors this mapping from the MIT-licensed `kyle-seongwoo-jun/apple-device-identifiers` repository and pins the JSON files to specific upstream commits. The pinned commit hashes are recorded in:
-
-```text
-apps/macos/Sources/OpenClaw/Resources/DeviceModels/NOTICE.md
-```
-
-The build lesson is important:
-
-> deterministic apps should pin external metadata, vendor the license, and keep a clear update procedure
-
-A safe update flow is:
-
-```bash
-IOS_COMMIT="<commit sha for ios-device-identifiers.json>"
-MAC_COMMIT="<commit sha for mac-device-identifiers.json>"
-
-curl -fsSL "https://raw.githubusercontent.com/kyle-seongwoo-jun/apple-device-identifiers/${IOS_COMMIT}/ios-device-identifiers.json" \
-  -o apps/macos/Sources/OpenClaw/Resources/DeviceModels/ios-device-identifiers.json
-
-curl -fsSL "https://raw.githubusercontent.com/kyle-seongwoo-jun/apple-device-identifiers/${MAC_COMMIT}/mac-device-identifiers.json" \
-  -o apps/macos/Sources/OpenClaw/Resources/DeviceModels/mac-device-identifiers.json
-
-swift build --package-path apps/macos
-```
-
-Also verify that:
-
-- `NOTICE.md` records the exact pinned commits
-- `LICENSE.apple-device-identifiers.txt` still matches upstream
-- unknown model identifiers fall back to the raw identifier instead of breaking the UI
-- the UI treats this database as optional presentation data
-
-This is the same platform discipline as typed RPCs:
-
-```text
-runtime state should be authoritative
-presentation metadata should be deterministic, pinned, licensed, and replaceable
-```
-
-### Nodes and media as remote peripherals
-
-Nodes are **companion devices** connected to the Gateway WebSocket with:
-
-```json
-{ "role": "node" }
-```
+Agent skills package **procedural knowledge**.
 
 Examples:
 
-- macOS menubar app running in node mode
-- iOS companion device
-- Android companion device
-- headless node host on Linux, macOS, or Windows
+- triage GitHub issues
+- summarize weather data
+- operate a CRM
+- write release notes
+- inspect GPU traces
+- follow a security review checklist
+- translate kernels between DSLs
 
-Legacy TCP JSONL bridge transport may still exist historically, but the current mental model is WebSocket node connection through the Gateway protocol.
+This is powerful because skills are **reusable**.
 
-The key rule:
+It is dangerous because skills can **silently degrade**.
 
-> nodes are peripherals, not gateways
+A bad skill can:
 
-They do not run the **Gateway service**.
+- add irrelevant context
+- over-constrain the model
+- cause wrong tool calls
+- increase token cost without quality lift
+- make the agent slower
+- hide stale instructions
+- make a task worse than baseline
 
-Messages from Telegram, WhatsApp, WebChat, or other channels still land on the Gateway. The Gateway owns the model, session routing, tool calls, and policy. Nodes expose device-local capabilities that the Gateway can invoke.
+Without evaluation, every skill PR becomes a **taste debate**.
 
-macOS can run as a node through the menubar app. In that mode it exposes local canvas and camera commands for that Mac. In remote gateway mode, browser automation should be handled by the CLI node host or installed node service, not by assuming the native app node owns all remote automation.
-
-The raw invocation shape is:
-
-```text
-node.invoke
-```
-
-A node can declare command families such as:
-
-```text
-canvas.*
-camera.*
-screen.*
-location.*
-device.*
-notifications.*
-system.*
-```
-
-Practical examples:
-
-```bash
-openclaw nodes status
-openclaw nodes describe --node <idOrNameOrIp>
-openclaw nodes invoke --node <idOrNameOrIp> --command canvas.eval --params '{"javaScript":"location.href"}'
-```
-
-Higher-level helpers exist for common media workflows:
-
-```bash
-openclaw nodes canvas snapshot --node <idOrNameOrIp> --format png
-openclaw nodes camera list --node <idOrNameOrIp>
-openclaw nodes camera snap --node <idOrNameOrIp> --facing front
-openclaw nodes screen record --node <idOrNameOrIp> --duration 10s --fps 10
-openclaw nodes location get --node <idOrNameOrIp>
-```
-
-The app-facing lesson:
+With evaluation, the conversation becomes:
 
 ```text
-Do not make the agent pretend the camera, screen, or canvas is local.
-Represent them as node capabilities behind Gateway-mediated commands.
+This skill improved 7/9 evals.
+It regressed the pagination case.
+The judge evidence points to missing tool-call criteria.
+The report includes both outputs and timing.
 ```
 
-#### Pairing and durable node identity
-
-WebSocket nodes use device pairing.
-
-The node presents a device identity during connect. The Gateway creates a pairing request for `role: node`. An operator approves or rejects that request:
-
-```bash
-openclaw devices list
-openclaw devices approve <requestId>
-openclaw devices reject <requestId>
-openclaw nodes status
-```
-
-This approval is the **durable role contract**.
-
-Token rotation must stay inside that contract. A rotated token should not silently upgrade a node into a different role or broader command surface.
-
-If a node reconnects with changed auth details, scopes, public key, or command declarations, treat the old pending request as stale and approve the current request.
-
-That avoids this unsafe state:
-
-```text
-operator approved old capability set
-node later exposes broader capability set
-gateway accidentally trusts it
-```
-
-Avoid a common pairing confusion:
-
-```text
-device pairing:
-  gates the WebSocket node role and approved role contract
-
-gateway-owned node pairing store:
-  supports older nodes pending/approve/reject/remove/rename flows
-  does not gate the WebSocket connect handshake
-```
-
-#### Node command policy
-
-A node command should pass **two gates** before invocation:
-
-```text
-1. The node declared the command at connect time.
-2. Gateway policy allows that declared command.
-```
-
-This matters for privacy-heavy capabilities.
-
-Safe or low-risk commands may be allowed by default on known platforms:
-
-```text
-canvas.*
-camera.list
-location.get
-screen.snapshot
-```
-
-More sensitive commands should require explicit opt-in:
-
-```text
-camera.snap
-camera.clip
-screen.record
-sms.send
-system.run
-system.which
-```
-
-The conservative rule:
-
-> unknown node platform means conservative allowlist
-
-If the Gateway cannot recognize the node platform or device family, it should not assume that `system.run` or other powerful commands are safe.
-
-#### Remote node host and `system.run`
-
-The **headless node host** is the pattern for remote execution.
-
-Use it when:
-
-```text
-Gateway host:
-  receives messages, runs the model, routes tool calls
-
-Node host:
-  executes selected system commands on another machine
-```
-
-Start a node host:
-
-```bash
-openclaw node run --host <gateway-host> --port 18789 --display-name "Build Node"
-```
-
-If the Gateway is bound to loopback, connect through an SSH tunnel:
-
-```bash
-ssh -N -L 18790:127.0.0.1:18789 user@gateway-host
-
-export OPENCLAW_GATEWAY_TOKEN="<gateway-token>"
-openclaw node run --host 127.0.0.1 --port 18790 --display-name "Build Node"
-```
-
-Then bind exec to the node:
-
-```bash
-openclaw config set tools.exec.host node
-openclaw config set tools.exec.security allowlist
-openclaw config set tools.exec.node "<id-or-name>"
-```
-
-Exec approvals live on the node host:
-
-```text
-~/.openclaw/exec-approvals.json
-```
-
-That is intentional. The machine executing the command enforces the **local approval and allowlist state**.
-
-The important security boundary:
-
-```text
-shell execution should go through the exec path
-explicit device commands should go through node.invoke
-```
-
-That separation keeps approvals, allowlists, and audit behavior understandable.
-
-For approval-backed node execution, bind the exact prepared command context. After approval, the Gateway should forward the stored plan, not a later caller-edited command, working directory, or session field.
-
-#### Media payload design
-
-Media commands often return large payloads:
-
-- canvas screenshots
-- camera photos
-- camera clips
-- screen recordings
-- latest photos from a device
-
-Do not force every app to parse base64 from transcript text.
-
-A better app architecture is:
-
-```text
-node media command
-  -> Gateway result
-  -> artifact record or MEDIA attachment
-  -> SDK event
-  -> app renderer
-```
-
-This connects directly to the artifact API discussion:
-
-```text
-node commands produce media
-artifact APIs make media discoverable and downloadable
-SDK events tell the UI what changed
-```
-
-For app developers, the rule is simple:
-
-> display media through structured attachments or artifacts, not transcript scraping
+That is a **better review standard**.
 
 ---
 
-## 17. Controlled tool invocation
+## 2. The baseline pattern
 
-Direct tool invocation is **powerful and risky**.
-
-A future SDK-facing method could mirror the existing HTTP tool invoke behavior as:
+The core design is simple:
 
 ```text
-tools.invoke
+same prompt
+  -> target model without skill
+  -> target model with skill
+  -> judge compares both against assertions
 ```
 
-Example:
+This matters because **absolute output quality is not enough**.
+
+You want to know **skill lift**:
+
+```text
+output with skill passes
+output without skill fails
+  -> skill likely helps
+
+both pass
+  -> skill may be unnecessary for this eval
+
+both fail
+  -> skill or eval is insufficient
+
+with skill fails, baseline passes
+  -> skill regressed behavior
+```
+
+The baseline mode prevents a common mistake:
+
+```text
+The skill produced a good answer, therefore the skill is useful.
+```
+
+Maybe the model already produced the same answer **without the skill**.
+
+The eval needs to **measure the delta**.
+
+---
+
+## 3. Quickstart
+
+Run directly with `npx`:
+
+```bash
+npx agent-skills-eval ./skills \
+  --target gpt-4o-mini \
+  --judge gpt-4o-mini \
+  --baseline \
+  --strict
+```
+
+Install if you want it in a project:
+
+```bash
+npm install agent-skills-eval
+```
+
+The key flags:
+
+```text
+--target
+  model being evaluated
+
+--judge
+  model grading outputs
+
+--baseline
+  run without_skill as comparison
+
+--strict
+  enforce skill/spec validation
+```
+
+For OpenClaw contributors, this is the useful mental model:
+
+```text
+skills are tested like code
+eval artifacts are reviewed like logs
+reports are attached to PRs
+```
+
+---
+
+## 4. Skill layout
+
+A minimal evaluated skill looks like:
+
+```text
+skills/
+  weather-summary/
+    SKILL.md
+    evals/
+      evals.json
+```
+
+Example `SKILL.md`:
+
+```markdown
+---
+name: weather-summary
+description: Summarize weather forecasts and call out operational risks.
+license: MIT
+compatibility: Works with text-capable chat models.
+---
+
+When summarizing weather, identify the location, time range, precipitation risk,
+temperature extremes, wind risk, and one practical recommendation.
+```
+
+Example `evals/evals.json`:
 
 ```json
 {
-  "type": "req",
-  "id": "req-1",
-  "method": "tools.invoke",
-  "params": {
-    "tool": "sessions_list",
-    "action": "json",
-    "args": {},
-    "sessionKey": "main"
-  }
+  "skill_name": "weather-summary",
+  "evals": [
+    {
+      "id": "storm-risk",
+      "name": "storm risk summary",
+      "prompt": "Summarize this forecast for an outdoor robotics test: thunderstorms after 2pm, wind gusts to 35 mph, high 91F.",
+      "expected_output": "The response should identify thunderstorm timing, wind risk, heat risk, and recommend moving the test earlier or indoors.",
+      "assertions": [
+        "The output mentions thunderstorm risk after 2pm.",
+        "The output mentions wind gusts or wind risk.",
+        "The output gives a practical scheduling or safety recommendation."
+      ]
+    }
+  ]
 }
 ```
 
-The important rule:
+The assertions are the **contract**.
 
-> SDK tool invocation must reuse the same Gateway auth, tool policy, deny-list, approval semantics, and owner/actor semantics as the existing server path
-
-It must not become a **shortcut around policy**.
-
-Tool invocation touches:
-
-- tool allow/deny policy
-- session scoping
-- agent scoping
-- approval states
-- confirmation and refusal states
-- audit logs
-- security boundaries
-
-That is why it is **harder than read-only methods**.
+If they are vague, the eval will be **vague**.
 
 ---
 
-## 18. Task ledger
+## 5. Artifact layout
 
-Event streams are **transient**.
-
-Apps also need **durable task state**.
-
-A task ledger API gives UIs a stable way to ask:
+A run creates a workspace similar to:
 
 ```text
-What work exists?
-What is running?
-What completed?
-What failed?
-What was cancelled?
-What artifacts belong to this work?
+agent-skills-workspace/
+  iteration-1/
+    meta.json
+    benchmark.json
+    eval-basic/
+      with_skill/
+      without_skill/
+    report/
+      index.html
 ```
 
-Potential surface:
+Important artifacts:
 
-```text
-tasks.list
-tasks.get
-tasks.cancel
-```
+- `benchmark.json`: rolled-up pass/fail results
+- `with_skill/`: output, timing, grading
+- `without_skill/`: baseline output, timing, grading
+- `report/index.html`: static report for review
+- JSON/JSONL events: useful for dashboards or CI history
 
-The key design point:
+This **artifact-first design** is important.
 
-> event streams are for live updates; task ledger APIs are for durable app-visible state
+You can **diff runs over time**.
 
-Do not make apps reconstruct durable state only from historical event streams.
+You can attach reports to pull requests.
+
+You can detect regressions after changing `SKILL.md`.
 
 ---
 
-## 19. Discovery and feature negotiation
+## 6. Judge model grading
 
-Gateway connections should **advertise capabilities**.
+The judge sees:
 
-The SDK can inspect:
+- eval prompt
+- expected output
+- assertions
+- target model output
 
-```text
-hello-ok.features.methods
-hello-ok.policy.maxPayload
-hello-ok.policy.maxBufferedBytes
-hello-ok.policy.tickIntervalMs
-```
+Then it grades pass/fail with evidence.
 
-Then the app can decide:
+This is useful, but it is **not perfect**.
 
-- whether artifact APIs exist
-- whether environment discovery exists
-- whether tool invocation exists
-- whether the payload is too large
-- whether to show or hide UI features
+LLM judges can:
 
-This avoids **hard-coded version assumptions**.
+- be inconsistent
+- over-reward fluent answers
+- miss subtle tool-call failures
+- leak bias from expected output phrasing
+- pass outputs that satisfy wording but not intent
+- disagree across model versions
 
-**Feature detection** beats guessing.
+Mitigations:
 
----
+- keep judge temperature at `0`
+- use explicit assertions
+- add deterministic checks where possible
+- review failures and unexpected passes manually
+- pin judge and target model versions when possible
+- keep raw artifacts
+- rerun flaky evals before blocking a release
 
-## 20. Auth, scopes, and fail-closed events
-
-SDK methods must be scope-gated.
-
-Examples:
-
-- `operator.read`
-- `operator.write`
-- `operator.admin`
-- plugin-defined scopes
-
-**Server-side checks** are mandatory.
-
-The SDK is **not a security boundary**.
-
-Events should also be gated by visibility.
-
-The safe rule:
-
-```text
-If the client should not see a session, run, task, artifact, or approval, do not broadcast the event to that client.
-```
-
-For app developers this means:
-
-- expect permission errors
-- design UI around missing capabilities
-- treat feature discovery as dynamic
-- do not assume owner-level access
+The judge is a **tool, not an authority**.
 
 ---
 
-## 21. Idempotency
+## 7. Tool-call assertions
 
-Side-effecting methods need **idempotency keys**.
+Many useful skills are **not pure text-generation skills**.
 
-Examples:
+OpenClaw-style skills often affect tool behavior:
 
-- start a run
-- cancel a run
-- approve a tool call
-- invoke a tool
-- create or mutate an artifact
+- call `gh` commands
+- invoke gateway RPCs
+- query weather APIs
+- inspect logs
+- read files
+- create issues
+- update docs
 
-Why?
+For those, **text-only grading is weak**.
 
-Because real clients retry.
-
-Networks fail.
-
-Mobile clients reconnect.
-
-Users double-click.
-
-Without idempotency:
+You want **deterministic tool-call assertions**:
 
 ```text
-one user action -> two runs
+Did the agent call the expected tool?
+Did it use the expected method?
+Did it pass safe arguments?
+Did it avoid a destructive command?
+Did it include the required idempotency key?
 ```
 
-With idempotency:
+Use LLM judging for **semantic quality**.
+
+Use deterministic assertions for **protocol behavior**.
+
+That split is **critical**:
 
 ```text
-same request key -> same accepted operation
-```
+semantic correctness:
+  judge model
 
-Idempotency is **part of the SDK contract**, not an optimization.
+tool contract correctness:
+  deterministic assertions
+```
 
 ---
 
-## 22. Dogfooding with OpenMeow
+## 8. Config file for CI
 
-OpenMeow-style dogfooding is valuable because it forces the SDK to behave like a **real product dependency**.
+For repeated runs, use a config file:
 
-The dogfood client should validate:
+```yaml
+# agent-skills-eval.yaml
+root: ./skills
+workspace: ./agent-skills-workspace
+baseline: true
+target: gpt-4o-mini
+judge: gpt-4o-mini
+baseUrl: https://api.openai.com/v1
+apiKeyEnv: OPENAI_API_KEY
+include:
+  - "skills/**"
+exclude:
+  - "**/draft-*"
+concurrency: 4
+layout: iteration
+strict: true
+report:
+  enabled: true
+  title: Agent Skills Report
+targetParams:
+  temperature: 0
+judgeParams:
+  temperature: 0
+```
 
-- connection setup
-- feature discovery
-- agent discovery
-- session creation
-- run start
-- event streaming
-- wait behavior
-- cancellation
-- approval handling
-- artifact display
-- unsupported feature errors
+Run:
 
-The app should not call private Gateway internals.
+```bash
+OPENAI_API_KEY=... npx agent-skills-eval --config agent-skills-eval.yaml
+```
 
-It should use the same SDK surface an external developer would use.
+In CI, do **not rely only on console output**.
 
-If the app needs a workaround, the **SDK contract** probably needs work.
+Persist:
+
+- `benchmark.json`
+- judge grading files
+- generated report
+- JSONL event logs
+
+Those artifacts are the **evidence**.
 
 ---
 
-## 23. Testing strategy
+## 9. OpenClaw skill testing workflow
 
-A strong SDK test harness uses fixtures.
+OpenClaw-style systems can use skills for:
 
-Test these paths:
+- GitHub issue triage
+- release note generation
+- weather and schedule planning
+- Gateway runbooks
+- node troubleshooting
+- app SDK testing
+- security review
+- GPU performance analysis
 
-- connect and discover
-- list agents
-- create a session
-- start a run
-- stream assistant deltas
-- stream tool events
-- approval requested and resolved
-- run completed
-- run failed
-- run cancelled
-- wait deadline expires while run remains active
-- raw event normalization
-- unknown event family
-- unsupported `oc.artifacts.*`
-- unsupported `oc.environments.*`
-- unsupported `oc.tasks.*`
-- unsupported `oc.tools.invoke`
-- device model lookup fallback for unknown Apple model identifiers
-- node pairing approval and stale request replacement
-- declared node command allowed versus denied by Gateway policy
-- node media event creates a structured attachment or artifact
+A practical workflow:
 
-The goal is not just **correctness**.
+```text
+1. Contributor edits SKILL.md.
+2. Contributor adds or updates evals/evals.json.
+3. CI runs agent-skills-eval with baseline.
+4. Report is uploaded as an artifact.
+5. PR review checks pass rate, regressions, and judge evidence.
+6. Maintainer decides whether the behavior change is acceptable.
+```
 
-The goal is **contract stability**.
+Suggested PR rule:
 
-When the Gateway evolves, the SDK fixtures tell you whether external apps will break.
+```text
+No skill behavior change without at least one eval proving the intended behavior.
+No regression accepted without an explicit note explaining why.
+```
+
+This mirrors **how code should be tested**.
 
 ---
 
-## 24. Practical app guidance
+## 10. Designing good skill evals
 
-For external apps:
+A good eval is **narrow**.
 
-- use `Run.events()` for progress instead of polling
-- use `Run.wait()` for final lifecycle result
-- use sessions for durable transcripts
-- use raw events only for advanced diagnostics
-- feature-detect Gateway methods before showing UI
-- treat unsupported SDK namespaces as intentional
-- use a custom transport in tests
-- do not parse transcripts to find files once artifact APIs exist
-- do not assume direct tool invocation is available
-- do not mix App SDK and Plugin SDK assumptions
-- treat nodes as remote peripherals, not as alternate gateways
-- render node media through structured attachments or artifacts, not transcript parsing
+It tests **one behavior**.
 
-For SDK implementers:
+Bad eval:
 
-- keep namespaces narrow
-- fail loudly on unsupported future fields
-- generate types from protocol schemas
-- keep auth and scope checks server-side
-- normalize events before exposing them
-- make cancellation semantics deterministic
-- keep node command policy server-side and fail closed for unknown platforms
-- add fixtures before expanding surface area
+```text
+Prompt: "Use the GitHub skill to manage issues well."
+Assertion: "The answer is good."
+```
+
+Good eval:
+
+```text
+Prompt: "Given these three issue titles and labels, identify which one is a bug, which one is a feature request, and which one needs more information."
+Assertions:
+  - The output classifies all three issues.
+  - The output asks for reproduction steps for the ambiguous bug report.
+  - The output does not propose closing any issue without evidence.
+```
+
+Good skill evals should cover:
+
+- happy path
+- ambiguous input
+- missing data
+- adversarial instruction
+- unsafe action request
+- tool-call behavior
+- regression case from a real bug
+
+Do **not make the eval suite huge** at first.
+
+Start with the three cases **most likely to break user trust**.
 
 ---
 
-## 25. Design exercise
+## 11. Common failure modes
 
-Design a small OpenClaw dashboard using only the App SDK.
+### The skill adds no lift
 
-The dashboard must:
+Both `with_skill` and `without_skill` pass.
 
-- connect to a Gateway
-- list agents
-- list models
-- create a session
-- start a run
-- stream assistant and tool events
-- show approval prompts
-- wait for final state
-- cancel a run
-- show artifacts if the Gateway supports artifact APIs
-- hide artifact UI if the Gateway does not support artifact APIs
+Interpretation:
 
-Answer:
+```text
+The model may already know this task,
+or the eval is too easy.
+```
 
-1. Which SDK namespaces do you need today?
-2. Which future namespaces should be feature-detected?
-3. Which operations need idempotency keys?
-4. What events update the UI state reducer?
-5. What happens if `Run.wait()` returns accepted because the wait deadline expired?
-6. How do you test the app without a real Gateway?
-7. What must stay in the SDK adapter instead of the UI component?
+Fix:
+
+- make the eval more specific
+- test domain-specific constraints
+- test tool-call behavior
+- test edge cases
+
+### The skill makes output worse
+
+Baseline passes, skill fails.
+
+Interpretation:
+
+```text
+The skill is too broad, stale, misleading, or over-prescriptive.
+```
+
+Fix:
+
+- shorten the skill
+- remove stale rules
+- improve trigger description
+- add counterexamples
+- split into smaller skills
+
+### The judge is unreliable
+
+Repeated runs disagree.
+
+Fix:
+
+- lower temperature
+- sharpen assertions
+- add deterministic checks
+- use a stronger judge
+- manually review artifacts
+
+### The eval tests formatting instead of behavior
+
+Fix:
+
+- assert outcome, not prose style
+- use schema checks for structured outputs
+- separate style tests from correctness tests
 
 ---
 
-## 26. Five apps that could use the App SDK
+## 12. How this connects to earlier lectures
 
-The App SDK is useful when an application wants OpenClaw's agent runtime **without embedding OpenClaw itself**.
+Lecture 21 introduced skills as **workflow discipline**.
 
-Here are five realistic app patterns.
-
-### 1. Personal desktop control center
-
-A macOS, Windows, or Linux **desktop app** that lets a user manage agents, sessions, models, approvals, nodes, screenshots, and long-running work.
-
-Core user flow:
+This lecture adds the **missing test loop**:
 
 ```text
-open app
-  -> connect to Gateway
-  -> list agents and sessions
-  -> start a run
-  -> stream assistant and tool events
-  -> approve or reject risky actions
-  -> show artifacts and node media
+skill design
+  -> eval prompt
+  -> with/without comparison
+  -> judge + deterministic assertions
+  -> artifact review
+  -> skill revision
 ```
 
-SDK surfaces:
+Lecture 29 argued that tests are the **durable asset** in agentic software development.
 
-- `oc.agents`
-- `oc.sessions`
-- `oc.runs`
-- `oc.models`
-- `oc.approvals`
-- future `oc.artifacts`
-- feature-detected node/media events
+Skill evals are the **tests for agent behavior**.
 
-Why it fits:
+Lecture 42 showed skills for GPU kernel translation.
+
+`agent-skills-eval` is how you test whether those translation rules actually improve outputs.
+
+Lecture 44 used traces as evidence for performance claims.
+
+Skill evals are **evidence for prompt/workflow claims**.
+
+Same principle:
 
 ```text
-The app is a remote operator UI. It should not run the agent loop locally.
+No evidence, no claim.
 ```
 
-### 2. AI lab dashboard for experiments
+---
 
-A **web dashboard** for comparing prompts, models, agents, and tool behavior across repeated runs.
+## Mini-lab: Add evals to one OpenClaw-style skill
 
-Core user flow:
+Pick one skill:
+
+- GitHub issue triage
+- weather planning
+- Gateway troubleshooting
+- node pairing runbook
+- app SDK testing
+- GPU trace analysis
+
+Create:
 
 ```text
-select agent + model
-  -> run experiment batch
-  -> stream outputs
-  -> collect artifacts/logs
-  -> compare final results
-  -> export report
+SKILL.md
+evals/evals.json
+agent-skills-eval.yaml
 ```
 
-SDK surfaces:
+Run:
 
-- `oc.agents`
-- `oc.models`
-- `oc.runs`
-- `Run.events()`
-- `Run.wait()`
-- future `oc.tasks`
-- future `oc.artifacts`
+```bash
+npx agent-skills-eval ./skills \
+  --target gpt-4o-mini \
+  --judge gpt-4o-mini \
+  --baseline \
+  --strict
+```
 
-Why it fits:
+Then write a short report:
 
 ```text
-The dashboard needs stable run lifecycle, normalized events, and durable result tracking.
-It should not parse CLI output or transcripts to reconstruct experiment state.
+Skill:
+Eval count:
+Pass rate with skill:
+Pass rate without skill:
+Cases improved:
+Cases regressed:
+Judge concerns:
+Deterministic assertions needed:
+Decision:
 ```
 
-### 3. CI and code-review automation app
+If the skill does **not beat baseline**, do not ship it as-is.
 
-A GitHub/GitLab-adjacent **service** that asks OpenClaw agents to review changes, inspect logs, run approved checks, and produce review artifacts.
-
-Core user flow:
-
-```text
-pull request opened
-  -> app creates or resumes review session
-  -> starts review run
-  -> streams progress into CI UI
-  -> waits for final result
-  -> uploads review summary/artifacts
-```
-
-SDK surfaces:
-
-- `oc.sessions`
-- `oc.runs`
-- `Run.wait()`
-- `Run.events()`
-- `oc.approvals`
-- future `oc.artifacts`
-- future `oc.tools.invoke` only if tightly policy-gated
-
-Why it fits:
-
-```text
-CI needs deterministic wait/cancel behavior and clear approval boundaries.
-It cannot depend on a human watching a terminal.
-```
-
-### 4. Smart device and media companion
-
-A mobile or desktop **companion app** that exposes camera, screen, canvas, location, notifications, and device status to OpenClaw through nodes.
-
-Core user flow:
-
-```text
-pair device as node
-  -> Gateway sees declared capabilities
-  -> user asks agent to inspect screen/camera/canvas
-  -> node returns media
-  -> app displays MEDIA attachment or artifact
-```
-
-SDK surfaces:
-
-- `oc.rawEvents()` or normalized SDK node/media events
-- future node-aware helpers
-- future `oc.artifacts`
-- `oc.approvals` for sensitive actions
-- device model metadata for friendly instance names
-
-Why it fits:
-
-```text
-The app turns physical device capabilities into Gateway-mediated agent capabilities.
-The node remains a peripheral; the Gateway remains the control plane.
-```
-
-### 5. Operations console for distributed agent infrastructure
-
-An **admin app** for teams running multiple Gateways, node hosts, models, agents, and execution environments.
-
-Core user flow:
-
-```text
-connect to Gateway
-  -> inspect agents/models/nodes/environments
-  -> view active runs and approvals
-  -> identify stuck tasks
-  -> cancel or retry work
-  -> audit artifacts and events
-```
-
-SDK surfaces:
-
-- `oc.agents`
-- `oc.models`
-- `oc.runs`
-- `oc.approvals`
-- future `oc.environments`
-- future `oc.tasks`
-- future `oc.artifacts`
-
-Why it fits:
-
-```text
-Operations needs observability and control through typed APIs.
-It should not SSH into machines and scrape logs as the primary interface.
-```
-
-The common pattern across all five:
-
-```text
-App owns UX.
-Gateway owns agent runtime.
-SDK owns the typed contract between them.
-```
+Either **improve the skill** or admit the skill is unnecessary.
 
 ---
 
 ## Key takeaways
 
-- `@openclaw/sdk` is the app-facing contract for code outside OpenClaw.
-- The Plugin SDK is a separate in-process extension contract.
-- Real external apps should use typed Gateway RPCs, not CLI output or runtime internals.
-- The happy path is connect, discover, session, run, stream, wait, cancel, and approvals.
-- Current SDK helpers cover agents, runs, sessions, models, tools catalog, approvals, raw events, and event normalization.
-- Future app-facing surfaces should be narrow: `artifacts.*`, `environments.*`, `tools.invoke`, and `tasks.*`.
-- Nodes extend the Gateway with companion-device capabilities such as canvas, camera, screen, location, notifications, and controlled system execution.
-- Nodes are peripherals, not gateways; the Gateway still owns messages, model execution, sessions, policy, and routing.
-- Unsupported future surfaces should throw explicit errors rather than pretending to work.
-- Dogfooding with OpenMeow-style clients is how the SDK contract becomes stable enough for external apps.
-- Good App SDK use cases include desktop control centers, experiment dashboards, CI automation, smart-device companions, and operations consoles.
-- Friendly device names are presentation metadata; raw device identifiers and capability fields remain authoritative for runtime decisions.
+- Skills need tests because they change agent behavior.
+- `with_skill` versus `without_skill` is the core pattern for measuring skill lift.
+- LLM judges are useful when paired with explicit assertions and stored artifacts.
+- Deterministic assertions are required for tool-call and protocol behavior.
+- Artifact output makes skill reviews repeatable and CI-friendly.
+- OpenClaw contributors can use this pattern to validate skill changes before merge.
+- Good evals test concrete behavior, edge cases, safety constraints, and regressions.
+- A skill that does not beat baseline is not automatically worth carrying.
 
 ---
 
 ## References
 
-- OpenClaw App SDK: [https://openclaw.knidal.com/openclaw-app-sdk](https://openclaw.knidal.com/openclaw-app-sdk)
-- OpenClaw Gateway protocol: [https://openclaw.knidal.com/gateway-protocol](https://openclaw.knidal.com/gateway-protocol)
-- OpenClaw RPC adapters: [https://openclaw.knidal.com/rpc-adapters](https://openclaw.knidal.com/rpc-adapters)
-- OpenClaw Tools Invoke API: [https://openclaw.knidal.com/tools-invoke-api](https://openclaw.knidal.com/tools-invoke-api)
-- OpenClaw Nodes: [https://openclaw.knidal.com/nodes](https://openclaw.knidal.com/nodes)
-- OpenClaw Node troubleshooting: [https://openclaw.knidal.com/nodes/troubleshooting](https://openclaw.knidal.com/nodes/troubleshooting)
-- Apple device identifiers data source: [kyle-seongwoo-jun/apple-device-identifiers](https://github.com/kyle-seongwoo-jun/apple-device-identifiers)
-- Case-study source repo: [OpenClaw](https://github.com/openclaw/openclaw)
+- agent-skills-eval repository: [https://github.com/darkrishabh/agent-skills-eval](https://github.com/darkrishabh/agent-skills-eval)
+- agent-skills-eval documentation: [https://darkrishabh.github.io/agent-skills-eval](https://darkrishabh.github.io/agent-skills-eval)
+- Agent Skills overview: [https://agentskills.io/home](https://agentskills.io/home)
+- Lecture 21 - Agent Skills: [Lecture-21.md](Lecture-21.md)
+- Lecture 29 - Agentic SDLC: [Lecture-29.md](Lecture-29.md)
+- Lecture 42 - Agent Skills for GPU Kernel Translation: [Lecture-42.md](Lecture-42.md)
 
 ---
 
-*Next: [Lecture 23 - OpenClaw Case Study: Gateway RPC Protocol](Lecture-23.md)*
+*Next: [Lecture 23](Lecture-23.md)*

@@ -714,7 +714,7 @@ Create `cache.py`:
 # cache.py
 """
 In-memory semantic cache using numpy (no Redis required for this lab).
-For production, swap self._store with Redis as shown in Lecture 12.
+For production, swap self._store with Redis as shown in Lecture 30.
 """
 
 import json
@@ -1060,7 +1060,7 @@ After running `evaluate.py`, you should see output close to:
 1. **Namespace isolation** — Separate different document categories (GPUs, networking, software) into ChromaDB namespaces or separate collections. Add a namespace selector to the API.
 2. **Re-ingestion webhook** — Add a `POST /ingest` endpoint that accepts a file upload, chunks it, and adds it to the live index without downtime.
 3. **Query classification** — Before retrieval, classify the query as "factual", "comparative", or "procedural" and apply different retrieval strategies per class.
-4. **Persistent Redis cache** — Swap the in-memory `SemanticCache` for the Redis-backed version from Lecture 12. Add a TTL of 24 hours for cached answers.
+4. **Persistent Redis cache** — Swap the in-memory `SemanticCache` for the Redis-backed version from Lecture 30. Add a TTL of 24 hours for cached answers.
 5. **Evaluation pipeline** — Schedule `evaluate.py` to run nightly on a fixed test set. If any metric drops below 0.75, send an alert.
 
 ---

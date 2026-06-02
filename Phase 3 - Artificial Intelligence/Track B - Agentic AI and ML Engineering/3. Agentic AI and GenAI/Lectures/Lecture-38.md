@@ -1,35 +1,27 @@
-# Lecture 38 - AutoSP: Compiler-Generated Sequence Parallelism for Long-Context Training
+# Lecture 38 - OpenClaw Case Study: App SDK Dogfooding and Typed Gateway RPCs
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 37](Lecture-37.md) | **Next:** [Lecture 39](Lecture-39.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 37](Lecture-37.md) | **Next:** [Lecture 39](Lecture-39.md)
 
 ---
 
-**Long-context agents** create long-context model requirements.
+An agent runtime becomes a **platform** only when external applications can use it without knowing private internals.
 
-**Serving** long contexts is one problem.
+That is the purpose of the **OpenClaw App SDK**.
 
-**Training** models to handle long contexts is another.
+The App SDK, published as `@openclaw/sdk`, is the public client API for applications that run **outside** the OpenClaw process:
 
-Lecture 36 covered vLLM FP8 KV-cache for long-context inference. This lecture covers the training-side complement: AutoSP.
+- dashboards
+- desktop clients
+- mobile clients
+- IDE extensions
+- CI jobs
+- admin tools
+- integration tests
+- companion apps such as OpenMeow
 
-**AutoSP** is a compiler-based system that automatically transforms ordinary transformer training code into **sequence-parallel** training code across multiple GPUs. The goal is direct:
+This lecture explains the current blueprint:
 
-```text
-write standard transformer training code
-  -> compile with AutoSP
-  -> train longer contexts across GPUs
-  -> avoid hand-writing sequence-parallel plumbing
-```
-
-The important idea is not just "sequence parallelism exists."
-
-The important idea is:
-
-```text
-distributed training strategies are moving into compiler passes
-```
-
-That has consequences for **model scientists, systems engineers, and hardware engineers**.
+> make `@openclaw/sdk` usable by real external apps through typed Gateway RPCs, instead of forcing apps to scrape CLI output, transcripts, or runtime internals
 
 ---
 
@@ -37,696 +29,1413 @@ That has consequences for **model scientists, systems engineers, and hardware en
 
 By the end of this lecture, you should be able to:
 
-1. Explain why long-context training OOMs even with conventional data-parallel scaling.
-2. Understand sequence parallelism as sharding the token dimension across GPUs.
-3. Explain what AutoSP automates compared with hand-written sequence parallelism.
-4. Understand how AutoSP integrates with DeepSpeed and DeepCompile.
-5. Describe why AutoSP targets DeepSpeed-Ulysses and where that strategy is limited.
-6. Explain sequence-aware activation checkpointing and why long-context training changes checkpointing tradeoffs.
-7. Understand how AutoSP composes with ZeRO 0/1 and why ZeRO/FSDP alone are not sufficient.
-8. Identify AutoSP's limitations around graph breaks and whole-model compilation.
-9. Design a benchmark and trace plan for validating AutoSP on real long-context workloads.
+1. Explain the difference between the App SDK and the Plugin SDK.
+2. Describe the App SDK happy path for real external applications.
+3. Understand why Gateway WebSocket RPC is the correct platform boundary.
+4. Explain how agents, sessions, runs, artifacts, tools, environments, and tasks fit into the app-facing architecture.
+5. Understand what the current SDK supports today versus what remains explicit future surface.
+6. Design a narrow typed RPC surface without mixing unrelated responsibilities.
+7. Explain how dogfooding with a real app stabilizes SDK contracts.
+8. Explain how nodes expose remote device and media capabilities without becoming gateways.
+9. Separate authoritative runtime state from deterministic presentation metadata.
+10. Build a testing strategy around normalized events, waits, cancellation, and unsupported feature errors.
 
 ---
 
-## 1. Why long-context training runs out of memory
+## 1. Big picture
 
-Training a transformer stores much more than model weights.
-
-It stores:
-
-- parameters
-- gradients
-- optimizer state
-- input activations
-- intermediate activations
-- attention intermediates
-- communication buffers
-- recomputation metadata
-
-For long-context training, **activation memory** becomes severe.
-
-The token dimension grows:
+The architecture is:
 
 ```text
-8k tokens
-  -> 32k tokens
-  -> 100k+ tokens
+External app / OpenMeow
+        |
+        v
+@openclaw/sdk
+        |
+        v
+Gateway WebSocket RPC
+        |
+        +-- agents / sessions / runs     # happy-path app control
+        +-- artifacts.*                  # rich outputs: files/images/logs/etc.
+        +-- tools.invoke                 # controlled tool execution
+        +-- environments.*               # discover where work can run
+        +-- task ledger                  # durable app-visible run/task state
 ```
 
-That increases memory pressure inside attention and MLP blocks.
-
-**Data parallelism alone** does not solve this.
-
-With ordinary data parallelism, every GPU still sees the full sequence for its local microbatch:
+This is the important shift:
 
 ```text
-GPU 0: full sequence
-GPU 1: full sequence
-GPU 2: full sequence
-GPU 3: full sequence
+Before:
+  App knows internal Gateway/session/runtime details.
+
+After:
+  App uses typed SDK methods backed by discoverable Gateway RPCs.
 ```
 
-Adding more data-parallel GPUs increases total throughput, but it does **not reduce per-GPU sequence activation memory**.
-
-**ZeRO and FSDP** help shard parameters, gradients, and optimizer state.
-
-They do **not automatically shard the token dimension**.
-
-For 100k+ context training, that difference matters.
+That is how OpenClaw moves from "working internal system" to **"external app platform."**
 
 ---
 
-## 2. Sequence parallelism
+## 2. App SDK versus Plugin SDK
 
-**Sequence parallelism** shards the sequence dimension across devices.
+OpenClaw has two different extension surfaces.
 
-Instead of:
+Do not mix them.
+
+| SDK | Where Code Runs | Use It For |
+|---|---|---|
+| App SDK | Outside OpenClaw | External apps, dashboards, scripts, CI jobs, IDE clients |
+| Plugin SDK | Inside OpenClaw | Providers, channels, hooks, tools, runtime plugins |
+
+The App SDK connects to a Gateway.
+
+The Plugin SDK extends the Gateway/runtime from inside.
+
+Wrong mental model:
 
 ```text
-GPU 0: tokens 0..99999
-GPU 1: tokens 0..99999
-GPU 2: tokens 0..99999
-GPU 3: tokens 0..99999
+"SDK is SDK; app code and plugin code can share the same assumptions."
 ```
 
-you can distribute:
+Correct mental model:
 
 ```text
-GPU 0: tokens 0..24999
-GPU 1: tokens 25000..49999
-GPU 2: tokens 50000..74999
-GPU 3: tokens 75000..99999
+App SDK = remote client contract.
+Plugin SDK = in-process extension contract.
 ```
 
-This increases the **effective context length** you can train because activation memory is spread across GPUs.
-
-But transformer layers are **not embarrassingly parallel** across sequence.
-
-Attention, normalization, projections, masks, position IDs, and backward gradients all need correct data movement.
-
-Hand-written SP requires:
-
-- partitioning input tokens
-- partitioning intermediate activations
-- inserting collectives
-- coordinating forward and backward communication
-- preserving masks and position IDs
-- overlapping communication with computation
-- validating numerical correctness
-- composing with data parallelism and optimizer sharding
-
-That is **invasive systems work**.
-
-AutoSP tries to move that work **into the compiler**.
+This separation matters for **auth, scopes, error handling, lifecycle, and compatibility**.
 
 ---
 
-## 3. What AutoSP automates
+## 3. What ships in `@openclaw/sdk`
 
-AutoSP automatically converts standard transformer training code into multi-GPU sequence-parallel code.
+The main entry is:
 
-The PyTorch blog describes it as integrated with **DeepSpeed through DeepCompile**, a compiler ecosystem for distributed training optimizations.
+```ts
+OpenClaw
+```
 
-The user-facing workflow is intentionally small:
+It owns:
 
-1. Tag input tensors for AutoSP analysis.
-2. Enable DeepCompile.
-3. Add the `autosp` compiler pass.
-4. Set `sequence_parallel_size`.
-5. Compile the model.
+- transport
+- connection
+- request/response calls
+- event handling
+- high-level resource helpers
 
-Representative configuration:
+Basic connection example:
 
-```python
-config = {
-    "train_micro_batch_size_per_gpu": 1,
-    "train_batch_size": 2,
-    "zero_optimization": {
-        "stage": 1,
-    },
-    "compile": {
-        "deepcompile": True,
-        "passes": ["autosp"],
-    },
-    "sequence_parallel_size": 4,
-    "gradient_clipping": 1.0,
+```ts
+import { OpenClaw } from "@openclaw/sdk";
+
+const oc = new OpenClaw({
+  url: "ws://127.0.0.1:14565",
+  token: process.env.OPENCLAW_GATEWAY_TOKEN,
+  requestTimeoutMs: 30_000,
+});
+
+await oc.connect();
+```
+
+The default transport is:
+
+```ts
+GatewayClientTransport
+```
+
+Tests can pass a custom transport implementing the SDK transport interface, so integration logic can be tested without a real WebSocket server.
+
+---
+
+## 4. The current high-level SDK helpers
+
+The SDK exposes resource helpers.
+
+| Helper | Purpose |
+|---|---|
+| `oc.agents` | List agents, get agent handles, start runs from agents |
+| `oc.runs` / `Run` | Create, get, wait, cancel, and stream runs |
+| `oc.sessions` / `Session` | Create sessions, send messages, patch, compact, abort |
+| `oc.models` | List models and inspect model auth status |
+| `oc.tools` | List tool catalog and effective tools |
+| `oc.approvals` | List and resolve approval requests |
+| `oc.rawEvents()` | Inspect raw Gateway frames for advanced cases |
+
+The SDK also exports types such as:
+
+- `AgentRunParams`
+- `RunResult`
+- `RunStatus`
+- `OpenClawEvent`
+- related RPC and selection types
+
+The design goal is that app authors use these helpers instead of **hand-writing Gateway frames**.
+
+---
+
+## 5. The SDK happy path
+
+The happy path is the **minimum app flow** that must be boringly reliable.
+
+```text
+Connect
+  -> Discover
+  -> Create or resume session
+  -> Start run
+  -> Stream events
+  -> Wait for result
+  -> Cancel if needed
+  -> Surface approvals
+```
+
+This path matters because most external apps need exactly this loop:
+
+```text
+User clicks "Run"
+  -> app sends task
+  -> assistant streams output
+  -> tools emit progress
+  -> approvals may be requested
+  -> app shows final result
+```
+
+If this path is unstable, every external app becomes a **pile of special cases**.
+
+---
+
+## 6. Running an agent
+
+A typical high-level app flow:
+
+```ts
+const agent = await oc.agents.get("default");
+
+const run = await agent.run({
+  message: "Summarize the current project status.",
+  sessionKey: "main",
+  model: "openai/gpt-5.5",
+  timeoutMs: 30_000,
+});
+
+for await (const event of run.events()) {
+  if (event.type === "assistant.delta") {
+    process.stdout.write(String(event.data));
+  }
+
+  if (event.type === "run.completed") {
+    break;
+  }
 }
 
-model, _, _ = deepspeed.initialize(config=config, model=model)
-model.compile(compile_kwargs={"dynamic": True})
+const result = await run.wait();
 ```
 
-Then the training loop tags inputs:
+Important SDK behavior:
 
-```python
-inputs, labels, positions, mask = prepare_auto_sp_inputs(batch)
+- provider-qualified model refs such as `openai/gpt-5.5` are split into provider and model overrides before being sent to the Gateway
+- SDK `timeoutMs` is milliseconds
+- Gateway timeout values may be sent as seconds
+- `Run.events()` filters events to one run
+- `Run.events()` can replay already-seen events for fast runs
+- `Run.wait()` maps Gateway lifecycle outcomes into stable SDK result shapes
 
-loss = model(
-    input_ids=inputs,
-    labels=labels,
-    position_ids=positions,
-    attention_mask=mask,
-)
-```
-
-The **compiler pass** handles the sequence-parallel code transformation.
-
-This is the same trend we saw in Lecture 35:
-
-```text
-Do not just prompt the agent or user to remember systems rules.
-Encode the workflow into reusable machinery.
-```
-
-Here, the machinery is a compiler pass.
+The app does not need to know the **internal agent loop implementation**.
 
 ---
 
-## 4. Why this matters for model scientists
+## 7. Sessions
 
-Without AutoSP, long-context research often requires **rewriting the training stack**.
+Sessions are **durable transcript holders**.
 
-Researchers who want to test model behavior at 64k, 128k, or longer contexts may be forced to become **distributed-systems engineers** first.
+They give apps **stable context** and session-affine behavior.
 
-AutoSP changes the workflow:
+Example:
 
-```text
-before:
-  modify DeepSpeed/HuggingFace internals
-  hand-insert communication
-  debug forward/backward layout bugs
-  tune activation checkpointing
-  repeat per model and hardware stack
+```ts
+const session = await oc.sessions.create({
+  agentId: "default",
+  label: "Hardware debug session",
+});
 
-after:
-  write normal model code
-  enable AutoSP pass
-  compile
-  benchmark and validate
+const run = await session.send({
+  message: "Review the latest UART bring-up notes.",
+});
 ```
 
-This does not remove the need for **performance engineering**.
+Session handles can support operations such as:
 
-It changes **where the complexity lives**.
+- send
+- abort
+- patch
+- compact
+- inspect metadata
 
-The complexity moves from every model implementation into a **reusable compiler system**.
+Use sessions when the app wants durable conversation state.
+
+Use isolated runs when the app wants clean one-shot work.
 
 ---
 
-## 5. DeepSpeed-Ulysses as the target SP strategy
+## 8. Event streaming and normalization
 
-AutoSP targets **DeepSpeed-Ulysses-style** sequence parallelism.
+External apps should not consume **raw Gateway internals** directly.
 
-The PyTorch blog notes two important points:
+The SDK normalizes Gateway events into a stable envelope:
 
-- Ulysses communication overhead can stay constant with increasing GPU counts on NVLink or fat-tree topologies.
-- Ulysses SP size is limited by the number of attention heads.
-
-That second point is operationally important.
-
-If a model has 32 heads, Ulysses cannot scale sequence parallelism past that **head-count limit**.
-
-This means AutoSP does **not remove topology and architecture constraints**.
-
-It automates a specific strategy with known tradeoffs.
-
-The useful mental model:
-
-```text
-AutoSP is not magic distributed training.
-AutoSP is compiler-generated Ulysses-style sequence parallelism plus long-context-aware checkpointing.
+```ts
+type OpenClawEvent = {
+  version: 1;
+  id: string;
+  ts: number;
+  type: OpenClawEventType;
+  runId?: string;
+  sessionId?: string;
+  sessionKey?: string;
+  taskId?: string;
+  agentId?: string;
+  data: unknown;
+  raw?: GatewayEvent;
+};
 ```
 
-That is still valuable because the hand-written version is **difficult and error-prone**.
+Common mapped event types include:
+
+- `run.started`
+- `run.completed`
+- `run.failed`
+- `run.cancelled`
+- `run.timed_out`
+- `assistant.delta`
+- `assistant.message`
+- `thinking.delta`
+- `tool.call.*`
+- `approval.requested`
+- `approval.resolved`
+- `session.created`
+- `session.updated`
+- `session.compacted`
+- `task.updated`
+- `artifact.updated`
+- `raw`
+
+The `raw` escape hatch is useful for advanced clients, but normal apps should prefer stable SDK event types.
 
 ---
 
-## 6. Sequence-aware activation checkpointing
+## 9. Why event leakage is dangerous
 
-**Activation checkpointing** saves memory by discarding selected intermediate activations during forward pass and recomputing them during backward pass.
+If raw chat or runtime events leak through `run.events()`, the app becomes **coupled to private implementation details**.
 
-Generic activation checkpointing asks:
-
-```text
-Which activations should we store?
-Which should we recompute?
-```
-
-AutoSP adds a long-context-specific strategy called **sequence-aware activation checkpointing**, or SAC.
-
-The reason is that long-context workloads change the **compute/memory balance**.
-
-At long sequence length:
-
-- activation memory grows sharply
-- some intermediates become too expensive to keep
-- recomputation may be cheaper than OOM
-- generic checkpoint policies can be overly conservative
-
-SAC targets this regime.
-
-The tradeoff:
+Bad pattern:
 
 ```text
-SAC enabled
-  -> lower activation memory
-  -> longer trainable context
-  -> some throughput cost from recomputation
-
-SAC disabled
-  -> faster when memory fits
-  -> may OOM at longer contexts
+UI reducer handles internal provider chunks, chat frames, and lifecycle frames directly.
 ```
 
-This is a **deployment decision**, not a checkbox.
+Good pattern:
 
-Use SAC when it **enables the context length you need** or substantially reduces memory pressure.
+```text
+Gateway event
+  -> SDK normalizer
+  -> stable OpenClawEvent
+  -> app adapter
+  -> UI reducer
+```
+
+If internal events leak, clients break when the runtime changes.
+
+The SDK should be the **compatibility layer**.
 
 ---
 
-## 7. Composition with ZeRO
+## 10. Wait and cancellation semantics
 
-AutoSP composes with ZeRO 0/1 according to the PyTorch post.
-
-That is important because sequence parallelism and ZeRO solve **different memory problems**.
+Run lifecycle must be consistent across three surfaces:
 
 ```text
-ZeRO/FSDP:
-  shard optimizer state, gradients, and parameters
-
-Sequence parallelism:
-  shard the token/activation dimension
+Run.cancel()
+Run.events()
+Run.wait()
 ```
 
-For long-context training, you often need both:
+The SDK should avoid contradictory states.
+
+Bad state:
 
 ```text
-large model
-  -> shard parameters and optimizer state
-
-long sequence
-  -> shard sequence activations
+cancel() returns cancelled
+events emit run.completed
+wait() returns timed_out
 ```
 
-A practical design could look like:
+Good state:
 
 ```text
-data parallel group
-  -> improves global batch throughput
-
-ZeRO group
-  -> reduces optimizer/parameter memory
-
-sequence parallel group
-  -> increases maximum context length
+cancel requested
+events eventually emit run.cancelled
+wait() returns cancelled
 ```
 
-The challenge is making those parallel dimensions **compose without breaking correctness or performance**.
+Important nuance:
 
-AutoSP's value is that it **handles that composition** for its supported cases rather than requiring every user to implement it manually.
+`Run.cancel()` is a **request to stop work**.
+
+The true terminal state is **confirmed by the runtime**.
+
+`Run.wait()` should return normalized statuses such as:
+
+- `completed`
+- `failed`
+- `cancelled`
+- `timed_out`
+- `accepted`
+
+If the wait deadline expires while the run is still active, the SDK should return an accepted or still-active result rather than pretending the run itself failed.
 
 ---
 
-## 8. Compiler pass requirements
+## 11. Current supported versus future SDK surface
 
-AutoSP needs to **see the model graph**.
+A mature SDK should not pretend **missing Gateway RPCs** exist.
 
-The blog calls out two key limitations.
+The current App SDK approach is explicit:
 
-First, the transformer must be compiled as **one compilable artifact**.
+| Namespace | Current Shape |
+|---|---|
+| `oc.agents` | App-facing helper surface for agents and agent handles |
+| `oc.runs` | Run creation, wait, cancel, stream |
+| `oc.sessions` | Durable session management and sending |
+| `oc.models` | Model listing and auth status |
+| `oc.tools` | Tool catalog and effective tools |
+| `oc.approvals` | Approval listing and resolution |
+| `oc.tasks` | Explicitly unsupported until Gateway APIs exist |
+| `oc.artifacts` | Explicitly unsupported until artifact RPCs exist |
+| `oc.environments` | Explicitly unsupported until environment RPCs exist |
+| `oc.tools.invoke` | Explicitly unsupported until Gateway tool invocation exists |
 
-If a project compiles many small functions separately and stitches them together, AutoSP cannot globally analyze and propagate sequence-sharding information through the whole model.
+This is **good API design**.
 
-Second, **graph breaks are disallowed** inside the compilable artifact.
+It prevents **silent fallback** to unsafe defaults.
 
-Graph breaks complicate:
+If a caller passes future-only fields such as workspace, runtime, environment, or approval parameters before the Gateway supports them, the SDK should throw before sending the request.
 
-- tensor sharding propagation
-- layout reasoning
-- communication insertion
-- backward-pass correctness
-- activation checkpointing
-
-This is a **compiler reality**.
-
-If the compiler cannot see the whole computation, it cannot **safely transform** the whole computation.
-
-For users, the implication is concrete:
-
-```text
-AutoSP-friendly code:
-  full transformer compiles as one graph
-  tensor metadata is visible
-  no graph breaks
-  inputs are tagged
-
-AutoSP-hostile code:
-  Python control flow that breaks graphs
-  custom ops without compiler visibility
-  fragmented compile regions
-  dynamic behavior the pass cannot analyze
-```
-
-This is not just an AutoSP issue.
-
-It is a **general rule** for compiler-based distributed training.
+That is **safer** than pretending the setting worked.
 
 ---
 
-## 9. Performance portability
+## 12. Blueprint: typed Gateway RPCs
 
-The AutoSP paper argues that putting SP into the compiler can improve **performance portability** across hardware.
+Every app-facing capability should become a **typed Gateway RPC**.
 
-The reason:
-
-```text
-manual SP implementation
-  -> tied to one framework path, one backend, one set of assumptions
-
-compiler pass
-  -> can lower the same high-level transformation differently per backend
-```
-
-This matters for:
-
-- NVIDIA clusters
-- AMD clusters
-- mixed backend research
-- cloud portability
-- future interconnect generations
-
-**Do not overstate this.**
-
-Compiler portability does **not mean every backend is automatically optimal**.
-
-It means the abstraction boundary is better:
+The implementation pattern:
 
 ```text
-model code expresses intent
-compiler/runtime chooses distributed lowering
-trace/profiler validates the actual result
+1. Protocol schema
+   src/gateway/protocol/schema/*.ts
+
+2. Protocol exports + validators
+   src/gateway/protocol/index.ts
+   src/gateway/protocol/schema/protocol-schemas.ts
+
+3. Gateway method handler
+   src/gateway/server-methods/*.ts
+
+4. Method discovery
+   src/gateway/server-methods-list.ts
+
+5. Scope gate
+   src/gateway/method-scopes.ts
+
+6. SDK wrapper
+   packages/sdk/src/client.ts
+   packages/sdk/src/types.ts
+   packages/sdk/src/index.ts
+
+7. Generated native protocol models
+   apps/macos/Sources/OpenClawProtocol/GatewayModels.swift
+   apps/shared/OpenClawKit/Sources/OpenClawProtocol/GatewayModels.swift
+
+8. Docs + changelog
+   docs/concepts/openclaw-sdk.md
+   docs/gateway/protocol.md
+   CHANGELOG.md
 ```
 
-This pairs directly with Lecture 37.
+The exact file names may evolve, but the architecture rule is stable:
 
-Use **TraceLens** or equivalent profiler analysis to verify whether the generated SP code is **actually efficient** on your hardware.
+> schema first, server handler second, discovery third, SDK wrapper fourth, generated native models and docs before calling it public
 
 ---
 
-## 10. What to measure
+## 13. Gateway RPC framing
 
-For AutoSP, benchmark **both capability and cost**.
+Gateway RPC uses WebSocket JSON frames.
 
-Capability metrics:
+Request:
 
-- maximum trainable context length before OOM
-- peak GPU memory
-- whether target batch size fits
-- correctness versus baseline loss
-- gradient consistency if doing deeper validation
-
-Performance metrics:
-
-- tokens/s
-- step time
-- forward time
-- backward time
-- exposed communication time
-- all-to-all latency and bandwidth
-- recomputation overhead
-- GPU idle time
-- compile time
-
-Quality metrics:
-
-- loss curve agreement
-- downstream long-context validation
-- stability at target sequence length
-- numerical differences versus hand-written baseline
-
-For a real report, do not only say:
-
-```text
-AutoSP works.
+```json
+{
+  "type": "req",
+  "id": "req-1",
+  "method": "runs.create",
+  "params": {}
+}
 ```
 
-Say:
+Response:
 
-```text
-AutoSP increased max sequence length from A to B
-with C% step-time overhead,
-D GB lower peak memory,
-E communication exposure,
-and loss difference within threshold F.
+```json
+{
+  "type": "res",
+  "id": "req-1",
+  "ok": true,
+  "payload": {}
+}
 ```
 
-That is the **engineering standard**.
+Event:
+
+```json
+{
+  "type": "event",
+  "family": "runs",
+  "name": "run.delta",
+  "payload": {}
+}
+```
+
+This gives SDKs:
+
+- request-response correlation
+- streaming events
+- typed errors
+- feature discovery
+- transport limits
+- auth and scope enforcement
+- compatibility checks
 
 ---
 
-## 11. Where AutoSP sits in the long-context stack
+## 14. Capability boundary rule
 
-Long-context systems have **both training and inference paths**.
-
-```text
-training:
-  sequence parallelism
-  activation checkpointing
-  ZeRO/FSDP
-  tensor/pipeline parallelism
-  distributed optimizer state
-
-serving:
-  KV-cache memory
-  prefill/decode scheduling
-  paged attention
-  FP8 KV-cache
-  batching and routing
-  request concurrency
-```
-
-AutoSP belongs to the **training side**.
-
-vLLM FP8 KV-cache belongs to the **serving side**.
-
-TraceLens belongs to **evidence and diagnosis** across both.
-
-Together:
+Keep RPC families narrow.
 
 ```text
-AutoSP:
-  train long-context models
-
-vLLM FP8 KV-cache:
-  serve long-context models efficiently
-
-TraceLens:
-  prove where performance changed
+environments.* = read-only discovery
+artifacts.*    = read-only output access/download
+tools.invoke   = controlled execution with policy/approval
+tasks.*        = durable task state
+sessions/runs  = core app execution path
 ```
 
-For agent systems, these are connected because persistent agents create demand for:
+Do not bundle these into one broad "SDK platform" method.
 
-- longer sessions
-- larger retrieved context
-- long tool traces
-- multimodal history
-- extended planning state
-- larger evaluation prompts
+Narrow RPC surfaces are easier to:
 
-**Training and serving** must both adapt.
+- review
+- test
+- secure
+- document
+- version
+- expose in native SDKs
+
+This is how the SDK grows **without becoming unstable**.
 
 ---
 
-## 12. Hardware engineer view
+## 15. Artifacts as app-visible outputs
 
-AutoSP exposes the **hardware bottlenecks** behind long-context training.
+Apps need **richer outputs** than text transcripts.
 
-Key questions:
+Artifacts represent:
+
+- generated files
+- images
+- logs
+- downloaded documents
+- reports
+- tool output bundles
+
+A clean artifact API surface looks like:
 
 ```text
-Memory capacity:
-  Does sequence sharding make the target context fit?
-
-Memory bandwidth:
-  Does recomputation or communication increase pressure elsewhere?
-
-Interconnect:
-  Are collectives exposed on the critical path?
-
-Topology:
-  Does Ulysses map cleanly onto NVLink, xGMI, or a fat-tree network?
-
-Compiler:
-  Can the graph stay intact enough for whole-model transformation?
-
-Kernel quality:
-  Do generated shapes hit efficient GEMM and attention kernels?
-
-Scheduling:
-  Is communication overlapped with useful compute?
+artifacts.list
+artifacts.get
+artifacts.download
 ```
 
-This is why long-context training is a **full-stack problem**.
+Why this matters:
 
-It is **not solved only by bigger HBM**.
+```text
+Without artifacts:
+  App parses transcript text to find output files.
 
-It needs:
+With artifacts:
+  App asks the Gateway for structured output metadata and downloads.
+```
 
-- model architecture choices
-- compiler transformations
-- communication topology
-- kernel efficiency
-- memory planning
-- profiler-backed validation
+Artifact APIs should be:
+
+- typed
+- read-only unless mutation is explicitly needed
+- scope-gated
+- payload-limit aware
+- discoverable in `hello-ok.features.methods`
+- backed by SDK wrappers
+- covered by tests
+
+Large artifact content should not be shoved blindly into **WebSocket frames**.
+
+Use metadata, download handles, or chunked behavior where appropriate.
 
 ---
 
-## 13. Practical usage checklist
+## 16. Environment discovery
 
-Before trying AutoSP on a real model, check:
+Apps need to know **where work can run**.
 
-- The model is transformer-like and compiles as one artifact.
-- The training path avoids graph breaks.
-- Input IDs, labels, position IDs, and attention masks can be tagged.
-- The DeepSpeed version includes the relevant DeepCompile/AutoSP support.
-- The desired ZeRO stage is supported by your AutoSP path.
-- The model head count supports the requested Ulysses SP size.
-- Your hardware topology can sustain the required collectives.
-- You have a baseline for correctness and step time.
-
-Start small:
+Environment discovery is read-only at first:
 
 ```text
-short sequence
-small model
-few layers
-sp_size = 2
-deterministic test
-compare loss
+environments.list
+environments.status
 ```
 
-Then scale:
+It can expose:
+
+- Gateway-local runtime candidates
+- node candidates
+- capabilities
+- health
+- availability
+- labels
+
+It should not initially do:
+
+- provisioning
+- create/delete
+- runtime selection
+- remote mutation
+
+That boundary is **intentional**.
+
+Discovery is **safer than control**.
+
+The app can show users where work can run without being allowed to create or destroy environments.
+
+### Device model database as UI metadata
+
+A concrete companion-app example is the OpenClaw macOS device model database.
+
+In the Instances UI, raw Apple model identifiers such as:
 
 ```text
-increase sequence length
-increase SP size
-enable SAC if needed
-add ZeRO
-measure traces
-compare with hand-written or compiled baseline
+iPad16,6
+Mac16,6
 ```
 
----
+are not friendly for users.
 
-## 14. Failure modes
-
-Common failure modes to expect:
+The macOS app maps them to human-readable Apple device names using vendored JSON files under:
 
 ```text
-graph break
-  -> compiler cannot apply AutoSP safely
-
-wrong masks or position IDs
-  -> correctness failure
-
-SP size exceeds head constraints
-  -> invalid or inefficient configuration
-
-communication dominates
-  -> topology or overlap issue
-
-SAC recomputation too expensive
-  -> context fits but throughput regresses
-
-dynamic behavior not captured
-  -> compile failure or fallback path
-
-loss diverges from baseline
-  -> sharding, mask, communication, or numerical issue
+apps/macos/Sources/OpenClaw/Resources/DeviceModels/
 ```
 
-The right response is **not to guess**.
+This is **not a new runtime authority**.
 
-Use:
+It is **app-side reference metadata**.
 
-- correctness tests
-- trace comparison
-- per-rank loss logging
-- memory reports
-- collective analysis
-- event replay for slow kernels where possible
-
----
-
-## Mini-lab: AutoSP evaluation plan
-
-You do **not need an 8-GPU node** to design the experiment.
-
-Write an evaluation plan for a Llama-style transformer.
-
-Include:
+That distinction matters:
 
 ```text
-Model:
-GPU type:
-GPU count:
-baseline strategy:
-AutoSP strategy:
-SP size:
-ZeRO stage:
-sequence lengths:
-batch size:
-activation checkpointing policy:
-correctness metric:
-performance metric:
-trace/profiler plan:
-failure threshold:
-deployment decision rule:
+Stable device identity:
+  model identifier, node id, instance id, capability fields
+
+Friendly UI label:
+  "iPad Pro ..." or "MacBook Pro ..."
 ```
 
-If you have access to multiple GPUs, run a small correctness test first:
+Do not use friendly names for auth, policy, routing, or compatibility decisions.
+
+Use them for display.
+
+OpenClaw vendors this mapping from the MIT-licensed `kyle-seongwoo-jun/apple-device-identifiers` repository and pins the JSON files to specific upstream commits. The pinned commit hashes are recorded in:
+
+```text
+apps/macos/Sources/OpenClaw/Resources/DeviceModels/NOTICE.md
+```
+
+The build lesson is important:
+
+> deterministic apps should pin external metadata, vendor the license, and keep a clear update procedure
+
+A safe update flow is:
 
 ```bash
-cd benchmarks/autosp
-./run_autosp.sh \
-  --compile autosp \
-  --batch-size 1 \
-  --seq-length 64 \
-  --sp-size 2 \
-  --num-layers 1 \
-  --steps 1 \
-  --deterministic
+IOS_COMMIT="<commit sha for ios-device-identifiers.json>"
+MAC_COMMIT="<commit sha for mac-device-identifiers.json>"
+
+curl -fsSL "https://raw.githubusercontent.com/kyle-seongwoo-jun/apple-device-identifiers/${IOS_COMMIT}/ios-device-identifiers.json" \
+  -o apps/macos/Sources/OpenClaw/Resources/DeviceModels/ios-device-identifiers.json
+
+curl -fsSL "https://raw.githubusercontent.com/kyle-seongwoo-jun/apple-device-identifiers/${MAC_COMMIT}/mac-device-identifiers.json" \
+  -o apps/macos/Sources/OpenClaw/Resources/DeviceModels/mac-device-identifiers.json
+
+swift build --package-path apps/macos
 ```
 
-Then compare against a baseline mode and record whether per-rank losses match within your threshold.
+Also verify that:
+
+- `NOTICE.md` records the exact pinned commits
+- `LICENSE.apple-device-identifiers.txt` still matches upstream
+- unknown model identifiers fall back to the raw identifier instead of breaking the UI
+- the UI treats this database as optional presentation data
+
+This is the same platform discipline as typed RPCs:
+
+```text
+runtime state should be authoritative
+presentation metadata should be deterministic, pinned, licensed, and replaceable
+```
+
+### Nodes and media as remote peripherals
+
+Nodes are **companion devices** connected to the Gateway WebSocket with:
+
+```json
+{ "role": "node" }
+```
+
+Examples:
+
+- macOS menubar app running in node mode
+- iOS companion device
+- Android companion device
+- headless node host on Linux, macOS, or Windows
+
+Legacy TCP JSONL bridge transport may still exist historically, but the current mental model is WebSocket node connection through the Gateway protocol.
+
+The key rule:
+
+> nodes are peripherals, not gateways
+
+They do not run the **Gateway service**.
+
+Messages from Telegram, WhatsApp, WebChat, or other channels still land on the Gateway. The Gateway owns the model, session routing, tool calls, and policy. Nodes expose device-local capabilities that the Gateway can invoke.
+
+macOS can run as a node through the menubar app. In that mode it exposes local canvas and camera commands for that Mac. In remote gateway mode, browser automation should be handled by the CLI node host or installed node service, not by assuming the native app node owns all remote automation.
+
+The raw invocation shape is:
+
+```text
+node.invoke
+```
+
+A node can declare command families such as:
+
+```text
+canvas.*
+camera.*
+screen.*
+location.*
+device.*
+notifications.*
+system.*
+```
+
+Practical examples:
+
+```bash
+openclaw nodes status
+openclaw nodes describe --node <idOrNameOrIp>
+openclaw nodes invoke --node <idOrNameOrIp> --command canvas.eval --params '{"javaScript":"location.href"}'
+```
+
+Higher-level helpers exist for common media workflows:
+
+```bash
+openclaw nodes canvas snapshot --node <idOrNameOrIp> --format png
+openclaw nodes camera list --node <idOrNameOrIp>
+openclaw nodes camera snap --node <idOrNameOrIp> --facing front
+openclaw nodes screen record --node <idOrNameOrIp> --duration 10s --fps 10
+openclaw nodes location get --node <idOrNameOrIp>
+```
+
+The app-facing lesson:
+
+```text
+Do not make the agent pretend the camera, screen, or canvas is local.
+Represent them as node capabilities behind Gateway-mediated commands.
+```
+
+#### Pairing and durable node identity
+
+WebSocket nodes use device pairing.
+
+The node presents a device identity during connect. The Gateway creates a pairing request for `role: node`. An operator approves or rejects that request:
+
+```bash
+openclaw devices list
+openclaw devices approve <requestId>
+openclaw devices reject <requestId>
+openclaw nodes status
+```
+
+This approval is the **durable role contract**.
+
+Token rotation must stay inside that contract. A rotated token should not silently upgrade a node into a different role or broader command surface.
+
+If a node reconnects with changed auth details, scopes, public key, or command declarations, treat the old pending request as stale and approve the current request.
+
+That avoids this unsafe state:
+
+```text
+operator approved old capability set
+node later exposes broader capability set
+gateway accidentally trusts it
+```
+
+Avoid a common pairing confusion:
+
+```text
+device pairing:
+  gates the WebSocket node role and approved role contract
+
+gateway-owned node pairing store:
+  supports older nodes pending/approve/reject/remove/rename flows
+  does not gate the WebSocket connect handshake
+```
+
+#### Node command policy
+
+A node command should pass **two gates** before invocation:
+
+```text
+1. The node declared the command at connect time.
+2. Gateway policy allows that declared command.
+```
+
+This matters for privacy-heavy capabilities.
+
+Safe or low-risk commands may be allowed by default on known platforms:
+
+```text
+canvas.*
+camera.list
+location.get
+screen.snapshot
+```
+
+More sensitive commands should require explicit opt-in:
+
+```text
+camera.snap
+camera.clip
+screen.record
+sms.send
+system.run
+system.which
+```
+
+The conservative rule:
+
+> unknown node platform means conservative allowlist
+
+If the Gateway cannot recognize the node platform or device family, it should not assume that `system.run` or other powerful commands are safe.
+
+#### Remote node host and `system.run`
+
+The **headless node host** is the pattern for remote execution.
+
+Use it when:
+
+```text
+Gateway host:
+  receives messages, runs the model, routes tool calls
+
+Node host:
+  executes selected system commands on another machine
+```
+
+Start a node host:
+
+```bash
+openclaw node run --host <gateway-host> --port 18789 --display-name "Build Node"
+```
+
+If the Gateway is bound to loopback, connect through an SSH tunnel:
+
+```bash
+ssh -N -L 18790:127.0.0.1:18789 user@gateway-host
+
+export OPENCLAW_GATEWAY_TOKEN="<gateway-token>"
+openclaw node run --host 127.0.0.1 --port 18790 --display-name "Build Node"
+```
+
+Then bind exec to the node:
+
+```bash
+openclaw config set tools.exec.host node
+openclaw config set tools.exec.security allowlist
+openclaw config set tools.exec.node "<id-or-name>"
+```
+
+Exec approvals live on the node host:
+
+```text
+~/.openclaw/exec-approvals.json
+```
+
+That is intentional. The machine executing the command enforces the **local approval and allowlist state**.
+
+The important security boundary:
+
+```text
+shell execution should go through the exec path
+explicit device commands should go through node.invoke
+```
+
+That separation keeps approvals, allowlists, and audit behavior understandable.
+
+For approval-backed node execution, bind the exact prepared command context. After approval, the Gateway should forward the stored plan, not a later caller-edited command, working directory, or session field.
+
+#### Media payload design
+
+Media commands often return large payloads:
+
+- canvas screenshots
+- camera photos
+- camera clips
+- screen recordings
+- latest photos from a device
+
+Do not force every app to parse base64 from transcript text.
+
+A better app architecture is:
+
+```text
+node media command
+  -> Gateway result
+  -> artifact record or MEDIA attachment
+  -> SDK event
+  -> app renderer
+```
+
+This connects directly to the artifact API discussion:
+
+```text
+node commands produce media
+artifact APIs make media discoverable and downloadable
+SDK events tell the UI what changed
+```
+
+For app developers, the rule is simple:
+
+> display media through structured attachments or artifacts, not transcript scraping
+
+---
+
+## 17. Controlled tool invocation
+
+Direct tool invocation is **powerful and risky**.
+
+A future SDK-facing method could mirror the existing HTTP tool invoke behavior as:
+
+```text
+tools.invoke
+```
+
+Example:
+
+```json
+{
+  "type": "req",
+  "id": "req-1",
+  "method": "tools.invoke",
+  "params": {
+    "tool": "sessions_list",
+    "action": "json",
+    "args": {},
+    "sessionKey": "main"
+  }
+}
+```
+
+The important rule:
+
+> SDK tool invocation must reuse the same Gateway auth, tool policy, deny-list, approval semantics, and owner/actor semantics as the existing server path
+
+It must not become a **shortcut around policy**.
+
+Tool invocation touches:
+
+- tool allow/deny policy
+- session scoping
+- agent scoping
+- approval states
+- confirmation and refusal states
+- audit logs
+- security boundaries
+
+That is why it is **harder than read-only methods**.
+
+---
+
+## 18. Task ledger
+
+Event streams are **transient**.
+
+Apps also need **durable task state**.
+
+A task ledger API gives UIs a stable way to ask:
+
+```text
+What work exists?
+What is running?
+What completed?
+What failed?
+What was cancelled?
+What artifacts belong to this work?
+```
+
+Potential surface:
+
+```text
+tasks.list
+tasks.get
+tasks.cancel
+```
+
+The key design point:
+
+> event streams are for live updates; task ledger APIs are for durable app-visible state
+
+Do not make apps reconstruct durable state only from historical event streams.
+
+---
+
+## 19. Discovery and feature negotiation
+
+Gateway connections should **advertise capabilities**.
+
+The SDK can inspect:
+
+```text
+hello-ok.features.methods
+hello-ok.policy.maxPayload
+hello-ok.policy.maxBufferedBytes
+hello-ok.policy.tickIntervalMs
+```
+
+Then the app can decide:
+
+- whether artifact APIs exist
+- whether environment discovery exists
+- whether tool invocation exists
+- whether the payload is too large
+- whether to show or hide UI features
+
+This avoids **hard-coded version assumptions**.
+
+**Feature detection** beats guessing.
+
+---
+
+## 20. Auth, scopes, and fail-closed events
+
+SDK methods must be scope-gated.
+
+Examples:
+
+- `operator.read`
+- `operator.write`
+- `operator.admin`
+- plugin-defined scopes
+
+**Server-side checks** are mandatory.
+
+The SDK is **not a security boundary**.
+
+Events should also be gated by visibility.
+
+The safe rule:
+
+```text
+If the client should not see a session, run, task, artifact, or approval, do not broadcast the event to that client.
+```
+
+For app developers this means:
+
+- expect permission errors
+- design UI around missing capabilities
+- treat feature discovery as dynamic
+- do not assume owner-level access
+
+---
+
+## 21. Idempotency
+
+Side-effecting methods need **idempotency keys**.
+
+Examples:
+
+- start a run
+- cancel a run
+- approve a tool call
+- invoke a tool
+- create or mutate an artifact
+
+Why?
+
+Because real clients retry.
+
+Networks fail.
+
+Mobile clients reconnect.
+
+Users double-click.
+
+Without idempotency:
+
+```text
+one user action -> two runs
+```
+
+With idempotency:
+
+```text
+same request key -> same accepted operation
+```
+
+Idempotency is **part of the SDK contract**, not an optimization.
+
+---
+
+## 22. Dogfooding with OpenMeow
+
+OpenMeow-style dogfooding is valuable because it forces the SDK to behave like a **real product dependency**.
+
+The dogfood client should validate:
+
+- connection setup
+- feature discovery
+- agent discovery
+- session creation
+- run start
+- event streaming
+- wait behavior
+- cancellation
+- approval handling
+- artifact display
+- unsupported feature errors
+
+The app should not call private Gateway internals.
+
+It should use the same SDK surface an external developer would use.
+
+If the app needs a workaround, the **SDK contract** probably needs work.
+
+---
+
+## 23. Testing strategy
+
+A strong SDK test harness uses fixtures.
+
+Test these paths:
+
+- connect and discover
+- list agents
+- create a session
+- start a run
+- stream assistant deltas
+- stream tool events
+- approval requested and resolved
+- run completed
+- run failed
+- run cancelled
+- wait deadline expires while run remains active
+- raw event normalization
+- unknown event family
+- unsupported `oc.artifacts.*`
+- unsupported `oc.environments.*`
+- unsupported `oc.tasks.*`
+- unsupported `oc.tools.invoke`
+- device model lookup fallback for unknown Apple model identifiers
+- node pairing approval and stale request replacement
+- declared node command allowed versus denied by Gateway policy
+- node media event creates a structured attachment or artifact
+
+The goal is not just **correctness**.
+
+The goal is **contract stability**.
+
+When the Gateway evolves, the SDK fixtures tell you whether external apps will break.
+
+---
+
+## 24. Practical app guidance
+
+For external apps:
+
+- use `Run.events()` for progress instead of polling
+- use `Run.wait()` for final lifecycle result
+- use sessions for durable transcripts
+- use raw events only for advanced diagnostics
+- feature-detect Gateway methods before showing UI
+- treat unsupported SDK namespaces as intentional
+- use a custom transport in tests
+- do not parse transcripts to find files once artifact APIs exist
+- do not assume direct tool invocation is available
+- do not mix App SDK and Plugin SDK assumptions
+- treat nodes as remote peripherals, not as alternate gateways
+- render node media through structured attachments or artifacts, not transcript parsing
+
+For SDK implementers:
+
+- keep namespaces narrow
+- fail loudly on unsupported future fields
+- generate types from protocol schemas
+- keep auth and scope checks server-side
+- normalize events before exposing them
+- make cancellation semantics deterministic
+- keep node command policy server-side and fail closed for unknown platforms
+- add fixtures before expanding surface area
+
+---
+
+## 25. Design exercise
+
+Design a small OpenClaw dashboard using only the App SDK.
+
+The dashboard must:
+
+- connect to a Gateway
+- list agents
+- list models
+- create a session
+- start a run
+- stream assistant and tool events
+- show approval prompts
+- wait for final state
+- cancel a run
+- show artifacts if the Gateway supports artifact APIs
+- hide artifact UI if the Gateway does not support artifact APIs
+
+Answer:
+
+1. Which SDK namespaces do you need today?
+2. Which future namespaces should be feature-detected?
+3. Which operations need idempotency keys?
+4. What events update the UI state reducer?
+5. What happens if `Run.wait()` returns accepted because the wait deadline expired?
+6. How do you test the app without a real Gateway?
+7. What must stay in the SDK adapter instead of the UI component?
+
+---
+
+## 26. Five apps that could use the App SDK
+
+The App SDK is useful when an application wants OpenClaw's agent runtime **without embedding OpenClaw itself**.
+
+Here are five realistic app patterns.
+
+### 1. Personal desktop control center
+
+A macOS, Windows, or Linux **desktop app** that lets a user manage agents, sessions, models, approvals, nodes, screenshots, and long-running work.
+
+Core user flow:
+
+```text
+open app
+  -> connect to Gateway
+  -> list agents and sessions
+  -> start a run
+  -> stream assistant and tool events
+  -> approve or reject risky actions
+  -> show artifacts and node media
+```
+
+SDK surfaces:
+
+- `oc.agents`
+- `oc.sessions`
+- `oc.runs`
+- `oc.models`
+- `oc.approvals`
+- future `oc.artifacts`
+- feature-detected node/media events
+
+Why it fits:
+
+```text
+The app is a remote operator UI. It should not run the agent loop locally.
+```
+
+### 2. AI lab dashboard for experiments
+
+A **web dashboard** for comparing prompts, models, agents, and tool behavior across repeated runs.
+
+Core user flow:
+
+```text
+select agent + model
+  -> run experiment batch
+  -> stream outputs
+  -> collect artifacts/logs
+  -> compare final results
+  -> export report
+```
+
+SDK surfaces:
+
+- `oc.agents`
+- `oc.models`
+- `oc.runs`
+- `Run.events()`
+- `Run.wait()`
+- future `oc.tasks`
+- future `oc.artifacts`
+
+Why it fits:
+
+```text
+The dashboard needs stable run lifecycle, normalized events, and durable result tracking.
+It should not parse CLI output or transcripts to reconstruct experiment state.
+```
+
+### 3. CI and code-review automation app
+
+A GitHub/GitLab-adjacent **service** that asks OpenClaw agents to review changes, inspect logs, run approved checks, and produce review artifacts.
+
+Core user flow:
+
+```text
+pull request opened
+  -> app creates or resumes review session
+  -> starts review run
+  -> streams progress into CI UI
+  -> waits for final result
+  -> uploads review summary/artifacts
+```
+
+SDK surfaces:
+
+- `oc.sessions`
+- `oc.runs`
+- `Run.wait()`
+- `Run.events()`
+- `oc.approvals`
+- future `oc.artifacts`
+- future `oc.tools.invoke` only if tightly policy-gated
+
+Why it fits:
+
+```text
+CI needs deterministic wait/cancel behavior and clear approval boundaries.
+It cannot depend on a human watching a terminal.
+```
+
+### 4. Smart device and media companion
+
+A mobile or desktop **companion app** that exposes camera, screen, canvas, location, notifications, and device status to OpenClaw through nodes.
+
+Core user flow:
+
+```text
+pair device as node
+  -> Gateway sees declared capabilities
+  -> user asks agent to inspect screen/camera/canvas
+  -> node returns media
+  -> app displays MEDIA attachment or artifact
+```
+
+SDK surfaces:
+
+- `oc.rawEvents()` or normalized SDK node/media events
+- future node-aware helpers
+- future `oc.artifacts`
+- `oc.approvals` for sensitive actions
+- device model metadata for friendly instance names
+
+Why it fits:
+
+```text
+The app turns physical device capabilities into Gateway-mediated agent capabilities.
+The node remains a peripheral; the Gateway remains the control plane.
+```
+
+### 5. Operations console for distributed agent infrastructure
+
+An **admin app** for teams running multiple Gateways, node hosts, models, agents, and execution environments.
+
+Core user flow:
+
+```text
+connect to Gateway
+  -> inspect agents/models/nodes/environments
+  -> view active runs and approvals
+  -> identify stuck tasks
+  -> cancel or retry work
+  -> audit artifacts and events
+```
+
+SDK surfaces:
+
+- `oc.agents`
+- `oc.models`
+- `oc.runs`
+- `oc.approvals`
+- future `oc.environments`
+- future `oc.tasks`
+- future `oc.artifacts`
+
+Why it fits:
+
+```text
+Operations needs observability and control through typed APIs.
+It should not SSH into machines and scrape logs as the primary interface.
+```
+
+The common pattern across all five:
+
+```text
+App owns UX.
+Gateway owns agent runtime.
+SDK owns the typed contract between them.
+```
 
 ---
 
 ## Key takeaways
 
-- Long-context training can OOM because activation memory grows with sequence length.
-- ZeRO and FSDP help model-state memory but do not automatically shard the token dimension.
-- Sequence parallelism shards the sequence dimension across GPUs, enabling longer context training.
-- Hand-written SP is invasive because it requires partitioning activations and inserting correct collectives in forward and backward passes.
-- AutoSP moves Ulysses-style sequence parallelism into a DeepSpeed/DeepCompile compiler pass.
-- Sequence-aware activation checkpointing trades recomputation for longer trainable contexts.
-- AutoSP composes with supported ZeRO stages, but it has strict compiler requirements.
-- Whole-model compilation and no graph breaks are core constraints.
-- Validate AutoSP with max context, memory, step time, communication exposure, and correctness, not only whether the run starts.
-- Compiler-generated distributed training should be paired with trace-driven analysis.
+- `@openclaw/sdk` is the app-facing contract for code outside OpenClaw.
+- The Plugin SDK is a separate in-process extension contract.
+- Real external apps should use typed Gateway RPCs, not CLI output or runtime internals.
+- The happy path is connect, discover, session, run, stream, wait, cancel, and approvals.
+- Current SDK helpers cover agents, runs, sessions, models, tools catalog, approvals, raw events, and event normalization.
+- Future app-facing surfaces should be narrow: `artifacts.*`, `environments.*`, `tools.invoke`, and `tasks.*`.
+- Nodes extend the Gateway with companion-device capabilities such as canvas, camera, screen, location, notifications, and controlled system execution.
+- Nodes are peripherals, not gateways; the Gateway still owns messages, model execution, sessions, policy, and routing.
+- Unsupported future surfaces should throw explicit errors rather than pretending to work.
+- Dogfooding with OpenMeow-style clients is how the SDK contract becomes stable enough for external apps.
+- Good App SDK use cases include desktop control centers, experiment dashboards, CI automation, smart-device companions, and operations consoles.
+- Friendly device names are presentation metadata; raw device identifiers and capability fields remain authoritative for runtime decisions.
 
 ---
 
 ## References
 
-- PyTorch Blog, "Introducing AutoSP": [https://pytorch.org/blog/introducing-autosp/](https://pytorch.org/blog/introducing-autosp/)
-- AutoSP paper, "AutoSP: Unlocking Long-Context LLM Training via Compiler-Based Sequence Parallelism": [https://openreview.net/pdf?id=0fgsHvmBBI](https://openreview.net/pdf?id=0fgsHvmBBI)
-- DeepSpeed AutoSP examples: [https://github.com/deepspeedai/DeepSpeedExamples/tree/master/benchmarks/autosp](https://github.com/deepspeedai/DeepSpeedExamples/tree/master/benchmarks/autosp)
-- DeepCompile paper: [https://arxiv.org/abs/2504.09983](https://arxiv.org/abs/2504.09983)
-- Lecture 36 - FP8 KV-Cache in vLLM: [Lecture-36.md](Lecture-36.md)
-- Lecture 37 - TraceLens: [Lecture-37.md](Lecture-37.md)
+- OpenClaw App SDK: [https://openclaw.knidal.com/openclaw-app-sdk](https://openclaw.knidal.com/openclaw-app-sdk)
+- OpenClaw Gateway protocol: [https://openclaw.knidal.com/gateway-protocol](https://openclaw.knidal.com/gateway-protocol)
+- OpenClaw RPC adapters: [https://openclaw.knidal.com/rpc-adapters](https://openclaw.knidal.com/rpc-adapters)
+- OpenClaw Tools Invoke API: [https://openclaw.knidal.com/tools-invoke-api](https://openclaw.knidal.com/tools-invoke-api)
+- OpenClaw Nodes: [https://openclaw.knidal.com/nodes](https://openclaw.knidal.com/nodes)
+- OpenClaw Node troubleshooting: [https://openclaw.knidal.com/nodes/troubleshooting](https://openclaw.knidal.com/nodes/troubleshooting)
+- Apple device identifiers data source: [kyle-seongwoo-jun/apple-device-identifiers](https://github.com/kyle-seongwoo-jun/apple-device-identifiers)
+- Case-study source repo: [OpenClaw](https://github.com/openclaw/openclaw)
 
 ---
 
-*Next: [Lecture 39 - Agent Skills Eval](Lecture-39.md)*
+*Next: [Lecture 39](Lecture-39.md)*

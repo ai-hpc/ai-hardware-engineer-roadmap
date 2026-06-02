@@ -1,41 +1,40 @@
-# Lecture 42 - OpenAI Agents SDK: Native Sandbox and Durable Agent Harness
+# Lecture 42 - Agent Skills for GPU Kernel Translation: cuTile Python to cuTile.jl
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 41](Lecture-41.md) | **Next:** [Lecture 43](Lecture-43.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 41](Lecture-41.md) | **Next:** [Lecture 43](Lecture-43.md)
 
 ---
 
-**Agent runtime infrastructure** is becoming product infrastructure.
+This lecture is where the **"Agent Skills"** idea becomes concrete for GPU systems work.
 
-The important signal in OpenAI's April 2026 Agents SDK update is **not only that the SDK can call tools**.
+The NVIDIA cuTile Python to cuTile.jl case study is important because the hard part is **not generating code**.
 
-The important signal is that **baseline agent platforms** now need:
-
-- filesystem workspaces
-- sandbox execution
-- shell tools
-- patch tools
-- manifests
-- resumable state
-- skills
-- MCP
-- repo instructions
-- approval and interruption surfaces
-- provider-aware orchestration
-
-That is the same direction this course has been tracking through OpenClaw:
+The hard part is:
 
 ```text
-model
-  -> harness
-  -> tools
-  -> sandbox
-  -> state
-  -> audit and recovery
+translating domain semantics correctly
+when the compiler will not catch many wrong translations
 ```
 
-The **model alone is no longer the product**.
+That is exactly the class of work where **naive agents fail**.
 
-The **harness is becoming part of the product**.
+They can produce plausible code, but **plausible GPU kernel code is not enough**.
+
+You need:
+
+- domain rules
+- API mappings
+- worked examples
+- static validators
+- reference tests
+- debugging guides
+- tolerance rules
+- repeatable workflow
+
+In other words:
+
+```text
+agent skill + validator + tests = reusable systems knowledge
+```
 
 ---
 
@@ -43,706 +42,562 @@ The **harness is becoming part of the product**.
 
 By the end of this lecture, you should be able to:
 
-1. Explain why file/tool-oriented long-running agents need a harness.
-2. Describe the updated OpenAI Agents SDK sandbox model.
-3. Understand manifests as portable workspace contracts.
-4. Explain why separating harness from compute improves security, durability, and scale.
-5. Understand how shell, `apply_patch`, MCP, skills, and `AGENTS.md` fit into an agent runtime.
-6. Compare OpenAI's SDK direction with OpenClaw's Gateway and node architecture.
-7. Identify where provider-native harnesses help and where application-owned policy is still required.
-8. Design a minimal evaluation plan for sandboxed durable agent workflows.
+1. Explain why cross-DSL GPU kernel translation is a strong use case for agent skills.
+2. Describe the differences between cuTile Python and cuTile.jl that cause silent wrong results.
+3. Understand why 0-based vs 1-based indexing and row-major vs column-major layout are semantic hazards.
+4. Explain how TileGym packages conversion knowledge into a reusable skill.
+5. Design a skill directory with rules, API mappings, examples, validation scripts, and tests.
+6. Apply the same pattern to CUDA, Triton, MLIR, TVM, tinygrad, and custom accelerator DSLs.
+7. Connect agent-generated GPU code to verification evidence and hardware-aware review.
 
 ---
 
-## 1. The shift: from chat calls to agent harnesses
+## 1. Why this case study matters
 
-Early LLM integrations looked like:
+Most agent-skill examples are **web or app-development workflows**.
 
-```text
-prompt
-  -> model
-  -> response
-```
+This one is different.
 
-Tool-using agents changed that:
+It targets **GPU kernel translation**.
 
-```text
-prompt
-  -> model
-  -> tool call
-  -> tool result
-  -> model
-  -> final response
-```
+That matters because GPU DSLs are full of **subtle semantic traps**:
 
-Long-running agents add more requirements:
+- indexing base changes
+- memory layout changes
+- broadcasting changes
+- loop syntax changes
+- accumulator shape changes
+- padding enum changes
+- type-conversion differences
+- matrix multiply API differences
+
+The scary part:
 
 ```text
-workspace
-  -> inspect files
-  -> run commands
-  -> edit files
-  -> checkpoint state
-  -> recover after interruption
-  -> continue work safely
+many mistakes compile
+and then silently produce wrong numbers
 ```
 
-That is no longer **just model invocation**.
+For GPU engineers, this is a high-value agent use case because the knowledge is:
 
-It is a **runtime system**.
-
-The OpenAI Agents SDK update **productizes that runtime layer** for OpenAI model workflows.
+- specific
+- repeatable
+- rule-heavy
+- testable
+- easy to encode in a repo
 
 ---
 
-## 2. What changed in the Agents SDK
+## 2. What cuTile is
 
-OpenAI describes the updated Agents SDK as adding a **more capable harness** for agents that work with documents, files, and systems.
+**NVIDIA CUDA Tile**, or cuTile, is a tile-based GPU kernel programming model.
 
-The notable primitives:
-
-- configurable memory
-- sandbox-aware orchestration
-- filesystem-oriented tools
-- MCP tool use
-- skills
-- `AGENTS.md` instructions
-- shell execution
-- `apply_patch` file edits
-- sandbox manifests
-- snapshotting and rehydration
-- resumable state after interruptions
-
-These are the **same primitives** that show up in production coding agents.
-
-The pattern:
+Instead of manually coordinating every thread, warp, and shared-memory operation, the programmer works with **tile-level operations**:
 
 ```text
-agent task
-  -> controlled workspace
-  -> explicit instructions
-  -> bounded tools
-  -> durable run state
-  -> reviewed artifacts
+load tile
+compute on tile
+matrix multiply-accumulate
+store tile
 ```
 
-For OpenClaw-style architecture, this validates a key design thesis:
+This does not eliminate low-level thinking.
+
+It raises the abstraction level enough that many kernels can be expressed in a more portable, structured way.
+
+**cuTile.jl** brings that style to Julia.
+
+That is valuable for Julia's scientific computing ecosystem:
+
+- differential equations
+- probabilistic programming
+- physics simulations
+- custom numeric kernels
+- research code that needs GPU acceleration
+
+The translation target is not "Python code to Julia syntax."
+
+The target is:
 
 ```text
-agent systems need a harness, not just a chat loop
+preserve GPU kernel semantics across two DSLs
 ```
 
 ---
 
-## 3. Native sandbox execution
+## 3. The semantic traps
 
-The updated Agents SDK supports **sandbox execution natively**.
+High-level differences:
 
-The sandbox gives the agent a controlled environment where it can:
+| Category | cuTile Python | cuTile.jl |
+|---|---|---|
+| indexing | 0-based, `ct.bid(0)` | 1-based, `ct.bid(1)` |
+| broadcasting | implicit, `a + b` | explicit dot syntax, `a .+ b` |
+| memory layout | row-major | column-major |
+| kernel definition | `@ct.kernel` decorator | plain Julia function |
+| constants | `ct.Constant[int]` in signature | `param::Int`, `ct.Constant(val)` at launch |
+| type conversion | `tile.astype(ct.float32)` | `convert(ct.Tile{Float32}, tile)` |
+| MMA | `ct.mma(a, b, acc=acc)` | `muladd(a, b, acc)` |
 
-- read files
-- write files
-- run code
-- use installed dependencies
-- produce artifacts
-- operate without directly sharing the application host
+None of these are conceptually impossible.
 
-OpenAI's docs describe `SandboxAgent` as the agent abstraction for this path.
+Together, they create a translation surface where a **single missed rule can corrupt results**.
 
-The simplified flow:
+Example:
 
 ```text
-Manifest
-  -> SandboxAgent
-  -> sandbox client
-  -> Runner.run(...)
-  -> artifacts and result state
+ct.bid(0) left unchanged
+  -> wrong tile loaded
+  -> wrong output
+  -> no compiler warning
 ```
 
-This is important because many useful agents need a **workspace**.
+Example:
+
+```text
+a * b in Julia
+  -> matrix multiply
+
+a .* b
+  -> element-wise multiply
+```
+
+For kernel code, that difference is **decisive**.
+
+---
+
+## 4. Matmul as the teaching example
+
+**Matrix multiplication** is a useful translation example because it combines several hazards:
+
+- block/tile indices
+- K-loop over tiles
+- accumulator initialization
+- type conversion for TF32
+- matrix multiply-accumulate
+- row-major to column-major layout shift
+- store index correctness
+
+Python-style shape thinking:
+
+```text
+A(M, K)
+B(K, N)
+C(M, N)
+```
+
+Julia column-major thinking often forces the translated kernel to reason differently about:
+
+- tile orientation
+- accumulator shape
+- load indices
+- store indices
+
+The common failure:
+
+```text
+accumulator shape looks plausible
+but is transposed for the target layout
+```
+
+This is exactly why a skill needs **worked examples**.
+
+The model should not **rediscover matmul layout rules** from scratch every time.
+
+---
+
+## 5. Softmax as the harder example
+
+Softmax adds **algorithmic invariants**, not just syntax.
+
+The NVIDIA post describes three Julia strategies:
+
+- TMA single-tile
+- online softmax
+- chunked softmax
+
+Softmax translation must preserve:
+
+- running maximum
+- running sum
+- numerical stability
+- reduction axis semantics
+- broadcast syntax
+- chunking strategy
+- dtype tolerance
 
 Examples:
 
-- audit a data room
-- inspect a repository
-- patch code
-- cluster support exports
-- run tests
-- generate a report from mounted inputs
-
-Without a sandbox, teams often **improvise their own filesystem and execution layer**.
-
-That is **risky and inconsistent**.
-
----
-
-## 4. Manifest as workspace contract
-
-The SDK's `Manifest` describes the initial sandbox workspace.
-
-It can specify:
-
-- input files
-- directories
-- repositories
-- mounted storage
-- output directories
-- environment values
-- sandbox-local users and groups where supported
-
-The key design idea:
-
 ```text
-manifest = fresh-session workspace contract
+ct.max -> maximum
+ct.sum -> sum
+axis must shift by +1
+ct.maximum(a, b) -> max.(a, b)
+ct.exp(ct.sub(a, b)) -> exp.(a .- b)
 ```
 
-It is not necessarily the full source of truth for every live sandbox, because a run may continue from:
+The hard part is not renaming functions.
 
-- a live sandbox session
-- serialized session state
-- a snapshot chosen at runtime
-- persistent storage
+The hard part is preserving the **mathematical invariant**.
 
-Good manifest design:
-
-- put input artifacts in the manifest
-- put output directories in the manifest
-- keep paths workspace-relative
-- avoid absolute paths and `..` escapes
-- scope mounted storage to the task
-- keep secrets out of persisted workspace state
-
-This is the sandbox equivalent of an **API schema**.
-
-It makes the agent's environment **explicit and reviewable**.
-
----
-
-## 5. Filesystem tools, shell, and apply_patch
-
-The OpenAI article calls out Codex-like filesystem tools.
-
-Two primitives matter for coding and document agents:
+For systems work, this is the recurring theme:
 
 ```text
-shell:
-  run commands in a sandboxed environment
-
-apply_patch:
-  make structured file edits
-```
-
-This is a **major product signal**.
-
-Agent platforms are **converging on the same low-level tool set**:
-
-- inspect files
-- search files
-- run shell commands
-- edit files through patch operations
-- test changes
-- produce artifacts
-
-Why `apply_patch` matters:
-
-```text
-free-form file writes are hard to review
-patch operations are easier to audit, replay, and constrain
-```
-
-Why shell matters:
-
-```text
-many real tasks require execution:
-tests, scripts, linters, data transforms, builds, profilers
-```
-
-But shell must be **policy-gated**.
-
-A sandbox reduces **blast radius**.
-
-It does **not remove** the need for approvals, allowlists, logs, and network controls.
-
----
-
-## 6. Skills and AGENTS.md
-
-The updated SDK also standardizes two instruction surfaces that coding agents already use in practice.
-
-### Skills
-
-OpenAI's skills docs describe a skill as a versioned bundle of files plus a `SKILL.md` manifest.
-
-Skills codify procedures:
-
-- style guides
-- spreadsheet workflows
-- maintenance workflows
-- analysis recipes
-- company conventions
-- multi-step tool use
-
-The model sees skill metadata and can load the full `SKILL.md` instructions when needed.
-
-Security caveat:
-
-```text
-skills influence planning, tool use, and command execution
-```
-
-Treat them as **privileged code-adjacent behavior**.
-
-### AGENTS.md
-
-`AGENTS.md` is a repo-local instruction file.
-
-It lets the workspace tell the agent:
-
-- project conventions
-- test commands
-- code style
-- repository-specific rules
-- safety notes
-- contribution workflow
-
-The important architecture point:
-
-```text
-global prompt
-  -> agent policy
-  -> skill instructions
-  -> repo-local instructions
-  -> task prompt
-```
-
-You need clear **priority and trust rules** for each layer.
-
----
-
-## 7. MCP and external tools
-
-MCP appears in the updated SDK as a standard way to connect tools.
-
-The design point:
-
-```text
-agent harness
-  -> MCP server
-  -> external system tools/resources
-```
-
-MCP helps **decouple the harness** from every tool implementation.
-
-But it creates a **trust boundary**.
-
-Questions to ask:
-
-- Who controls the MCP server?
-- What scopes does it expose?
-- Can it read secrets?
-- Can it write external systems?
-- Are tool schemas precise?
-- Are destructive actions approval-gated?
-- Are outputs treated as untrusted?
-- Are calls logged?
-
-MCP is an **interface**.
-
-It is **not a security policy** by itself.
-
----
-
-## 8. Durable execution: state, snapshots, and rehydration
-
-Long-running agents fail.
-
-Containers expire.
-
-Approvals pause.
-
-Networks break.
-
-Runs need human review.
-
-The updated SDK emphasizes **durable execution** by separating state from the sandbox compute environment.
-
-The official article describes a model where externalized state allows a run to continue after a sandbox fails or expires, using snapshotting and rehydration.
-
-The Agents SDK results docs also expose state surfaces for interruptions and approvals:
-
-```text
-interruptions:
-  pending tool calls that need a decision
-
-state / to_state():
-  resumable snapshot to pass back after approval or rejection
-```
-
-The runtime design principle:
-
-```text
-compute is replaceable
-state is durable
-```
-
-This matches the **event-sourced session model** in Lecture 24b.
-
-If the sandbox dies, the application should not lose:
-
-- user intent
-- tool-call history
-- pending approvals
-- workspace artifacts
-- agent ownership
-- continuation state
-
----
-
-## 9. Separating harness from compute
-
-OpenAI explicitly frames **harness/compute separation** as a security, durability, and scale improvement.
-
-Security:
-
-```text
-keep credentials out of environments where model-generated code executes
-```
-
-Durability:
-
-```text
-if a sandbox dies, restore state into a fresh environment
-```
-
-Scale:
-
-```text
-use one sandbox or many,
-invoke sandboxes only when needed,
-route subagents to isolated environments,
-parallelize work across containers
-```
-
-This should be a default design principle for agent platforms.
-
-Do **not put everything in one process** with one filesystem and one credential set.
-
-Prefer:
-
-```text
-harness:
-  owns identity, policy, state, approvals, routing
-
-compute sandbox:
-  owns temporary execution, files, dependencies, artifacts
-```
-
-The sandbox should be **disposable**.
-
-The harness should be **auditable**.
-
----
-
-## 10. OpenAI SDK versus OpenClaw Gateway
-
-OpenAI Agents SDK and OpenClaw solve overlapping but different layers.
-
-OpenAI Agents SDK:
-
-- provider-native model harness
-- sandbox-aware orchestration
-- OpenAI model alignment
-- OpenAI tool primitives
-- Python-first release for new sandbox features
-- managed API pricing and tool usage
-
-OpenClaw Gateway:
-
-- local-first control plane
-- channels and sessions
-- device pairing
-- remote nodes
-- multi-provider routing
-- local tools and app SDKs
-- explicit Gateway RPC protocol
-- user-owned deployment boundary
-
-Comparison:
-
-```text
-OpenAI Agents SDK:
-  strong provider-native harness for OpenAI model workflows
-
-OpenClaw:
-  broader local control plane for multi-channel, multi-node, user-owned agent operation
-```
-
-The useful direction is **not necessarily replacement**.
-
-It is **integration and architectural learning**.
-
-An OpenClaw-style system can learn from the SDK's productized sandbox abstractions.
-
-An OpenAI SDK app can learn from OpenClaw's explicit gateway, pairing, threat model, and node architecture.
-
----
-
-## 11. What becomes baseline infrastructure
-
-This release is a useful **market signal**.
-
-The following are no longer "advanced extras" for serious agents:
-
-```text
-filesystem workspace
-sandbox boundary
-shell execution
-patch-based edits
-tool registry
-skills
-repo-local instructions
-state snapshots
-human approval interruptions
-observability
-artifact review
-MCP integration
-secrets separation
-```
-
-If an agent platform lacks these, it is probably a **prototype or a narrow wrapper**.
-
-Production users will expect:
-
-- reliable continuation
-- safe execution
-- inspectable artifacts
-- bounded tool access
-- replayable history
-- policy enforcement
-- integration with their own storage and sandbox providers
-
----
-
-## 12. Security implications
-
-Native sandboxing is useful, but it is **not a complete security model**.
-
-Threats remain:
-
-- malicious skills
-- prompt injection through files
-- malicious repository instructions
-- unsafe shell commands
-- artifact exfiltration
-- overbroad mounts
-- secrets copied into workspace
-- MCP server compromise
-- tool-result injection
-- approval prompt manipulation
-
-Controls:
-
-- minimal manifests
-- scoped mounts
-- secrets outside sandbox when possible
-- explicit approval for high-impact actions
-- network egress policy
-- skill review
-- `AGENTS.md` trust rules
-- output artifact review
-- audit logs
-- snapshot redaction
-- deterministic tool policy
-
-Tie this back to Lecture 41:
-
-```text
-sandbox is a boundary,
-not a trust substitute
+syntax is cheap
+semantics are expensive
 ```
 
 ---
 
-## 13. Evaluation plan
+## 6. TileGym's skill structure
 
-To evaluate a durable sandboxed agent harness, do **not only ask whether it can complete one task**.
-
-Evaluate:
+The project packages the translation workflow into a **repository skill**:
 
 ```text
-task success:
-  correct final artifact
-
-durability:
-  can resume after interruption?
-
-sandbox safety:
-  can it only access mounted files?
-
-tool correctness:
-  did shell/apply_patch calls match policy?
-
-state quality:
-  is continuation faithful after rehydration?
-
-artifact quality:
-  are outputs inspectable and reproducible?
-
-security:
-  does prompt injection fail to cross authority boundaries?
-
-latency/cost:
-  does sandbox startup or snapshotting dominate?
+.claude/skills/converting-cutile-to-julia/
+  SKILL.md
+  translations/
+    workflow.md
+  references/
+    api-mapping.md
+    critical-rules.md
+    debugging.md
+    testing.md
+  scripts/
+    validate_cutile_jl.py
+  examples/
+    01_add/
+    02_matmul/
+    03_softmax/
 ```
 
-Example test:
+This structure matters.
+
+Each file has a job:
+
+| File | Job |
+|---|---|
+| `SKILL.md` | entry point and workflow overview |
+| `workflow.md` | step-by-step conversion process |
+| `api-mapping.md` | Python to Julia API mapping |
+| `critical-rules.md` | known semantic traps |
+| `debugging.md` | how to diagnose common failures |
+| `testing.md` | test patterns and tolerances |
+| `validate_cutile_jl.py` | static checker for anti-patterns |
+| examples | worked source/target translations |
+
+The key design principle:
 
 ```text
-1. Mount a small repo and task file.
-2. Ask the agent to fix a bug.
-3. Require it to run tests.
-4. Interrupt before a high-impact command.
-5. Serialize state.
-6. Resume in a fresh sandbox.
-7. Verify final patch, logs, and artifacts.
-8. Confirm no files outside the manifest were read.
+put reusable domain knowledge beside the code it governs
 ```
 
-That is the right level of test for the new baseline.
+Do not leave it as a **one-off prompt** in chat history.
 
 ---
 
-## 14. Hardware and systems view
+## 7. What the validator catches
 
-For AI hardware engineers, this release matters because it changes workload shape.
+The validator catches **patterns before the GPU runs**.
 
-Long-running sandboxed agents create:
+Examples from the post include:
 
-- bursty inference
-- tool-heavy pauses
-- background mode runs
-- file I/O around model calls
-- shell execution outside the model server
-- checkpoint and snapshot events
-- parallel subagent workloads
-- larger context from files and histories
+- leftover `ct.bid(0)`
+- Python-style type names
+- unsupported loop forms
+- common cuTile.jl anti-patterns
 
-The GPU is not the only bottleneck.
-
-The full system includes:
+This is the important step:
 
 ```text
-model serving latency
-sandbox startup time
-filesystem throughput
-network egress
-tool runtime
-snapshot size
-orchestration queueing
-approval latency
+LLM generates candidate
+  -> static validator catches known mistakes
+  -> tests catch semantic errors
+  -> debugging guide routes fixes
 ```
 
-That means agent performance must be measured end-to-end.
+The model is **not trusted blindly**.
 
-Use model metrics, but also collect:
+The skill creates a **workflow around it**.
 
-- sandbox lifecycle timing
-- tool-call timing
-- artifact size
-- resume time
-- queue delay
-- token usage
-- error/retry counts
+This is the same principle from Lecture 21:
+
+```text
+No evidence, no completion.
+```
+
+For GPU code, evidence must include numeric correctness.
 
 ---
 
-## Mini-lab: durable sandbox agent design
+## 8. Test design for translated kernels
 
-Design a small agent app using the updated harness model.
-
-Scenario:
+The Julia subproject contains:
 
 ```text
-An agent reviews a repository, edits one file, runs tests,
-and produces a patch plus a short report.
+julia/
+  Project.toml
+  kernels/
+    add.jl
+    matmul.jl
+    softmax.jl
+  test/
+    runtests.jl
+    test_add.jl
+    test_matmul.jl
+    test_softmax.jl
 ```
 
-Specify:
+Good tests compare against **CPU references** with dtype-specific tolerances.
+
+They also test boundary cases:
+
+- dimensions not aligned to tile sizes
+- dtype differences
+- padding behavior
+- reduction axes
+- edge shapes
+
+For GPU translation, "passes one happy path" is not enough.
+
+You want:
 
 ```text
-Manifest:
-  mounted repo:
-  output directory:
-  task file:
-  environment:
-
-Tools:
-  shell:
-  apply_patch:
-  MCP:
-  skills:
-
-Policy:
-  allowed commands:
-  denied commands:
-  approval-required commands:
-  network policy:
-
-Durability:
-  snapshot trigger:
-  state serialization:
-  rehydration test:
-
-Security:
-  untrusted files:
-  secrets boundary:
-  prompt-injection test:
-
-Evidence:
-  logs:
-  final patch:
-  test output:
-  artifact review:
+reference implementation
+edge shapes
+dtypes
+tolerances
+boundary tiles
 ```
 
-Then write the acceptance criteria:
+This makes the agent output **reviewable by numbers, not vibes**.
+
+---
+
+## 9. Why this is better than a prompt
+
+Prompt:
 
 ```text
-Task passes only if:
-  tests pass
-  patch is minimal
-  state resumes correctly after interruption
-  no out-of-scope file access occurs
-  artifact report cites exact files changed
+Be careful with indexing, broadcasting, and memory layout.
+```
+
+Skill:
+
+```text
+Here are the 17 rules.
+Here is the API mapping.
+Here are add, matmul, softmax examples.
+Here is a validator.
+Here are tests and tolerances.
+Here is the debugging guide.
+```
+
+The difference:
+
+```text
+prompt = reminder
+skill = executable domain process
+```
+
+This is why agent skills are relevant to **hardware and compiler work**.
+
+The model should not rediscover the same **domain pitfalls** repeatedly.
+
+The project should **accumulate them**.
+
+---
+
+## 10. Result pattern
+
+The NVIDIA post reports that a representative GEMM conversion took about:
+
+```text
+4 minutes
+~78K tokens
+no manual intervention
+```
+
+Do not overgeneralize this number.
+
+The important point is not the exact time or token count.
+
+The important pattern is:
+
+```text
+first port teaches the skill
+later ports reuse the skill
+each kernel gets cheaper and safer
+```
+
+This is how agentic systems improve **without fine-tuning the model**.
+
+They improve by **versioning the workflow, rules, examples, and validators**.
+
+---
+
+## 11. Generalizing beyond cuTile
+
+The same pattern applies to many GPU and compiler workflows:
+
+| Source | Target | Skill focus |
+|---|---|---|
+| CUDA C++ | Triton | memory layout, block mapping, vectorization |
+| Triton | CUDA C++ | explicit shared memory and warp details |
+| PyTorch op | CUDA kernel | shape contracts, dtype, autograd |
+| CUDA | HIP/ROCm | API mapping, wavefront size, library differences |
+| Python DSL | MLIR | types, affine maps, lowering rules |
+| TVM schedule | Triton | tiling, memory hierarchy, reduction axes |
+| tinygrad op | custom accelerator | shape tracker semantics, memory movement |
+
+Good skill candidates share traits:
+
+- finite recurring rules
+- silent semantic failure modes
+- reference examples
+- static validation possible
+- runtime tests possible
+- high review cost if done manually
+
+---
+
+## 12. OpenClaw and agent harness mapping
+
+In an OpenClaw-style harness:
+
+```text
+source kernel
+  -> skill selection
+  -> read API mapping and critical rules
+  -> generate target kernel
+  -> run static validator
+  -> run tests on GPU
+  -> capture logs/artifacts
+  -> summarize diff and evidence
+```
+
+Runtime pieces:
+
+| Harness part | Role |
+|---|---|
+| skill router | choose cuTile translation skill |
+| tool policy | allow file reads/writes and test commands only in workspace |
+| exec approval | gate GPU test commands if needed |
+| artifacts | store validator output and test logs |
+| session log | preserve translation reasoning and fixes |
+| final-answer hook | require validation evidence |
+
+The LLM writes **candidate code**.
+
+The harness makes the work **safe and reviewable**.
+
+---
+
+## 13. GPU engineer review checklist
+
+When reviewing agent-translated kernels, inspect:
+
+```text
+index base
+memory layout
+tile shape
+accumulator shape
+reduction axis
+broadcast semantics
+dtype conversion
+padding behavior
+loop bounds
+boundary tiles
+reference test tolerance
+performance assumptions
+```
+
+Ask:
+
+```text
+Could this produce correct results only for square matrices?
+Could this pass fp32 but fail lower precision?
+Could this fail on non-divisible dimensions?
+Could this silently transpose output?
+Could this be correct but much slower?
+```
+
+Agentic kernel work still requires **human domain review**.
+
+The skill **reduces review burden**.
+
+It does not remove **engineering responsibility**.
+
+---
+
+## 14. Mini-lab: write a DSL translation skill
+
+Pick one translation pair:
+
+- CUDA C++ to Triton
+- Triton to CUDA C++
+- PyTorch reference to CUDA kernel
+- CUDA to HIP
+- tinygrad op to CUDA
+- cuTile Python to cuTile.jl
+
+Create:
+
+```text
+SKILL.md
+references/api-mapping.md
+references/critical-rules.md
+references/testing.md
+scripts/validate_translation.py
+examples/01_simple/
+examples/02_reduction/
+examples/03_matmul_or_softmax/
+```
+
+Minimum critical rules:
+
+```text
+indexing
+layout
+broadcasting
+dtype
+boundary conditions
+reduction axes
+memory aliasing
+test tolerance
+```
+
+Then run one translation and require:
+
+```text
+static validator output
+CPU reference comparison
+GPU test output
+summary of known risks
 ```
 
 ---
 
 ## Key takeaways
 
-- The OpenAI Agents SDK update productizes infrastructure that serious agent systems already need.
-- Native sandbox execution gives agents controlled workspaces for files, tools, dependencies, and artifacts.
-- Manifests make sandbox workspaces explicit, portable, and reviewable.
-- Shell and `apply_patch` are becoming baseline tools for file-oriented agents.
-- Skills, MCP, and `AGENTS.md` standardize reusable instructions and tool ecosystems.
-- Durable state, interruptions, snapshotting, and rehydration are required for long-running work.
-- Separating harness from compute improves security, durability, and scale.
-- Provider-native harnesses are useful, but application-owned policy, threat modeling, and evals remain necessary.
-- OpenClaw and OpenAI Agents SDK point toward the same baseline: agents need a real runtime around the model.
+- Cross-DSL GPU kernel translation is a strong agent-skill use case because the rules are finite, recurring, and testable.
+- The hard part is semantic preservation, not syntax conversion.
+- cuTile Python to cuTile.jl has traps around indexing, broadcasting, memory layout, constants, type conversion, and MMA APIs.
+- TileGym packages translation knowledge into a skill with rules, mappings, examples, validator, tests, and debugging docs.
+- Static validation plus runtime tests make agent-generated GPU code reviewable.
+- The broader lesson is that systems work needs version-controlled domain skills, not one-off prompts.
 
 ---
 
 ## References
 
-- OpenAI, "The next evolution of the Agents SDK": [https://openai.com/index/the-next-evolution-of-the-agents-sdk/](https://openai.com/index/the-next-evolution-of-the-agents-sdk/)
-- OpenAI Agents SDK guide: [https://developers.openai.com/api/docs/guides/agents](https://developers.openai.com/api/docs/guides/agents)
-- OpenAI Sandbox Agents guide: [https://developers.openai.com/api/docs/guides/agents/sandboxes](https://developers.openai.com/api/docs/guides/agents/sandboxes)
-- OpenAI Results and state guide: [https://developers.openai.com/api/docs/guides/agents/results](https://developers.openai.com/api/docs/guides/agents/results)
-- OpenAI Skills guide: [https://developers.openai.com/api/docs/guides/tools-skills](https://developers.openai.com/api/docs/guides/tools-skills)
-- Lecture 24b - Event-Sourced Agent State: [Lecture-24b.md](Lecture-24b.md)
-- Lecture 29 - Agent Skills: [Lecture-29.md](Lecture-29.md)
-- Lecture 41 - OpenClaw Threat Model: [Lecture-41.md](Lecture-41.md)
+- NVIDIA Technical Blog, "Automating GPU Kernel Translation with AI Agents: cuTile Python to cuTile.jl": [https://developer.nvidia.com/blog/automating-gpu-kernel-translation-with-ai-agents-cutile-python-to-cutile-jl/](https://developer.nvidia.com/blog/automating-gpu-kernel-translation-with-ai-agents-cutile-python-to-cutile-jl/)
+- NVIDIA TileGym repository: [https://github.com/NVIDIA/TileGym](https://github.com/NVIDIA/TileGym)
+- cuTile Python documentation: [https://nvidia.github.io/cutlass/latest/media/docs/pythonDSL/cute_dsl_api/cute.html](https://nvidia.github.io/cutlass/latest/media/docs/pythonDSL/cute_dsl_api/cute.html)
+- CUDA.jl: [https://cuda.juliagpu.org/stable/](https://cuda.juliagpu.org/stable/)
+- Lecture 21 - Agent Skills: [Lecture-21.md](Lecture-21.md)
+- Lecture 06 - LLM From Scratch: [Lecture-06.md](Lecture-06.md)
 
 ---
 
-*Next: [Lecture 43 - MLSys 2026 Kernel Contest](Lecture-43.md)*
+*Next: [Lecture 43](Lecture-43.md)*

@@ -1,473 +1,371 @@
-# Lecture 15 - OpenClaw Case Study: Why Real Agents Need a Gateway
+# Lecture 15 — Agent Architecture Patterns
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 14](Lecture-14.md) | **Next:** [Lecture 16](Lecture-16.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 14](Lecture-14.md) | **Next:** [Lecture 16](Lecture-16.md)
 
 ---
 
-## Why this lecture exists
+## Learning Objectives
 
-Many agent tutorials still teach the same simple pattern:
+- Understand the major agent design patterns and when to use each
+- Implement ReAct from scratch
+- Know when to use plan-and-execute vs. reactive agents
+- Recognize failure modes and build in safety rails
 
-```text
-user -> prompt -> model -> answer
+---
+
+## 1. Pattern Overview
+
+| Pattern | Best for | Weakness |
+|---------|----------|----------|
+| **ReAct** | Open-ended tasks, tool use | Can get stuck in loops |
+| **Plan-and-Execute** | Long multi-step tasks, predictable workflows | Plan goes stale mid-execution |
+| **Reflexion** | Tasks with clear success criteria | Expensive — multiple LLM calls per step |
+| **LATS (Tree Search)** | Optimization, code generation | Very expensive, complex to implement |
+
+---
+
+## 2. ReAct (Reason + Act)
+
+**ReAct** interleaves reasoning and action in a loop: **Thought → Action → Observation → Thought → ...**
+
+This is the foundation of most production agents.
+
+```python
+import anthropic
+import json
+from datetime import datetime
+
+client = anthropic.Anthropic()
+
+REACT_SYSTEM = """You are a research agent. You solve problems by thinking step by step
+and using tools. Work through the problem systematically.
+
+At each step:
+1. Think about what you know and what you need
+2. Decide on the best action (tool call or final answer)
+3. Use the result to inform your next step
+
+Be systematic. Don't guess — use tools to verify."""
+
+# Tools available to the agent
+tools = [
+    {
+        "name": "web_search",
+        "description": "Search the web for current information. Use for facts, recent events, technical specs.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search query"}
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "calculator",
+        "description": "Evaluate mathematical expressions. Use for any arithmetic.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "expression": {"type": "string", "description": "Python math expression, e.g. '1024 * 80 / 1000'"}
+            },
+            "required": ["expression"]
+        }
+    },
+    {
+        "name": "python_repl",
+        "description": "Execute Python code and return output. Use for data processing, analysis.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "code": {"type": "string", "description": "Python code to execute"}
+            },
+            "required": ["code"]
+        }
+    }
+]
+
+def web_search(query: str) -> str:
+    # Mock — in production use SerpAPI, Tavily, or Brave Search
+    return f"[Search results for '{query}': ... mock data ...]"
+
+def calculator(expression: str) -> str:
+    try:
+        result = eval(expression, {"__builtins__": {}}, {})
+        return str(result)
+    except Exception as e:
+        return f"Error: {e}"
+
+def python_repl(code: str) -> str:
+    import io, contextlib
+    buffer = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buffer):
+            exec(code, {})
+        return buffer.getvalue() or "(no output)"
+    except Exception as e:
+        return f"Error: {type(e).__name__}: {e}"
+
+TOOL_MAP = {"web_search": web_search, "calculator": calculator, "python_repl": python_repl}
+
+class ReActAgent:
+    def __init__(self, max_steps: int = 20):
+        self.max_steps = max_steps
+        self.steps = []
+
+    def run(self, task: str) -> str:
+        messages = [{"role": "user", "content": task}]
+        step = 0
+
+        while step < self.max_steps:
+            step += 1
+            response = client.messages.create(
+                model="your-agent-model-id",
+                max_tokens=2048,
+                system=REACT_SYSTEM,
+                tools=tools,
+                messages=messages
+            )
+
+            messages.append({"role": "assistant", "content": response.content})
+
+            if response.stop_reason == "end_turn":
+                return next(
+                    (b.text for b in response.content if hasattr(b, "text")), ""
+                )
+
+            elif response.stop_reason == "tool_use":
+                tool_results = []
+                for block in response.content:
+                    if block.type == "tool_use":
+                        result = TOOL_MAP[block.name](**block.input)
+                        self.steps.append({
+                            "step": step,
+                            "tool": block.name,
+                            "input": block.input,
+                            "output": result[:200]  # truncate for logging
+                        })
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": result
+                        })
+                messages.append({"role": "user", "content": tool_results})
+
+        return "Agent reached max steps without completing."
+
+agent = ReActAgent(max_steps=15)
+answer = agent.run("What is the memory bandwidth of an H100 SXM5 in GB/s? How many times faster is it than DDR5-5600?")
+print(answer)
+print(f"\nSteps taken: {len(agent.steps)}")
 ```
 
-That is useful for learning, but it is too small to explain how modern agent products actually work.
-
-Real agent systems need to handle:
-
-- many users
-- many channels
-- long-lived sessions
-- tools
-- memory
-- device clients
-- background work
-- health and operations
-- routing and identity
-
-That is where **OpenClaw** becomes a useful case study.
-
-OpenClaw is not just "an app that calls an LLM." It is a **control plane** for **persistent agents**.
-
-This lecture uses OpenClaw to teach a more realistic system model:
-
-> an agent is not only a model call. It is a long-running service with routing, state, safety, and operations.
-
 ---
 
-## Learning objectives
+## 3. Plan-and-Execute
 
-By the end of this lecture you will be able to:
+For complex multi-step tasks, **separate planning from execution**. The **planner** creates a task list; the **executor** works through it.
 
-1. Explain why a real agent product often needs a gateway or control plane.
-2. Describe OpenClaw's high-level architecture in simple terms.
-3. Separate channels, clients, nodes, and agents.
-4. Explain the difference between a one-shot inference call and an agent loop.
-5. Understand why session serialization matters.
-6. Explain why "one long-lived gateway" is different from "one model endpoint."
+```python
+from dataclasses import dataclass, field
+from enum import Enum
 
----
+class TaskStatus(Enum):
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    DONE = "done"
+    FAILED = "failed"
 
-## 1. The simple mental model
+@dataclass
+class Task:
+    id: int
+    description: str
+    status: TaskStatus = TaskStatus.PENDING
+    result: str = ""
+    depends_on: list[int] = field(default_factory=list)
 
-The easiest way to understand OpenClaw is this:
+class PlanAndExecuteAgent:
+    def __init__(self):
+        self.plan: list[Task] = []
 
-```text
-OpenClaw Gateway = a central station for agent traffic
+    def plan_task(self, goal: str) -> list[Task]:
+        """Generate a structured plan for the goal."""
+        response = client.messages.create(
+            model="your-agent-model-id",
+            max_tokens=1024,
+            system="""Create a numbered execution plan. Return JSON array of tasks.
+Each task: {"id": int, "description": str, "depends_on": [int]}
+Keep tasks atomic — one action each. Maximum 10 tasks.""",
+            messages=[{"role": "user", "content": f"Goal: {goal}"}]
+        )
+
+        raw = response.content[0].text.strip().strip("```json").strip("```")
+        task_dicts = json.loads(raw)
+        return [Task(**t) for t in task_dicts]
+
+    def execute_task(self, task: Task, context: str) -> str:
+        """Execute a single task given accumulated context."""
+        response = client.messages.create(
+            model="your-agent-model-id",
+            max_tokens=1024,
+            system="Execute the given task. Be concise. Return only the result.",
+            tools=tools,
+            messages=[{
+                "role": "user",
+                "content": f"Task: {task.description}\n\nContext from previous steps:\n{context}"
+            }]
+        )
+        # Handle tool use inline
+        messages = [{"role": "user", "content": f"Task: {task.description}\n\nContext:\n{context}"}]
+        while True:
+            response = client.messages.create(
+                model="your-agent-model-id",
+                max_tokens=1024,
+                system="Execute the given task. Be concise. Return only the result.",
+                tools=tools,
+                messages=messages
+            )
+            messages.append({"role": "assistant", "content": response.content})
+            if response.stop_reason == "end_turn":
+                return next((b.text for b in response.content if hasattr(b, "text")), "")
+            elif response.stop_reason == "tool_use":
+                tool_results = []
+                for block in response.content:
+                    if block.type == "tool_use":
+                        result = TOOL_MAP[block.name](**block.input)
+                        tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": result})
+                messages.append({"role": "user", "content": tool_results})
+
+    def run(self, goal: str) -> str:
+        print(f"Planning for: {goal}")
+        self.plan = self.plan_task(goal)
+        print(f"Plan ({len(self.plan)} steps):")
+        for t in self.plan:
+            print(f"  {t.id}. {t.description}")
+
+        context_parts = []
+        for task in self.plan:
+            # Check dependencies
+            deps_done = all(
+                any(t.id == dep and t.status == TaskStatus.DONE for t in self.plan)
+                for dep in task.depends_on
+            )
+            if task.depends_on and not deps_done:
+                task.status = TaskStatus.FAILED
+                task.result = "Dependency failed"
+                continue
+
+            task.status = TaskStatus.IN_PROGRESS
+            context = "\n".join(context_parts)
+            task.result = self.execute_task(task, context)
+            task.status = TaskStatus.DONE
+            context_parts.append(f"Step {task.id} ({task.description}): {task.result}")
+            print(f"  ✓ Step {task.id} done")
+
+        # Final synthesis
+        all_results = "\n".join(context_parts)
+        response = client.messages.create(
+            model="your-agent-model-id",
+            max_tokens=1024,
+            messages=[{
+                "role": "user",
+                "content": f"Goal: {goal}\n\nResults:\n{all_results}\n\nWrite a concise final answer."
+            }]
+        )
+        return response.content[0].text
 ```
 
-Messages and control requests arrive from many places:
+---
 
-- Telegram
-- WhatsApp
-- Slack
-- Discord
-- Web UI
-- CLI
-- mobile devices
+## 4. Reflexion — Self-Critique Loop
 
-The gateway is the place that:
+After completing a task, the agent **evaluates its own output** and retries if needed.
 
-- receives the message
-- decides which agent should handle it
-- loads the right session
-- runs the agent loop
-- streams tool and assistant events
-- stores state
-- sends the reply back through the correct channel
+```python
+def reflexion_agent(task: str, max_retries: int = 3) -> str:
+    """Agent that self-critiques and retries until satisfied."""
+    attempt = ""
 
-So instead of:
+    for i in range(max_retries):
+        # Generate attempt
+        attempt_response = client.messages.create(
+            model="your-agent-model-id",
+            max_tokens=1024,
+            messages=[{
+                "role": "user",
+                "content": task if i == 0 else f"{task}\n\nPrevious attempt:\n{attempt}\n\nTry again, fixing the issues."
+            }]
+        )
+        attempt = attempt_response.content[0].text
 
-```text
-web app -> model API
+        # Self-critique
+        critique_response = client.messages.create(
+            model="your-agent-model-id",
+            max_tokens=512,
+            system="You are a strict quality reviewer. Identify any errors, gaps, or improvements needed.",
+            messages=[{
+                "role": "user",
+                "content": f"Task: {task}\n\nAttempt:\n{attempt}\n\nIs this correct and complete? Reply with 'PASS' if good, or list specific issues."
+            }]
+        )
+        critique = critique_response.content[0].text
+
+        if "PASS" in critique:
+            print(f"✓ Passed critique on attempt {i+1}")
+            return attempt
+
+        print(f"✗ Attempt {i+1} failed critique: {critique[:100]}...")
+
+    return attempt  # Return best attempt after max retries
 ```
 
-you get:
+---
 
-```text
-channel/client/node
-  -> gateway
-  -> session + routing
-  -> agent loop
-  -> tools + memory
-  -> reply back to the same surface
+## 5. Failure Mode Prevention
+
+| Failure mode | Symptom | Prevention |
+|-------------|---------|-----------|
+| **Infinite loop** | Agent keeps calling same tool | `max_steps` counter |
+| **Tool hallucination** | Model invents tool parameters | Strict schema + `enum` constraints |
+| **Context overflow** | Responses degrade as context grows | Summarize history periodically |
+| **Stale plan** | Plan-and-execute follows outdated plan | Re-plan if environment changes |
+| **Runaway cost** | Hundreds of API calls | Budget limit + step counter |
+
+```python
+class SafeAgentWrapper:
+    def __init__(self, agent_fn, max_steps=20, budget_usd=1.0):
+        self.agent_fn = agent_fn
+        self.max_steps = max_steps
+        self.budget = budget_usd
+        self.total_cost = 0.0
+        self.step_count = 0
+
+    def __call__(self, *args, **kwargs):
+        if self.step_count >= self.max_steps:
+            raise RuntimeError(f"Agent exceeded {self.max_steps} steps")
+        if self.total_cost >= self.budget:
+            raise RuntimeError(f"Agent exceeded ${self.budget:.2f} budget")
+        self.step_count += 1
+        return self.agent_fn(*args, **kwargs)
 ```
 
-That is a much better mental model for production agents.
+---
+
+## Key Takeaways
+
+1. **ReAct** is the default pattern — simple, effective, handles most tasks
+2. **Plan-and-Execute** for predictable multi-step workflows where you want visibility
+3. **Reflexion** when quality matters more than speed — adds self-correction
+4. Always set `max_steps` and a budget limit — agents can loop indefinitely without them
+5. Log every tool call for debugging — agent failures are hard to diagnose without a trace
 
 ---
 
-## 2. Why a gateway exists at all
+## Exercises
 
-When people first see a gateway-style system, they often ask:
-
-> Why not let every client call the model directly?
-
-Because direct calls break down once you need **shared behavior**.
-
-A gateway gives you one place for:
-
-- session ownership
-- identity checks
-- channel integrations
-- tool policy
-- model routing
-- logging
-- streaming events
-- memory access
-- health checks
-- operations
-
-Without a gateway, each client must reimplement these concerns.
-
-That leads to:
-
-- duplicated logic
-- inconsistent safety rules
-- mismatched session state
-- difficult debugging
-- poor auditability
-
-The gateway solves this by **centralizing the agent runtime**.
+1. Implement a ReAct agent that solves a 3-step data analysis task (fetch data → process → visualize).
+2. Add context compression to `ReActAgent`: after every 5 steps, summarize the conversation history.
+3. Build a `Reflexion` agent for code generation — it runs the code and uses the output/errors as critique.
 
 ---
 
-## 3. The OpenClaw architecture in plain English
-
-Based on the local OpenClaw docs, the core design is:
-
-- one long-lived **Gateway**
-- many **channels**
-- many **clients**
-- optional **nodes**
-- one or more **agents**
-- each agent with its own workspace and session store
-
-### Gateway
-
-The gateway is the **long-lived daemon process**.
-
-It:
-
-- owns messaging surfaces
-- exposes WebSocket and HTTP APIs
-- validates requests
-- emits events
-- manages sessions
-- runs the agent loop
-
-### Clients
-
-Clients are operator-facing tools such as:
-
-- CLI
-- web admin UI
-- macOS companion app
-
-They do not own the agent state. They connect to the gateway.
-
-### Nodes
-
-Nodes are attached devices, such as:
-
-- iOS node
-- Android node
-- headless device node
-
-They connect to the same gateway but identify themselves as devices with capabilities.
-
-### Channels
-
-Channels are message surfaces like:
-
-- Telegram
-- WhatsApp
-- Slack
-- Discord
-- Signal
-- WebChat
-
-Channels deliver messages in and out. They are not the same as agents.
-
-### Agents
-
-An **agent** is the "brain" that handles a conversation or workflow.
-
-In OpenClaw, one gateway can host:
-
-- one default agent
-- or many isolated agents side by side
-
-That is an important production idea:
-
-> one runtime process can host many isolated agent personalities and workspaces
-
----
-
-## 4. The most important architecture shift
-
-The biggest lesson from OpenClaw is this:
-
-> A serious agent system is not just model inference. It is message routing plus state plus execution plus operations.
-
-That sounds abstract, so compare the two worlds directly.
-
-| Simple demo app | Real agent system |
-|---|---|
-| one chat box | many channels and clients |
-| one prompt | multiple prompts, system files, and context sources |
-| one request-response | long-lived sessions |
-| stateless backend | persistent state and memory |
-| no tool orchestration | tool calls and device capabilities |
-| no session ownership | session routing and isolation |
-| model call logs only | full runtime events and operational visibility |
-
-This is why studying real systems matters.
-
-If you only study notebook demos, your mental model stays too small.
-
----
-
-## 5. The OpenClaw agent loop
-
-OpenClaw documents the **agent loop** explicitly.
-
-The high-level shape is:
-
-```text
-intake
-  -> context assembly
-  -> model inference
-  -> tool execution
-  -> streaming
-  -> persistence
-```
-
-This is a much better teaching model than "call the model and print the response."
-
-### Why this matters
-
-Each step has a distinct engineering concern:
-
-| Step | Engineering concern |
-|---|---|
-| intake | validate request, route session, identify sender |
-| context assembly | build prompts, load workspace files, memory, and tools |
-| inference | model selection, cost, latency, timeouts |
-| tool execution | policy, safety, retries, serialization |
-| streaming | user experience and observability |
-| persistence | session history, replay, recovery, audit |
-
-That means the agent loop is not only about the model.
-
-It is the full runtime path from inbound event to durable result.
-
----
-
-## 6. Why session serialization matters
-
-OpenClaw's docs emphasize that runs are **serialized per session**.
-
-That means one session should not have many overlapping agent runs mutating it at the same time.
-
-Why?
-
-Because concurrency bugs in agents are subtle.
-
-Imagine this broken case:
-
-```text
-message A arrives
-message B arrives one second later
-both runs share the same session
-both read old context
-both call tools
-both write memory
-both reply
-```
-
-Now you get:
-
-- duplicated tool calls
-- mixed replies
-- inconsistent state
-- broken summaries
-- confusing memory
-
-Session serialization avoids that.
-
-This is a key production lesson:
-
-> agent correctness often depends on controlling concurrency, not just improving prompts
-
----
-
-## 7. One gateway, many surfaces
-
-OpenClaw is useful because it shows how **one agent runtime** can support **many communication surfaces**.
-
-A single agent can be reachable through:
-
-- Telegram
-- Slack
-- WebChat
-- mobile node
-- CLI
-
-That means "the agent" is not the same thing as "the UI."
-
-This is one of the most important design upgrades students need to make.
-
-Bad beginner mental model:
-
-> the agent is the chat app
-
-Better production mental model:
-
-> the agent is a service, and chat apps are only surfaces connected to it
-
-This leads to better architecture decisions:
-
-- the agent owns logic
-- channels own transport
-- clients own interaction style
-- the gateway owns orchestration
-
----
-
-## 8. Example: from Telegram message to final reply
-
-Here is a simplified OpenClaw-style flow:
-
-```text
-Telegram user sends a message
-  -> Telegram channel adapter receives it
-  -> gateway validates the inbound event
-  -> routing logic picks an agent
-  -> session key is resolved
-  -> session state is loaded
-  -> workspace files and prompt context are assembled
-  -> model runs
-  -> tool is called if needed
-  -> assistant text streams
-  -> session transcript is updated
-  -> reply goes back to Telegram
-```
-
-What is important here is not the specific transport.
-
-What matters is that:
-
-- channel selection
-- agent selection
-- session selection
-- tool execution
-- persistence
-
-are all explicit runtime steps.
-
-That is real agent engineering.
-
----
-
-## 9. Why OpenClaw is a strong teaching example
-
-OpenClaw is useful for this roadmap because it is **not limited to one narrow pattern**.
-
-It combines:
-
-- message channels
-- persistent sessions
-- multi-agent routing
-- device nodes
-- skills and plugins
-- gateway operations
-- safety boundaries
-- long-lived local-first control
-
-That makes it a high-signal example of what a 2026 agent product actually looks like.
-
-It teaches students that:
-
-- an agent can be a system, not just a function
-- local-first designs matter
-- channels are product surfaces
-- sessions are first-class state
-- runtime safety and operations are core features
-
----
-
-## 10. A minimal OpenClaw-style design exercise
-
-Imagine you are building a home AI assistant using the OpenClaw architecture pattern.
-
-It should:
-
-- answer chat questions
-- receive Telegram messages
-- receive voice notes from a mobile node
-- search local notes
-- control a few approved devices
-
-Your architecture sketch should include:
-
-| Part | Your decision |
-|---|---|
-| Gateway | one always-on process on Jetson |
-| Agent | one default personal assistant agent |
-| Channels | Telegram + WebChat |
-| Nodes | one phone node |
-| Session policy | DMs isolated per sender |
-| Tools | note search, calendar lookup, device control |
-| Safety | pairing, tool policy, audit logs |
-
-This already gives you a much stronger design than:
-
-> "I have a chatbot with a prompt."
-
----
-
-## 11. What to remember
-
-The main lesson is simple:
-
-> A real agent product needs a runtime shape.
-
-OpenClaw gives you a strong example of that shape:
-
-- long-lived gateway
-- many surfaces
-- routed sessions
-- explicit agent loop
-- persistent state
-- operational visibility
-
-If you understand this model, you are much closer to building serious agents than if you only know prompting.
-
----
-
-## Key takeaways
-
-- A gateway exists because real agents need shared control over routing, sessions, tools, and operations.
-- OpenClaw is a useful case study because it treats the agent as a long-lived service, not a one-shot prompt call.
-- Channels, clients, nodes, and agents are different roles in the system.
-- The agent loop is a full runtime path: intake, context, inference, tools, streaming, persistence.
-- Session serialization is a production requirement, not an optional optimization.
-- A serious agent product is a control plane plus runtime, not only a model endpoint.
-
----
-
-## References
-
-- Case-study source repo: [OpenClaw](https://github.com/openclaw/openclaw)
-- Practitioner reference: [The OpenClaw Book](https://openclawconsultant.com/openclaw-book/)
-- OpenClaw concepts:
-  - `docs/concepts/architecture.md`
-  - `docs/concepts/agent-loop.md`
-  - `docs/concepts/features.md`
-  - `docs/gateway/index.md`
-
----
-
-*Next: [Lecture 16 - OpenClaw Case Study: Channels, Routing, and Session Design](Lecture-16.md)*
+**Previous:** [Lecture 14](Lecture-14.md) | **Next:** [Lecture 16](Lecture-16.md)

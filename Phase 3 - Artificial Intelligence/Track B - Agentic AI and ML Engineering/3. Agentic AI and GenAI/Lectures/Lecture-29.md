@@ -1,22 +1,33 @@
-# Lecture 29 - Agent Skills: Workflow Discipline for Reliable Coding Agents
+# Lecture 29 - Agentic SDLC: Explore Fast, Ship Safely
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 28](Lecture-28.md) | **Next:** [Lecture 30](Lecture-30.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 28](Lecture-28.md) | **Next:** [Lecture 30](Lecture-30.md)
 
 ---
 
-Modern coding agents can **generate code quickly**.
-
-That is not the same as **doing engineering work correctly**.
-
-The useful mental model:
+Lecture 21 focused on agent skills:
 
 ```text
-Agents optimize for "done."
-Senior engineers optimize for correct, reviewable, and safe.
-Agent skills encode the missing senior-engineering process.
+agents skip discipline
+  -> encode senior-engineering workflows
+  -> require checkpoints, evidence, tests, and scope control
 ```
 
-This lecture uses Addy Osmani's Agent Skills work as a reference pattern and adapts it to OpenClaw-style harnesses, local-first agents, on-device AI, and hardware bring-up workflows.
+This lecture starts from the opposite side:
+
+```text
+code is cheaper now
+  -> use implementation as exploration
+  -> preserve what matters: tests, intent, specs, security, and taste
+```
+
+The tension is the point:
+
+```text
+Explore fast.
+Ship safely.
+```
+
+Strong agent systems **support both**.
 
 ---
 
@@ -24,555 +35,639 @@ This lecture uses Addy Osmani's Agent Skills work as a reference pattern and ada
 
 By the end of this lecture, you should be able to:
 
-1. Explain why agent skills are workflows, not knowledge dumps.
-2. Design a skill with triggers, checkpoints, evidence, and exit criteria.
-3. Use anti-rationalization tables to prevent shortcut behavior.
-4. Apply progressive disclosure so agents load only relevant workflows.
-5. Separate soft skill guidance from hard runtime enforcement.
-6. Map skills into OpenClaw-style prompts, hooks, tools, sessions, and artifacts.
-7. Write skills for coding, hardware bring-up, and on-device AI work.
+1. Explain why cheap code changes software-process economics.
+2. Separate exploration code from shipping code.
+3. Treat tests and intent as persistent assets.
+4. Explain why end-to-end behavior tests matter more when agents can rewrite internals quickly.
+5. Keep specs synchronized with implementation instead of freezing them upfront.
+6. Identify which work should be automated and which work still requires human taste.
+7. Design a dual-mode agent workflow: explore mode and stabilize mode.
+8. Apply this workflow to OpenClaw, on-device AI, and hardware engineering.
 
 ---
 
-## 1. Why agents fail in practice
+## 1. The core shift
 
-Agents often fail because they skip **invisible engineering work**:
+Traditional software economics assumed:
 
-| Missing discipline | Failure mode |
+| Old world | Practical effect |
 |---|---|
-| Spec | the agent solves the wrong problem |
-| Constraints | the agent changes files or behavior outside scope |
-| Tests | the agent declares success without proof |
-| Reviewability | the final diff is too broad to trust |
-| Runtime evidence | code compiles but fails in the real environment |
-| Safety boundary | the prompt says "be careful" but tools still allow damage |
+| Writing code is expensive | plan carefully before coding |
+| Rewriting is expensive | avoid large experiments |
+| Tests feel like overhead | test after implementation pressure allows it |
+| Specs are upfront artifacts | write once, then implement |
 
-This resembles a fast junior engineer:
+Agentic coding shifts the cost structure:
 
-```text
-can produce output
-but may skip assumptions, tests, and review shape
-```
-
-Agent skills exist to make the **missing process explicit**.
-
----
-
-## 2. What an agent skill actually is
-
-A useful skill is not:
-
-```text
-"Follow best practices."
-```
-
-A useful skill is:
-
-```text
-a small workflow
-with specific steps
-and a concrete completion signal
-```
-
-Weak instruction:
-
-```text
-Use TDD where appropriate.
-```
-
-Skill-shaped instruction:
-
-```text
-1. Identify the behavior contract.
-2. Write the smallest failing test.
-3. Run it and capture the failure.
-4. Implement the smallest fix.
-5. Run the targeted test and capture the pass.
-6. Run the relevant broader check.
-7. Finalize only with evidence.
-```
-
-The first version gives **advice**.
-
-The second version creates a **loop**.
-
----
-
-## 3. Where skills sit in the agent stack
-
-Skills are one layer in the harness:
-
-```text
-Model
-  -> system prompt
-  -> skill router
-  -> active skill workflow
-  -> tools
-  -> hooks and policy
-  -> logs and artifacts
-  -> final answer
-```
-
-In OpenClaw language:
-
-```text
-Gateway
-  -> agent loop
-  -> prompt assembly
-  -> skills / bootstrap context
-  -> tool execution
-  -> hooks and approvals
-  -> session log
-  -> artifacts and delivery
-```
-
-Important distinction:
-
-```text
-Skill = workflow instruction
-Hook = deterministic interception
-Tool policy = authority boundary
-Artifact = durable evidence
-```
-
-Do not ask a skill to do the **job of policy**.
-
-A skill can say "ask before deleting files."
-
-The runtime should still **deny unsafe delete tools** unless policy allows them.
-
----
-
-## 4. Process over prose
-
-Agents can summarize rules **without applying them**.
-
-So a skill should prefer **action steps over essays**.
-
-Weak:
-
-```text
-Be careful with production changes.
-```
-
-Better:
-
-```text
-Before editing production code:
-1. Identify the production boundary.
-2. Identify rollback path.
-3. List files allowed to change.
-4. List tests or runtime checks required.
-5. Stop if required evidence cannot be produced.
-```
-
-Skill design rule:
-
-```text
-If the agent cannot act on it, it is reference material, not a skill.
-```
-
----
-
-## 5. Anti-rationalization tables
-
-Agents are good at **plausible excuses**.
-
-Examples:
-
-| Shortcut claim | Required rebuttal |
+| Agentic world | Practical effect |
 |---|---|
-| "This is too small for a spec." | Small changes still need acceptance criteria. Write the smallest possible spec. |
-| "I will add tests later." | Later usually means never. Add the minimal verification now. |
-| "The code compiles, so it works." | Compilation is one signal, not behavior proof. Run the relevant check. |
-| "This nearby refactor is useful." | Useful is not requested. Keep the diff scoped unless scope expansion is approved. |
-| "The tool output is probably good enough." | Mutable state must be checked live before finalizing. |
-| "This is local only, so security does not matter." | Local agents often hold secrets and filesystem authority. Apply least privilege. |
+| Writing code is cheap | implement to learn |
+| Rebuilding is cheaper | try parallel designs |
+| Tests become the asset | behavior contracts let internals change |
+| Specs are continuous | update intent as learning happens |
 
-This is **cheap and effective**.
-
-The goal is to **pre-write the response** to the shortcuts the model is likely to take.
-
----
-
-## 6. Verification is mandatory
-
-A skill should end with **evidence**.
-
-Evidence examples:
-
-| Task type | Evidence |
-|---|---|
-| Code change | test output, lint output, build output |
-| UI change | screenshot, visual diff, responsive check |
-| API change | schema diff, contract test, compatibility note |
-| Runtime change | health check, log excerpt, smoke test |
-| Security change | denied-path test, permission audit, policy check |
-| Documentation change | docs build, link check, rendered preview |
-| Hardware bring-up | kernel log, bus scan, command output, waveform capture |
-
-Rule:
+The bottleneck moves from **typing code to judging code**:
 
 ```text
-No evidence, no completion.
+Do we know what is worth building?
+Can we tell when it is correct?
+Can we maintain what we generated?
+Can we keep it safe?
 ```
-
-This matters more for **long-running agents**.
-
-Small shortcuts **compound over long sessions**.
 
 ---
 
-## 7. Progressive disclosure
+## 2. Code as exploration
 
-Do not load **every workflow into every run**.
+**"Implement to learn"** is the key idea.
 
-That creates:
+Sometimes you do not know the right design until you build a **rough version**.
 
-- token bloat
-- weaker attention
-- slower inference
-- more compaction pressure
-- irrelevant instruction conflicts
+This is especially true for:
 
-Better pattern:
+- UI workflows
+- agent loops
+- streaming event protocols
+- retrieval quality
+- latency paths
+- hardware bring-up scripts
+- deployment automation
+- developer experience
+
+Prototype code becomes a **probe**:
 
 ```text
-small router
-  -> load only relevant skill
-  -> load deeper references only when needed
+implementation -> feedback -> updated intent
 ```
 
-Example:
+You build a slice to discover:
 
-```text
-Bug fix request
-  -> load test-driven-bugfix
-  -> maybe load runtime-debug
-  -> do not load deployment, frontend, and release skills unless needed
-```
+- missing requirements
+- hidden state
+- bad abstractions
+- UX friction
+- testability problems
+- performance bottlenecks
+- security assumptions
 
-This is especially important for **on-device AI** where context, latency, memory, and thermal budget matter.
-
----
-
-## 8. Scope discipline
-
-A reliable coding agent must keep changes **reviewable**.
-
-Before editing:
-
-```text
-- list intended files
-- list non-goals
-- identify protected areas
-- ask before broadening scope
-```
-
-Before final answer:
-
-```text
-- list files changed
-- state whether scope expanded
-- explain why any expansion was necessary
-- provide verification evidence
-```
-
-Reviewability is **not a cosmetic concern**.
-
-It is how humans **keep authority over generated work**.
+Then you decide **what to keep**.
 
 ---
 
-## 9. Skill anatomy
+## 3. Cheap code still has expensive consequences
 
-A practical `SKILL.md` should be short and structured:
+Cheap generation does not make software **free**.
 
-```markdown
----
-name: test-driven-bugfix
-description: Use for bug fixes where behavior must be proven with tests or runtime evidence.
----
-
-# Test-Driven Bug Fix
-
-## When to use
-
-Use when fixing a bug, regression, failing test, or runtime error.
-
-## Workflow
-
-1. Reproduce the bug or failing behavior.
-2. Record the exact failure output.
-3. Identify the smallest behavior contract.
-4. Add or update the minimal failing test.
-5. Run the test and confirm failure.
-6. Implement the smallest fix.
-7. Run the targeted test and confirm pass.
-8. Run the relevant broader check.
-9. Review the diff for unrelated changes.
-
-## Anti-rationalization
-
-| Claim | Response |
-|---|---|
-| "This is obvious." | Obvious fixes still need evidence. |
-| "There is no test harness." | Use the smallest available runtime or command-level check. |
-| "The failure is intermittent." | Capture logs and state what was and was not reproduced. |
-
-## Exit criteria
-
-- Failure was reproduced or explicitly marked unreproducible.
-- Fix is scoped to the bug.
-- Verification command and result are recorded.
-- No unrelated files were changed.
-```
-
-This is **compact enough to load** and specific enough to audit.
-
----
-
-## 10. Hardware bring-up skill
-
-Agent skills are useful for embedded and hardware work because bring-up is **full of mutable state**.
-
-Example:
-
-```markdown
----
-name: hardware-bringup-debug
-description: Use for Jetson, ESP32, I2S, SPI, UART, kernel, driver, and device-tree debugging.
----
-
-# Hardware Bring-Up Debug
-
-## Workflow
-
-1. Identify board, OS image, kernel version, and exact hardware path.
-2. Record the expected signal or interface contract.
-3. Capture current observable state.
-4. Separate host, wiring, firmware, driver, and userspace hypotheses.
-5. Test one hypothesis at a time.
-6. Do not change kernel, device tree, firmware, and userspace simultaneously.
-7. Preserve raw command outputs for evidence.
-8. Summarize blocker and next physical or software check.
-
-## Anti-rationalization
-
-| Claim | Response |
-|---|---|
-| "It is probably wiring." | Prove host and software state before blaming wiring. |
-| "It is probably software." | Check voltage, pinmux, and physical bus assumptions. |
-| "Let's rebuild everything." | Change one layer at a time or the result is not diagnosable. |
-```
-
-This applies directly to:
-
-- Jetson I2S microphone capture
-- ESP32-C6 RCP/NCP bring-up
-- OpenThread attach debugging
-- Zigbee coordinator testing
-- camera sensor bring-up
-- audio codec device-tree work
-
-The skill prevents the classic failure:
-
-```text
-change five variables, then no one knows which one mattered
-```
-
----
-
-## 11. On-device AI skill
-
-On-device agents have **additional constraints**:
-
-- memory pressure
-- thermal budget
-- local privacy
-- smaller context windows
-- intermittent network
-- model fallback behavior
-- hardware permissions
-
-Example:
-
-```markdown
----
-name: on-device-agent-change
-description: Use when modifying an agent that runs on a laptop, Jetson, phone, or local gateway.
----
-
-# On-Device Agent Change
-
-## Workflow
-
-1. Identify target device and runtime limits.
-2. Identify local-only data and privacy boundaries.
-3. Check startup path and readiness gates.
-4. Keep prompt/context additions minimal.
-5. Prefer deterministic checks over model judgment.
-6. Validate behavior with network unavailable if relevant.
-7. Record CPU/GPU/memory impact when measurable.
-
-## Exit criteria
-
-- startup remains deterministic
-- local permissions are unchanged or explicitly reviewed
-- context growth is bounded
-- fallback behavior is documented
-- verification was run on or representative of the target device
-```
-
-This fits OpenClaw, Jetson, and local-first assistant systems.
-
----
-
-## 12. Runtime enforcement pattern
-
-Use two layers:
-
-```text
-1. Soft guidance: skill workflow
-2. Hard enforcement: harness policy
-```
-
-Examples:
-
-| Workflow requirement | Runtime enforcement |
-|---|---|
-| Run tests before finalizing | final-answer hook checks for test evidence |
-| Do not edit outside scope | filesystem policy or diff checker |
-| Ask before dangerous command | exec approval gate |
-| Keep secrets out of logs | log redaction and denylisted paths |
-| Use small context | prompt budget and context inspectors |
-| Preserve evidence | artifact API or session attachment |
-
-Prompts help behavior.
-
-They do not enforce authority.
-
----
-
-## 13. Evidence ledger
-
-For production agents, keep a run-level evidence ledger:
-
-```text
-task id
-skill used
-files touched
-tools called
-approval decisions
-tests run
-logs captured
-artifacts created
-scope changes
-known gaps
-```
-
-This supports:
+It **moves cost** into:
 
 - review
-- debugging
+- verification
+- maintenance
+- support
+- security
 - incident response
-- auditability
-- future skill improvement
+- user trust
+- documentation
+- operational ownership
 
-OpenClaw-style systems can store this across:
-
-- session transcript
-- run events
-- artifacts
-- Gateway RPC task state
-- external dashboards
-
-Principle:
+The practical rule:
 
 ```text
-If the agent claims success, the system should know why.
+Treat exploratory code as disposable.
+Treat tests and intent as assets.
+```
+
+This is why **"vibe coding" without contracts** breaks down quickly.
+
+The agent can generate a feature **in minutes**.
+
+The team still owns the bugs **for months**.
+
+---
+
+## 4. The synthesis with Agent Skills
+
+Lecture 21 and this lecture fit together like this:
+
+| Concern | Agentic SDLC | Agent Skills |
+|---|---|---|
+| Exploration | implement to learn, rebuild often | not the main focus |
+| Discipline | maintenance is real | workflow checkpoints |
+| Tests | persistent behavioral contracts | mandatory exit criteria |
+| Specs | continuously synchronized | structured entry point |
+| Safety | cheap code does not remove risk | anti-rationalization and policy gates |
+| Human role | taste and experience become bottlenecks | review, scope, and verification discipline |
+
+Combined loop:
+
+```text
+EXPLORE
+  -> build cheap prototypes
+  -> learn from behavior
+  -> update intent
+
+LOCK IN
+  -> turn useful behavior into tests
+  -> update specs
+  -> define constraints
+
+STABILIZE
+  -> apply skills
+  -> verify
+  -> review diff
+
+SHIP
+  -> release with evidence
+  -> monitor and maintain
+```
+
+This is the **agentic SDLC**.
+
+---
+
+## 5. Explore mode vs stabilize mode
+
+Do not use the **same rules for every phase**.
+
+### Explore mode
+
+| Property | Rule |
+|---|---|
+| Goal | learn quickly |
+| Code quality | rough is acceptable |
+| Scope | broader experiments allowed |
+| Tests | lightweight probes or golden examples |
+| Output | notes, screenshots, traces, candidate designs |
+| Human review | frequent direction checks |
+
+### Stabilize mode
+
+| Property | Rule |
+|---|---|
+| Goal | make selected behavior safe to ship |
+| Code quality | maintainable and reviewable |
+| Scope | narrow, explicit, approved |
+| Tests | required behavior contracts |
+| Output | small diff, evidence, risk note |
+| Human review | final engineering review |
+
+Example:
+
+```text
+"Try three ways to implement local voice activity detection."
+  -> explore mode
+
+"Make the selected VAD implementation production-ready."
+  -> stabilize mode
 ```
 
 ---
 
-## 14. Practical implementation checklist
+## 6. Tests as the stability layer
 
-Start with five skills:
+When code is easy to rewrite, tests become **more important**.
 
-| Skill | Why it matters |
-|---|---|
-| `spec-first` | prevents wrong-target implementation |
-| `small-plan` | forces reviewable chunks |
-| `test-driven-bugfix` | creates behavior evidence |
-| `runtime-safety-review` | catches tool, permission, and data risks |
-| `hardware-bringup-debug` | prevents multi-variable debugging chaos |
-
-For each skill, define:
+Reason:
 
 ```text
-name
-description
-when to use
-workflow
-anti-rationalization table
-exit criteria
-evidence format
-references, if needed
+tests preserve behavior while agents rewrite implementation
 ```
 
-Then add:
+Useful agentic tests are often **behavior-level**:
 
-- a small router
-- a final-answer evidence check
-- a diff-scope check
-- a way to inspect which skill ran
-- skill versioning for reproducibility
+- user journey tests
+- API contract tests
+- CLI smoke tests
+- event-stream contract tests
+- artifact-shape tests
+- model-independent harness tests
+- hardware observable-state tests
+
+For OpenClaw-style systems:
+
+| Area | Useful contract |
+|---|---|
+| Gateway RPC | request/response schema and event ordering |
+| App SDK | normalized event shapes and wait/cancel behavior |
+| cron | invalid schedules rejected before job creation |
+| node transport | node command must be declared and allowed |
+| tool policy | denied tools fail closed |
+| system prompt | expected sections present without leaking secrets |
+
+The test should answer:
+
+```text
+What must remain true if the implementation changes?
+```
+
+---
+
+## 7. Intent documentation
+
+Tests say **what works**.
+
+Code says **how it works**.
+
+Specs say **what the system should do**.
+
+Intent explains **why**.
+
+Agents need intent because they do not have **durable product judgment** unless you write it down.
+
+Good intent docs include:
+
+- why this design exists
+- alternatives rejected
+- tradeoffs accepted
+- what must not be optimized away
+- what future work is intentionally deferred
+
+Example:
+
+```markdown
+# Intent: Gateway RPC Event Normalization
+
+We normalize raw Gateway frames in the App SDK because external apps need a
+stable event contract. Apps should not parse internal runtime frames directly.
+
+Rejected alternative:
+- expose raw frames only
+
+Reason:
+- raw frames create fragile UI integrations and make runtime changes risky
+
+Must preserve:
+- unknown raw frames remain available for advanced users
+- stable event envelope stays versioned
+```
+
+This is **high-value context** for future agents.
+
+---
+
+## 8. Specs must evolve
+
+A static spec is **often wrong** after implementation begins.
+
+Agentic development reveals:
+
+- API edge cases
+- missing permission states
+- testability constraints
+- model behavior issues
+- UI states not considered
+- hardware timing problems
+
+Continuous spec rule:
+
+```text
+Every meaningful implementation discovery should update:
+- acceptance criteria
+- non-goals
+- constraints
+- test plan
+- open risks
+```
+
+This is **not bureaucracy**.
+
+It **preserves learning**.
+
+---
+
+## 9. Human taste becomes the limiter
+
+When code arrives faster than external feedback, **judgment becomes the bottleneck**.
+
+Taste means knowing:
+
+- what good looks like
+- which complexity is not worth it
+- when a prototype is lying
+- when UX is awkward
+- when an abstraction is premature
+- when a test is too brittle
+- when security risk is being hand-waved
+
+Agents **amplify taste**.
+
+They do **not replace it**.
+
+Better engineers get more from agents because they:
+
+- frame tasks precisely
+- constrain the search space
+- detect weak answers faster
+- recognize accidental complexity
+- identify missing verification
+
+---
+
+## 10. Automate the easy stuff
+
+Good automation targets:
+
+- formatting
+- linting
+- test selection
+- smoke test execution
+- dependency checks
+- docs build checks
+- API schema generation
+- screenshot capture
+- event fixture replay
+- log summarization
+
+Repeated lessons should become:
+
+```text
+habit -> checklist -> skill -> hook -> CI gate
+```
+
+Example:
+
+```text
+Agent repeatedly forgets to run mkdocs build.
+  -> add docs-build skill
+  -> add final-answer evidence check
+  -> add CI gate
+```
+
+---
+
+## 11. Dual-mode agent design
+
+A practical coding agent should support **two explicit modes**.
+
+### Explore mode
+
+Purpose:
+
+```text
+learn quickly, compare options, surface hidden constraints
+```
+
+Allowed behavior:
+
+- build throwaway prototypes
+- compare approaches
+- run quick probes
+- produce notes and tradeoff tables
+- ask for human direction before stabilizing
+
+Required output:
+
+```text
+what was tried
+what was learned
+which option is recommended
+what evidence supports it
+what should be discarded
+```
+
+### Stabilize mode
+
+Purpose:
+
+```text
+turn selected behavior into reviewable, maintainable code
+```
+
+Required behavior:
+
+- update spec
+- add or update tests
+- keep diff scoped
+- run verification
+- document remaining risk
+- produce review-ready summary
+
+Required output:
+
+```text
+files changed
+tests run
+evidence captured
+scope changes
+known risks
+next action
+```
+
+---
+
+## 12. OpenClaw mapping
+
+In an OpenClaw-style runtime:
+
+| SDLC concern | Runtime primitive |
+|---|---|
+| Explore mode | isolated session or sandbox workspace |
+| Stabilize mode | main project session with stricter tools |
+| Tests as contracts | tool execution plus captured run output |
+| Intent docs | workspace bootstrap files or project docs |
+| Spec sync | session memory and project markdown updates |
+| Scope discipline | file policy, diff review, approval hook |
+| Evidence | artifacts, logs, screenshots, run events |
+| Human taste | approval UI, dashboard, review surfaces |
+| Long-running work | cron, sessions, task ledger |
+
+Useful command vocabulary:
+
+```text
+/explore "Try three possible implementations"
+/choose "Select option B and explain why"
+/stabilize "Make option B production-ready"
+/verify "Run the contract checks"
+/review "Inspect the diff and risks"
+```
+
+The runtime should record mode in run metadata.
+
+Reviewers need to know whether they are looking at experiment output or ship-ready output.
+
+---
+
+## 13. On-device AI example
+
+Task:
+
+```text
+Improve wake-word responsiveness without increasing false positives.
+```
+
+Explore mode:
+
+```text
+1. Try three VAD/wake-word pipeline variants.
+2. Measure latency on short sample clips.
+3. Track CPU/GPU usage.
+4. Record false-positive behavior on noisy clips.
+5. Recommend one candidate.
+```
+
+Stabilize mode:
+
+```text
+1. Update the selected pipeline only.
+2. Add regression clips.
+3. Add latency threshold test.
+4. Add false-positive check.
+5. Document runtime limits.
+6. Run on target Jetson or representative device.
+```
+
+Exploration discovers behavior.
+
+Tests turn discoveries into contracts.
+
+Stabilization prevents prototype debt.
+
+---
+
+## 14. Hardware bring-up example
+
+Task:
+
+```text
+Get ESP32-C6 Zigbee NCP talking to Jetson over UART.
+```
+
+Explore mode:
+
+```text
+1. Confirm serial device candidates.
+2. Try baud rates and flow-control assumptions.
+3. Capture logs for each attempt.
+4. Compare host-side and firmware-side symptoms.
+5. Stop before changing firmware and kernel settings together.
+```
+
+Stabilize mode:
+
+```text
+1. Document working wiring and serial config.
+2. Add a bring-up checklist.
+3. Add a smoke command.
+4. Save known-good logs.
+5. Add troubleshooting table for common failure states.
+```
+
+The agent skills from Lecture 21 prevent multi-variable chaos.
+
+This SDLC lets you explore enough to learn.
+
+---
+
+## 15. Minimal artifact set
+
+For serious projects, preserve:
+
+```text
+SPEC.md
+INTENT.md
+TEST_PLAN.md
+DECISIONS.md
+RISKS.md
+RUNBOOK.md
+```
+
+Minimal version:
+
+```text
+SPEC.md      what should be true
+INTENT.md    why decisions were made
+TESTS        executable behavior contracts
+```
+
+If the agent can read only three things before changing code, give it:
+
+```text
+current spec
+relevant tests
+current intent
+```
+
+---
+
+## 16. Failure modes
+
+| Failure | What happened | Fix |
+|---|---|---|
+| Prototype shipped | exploration code went to production | require stabilize mode before merge |
+| Spec drift | implementation taught new facts, docs stayed old | update spec during work |
+| Test theater | tests assert implementation details only | write behavior contracts |
+| Infinite exploration | agent keeps trying ideas without converging | timebox and force recommendation |
+| Over-process | agent writes bureaucracy for tiny tasks | scale process to risk |
+| Weak taste | agent optimizes local code but worsens product | human review for UX/architecture/security |
+| Hidden maintenance | generated code owns long-term support burden | record owner, risks, and rollback path |
+| Security blind spot | code is cheap, exploit cleanup is not | enforce policy and review threat paths |
+
+Dangerous confusion:
+
+```text
+fast generation != low total cost
+```
 
 ---
 
 ## Mini-lab
 
-Create one local skill for a painful workflow.
+Add two commands or skills to your agent workspace:
 
-Recommended choices:
+```text
+/explore
+/stabilize
+```
 
-- Jetson audio debug
-- ESP32-C6 radio bring-up
-- OpenClaw plugin debugging
-- App SDK smoke test
-- model runtime regression
-- documentation build failure
+`/explore` output:
 
-Test it manually:
+```text
+- options tried
+- evidence gathered
+- recommendation
+- discarded ideas
+- follow-up questions
+```
 
-1. Give the agent a task that should trigger the skill.
-2. Check whether it follows the workflow.
-3. Check whether it produces evidence.
-4. Check whether the final answer is reviewable.
-5. Revise the skill where the agent skipped or rationalized.
+`/stabilize` output:
+
+```text
+- updated spec/intent
+- tests added or updated
+- verification command output
+- scoped diff summary
+- risks and rollback
+```
+
+Test with:
+
+```text
+Explore three ways to improve OpenClaw App SDK event replay.
+Then stabilize the best one.
+```
 
 ---
 
 ## Key takeaways
 
-- Agent skills turn senior-engineering discipline into reusable workflows.
-- A useful skill is process, not prose.
-- Skills need checkpoints, anti-rationalization, and exit criteria.
-- Verification must produce evidence.
-- Progressive disclosure keeps context small and relevant.
-- Scope discipline makes agent output reviewable.
-- Skills do not replace hooks, approvals, sandboxing, or tool policy.
+- Cheap code changes software process, but it does not remove engineering cost.
+- Implementation can be an exploration tool.
+- Tests and intent are durable assets.
+- Specs should evolve as implementation reveals reality.
+- Human taste and domain experience become more important when code arrives faster.
+- Agent skills provide the stabilization discipline that exploration alone lacks.
+- The useful pattern is dual-mode: explore fast, then stabilize with evidence.
 
 ---
 
 ## References
 
+- Drew Breunig, "10 Lessons for Agentic Coding": [https://www.dbreunig.com/2026/05/04/10-lessons-for-agentic-coding.html](https://www.dbreunig.com/2026/05/04/10-lessons-for-agentic-coding.html)
 - Addy Osmani, "Agent Skills": [https://addyosmani.com/blog/agent-skills/](https://addyosmani.com/blog/agent-skills/)
-- Agent Skills repository: [https://github.com/addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)
-- Lecture 19 - OpenClaw Agent Loop: [Lecture-19.md](Lecture-19.md)
-- Lecture 21 - System Prompt Architecture: [Lecture-21.md](Lecture-21.md)
-- Lecture 28 - Pi: [Lecture-28.md](Lecture-28.md)
+- Lecture 21 - Agent Skills: [Lecture-21.md](Lecture-21.md)
+- Lecture 35 - OpenClaw Agent Loop: [Lecture-35.md](Lecture-35.md)
+- Lecture 38 - OpenClaw App SDK: [Lecture-38.md](Lecture-38.md)
 
 ---
 
-*Next: [Lecture 30 - Agentic SDLC: Explore Fast, Ship Safely](Lecture-30.md)*
+*Next: [Lecture 30](Lecture-30.md)*

@@ -1,673 +1,676 @@
-# Lecture 30 - Agentic SDLC: Explore Fast, Ship Safely
+# Lecture 30 — Production Deployment
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 29](Lecture-29.md) | **Next:** [Lecture 31](Lecture-31.md)
-
----
-
-Lecture 29 focused on agent skills:
-
-```text
-agents skip discipline
-  -> encode senior-engineering workflows
-  -> require checkpoints, evidence, tests, and scope control
-```
-
-This lecture starts from the opposite side:
-
-```text
-code is cheaper now
-  -> use implementation as exploration
-  -> preserve what matters: tests, intent, specs, security, and taste
-```
-
-The tension is the point:
-
-```text
-Explore fast.
-Ship safely.
-```
-
-Strong agent systems **support both**.
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 29](Lecture-29.md) | **Next:** [Lecture 31](Lecture-31.md)
 
 ---
 
-## Learning objectives
+## Learning Objectives
 
-By the end of this lecture, you should be able to:
+By the end of this lecture you will be able to:
 
-1. Explain why cheap code changes software-process economics.
-2. Separate exploration code from shipping code.
-3. Treat tests and intent as persistent assets.
-4. Explain why end-to-end behavior tests matter more when agents can rewrite internals quickly.
-5. Keep specs synchronized with implementation instead of freezing them upfront.
-6. Identify which work should be automated and which work still requires human taste.
-7. Design a dual-mode agent workflow: explore mode and stabilize mode.
-8. Apply this workflow to OpenClaw, on-device AI, and hardware engineering.
+1. Wrap an AI agent in a production-grade FastAPI endpoint.
+2. Stream tokens to the client using Server-Sent Events (SSE).
+3. Implement semantic caching with Redis and embeddings to cut repeat-query cost.
+4. Route requests to fast/cheap or powerful models based on query complexity.
+5. Apply rate limiting and exponential-backoff retry to third-party API calls.
+6. Filter outputs for safety: content moderation and PII detection.
+7. Add health-check endpoints and handle graceful shutdown.
 
 ---
 
-## 1. The core shift
+## 1. FastAPI Wrapper for an Agent Endpoint
 
-Traditional software economics assumed:
+```python
+# pip install fastapi uvicorn pydantic openai python-dotenv
 
-| Old world | Practical effect |
-|---|---|
-| Writing code is expensive | plan carefully before coding |
-| Rewriting is expensive | avoid large experiments |
-| Tests feel like overhead | test after implementation pressure allows it |
-| Specs are upfront artifacts | write once, then implement |
+from __future__ import annotations
 
-Agentic coding shifts the cost structure:
+import os
+import time
+import uuid
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
 
-| Agentic world | Practical effect |
-|---|---|
-| Writing code is cheap | implement to learn |
-| Rebuilding is cheaper | try parallel designs |
-| Tests become the asset | behavior contracts let internals change |
-| Specs are continuous | update intent as learning happens |
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+from openai import AsyncOpenAI
 
-The bottleneck moves from **typing code to judging code**:
+# ── Models ────────────────────────────────────────────────────────────────────
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=4096)
+    session_id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    model: str = Field(default_factory=lambda: os.environ.get("OPENAI_MODEL", "your-model-id"))
 
-```text
-Do we know what is worth building?
-Can we tell when it is correct?
-Can we maintain what we generated?
-Can we keep it safe?
+class ChatResponse(BaseModel):
+    session_id: str
+    answer: str
+    model_used: str
+    latency_ms: float
+    tokens_used: int
+
+# ── Application state ─────────────────────────────────────────────────────────
+class AppState:
+    client: AsyncOpenAI | None = None
+    ready: bool = False
+
+state = AppState()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    state.client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY", "sk-fake"))
+    state.ready = True
+    print("Agent service started")
+    yield
+    # Shutdown
+    state.ready = False
+    print("Agent service shutting down gracefully")
+
+app = FastAPI(title="AI Agent API", version="1.0.0", lifespan=lifespan)
+
+# ── Health checks ─────────────────────────────────────────────────────────────
+@app.get("/health")
+async def health():
+    return {"status": "ok" if state.ready else "starting", "timestamp": time.time()}
+
+@app.get("/ready")
+async def readiness():
+    if not state.ready:
+        raise HTTPException(status_code=503, detail="Service not ready")
+    return {"status": "ready"}
+
+# ── Chat endpoint ─────────────────────────────────────────────────────────────
+SYSTEM_PROMPT = (
+    "You are a helpful AI assistant specializing in hardware engineering. "
+    "Answer questions clearly and concisely."
+)
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat(req: ChatRequest):
+    start = time.perf_counter()
+
+    response = await state.client.chat.completions.create(
+        model=req.model,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user",   "content": req.message},
+        ],
+        temperature=0.2,
+    )
+
+    answer = response.choices[0].message.content
+    latency_ms = (time.perf_counter() - start) * 1000
+
+    return ChatResponse(
+        session_id=req.session_id,
+        answer=answer,
+        model_used=req.model,
+        latency_ms=round(latency_ms, 1),
+        tokens_used=response.usage.total_tokens,
+    )
 ```
 
----
+Run with:
 
-## 2. Code as exploration
-
-**"Implement to learn"** is the key idea.
-
-Sometimes you do not know the right design until you build a **rough version**.
-
-This is especially true for:
-
-- UI workflows
-- agent loops
-- streaming event protocols
-- retrieval quality
-- latency paths
-- hardware bring-up scripts
-- deployment automation
-- developer experience
-
-Prototype code becomes a **probe**:
-
-```text
-implementation -> feedback -> updated intent
-```
-
-You build a slice to discover:
-
-- missing requirements
-- hidden state
-- bad abstractions
-- UX friction
-- testability problems
-- performance bottlenecks
-- security assumptions
-
-Then you decide **what to keep**.
-
----
-
-## 3. Cheap code still has expensive consequences
-
-Cheap generation does not make software **free**.
-
-It **moves cost** into:
-
-- review
-- verification
-- maintenance
-- support
-- security
-- incident response
-- user trust
-- documentation
-- operational ownership
-
-The practical rule:
-
-```text
-Treat exploratory code as disposable.
-Treat tests and intent as assets.
-```
-
-This is why **"vibe coding" without contracts** breaks down quickly.
-
-The agent can generate a feature **in minutes**.
-
-The team still owns the bugs **for months**.
-
----
-
-## 4. The synthesis with Agent Skills
-
-Lecture 29 and this lecture fit together like this:
-
-| Concern | Agentic SDLC | Agent Skills |
-|---|---|---|
-| Exploration | implement to learn, rebuild often | not the main focus |
-| Discipline | maintenance is real | workflow checkpoints |
-| Tests | persistent behavioral contracts | mandatory exit criteria |
-| Specs | continuously synchronized | structured entry point |
-| Safety | cheap code does not remove risk | anti-rationalization and policy gates |
-| Human role | taste and experience become bottlenecks | review, scope, and verification discipline |
-
-Combined loop:
-
-```text
-EXPLORE
-  -> build cheap prototypes
-  -> learn from behavior
-  -> update intent
-
-LOCK IN
-  -> turn useful behavior into tests
-  -> update specs
-  -> define constraints
-
-STABILIZE
-  -> apply skills
-  -> verify
-  -> review diff
-
-SHIP
-  -> release with evidence
-  -> monitor and maintain
-```
-
-This is the **agentic SDLC**.
-
----
-
-## 5. Explore mode vs stabilize mode
-
-Do not use the **same rules for every phase**.
-
-### Explore mode
-
-| Property | Rule |
-|---|---|
-| Goal | learn quickly |
-| Code quality | rough is acceptable |
-| Scope | broader experiments allowed |
-| Tests | lightweight probes or golden examples |
-| Output | notes, screenshots, traces, candidate designs |
-| Human review | frequent direction checks |
-
-### Stabilize mode
-
-| Property | Rule |
-|---|---|
-| Goal | make selected behavior safe to ship |
-| Code quality | maintainable and reviewable |
-| Scope | narrow, explicit, approved |
-| Tests | required behavior contracts |
-| Output | small diff, evidence, risk note |
-| Human review | final engineering review |
-
-Example:
-
-```text
-"Try three ways to implement local voice activity detection."
-  -> explore mode
-
-"Make the selected VAD implementation production-ready."
-  -> stabilize mode
+```bash
+uvicorn agent_api:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ---
 
-## 6. Tests as the stability layer
+## 2. Streaming with Server-Sent Events (SSE)
 
-When code is easy to rewrite, tests become **more important**.
+**SSE** lets the client receive tokens as they are generated, making long responses feel **interactive**.
 
-Reason:
+```python
+# pip install sse-starlette
 
-```text
-tests preserve behavior while agents rewrite implementation
+from sse_starlette.sse import EventSourceResponse
+from fastapi import FastAPI
+from pydantic import BaseModel
+import asyncio
+
+class StreamRequest(BaseModel):
+    message: str
+    session_id: str = ""
+
+@app.post("/chat/stream")
+async def chat_stream(req: StreamRequest):
+    async def token_generator() -> AsyncGenerator[dict, None]:
+        try:
+            stream = await state.client.chat.completions.create(
+                model=os.environ.get("OPENAI_MODEL", "your-model-id"),
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user",   "content": req.message},
+                ],
+                stream=True,
+                temperature=0.2,
+            )
+            async for chunk in stream:
+                delta = chunk.choices[0].delta
+                if delta.content:
+                    yield {"event": "token", "data": delta.content}
+            yield {"event": "done", "data": "[DONE]"}
+        except Exception as e:
+            yield {"event": "error", "data": str(e)}
+
+    return EventSourceResponse(token_generator())
 ```
 
-Useful agentic tests are often **behavior-level**:
+**Client-side JavaScript (for reference):**
 
-- user journey tests
-- API contract tests
-- CLI smoke tests
-- event-stream contract tests
-- artifact-shape tests
-- model-independent harness tests
-- hardware observable-state tests
-
-For OpenClaw-style systems:
-
-| Area | Useful contract |
-|---|---|
-| Gateway RPC | request/response schema and event ordering |
-| App SDK | normalized event shapes and wait/cancel behavior |
-| cron | invalid schedules rejected before job creation |
-| node transport | node command must be declared and allowed |
-| tool policy | denied tools fail closed |
-| system prompt | expected sections present without leaking secrets |
-
-The test should answer:
-
-```text
-What must remain true if the implementation changes?
+```javascript
+const evtSource = new EventSource("/chat/stream?message=What+is+HBM3");
+evtSource.addEventListener("token", (e) => process.stdout.write(e.data));
+evtSource.addEventListener("done", () => evtSource.close());
 ```
 
----
+**Python client:**
 
-## 7. Intent documentation
+```python
+import httpx
 
-Tests say **what works**.
-
-Code says **how it works**.
-
-Specs say **what the system should do**.
-
-Intent explains **why**.
-
-Agents need intent because they do not have **durable product judgment** unless you write it down.
-
-Good intent docs include:
-
-- why this design exists
-- alternatives rejected
-- tradeoffs accepted
-- what must not be optimized away
-- what future work is intentionally deferred
-
-Example:
-
-```markdown
-# Intent: Gateway RPC Event Normalization
-
-We normalize raw Gateway frames in the App SDK because external apps need a
-stable event contract. Apps should not parse internal runtime frames directly.
-
-Rejected alternative:
-- expose raw frames only
-
-Reason:
-- raw frames create fragile UI integrations and make runtime changes risky
-
-Must preserve:
-- unknown raw frames remain available for advanced users
-- stable event envelope stays versioned
-```
-
-This is **high-value context** for future agents.
-
----
-
-## 8. Specs must evolve
-
-A static spec is **often wrong** after implementation begins.
-
-Agentic development reveals:
-
-- API edge cases
-- missing permission states
-- testability constraints
-- model behavior issues
-- UI states not considered
-- hardware timing problems
-
-Continuous spec rule:
-
-```text
-Every meaningful implementation discovery should update:
-- acceptance criteria
-- non-goals
-- constraints
-- test plan
-- open risks
-```
-
-This is **not bureaucracy**.
-
-It **preserves learning**.
-
----
-
-## 9. Human taste becomes the limiter
-
-When code arrives faster than external feedback, **judgment becomes the bottleneck**.
-
-Taste means knowing:
-
-- what good looks like
-- which complexity is not worth it
-- when a prototype is lying
-- when UX is awkward
-- when an abstraction is premature
-- when a test is too brittle
-- when security risk is being hand-waved
-
-Agents **amplify taste**.
-
-They do **not replace it**.
-
-Better engineers get more from agents because they:
-
-- frame tasks precisely
-- constrain the search space
-- detect weak answers faster
-- recognize accidental complexity
-- identify missing verification
-
----
-
-## 10. Automate the easy stuff
-
-Good automation targets:
-
-- formatting
-- linting
-- test selection
-- smoke test execution
-- dependency checks
-- docs build checks
-- API schema generation
-- screenshot capture
-- event fixture replay
-- log summarization
-
-Repeated lessons should become:
-
-```text
-habit -> checklist -> skill -> hook -> CI gate
-```
-
-Example:
-
-```text
-Agent repeatedly forgets to run mkdocs build.
-  -> add docs-build skill
-  -> add final-answer evidence check
-  -> add CI gate
+with httpx.stream("POST", "http://localhost:8000/chat/stream",
+                  json={"message": "Explain HBM3"}) as response:
+    for line in response.iter_lines():
+        if line.startswith("data:"):
+            token = line[5:].strip()
+            if token != "[DONE]":
+                print(token, end="", flush=True)
+print()
 ```
 
 ---
 
-## 11. Dual-mode agent design
+## 3. Semantic Caching with Redis + Embeddings
 
-A practical coding agent should support **two explicit modes**.
+**Semantic caching** stores (query_embedding → answer) pairs. On a new query, if it is within a **similarity threshold** of a cached query, return the cached answer without calling the LLM.
 
-### Explore mode
+```python
+# pip install redis sentence-transformers numpy
 
-Purpose:
+import json
+import time
+import numpy as np
+import redis
+from sentence_transformers import SentenceTransformer
 
-```text
-learn quickly, compare options, surface hidden constraints
-```
+class SemanticCache:
+    """
+    Redis-backed semantic cache.
+    Keys: 'cache:emb:{id}' (vector as JSON) and 'cache:ans:{id}' (answer string).
+    """
 
-Allowed behavior:
+    def __init__(
+        self,
+        redis_url: str = "redis://localhost:6379",
+        model_name: str = "all-MiniLM-L6-v2",
+        similarity_threshold: float = 0.95,
+        ttl_seconds: int = 3600,
+    ):
+        self.redis = redis.from_url(redis_url)
+        self.model = SentenceTransformer(model_name)
+        self.threshold = similarity_threshold
+        self.ttl = ttl_seconds
+        self._index_key = "cache:index"  # list of all cache entry ids
 
-- build throwaway prototypes
-- compare approaches
-- run quick probes
-- produce notes and tradeoff tables
-- ask for human direction before stabilizing
+    def _embed(self, text: str) -> np.ndarray:
+        return self.model.encode(text, normalize_embeddings=True)
 
-Required output:
+    def get(self, query: str) -> str | None:
+        """Return cached answer if a sufficiently similar query exists."""
+        q_vec = self._embed(query)
+        ids = self.redis.lrange(self._index_key, 0, -1)
 
-```text
-what was tried
-what was learned
-which option is recommended
-what evidence supports it
-what should be discarded
-```
+        best_sim = -1.0
+        best_id = None
+        for id_bytes in ids:
+            cache_id = id_bytes.decode()
+            emb_json = self.redis.get(f"cache:emb:{cache_id}")
+            if not emb_json:
+                continue
+            cached_vec = np.array(json.loads(emb_json))
+            sim = float(np.dot(q_vec, cached_vec))
+            if sim > best_sim:
+                best_sim = sim
+                best_id = cache_id
 
-### Stabilize mode
+        if best_sim >= self.threshold and best_id:
+            print(f"[Cache HIT] similarity={best_sim:.4f}")
+            answer = self.redis.get(f"cache:ans:{best_id}")
+            return answer.decode() if answer else None
 
-Purpose:
+        print(f"[Cache MISS] best_similarity={best_sim:.4f}")
+        return None
 
-```text
-turn selected behavior into reviewable, maintainable code
-```
+    def set(self, query: str, answer: str):
+        """Store a new cache entry."""
+        cache_id = f"{time.time():.0f}_{hash(query) % 100000}"
+        q_vec = self._embed(query)
+        self.redis.setex(f"cache:emb:{cache_id}", self.ttl, json.dumps(q_vec.tolist()))
+        self.redis.setex(f"cache:ans:{cache_id}", self.ttl, answer)
+        self.redis.rpush(self._index_key, cache_id)
+        print(f"[Cache SET] id={cache_id}")
 
-Required behavior:
+    def stats(self) -> dict:
+        n = self.redis.llen(self._index_key)
+        return {"cached_entries": n, "ttl_seconds": self.ttl, "threshold": self.threshold}
 
-- update spec
-- add or update tests
-- keep diff scoped
-- run verification
-- document remaining risk
-- produce review-ready summary
 
-Required output:
+# Integrate with the FastAPI endpoint
+cache = SemanticCache(similarity_threshold=0.95)
 
-```text
-files changed
-tests run
-evidence captured
-scope changes
-known risks
-next action
-```
+async def cached_chat(message: str) -> tuple[str, bool]:
+    """Return (answer, from_cache)."""
+    cached = cache.get(message)
+    if cached:
+        return cached, True
 
----
-
-## 12. OpenClaw mapping
-
-In an OpenClaw-style runtime:
-
-| SDLC concern | Runtime primitive |
-|---|---|
-| Explore mode | isolated session or sandbox workspace |
-| Stabilize mode | main project session with stricter tools |
-| Tests as contracts | tool execution plus captured run output |
-| Intent docs | workspace bootstrap files or project docs |
-| Spec sync | session memory and project markdown updates |
-| Scope discipline | file policy, diff review, approval hook |
-| Evidence | artifacts, logs, screenshots, run events |
-| Human taste | approval UI, dashboard, review surfaces |
-| Long-running work | cron, sessions, task ledger |
-
-Useful command vocabulary:
-
-```text
-/explore "Try three possible implementations"
-/choose "Select option B and explain why"
-/stabilize "Make option B production-ready"
-/verify "Run the contract checks"
-/review "Inspect the diff and risks"
-```
-
-The runtime should record mode in run metadata.
-
-Reviewers need to know whether they are looking at experiment output or ship-ready output.
-
----
-
-## 13. On-device AI example
-
-Task:
-
-```text
-Improve wake-word responsiveness without increasing false positives.
-```
-
-Explore mode:
-
-```text
-1. Try three VAD/wake-word pipeline variants.
-2. Measure latency on short sample clips.
-3. Track CPU/GPU usage.
-4. Record false-positive behavior on noisy clips.
-5. Recommend one candidate.
-```
-
-Stabilize mode:
-
-```text
-1. Update the selected pipeline only.
-2. Add regression clips.
-3. Add latency threshold test.
-4. Add false-positive check.
-5. Document runtime limits.
-6. Run on target Jetson or representative device.
-```
-
-Exploration discovers behavior.
-
-Tests turn discoveries into contracts.
-
-Stabilization prevents prototype debt.
-
----
-
-## 14. Hardware bring-up example
-
-Task:
-
-```text
-Get ESP32-C6 Zigbee NCP talking to Jetson over UART.
-```
-
-Explore mode:
-
-```text
-1. Confirm serial device candidates.
-2. Try baud rates and flow-control assumptions.
-3. Capture logs for each attempt.
-4. Compare host-side and firmware-side symptoms.
-5. Stop before changing firmware and kernel settings together.
-```
-
-Stabilize mode:
-
-```text
-1. Document working wiring and serial config.
-2. Add a bring-up checklist.
-3. Add a smoke command.
-4. Save known-good logs.
-5. Add troubleshooting table for common failure states.
-```
-
-The agent skills from Lecture 29 prevent multi-variable chaos.
-
-This SDLC lets you explore enough to learn.
-
----
-
-## 15. Minimal artifact set
-
-For serious projects, preserve:
-
-```text
-SPEC.md
-INTENT.md
-TEST_PLAN.md
-DECISIONS.md
-RISKS.md
-RUNBOOK.md
-```
-
-Minimal version:
-
-```text
-SPEC.md      what should be true
-INTENT.md    why decisions were made
-TESTS        executable behavior contracts
-```
-
-If the agent can read only three things before changing code, give it:
-
-```text
-current spec
-relevant tests
-current intent
+    response = await state.client.chat.completions.create(
+        model=os.environ.get("OPENAI_MODEL", "your-model-id"),
+        messages=[{"role": "user", "content": message}],
+        temperature=0,
+    )
+    answer = response.choices[0].message.content
+    cache.set(message, answer)
+    return answer, False
 ```
 
 ---
 
-## 16. Failure modes
+## 4. Model Routing
 
-| Failure | What happened | Fix |
-|---|---|---|
-| Prototype shipped | exploration code went to production | require stabilize mode before merge |
-| Spec drift | implementation taught new facts, docs stayed old | update spec during work |
-| Test theater | tests assert implementation details only | write behavior contracts |
-| Infinite exploration | agent keeps trying ideas without converging | timebox and force recommendation |
-| Over-process | agent writes bureaucracy for tiny tasks | scale process to risk |
-| Weak taste | agent optimizes local code but worsens product | human review for UX/architecture/security |
-| Hidden maintenance | generated code owns long-term support burden | record owner, risks, and rollback path |
-| Security blind spot | code is cheap, exploit cleanup is not | enforce policy and review threat paths |
+Route cheap/simple queries to a **fast model** and complex queries to a **more capable one**.
 
-Dangerous confusion:
+```python
+import os
+import re
 
-```text
-fast generation != low total cost
+# Routing rules
+FAST_MODEL = os.environ.get("OPENAI_FAST_MODEL", "provider-fast-model")
+SMART_MODEL = os.environ.get("OPENAI_SMART_MODEL", "provider-reasoning-model")
+
+COMPLEXITY_SIGNALS = [
+    r"\bcompare\b", r"\bdifference\b", r"\bwhy\b", r"\bexplain\b",
+    r"\banalyze\b", r"\bimplement\b", r"\bdesign\b", r"\barchitecture\b",
+    r"\btradeoff\b", r"\bpros and cons\b",
+]
+
+def estimate_complexity(message: str) -> str:
+    """
+    Returns 'simple' or 'complex' based on heuristics.
+    For production, replace with a small classifier LLM call.
+    """
+    msg_lower = message.lower()
+    word_count = len(message.split())
+
+    # Rule 1: very short messages are simple
+    if word_count <= 5:
+        return "simple"
+
+    # Rule 2: complexity signal keywords
+    for pattern in COMPLEXITY_SIGNALS:
+        if re.search(pattern, msg_lower):
+            return "complex"
+
+    # Rule 3: long messages tend to be complex
+    if word_count > 50:
+        return "complex"
+
+    return "simple"
+
+
+def select_model(message: str) -> str:
+    complexity = estimate_complexity(message)
+    model = FAST_MODEL if complexity == "simple" else SMART_MODEL
+    print(f"[Router] complexity={complexity} → {model}")
+    return model
+
+
+@app.post("/chat/smart", response_model=ChatResponse)
+async def smart_chat(req: ChatRequest):
+    start = time.perf_counter()
+    model = select_model(req.message)
+
+    response = await state.client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user",   "content": req.message},
+        ],
+        temperature=0.2,
+    )
+    answer = response.choices[0].message.content
+    latency_ms = (time.perf_counter() - start) * 1000
+
+    return ChatResponse(
+        session_id=req.session_id,
+        answer=answer,
+        model_used=model,
+        latency_ms=round(latency_ms, 1),
+        tokens_used=response.usage.total_tokens,
+    )
 ```
 
 ---
 
-## Mini-lab
+## 5. Rate Limiting and Retry with Exponential Backoff
 
-Add two commands or skills to your agent workspace:
+```python
+# pip install tenacity
 
-```text
-/explore
-/stabilize
-```
+import asyncio
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log,
+)
+import logging
+from openai import RateLimitError, APITimeoutError, APIConnectionError
 
-`/explore` output:
+logger = logging.getLogger(__name__)
 
-```text
-- options tried
-- evidence gathered
-- recommendation
-- discarded ideas
-- follow-up questions
-```
+RETRYABLE_ERRORS = (RateLimitError, APITimeoutError, APIConnectionError)
 
-`/stabilize` output:
+@retry(
+    retry=retry_if_exception_type(RETRYABLE_ERRORS),
+    wait=wait_exponential(multiplier=1, min=1, max=60),
+    stop=stop_after_attempt(5),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    reraise=True,
+)
+async def resilient_completion(client: AsyncOpenAI, messages: list[dict], model: str) -> str:
+    """LLM call with automatic retry on transient errors."""
+    response = await client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=0,
+        timeout=30.0,
+    )
+    return response.choices[0].message.content
 
-```text
-- updated spec/intent
-- tests added or updated
-- verification command output
-- scoped diff summary
-- risks and rollback
-```
 
-Test with:
+# Per-IP rate limiting using a token bucket
+from collections import defaultdict
 
-```text
-Explore three ways to improve OpenClaw App SDK event replay.
-Then stabilize the best one.
+class RateLimiter:
+    """Simple in-memory token bucket rate limiter."""
+
+    def __init__(self, requests_per_minute: int = 60):
+        self.rpm = requests_per_minute
+        self._buckets: dict[str, list[float]] = defaultdict(list)
+
+    def is_allowed(self, client_id: str) -> bool:
+        now = time.time()
+        window = 60.0
+        timestamps = self._buckets[client_id]
+        # Remove timestamps older than 1 minute
+        self._buckets[client_id] = [t for t in timestamps if now - t < window]
+        if len(self._buckets[client_id]) >= self.rpm:
+            return False
+        self._buckets[client_id].append(now)
+        return True
+
+
+rate_limiter = RateLimiter(requests_per_minute=30)
+
+from fastapi import Header
+
+@app.post("/chat/limited", response_model=ChatResponse)
+async def rate_limited_chat(req: ChatRequest, x_client_id: str = Header(default="anonymous")):
+    if not rate_limiter.is_allowed(x_client_id):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again in 60 seconds.")
+
+    start = time.perf_counter()
+    answer = await resilient_completion(
+        state.client,
+        [{"role": "user", "content": req.message}],
+        model=req.model,
+    )
+    latency_ms = (time.perf_counter() - start) * 1000
+
+    return ChatResponse(
+        session_id=req.session_id,
+        answer=answer,
+        model_used=req.model,
+        latency_ms=round(latency_ms, 1),
+        tokens_used=0,  # usage not available without full response object
+    )
 ```
 
 ---
 
-## Key takeaways
+## 6. Safety Filters
 
-- Cheap code changes software process, but it does not remove engineering cost.
-- Implementation can be an exploration tool.
-- Tests and intent are durable assets.
-- Specs should evolve as implementation reveals reality.
-- Human taste and domain experience become more important when code arrives faster.
-- Agent skills provide the stabilization discipline that exploration alone lacks.
-- The useful pattern is dual-mode: explore fast, then stabilize with evidence.
+### 6.1 Content Moderation
+
+```python
+async def check_moderation(text: str) -> dict:
+    """Use OpenAI moderation API to flag unsafe content."""
+    response = await state.client.moderations.create(input=text)
+    result = response.results[0]
+    return {
+        "flagged": result.flagged,
+        "categories": {k: v for k, v in result.categories.__dict__.items() if v},
+    }
+
+
+@app.post("/chat/safe", response_model=ChatResponse)
+async def safe_chat(req: ChatRequest):
+    # Moderate the input
+    moderation = await check_moderation(req.message)
+    if moderation["flagged"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Input flagged by content moderation: {moderation['categories']}",
+        )
+
+    start = time.perf_counter()
+    answer = await resilient_completion(
+        state.client,
+        [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": req.message}],
+        model=req.model,
+    )
+
+    # Moderate the output as well
+    output_mod = await check_moderation(answer)
+    if output_mod["flagged"]:
+        answer = "I'm unable to provide that response."
+
+    latency_ms = (time.perf_counter() - start) * 1000
+    return ChatResponse(
+        session_id=req.session_id,
+        answer=answer,
+        model_used=req.model,
+        latency_ms=round(latency_ms, 1),
+        tokens_used=0,
+    )
+```
+
+### 6.2 PII Detection
+
+```python
+# pip install presidio-analyzer presidio-anonymizer
+
+from presidio_analyzer import AnalyzerEngine
+from presidio_anonymizer import AnonymizerEngine
+
+analyzer = AnalyzerEngine()
+anonymizer = AnonymizerEngine()
+
+PII_ENTITIES = ["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "US_SSN", "IP_ADDRESS"]
+
+def detect_pii(text: str) -> list[dict]:
+    """Return detected PII entities."""
+    results = analyzer.analyze(text=text, language="en", entities=PII_ENTITIES)
+    return [
+        {"type": r.entity_type, "score": r.score, "start": r.start, "end": r.end}
+        for r in results
+    ]
+
+def anonymize_pii(text: str) -> str:
+    """Replace PII with placeholder tokens."""
+    results = analyzer.analyze(text=text, language="en", entities=PII_ENTITIES)
+    if not results:
+        return text
+    anonymized = anonymizer.anonymize(text=text, analyzer_results=results)
+    return anonymized.text
+
+
+# Example
+text = "My name is John Smith. Email me at john@example.com or call 555-123-4567."
+pii_found = detect_pii(text)
+print(f"PII detected: {pii_found}")
+
+clean_text = anonymize_pii(text)
+print(f"Anonymized: {clean_text}")
+# Output: "My name is <PERSON>. Email me at <EMAIL_ADDRESS> or call <PHONE_NUMBER>."
+```
 
 ---
 
-## References
+## 7. Health Checks and Graceful Shutdown
 
-- Drew Breunig, "10 Lessons for Agentic Coding": [https://www.dbreunig.com/2026/05/04/10-lessons-for-agentic-coding.html](https://www.dbreunig.com/2026/05/04/10-lessons-for-agentic-coding.html)
-- Addy Osmani, "Agent Skills": [https://addyosmani.com/blog/agent-skills/](https://addyosmani.com/blog/agent-skills/)
-- Lecture 29 - Agent Skills: [Lecture-29.md](Lecture-29.md)
-- Lecture 19 - OpenClaw Agent Loop: [Lecture-19.md](Lecture-19.md)
-- Lecture 22 - OpenClaw App SDK: [Lecture-22.md](Lecture-22.md)
+```python
+# ── Full application with all features ────────────────────────────────────────
+import signal
+import asyncio
+from contextlib import asynccontextmanager
+
+# Track background tasks for graceful cleanup
+background_tasks: set[asyncio.Task] = set()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ── Startup ────────────────────────────────────────────────────────────────
+    state.client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY", "sk-fake"))
+    state.ready = True
+    print("Startup complete. Service is ready.")
+
+    yield  # application runs here
+
+    # ── Shutdown ───────────────────────────────────────────────────────────────
+    state.ready = False
+    print("Shutdown signal received. Draining in-flight requests...")
+
+    # Cancel and await all background tasks
+    for task in background_tasks:
+        task.cancel()
+    if background_tasks:
+        await asyncio.gather(*background_tasks, return_exceptions=True)
+
+    print("Graceful shutdown complete.")
+
+
+@app.get("/health/detailed")
+async def health_detailed():
+    """Detailed health check for orchestrators (k8s liveness probe)."""
+    checks = {
+        "api_client": state.client is not None,
+        "ready": state.ready,
+    }
+    # Check Redis connectivity
+    try:
+        cache.redis.ping()
+        checks["cache"] = True
+    except Exception:
+        checks["cache"] = False
+
+    all_ok = all(checks.values())
+    return JSONResponse(
+        content={"status": "ok" if all_ok else "degraded", "checks": checks},
+        status_code=200 if all_ok else 503,
+    )
+
+
+# Kubernetes probe endpoints
+@app.get("/livez")
+async def liveness():
+    """k8s liveness probe — process is alive."""
+    return {"alive": True}
+
+@app.get("/readyz")
+async def readiness_probe():
+    """k8s readiness probe — ready to serve traffic."""
+    if not state.ready:
+        raise HTTPException(status_code=503)
+    return {"ready": True}
+```
+
+### 7.1 Putting It All Together
+
+```python
+# Complete minimal production agent service
+# Save as: agent_service.py
+# Run with: uvicorn agent_service:app --host 0.0.0.0 --port 8000
+
+"""
+Agent service startup checklist:
+  1. Set OPENAI_API_KEY environment variable
+  2. Start Redis: docker run -d -p 6379:6379 redis:alpine
+  3. uvicorn agent_service:app --host 0.0.0.0 --port 8000 --workers 4
+
+Endpoints:
+  GET  /health           — basic health check
+  GET  /health/detailed  — full dependency health check
+  GET  /livez            — k8s liveness probe
+  GET  /readyz           — k8s readiness probe
+  POST /chat             — synchronous chat (JSON response)
+  POST /chat/stream      — streaming chat (SSE)
+  POST /chat/smart       — chat with automatic model routing
+  POST /chat/safe        — chat with content moderation + PII detection
+  POST /chat/limited     — chat with per-client rate limiting
+"""
+
+# Test with curl:
+# curl -X POST http://localhost:8000/chat \
+#   -H "Content-Type: application/json" \
+#   -d '{"message": "What is HBM3?"}'
+
+# Streaming test:
+# curl -X POST http://localhost:8000/chat/stream \
+#   -H "Content-Type: application/json" \
+#   -H "Accept: text/event-stream" \
+#   -d '{"message": "Explain NVLink 4.0"}'
+```
 
 ---
 
-*Next: [Lecture 31 - Runtime Strategy for Agent Systems: Node, Bun, Rust, and Edge Packaging](Lecture-31.md)*
+## Key Takeaways
+
+- **FastAPI + async OpenAI** is the standard production stack. Use `lifespan` for clean startup/shutdown and `pydantic` for request validation.
+- **SSE streaming** dramatically improves perceived latency for long responses — implement it from day one.
+- **Semantic caching** with a 0.95 similarity threshold can reduce LLM calls by 30–60% on typical support/QA workloads.
+- **Model routing** saves 10–20x on cost by sending simple queries to cheap models. Even a rule-based classifier is a good start.
+- **Exponential backoff** with `tenacity` handles transient API errors gracefully. Always set a `max_attempts` ceiling.
+- **Moderate both input and output.** Input moderation prevents abuse; output moderation prevents liability.
+- **PII anonymization** before sending user data to external LLM APIs is a compliance requirement in most jurisdictions.
+- **Three probe endpoints** (`/health`, `/livez`, `/readyz`) are the minimum for Kubernetes deployment.
+
+---
+
+## Exercises
+
+### Exercise 1 — Streaming Chat Client
+
+Build a Python command-line chat client that connects to the `/chat/stream` endpoint using the `httpx` library. The client should maintain a list of previous messages locally and prepend them as conversation history in each request. The client should print tokens as they stream in and show the total latency and token count after each response.
+
+### Exercise 2 — Cache Benchmark
+
+Set up the `SemanticCache` (you can mock Redis with a dict-based in-memory store if needed). Create 20 queries — 10 unique and 10 that are near-paraphrases of the first 10. Measure the latency of the first call (cache miss, LLM call) vs the second call (cache hit, no LLM call) for each pair. Plot the latency distribution and report the cache hit rate and average speedup ratio.
+
+### Exercise 3 — Production Hardening
+
+Start with the basic `/chat` endpoint and add the following hardening features one by one:
+1. Request ID header (`X-Request-ID`) that is echoed in the response.
+2. Request timeout — if the LLM call takes more than 10 seconds, return HTTP 504.
+3. Circuit breaker — after 5 consecutive LLM failures, return HTTP 503 without calling the API until a 30-second cooldown passes.
+Write integration tests (using `httpx.AsyncClient` and `pytest-asyncio`) that verify each behavior.
+
+---
+
+*Next: [Lecture 31](Lecture-31.md)*

@@ -1,6 +1,6 @@
-# Lecture 12 — Production Deployment
+# Lecture 12 — RAG: Retrieval & Reranking
 
-**Track B · Agentic AI & GenAI** | [← Lecture 11](Lecture-11.md) | [Next → Lecture 13](Lecture-13.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 11](Lecture-11.md) | **Next:** [Lecture 13](Lecture-13.md)
 
 ---
 
@@ -8,669 +8,509 @@
 
 By the end of this lecture you will be able to:
 
-1. Wrap an AI agent in a production-grade FastAPI endpoint.
-2. Stream tokens to the client using Server-Sent Events (SSE).
-3. Implement semantic caching with Redis and embeddings to cut repeat-query cost.
-4. Route requests to fast/cheap or powerful models based on query complexity.
-5. Apply rate limiting and exponential-backoff retry to third-party API calls.
-6. Filter outputs for safety: content moderation and PII detection.
-7. Add health-check endpoints and handle graceful shutdown.
+1. Explain the difference between dense retrieval and hybrid (BM25 + dense) retrieval.
+2. Apply MMR to produce diverse, non-redundant result sets.
+3. Implement a cross-encoder reranker to reorder initial retrieval results.
+4. Use query expansion and HyDE to improve recall on ambiguous queries.
+5. Build a multi-query retriever to cover multiple phrasings of the same question.
+6. Assemble a complete, production-grade RAG chain using LangChain LCEL.
 
 ---
 
-## 1. FastAPI Wrapper for an Agent Endpoint
+## 1. Dense vs Hybrid Search
+
+### 1.1 Dense Retrieval (Semantic Search)
+
+**Dense retrieval** embeds the query and all documents into a shared **vector space**. Documents are ranked by **cosine similarity** (or dot product) to the query vector. It handles semantic equivalence well: "memory bandwidth" and "data transfer rate" may retrieve the same documents.
 
 ```python
-# pip install fastapi uvicorn pydantic openai python-dotenv
+# pip install langchain langchain-chroma sentence-transformers
 
-from __future__ import annotations
+from langchain_chroma import Chroma
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_core.documents import Document
 
-import os
-import time
-import uuid
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+embedding_fn = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
-from openai import AsyncOpenAI
+vectorstore = Chroma(embedding_function=embedding_fn, collection_name="demo")
+docs = [
+    Document(page_content="H100 GPU delivers 3.35 TB/s HBM3 bandwidth.", metadata={"id": "1"}),
+    Document(page_content="The A100 accelerator provides 2 TB/s memory throughput.", metadata={"id": "2"}),
+    Document(page_content="Python 3.12 introduced significant interpreter speedups.", metadata={"id": "3"}),
+    Document(page_content="NVLink 4.0 connects GPUs at 900 GB/s.", metadata={"id": "4"}),
+]
+vectorstore.add_documents(docs)
 
-# ── Models ────────────────────────────────────────────────────────────────────
-class ChatRequest(BaseModel):
-    message: str = Field(..., min_length=1, max_length=4096)
-    session_id: str = Field(default_factory=lambda: uuid.uuid4().hex)
-    model: str = Field(default_factory=lambda: os.environ.get("OPENAI_MODEL", "your-model-id"))
-
-class ChatResponse(BaseModel):
-    session_id: str
-    answer: str
-    model_used: str
-    latency_ms: float
-    tokens_used: int
-
-# ── Application state ─────────────────────────────────────────────────────────
-class AppState:
-    client: AsyncOpenAI | None = None
-    ready: bool = False
-
-state = AppState()
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    state.client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY", "sk-fake"))
-    state.ready = True
-    print("Agent service started")
-    yield
-    # Shutdown
-    state.ready = False
-    print("Agent service shutting down gracefully")
-
-app = FastAPI(title="AI Agent API", version="1.0.0", lifespan=lifespan)
-
-# ── Health checks ─────────────────────────────────────────────────────────────
-@app.get("/health")
-async def health():
-    return {"status": "ok" if state.ready else "starting", "timestamp": time.time()}
-
-@app.get("/ready")
-async def readiness():
-    if not state.ready:
-        raise HTTPException(status_code=503, detail="Service not ready")
-    return {"status": "ready"}
-
-# ── Chat endpoint ─────────────────────────────────────────────────────────────
-SYSTEM_PROMPT = (
-    "You are a helpful AI assistant specializing in hardware engineering. "
-    "Answer questions clearly and concisely."
-)
-
-@app.post("/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest):
-    start = time.perf_counter()
-
-    response = await state.client.chat.completions.create(
-        model=req.model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user",   "content": req.message},
-        ],
-        temperature=0.2,
-    )
-
-    answer = response.choices[0].message.content
-    latency_ms = (time.perf_counter() - start) * 1000
-
-    return ChatResponse(
-        session_id=req.session_id,
-        answer=answer,
-        model_used=req.model,
-        latency_ms=round(latency_ms, 1),
-        tokens_used=response.usage.total_tokens,
-    )
+results = vectorstore.similarity_search_with_score("GPU memory data transfer rate", k=3)
+print("Dense retrieval results:")
+for doc, score in results:
+    print(f"  score={score:.4f}  {doc.page_content}")
 ```
 
-Run with:
+**Weakness:** Dense retrieval misses exact keyword matches. If you search for "NVLink 4.0" but no document contains that exact phrase, it may fail.
 
-```bash
-uvicorn agent_api:app --host 0.0.0.0 --port 8000 --reload
-```
+### 1.2 BM25 (Sparse/Keyword Search)
 
----
-
-## 2. Streaming with Server-Sent Events (SSE)
-
-**SSE** lets the client receive tokens as they are generated, making long responses feel **interactive**.
+**BM25** is a classical TF-IDF-derived ranking function. It excels at **exact keyword matching**.
 
 ```python
-# pip install sse-starlette
+# pip install rank-bm25
 
-from sse_starlette.sse import EventSourceResponse
-from fastapi import FastAPI
-from pydantic import BaseModel
-import asyncio
-
-class StreamRequest(BaseModel):
-    message: str
-    session_id: str = ""
-
-@app.post("/chat/stream")
-async def chat_stream(req: StreamRequest):
-    async def token_generator() -> AsyncGenerator[dict, None]:
-        try:
-            stream = await state.client.chat.completions.create(
-                model=os.environ.get("OPENAI_MODEL", "your-model-id"),
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user",   "content": req.message},
-                ],
-                stream=True,
-                temperature=0.2,
-            )
-            async for chunk in stream:
-                delta = chunk.choices[0].delta
-                if delta.content:
-                    yield {"event": "token", "data": delta.content}
-            yield {"event": "done", "data": "[DONE]"}
-        except Exception as e:
-            yield {"event": "error", "data": str(e)}
-
-    return EventSourceResponse(token_generator())
-```
-
-**Client-side JavaScript (for reference):**
-
-```javascript
-const evtSource = new EventSource("/chat/stream?message=What+is+HBM3");
-evtSource.addEventListener("token", (e) => process.stdout.write(e.data));
-evtSource.addEventListener("done", () => evtSource.close());
-```
-
-**Python client:**
-
-```python
-import httpx
-
-with httpx.stream("POST", "http://localhost:8000/chat/stream",
-                  json={"message": "Explain HBM3"}) as response:
-    for line in response.iter_lines():
-        if line.startswith("data:"):
-            token = line[5:].strip()
-            if token != "[DONE]":
-                print(token, end="", flush=True)
-print()
-```
-
----
-
-## 3. Semantic Caching with Redis + Embeddings
-
-**Semantic caching** stores (query_embedding → answer) pairs. On a new query, if it is within a **similarity threshold** of a cached query, return the cached answer without calling the LLM.
-
-```python
-# pip install redis sentence-transformers numpy
-
-import json
-import time
-import numpy as np
-import redis
-from sentence_transformers import SentenceTransformer
-
-class SemanticCache:
-    """
-    Redis-backed semantic cache.
-    Keys: 'cache:emb:{id}' (vector as JSON) and 'cache:ans:{id}' (answer string).
-    """
-
-    def __init__(
-        self,
-        redis_url: str = "redis://localhost:6379",
-        model_name: str = "all-MiniLM-L6-v2",
-        similarity_threshold: float = 0.95,
-        ttl_seconds: int = 3600,
-    ):
-        self.redis = redis.from_url(redis_url)
-        self.model = SentenceTransformer(model_name)
-        self.threshold = similarity_threshold
-        self.ttl = ttl_seconds
-        self._index_key = "cache:index"  # list of all cache entry ids
-
-    def _embed(self, text: str) -> np.ndarray:
-        return self.model.encode(text, normalize_embeddings=True)
-
-    def get(self, query: str) -> str | None:
-        """Return cached answer if a sufficiently similar query exists."""
-        q_vec = self._embed(query)
-        ids = self.redis.lrange(self._index_key, 0, -1)
-
-        best_sim = -1.0
-        best_id = None
-        for id_bytes in ids:
-            cache_id = id_bytes.decode()
-            emb_json = self.redis.get(f"cache:emb:{cache_id}")
-            if not emb_json:
-                continue
-            cached_vec = np.array(json.loads(emb_json))
-            sim = float(np.dot(q_vec, cached_vec))
-            if sim > best_sim:
-                best_sim = sim
-                best_id = cache_id
-
-        if best_sim >= self.threshold and best_id:
-            print(f"[Cache HIT] similarity={best_sim:.4f}")
-            answer = self.redis.get(f"cache:ans:{best_id}")
-            return answer.decode() if answer else None
-
-        print(f"[Cache MISS] best_similarity={best_sim:.4f}")
-        return None
-
-    def set(self, query: str, answer: str):
-        """Store a new cache entry."""
-        cache_id = f"{time.time():.0f}_{hash(query) % 100000}"
-        q_vec = self._embed(query)
-        self.redis.setex(f"cache:emb:{cache_id}", self.ttl, json.dumps(q_vec.tolist()))
-        self.redis.setex(f"cache:ans:{cache_id}", self.ttl, answer)
-        self.redis.rpush(self._index_key, cache_id)
-        print(f"[Cache SET] id={cache_id}")
-
-    def stats(self) -> dict:
-        n = self.redis.llen(self._index_key)
-        return {"cached_entries": n, "ttl_seconds": self.ttl, "threshold": self.threshold}
-
-
-# Integrate with the FastAPI endpoint
-cache = SemanticCache(similarity_threshold=0.95)
-
-async def cached_chat(message: str) -> tuple[str, bool]:
-    """Return (answer, from_cache)."""
-    cached = cache.get(message)
-    if cached:
-        return cached, True
-
-    response = await state.client.chat.completions.create(
-        model=os.environ.get("OPENAI_MODEL", "your-model-id"),
-        messages=[{"role": "user", "content": message}],
-        temperature=0,
-    )
-    answer = response.choices[0].message.content
-    cache.set(message, answer)
-    return answer, False
-```
-
----
-
-## 4. Model Routing
-
-Route cheap/simple queries to a **fast model** and complex queries to a **more capable one**.
-
-```python
-import os
+from rank_bm25 import BM25Okapi
 import re
 
-# Routing rules
-FAST_MODEL = os.environ.get("OPENAI_FAST_MODEL", "provider-fast-model")
-SMART_MODEL = os.environ.get("OPENAI_SMART_MODEL", "provider-reasoning-model")
-
-COMPLEXITY_SIGNALS = [
-    r"\bcompare\b", r"\bdifference\b", r"\bwhy\b", r"\bexplain\b",
-    r"\banalyze\b", r"\bimplement\b", r"\bdesign\b", r"\barchitecture\b",
-    r"\btradeoff\b", r"\bpros and cons\b",
+corpus = [
+    "H100 GPU delivers 3.35 TB/s HBM3 bandwidth.",
+    "The A100 accelerator provides 2 TB/s memory throughput.",
+    "Python 3.12 introduced significant interpreter speedups.",
+    "NVLink 4.0 connects GPUs at 900 GB/s.",
 ]
 
-def estimate_complexity(message: str) -> str:
-    """
-    Returns 'simple' or 'complex' based on heuristics.
-    For production, replace with a small classifier LLM call.
-    """
-    msg_lower = message.lower()
-    word_count = len(message.split())
+def tokenize(text: str) -> list[str]:
+    return re.sub(r"[^\w\s]", "", text.lower()).split()
 
-    # Rule 1: very short messages are simple
-    if word_count <= 5:
-        return "simple"
+tokenized_corpus = [tokenize(doc) for doc in corpus]
+bm25 = BM25Okapi(tokenized_corpus)
 
-    # Rule 2: complexity signal keywords
-    for pattern in COMPLEXITY_SIGNALS:
-        if re.search(pattern, msg_lower):
-            return "complex"
+query = "NVLink 4.0"
+scores = bm25.get_scores(tokenize(query))
+ranked = sorted(zip(scores, corpus), reverse=True)
 
-    # Rule 3: long messages tend to be complex
-    if word_count > 50:
-        return "complex"
+print("BM25 results:")
+for score, doc in ranked:
+    print(f"  score={score:.3f}  {doc}")
+```
 
-    return "simple"
+### 1.3 Hybrid Search (BM25 + Dense)
 
+**Hybrid search** combines both scores using **Reciprocal Rank Fusion (RRF)**:
 
-def select_model(message: str) -> str:
-    complexity = estimate_complexity(message)
-    model = FAST_MODEL if complexity == "simple" else SMART_MODEL
-    print(f"[Router] complexity={complexity} → {model}")
-    return model
+```python
+# pip install langchain-community rank-bm25 sentence-transformers
+
+import re
+import numpy as np
+from rank_bm25 import BM25Okapi
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_core.documents import Document
 
 
-@app.post("/chat/smart", response_model=ChatResponse)
-async def smart_chat(req: ChatRequest):
-    start = time.perf_counter()
-    model = select_model(req.message)
+class HybridRetriever:
+    """Combines BM25 and dense vector search via Reciprocal Rank Fusion."""
 
-    response = await state.client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user",   "content": req.message},
-        ],
-        temperature=0.2,
-    )
-    answer = response.choices[0].message.content
-    latency_ms = (time.perf_counter() - start) * 1000
+    def __init__(self, documents: list[Document], embedding_model: str = "all-MiniLM-L6-v2", k: int = 60):
+        self.documents = documents
+        self.k = k  # RRF constant
 
-    return ChatResponse(
-        session_id=req.session_id,
-        answer=answer,
-        model_used=model,
-        latency_ms=round(latency_ms, 1),
-        tokens_used=response.usage.total_tokens,
-    )
+        # BM25 index
+        tokenized = [self._tokenize(d.page_content) for d in documents]
+        self.bm25 = BM25Okapi(tokenized)
+
+        # Dense embeddings
+        self.embedder = HuggingFaceEmbeddings(model_name=embedding_model)
+        texts = [d.page_content for d in documents]
+        self.doc_vectors = np.array(self.embedder.embed_documents(texts))
+
+    def _tokenize(self, text: str) -> list[str]:
+        return re.sub(r"[^\w\s]", "", text.lower()).split()
+
+    def _dense_ranks(self, query: str) -> list[int]:
+        q_vec = np.array(self.embedder.embed_query(query))
+        scores = self.doc_vectors @ q_vec
+        return list(np.argsort(-scores))  # descending
+
+    def _bm25_ranks(self, query: str) -> list[int]:
+        scores = self.bm25.get_scores(self._tokenize(query))
+        return list(np.argsort(-scores))
+
+    def retrieve(self, query: str, top_k: int = 4) -> list[Document]:
+        dense_ranks = self._dense_ranks(query)
+        sparse_ranks = self._bm25_ranks(query)
+
+        # Reciprocal Rank Fusion
+        rrf_scores: dict[int, float] = {}
+        for rank, idx in enumerate(dense_ranks):
+            rrf_scores[idx] = rrf_scores.get(idx, 0.0) + 1 / (self.k + rank + 1)
+        for rank, idx in enumerate(sparse_ranks):
+            rrf_scores[idx] = rrf_scores.get(idx, 0.0) + 1 / (self.k + rank + 1)
+
+        top_indices = sorted(rrf_scores, key=rrf_scores.get, reverse=True)[:top_k]
+        return [self.documents[i] for i in top_indices]
+
+
+# Demo
+docs = [
+    Document(page_content="H100 GPU delivers 3.35 TB/s HBM3 bandwidth."),
+    Document(page_content="The A100 accelerator provides 2 TB/s memory throughput."),
+    Document(page_content="NVLink 4.0 connects GPUs at 900 GB/s."),
+    Document(page_content="Python 3.12 introduced significant interpreter speedups."),
+    Document(page_content="CUDA 12 supports the Hopper architecture."),
+]
+retriever = HybridRetriever(docs)
+for doc in retriever.retrieve("NVLink 4.0 bandwidth"):
+    print(f"  {doc.page_content}")
 ```
 
 ---
 
-## 5. Rate Limiting and Retry with Exponential Backoff
+## 2. Maximal Marginal Relevance (MMR)
+
+**MMR** selects documents that are relevant to the query AND **diverse** from each other. It prevents retrieving five near-identical chunks.
 
 ```python
-# pip install tenacity
+from langchain_chroma import Chroma
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_core.documents import Document
 
-import asyncio
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_exponential,
-    retry_if_exception_type,
-    before_sleep_log,
+embedding_fn = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+vs = Chroma(embedding_function=embedding_fn)
+
+# Add some redundant documents
+vs.add_documents([
+    Document(page_content="H100 has 80 GB HBM3 memory with 3.35 TB/s bandwidth."),
+    Document(page_content="H100 GPU memory is 80 GB HBM3 at 3.35 terabytes per second."),
+    Document(page_content="The H100 SXM5 uses HBM3 providing 3.35 TB/s throughput."),
+    Document(page_content="NVLink 4.0 delivers 900 GB/s between H100 GPUs."),
+    Document(page_content="H100 Tensor Cores achieve 3958 TFLOPS for FP8 inference."),
+])
+
+# Standard retrieval — will return 3 near-identical H100 memory docs
+standard = vs.similarity_search("H100 memory bandwidth", k=3)
+print("Standard retrieval:")
+for d in standard:
+    print(f"  {d.page_content}")
+
+# MMR retrieval — lambda_mult=0.5 balances relevance vs diversity
+mmr = vs.max_marginal_relevance_search(
+    "H100 memory bandwidth",
+    k=3,
+    fetch_k=10,       # candidate pool size
+    lambda_mult=0.5,  # 0=pure diversity, 1=pure relevance
 )
+print("\nMMR retrieval:")
+for d in mmr:
+    print(f"  {d.page_content}")
+```
+
+**lambda_mult tuning:**
+- `0.0` — maximally diverse (ignores relevance)
+- `0.5` — balanced default
+- `1.0` — equivalent to standard similarity search
+
+---
+
+## 3. Cross-Encoder Reranking
+
+**Two-stage retrieval**: first retrieve a broad candidate set (e.g., top-20 with fast dense search), then rerank with a slower but more accurate **cross-encoder** that reads query + document together.
+
+```python
+# pip install sentence-transformers
+
+from sentence_transformers.cross_encoder import CrossEncoder
+from langchain_core.documents import Document
+
+# Load once at startup (model is ~130 MB)
+reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+
+
+def rerank(query: str, candidates: list[Document], top_k: int = 3) -> list[Document]:
+    """Rerank candidate documents using a cross-encoder."""
+    pairs = [(query, doc.page_content) for doc in candidates]
+    scores = reranker.predict(pairs)
+
+    ranked = sorted(zip(scores, candidates), reverse=True, key=lambda x: x[0])
+    return [doc for _, doc in ranked[:top_k]]
+
+
+# Simulate a first-stage retrieval returning 6 candidates
+candidates = [
+    Document(page_content="H100 SXM5 memory bandwidth is 3.35 TB/s using HBM3."),
+    Document(page_content="Python lists are dynamically resizable arrays."),
+    Document(page_content="The GPU memory subsystem uses high bandwidth memory."),
+    Document(page_content="H100 PCIe version has 80 GB HBM2e at 2 TB/s."),
+    Document(page_content="NVLink connects multiple H100 GPUs in a node."),
+    Document(page_content="Memory bandwidth determines LLM inference throughput."),
+]
+
+query = "What is the memory bandwidth of the H100?"
+reranked = rerank(query, candidates, top_k=3)
+print(f"Top 3 after reranking for: '{query}'")
+for i, doc in enumerate(reranked, 1):
+    print(f"  {i}. {doc.page_content}")
+```
+
+**Why reranking helps:** The **bi-encoder** (dense retrieval) encodes query and document independently. The **cross-encoder** attends to every token of both simultaneously, giving much better relevance scores at the cost of O(candidates) inference calls.
+
+---
+
+## 4. Query Expansion and HyDE
+
+### 4.1 Query Expansion
+
+Simple expansion generates **multiple phrasings** of the query and merges results.
+
+```python
+import os
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
+llm = ChatOpenAI(model="your-fast-model-id", temperature=0)
+
+expand_prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a search query optimizer. Generate {n} diverse rephrasing of the user's question. Output one per line, no numbering."),
+    ("human", "{query}"),
+])
+
+expand_chain = expand_prompt | llm | StrOutputParser()
+
+def expand_query(query: str, n: int = 3) -> list[str]:
+    result = expand_chain.invoke({"query": query, "n": n})
+    variants = [q.strip() for q in result.strip().split("\n") if q.strip()]
+    return [query] + variants  # original + expansions
+
+# Usage
+queries = expand_query("What is the memory bandwidth of H100?")
+for q in queries:
+    print(f"  - {q}")
+```
+
+### 4.2 HyDE (Hypothetical Document Embeddings)
+
+Instead of embedding the short query, generate a **hypothetical document** that would answer the question, then embed that. The hypothesis is much closer in vector space to actual documents.
+
+```python
+import numpy as np
+from langchain_openai import ChatOpenAI
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_core.documents import Document
+
+llm = ChatOpenAI(model="your-fast-model-id", temperature=0.3)
+embedder = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+
+
+def hyde_retrieve(query: str, documents: list[Document], top_k: int = 3) -> list[Document]:
+    """
+    HyDE: embed a generated hypothetical answer rather than the raw query.
+    """
+    # Step 1: generate a hypothetical document
+    hypothesis = llm.invoke(
+        f"Write a short technical paragraph (3-4 sentences) that would answer: {query}"
+    ).content
+
+    print(f"Hypothesis: {hypothesis[:100]}...")
+
+    # Step 2: embed the hypothesis
+    hyp_vec = np.array(embedder.embed_query(hypothesis))
+
+    # Step 3: embed all documents and rank by similarity to hypothesis
+    doc_vecs = np.array(embedder.embed_documents([d.page_content for d in documents]))
+    scores = doc_vecs @ hyp_vec
+
+    ranked_idx = np.argsort(-scores)[:top_k]
+    return [documents[i] for i in ranked_idx]
+
+
+corpus = [
+    Document(page_content="H100 SXM5 uses HBM3 with 3.35 TB/s memory bandwidth."),
+    Document(page_content="A100 features HBM2e memory delivering 2 TB/s bandwidth."),
+    Document(page_content="NVLink 4.0 provides 900 GB/s GPU-to-GPU bandwidth."),
+    Document(page_content="Python asyncio enables non-blocking I/O operations."),
+]
+
+results = hyde_retrieve("What is the fastest GPU memory bandwidth available?", corpus)
+for doc in results:
+    print(f"  {doc.page_content}")
+```
+
+---
+
+## 5. Multi-Query Retrieval
+
+LangChain's `MultiQueryRetriever` issues multiple rephrasings of the original query, deduplicates results, and returns the union.
+
+```python
+import os
+from langchain.retrievers.multi_query import MultiQueryRetriever
+from langchain_openai import ChatOpenAI
+from langchain_chroma import Chroma
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_core.documents import Document
+
+embedding_fn = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+vs = Chroma(embedding_function=embedding_fn)
+vs.add_documents([
+    Document(page_content="H100 SXM5 has 3.35 TB/s HBM3 bandwidth."),
+    Document(page_content="A100 has 2 TB/s HBM2e bandwidth."),
+    Document(page_content="GPU memory bandwidth limits LLM inference speed."),
+    Document(page_content="NVLink 4.0 enables 900 GB/s inter-GPU communication."),
+    Document(page_content="The H100 PCIe variant has lower bandwidth than SXM5."),
+])
+
+llm = ChatOpenAI(model="your-fast-model-id", temperature=0)
+base_retriever = vs.as_retriever(search_kwargs={"k": 2})
+
+multi_retriever = MultiQueryRetriever.from_llm(
+    retriever=base_retriever,
+    llm=llm,
+)
+
+# Enable verbose logging to see generated queries
 import logging
-from openai import RateLimitError, APITimeoutError, APIConnectionError
+logging.getLogger("langchain.retrievers.multi_query").setLevel(logging.INFO)
 
-logger = logging.getLogger(__name__)
+docs = multi_retriever.invoke("How fast is H100 GPU memory?")
+print(f"\nRetrieved {len(docs)} unique documents:")
+for doc in docs:
+    print(f"  {doc.page_content}")
+```
 
-RETRYABLE_ERRORS = (RateLimitError, APITimeoutError, APIConnectionError)
+---
 
-@retry(
-    retry=retry_if_exception_type(RETRYABLE_ERRORS),
-    wait=wait_exponential(multiplier=1, min=1, max=60),
-    stop=stop_after_attempt(5),
-    before_sleep=before_sleep_log(logger, logging.WARNING),
-    reraise=True,
+## 6. Complete RAG Chain with LCEL
+
+Putting retrieval, reranking, and generation together:
+
+```python
+# pip install langchain langchain-openai langchain-chroma sentence-transformers
+
+import os
+from typing import Any
+from operator import itemgetter
+
+from langchain_chroma import Chroma
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_core.documents import Document
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableLambda, RunnablePassthrough
+from langchain_openai import ChatOpenAI
+from sentence_transformers.cross_encoder import CrossEncoder
+
+
+# ── Setup ─────────────────────────────────────────────────────────────────────
+embedding_fn = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+cross_encoder = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+llm = ChatOpenAI(model="your-fast-model-id", temperature=0)
+
+# Build vector store
+vs = Chroma(embedding_function=embedding_fn)
+vs.add_documents([
+    Document(page_content="H100 SXM5 provides 3.35 TB/s HBM3 memory bandwidth.", metadata={"source": "h100_spec.md"}),
+    Document(page_content="A100 provides 2 TB/s HBM2e memory bandwidth.", metadata={"source": "a100_spec.md"}),
+    Document(page_content="NVLink 4.0 delivers 900 GB/s bidirectional GPU-to-GPU bandwidth.", metadata={"source": "nvlink.md"}),
+    Document(page_content="H100 PCIe has lower bandwidth (2 TB/s) compared to SXM5.", metadata={"source": "h100_spec.md"}),
+    Document(page_content="GPU memory bandwidth is critical for LLM inference throughput.", metadata={"source": "guide.md"}),
+    Document(page_content="HBM3 uses a stacked DRAM design to achieve high bandwidth density.", metadata={"source": "hbm.md"}),
+])
+
+base_retriever = vs.as_retriever(search_kwargs={"k": 6})  # broad first stage
+
+
+# ── Reranking step ────────────────────────────────────────────────────────────
+def rerank_docs(inputs: dict) -> list[Document]:
+    query = inputs["question"]
+    candidates = inputs["documents"]
+    if not candidates:
+        return []
+    pairs = [(query, d.page_content) for d in candidates]
+    scores = cross_encoder.predict(pairs)
+    ranked = sorted(zip(scores, candidates), reverse=True)
+    return [doc for _, doc in ranked[:3]]  # top-3 after reranking
+
+
+# ── Format context ────────────────────────────────────────────────────────────
+def format_context(docs: list[Document]) -> str:
+    sections = []
+    for i, doc in enumerate(docs, 1):
+        src = doc.metadata.get("source", "unknown")
+        sections.append(f"[{i}] ({src})\n{doc.page_content}")
+    return "\n\n".join(sections)
+
+
+# ── Prompt ────────────────────────────────────────────────────────────────────
+rag_prompt = ChatPromptTemplate.from_messages([
+    ("system", (
+        "You are a technical assistant. Answer the question using ONLY the provided context. "
+        "Cite sources using [N] notation. If the context does not contain the answer, say so."
+    )),
+    ("human", "Context:\n{context}\n\nQuestion: {question}"),
+])
+
+
+# ── LCEL Pipeline ─────────────────────────────────────────────────────────────
+rag_chain = (
+    RunnablePassthrough.assign(
+        documents=itemgetter("question") | base_retriever
+    )
+    | RunnablePassthrough.assign(
+        documents=RunnableLambda(rerank_docs),
+    )
+    | RunnablePassthrough.assign(
+        context=itemgetter("documents") | RunnableLambda(format_context)
+    )
+    | rag_prompt
+    | llm
+    | StrOutputParser()
 )
-async def resilient_completion(client: AsyncOpenAI, messages: list[dict], model: str) -> str:
-    """LLM call with automatic retry on transient errors."""
-    response = await client.chat.completions.create(
-        model=model,
-        messages=messages,
-        temperature=0,
-        timeout=30.0,
-    )
-    return response.choices[0].message.content
 
 
-# Per-IP rate limiting using a token bucket
-from collections import defaultdict
-
-class RateLimiter:
-    """Simple in-memory token bucket rate limiter."""
-
-    def __init__(self, requests_per_minute: int = 60):
-        self.rpm = requests_per_minute
-        self._buckets: dict[str, list[float]] = defaultdict(list)
-
-    def is_allowed(self, client_id: str) -> bool:
-        now = time.time()
-        window = 60.0
-        timestamps = self._buckets[client_id]
-        # Remove timestamps older than 1 minute
-        self._buckets[client_id] = [t for t in timestamps if now - t < window]
-        if len(self._buckets[client_id]) >= self.rpm:
-            return False
-        self._buckets[client_id].append(now)
-        return True
+def ask(question: str) -> str:
+    return rag_chain.invoke({"question": question})
 
 
-rate_limiter = RateLimiter(requests_per_minute=30)
-
-from fastapi import Header
-
-@app.post("/chat/limited", response_model=ChatResponse)
-async def rate_limited_chat(req: ChatRequest, x_client_id: str = Header(default="anonymous")):
-    if not rate_limiter.is_allowed(x_client_id):
-        raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again in 60 seconds.")
-
-    start = time.perf_counter()
-    answer = await resilient_completion(
-        state.client,
-        [{"role": "user", "content": req.message}],
-        model=req.model,
-    )
-    latency_ms = (time.perf_counter() - start) * 1000
-
-    return ChatResponse(
-        session_id=req.session_id,
-        answer=answer,
-        model_used=req.model,
-        latency_ms=round(latency_ms, 1),
-        tokens_used=0,  # usage not available without full response object
-    )
-```
-
----
-
-## 6. Safety Filters
-
-### 6.1 Content Moderation
-
-```python
-async def check_moderation(text: str) -> dict:
-    """Use OpenAI moderation API to flag unsafe content."""
-    response = await state.client.moderations.create(input=text)
-    result = response.results[0]
-    return {
-        "flagged": result.flagged,
-        "categories": {k: v for k, v in result.categories.__dict__.items() if v},
-    }
-
-
-@app.post("/chat/safe", response_model=ChatResponse)
-async def safe_chat(req: ChatRequest):
-    # Moderate the input
-    moderation = await check_moderation(req.message)
-    if moderation["flagged"]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Input flagged by content moderation: {moderation['categories']}",
-        )
-
-    start = time.perf_counter()
-    answer = await resilient_completion(
-        state.client,
-        [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": req.message}],
-        model=req.model,
-    )
-
-    # Moderate the output as well
-    output_mod = await check_moderation(answer)
-    if output_mod["flagged"]:
-        answer = "I'm unable to provide that response."
-
-    latency_ms = (time.perf_counter() - start) * 1000
-    return ChatResponse(
-        session_id=req.session_id,
-        answer=answer,
-        model_used=req.model,
-        latency_ms=round(latency_ms, 1),
-        tokens_used=0,
-    )
-```
-
-### 6.2 PII Detection
-
-```python
-# pip install presidio-analyzer presidio-anonymizer
-
-from presidio_analyzer import AnalyzerEngine
-from presidio_anonymizer import AnonymizerEngine
-
-analyzer = AnalyzerEngine()
-anonymizer = AnonymizerEngine()
-
-PII_ENTITIES = ["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "US_SSN", "IP_ADDRESS"]
-
-def detect_pii(text: str) -> list[dict]:
-    """Return detected PII entities."""
-    results = analyzer.analyze(text=text, language="en", entities=PII_ENTITIES)
-    return [
-        {"type": r.entity_type, "score": r.score, "start": r.start, "end": r.end}
-        for r in results
+if __name__ == "__main__":
+    questions = [
+        "What is the memory bandwidth of the H100?",
+        "How does HBM3 achieve high bandwidth?",
+        "What is NVLink 4.0 bandwidth?",
     ]
-
-def anonymize_pii(text: str) -> str:
-    """Replace PII with placeholder tokens."""
-    results = analyzer.analyze(text=text, language="en", entities=PII_ENTITIES)
-    if not results:
-        return text
-    anonymized = anonymizer.anonymize(text=text, analyzer_results=results)
-    return anonymized.text
-
-
-# Example
-text = "My name is John Smith. Email me at john@example.com or call 555-123-4567."
-pii_found = detect_pii(text)
-print(f"PII detected: {pii_found}")
-
-clean_text = anonymize_pii(text)
-print(f"Anonymized: {clean_text}")
-# Output: "My name is <PERSON>. Email me at <EMAIL_ADDRESS> or call <PHONE_NUMBER>."
+    for q in questions:
+        print(f"\nQ: {q}")
+        print(f"A: {ask(q)}")
 ```
 
----
-
-## 7. Health Checks and Graceful Shutdown
+### 6.1 Streaming the Chain
 
 ```python
-# ── Full application with all features ────────────────────────────────────────
-import signal
-import asyncio
-from contextlib import asynccontextmanager
+# Replace the final .invoke() call with .stream() for token-by-token output
+def ask_streaming(question: str):
+    print(f"Q: {question}")
+    print("A: ", end="", flush=True)
+    for chunk in rag_chain.stream({"question": question}):
+        print(chunk, end="", flush=True)
+    print()  # newline
 
-# Track background tasks for graceful cleanup
-background_tasks: set[asyncio.Task] = set()
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # ── Startup ────────────────────────────────────────────────────────────────
-    state.client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY", "sk-fake"))
-    state.ready = True
-    print("Startup complete. Service is ready.")
-
-    yield  # application runs here
-
-    # ── Shutdown ───────────────────────────────────────────────────────────────
-    state.ready = False
-    print("Shutdown signal received. Draining in-flight requests...")
-
-    # Cancel and await all background tasks
-    for task in background_tasks:
-        task.cancel()
-    if background_tasks:
-        await asyncio.gather(*background_tasks, return_exceptions=True)
-
-    print("Graceful shutdown complete.")
-
-
-@app.get("/health/detailed")
-async def health_detailed():
-    """Detailed health check for orchestrators (k8s liveness probe)."""
-    checks = {
-        "api_client": state.client is not None,
-        "ready": state.ready,
-    }
-    # Check Redis connectivity
-    try:
-        cache.redis.ping()
-        checks["cache"] = True
-    except Exception:
-        checks["cache"] = False
-
-    all_ok = all(checks.values())
-    return JSONResponse(
-        content={"status": "ok" if all_ok else "degraded", "checks": checks},
-        status_code=200 if all_ok else 503,
-    )
-
-
-# Kubernetes probe endpoints
-@app.get("/livez")
-async def liveness():
-    """k8s liveness probe — process is alive."""
-    return {"alive": True}
-
-@app.get("/readyz")
-async def readiness_probe():
-    """k8s readiness probe — ready to serve traffic."""
-    if not state.ready:
-        raise HTTPException(status_code=503)
-    return {"ready": True}
-```
-
-### 7.1 Putting It All Together
-
-```python
-# Complete minimal production agent service
-# Save as: agent_service.py
-# Run with: uvicorn agent_service:app --host 0.0.0.0 --port 8000
-
-"""
-Agent service startup checklist:
-  1. Set OPENAI_API_KEY environment variable
-  2. Start Redis: docker run -d -p 6379:6379 redis:alpine
-  3. uvicorn agent_service:app --host 0.0.0.0 --port 8000 --workers 4
-
-Endpoints:
-  GET  /health           — basic health check
-  GET  /health/detailed  — full dependency health check
-  GET  /livez            — k8s liveness probe
-  GET  /readyz           — k8s readiness probe
-  POST /chat             — synchronous chat (JSON response)
-  POST /chat/stream      — streaming chat (SSE)
-  POST /chat/smart       — chat with automatic model routing
-  POST /chat/safe        — chat with content moderation + PII detection
-  POST /chat/limited     — chat with per-client rate limiting
-"""
-
-# Test with curl:
-# curl -X POST http://localhost:8000/chat \
-#   -H "Content-Type: application/json" \
-#   -d '{"message": "What is HBM3?"}'
-
-# Streaming test:
-# curl -X POST http://localhost:8000/chat/stream \
-#   -H "Content-Type: application/json" \
-#   -H "Accept: text/event-stream" \
-#   -d '{"message": "Explain NVLink 4.0"}'
+ask_streaming("Which GPU has faster memory, H100 SXM5 or A100?")
 ```
 
 ---
 
 ## Key Takeaways
 
-- **FastAPI + async OpenAI** is the standard production stack. Use `lifespan` for clean startup/shutdown and `pydantic` for request validation.
-- **SSE streaming** dramatically improves perceived latency for long responses — implement it from day one.
-- **Semantic caching** with a 0.95 similarity threshold can reduce LLM calls by 30–60% on typical support/QA workloads.
-- **Model routing** saves 10–20x on cost by sending simple queries to cheap models. Even a rule-based classifier is a good start.
-- **Exponential backoff** with `tenacity` handles transient API errors gracefully. Always set a `max_attempts` ceiling.
-- **Moderate both input and output.** Input moderation prevents abuse; output moderation prevents liability.
-- **PII anonymization** before sending user data to external LLM APIs is a compliance requirement in most jurisdictions.
-- **Three probe endpoints** (`/health`, `/livez`, `/readyz`) are the minimum for Kubernetes deployment.
+- **Hybrid search** combines BM25 (exact keyword matching) with dense retrieval (semantic matching) via RRF, covering the weaknesses of each.
+- **MMR** is a simple but effective way to prevent duplicate chunks from dominating retrieval results.
+- **Two-stage retrieval** (dense top-K → cross-encoder rerank) gives the quality of cross-encoder scoring without the latency of scoring every document.
+- **HyDE** often beats raw query embedding for sparse or short queries by generating a more "document-like" embedding.
+- **Multi-query retrieval** improves recall at the cost of extra LLM calls — worth it for high-stakes questions.
+- **LCEL** (`|` operator) composes retrieval and generation steps into a clean, inspectable pipeline that supports streaming out of the box.
 
 ---
 
 ## Exercises
 
-### Exercise 1 — Streaming Chat Client
+### Exercise 1 — Hybrid vs Dense Ablation
 
-Build a Python command-line chat client that connects to the `/chat/stream` endpoint using the `httpx` library. The client should maintain a list of previous messages locally and prepend them as conversation history in each request. The client should print tokens as they stream in and show the total latency and token count after each response.
+Build a small corpus of 15 documents (mix of exact-keyword docs and paraphrase-heavy docs). Create five test queries where you expect keyword matching to win, and five where you expect semantic matching to win. Run both pure BM25 and pure dense retrieval, then hybrid. Report which strategy wins for each query and why.
 
-### Exercise 2 — Cache Benchmark
+### Exercise 2 — Reranker Threshold
 
-Set up the `SemanticCache` (you can mock Redis with a dict-based in-memory store if needed). Create 20 queries — 10 unique and 10 that are near-paraphrases of the first 10. Measure the latency of the first call (cache miss, LLM call) vs the second call (cache hit, no LLM call) for each pair. Plot the latency distribution and report the cache hit rate and average speedup ratio.
+Implement a `rerank_with_threshold(query, candidates, min_score)` function that uses the `CrossEncoder` but only returns documents whose raw score exceeds `min_score`. Experiment with values between -5 and 5 on a 10-document corpus. Plot the number of documents returned vs the threshold value and identify a sensible default for a technical documentation use case.
 
-### Exercise 3 — Production Hardening
+### Exercise 3 — Full Pipeline Benchmark
 
-Start with the basic `/chat` endpoint and add the following hardening features one by one:
-1. Request ID header (`X-Request-ID`) that is echoed in the response.
-2. Request timeout — if the LLM call takes more than 10 seconds, return HTTP 504.
-3. Circuit breaker — after 5 consecutive LLM failures, return HTTP 503 without calling the API until a 30-second cooldown passes.
-Write integration tests (using `httpx.AsyncClient` and `pytest-asyncio`) that verify each behavior.
+Build the complete LCEL RAG chain from this lecture. Add a wrapper that measures total latency broken down into three parts: (a) retrieval time, (b) reranking time, (c) LLM generation time. Run 10 queries and report the mean and p95 latency for each stage. Which stage dominates? What would you optimize first in a production system?
 
 ---
 
-*Next: [Lecture 13 — Runtime Discipline and AI Runtime Security](Lecture-13.md)*
+*Next: [Lecture 13](Lecture-13.md)*

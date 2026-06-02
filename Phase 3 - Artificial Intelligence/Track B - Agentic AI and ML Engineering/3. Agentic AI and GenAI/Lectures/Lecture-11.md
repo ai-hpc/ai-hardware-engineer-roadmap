@@ -1,6 +1,6 @@
-# Lecture 11 — Evaluation & Observability
+# Lecture 11 — RAG: Ingestion & Embeddings
 
-**Track B · Agentic AI & GenAI** | [← Lecture 10](Lecture-10.md) | [Next → Lecture 12](Lecture-12.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 10](Lecture-10.md) | **Next:** [Lecture 12](Lecture-12.md)
 
 ---
 
@@ -8,610 +8,684 @@
 
 By the end of this lecture you will be able to:
 
-1. Score LLM outputs for correctness and quality using an LLM-as-judge pattern.
-2. Compute RAGAS metrics (faithfulness, answer relevancy, context precision, context recall) on a RAG system.
-3. Trace LLM calls with LangSmith and understand what to log.
-4. Build a cost-tracking decorator that accumulates token spend per session.
-5. Log every LLM call with full input/output/token/latency details.
-6. Construct an evaluation dataset from production traffic and run A/B prompt tests.
+1. Load documents from PDF, HTML, and Markdown sources using LangChain loaders.
+2. Apply fixed-size, recursive, and semantic chunking strategies and explain the tradeoffs.
+3. Generate embeddings with both API-based (OpenAI) and local (sentence-transformers) models.
+4. Store and query vectors in Chroma, FAISS, and Pinecone.
+5. Filter retrieval results using metadata and namespaces.
+6. Assemble a complete, reusable indexing pipeline class.
 
 ---
 
-## 1. LLM-as-Judge
+## 1. Document Loading
 
-The **"LLM-as-judge"** pattern uses a capable LLM to evaluate the output of another LLM call. It is **cheaper and faster than human annotation** while correlating well with human judgment for well-designed rubrics.
+The first stage of any **RAG system** is getting raw content into a usable format. LangChain provides `BaseLoader` implementations for dozens of file types. All loaders return a list of `Document` objects — each with `.page_content` (string) and `.metadata` (dict).
 
-```python
-# pip install openai
-
-import os
-import json
-from openai import OpenAI
-
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "sk-fake"))
-
-JUDGE_PROMPT = """You are an expert evaluator. Score the answer on the following rubric.
-Return a JSON object with keys: score (0-5), reasoning (one sentence).
-
-Rubric:
-  5 = Completely correct, well-cited, nothing to add.
-  4 = Correct but missing minor details.
-  3 = Partially correct with one factual error.
-  2 = Mostly wrong or misleading.
-  1 = Completely wrong.
-  0 = Refused to answer or empty.
-
-Question: {question}
-Reference Answer: {reference}
-Model Answer: {answer}
-"""
-
-def judge_answer(question: str, reference: str, answer: str) -> dict:
-    prompt = JUDGE_PROMPT.format(
-        question=question, reference=reference, answer=answer
-    )
-    response = client.chat.completions.create(
-        model=os.environ.get("OPENAI_JUDGE_MODEL", "your-judge-model-id"),
-        messages=[{"role": "user", "content": prompt}],
-        response_format={"type": "json_object"},
-        temperature=0,
-    )
-    return json.loads(response.choices[0].message.content)
-
-
-# Example evaluation
-test_cases = [
-    {
-        "question": "What is the memory bandwidth of the H100 SXM5?",
-        "reference": "3.35 TB/s using HBM3 memory.",
-        "answer": "The H100 SXM5 provides approximately 3.35 terabytes per second of memory bandwidth via HBM3.",
-    },
-    {
-        "question": "What is the memory bandwidth of the H100 SXM5?",
-        "reference": "3.35 TB/s using HBM3 memory.",
-        "answer": "The H100 SXM5 has 2 TB/s memory bandwidth.",  # wrong
-    },
-]
-
-for tc in test_cases:
-    result = judge_answer(tc["question"], tc["reference"], tc["answer"])
-    print(f"Score: {result['score']}/5 — {result['reasoning']}")
-    print(f"Answer was: '{tc['answer'][:60]}...'")
-    print()
-```
-
-### 1.1 Batch Evaluation
+### 1.1 PDF Loading
 
 ```python
-from concurrent.futures import ThreadPoolExecutor, as_completed
+# pip install langchain langchain-community pypdf
 
-def batch_evaluate(test_cases: list[dict], max_workers: int = 4) -> list[dict]:
-    """Evaluate multiple test cases in parallel."""
-    results = []
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(judge_answer, tc["question"], tc["reference"], tc["answer"]): tc
-            for tc in test_cases
-        }
-        for future in as_completed(futures):
-            tc = futures[future]
-            result = future.result()
-            results.append({**tc, **result})
+from langchain_community.document_loaders import PyPDFLoader
 
-    results.sort(key=lambda x: x["score"], reverse=True)
-    avg = sum(r["score"] for r in results) / len(results)
-    print(f"\nMean score: {avg:.2f}/5.0 over {len(results)} cases")
-    return results
-```
-
----
-
-## 2. RAGAS Metrics
-
-**RAGAS** (Retrieval Augmented Generation Assessment) defines **four complementary metrics** for RAG systems. All are computed without needing ground-truth answers for the first two.
-
-```python
-# pip install ragas langchain-openai datasets
-
-import os
-from datasets import Dataset
-from ragas import evaluate
-from ragas.metrics import (
-    faithfulness,
-    answer_relevancy,
-    context_precision,
-    context_recall,
-)
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-
-# Prepare evaluation data
-# Each row: question, answer (from RAG), contexts (list of retrieved chunks), ground_truth
-eval_data = {
-    "question": [
-        "What is the H100 memory bandwidth?",
-        "What does HBM3 stand for?",
-        "How does NVLink 4.0 compare to NVLink 3.0?",
-    ],
-    "answer": [
-        "The H100 SXM5 delivers 3.35 TB/s of memory bandwidth using HBM3.",
-        "HBM3 stands for High Bandwidth Memory generation 3.",
-        "NVLink 4.0 provides 900 GB/s bidirectional bandwidth, double NVLink 3.0's 600 GB/s.",
-    ],
-    "contexts": [
-        ["H100 SXM5 uses HBM3 providing 3.35 TB/s bandwidth.", "The H100 PCIe offers 2 TB/s."],
-        ["HBM3 is the third generation of High Bandwidth Memory DRAM standard."],
-        ["NVLink 4.0 delivers 900 GB/s total bidirectional bandwidth.", "NVLink 3.0 provided 600 GB/s."],
-    ],
-    "ground_truth": [
-        "3.35 TB/s",
-        "High Bandwidth Memory generation 3",
-        "NVLink 4.0 doubles NVLink 3.0 bandwidth to 900 GB/s",
-    ],
-}
-
-dataset = Dataset.from_dict(eval_data)
-
-# Configure LLM and embeddings for RAGAS internal evaluation
-llm = ChatOpenAI(model=os.environ.get("OPENAI_EVAL_MODEL", "your-eval-model-id"), temperature=0)
-embeddings = OpenAIEmbeddings(model=os.environ.get("OPENAI_EMBEDDING_MODEL", "your-embedding-model-id"))
-
-results = evaluate(
-    dataset=dataset,
-    metrics=[faithfulness, answer_relevancy, context_precision, context_recall],
-    llm=llm,
-    embeddings=embeddings,
-)
-
-print("\nRAGAS Evaluation Results:")
-print(results.to_pandas().to_string(index=False))
-```
-
-### 2.1 Understanding Each Metric
-
-| Metric | Measures | Range | Formula |
-|---|---|---|---|
-| **Faithfulness** | Is the answer factually grounded in the retrieved context? | 0–1 | claims in context / total claims |
-| **Answer Relevancy** | Does the answer address the question? | 0–1 | cosine sim of regenerated questions |
-| **Context Precision** | Are retrieved chunks relevant (precision)? | 0–1 | relevant chunks / total retrieved |
-| **Context Recall** | Are all ground-truth facts covered by context? | 0–1 | facts in context / total facts |
-
-```python
-# Manual faithfulness calculation (illustrative)
-import re
-
-def compute_faithfulness_manual(answer: str, context: str, llm) -> float:
-    """Decompose answer into claims and check each against context."""
-
-    # Step 1: extract claims from the answer
-    claims_prompt = f"List every factual claim in this answer as a JSON array of strings:\n{answer}"
-    claims_response = llm.invoke(claims_prompt).content
-    try:
-        claims = json.loads(claims_response)
-    except Exception:
-        claims = [answer]  # fallback
-
-    if not claims:
-        return 1.0
-
-    # Step 2: verify each claim against context
-    supported = 0
-    for claim in claims:
-        verify_prompt = (
-            f"Context: {context}\n\n"
-            f"Claim: {claim}\n\n"
-            "Is this claim supported by the context? Reply only YES or NO."
-        )
-        verdict = llm.invoke(verify_prompt).content.strip().upper()
-        if verdict.startswith("YES"):
-            supported += 1
-
-    return supported / len(claims)
-```
-
----
-
-## 3. Tracing with LangSmith
-
-**LangSmith** records every LangChain invocation with full **input/output, timing, and token counts**. When no API key is available, we can mock the tracing interface.
-
-```python
-# With a real LangSmith account:
-# export LANGCHAIN_TRACING_V2=true
-# export LANGCHAIN_API_KEY=ls__...
-# export LANGCHAIN_PROJECT=my-rag-project
-# All subsequent LangChain calls are automatically traced.
-
-import os
-
-def setup_tracing(project_name: str = "rag-evaluation"):
-    """Configure LangSmith tracing if credentials are available."""
-    api_key = os.environ.get("LANGCHAIN_API_KEY")
-    if api_key:
-        os.environ["LANGCHAIN_TRACING_V2"] = "true"
-        os.environ["LANGCHAIN_PROJECT"] = project_name
-        print(f"LangSmith tracing enabled → project: {project_name}")
-    else:
-        print("LANGCHAIN_API_KEY not set — tracing disabled (running locally)")
-
-setup_tracing()
-```
-
-### 3.1 Manual Run Logging (Mock)
-
-When LangSmith is not available, log runs to a **local JSONL file**:
-
-```python
-import json
-import time
-import uuid
-from pathlib import Path
-from functools import wraps
-from typing import Any, Callable
-
-TRACE_FILE = Path("./traces.jsonl")
-
-def trace_llm_call(run_name: str):
-    """Decorator that logs LLM calls to a local JSONL trace file."""
-    def decorator(fn: Callable) -> Callable:
-        @wraps(fn)
-        def wrapper(*args, **kwargs) -> Any:
-            run_id = str(uuid.uuid4())[:8]
-            start = time.perf_counter()
-            error = None
-            result = None
-            try:
-                result = fn(*args, **kwargs)
-                return result
-            except Exception as e:
-                error = str(e)
-                raise
-            finally:
-                elapsed = time.perf_counter() - start
-                record = {
-                    "run_id": run_id,
-                    "name": run_name,
-                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                    "latency_s": round(elapsed, 4),
-                    "inputs": {"args": str(args)[:200], "kwargs": str(kwargs)[:200]},
-                    "output": str(result)[:500] if result is not None else None,
-                    "error": error,
-                }
-                with TRACE_FILE.open("a") as f:
-                    f.write(json.dumps(record) + "\n")
-        return wrapper
-    return decorator
-
-
-@trace_llm_call("summarize")
-def summarize(text: str) -> str:
-    # Mocked — replace with real LLM call
-    return f"Summary of: {text[:50]}..."
-
-summarize("The H100 GPU achieves 3.35 TB/s memory bandwidth using HBM3...")
-print(f"Trace written to {TRACE_FILE}")
-```
-
----
-
-## 4. Cost Tracking
-
-```python
-import os
-import time
-import uuid
-from dataclasses import dataclass, field
-from openai import OpenAI
-
-# Example pricing per million tokens.
-# Do not use this table for billing decisions. Keep real prices in deployment
-# config and update them from the current provider pricing page.
-PRICING = {
-    "fast-model": {"input": 0.15, "output": 0.60},
-    "balanced-agent-model": {"input": 3.00, "output": 15.00},
-    "reasoning-model": {"input": 15.00, "output": 75.00},
-    "embedding-model": {"input": 0.02, "output": 0.0},
-}
-
-@dataclass
-class CostTracker:
-    session_id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
-    total_input_tokens: int = 0
-    total_output_tokens: int = 0
-    total_cost_usd: float = 0.0
-    calls: list[dict] = field(default_factory=list)
-
-    def record(self, model: str, input_tokens: int, output_tokens: int, latency_s: float):
-        pricing = PRICING.get(model, {"input": 0.0, "output": 0.0})
-        cost = (input_tokens * pricing["input"] + output_tokens * pricing["output"]) / 1_000_000
-        self.total_input_tokens += input_tokens
-        self.total_output_tokens += output_tokens
-        self.total_cost_usd += cost
-        self.calls.append({
-            "model": model,
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "cost_usd": round(cost, 6),
-            "latency_s": round(latency_s, 4),
-        })
-
-    def summary(self) -> dict:
-        return {
-            "session_id": self.session_id,
-            "total_calls": len(self.calls),
-            "total_input_tokens": self.total_input_tokens,
-            "total_output_tokens": self.total_output_tokens,
-            "total_cost_usd": round(self.total_cost_usd, 6),
-        }
-
-
-# Global tracker for the session
-tracker = CostTracker()
-
-def tracked_completion(messages: list[dict], model: str | None = None) -> str:
-    """OpenAI chat completion with automatic cost tracking."""
-    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "sk-fake"))
-    model = model or os.environ.get("OPENAI_MODEL", "your-model-id")
-    start = time.perf_counter()
-    response = client.chat.completions.create(
-        model=model, messages=messages, temperature=0
-    )
-    elapsed = time.perf_counter() - start
-    usage = response.usage
-    tracker.record(model, usage.prompt_tokens, usage.completion_tokens, elapsed)
-    return response.choices[0].message.content
-
-
-# Demo
-# answer = tracked_completion([{"role": "user", "content": "What is HBM3?"}])
-# print(tracker.summary())
-```
-
----
-
-## 5. Structured LLM Call Logger
-
-```python
-import json
-import logging
-import time
-import uuid
-from pathlib import Path
-from openai import OpenAI
-
-# Configure structured logging
-logging.basicConfig(level=logging.INFO, format="%(message)s")
-logger = logging.getLogger("llm_logger")
-log_file = Path("llm_calls.jsonl")
-
-class LLMLogger:
-    """Logs every LLM call to both console and a JSONL file."""
-
-    def __init__(self, model: str | None = None, log_path: Path = log_file):
-        self.client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "sk-fake"))
-        self.model = model or os.environ.get("OPENAI_MODEL", "your-model-id")
-        self.log_path = log_path
-
-    def _write(self, record: dict):
-        self.log_path.open("a").write(json.dumps(record) + "\n")
-        # Brief console log
-        logger.info(
-            f"[LLM] call_id={record['call_id']} "
-            f"model={record['model']} "
-            f"tokens={record['usage']['total_tokens']} "
-            f"latency={record['latency_s']:.3f}s "
-            f"cost=${record['cost_usd']:.5f}"
-        )
-
-    def complete(self, messages: list[dict], **kwargs) -> str:
-        call_id = uuid.uuid4().hex[:8]
-        start = time.perf_counter()
-        response = self.client.chat.completions.create(
-            model=self.model, messages=messages, temperature=0, **kwargs
-        )
-        latency = time.perf_counter() - start
-        usage = response.usage
-        pricing = PRICING.get(self.model, {"input": 0.0, "output": 0.0})
-        cost = (
-            usage.prompt_tokens * pricing["input"]
-            + usage.completion_tokens * pricing["output"]
-        ) / 1_000_000
-
-        record = {
-            "call_id": call_id,
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "model": self.model,
-            "messages": [{"role": m["role"], "content": m["content"][:300]} for m in messages],
-            "response": response.choices[0].message.content[:500],
-            "usage": {
-                "prompt_tokens": usage.prompt_tokens,
-                "completion_tokens": usage.completion_tokens,
-                "total_tokens": usage.total_tokens,
-            },
-            "latency_s": round(latency, 4),
-            "cost_usd": round(cost, 6),
-        }
-        self._write(record)
-        return response.choices[0].message.content
-
+def load_pdf(path: str):
+    loader = PyPDFLoader(path)
+    docs = loader.load()           # one Document per page
+    print(f"Loaded {len(docs)} pages from {path}")
+    for doc in docs[:2]:
+        print(f"  Page {doc.metadata['page']}: {len(doc.page_content)} chars")
+    return docs
 
 # Usage
-# llm = LLMLogger()
-# answer = llm.complete([{"role": "user", "content": "Explain HBM3 in one sentence."}])
+# docs = load_pdf("hardware_manual.pdf")
+```
+
+For scanned PDFs that need OCR, swap in `UnstructuredPDFLoader`:
+
+```python
+from langchain_community.document_loaders import UnstructuredPDFLoader
+
+loader = UnstructuredPDFLoader("scanned.pdf", mode="elements")
+docs = loader.load()
+# Each element (Title, NarrativeText, Table) becomes a separate Document
+```
+
+### 1.2 HTML Loading
+
+```python
+from langchain_community.document_loaders import AsyncHtmlLoader
+from langchain_community.document_transformers import BeautifulSoupTransformer
+
+urls = [
+    "https://example.com/docs/intro",
+    "https://example.com/docs/api",
+]
+
+# Load raw HTML
+loader = AsyncHtmlLoader(urls)
+raw_docs = loader.load()
+
+# Strip tags, keep only meaningful text
+bs_transformer = BeautifulSoupTransformer()
+docs = bs_transformer.transform_documents(
+    raw_docs,
+    tags_to_extract=["p", "li", "h1", "h2", "h3", "code"],
+    remove_unwanted_tags=["script", "style", "nav", "footer"],
+)
+print(f"Extracted {len(docs)} documents")
+```
+
+### 1.3 Markdown Loading
+
+```python
+from langchain_community.document_loaders import UnstructuredMarkdownLoader
+import glob
+
+def load_markdown_directory(directory: str):
+    all_docs = []
+    for path in glob.glob(f"{directory}/**/*.md", recursive=True):
+        loader = UnstructuredMarkdownLoader(path, mode="elements")
+        docs = loader.load()
+        # Enrich metadata
+        for doc in docs:
+            doc.metadata["source_file"] = path
+            doc.metadata["file_type"] = "markdown"
+        all_docs.extend(docs)
+    print(f"Loaded {len(all_docs)} elements from {directory}")
+    return all_docs
 ```
 
 ---
 
-## 6. Building an Evaluation Dataset from Production Traffic
+## 2. Chunking Strategies
+
+Raw documents are almost always too long to embed as-is. **Chunking** splits them into pieces small enough for an embedding model while **preserving enough context** for retrieval.
+
+### 2.1 Fixed-Size Chunking
+
+The simplest approach: split every N characters with an **overlap** to prevent context from being cut at boundaries.
 
 ```python
-import json
-import random
-from pathlib import Path
-from datetime import datetime
+from langchain.text_splitter import CharacterTextSplitter
 
-TRACE_FILE = Path("./traces.jsonl")
-EVAL_DATASET_FILE = Path("./eval_dataset.json")
+splitter = CharacterTextSplitter(
+    chunk_size=500,       # characters per chunk
+    chunk_overlap=50,     # overlap between consecutive chunks
+    separator="\n",       # split on newlines first
+)
 
+text = """
+GPUs are massively parallel processors. They contain thousands of small cores
+optimized for floating-point arithmetic. Modern AI accelerators like the H100
+push this further with dedicated Tensor Cores for matrix multiplication.
 
-def sample_production_traces(
-    trace_file: Path,
-    sample_size: int = 50,
-    min_response_length: int = 50,
-) -> list[dict]:
-    """Sample high-quality traces to build a labeled eval dataset."""
-    traces = []
-    if not trace_file.exists():
-        print(f"Trace file not found: {trace_file}")
-        return []
+DRAM bandwidth is the primary bottleneck for large language model inference.
+A100 provides 2 TB/s HBM2e bandwidth. H100 SXM5 delivers 3.35 TB/s HBM3.
+""".strip()
 
-    with trace_file.open() as f:
-        for line in f:
-            try:
-                record = json.loads(line)
-                if (
-                    record.get("output")
-                    and len(record["output"]) >= min_response_length
-                    and not record.get("error")
-                ):
-                    traces.append(record)
-            except json.JSONDecodeError:
-                continue
+chunks = splitter.split_text(text)
+for i, chunk in enumerate(chunks):
+    print(f"Chunk {i}: {len(chunk)} chars | '{chunk[:60]}...'")
+```
 
-    sample = random.sample(traces, min(sample_size, len(traces)))
-    print(f"Sampled {len(sample)} traces from {len(traces)} total")
-    return sample
+**When to use:** Homogeneous text (logs, emails) where sentence boundaries do not matter much.
 
+### 2.2 Recursive Character Chunking
 
-def build_eval_dataset(traces: list[dict]) -> list[dict]:
-    """
-    Convert production traces into evaluation examples.
-    In production: send these to human annotators for labeling.
-    Here: auto-generate placeholder labels.
-    """
-    dataset = []
-    for trace in traces:
-        dataset.append({
-            "id": trace.get("run_id", "unknown"),
-            "question": _extract_question(trace),
-            "answer": trace.get("output", ""),
-            "label": None,       # to be filled by human annotator
-            "score": None,       # to be filled by judge
-            "sampled_at": datetime.utcnow().isoformat(),
-        })
-    EVAL_DATASET_FILE.write_text(json.dumps(dataset, indent=2))
-    print(f"Saved {len(dataset)} eval examples → {EVAL_DATASET_FILE}")
-    return dataset
+Uses a hierarchy of separators (`\n\n`, `\n`, ` `, `""`) so it tries to break on paragraph boundaries first, then sentences, then words.
 
+```python
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-def _extract_question(trace: dict) -> str:
-    """Pull the user question from a trace record."""
-    inputs = trace.get("inputs", {})
-    if isinstance(inputs, dict):
-        for key in ("question", "query", "input", "user_message"):
-            if key in inputs:
-                return inputs[key]
-    return str(inputs)[:200]
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=400,
+    chunk_overlap=80,
+    length_function=len,
+    separators=["\n\n", "\n", ". ", " ", ""],
+)
+
+from langchain_community.document_loaders import TextLoader
+
+loader = TextLoader("docs/architecture.md")
+docs = loader.load()
+chunks = splitter.split_documents(docs)
+
+print(f"Original: {len(docs)} docs → {len(chunks)} chunks")
+print(f"Chunk 0 metadata: {chunks[0].metadata}")
+print(f"Chunk 0 preview: {chunks[0].page_content[:120]}")
+```
+
+**When to use:** The default choice for most unstructured text. Respects natural language structure.
+
+### 2.3 Semantic Chunking
+
+Instead of splitting by character count, **semantic chunking** embeds consecutive sentences and splits whenever the **cosine similarity** between adjacent sentences drops below a threshold. This keeps topically coherent content together.
+
+```python
+# pip install langchain-experimental sentence-transformers
+
+from langchain_experimental.text_splitter import SemanticChunker
+from langchain_community.embeddings import HuggingFaceEmbeddings
+
+embedding_model = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+)
+
+splitter = SemanticChunker(
+    embeddings=embedding_model,
+    breakpoint_threshold_type="percentile",   # "standard_deviation" | "interquartile"
+    breakpoint_threshold_amount=90,           # split when similarity drops to 90th percentile
+)
+
+text = open("docs/long_article.txt").read()
+chunks = splitter.create_documents([text])
+print(f"Created {len(chunks)} semantic chunks")
+for c in chunks[:3]:
+    print(f"  {len(c.page_content)} chars: {c.page_content[:80]}...")
+```
+
+**When to use:** Technical documentation, research papers, or any content where topic shifts should define chunk boundaries. Costs more compute than fixed-size splitting.
+
+---
+
+## 3. Embedding Models
+
+An **embedding model** converts text into a **dense vector** (list of floats). Semantically similar texts produce vectors that are close in **cosine distance**.
+
+### 3.1 OpenAI your-embedding-model-id (API)
+
+```python
+# pip install openai langchain-openai
+
+import os
+from langchain_openai import OpenAIEmbeddings
+
+embeddings = OpenAIEmbeddings(
+    model="your-embedding-model-id",  # 1536 dims, cheap & fast
+    api_key=os.environ["OPENAI_API_KEY"],
+)
+
+texts = [
+    "CUDA cores execute floating-point operations in parallel.",
+    "Tensor Cores accelerate matrix multiplication for AI workloads.",
+    "The weather in Paris is often cloudy in November.",
+]
+
+vectors = embeddings.embed_documents(texts)
+print(f"Embedding shape: {len(vectors)} x {len(vectors[0])}")
+
+# Single query embedding
+query_vec = embeddings.embed_query("What are Tensor Cores?")
+print(f"Query vector dim: {len(query_vec)}")
+
+# Compute cosine similarity manually
+import numpy as np
+
+def cosine_sim(a, b):
+    a, b = np.array(a), np.array(b)
+    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+for i, text in enumerate(texts):
+    sim = cosine_sim(query_vec, vectors[i])
+    print(f"  sim({text[:40]}...) = {sim:.3f}")
+```
+
+**Cost note:** your-embedding-model-id costs $0.02 per million tokens. For a 100 MB corpus (~25M tokens), that is ~$0.50.
+
+### 3.2 Local Embeddings with sentence-transformers
+
+```python
+# pip install sentence-transformers
+
+from sentence_transformers import SentenceTransformer
+import numpy as np
+
+model = SentenceTransformer("all-MiniLM-L6-v2")  # 384 dims, ~22 MB
+
+texts = [
+    "CUDA cores execute floating-point operations in parallel.",
+    "Tensor Cores accelerate matrix multiplication for AI workloads.",
+    "The weather in Paris is often cloudy in November.",
+]
+
+# Batch encode
+vectors = model.encode(texts, normalize_embeddings=True, show_progress_bar=True)
+print(f"Shape: {vectors.shape}")  # (3, 384)
+
+query_vec = model.encode("What are Tensor Cores?", normalize_embeddings=True)
+
+# With normalized vectors, dot product == cosine similarity
+similarities = vectors @ query_vec
+for text, sim in zip(texts, similarities):
+    print(f"  {sim:.3f}  {text[:50]}")
+```
+
+### 3.3 Comparison Table
+
+| Model | Dims | Speed | Cost | Quality |
+|---|---|---|---|---|
+| your-embedding-model-id | 1536 | ~500 docs/s (API) | $0.02/1M tokens | Very good |
+| text-embedding-3-large | 3072 | ~200 docs/s (API) | $0.13/1M tokens | Best OpenAI |
+| all-MiniLM-L6-v2 | 384 | ~10k docs/s (CPU) | Free | Good |
+| all-mpnet-base-v2 | 768 | ~2k docs/s (CPU) | Free | Very good |
+| bge-large-en-v1.5 | 1024 | ~1k docs/s (CPU) | Free | Excellent |
+
+**Rule of thumb:** Use local models for prototyping and high-volume offline indexing. Use OpenAI embeddings when query latency and accuracy are critical.
+
+---
+
+## 4. Vector Stores
+
+### 4.1 Chroma (Local, No Setup)
+
+```python
+# pip install chromadb langchain-chroma
+
+from langchain_chroma import Chroma
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_core.documents import Document
+
+embedding_fn = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+
+# Create / open a persistent store
+vectorstore = Chroma(
+    collection_name="hardware_docs",
+    embedding_function=embedding_fn,
+    persist_directory="./chroma_db",   # omit for in-memory
+)
+
+# Add documents
+docs = [
+    Document(page_content="H100 SXM5 has 80 GB HBM3 memory.", metadata={"source": "h100.md", "section": "memory"}),
+    Document(page_content="A100 offers 312 TFLOPS of BF16 performance.", metadata={"source": "a100.md", "section": "compute"}),
+    Document(page_content="NVLink 4.0 provides 900 GB/s bidirectional bandwidth.", metadata={"source": "nvlink.md", "section": "interconnect"}),
+    Document(page_content="CUDA 12.0 introduced TMA (Tensor Memory Accelerator).", metadata={"source": "cuda.md", "section": "software"}),
+]
+
+vectorstore.add_documents(docs)
+print(f"Collection size: {vectorstore._collection.count()}")
+
+# Basic similarity search
+results = vectorstore.similarity_search("GPU memory bandwidth", k=2)
+for r in results:
+    print(f"  [{r.metadata['source']}] {r.page_content}")
+
+# With scores (lower L2 distance = more similar)
+results_with_scores = vectorstore.similarity_search_with_score("GPU memory bandwidth", k=2)
+for doc, score in results_with_scores:
+    print(f"  score={score:.4f}  {doc.page_content}")
+```
+
+### 4.2 FAISS (High-Performance Local)
+
+```python
+# pip install faiss-cpu langchain-community
+
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import HuggingFaceEmbeddings
+
+embedding_fn = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+
+texts = [
+    "H100 SXM5 has 80 GB HBM3 memory.",
+    "A100 offers 312 TFLOPS of BF16 performance.",
+    "NVLink 4.0 provides 900 GB/s bidirectional bandwidth.",
+    "CUDA 12.0 introduced TMA (Tensor Memory Accelerator).",
+]
+metadatas = [
+    {"source": "h100.md"},
+    {"source": "a100.md"},
+    {"source": "nvlink.md"},
+    {"source": "cuda.md"},
+]
+
+vectorstore = FAISS.from_texts(texts, embedding_fn, metadatas=metadatas)
+
+# Save to disk
+vectorstore.save_local("faiss_index")
+
+# Load from disk
+vectorstore = FAISS.load_local(
+    "faiss_index", embedding_fn, allow_dangerous_deserialization=True
+)
+
+results = vectorstore.similarity_search("interconnect bandwidth", k=2)
+for r in results:
+    print(f"  [{r.metadata['source']}] {r.page_content}")
+```
+
+### 4.3 Pinecone (Managed Cloud)
+
+```python
+# pip install pinecone-client langchain-pinecone
+
+import os
+from pinecone import Pinecone, ServerlessSpec
+from langchain_pinecone import PineconeVectorStore
+from langchain_openai import OpenAIEmbeddings
+
+pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
+
+index_name = "hardware-docs"
+if index_name not in [i.name for i in pc.list_indexes()]:
+    pc.create_index(
+        name=index_name,
+        dimension=1536,
+        metric="cosine",
+        spec=ServerlessSpec(cloud="aws", region="us-east-1"),
+    )
+
+embedding_fn = OpenAIEmbeddings(model="your-embedding-model-id")
+vectorstore = PineconeVectorStore(index_name=index_name, embedding=embedding_fn)
+
+from langchain_core.documents import Document
+docs = [
+    Document(page_content="H100 SXM5 has 80 GB HBM3.", metadata={"source": "h100", "type": "gpu"}),
+    Document(page_content="A100 BF16 312 TFLOPS.", metadata={"source": "a100", "type": "gpu"}),
+]
+vectorstore.add_documents(docs)
+
+results = vectorstore.similarity_search("GPU memory", k=2)
+for r in results:
+    print(r.page_content)
 ```
 
 ---
 
-## 7. A/B Testing Prompts
+## 5. Metadata Filtering and Namespacing
 
 ```python
+from langchain_chroma import Chroma
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_core.documents import Document
+
+embedding_fn = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+vectorstore = Chroma(collection_name="filtered_demo", embedding_function=embedding_fn)
+
+docs = [
+    Document(page_content="H100 memory bandwidth is 3.35 TB/s.", metadata={"product": "H100", "year": 2023, "category": "memory"}),
+    Document(page_content="A100 memory bandwidth is 2 TB/s.", metadata={"product": "A100", "year": 2020, "category": "memory"}),
+    Document(page_content="H100 uses NVLink 4.0.", metadata={"product": "H100", "year": 2023, "category": "interconnect"}),
+    Document(page_content="A100 uses NVLink 3.0.", metadata={"product": "A100", "year": 2020, "category": "interconnect"}),
+]
+vectorstore.add_documents(docs)
+
+# Filter to only H100 documents
+results = vectorstore.similarity_search(
+    "bandwidth",
+    k=5,
+    filter={"product": "H100"},
+)
+print("H100 only:")
+for r in results:
+    print(f"  {r.page_content}")
+
+# Compound filter (Chroma supports $and, $or, $eq, $ne, $gt, $gte, $lt, $lte, $in)
+results = vectorstore.similarity_search(
+    "bandwidth",
+    k=5,
+    filter={"$and": [{"year": {"$gte": 2023}}, {"category": "memory"}]},
+)
+print("\nH100 memory docs (year >= 2023):")
+for r in results:
+    print(f"  {r.page_content}")
+```
+
+**Pinecone namespacing** allows **tenant isolation** — each namespace is a separate partition:
+
+```python
+# Pinecone: use namespace parameter to isolate tenants
+vectorstore.add_documents(docs, namespace="customer_acme")
+results = vectorstore.similarity_search("bandwidth", k=2, namespace="customer_acme")
+```
+
+---
+
+## 6. Complete Indexing Pipeline
+
+Putting it all together into a **reusable class**:
+
+```python
+# pip install langchain langchain-community langchain-chroma
+# pip install sentence-transformers pypdf unstructured[md]
+
+import glob
 import hashlib
-import random
-from typing import Callable
+import json
+import os
+from pathlib import Path
+from typing import List, Optional
 
-PROMPT_A = """Answer the following question concisely using only facts from the context.
-Context: {context}
-Question: {question}"""
+from langchain_chroma import Chroma
+from langchain_community.document_loaders import (
+    PyPDFLoader,
+    UnstructuredMarkdownLoader,
+    AsyncHtmlLoader,
+)
+from langchain_community.document_transformers import BeautifulSoupTransformer
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
 
-PROMPT_B = """You are a precise technical assistant. Using ONLY the provided context,
-answer the question. If unsure, say "I don't know."
-Context: {context}
-Question: {question}"""
 
-
-def ab_router(user_id: str, variants: list[str], weights: list[float] | None = None) -> str:
+class IndexingPipeline:
     """
-    Deterministically assign a user to a prompt variant using their ID hash.
-    Same user always gets the same variant (sticky assignment).
+    End-to-end RAG ingestion pipeline.
+
+    Usage:
+        pipeline = IndexingPipeline(persist_dir="./my_index")
+        pipeline.ingest_directory("./docs", file_types=["*.md", "*.pdf"])
+        results = pipeline.search("What is HBM3?", k=3)
     """
-    if weights:
-        # Weighted random assignment (not deterministic, for gradual rollout)
-        return random.choices(variants, weights=weights)[0]
 
-    # Deterministic: hash user_id to choose variant
-    hash_int = int(hashlib.md5(user_id.encode()).hexdigest(), 16)
-    return variants[hash_int % len(variants)]
+    def __init__(
+        self,
+        persist_dir: str = "./chroma_db",
+        collection_name: str = "documents",
+        embedding_model: str = "all-MiniLM-L6-v2",
+        chunk_size: int = 400,
+        chunk_overlap: int = 80,
+    ):
+        self.persist_dir = persist_dir
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+
+        print(f"Loading embedding model: {embedding_model}")
+        self.embeddings = HuggingFaceEmbeddings(model_name=embedding_model)
+
+        self.vectorstore = Chroma(
+            collection_name=collection_name,
+            embedding_function=self.embeddings,
+            persist_directory=persist_dir,
+        )
+
+        self.splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            length_function=len,
+        )
+
+        # Track ingested file hashes to avoid re-indexing unchanged files
+        self._hash_file = Path(persist_dir) / "ingested_hashes.json"
+        self._hashes: dict = self._load_hashes()
+
+    def _load_hashes(self) -> dict:
+        if self._hash_file.exists():
+            return json.loads(self._hash_file.read_text())
+        return {}
+
+    def _save_hashes(self):
+        self._hash_file.parent.mkdir(parents=True, exist_ok=True)
+        self._hash_file.write_text(json.dumps(self._hashes, indent=2))
+
+    def _file_hash(self, path: str) -> str:
+        content = Path(path).read_bytes()
+        return hashlib.md5(content).hexdigest()
+
+    def _load_file(self, path: str) -> List[Document]:
+        ext = Path(path).suffix.lower()
+        if ext == ".pdf":
+            return PyPDFLoader(path).load()
+        elif ext in (".md", ".markdown"):
+            return UnstructuredMarkdownLoader(path, mode="elements").load()
+        elif ext in (".txt",):
+            from langchain_community.document_loaders import TextLoader
+            return TextLoader(path).load()
+        else:
+            raise ValueError(f"Unsupported file type: {ext}")
+
+    def ingest_file(self, path: str, extra_metadata: Optional[dict] = None) -> int:
+        """Ingest a single file. Returns number of chunks added."""
+        current_hash = self._file_hash(path)
+        if self._hashes.get(path) == current_hash:
+            print(f"  Skipping (unchanged): {path}")
+            return 0
+
+        docs = self._load_file(path)
+        chunks = self.splitter.split_documents(docs)
+
+        for chunk in chunks:
+            chunk.metadata["source_path"] = path
+            chunk.metadata["file_name"] = Path(path).name
+            if extra_metadata:
+                chunk.metadata.update(extra_metadata)
+
+        self.vectorstore.add_documents(chunks)
+        self._hashes[path] = current_hash
+        self._save_hashes()
+
+        print(f"  Ingested: {path} → {len(chunks)} chunks")
+        return len(chunks)
+
+    def ingest_directory(
+        self,
+        directory: str,
+        file_types: Optional[List[str]] = None,
+        extra_metadata: Optional[dict] = None,
+    ) -> int:
+        """Ingest all matching files in a directory tree."""
+        if file_types is None:
+            file_types = ["*.md", "*.pdf", "*.txt"]
+
+        total = 0
+        for pattern in file_types:
+            for path in glob.glob(f"{directory}/**/{pattern}", recursive=True):
+                try:
+                    total += self.ingest_file(path, extra_metadata)
+                except Exception as e:
+                    print(f"  ERROR ingesting {path}: {e}")
+
+        print(f"\nTotal chunks added: {total}")
+        print(f"Collection size: {self.vectorstore._collection.count()}")
+        return total
+
+    def ingest_urls(self, urls: List[str]) -> int:
+        """Ingest content from a list of URLs."""
+        loader = AsyncHtmlLoader(urls)
+        raw_docs = loader.load()
+        transformer = BeautifulSoupTransformer()
+        clean_docs = transformer.transform_documents(
+            raw_docs,
+            tags_to_extract=["p", "li", "h1", "h2", "h3", "code"],
+        )
+        chunks = self.splitter.split_documents(clean_docs)
+        self.vectorstore.add_documents(chunks)
+        print(f"Ingested {len(urls)} URLs → {len(chunks)} chunks")
+        return len(chunks)
+
+    def search(
+        self,
+        query: str,
+        k: int = 4,
+        filter: Optional[dict] = None,
+    ) -> List[Document]:
+        """Similarity search with optional metadata filter."""
+        return self.vectorstore.similarity_search(query, k=k, filter=filter)
+
+    def get_retriever(self, k: int = 4, filter: Optional[dict] = None):
+        """Return a LangChain retriever for use in chains."""
+        search_kwargs = {"k": k}
+        if filter:
+            search_kwargs["filter"] = filter
+        return self.vectorstore.as_retriever(search_kwargs=search_kwargs)
+
+    def stats(self) -> dict:
+        count = self.vectorstore._collection.count()
+        return {
+            "total_chunks": count,
+            "indexed_files": len(self._hashes),
+            "persist_dir": self.persist_dir,
+        }
 
 
-class PromptABTest:
-    def __init__(self, variant_a: str, variant_b: str):
-        self.variants = {"A": variant_a, "B": variant_b}
-        self.results: dict[str, list[float]] = {"A": [], "B": []}
+# ── Demo ──────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    import tempfile
 
-    def run(self, user_id: str, context: str, question: str, judge_fn: Callable) -> dict:
-        variant_key = ab_router(user_id, ["A", "B"])
-        prompt = self.variants[variant_key].format(context=context, question=question)
+    # Create some fake docs
+    with tempfile.TemporaryDirectory() as tmpdir:
+        Path(f"{tmpdir}/h100.md").write_text(
+            "# H100\nThe H100 GPU has 80 GB HBM3. Bandwidth is 3.35 TB/s.\n"
+            "It contains 16896 CUDA cores and 528 Tensor Cores.\n"
+        )
+        Path(f"{tmpdir}/a100.md").write_text(
+            "# A100\nThe A100 GPU has 80 GB HBM2e. Bandwidth is 2 TB/s.\n"
+            "BF16 performance reaches 312 TFLOPS.\n"
+        )
 
-        # Generate answer (mock here)
-        answer = f"[Variant {variant_key}] Answer about: {question[:40]}..."
+        pipeline = IndexingPipeline(
+            persist_dir=f"{tmpdir}/index",
+            chunk_size=200,
+            chunk_overlap=40,
+        )
+        pipeline.ingest_directory(tmpdir, file_types=["*.md"])
+        print("\nStats:", pipeline.stats())
 
-        # Score the answer
-        score = judge_fn(question=question, reference="ground truth placeholder", answer=answer)
-        self.results[variant_key].append(score["score"])
-
-        return {"variant": variant_key, "answer": answer, "score": score["score"]}
-
-    def report(self) -> dict:
-        report = {}
-        for key, scores in self.results.items():
-            if scores:
-                report[key] = {
-                    "n": len(scores),
-                    "mean_score": round(sum(scores) / len(scores), 2),
-                    "min": min(scores),
-                    "max": max(scores),
-                }
-        winner = max(report, key=lambda k: report[k]["mean_score"]) if report else None
-        return {"variants": report, "winner": winner}
-
-
-# Demo
-# ab = PromptABTest(PROMPT_A, PROMPT_B)
-# for i in range(20):
-#     ab.run(f"user_{i}", context="H100 has 3.35 TB/s bandwidth.", question="H100 bandwidth?", judge_fn=judge_answer)
-# print(ab.report())
+        print("\nSearch results for 'memory bandwidth':")
+        for doc in pipeline.search("memory bandwidth", k=2):
+            print(f"  [{doc.metadata.get('file_name')}] {doc.page_content.strip()}")
 ```
 
 ---
 
 ## Key Takeaways
 
-- **LLM-as-judge** scales evaluation to thousands of examples quickly. Use a rubric with clear integer scores (0-5) and require JSON output for reliable parsing.
-- **RAGAS** gives you four orthogonal RAG metrics. Faithfulness catches hallucinations; context recall diagnoses retrieval gaps.
-- **LangSmith** tracing is zero-code with environment variables set. Always trace in staging even if not in production.
-- **Cost tracking** should accumulate per-session and log per-call. Early visibility on costs prevents budget surprises.
-- **Structured call logging** (JSONL) is your flight recorder — essential for debugging failures and building eval datasets.
-- **A/B testing** with sticky user assignment ensures reproducible experiments. Always run for a statistically meaningful number of samples before declaring a winner.
+- **Loading**: Use `PyPDFLoader` for PDFs, `UnstructuredMarkdownLoader` for Markdown, `AsyncHtmlLoader` + `BeautifulSoupTransformer` for web content.
+- **Chunking**: Start with `RecursiveCharacterTextSplitter` (chunk_size=400, overlap=80). Graduate to semantic chunking for research-grade quality.
+- **Embeddings**: Local `all-MiniLM-L6-v2` is free and fast enough for millions of docs. Use OpenAI embeddings when query precision matters.
+- **Vector stores**: Chroma for local development, FAISS for high-performance offline search, Pinecone for production multi-tenant systems.
+- **Metadata**: Always store `source`, `section`, and any filterable fields at ingest time — retroactively adding metadata is painful.
+- **Incremental indexing**: Hash files at ingest to skip re-processing unchanged documents.
 
 ---
 
 ## Exercises
 
-### Exercise 1 — Multi-Criteria Judge
+### Exercise 1 — Chunking Comparison
 
-Extend the LLM-as-judge to evaluate on three separate criteria: (1) factual accuracy, (2) completeness, and (3) conciseness. Each criterion should return a score of 0–5 with a one-sentence justification. Build a `MultiCriteriaJudge` class that averages the three scores and returns a combined verdict. Test it on at least 5 question-answer pairs from a domain you know well.
+Take any long text file (at least 2000 words). Split it with all three strategies: `CharacterTextSplitter`, `RecursiveCharacterTextSplitter`, and `SemanticChunker`. For each strategy, print the number of chunks, the mean chunk length, and the standard deviation of chunk lengths. Which strategy produces the most uniform chunks? Which produces the most semantically coherent ones? Write a one-paragraph explanation.
 
-### Exercise 2 — RAGAS on Your Own Data
+### Exercise 2 — Embedding Distance Analysis
 
-Create a small corpus of 5–10 documents on any technical topic you choose. Write 5 test questions with known ground-truth answers. Build a simple RAG system (from Lecture 09/10), run it on all 5 questions, and evaluate using RAGAS. Report all four metric scores in a table. For any metric below 0.7, identify one concrete change to the RAG system that would improve it.
+Embed the following five sentences using `all-MiniLM-L6-v2`. Build the full 5×5 cosine similarity matrix and display it as a formatted table. Identify the pair of sentences that is most similar and the pair that is most dissimilar. Explain whether the results match your intuition.
 
-### Exercise 3 — Cost Dashboard
+```
+"The H100 GPU achieves 3.35 TB/s memory bandwidth."
+"HBM3 provides high-bandwidth memory for AI accelerators."
+"Python is a dynamically typed programming language."
+"CUDA enables general-purpose computing on NVIDIA GPUs."
+"Renewable energy sources include solar and wind power."
+```
 
-Build a `CostDashboard` class that reads from the JSONL log file produced by `LLMLogger` and renders a summary report. The report should include: total spend, spend by model, average cost per call, top 5 most expensive calls (with their inputs), and a call count time series grouped by hour. The report should be printable as a formatted text table.
+### Exercise 3 — Pipeline Extension
+
+Extend the `IndexingPipeline` class with two new methods:
+
+1. `delete_file(path: str)` — removes all chunks from the vector store that came from `path` and removes its hash entry.
+2. `search_with_sources(query: str, k: int) -> list[dict]` — returns results as `[{"content": ..., "source": ..., "score": ...}]`.
+
+Test both methods in a short `main` block using at least three markdown files.
 
 ---
 
-*Next: [Lecture 12 — Production Deployment](Lecture-12.md)*
+*Next: [Lecture 12](Lecture-12.md)*

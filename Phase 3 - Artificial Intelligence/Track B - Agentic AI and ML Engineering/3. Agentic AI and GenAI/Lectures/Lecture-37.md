@@ -1,34 +1,28 @@
-# Lecture 37 - TraceLens: Trace-Driven AI Performance Analysis
+# Lecture 37 - OpenClaw Case Study: System Prompt Architecture
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 36](Lecture-36.md) | **Next:** [Lecture 38](Lecture-38.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 36](Lecture-36.md) | **Next:** [Lecture 38](Lecture-38.md)
 
 ---
 
-Performance optimization is **not a vibes problem**.
+Modern agent systems are not controlled by **one short prompt**.
 
-For AI systems, the hard part is often not collecting data. It is turning a huge profiler trace into a **specific diagnosis**:
+They are controlled by a **prompt assembly system**.
 
-```text
-What was slow?
-Where in the model did it happen?
-Was the GPU computing, communicating, copying, or waiting?
-Did the new kernel actually help?
-Can we reproduce the slow op without the full model?
-```
+That system decides:
 
-**TraceLens** is useful because it treats profiler traces as **structured data**, not screenshots for humans to manually inspect.
+- what identity the agent receives
+- what tools it knows how to use
+- what workspace context is injected
+- what safety guidance is present
+- what provider-specific tuning is added
+- what should stay stable for prompt caching
+- what should stay out of the prompt and be enforced by runtime policy
 
-It consumes traces from frameworks such as PyTorch and JAX, then produces **summaries, comparisons, roofline-style metrics**, collective communication analysis, and minimal operation reproducers.
+This lecture uses OpenClaw's system prompt design as the case study.
 
-For this course, TraceLens is the missing evidence layer between:
+The important lesson is:
 
-```text
-agent workload
-  -> model server
-  -> GPU kernels and collectives
-  -> performance claim
-  -> trace-backed diagnosis
-```
+> a production agent should not depend on a random provider default prompt; it should have an owned, inspectable, versioned prompt assembled by the application runtime
 
 ---
 
@@ -36,821 +30,795 @@ agent workload
 
 By the end of this lecture, you should be able to:
 
-1. Explain why raw AI profiler traces are hard to analyze manually.
-2. Understand Trace2Tree as a hierarchical trace intermediate representation.
-3. Use top-down performance breakdowns to locate bottlenecks.
-4. Interpret GPU timeline, operator category, dispatch-level, and shape-level reports.
-5. Understand TraceLens roofline metrics such as TFLOPS/s and TB/s.
-6. Diagnose multi-GPU scaling with communication latency, bandwidth, and synchronization skew.
-7. Use trace comparison to quantify regressions across hardware, drivers, kernels, or software versions.
-8. Understand event replay as a way to produce minimal, IP-safe performance reproducers.
-9. Apply TraceLens to OpenClaw-style agent serving and vLLM optimization workflows.
+1. Explain why OpenClaw owns the system prompt instead of using provider defaults.
+2. Describe the major sections of an OpenClaw-style system prompt.
+3. Understand full, minimal, and none prompt modes.
+4. Explain how bootstrap files become Project Context.
+5. Understand why skills are listed compactly and loaded on demand.
+6. Separate advisory prompt safety from hard runtime enforcement.
+7. Design a cache-aware provider overlay.
+8. Inspect prompt size and context injection when debugging an agent.
 
 ---
 
-## 1. The profiler trace problem
+## 1. Simple mental model
 
-Modern AI workloads generate large traces:
+Think of a serious agent as a **field engineer**.
 
-- Python module calls
-- PyTorch or JAX framework operations
-- CPU dispatches
-- runtime launch events
-- GPU kernels
-- memory copies
-- collective communication
-- synchronization gaps
-
-Tools such as **Perfetto** are useful for visual inspection, but the **manual workflow does not scale**.
-
-The engineer ends up asking:
+Before the engineer starts work, you do not just say:
 
 ```text
-Which kernels belong to this model layer?
-Which aten op launched this slow kernel?
-Is this memcpy from my code or from AMP/framework behavior?
-Did communication overlap with compute?
-Did a new software version shift time into a different op?
+Be helpful.
 ```
 
-Raw traces are **too flat**.
+You give them an operating binder:
 
-They show events, but **not enough intent**.
+```text
+Who you are.
+How to talk to users.
+How to use tools.
+Which workspace you are in.
+What files contain project context.
+What policies you must follow.
+When to ask for help.
+How to report completion.
+```
 
-TraceLens adds **structure**.
+In OpenClaw, the **system prompt** is that operating binder.
+
+It is assembled before each agent run.
+
+```text
+agent request
+  -> resolve agent/session/workspace
+  -> assemble OpenClaw-owned system prompt
+  -> inject bootstrap context and skills list
+  -> apply provider-specific small overlays
+  -> run model
+```
+
+The model does not invent the operating binder.
+
+OpenClaw builds it.
 
 ---
 
-## 2. Trace2Tree: from flat trace to hierarchy
+## 2. Why OpenClaw owns the system prompt
 
-The central idea is **Trace2Tree**.
+A provider default prompt is useful for a **generic chat product**.
 
-TraceLens converts **flat events into a tree**:
+It is not enough for a product that has:
 
-```text
-Python module / function
-  -> framework op
-    -> CPU dispatch
-      -> runtime launch
-        -> GPU kernel
-```
+- tools
+- sessions
+- workspaces
+- sub-agents
+- cron jobs
+- long-running processes
+- provider plugins
+- local docs
+- memory files
+- sandbox behavior
+- gateway commands
+- user-specific persona files
 
-Example shape:
+OpenClaw owns the prompt so that behavior is **consistent across models and providers**.
 
-```text
-nn.Module: Linear
-  -> aten::linear
-    -> aten::to
-      -> aten::copy_
-        -> elementwise kernel
-    -> aten::addmm
-      -> matrix multiply kernel
-```
+The system can say:
 
-This matters because many expensive events are **hidden at the Python level**.
+- "This is how OpenClaw agents use tools."
+- "This is where local docs live."
+- "This is the workspace."
+- "This is how sub-agents should be used."
+- "This is what bootstrap context was injected."
+- "This is what safety means in this runtime."
 
-Common examples:
-
-- automatic mixed precision casts
-- implicit copies
-- layout conversions
-- unfused bias additions
-- framework-generated elementwise kernels
-- backend-specific convolution or attention kernels
-
-Without a tree, a kernel is just a name and timestamp.
-
-With a tree, the kernel has ownership:
-
-```text
-This exact module launched this exact framework op,
-which launched this exact kernel.
-```
-
-That is the difference between **tracing and diagnosis**.
+The provider still matters, but the product owns the **agent contract**.
 
 ---
 
-## 3. Top-down bottleneck analysis
+## 3. The fixed prompt spine
 
-TraceLens reports are designed to move from **coarse to precise**.
+OpenClaw uses compact, structured sections.
 
-The useful progression is:
+The exact wording may evolve, but the architecture is stable.
+
+An OpenClaw-style prompt looks like this:
 
 ```text
-GPU timeline
-  -> operator category
-  -> framework op
-  -> unique input shape
-  -> exact kernel or replay case
+Identity
+Tooling
+Execution Bias
+Safety
+Skills
+OpenClaw Self-Update
+Workspace
+Documentation
+Project Context
+Sandbox
+Current Date & Time
+Reply Tags
+Heartbeats
+Runtime
+Reasoning
+Provider additions
 ```
 
-This is the right order.
+The point is not to make the prompt long.
 
-Do not start with **kernel names**.
+The point is to make it **predictable**.
 
-Start by asking **how the system spent time**.
+Each section has one job.
 
 ---
 
-## 4. GPU timeline: was the GPU doing useful work?
+## 4. Tooling section
 
-The GPU timeline report separates time into categories such as:
+The Tooling section teaches the model **how work should be done** inside this runtime.
 
-- computation
-- exposed communication
-- exposed memory copy
-- busy time
-- idle time
-- total communication
-- total memory copy
+It covers patterns such as:
 
-This answers the first diagnostic question:
+- use structured tools instead of pretending to act
+- prefer `cron` for future follow-ups instead of sleep loops
+- use process tools for long-running commands and logs
+- use sub-agents for larger parallel work
+- do not poll sub-agents in tight loops
+- use `update_plan` only when it is enabled and useful
 
-```text
-Is the GPU compute-bound, communication-bound, copy-bound, or idle?
-```
+This section is important because tool-using agents often fail in boring ways:
 
-Example interpretations:
+- they say they did something but did not call the tool
+- they start a long process and lose the logs
+- they sleep inside a command instead of scheduling future work
+- they spawn too many agents for simple work
+- they update a plan repeatedly without doing work
 
-```text
-high computation time
-  -> optimize kernels, shapes, dtype, fusion, algorithm
-
-high exposed communication time
-  -> improve overlap, collective strategy, tensor parallel layout, network path
-
-high exposed memcpy time
-  -> inspect dtype casts, host/device movement, layout conversions
-
-high idle time
-  -> inspect CPU dispatch, dataloader, synchronization, scheduling, dynamic shapes
-```
-
-The ROCm blog's Llama FSDP example shows a GPU timeline where the GPU is mostly busy, but **total communication** is still a large fraction of the run. That distinction matters: communication can be **present but hidden** under compute, or it can be **exposed and directly hurt** wall time.
+The Tooling section converts product expectations into **model-facing habits**.
 
 ---
 
-## 5. Operator category view: what kind of work dominates?
+## 5. Execution Bias section
 
-After the timeline, group work by operation family:
+Execution Bias is the **"finish the work"** section.
 
-- GEMM
-- attention / SDPA
-- convolution
-- elementwise
-- reduce
-- Triton-generated kernels
-- multi-tensor apply
-- other backend kernels
+It gives compact follow-through guidance:
 
-This tells you **where to spend engineering effort**.
+- act within the current turn when the request is actionable
+- continue until done or genuinely blocked
+- recover when a tool result is weak
+- check mutable state live instead of assuming
+- verify before finalizing
 
-If GEMM and attention dominate most of the time, optimizing a small elementwise kernel will not move end-to-end performance unless it blocks fusion, causes copies, or sits on the critical path.
+This section exists because many models default to **advice**.
 
-For transformer training and serving, the usual dominant categories are:
+A production engineering agent often needs **action**.
+
+Compare:
 
 ```text
-GEMM
-attention
-communication
-memory movement
+Weak behavior:
+"You could run the tests."
+
+OpenClaw-style behavior:
+"Run the tests, inspect the failure, patch the issue, rerun verification, then summarize."
 ```
 
-The point is not that other ops are irrelevant.
+Execution Bias does not mean reckless automation.
 
-The point is **prioritization**.
-
-Performance work should **follow the trace**.
+It means the agent should **carry work through the runtime loop** when it has enough permission and context.
 
 ---
 
-## 6. Dispatch-level view: stable names across backends
+## 6. Safety section
 
-GPU kernel names change across:
+The Safety section is intentionally brief.
 
-- CUDA vs ROCm
-- driver versions
-- compiler versions
-- library backends
-- hardware generations
-- autotuning choices
+It tells the model not to bypass oversight, escalate privileges improperly, hide risky behavior, or seek control outside the user intent.
 
-**Framework dispatch names** are often more stable.
+But this is a key production lesson:
 
-Examples:
+> prompt safety is advisory; runtime enforcement is mandatory
 
-```text
-aten::mm
-aten::linear
-aten::copy_
-flash_attn::_flash_attn_forward
-flash_attn::_flash_attn_backward
-```
+The system prompt can ask the model to behave safely.
 
-TraceLens uses this level to make comparisons more meaningful.
+Hard enforcement must come from:
 
-Instead of asking:
+- tool policy
+- exec approvals
+- sandboxing
+- filesystem boundaries
+- channel allowlists
+- identity and permission checks
+- audit logs
 
-```text
-Why did kernel igemm_fwd_gtcx3_... change?
-```
+If a command must never run, do not merely write "do not run it" in a prompt.
 
-you can ask:
-
-```text
-Did aten::convolution become slower?
-Did aten::mm improve for this shape?
-Did flash attention regress after the backend update?
-```
-
-That abstraction is important when comparing **CUDA and ROCm**, or comparing two software versions on the same platform.
+Block it in the **tool layer**.
 
 ---
 
-## 7. Shape-level view: the real root cause
+## 7. Skills section
 
-**Operator names are not enough.**
+OpenClaw can inject a compact list of available skills.
 
-The same operation can have **very different performance** depending on:
+The prompt does not paste every skill into the context.
 
-- tensor dimensions
-- strides
-- dtype
-- layout
-- batch size
-- sequence length
-- head count
-- head dimension
-- padding
-- transposition
+It lists:
 
-TraceLens breaks down operations by unique input shape and arguments.
+- skill name
+- short description
+- location
 
-This is where **many real optimizations start**.
+Then the model is instructed to read the relevant `SKILL.md` only when needed.
+
+That is the correct architecture.
+
+Bad pattern:
+
+```text
+Paste every skill file into every run.
+```
+
+Good pattern:
+
+```text
+List available skills compactly.
+Load the matching skill on demand.
+```
+
+This avoids **token bloat** and keeps unrelated skills from polluting the run.
+
+Skills have their own sizing budget:
+
+- global default: `skills.limits.maxSkillsPromptChars`
+- per-agent override: `agents.list[].skillsLimits.maxSkillsPromptChars`
+
+This is separate from other runtime context limits.
+
+That separation matters because a skills list and a workspace bootstrap file are different kinds of context.
+
+---
+
+## 8. OpenClaw Self-Update section
+
+OpenClaw can expose tools for safely inspecting and changing its own configuration.
+
+The prompt teaches a controlled path:
+
+```text
+config.schema.lookup
+config.patch
+config.apply
+update.run
+```
+
+The model should inspect the schema before changing config.
+
+It should patch narrowly.
+
+It should apply through the supported gateway tool.
+
+It should not rewrite protected execution policy keys casually.
+
+This is a useful pattern for any self-modifying agent system:
+
+> self-update should be schema-driven, narrow, logged, and guarded
+
+Do not give an agent **raw config file mutation** and hope the prompt keeps it safe.
+
+---
+
+## 9. Workspace and documentation sections
+
+The Workspace section tells the agent where it is operating.
+
+It usually reflects:
+
+```text
+agents.defaults.workspace
+```
+
+The Documentation section tells the agent where local OpenClaw docs live and encourages consulting them first.
+
+This is a subtle but important production pattern.
+
+For a tool-rich local assistant, local docs are often **more accurate than memory**.
+
+The prompt should point the model to the local source of truth:
+
+```text
+If you need OpenClaw behavior, inspect local docs first.
+Then act.
+```
+
+---
+
+## 10. Project Context and bootstrap files
+
+OpenClaw appends selected workspace files under Project Context.
+
+These are bootstrap files such as:
+
+- `AGENTS.md`
+- `SOUL.md`
+- `TOOLS.md`
+- `IDENTITY.md`
+- `USER.md`
+- `HEARTBEAT.md`
+- `BOOTSTRAP.md`
+- `MEMORY.md`
+
+The goal is simple:
+
+> important identity and project context should be present without requiring the model to remember to read it
 
 Example:
 
 ```text
-aten::mm with shape A
-  -> high TFLOPS/s
-
-aten::mm with shape B
-  -> poor TFLOPS/s
+Project Context
+  AGENTS.md -> project rules
+  SOUL.md -> personality and voice
+  TOOLS.md -> custom workspace tool guidance
+  USER.md -> user preferences
+  MEMORY.md -> durable compact memory
 ```
 
-Possible causes:
+This is powerful, but it has a **cost**.
 
-- bad tile shape
-- small batch dimension
-- unfavorable alignment
-- memory-bound shape
-- layout conversion nearby
-- low occupancy
-- poor backend algorithm selection
+Large bootstrap files increase:
 
-For agent workloads, this is especially useful because **context length and output length** change request by request.
+- prompt size
+- compaction pressure
+- latency
+- cache invalidation risk
+- irrelevant context exposure
 
-A model may be **fast at one sequence length and slow at another**.
+So OpenClaw trims injection.
+
+Documented defaults include:
+
+- per-file max: `agents.defaults.bootstrapMaxChars`, default `12000`
+- total injected max: `agents.defaults.bootstrapTotalMaxChars`, default `60000`
+- truncation warning: `agents.defaults.bootstrapPromptTruncationWarning`, default `once`
+
+The practical rule:
+
+> bootstrap files should be concise operating context, not a dumping ground
 
 ---
 
-## 8. Roofline-style compute modeling
+## 11. Memory files
 
-Kernel duration answers:
+`MEMORY.md` can be injected as bootstrap context.
 
-```text
-How long did it take?
-```
+Daily memory files under `memory/*.md` are different.
 
-It does not answer:
+They are not normally injected by default.
 
-```text
-Was that good?
-```
-
-TraceLens estimates **theoretical work** from operator arguments.
-
-For GEMM:
+They are accessed on demand through memory tools such as:
 
 ```text
-FLOPs = 2 * M * N * K
-Bytes = (M*K + K*N + M*N) * element_size
+memory_search
+memory_get
 ```
 
-Then it combines that with actual trace timing:
+This keeps normal runs **small**.
 
-```text
-TFLOPS/s = FLOPs / time
-TB/s     = bytes / time
-```
+Recent daily memory may be prepended once in special bare `/new` or `/reset` turns, but it is not the default for every run.
 
-This gives a roofline-style view:
+This is the right tradeoff:
 
-```text
-high arithmetic intensity + low TFLOPS/s
-  -> compute kernel may be underutilizing the GPU
-
-low arithmetic intensity + high TB/s
-  -> operation may be memory-bandwidth bound
-
-unexpected bytes or copies nearby
-  -> inspect layout, dtype, or framework-generated movement
-```
-
-Important distinction:
-
-TraceLens estimates useful **theoretical work** from framework semantics.
-
-Hardware profilers measure **what the GPU actually executed**.
-
-Use both:
-
-```text
-TraceLens:
-  "What work did the model intend?"
-
-Hardware counters:
-  "What did the GPU actually do?"
-```
-
-The gap between those two is often **where the optimization lives**.
+- durable compact memory can be prompt context
+- large daily logs should be retrieved only when relevant
 
 ---
 
-## 9. Multi-GPU communication analysis
+## 12. Prompt modes
 
-Distributed training and serving add another failure mode:
+OpenClaw supports multiple prompt modes.
 
-```text
-total collective time != pure network time
-```
+### Full mode
 
-Collective operations can include synchronization skew.
+Full mode is the default.
 
-One rank may enter the collective late because:
+It includes the main sections:
 
-- its compute was slower
-- its batch was heavier
-- it hit a local scheduling delay
-- it had a CPU dispatch stall
-- it waited on a prior dependency
+- Tooling
+- Execution Bias
+- Safety
+- Skills
+- OpenClaw Self-Update
+- Workspace
+- Documentation
+- Project Context
+- Sandbox
+- Current Date and Time
+- Reply Tags
+- Heartbeats
+- Runtime
+- Reasoning
 
-If you only look at total collective duration, you may **blame the network for workload imbalance**.
+Use full mode for the main interactive agent.
 
-TraceLens separates:
+### Minimal mode
 
-- payload size
-- collective latency
-- algorithmic bandwidth
-- bus bandwidth
-- synchronization skew
+Minimal mode is used for **sub-agents**.
 
-Useful diagnostic patterns:
+It keeps the **essential runtime contract** but omits context that would bloat or confuse a delegated worker.
 
-```text
-high communication latency, low skew
-  -> likely network or collective implementation bottleneck
+It omits sections like:
 
-high skew, reasonable bandwidth
-  -> likely imbalance or late-arriving ranks
+- Skills
+- Memory Recall
+- OpenClaw Self-Update
+- Model Aliases
+- User Identity
+- Reply Tags
+- Messaging
+- Silent Replies
+- Heartbeats
 
-high exposed communication time
-  -> overlap is insufficient
+It keeps sections like:
 
-high total communication but low exposed communication
-  -> communication exists but is mostly hidden under compute
-```
+- Tooling
+- Safety
+- Workspace
+- Sandbox
+- Current Date and Time
+- Runtime
+- injected context
 
-For hardware engineers, this matters because **AI scaling bottlenecks are often misdiagnosed**.
+In minimal mode, injected prompts are labeled **Subagent Context** instead of **Group Chat Context**.
 
-The right question is not:
+The idea is:
 
-```text
-How much time did all-reduce take?
-```
+> a sub-agent needs enough context to do its bounded task, not the entire personality and memory system of the main assistant
 
-The better question is:
+### None mode
 
-```text
-How much pure communication time was exposed on the critical path,
-and how much was rank skew?
-```
+None mode returns only the **base identity line**.
+
+Use it rarely.
+
+It is useful for tests or cases where the caller wants almost no runtime prompt material.
 
 ---
 
-## 10. Trace comparison: prove the delta
+## 13. Sub-agent bootstrap behavior
 
-Most performance work is **comparative**:
+Sub-agent sessions inject less context.
+
+OpenClaw limits sub-agent bootstrap to:
+
+- `AGENTS.md`
+- `TOOLS.md`
+
+This is intentional.
+
+A sub-agent should know project rules and tool rules.
+
+It usually does not need the full user profile, memory, heartbeat behavior, or self-update instructions.
+
+This keeps delegated work **cheaper and less noisy**.
+
+---
+
+## 14. Time handling and prompt-cache stability
+
+The Current Date and Time section is designed carefully.
+
+It includes timezone and time-format guidance.
+
+It avoids injecting a live clock into every prompt.
+
+Why?
+
+Because a live timestamp **changes every run**.
+
+Changing every run can **hurt prompt caching**.
+
+So OpenClaw keeps the prompt-cache boundary stable and tells the model how to get exact time when needed.
+
+When the exact timestamp matters, use:
 
 ```text
-old kernel vs new kernel
-CUDA vs ROCm
-H100 vs MI300X
-driver A vs driver B
-BF16 vs FP8
-FlashAttention backend vs FlashInfer backend
-baseline vLLM vs optimized vLLM
+session_status
 ```
 
-TraceLens can compare reports and identify where time changed.
+Relevant config keys:
 
-For simple cases, matching happens at the same operator level.
+- `agents.defaults.userTimezone`
+- `agents.defaults.timeFormat`
 
-For more complex cases, TraceLens can use **morphological comparison**: it aligns trees and finds the lowest point where the call stacks diverge.
+This is a strong production lesson:
 
-That is useful when two backends implement the same framework op differently.
+> do not put high-churn values into the stable prompt unless the model truly needs them every turn
+
+---
+
+## 15. Provider tuning and cache-aware overlays
+
+Provider plugins are allowed to contribute small additions.
+
+They should not replace the whole OpenClaw system prompt.
+
+Provider plugins can:
+
+- replace named core sections such as `interaction_style`
+- replace `tool_call_style`
+- replace `execution_bias`
+- inject a stable prefix above the prompt-cache boundary
+- inject a dynamic suffix below the prompt-cache boundary
+
+This gives **model-family tuning** without losing product control.
 
 Example:
 
 ```text
-aten::_convolution
-  -> ROCm backend subtree
-  -> CUDA backend subtree
+OpenClaw core prompt:
+  stable runtime behavior
+
+Provider overlay:
+  small model-family guidance for GPT-5, Claude, local models, etc.
 ```
 
-The framework-level intent is the same, but the backend subtree differs.
+The OpenAI GPT-5 family overlay is described as keeping core execution rules small while adding guidance such as:
 
-Trace comparison lets you say:
+- persona latching
+- concise output
+- tool discipline
+- parallel lookup
+- deliverable coverage
+- verification
+- missing context handling
+- terminal-tool hygiene
 
-```text
-This change improved convolution backward by X ms.
-This change regressed aten::mm by Y ms.
-This backend moved time from one subtree into another.
-```
+The architecture rule is:
 
-That is the **standard you should use** for optimization claims.
+> provider tuning should be a small overlay, not a hostile takeover of the product prompt
 
 ---
 
-## 11. Event replay: isolate the slow operation
+## 16. Legacy hooks versus provider contributions
 
-Finding a slow operation is **only half the job**.
+OpenClaw still supports a legacy `before_prompt_build` hook.
 
-You still need a **reproducer**.
+It can inject or mutate prompt material globally.
 
-Full model reproducers are often difficult to share because they include:
+But for model-family behavior, provider contributions are preferred.
 
-- proprietary model architecture
-- private weights
-- production input data
-- distributed launch setup
-- complex environment state
+Why?
 
-TraceLens **event replay** generates a minimal script from trace metadata:
+Because provider contributions can be **cache-aware** and scoped to the model family.
 
-- operation type
-- tensor shapes
-- dtypes
-- strides
-- relevant arguments
+Use the right layer:
 
-This produces a focused benchmark case.
-
-Why this matters:
-
-```text
-model team finds a slow op
-  -> event replay creates minimal reproducer
-  -> kernel/compiler/vendor team debugs it
-  -> fix is validated against original trace
-```
-
-This is how you turn model-level performance debugging into **systems engineering**.
+| Need | Better mechanism |
+|---|---|
+| Workspace-specific context | Bootstrap files |
+| Global prompt mutation | `before_prompt_build` hook |
+| Model-family tuning | Provider contribution |
+| Runtime security | Tool policy and sandbox |
+| User personality | `SOUL.md` |
 
 ---
 
-## 12. Where TraceLens fits in the agent stack
+## 17. Reply Tags and Heartbeats
 
-Agent systems need performance evidence at multiple layers:
+Reply Tags are optional provider-specific syntax guidance.
 
-```text
-application:
-  user latency, tool latency, session throughput
+They help models format replies in a way the runtime can parse or route.
 
-agent runtime:
-  planning time, tool-call count, retry count, context growth
+Heartbeats are also optional.
 
-model server:
-  TTFT, ITL, output tokens/s, queueing, KV-cache memory
+When enabled, OpenClaw can include heartbeat prompt and acknowledgement behavior.
 
-GPU:
-  kernels, copies, collectives, idle time, roofline metrics
-```
+But heartbeats are omitted from normal runs when:
 
-TraceLens focuses on the **lower layers**, but it should be connected to the higher layers.
+- heartbeats are disabled for the default agent
+- `agents.defaults.heartbeat.includeSystemPromptSection` is false
 
-For OpenClaw-style systems, a useful workflow is:
-
-```text
-run representative agent workload
-  -> collect model-server trace
-  -> generate TraceLens report
-  -> identify bottleneck
-  -> create event replay if needed
-  -> change model/backend/kernel/config
-  -> compare traces
-  -> attach report to deployment decision
-```
-
-This pairs directly with **Lecture 36**.
-
-If you enable FP8 KV-cache, do not only report:
-
-```text
-It feels faster.
-```
-
-Report:
-
-```text
-TTFT
-ITL
-output tokens/s
-GPU memory
-operator-level time
-attention kernel time
-copy time
-communication exposure
-accuracy
-trace comparison delta
-```
+This keeps the prompt clean when heartbeat behavior is not active.
 
 ---
 
-## 13. Practical workflow
+## 18. Runtime and Reasoning sections
 
-Install TraceLens:
+The Runtime section provides a compact one-line summary of the execution environment.
 
-```bash
-pip install git+https://github.com/AMD-AGI/TraceLens.git
-```
+It can include:
 
-Generate a performance report from a PyTorch trace:
+- host
+- OS
+- Node.js version
+- selected model
+- repo root if detected
+- thinking level
 
-```bash
-TraceLens_generate_perf_report_pytorch \
-  --profile_json_path path/to/your/trace.json
-```
+The Reasoning section explains visibility level and can hint at a `/reasoning` toggle.
 
-Compare two reports:
+This is not meant to be verbose.
 
-```bash
-TraceLens_compare_perf_reports_pytorch \
-  baseline.xlsx candidate.xlsx \
-  --names baseline candidate \
-  --sheets all \
-  -o comparison.xlsx
-```
-
-Generate a multi-rank collective report:
-
-```bash
-TraceLens_generate_multi_rank_collective_report_pytorch \
-  --trace_dir /path/to/traces \
-  --world_size 8
-```
-
-For ROCm `rocprofv3` Perfetto-style traces:
-
-```bash
-rocprofv3 \
-  --hip-trace \
-  --kernel-trace \
-  --memory-copy-trace \
-  --rccl-trace \
-  --output-format pftrace \
-  -d ./v3_traces \
-  -- python3 your_app.py
-
-TraceLens_generate_perf_report_pftrace_hip_activity \
-  --trace_path sample.pftrace \
-  --write_md
-```
-
-Use these commands as **starting points**, not a complete profiling policy.
-
-For reliable comparisons, also pin:
-
-- model revision
-- input workload
-- batch/concurrency
-- sequence lengths
-- dtype policy
-- GPU clocks if relevant
-- driver/runtime versions
-- backend flags
-- warmup count
-- random seeds if accuracy is involved
+It is a compact runtime signal so the model knows where it is operating.
 
 ---
 
-## 14. Diagnostic playbook
+## 19. Diagnostics: inspecting context
 
-Use TraceLens reports to **choose the next action**.
+When an agent behaves strangely, inspect **what it actually received**.
 
-### Case: high idle time
+OpenClaw supports commands such as:
 
-Likely causes:
+```text
+/context list
+/context detail
+```
 
-- CPU dataloader bottleneck
-- Python overhead
-- synchronization
-- dynamic shape recompilation
-- queue starvation
-- model server scheduling gap
+Use these to inspect:
 
-Next actions:
+- which files were injected
+- raw size versus injected size
+- whether truncation happened
+- tool schema overhead
+- which context source dominates the prompt
 
-- inspect CPU dispatch timeline
-- check batch construction
-- reduce Python in the hot path
-- verify warmup and compile behavior
-- correlate with request-level telemetry
+This is critical for debugging.
 
-### Case: GEMM dominates but TFLOPS/s is low
+Many "model problems" are actually **context problems**:
 
-Likely causes:
+- a bootstrap file is too large
+- a stale memory file is injected
+- a project rule is missing
+- a provider overlay is too strong
+- a sub-agent received full context instead of minimal context
 
-- small or awkward matrix shapes
-- poor alignment
-- bad layout
-- backend algorithm choice
-- unnecessary transposes
-- low occupancy
-
-Next actions:
-
-- inspect shape-level rows
-- compare against hardware peak and expected roofline
-- generate event replay for the slow shape
-- test alternative kernels or layouts
-
-### Case: attention dominates long-context serving
-
-Likely causes:
-
-- KV-cache memory traffic
-- head dimension issue
-- backend selection
-- context length distribution
-- low-precision conversion overhead
-
-Next actions:
-
-- compare BF16 vs FP8 traces
-- inspect attention kernel time
-- test skip policies for sliding-window layers
-- validate accuracy on real prompts
-- connect to Lecture 36's TTFT/ITL benchmark plan
-
-### Case: exposed communication is high
-
-Likely causes:
-
-- poor overlap
-- collective algorithm issue
-- rank imbalance
-- network bottleneck
-- tensor-parallel or FSDP layout mismatch
-
-Next actions:
-
-- inspect skew vs pure communication time
-- compare algorithmic and bus bandwidth
-- inspect per-rank timelines
-- adjust sharding, bucket sizes, or overlap strategy
-
-### Case: regression after a software update
-
-Likely causes:
-
-- backend kernel selection changed
-- compiler changed generated code
-- framework changed dispatch path
-- dtype/layout behavior changed
-- fusion changed
-
-Next actions:
-
-- run TraceLens comparison
-- identify the largest positive deltas
-- inspect lowest divergent subtree
-- replay the slow op
-- keep the trace report with the change review
+Inspect the prompt assembly **before blaming the model**.
 
 ---
 
-## 15. How this connects to agent reliability
+## 20. Example: smart speaker engineering agent
 
-Earlier lectures focused on **agent skills, structured tools, and verification**.
+Imagine an OpenClaw-powered smart speaker assistant for a Jetson-based product lab.
 
-TraceLens applies the **same idea to performance**:
+The agent may need to:
 
-```text
-claim:
-  "This optimization improves long-context serving."
+- inspect hardware notes
+- schedule follow-up tests
+- run shell commands
+- spawn a sub-agent to research codecs
+- remember user preferences
+- avoid unsafe GPIO or power commands
+- summarize logs
 
-required evidence:
-  trace report
-  before/after comparison
-  workload description
-  bottleneck explanation
-  accuracy check
-  deployment decision
-```
-
-This matters because agent systems invite **vague performance claims**:
-
-- "The model is slow."
-- "The GPU is the bottleneck."
-- "Communication is killing scaling."
-- "FP8 is faster."
-- "The new backend regressed."
-
-TraceLens helps turn those into **falsifiable statements**:
+An OpenClaw-style system prompt might assemble this:
 
 ```text
-On this workload, aten::mm for this shape regressed by X ms.
-On this run, exposed communication is Y% and skew is Z us.
-On this model, attention kernel time dropped but copy time increased.
-On this backend, GPU idle time is dominated by CPU dispatch gaps.
+Tooling:
+  Use process tools for long-running audio tests.
+  Use cron for future lab reminders.
+  Spawn sub-agents for isolated research.
+
+Execution Bias:
+  Run available checks before answering.
+  Verify file paths and hardware state live.
+
+Safety:
+  Do not bypass exec policy.
+  Do not change protected power or network settings without approval.
+
+Workspace:
+  /home/lab/smart-speaker
+
+Project Context:
+  AGENTS.md: lab rules
+  TOOLS.md: audio test commands
+  USER.md: preferred report format
+  MEMORY.md: concise project memory
+
+Runtime:
+  Jetson Orin Nano, Linux, local model provider, reasoning medium
 ```
 
-That is the **engineering standard**.
+Notice what is **not** in the prompt:
+
+- every past lab log
+- every available skill file
+- every daily memory file
+- raw policy implementation
+- secrets
+
+The prompt gives the model the **operating contract**.
+
+The runtime enforces the **dangerous boundaries**.
 
 ---
 
-## Mini-lab: Trace a model change
+## 21. Common design mistakes
 
-Choose one small but real workload:
+### Mistake 1: putting everything in the system prompt
 
-- a PyTorch transformer block
-- a vLLM benchmark
-- a multi-GPU training step
-- a custom CUDA/ROCm kernel path
-- an OpenClaw agent workload that calls a local model server
+Large prompts feel powerful, but they become **slow and noisy**.
 
-Run two configurations:
+Use retrieval, skills, memory search, and local docs instead.
 
-```text
-baseline
-candidate
-```
+### Mistake 2: relying on prompt safety alone
 
-Examples:
+If a tool action is dangerous, gate it in the tool layer.
 
-```text
-BF16 vs FP8
-old backend vs new backend
-CUDA vs ROCm
-single GPU vs multi-GPU
-eager vs compiled
-with fusion vs without fusion
-```
+Prompt wording is **not a permission system**.
 
-Collect traces, then generate TraceLens reports.
+### Mistake 3: giving sub-agents full context
 
-Write a short performance note:
+Sub-agents should receive bounded context for bounded work.
 
-```text
-Workload:
-Hardware:
-Software versions:
-Main bottleneck:
-Biggest improvement:
-Biggest regression:
-Evidence:
-Deployment decision:
-Next experiment:
-```
+Full identity and memory can distract them.
 
-If you find one slow operation, generate an event replay and treat it as a kernel debugging task.
+### Mistake 4: putting live timestamps above the cache boundary
+
+High-churn values reduce cache stability.
+
+Expose exact time through tools when needed.
+
+### Mistake 5: letting provider plugins replace the product prompt
+
+Provider overlays should tune.
+
+They should not own the product contract.
+
+---
+
+## 22. Design exercise
+
+Design a system prompt strategy for a local AI hardware lab assistant.
+
+The assistant can:
+
+- answer questions
+- inspect local Markdown docs
+- run safe shell commands
+- schedule follow-ups
+- use a sub-agent for research
+- remember hardware inventory
+
+Answer these:
+
+1. Which sections belong in the full prompt?
+2. Which sections should be omitted from sub-agent minimal prompts?
+3. Which files should be bootstrap-injected?
+4. Which information should be retrieved on demand instead of injected?
+5. Which safety requirements must be enforced by tools rather than prompt text?
+6. Which provider-specific guidance should be a small overlay?
+7. How will you inspect prompt size and truncation?
+
+If you cannot answer these, your agent system is **not yet operationally mature**.
 
 ---
 
 ## Key takeaways
 
-- Raw profiler traces are too large and flat for reliable manual analysis.
-- TraceLens turns framework traces into hierarchical, queryable evidence.
-- Trace2Tree connects Python modules, CPU dispatches, runtime launches, and GPU kernels.
-- Start diagnosis at the GPU timeline, then drill into categories, ops, shapes, and kernels.
-- Roofline-style metrics help distinguish "slow" from "inefficient."
-- Multi-GPU collective time must be separated into pure communication and synchronization skew.
-- Trace comparison is the right way to prove a performance change.
-- Event replay turns trace metadata into minimal reproducers for kernel and backend debugging.
-- For agent systems, performance claims should be backed by traces, comparisons, and workload descriptions.
+- OpenClaw owns and assembles the system prompt for each agent run.
+- The system prompt is a runtime contract, not a generic chat instruction.
+- Provider plugins should add small cache-aware overlays, not replace the full prompt.
+- Full mode is for main agents; minimal mode is for bounded sub-agents; none mode is for rare low-prompt cases.
+- Bootstrap files provide Project Context, but they must stay concise.
+- Skills should be listed compactly and loaded on demand.
+- Exact time should come from tools when needed so the stable prompt remains cache-friendly.
+- Prompt safety is advisory; hard safety belongs in runtime controls.
+- Context inspection is a first-class debugging skill.
 
 ---
 
 ## References
 
-- AMD ROCm Blog, "TraceLens: Democratizing AI Performance Analysis": [https://rocm.blogs.amd.com/software-tools-optimization/tracelens/README.html](https://rocm.blogs.amd.com/software-tools-optimization/tracelens/README.html)
-- TraceLens GitHub repository: [https://github.com/AMD-AGI/TraceLens](https://github.com/AMD-AGI/TraceLens)
-- PyTorch profiler documentation: [https://docs.pytorch.org/docs/stable/profiler.html](https://docs.pytorch.org/docs/stable/profiler.html)
-- Perfetto trace viewer: [https://ui.perfetto.dev](https://ui.perfetto.dev)
-- Lecture 36 - FP8 KV-Cache in vLLM: [Lecture-36.md](Lecture-36.md)
+- OpenClaw system prompt: [https://openclaw.knidal.com/system-prompt](https://openclaw.knidal.com/system-prompt)
+- Case-study source repo: [OpenClaw](https://github.com/openclaw/openclaw)
+- Related OpenClaw concepts:
+  - agent loop
+  - cron jobs
+  - sessions and workspaces
+  - skills
+  - runtime configuration
 
 ---
 
-*Next: [Lecture 38 - AutoSP](Lecture-38.md)*
+*Next: [Lecture 38](Lecture-38.md)*

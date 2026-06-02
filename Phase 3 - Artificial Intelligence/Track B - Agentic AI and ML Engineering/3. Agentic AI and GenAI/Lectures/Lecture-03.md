@@ -1,387 +1,185 @@
-# Lecture 03 — Tool Use & Function Calling
+# Lecture 03 - Building Agents I: Foundations (Model, Tools, Instructions)
 
-**Track B · Agentic AI & GenAI** | [← Lecture 02](Lecture-02.md) | [Next →](Lecture-04.md)
-
----
-
-## Learning Objectives
-
-- Define tools with precise schemas that minimize hallucination
-- Implement the tool-use loop correctly (the core of every agent)
-- Handle tool errors gracefully
-- Use parallel tool calls to reduce latency
-- Understand safety boundaries for dangerous tools
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 02](Lecture-02.md) | **Next:** [Lecture 04](Lecture-04.md)
 
 ---
 
-## 1. What Is Tool Use?
+This lecture and the next distill the **practitioner framework for building agents** — the design choices that separate a reliable production agent from a demo. It follows the structure popularized by OpenAI's practical guidance on building agents, grounded in patterns seen across many real deployments.
 
-**Tool use** lets the LLM call external functions — search the web, run code, query a database, control a browser. The model doesn't execute code; it outputs a **structured JSON call** that your application executes.
-
-```
-User message
-     ↓
-  [LLM] → stop_reason: "tool_use" → tool call JSON
-     ↓
-Your code executes the tool
-     ↓
-Tool result sent back to LLM as "tool" role message
-     ↓
-  [LLM] → stop_reason: "end_turn" → final answer
-```
+This lecture covers the **foundations**: what an agent actually is, when you should (and should not) build one, and the three components every agent is made of — **model, tools, and instructions**. Lecture 04 covers orchestration and guardrails.
 
 ---
 
-## 2. Defining Tools
+## 1. What is an agent?
 
-**Tool schemas** are the most important thing to get right. Vague descriptions cause wrong calls; wrong input types cause parse errors.
+> **Agents are systems that independently accomplish tasks on your behalf.**
+
+Conventional software lets a user *streamline and automate* a workflow. An agent goes further: it performs the workflow **on the user's behalf, with a high degree of independence**.
+
+A **workflow** is a sequence of steps that must be executed to meet a goal — resolving a support ticket, booking a reservation, committing a code change, generating a report.
+
+**What is *not* an agent:** applications that integrate an LLM but don't use it to *control workflow execution* — simple chatbots, single-turn LLM calls, sentiment classifiers. Wrapping a model call is not agency.
+
+An agent has two core characteristics that let it act reliably on a user's behalf:
+
+1. **It uses an LLM to manage workflow execution and make decisions.** It recognizes when a workflow is complete, can proactively correct its own actions, and — on failure — can halt and **transfer control back to the user**.
+2. **It has access to tools** to interact with external systems (both to gather context and to take action) and **dynamically selects** the right tool for the current state — always within **clearly defined guardrails**.
+
+---
+
+## 2. When should you build an agent?
+
+Building an agent means rethinking how your system makes decisions. Agents shine exactly where **deterministic, rule-based automation falls short**.
+
+The canonical example is **payment fraud analysis**. A traditional rules engine works like a *checklist*, flagging transactions against preset criteria. An LLM agent works more like a **seasoned investigator** — weighing context, considering subtle patterns, and catching suspicious activity even when no hard rule is violated. That nuanced reasoning is what lets agents handle complex, ambiguous situations.
+
+Prioritize workflows that have **resisted automation**, especially where traditional methods hit friction:
+
+<div class="lecture-map" markdown>
+
+| Signal | What it looks like | Example |
+|--------|--------------------|---------|
+| **Complex decision-making** | Nuanced judgment, exceptions, context-sensitive calls | Refund approval in customer service |
+| **Difficult-to-maintain rules** | Rulesets grown unwieldy; updates costly or error-prone | Vendor security reviews |
+| **Heavy reliance on unstructured data** | Interpreting natural language, extracting from documents, conversational interaction | Processing a home-insurance claim |
+
+</div>
+
+> **Validate first.** Before committing to an agent, confirm your use case clearly meets these criteria. If it doesn't, a **deterministic solution may suffice** — and will be cheaper, faster, and easier to reason about. (Same discipline as the inference course: don't reach for the heavy tool when a simple one fits.)
+
+---
+
+## 3. Agent design foundations — the three components
+
+In its most fundamental form, an agent has three components:
+
+<div class="lecture-map" markdown>
+
+| # | Component | Role |
+|---|-----------|------|
+| 01 | **Model** | The LLM powering the agent's reasoning and decision-making |
+| 02 | **Tools** | External functions or APIs the agent can use to take action |
+| 03 | **Instructions** | Explicit guidelines and guardrails defining how the agent behaves |
+
+</div>
+
+In code (using an agents framework), this is as small as:
 
 ```python
-import anthropic
-
-tools = [
-    {
-        "name": "get_gpu_specs",
-        "description": (
-            "Retrieve detailed specifications for an NVIDIA or AMD GPU by model name. "
-            "Returns memory, bandwidth, compute, and TDP. "
-            "Use this when the user asks about specific GPU hardware capabilities."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "model": {
-                    "type": "string",
-                    "description": "GPU model name, e.g. 'H100 SXM5', 'A100 PCIe 80GB', 'RX 7900 XTX'"
-                },
-                "metric": {
-                    "type": "string",
-                    "enum": ["memory", "bandwidth", "compute", "tdp", "all"],
-                    "description": "Which specification to retrieve. Use 'all' if unsure."
-                }
-            },
-            "required": ["model"]
-        }
-    },
-    {
-        "name": "run_cuda_profiler",
-        "description": (
-            "Run Nsight Systems profiler on a CUDA kernel file and return performance metrics. "
-            "Use this to identify bottlenecks: memory bound vs compute bound."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "kernel_path": {
-                    "type": "string",
-                    "description": "Absolute path to the .cu file"
-                },
-                "num_iterations": {
-                    "type": "integer",
-                    "description": "Number of profiling iterations (default: 100)",
-                    "default": 100
-                }
-            },
-            "required": ["kernel_path"]
-        }
-    }
-]
-```
-
-**Schema writing rules:**
-
-| Rule | Why |
-|------|-----|
-| Description explains *when* to call, not just *what* it does | Model decides whether to call based on this |
-| Use `enum` for constrained string values | Eliminates typos and invalid inputs |
-| Mark truly optional fields with `default`, don't put in `required` | Prevents unnecessary calls |
-| Keep parameter names short and clear | Model generates parameter names verbatim |
-
----
-
-## 3. The Tool-Use Loop
-
-```python
-import anthropic
-import json
-from typing import Any
-
-client = anthropic.Anthropic()
-
-# Mock tool implementations
-def get_gpu_specs(model: str, metric: str = "all") -> dict:
-    specs_db = {
-        "H100 SXM5": {"memory": "80GB HBM3", "bandwidth": "3.35 TB/s",
-                       "compute": "989 TFLOPS FP16", "tdp": "700W"},
-        "A100 PCIe 80GB": {"memory": "80GB HBM2e", "bandwidth": "1.935 TB/s",
-                            "compute": "312 TFLOPS FP16", "tdp": "300W"},
-    }
-    data = specs_db.get(model, {"error": f"GPU '{model}' not found in database"})
-    if metric == "all" or "error" in data:
-        return data
-    return {metric: data.get(metric, "unknown")}
-
-def run_cuda_profiler(kernel_path: str, num_iterations: int = 100) -> dict:
-    # In production, actually run nsys/ncu here
-    return {
-        "kernel": kernel_path,
-        "avg_duration_ms": 2.34,
-        "memory_throughput_pct": 78.5,
-        "compute_throughput_pct": 31.2,
-        "bottleneck": "memory_bound",
-        "recommendation": "Improve memory access coalescing"
-    }
-
-TOOL_MAP = {
-    "get_gpu_specs": get_gpu_specs,
-    "run_cuda_profiler": run_cuda_profiler,
-}
-
-def run_agent(user_message: str) -> str:
-    """Core agent loop with tool use."""
-    messages = [{"role": "user", "content": user_message}]
-
-    while True:
-        response = client.messages.create(
-            model="your-agent-model-id",
-            max_tokens=2048,
-            tools=tools,
-            messages=messages
-        )
-
-        # Append assistant response to message history
-        messages.append({"role": "assistant", "content": response.content})
-
-        if response.stop_reason == "end_turn":
-            # Extract final text response
-            for block in response.content:
-                if hasattr(block, "text"):
-                    return block.text
-
-        elif response.stop_reason == "tool_use":
-            # Process all tool calls in this response
-            tool_results = []
-
-            for block in response.content:
-                if block.type == "tool_use":
-                    tool_name = block.name
-                    tool_input = block.input
-
-                    # Execute the tool
-                    if tool_name in TOOL_MAP:
-                        result = TOOL_MAP[tool_name](**tool_input)
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": json.dumps(result)
-                        })
-                    else:
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": f"Error: tool '{tool_name}' not found",
-                            "is_error": True
-                        })
-
-            # Send tool results back to model
-            messages.append({"role": "user", "content": tool_results})
-
-        else:
-            break  # Unexpected stop reason
-
-    return "Agent completed without response."
-
-
-# Test it
-answer = run_agent(
-    "Compare the H100 SXM5 and A100 PCIe 80GB memory bandwidth. "
-    "Which is better for memory-bound kernels?"
+weather_agent = Agent(
+    name="Weather agent",
+    instructions="You are a helpful agent who can talk to users about the weather.",
+    tools=[get_weather],
 )
-print(answer)
 ```
+
+The rest of this lecture takes each component in turn.
 
 ---
 
-## 4. Parallel Tool Calls
+## 4. Selecting your model
 
-When multiple independent tools are needed, Claude can call them **simultaneously** — reducing **round-trips**.
+Different models trade off **task complexity, latency, and cost**. Not every task needs the smartest model — a simple retrieval or intent-classification step can run on a smaller, faster model, while a hard decision (approve a refund?) benefits from a more capable one. You will often use **a mix of models** across one workflow.
 
-```python
-# Claude may return multiple tool_use blocks in one response
-# Your loop must handle ALL of them before sending results back
+The approach that works: **prototype with the most capable model for every task to establish a performance baseline.** Then swap in smaller models and see whether they still hit your accuracy target. This way you never prematurely cap the agent's ability, and you learn exactly where small models succeed or fail.
 
-for block in response.content:
-    if block.type == "tool_use":
-        # This may execute multiple times per response
-        result = TOOL_MAP[block.name](**block.input)
-        tool_results.append({
-            "type": "tool_result",
-            "tool_use_id": block.id,
-            "content": json.dumps(result)
-        })
+The principles for choosing a model:
 
-# Send ALL results in one message — critical!
-messages.append({"role": "user", "content": tool_results})
-```
+1. **Set up evals** to establish a performance baseline.
+2. **Meet your accuracy target** with the best models available.
+3. **Optimize for cost and latency** by replacing larger models with smaller ones where possible.
 
-**With Python `asyncio` for true parallel execution:**
-
-```python
-import asyncio
-import anthropic
-
-async def execute_tool_async(tool_name: str, tool_input: dict, tool_id: str) -> dict:
-    # Run tool in thread pool (for blocking I/O tools)
-    loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(None, lambda: TOOL_MAP[tool_name](**tool_input))
-    return {
-        "type": "tool_result",
-        "tool_use_id": tool_id,
-        "content": json.dumps(result)
-    }
-
-async def process_tool_calls(tool_blocks: list) -> list:
-    tasks = [
-        execute_tool_async(b.name, b.input, b.id)
-        for b in tool_blocks if b.type == "tool_use"
-    ]
-    return await asyncio.gather(*tasks)
-```
-
-> **Pro tip:** For I/O-heavy tools (HTTP requests, database queries), parallel async execution can cut multi-tool latency by 3–5×.
+> This is the agent-layer mirror of the inference course's whole thesis: the model is a knob you tune against a measured target, not a default you accept.
 
 ---
 
-## 5. Error Handling
+## 5. Defining tools
 
-Agents must **handle tool failures gracefully** — the LLM can recover if you give it good error messages.
+Tools extend an agent by calling the **APIs** of underlying applications. For **legacy systems without APIs**, agents can fall back on **computer-use models** that drive web and application UIs directly — just as a human would.
 
-```python
-def safe_tool_call(tool_name: str, tool_input: dict, tool_id: str) -> dict:
-    """Execute a tool with error handling."""
-    try:
-        result = TOOL_MAP[tool_name](**tool_input)
-        return {
-            "type": "tool_result",
-            "tool_use_id": tool_id,
-            "content": json.dumps(result)
-        }
-    except KeyError as e:
-        return {
-            "type": "tool_result",
-            "tool_use_id": tool_id,
-            "content": f"Missing required parameter: {e}",
-            "is_error": True
-        }
-    except Exception as e:
-        return {
-            "type": "tool_result",
-            "tool_use_id": tool_id,
-            "content": f"Tool execution failed: {type(e).__name__}: {e}",
-            "is_error": True
-        }
-```
+Each tool should have a **standardized, well-documented, tested, reusable definition**. That enables flexible many-to-many relationships between tools and agents, improves discoverability, simplifies versioning, and prevents redundant definitions.
 
-**When `is_error: True` is set**, Claude will typically:
-1. Acknowledge the error
-2. Try a different approach (different parameters, different tool)
-3. Ask the user for clarification if stuck
+Broadly, agents need three types of tools:
 
----
+<div class="lecture-map" markdown>
 
-## 6. Tool Safety Patterns
+| Type | What it does | Examples |
+|------|--------------|----------|
+| **Data** | Retrieve the context needed to execute the workflow | Query a transaction DB or CRM, read a PDF, search the web |
+| **Action** | Interact with systems to *do* something | Send an email/text, update a CRM record, hand a ticket off to a human |
+| **Orchestration** | Other **agents used as tools** (see the Manager pattern, Lecture 04) | Refund agent, research agent, writing agent |
 
-Some tools are **dangerous** (delete files, send emails, execute shell commands). Add **confirmation gates**.
+</div>
 
 ```python
-DANGEROUS_TOOLS = {"delete_file", "send_email", "execute_shell", "git_push"}
+from agents import Agent, WebSearchTool, function_tool
 
-def run_agent_with_confirmation(user_message: str) -> str:
-    messages = [{"role": "user", "content": user_message}]
+@function_tool
+def save_results(output):
+    db.insert({"output": output, "timestamp": datetime.time()})
+    return "File saved"
 
-    while True:
-        response = client.messages.create(
-            model="your-agent-model-id",
-            max_tokens=2048,
-            tools=all_tools,
-            messages=messages
-        )
-
-        messages.append({"role": "assistant", "content": response.content})
-
-        if response.stop_reason == "end_turn":
-            return next(b.text for b in response.content if hasattr(b, "text"))
-
-        elif response.stop_reason == "tool_use":
-            tool_results = []
-
-            for block in response.content:
-                if block.type != "tool_use":
-                    continue
-
-                # Human-in-the-loop for dangerous operations
-                if block.name in DANGEROUS_TOOLS:
-                    print(f"\n⚠️  Agent wants to call: {block.name}")
-                    print(f"   Input: {json.dumps(block.input, indent=2)}")
-                    confirm = input("   Allow? (y/n): ").strip().lower()
-
-                    if confirm != "y":
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": "User denied this action.",
-                            "is_error": True
-                        })
-                        continue
-
-                result = safe_tool_call(block.name, block.input, block.id)
-                tool_results.append(result)
-
-            messages.append({"role": "user", "content": tool_results})
-```
-
----
-
-## 7. Tool Use with `tool_choice`
-
-Force or restrict which tools the model uses:
-
-```python
-# Force the model to use a specific tool
-response = client.messages.create(
-    model="your-agent-model-id",
-    max_tokens=512,
-    tools=tools,
-    tool_choice={"type": "tool", "name": "get_gpu_specs"},  # must call this
-    messages=[{"role": "user", "content": "Tell me about the H100."}]
+search_agent = Agent(
+    name="Search agent",
+    instructions="Help the user search the internet and save results if asked.",
+    tools=[WebSearchTool(), save_results],
 )
+```
 
-# Allow any tool (default)
-tool_choice={"type": "auto"}
+As the number of required tools grows, **consider splitting tasks across multiple agents** (Lecture 04, Orchestration).
 
-# Prevent any tool use
-tool_choice={"type": "none"}
+---
+
+## 6. Configuring instructions
+
+High-quality **instructions** are essential for any LLM app and *especially* critical for agents: clear instructions reduce ambiguity, improve decision-making, and produce smoother execution with fewer errors.
+
+**Best practices for agent instructions:**
+
+<div class="lecture-map" markdown>
+
+| Practice | Why |
+|----------|-----|
+| **Use existing documents** | Turn SOPs, support scripts, and policy docs into LLM-friendly **routines**. In customer service, routines roughly map to individual knowledge-base articles. |
+| **Prompt agents to break down tasks** | Smaller, clearer steps from dense resources minimize ambiguity and help the model follow along. |
+| **Define clear actions** | Every step should map to a specific action or output (ask for the order number; call an API). Being explicit — even about the wording of a user-facing message — leaves less room for misinterpretation. |
+| **Capture edge cases** | Real interactions create decision points (incomplete info, unexpected questions). Anticipate common variations with conditional steps and branches. |
+
+</div>
+
+A practical accelerator: use an advanced model to **auto-generate instructions from existing documents**, e.g.:
+
+```text
+You are an expert in writing instructions for an LLM agent. Convert the following
+help-center document into a clear, unambiguous, numbered set of instructions,
+written as directions for an agent. The document to convert is: {{help_center_doc}}
 ```
 
 ---
 
-## Key Takeaways
+## Key takeaways
 
-1. The tool loop: call API → check `stop_reason` → execute tools → append results → repeat
-2. Send **all** tool results in one message — never split them
-3. Use `is_error: True` for failures; the model will try to recover
-4. Parallel tool calls are automatic — your code must handle multiple blocks per response
-5. Gate dangerous operations with human-in-the-loop confirmation
-6. `tool_choice` forces or prevents tool use — useful for structured extraction workflows
+* An **agent independently executes a multi-step workflow** using an LLM to drive control flow plus tools — not just a wrapped model call.
+* Build an agent when the workflow needs **nuanced judgment, has unwieldy rules, or leans on unstructured data**; otherwise prefer a deterministic solution.
+* Every agent = **model + tools + instructions**. Baseline with the strongest model, then optimize down; give it **standardized data / action / orchestration tools**; and write **explicit, routine-based instructions that capture edge cases**.
 
 ---
 
-## Exercises
+## Self-check
 
-1. Build a weather + calculator dual-tool agent. Test it with a query that requires both tools in one response.
-2. Add retry logic to `safe_tool_call` — retry up to 3 times with exponential backoff on network errors.
-3. Implement a `max_tool_calls` safety limit that stops the agent after N tool calls to prevent infinite loops.
+1. Give two examples of LLM applications that are **not** agents, and say what they're missing.
+2. Your team wants to automate refund approvals that currently need a human to weigh exceptions. Is this a good agent candidate? Which of the three "when to build" signals applies?
+3. Why prototype with the most capable model first, then swap smaller models in — rather than starting small?
+4. Classify each as a data / action / orchestration tool: `read_pdf`, `send_email`, `research_agent.as_tool()`.
+5. What is the risk of vague instructions for an agent specifically (vs a single-turn chatbot)?
 
 ---
 
-**Previous:** [Lecture 02](Lecture-02.md) | **Next:** [Lecture 04 — Agent Architecture Patterns](Lecture-04.md)
+## References
+
+* OpenAI — *A Practical Guide to Building Agents* (the framework this lecture follows: agent definition, when-to-build criteria, model / tools / instructions).
+* Cross-reference: [Lecture 08 — Tool Use & Function Calling](Lecture-08.md) · [Lecture 17 — Agent SDKs and Runtime APIs](Lecture-17.md) · [Lecture 04 — Orchestration & Guardrails](Lecture-04.md)
+
+---
+
+*Next: [Lecture 04](Lecture-04.md)*

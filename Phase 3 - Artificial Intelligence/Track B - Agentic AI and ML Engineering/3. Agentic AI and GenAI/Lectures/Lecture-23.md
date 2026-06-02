@@ -1,1310 +1,617 @@
-# Lecture 23 - OpenClaw Case Study: Gateway RPC Protocol
+# Lecture 23 — Evaluation & Observability
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 22](Lecture-22.md) | **Next:** [Lecture 24](Lecture-24.md)
-
----
-
-Lecture 22 explained the App SDK from the outside.
-
-This lecture goes one layer lower:
-
-```text
-App SDK / CLI / UI / node
-  -> Gateway WebSocket RPC
-  -> OpenClaw control plane
-```
-
-The Gateway RPC is the **stable protocol boundary** that lets clients, SDKs, automation, and nodes talk to OpenClaw without scraping private runtime internals.
-
-The core idea:
-
-> a production agent system needs a typed, authenticated, scope-gated control plane, not random ad-hoc HTTP endpoints and terminal output parsing
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 22](Lecture-22.md) | **Next:** [Lecture 24](Lecture-24.md)
 
 ---
 
-## Learning objectives
+## Learning Objectives
 
-By the end of this lecture, you should be able to:
+By the end of this lecture you will be able to:
 
-1. Explain the Gateway RPC frame model: `req`, `res`, and `event`.
-2. Describe the connect handshake and `hello-ok` response.
-3. Understand roles, scopes, and method-level access control.
-4. Explain device pairing, device tokens, and node authentication.
-5. Understand why feature discovery lives in `hello-ok.features`.
-6. Explain broadcast scoping and per-client event ordering.
-7. Describe why side-effecting methods need idempotency keys.
-8. Understand shared-secret auth, trusted-proxy auth, private-ingress mode, and device-token reconnect behavior.
-9. Design a new RPC method without leaking secrets or bypassing policy.
+1. Score LLM outputs for correctness and quality using an LLM-as-judge pattern.
+2. Compute RAGAS metrics (faithfulness, answer relevancy, context precision, context recall) on a RAG system.
+3. Trace LLM calls with LangSmith and understand what to log.
+4. Build a cost-tracking decorator that accumulates token spend per session.
+5. Log every LLM call with full input/output/token/latency details.
+6. Construct an evaluation dataset from production traffic and run A/B prompt tests.
 
 ---
 
-## 1. What the Gateway RPC is
+## 1. LLM-as-Judge
 
-The Gateway RPC is a **WebSocket-based control plane**.
+The **"LLM-as-judge"** pattern uses a capable LLM to evaluate the output of another LLM call. It is **cheaper and faster than human annotation** while correlating well with human judgment for well-designed rubrics.
 
-It is used by:
+```python
+# pip install openai
 
-- CLI clients
-- desktop apps
-- web UIs
-- automation tools
-- App SDK clients
-- companion nodes
-- headless node hosts
+import os
+import json
+from openai import OpenAI
 
-It carries:
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "sk-fake"))
 
-- request/response RPC calls
-- agent and tool events
-- node transport frames
-- presence updates
-- pairing state
-- diagnostics
-- admin operations
+JUDGE_PROMPT = """You are an expert evaluator. Score the answer on the following rubric.
+Return a JSON object with keys: score (0-5), reasoning (one sentence).
 
-In simple terms:
+Rubric:
+  5 = Completely correct, well-cited, nothing to add.
+  4 = Correct but missing minor details.
+  3 = Partially correct with one factual error.
+  2 = Mostly wrong or misleading.
+  1 = Completely wrong.
+  0 = Refused to answer or empty.
 
-```text
-Gateway RPC = OpenClaw's command bus
-```
+Question: {question}
+Reference Answer: {reference}
+Model Answer: {answer}
+"""
 
-It is not just a chat stream.
+def judge_answer(question: str, reference: str, answer: str) -> dict:
+    prompt = JUDGE_PROMPT.format(
+        question=question, reference=reference, answer=answer
+    )
+    response = client.chat.completions.create(
+        model=os.environ.get("OPENAI_JUDGE_MODEL", "your-judge-model-id"),
+        messages=[{"role": "user", "content": prompt}],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+    return json.loads(response.choices[0].message.content)
 
-It is the **control plane for the whole runtime**.
 
----
-
-## 2. The frame model
-
-Gateway RPC uses WebSocket text frames containing JSON.
-
-There are three core frame shapes.
-
-### Request
-
-```json
-{
-  "type": "req",
-  "id": "req-123",
-  "method": "agents.list",
-  "params": {}
-}
-```
-
-### Response
-
-```json
-{
-  "type": "res",
-  "id": "req-123",
-  "ok": true,
-  "payload": {
-    "agents": []
-  }
-}
-```
-
-Error response:
-
-```json
-{
-  "type": "res",
-  "id": "req-123",
-  "ok": false,
-  "error": {
-    "type": "FORBIDDEN",
-    "message": "Missing required scope"
-  }
-}
-```
-
-### Event
-
-```json
-{
-  "type": "event",
-  "event": "agent.delta",
-  "payload": {},
-  "seq": 42,
-  "stateVersion": 7
-}
-```
-
-Mental model:
-
-```text
-req/res = ask the Gateway to do or return something
-event   = Gateway tells you something happened
-```
-
----
-
-## 3. Why WebSocket instead of plain REST
-
-REST works well for **simple request/response APIs**.
-
-Agent systems need more:
-
-- live assistant deltas
-- tool progress
-- approval requests
-- node presence
-- pairing events
-- stream lifecycle events
-- reconnect behavior
-- per-client event filtering
-
-WebSocket gives OpenClaw one **long-lived bidirectional channel**:
-
-```text
-client -> Gateway: requests
-Gateway -> client: responses and events
-node -> Gateway: capabilities and command results
-Gateway -> node: node.invoke commands
-```
-
-This is why the Gateway can serve both:
-
-- operator clients
-- node transports
-
-on the same protocol family.
-
----
-
-## 4. Connect handshake
-
-The first frame must be a **connect request**.
-
-Example shape:
-
-```json
-{
-  "type": "req",
-  "id": "connect-1",
-  "method": "connect",
-  "params": {
-    "minProtocol": 3,
-    "maxProtocol": 3,
-    "client": {
-      "id": "cli",
-      "version": "1.2.3",
-      "platform": "macos",
-      "mode": "operator"
+# Example evaluation
+test_cases = [
+    {
+        "question": "What is the memory bandwidth of the H100 SXM5?",
+        "reference": "3.35 TB/s using HBM3 memory.",
+        "answer": "The H100 SXM5 provides approximately 3.35 terabytes per second of memory bandwidth via HBM3.",
     },
-    "role": "operator",
-    "scopes": ["operator.read", "operator.write"],
-    "auth": {
-      "token": "..."
+    {
+        "question": "What is the memory bandwidth of the H100 SXM5?",
+        "reference": "3.35 TB/s using HBM3 memory.",
+        "answer": "The H100 SXM5 has 2 TB/s memory bandwidth.",  # wrong
     },
-    "device": {
-      "id": "device_fp",
-      "publicKey": "...",
-      "signature": "...",
-      "signedAt": 1737264000,
-      "nonce": "..."
-    }
-  }
+]
+
+for tc in test_cases:
+    result = judge_answer(tc["question"], tc["reference"], tc["answer"])
+    print(f"Score: {result['score']}/5 — {result['reasoning']}")
+    print(f"Answer was: '{tc['answer'][:60]}...'")
+    print()
+```
+
+### 1.1 Batch Evaluation
+
+```python
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def batch_evaluate(test_cases: list[dict], max_workers: int = 4) -> list[dict]:
+    """Evaluate multiple test cases in parallel."""
+    results = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(judge_answer, tc["question"], tc["reference"], tc["answer"]): tc
+            for tc in test_cases
+        }
+        for future in as_completed(futures):
+            tc = futures[future]
+            result = future.result()
+            results.append({**tc, **result})
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    avg = sum(r["score"] for r in results) / len(results)
+    print(f"\nMean score: {avg:.2f}/5.0 over {len(results)} cases")
+    return results
+```
+
+---
+
+## 2. RAGAS Metrics
+
+**RAGAS** (Retrieval Augmented Generation Assessment) defines **four complementary metrics** for RAG systems. All are computed without needing ground-truth answers for the first two.
+
+```python
+# pip install ragas langchain-openai datasets
+
+import os
+from datasets import Dataset
+from ragas import evaluate
+from ragas.metrics import (
+    faithfulness,
+    answer_relevancy,
+    context_precision,
+    context_recall,
+)
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+
+# Prepare evaluation data
+# Each row: question, answer (from RAG), contexts (list of retrieved chunks), ground_truth
+eval_data = {
+    "question": [
+        "What is the H100 memory bandwidth?",
+        "What does HBM3 stand for?",
+        "How does NVLink 4.0 compare to NVLink 3.0?",
+    ],
+    "answer": [
+        "The H100 SXM5 delivers 3.35 TB/s of memory bandwidth using HBM3.",
+        "HBM3 stands for High Bandwidth Memory generation 3.",
+        "NVLink 4.0 provides 900 GB/s bidirectional bandwidth, double NVLink 3.0's 600 GB/s.",
+    ],
+    "contexts": [
+        ["H100 SXM5 uses HBM3 providing 3.35 TB/s bandwidth.", "The H100 PCIe offers 2 TB/s."],
+        ["HBM3 is the third generation of High Bandwidth Memory DRAM standard."],
+        ["NVLink 4.0 delivers 900 GB/s total bidirectional bandwidth.", "NVLink 3.0 provided 600 GB/s."],
+    ],
+    "ground_truth": [
+        "3.35 TB/s",
+        "High Bandwidth Memory generation 3",
+        "NVLink 4.0 doubles NVLink 3.0 bandwidth to 900 GB/s",
+    ],
 }
+
+dataset = Dataset.from_dict(eval_data)
+
+# Configure LLM and embeddings for RAGAS internal evaluation
+llm = ChatOpenAI(model=os.environ.get("OPENAI_EVAL_MODEL", "your-eval-model-id"), temperature=0)
+embeddings = OpenAIEmbeddings(model=os.environ.get("OPENAI_EMBEDDING_MODEL", "your-embedding-model-id"))
+
+results = evaluate(
+    dataset=dataset,
+    metrics=[faithfulness, answer_relevancy, context_precision, context_recall],
+    llm=llm,
+    embeddings=embeddings,
+)
+
+print("\nRAGAS Evaluation Results:")
+print(results.to_pandas().to_string(index=False))
 ```
 
-The important parts:
+### 2.1 Understanding Each Metric
 
-- protocol version range
-- client metadata
-- requested role
-- requested scopes
-- authentication material
-- device identity
-- signed nonce
-
-The **signed nonce** matters because the server needs to know the client controls the device key.
-
-Without nonce signing, a copied device ID would be **too easy to fake**.
-
----
-
-## 5. The `hello-ok` response
-
-A **successful handshake** returns `hello-ok`.
-
-Conceptually it contains:
-
-```text
-protocol version
-server metadata
-connection id
-auth outcome
-role
-granted scopes
-device token, if issued
-features.methods
-features.events
-policy limits
-snapshot state
-```
-
-Example shape:
-
-```json
-{
-  "type": "res",
-  "id": "connect-1",
-  "ok": true,
-  "payload": {
-    "type": "hello-ok",
-    "protocol": 3,
-    "server": {
-      "version": "x.y.z",
-      "connId": "conn-abc"
-    },
-    "auth": {
-      "role": "operator",
-      "scopes": ["operator.read", "operator.write"],
-      "deviceToken": "..."
-    },
-    "features": {
-      "methods": ["agents.list", "sessions.create", "agent.wait"],
-      "events": ["agent.delta", "session.updated"]
-    },
-    "policy": {
-      "tickIntervalMs": 30000,
-      "maxPayload": 1048576,
-      "maxBufferedBytes": 4194304
-    }
-  }
-}
-```
-
-The key lesson:
-
-> clients should trust `hello-ok.features`, not hard-code method availability
-
-This is the same principle from Lecture 22:
-
-```text
-feature detection beats version guessing
-```
-
----
-
-## 6. Startup unavailable state
-
-During startup, the Gateway **may not be ready**.
-
-It can return a retryable unavailable error such as:
-
-```json
-{
-  "type": "res",
-  "id": "connect-1",
-  "ok": false,
-  "error": {
-    "type": "UNAVAILABLE",
-    "reason": "startup-sidecars",
-    "retryable": true
-  }
-}
-```
-
-Client behavior:
-
-- do not crash permanently
-- back off
-- retry connection
-- surface "Gateway starting" in UI
-
-This is part of **deterministic startup behavior**.
-
----
-
-## 7. Roles
-
-The two main roles are:
-
-```text
-operator
-node
-```
-
-### Operator
-
-An operator is a **control-plane client**.
-
-Examples:
-
-- CLI
-- admin UI
-- macOS app in operator mode
-- App SDK automation
-- dashboard
-
-Operators ask the Gateway to:
-
-- list agents
-- create sessions
-- start runs
-- resolve approvals
-- inspect status
-- manage config if allowed
-
-### Node
-
-A node is a **capability host**.
-
-Examples:
-
-- macOS node mode
-- iOS companion device
-- Android companion device
-- headless node host
-
-Nodes expose capabilities such as:
-
-- `canvas.*`
-- `camera.*`
-- `screen.*`
-- `device.*`
-- `notifications.*`
-- `system.*`
-
-The important boundary:
-
-```text
-operator = controls Gateway
-node     = exposes device capability to Gateway
-```
-
-Nodes are **not gateways**.
-
----
-
-## 8. Scopes
-
-Roles say **what kind of client** this is.
-
-Scopes say **what that client is allowed to do**.
-
-Common operator scopes:
-
-| Scope | Meaning |
-|---|---|
-| `operator.read` | Read status, sessions, agents, events |
-| `operator.write` | Create or mutate normal runtime resources |
-| `operator.admin` | Admin operations such as config/update/exec policy |
-| `operator.approvals` | Approval management |
-| `operator.pairing` | Device and node pairing operations |
-| `operator.talk.secrets` | Secret-sensitive talk operations |
-
-Reserved admin prefixes should require admin-level access:
-
-```text
-config.*
-exec.approvals.*
-update.*
-```
-
-Good rule:
-
-> method-level access is the first gate, not the only gate
-
-Some methods add deeper checks.
-
-Example:
-
-```text
-config.get    -> read
-config.patch  -> admin
-node.invoke   -> role/scope check plus node command policy
-```
-
----
-
-## 9. Device identity and pairing
-
-Device identity exists so the Gateway can **recognize clients over time**.
-
-A connecting client may present:
-
-- device ID
-- public key
-- signature
-- timestamp
-- nonce
-
-If the device is not approved yet, the Gateway creates a pairing request.
-
-Operator flow:
-
-```bash
-openclaw devices list
-openclaw devices approve <requestId>
-openclaw devices reject <requestId>
-```
-
-Once approved, the Gateway can issue a device token.
-
-The client should **persist the device token** and reuse it for reconnects.
-
-Why this matters:
-
-```text
-shared password/token:
-  useful for bootstrap
-
-device token:
-  useful for durable least-privilege reconnects
-```
-
-Nodes should include a stable `device.id` derived from a keypair fingerprint.
-
-Gateway tokens are issued per:
-
-```text
-device + role + approved scope set
-```
-
-Pairing approvals are required for new device IDs unless a tightly scoped local auto-approval path is enabled.
-
-The safe default:
-
-```text
-new device ID
-  -> pairing request
-  -> operator approval
-  -> device token issuance
-```
-
-Pairing auto-approval should be centered on direct local loopback connects.
-
-Same-host tailnet or LAN connects should still be **treated as remote** unless explicitly trusted by configuration.
-
-There are a few device-less operator exceptions, but they should be narrow:
-
-- localhost-only insecure Control UI compatibility, if explicitly enabled
-- successful trusted-proxy operator Control UI auth
-- break-glass `dangerouslyDisableDeviceAuth`, which is a severe downgrade
-- direct-loopback backend RPCs authenticated with the shared Gateway token/password
-
-The rule:
-
-> if a client is not in a narrow explicit trust path, require device identity and pairing
-
----
-
-## 10. Device token lifecycle
-
-Device tokens are **first-class credentials**.
-
-The Gateway can rotate or revoke them:
-
-```text
-device.token.rotate
-device.token.revoke
-```
-
-Safe behavior:
-
-- non-admin callers can only manage their own device entries
-- pairing scope rules still apply
-- token rotation must not upgrade roles
-- token revocation should make future reconnect fail
-- token mutation cannot target a device role that pairing approval never granted
-- non-admin callers cannot rotate or revoke a broader operator token than they already hold
-
-This gives OpenClaw a **cleaner security model** than long-lived shared tokens everywhere.
-
-### Persisting device tokens
-
-After any successful connect, clients should persist the primary token:
-
-```text
-hello-ok.auth.deviceToken
-```
-
-On reconnect, the stored device token should reuse the approved scope set for that token.
-
-Why this matters:
-
-```text
-first connect:
-  approved scopes = operator.read + operator.write
-
-reconnect:
-  reuse stored device token
-  preserve approved read/write access
-```
-
-Bad reconnect behavior:
-
-```text
-client reconnects with stored token
-  -> silently collapses to narrower implicit scope
-  -> status/probe/read UI breaks
-```
-
-Good reconnect behavior:
-
-```text
-stored device token
-  -> approved role + scope set restored
-```
-
-If the caller supplies explicit scopes or an explicit device token, that caller-requested scope set stays authoritative.
-
-Cached scopes are only reused when the client is reusing the stored per-device token.
-
-### Rotation behavior
-
-`device.token.rotate` returns rotation metadata.
-
-It should echo the replacement bearer token only for same-device calls already authenticated with that device token.
-
-That lets token-only clients persist their replacement before reconnecting.
-
-Shared/admin rotations should not echo the bearer token.
-
-Why:
-
-```text
-same-device token rotation:
-  client needs the replacement token to keep working
-
-shared/admin rotation:
-  should not leak bearer tokens to broader control-plane clients
-```
-
----
-
-## 11. Auth paths
-
-Gateway auth may support multiple paths:
-
-- shared token
-- shared password
-- device token
-- bootstrap token
-- trusted proxy headers
-- private-ingress / none, only in intentionally private deployments
-
-### Shared-secret auth
-
-Shared-secret Gateway auth uses one of:
-
-```text
-connect.params.auth.token
-connect.params.auth.password
-```
-
-depending on configured auth mode.
-
-On the client side, password and token are not identical:
-
-```text
-auth.password:
-  orthogonal
-  forwarded when set
-
-auth.token:
-  selected by priority
-```
-
-Token selection priority:
-
-```text
-1. explicit shared token
-2. explicit deviceToken
-3. stored per-device token keyed by deviceId + role
-```
-
-Bootstrap token behavior:
-
-```text
-auth.bootstrapToken is sent only when no auth.token was resolved
-```
-
-That means a shared token or any resolved device token suppresses bootstrap auth.
-
-### Trusted proxy and private ingress
-
-Identity-bearing modes can satisfy connect auth from request headers rather than `connect.params.auth.*`.
-
-Examples:
-
-```text
-gateway.auth.allowTailscale = true
-gateway.auth.mode = "trusted-proxy"
-```
-
-These modes are for deployments where an **upstream layer already authenticates identity**.
-
-Private-ingress mode:
-
-```text
-gateway.auth.mode = "none"
-```
-
-skips shared-secret connect auth.
-
-Use it only behind trusted private ingress.
-
-Do not expose private-ingress mode on **public or untrusted networks**.
-
-### Bootstrap handoff tokens
-
-`hello-ok.auth.deviceTokens` can contain additional bootstrap handoff tokens.
-
-Persist them only when the connection used bootstrap auth on a trusted transport such as:
-
-```text
-wss:// with appropriate trust
-loopback / local pairing path
-```
-
-Do not blindly persist handoff tokens from an **untrusted public connection**.
-
-The client should handle auth failures with recovery logic.
-
-Useful error hints include:
-
-```text
-canRetryWithDeviceToken
-recommendedNextStep
-nonce/signature diagnostic code
-```
-
-Practical client behavior:
-
-```text
-auth failed
-  -> check whether device token exists
-  -> retry if server suggests it
-  -> otherwise show pairing/login guidance
-```
-
-### `AUTH_TOKEN_MISMATCH`
-
-For `AUTH_TOKEN_MISMATCH`, trusted clients may attempt one bounded retry with a cached per-device token.
-
-Trusted means:
-
-```text
-loopback
-or
-wss:// with pinned tlsFingerprint
-```
-
-Public `wss://` without pinning **does not qualify** for automatic token promotion.
-
-If the retry fails:
-
-```text
-stop automatic reconnect loop
-surface operator action guidance
-```
-
-Do not spin forever with **bad credentials**.
-
-Recovery hints may include:
-
-| Field | Purpose |
-|---|---|
-| `error.details.code` | Stable machine-readable auth failure code |
-| `error.details.canRetryWithDeviceToken` | Whether a device-token retry may help |
-| `error.details.recommendedNextStep` | Suggested client/operator action |
-
-Example recommended next steps:
-
-```text
-retry_with_device_token
-update_auth_configuration
-update_auth_credentials
-wait_then_retry
-review_auth_configuration
-```
-
----
-
-## 12. Device auth migration diagnostics
-
-All connections should **sign the server-provided** `connect.challenge` nonce.
-
-Legacy clients may still use pre-challenge signing behavior.
-
-For those clients, Gateway auth should return stable `DEVICE_AUTH_*` detail codes.
-
-| Message | details.code | details.reason | Meaning |
+| Metric | Measures | Range | Formula |
 |---|---|---|---|
-| device nonce required | `DEVICE_AUTH_NONCE_REQUIRED` | `device-nonce-missing` | Client omitted `device.nonce` or sent it blank |
-| device nonce mismatch | `DEVICE_AUTH_NONCE_MISMATCH` | `device-nonce-mismatch` | Client signed with stale or wrong nonce |
-| device signature invalid | `DEVICE_AUTH_SIGNATURE_INVALID` | `device-signature` | Signature payload does not match expected payload |
-| device signature expired | `DEVICE_AUTH_SIGNATURE_EXPIRED` | `device-signature-stale` | Signed timestamp is outside allowed skew |
-| device identity mismatch | `DEVICE_AUTH_DEVICE_ID_MISMATCH` | `device-id-mismatch` | `device.id` does not match public key fingerprint |
-| device public key invalid | `DEVICE_AUTH_PUBLIC_KEY_INVALID` | `device-public-key` | Public key format or canonicalization failed |
+| **Faithfulness** | Is the answer factually grounded in the retrieved context? | 0–1 | claims in context / total claims |
+| **Answer Relevancy** | Does the answer address the question? | 0–1 | cosine sim of regenerated questions |
+| **Context Precision** | Are retrieved chunks relevant (precision)? | 0–1 | relevant chunks / total retrieved |
+| **Context Recall** | Are all ground-truth facts covered by context? | 0–1 | facts in context / total facts |
 
-Migration target:
+```python
+# Manual faithfulness calculation (illustrative)
+import re
 
-```text
-1. wait for connect.challenge
-2. sign the payload that includes the server nonce
-3. send the same nonce in connect.params.device.nonce
+def compute_faithfulness_manual(answer: str, context: str, llm) -> float:
+    """Decompose answer into claims and check each against context."""
+
+    # Step 1: extract claims from the answer
+    claims_prompt = f"List every factual claim in this answer as a JSON array of strings:\n{answer}"
+    claims_response = llm.invoke(claims_prompt).content
+    try:
+        claims = json.loads(claims_response)
+    except Exception:
+        claims = [answer]  # fallback
+
+    if not claims:
+        return 1.0
+
+    # Step 2: verify each claim against context
+    supported = 0
+    for claim in claims:
+        verify_prompt = (
+            f"Context: {context}\n\n"
+            f"Claim: {claim}\n\n"
+            "Is this claim supported by the context? Reply only YES or NO."
+        )
+        verdict = llm.invoke(verify_prompt).content.strip().upper()
+        if verdict.startswith("YES"):
+            supported += 1
+
+    return supported / len(claims)
 ```
-
-Preferred signing payload:
-
-```text
-v3 signature payload
-  binds platform
-  binds deviceFamily
-  binds device/client/role/scopes/token/nonce fields
-```
-
-Legacy v2 signatures may remain accepted for compatibility, but paired-device metadata should still control command policy on reconnect.
 
 ---
 
-## 13. TLS and pinning
+## 3. Tracing with LangSmith
 
-Gateway WebSocket connections can use **TLS**.
+**LangSmith** records every LangChain invocation with full **input/output, timing, and token counts**. When no API key is available, we can mock the tracing interface.
 
-Clients may optionally **pin the Gateway certificate fingerprint**.
+```python
+# With a real LangSmith account:
+# export LANGCHAIN_TRACING_V2=true
+# export LANGCHAIN_API_KEY=ls__...
+# export LANGCHAIN_PROJECT=my-rag-project
+# All subsequent LangChain calls are automatically traced.
 
-Relevant configuration/CLI concepts:
+import os
 
-```text
-gateway.tls
-gateway.remote.tlsFingerprint
---tls-fingerprint
+def setup_tracing(project_name: str = "rag-evaluation"):
+    """Configure LangSmith tracing if credentials are available."""
+    api_key = os.environ.get("LANGCHAIN_API_KEY")
+    if api_key:
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
+        os.environ["LANGCHAIN_PROJECT"] = project_name
+        print(f"LangSmith tracing enabled → project: {project_name}")
+    else:
+        print("LANGCHAIN_API_KEY not set — tracing disabled (running locally)")
+
+setup_tracing()
 ```
 
-Pinning matters because it upgrades "encrypted connection" into "I know exactly which Gateway certificate I expected."
+### 3.1 Manual Run Logging (Mock)
 
-This is why automatic stored-device-token promotion should be limited to:
+When LangSmith is not available, log runs to a **local JSONL file**:
 
-```text
-loopback
-or
-wss:// with pinned fingerprint
+```python
+import json
+import time
+import uuid
+from pathlib import Path
+from functools import wraps
+from typing import Any, Callable
+
+TRACE_FILE = Path("./traces.jsonl")
+
+def trace_llm_call(run_name: str):
+    """Decorator that logs LLM calls to a local JSONL trace file."""
+    def decorator(fn: Callable) -> Callable:
+        @wraps(fn)
+        def wrapper(*args, **kwargs) -> Any:
+            run_id = str(uuid.uuid4())[:8]
+            start = time.perf_counter()
+            error = None
+            result = None
+            try:
+                result = fn(*args, **kwargs)
+                return result
+            except Exception as e:
+                error = str(e)
+                raise
+            finally:
+                elapsed = time.perf_counter() - start
+                record = {
+                    "run_id": run_id,
+                    "name": run_name,
+                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "latency_s": round(elapsed, 4),
+                    "inputs": {"args": str(args)[:200], "kwargs": str(kwargs)[:200]},
+                    "output": str(result)[:500] if result is not None else None,
+                    "error": error,
+                }
+                with TRACE_FILE.open("a") as f:
+                    f.write(json.dumps(record) + "\n")
+        return wrapper
+    return decorator
+
+
+@trace_llm_call("summarize")
+def summarize(text: str) -> str:
+    # Mocked — replace with real LLM call
+    return f"Summary of: {text[:50]}..."
+
+summarize("The H100 GPU achieves 3.35 TB/s memory bandwidth using HBM3...")
+print(f"Trace written to {TRACE_FILE}")
 ```
-
-Without pinning, a public `wss://` endpoint is **encrypted but not trusted** enough for aggressive credential fallback.
 
 ---
 
-## 14. Feature discovery
+## 4. Cost Tracking
 
-`hello-ok.features` is the **discovery surface**.
+```python
+import os
+import time
+import uuid
+from dataclasses import dataclass, field
+from openai import OpenAI
 
-It advertises:
-
-```text
-methods
-events
-```
-
-The client should use this to decide whether to show UI.
-
-Example:
-
-```ts
-if (features.methods.includes("artifacts.list")) {
-  showArtifactsPanel();
-} else {
-  hideArtifactsPanel();
+# Example pricing per million tokens.
+# Do not use this table for billing decisions. Keep real prices in deployment
+# config and update them from the current provider pricing page.
+PRICING = {
+    "fast-model": {"input": 0.15, "output": 0.60},
+    "balanced-agent-model": {"input": 3.00, "output": 15.00},
+    "reasoning-model": {"input": 15.00, "output": 75.00},
+    "embedding-model": {"input": 0.02, "output": 0.0},
 }
-```
 
-Do not assume:
+@dataclass
+class CostTracker:
+    session_id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    total_cost_usd: float = 0.0
+    calls: list[dict] = field(default_factory=list)
 
-```text
-OpenClaw version x.y.z means method exists
-```
+    def record(self, model: str, input_tokens: int, output_tokens: int, latency_s: float):
+        pricing = PRICING.get(model, {"input": 0.0, "output": 0.0})
+        cost = (input_tokens * pricing["input"] + output_tokens * pricing["output"]) / 1_000_000
+        self.total_input_tokens += input_tokens
+        self.total_output_tokens += output_tokens
+        self.total_cost_usd += cost
+        self.calls.append({
+            "model": model,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "cost_usd": round(cost, 6),
+            "latency_s": round(latency_s, 4),
+        })
 
-Assume:
+    def summary(self) -> dict:
+        return {
+            "session_id": self.session_id,
+            "total_calls": len(self.calls),
+            "total_input_tokens": self.total_input_tokens,
+            "total_output_tokens": self.total_output_tokens,
+            "total_cost_usd": round(self.total_cost_usd, 6),
+        }
 
-```text
-method exists only if hello-ok advertises it
-```
 
-This makes clients safer across **version skew**.
+# Global tracker for the session
+tracker = CostTracker()
 
----
+def tracked_completion(messages: list[dict], model: str | None = None) -> str:
+    """OpenAI chat completion with automatic cost tracking."""
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "sk-fake"))
+    model = model or os.environ.get("OPENAI_MODEL", "your-model-id")
+    start = time.perf_counter()
+    response = client.chat.completions.create(
+        model=model, messages=messages, temperature=0
+    )
+    elapsed = time.perf_counter() - start
+    usage = response.usage
+    tracker.record(model, usage.prompt_tokens, usage.completion_tokens, elapsed)
+    return response.choices[0].message.content
 
-## 15. Size limits and payload safety
 
-Before connect, frames are **capped tightly**.
-
-The provided summary describes a pre-connect cap of:
-
-```text
-64 KiB
-```
-
-After handshake, clients should honor:
-
-```text
-hello-ok.policy.maxPayload
-hello-ok.policy.maxBufferedBytes
-hello-ok.policy.tickIntervalMs
-```
-
-If a client sends oversized data, the Gateway can emit diagnostics such as:
-
-```text
-payload.large
-```
-
-Then it may drop or close the connection.
-
-Practical rule:
-
-> do not push large files, videos, or screenshots as arbitrary JSON frames
-
-Use:
-
-- artifact metadata
-- download handles
-- chunking
-- media attachments
-- explicit file APIs
-
----
-
-## 16. Events and broadcast scoping
-
-Events are **not broadcast blindly** to everyone.
-
-They are **scope-gated**.
-
-Examples:
-
-```text
-chat / agent / tool frames:
-  require operator.read
-
-plugin broadcasts:
-  default to operator.write or operator.admin depending on registration
-
-status / heartbeat / presence / tick:
-  generally not scope-restricted
-```
-
-The secure rule:
-
-> if a client should not see a session, run, task, artifact, approval, or secret-adjacent event, do not broadcast it to that client
-
-The Gateway also keeps ordering **monotonic per socket**.
-
-That means each client gets its own sequence view after filtering.
-
-This matters because scope filtering could otherwise make event ordering ambiguous.
-
----
-
-## 17. Common RPC families
-
-The Gateway has many **method families**.
-
-Think in **categories**.
-
-| Family | Examples | Purpose |
-|---|---|---|
-| System | `health`, `status`, `system-presence` | Liveness and runtime status |
-| Config | `config.get`, `config.patch`, `config.apply`, `config.schema` | Controlled configuration |
-| Update | `update.run`, `update.status` | Runtime update workflow |
-| Agents | `agents.list`, `agents.create`, `agents.update` | Agent management |
-| Sessions | `sessions.list`, `sessions.create`, `sessions.send`, `sessions.abort`, `sessions.compact` | Conversation state |
-| Chat | `chat.history`, `chat.send` | Chat-facing operations |
-| Runs | `agent.wait` | Wait for run lifecycle |
-| Models | `models.list` | Model catalog and picker support |
-| Usage | `usage.status`, `usage.cost` | Cost and usage reporting |
-| Channels | `channels.status`, `web.login.start`, `web.login.wait`, `channels.logout` | External message surfaces |
-| Nodes | `node.invoke`, `node.pair.*`, `node.pending.*` | Device and node transport |
-| Approvals | `exec.approval.request`, `exec.approval.list`, `exec.approval.resolve` | Human approval flow |
-| Automation | `cron.*`, `wake` | Scheduled and wake-based execution |
-| Skills | `skills.*` | Skill discovery and management |
-| Tools | `tools.catalog`, `tools.effective` | Tool visibility |
-
-You do not need to memorize every method.
-
-You need to understand the pattern:
-
-```text
-typed method
-  -> schema
-  -> scope gate
-  -> handler
-  -> discovery in hello-ok.features.methods
+# Demo
+# answer = tracked_completion([{"role": "user", "content": "What is HBM3?"}])
+# print(tracker.summary())
 ```
 
 ---
 
-## 18. Idempotency
+## 5. Structured LLM Call Logger
 
-Side-effecting methods need **idempotency keys**.
+```python
+import json
+import logging
+import time
+import uuid
+from pathlib import Path
+from openai import OpenAI
 
-Why?
+# Configure structured logging
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+logger = logging.getLogger("llm_logger")
+log_file = Path("llm_calls.jsonl")
 
-Because real clients retry.
+class LLMLogger:
+    """Logs every LLM call to both console and a JSONL file."""
 
-Bad behavior:
+    def __init__(self, model: str | None = None, log_path: Path = log_file):
+        self.client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "sk-fake"))
+        self.model = model or os.environ.get("OPENAI_MODEL", "your-model-id")
+        self.log_path = log_path
 
-```text
-mobile reconnects
-  -> repeats sessions.send
-  -> Gateway starts two runs
-```
+    def _write(self, record: dict):
+        self.log_path.open("a").write(json.dumps(record) + "\n")
+        # Brief console log
+        logger.info(
+            f"[LLM] call_id={record['call_id']} "
+            f"model={record['model']} "
+            f"tokens={record['usage']['total_tokens']} "
+            f"latency={record['latency_s']:.3f}s "
+            f"cost=${record['cost_usd']:.5f}"
+        )
 
-Good behavior:
+    def complete(self, messages: list[dict], **kwargs) -> str:
+        call_id = uuid.uuid4().hex[:8]
+        start = time.perf_counter()
+        response = self.client.chat.completions.create(
+            model=self.model, messages=messages, temperature=0, **kwargs
+        )
+        latency = time.perf_counter() - start
+        usage = response.usage
+        pricing = PRICING.get(self.model, {"input": 0.0, "output": 0.0})
+        cost = (
+            usage.prompt_tokens * pricing["input"]
+            + usage.completion_tokens * pricing["output"]
+        ) / 1_000_000
 
-```text
-mobile reconnects
-  -> repeats same request with same idempotency key
-  -> Gateway returns same accepted operation
-```
+        record = {
+            "call_id": call_id,
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "model": self.model,
+            "messages": [{"role": m["role"], "content": m["content"][:300]} for m in messages],
+            "response": response.choices[0].message.content[:500],
+            "usage": {
+                "prompt_tokens": usage.prompt_tokens,
+                "completion_tokens": usage.completion_tokens,
+                "total_tokens": usage.total_tokens,
+            },
+            "latency_s": round(latency, 4),
+            "cost_usd": round(cost, 6),
+        }
+        self._write(record)
+        return response.choices[0].message.content
 
-Methods that should use idempotency:
 
-- create session
-- send message
-- start run
-- cancel run
-- approve action
-- rotate token
-- invoke side-effecting node command
-- patch config
-- schedule cron job
-
-Idempotency is **not polish**.
-
-It is required for **reliable distributed clients**.
-
----
-
-## 19. TypeBox schemas and generated clients
-
-Gateway RPC shapes should be **schema-owned**.
-
-OpenClaw uses **TypeBox-style schemas** for canonical protocol shapes.
-
-The workflow:
-
-```text
-define schema
-  -> generate validators/types
-  -> register method handler
-  -> advertise method
-  -> update SDK wrapper
-  -> test client/server parity
-```
-
-Commands mentioned in the source material:
-
-```bash
-pnpm protocol:gen
-pnpm protocol:check
-```
-
-The engineering goal:
-
-> client and server should not silently disagree about method shapes
-
----
-
-## 20. Secret safety
-
-Diagnostics and discovery must **not leak secrets**.
-
-Do not expose:
-
-- raw chat bodies in diagnostic snapshots
-- webhook request bodies
-- tokens
-- cookies
-- secret values
-- raw authorization headers
-
-Expose summaries instead:
-
-```text
-capability: configured
-auth: token-present
-channel: connected
-lastSeenAtMs: 1737264000
-```
-
-This is a core rule for control planes:
-
-> observability is necessary, but raw secrets do not belong in status payloads
-
----
-
-## 21. Nodes over Gateway RPC
-
-Nodes connect to the same Gateway WebSocket protocol, but with:
-
-```json
-{ "role": "node" }
-```
-
-Nodes declare:
-
-- device ID
-- roles
-- scopes
-- capabilities
-- commands
-- permissions
-
-The Gateway treats these as **claims**.
-
-Claims are **not enough**.
-
-The Gateway still enforces server-side policy:
-
-```text
-node declared command
-  + gateway allowlist permits command
-  + caller has scope
-  + plugin policy permits command, if present
-  -> node.invoke allowed
-```
-
-Presence methods can expose:
-
-- `deviceId`
-- roles
-- scopes
-- `lastSeenAtMs`
-- reason
-- capabilities
-
-But again:
-
-> capability reporting should not expose secrets
-
----
-
-## 22. Model listing views
-
-Model listing is a useful example of **one method with multiple views**.
-
-`models.list` accepts a `view`.
-
-| View | Meaning |
-|---|---|
-| omitted / `default` | runtime-allowed catalog, respecting default model policy |
-| `configured` | picker-sized configured models |
-| `all` | full Gateway catalog for diagnostics |
-
-This is better than creating **three unrelated methods**.
-
-It gives clients a clear contract:
-
-```text
-normal UI:
-  default or configured
-
-diagnostics:
-  all
+# Usage
+# llm = LLMLogger()
+# answer = llm.complete([{"role": "user", "content": "Explain HBM3 in one sentence."}])
 ```
 
 ---
 
-## 23. Reconnect and timeouts
+## 6. Building an Evaluation Dataset from Production Traffic
 
-Clients need **predictable timeout behavior**.
+```python
+import json
+import random
+from pathlib import Path
+from datetime import datetime
 
-Typical values from the source material:
+TRACE_FILE = Path("./traces.jsonl")
+EVAL_DATASET_FILE = Path("./eval_dataset.json")
 
-```text
-per-RPC request timeout:
-  30,000 ms
 
-default tick interval before handshake:
-  30,000 ms
+def sample_production_traces(
+    trace_file: Path,
+    sample_size: int = 50,
+    min_response_length: int = 50,
+) -> list[dict]:
+    """Sample high-quality traces to build a labeled eval dataset."""
+    traces = []
+    if not trace_file.exists():
+        print(f"Trace file not found: {trace_file}")
+        return []
 
-reconnect backoff:
-  initial 1s
-  max 30s
+    with trace_file.open() as f:
+        for line in f:
+            try:
+                record = json.loads(line)
+                if (
+                    record.get("output")
+                    and len(record["output"]) >= min_response_length
+                    and not record.get("error")
+                ):
+                    traces.append(record)
+            except json.JSONDecodeError:
+                continue
+
+    sample = random.sample(traces, min(sample_size, len(traces)))
+    print(f"Sampled {len(sample)} traces from {len(traces)} total")
+    return sample
+
+
+def build_eval_dataset(traces: list[dict]) -> list[dict]:
+    """
+    Convert production traces into evaluation examples.
+    In production: send these to human annotators for labeling.
+    Here: auto-generate placeholder labels.
+    """
+    dataset = []
+    for trace in traces:
+        dataset.append({
+            "id": trace.get("run_id", "unknown"),
+            "question": _extract_question(trace),
+            "answer": trace.get("output", ""),
+            "label": None,       # to be filled by human annotator
+            "score": None,       # to be filled by judge
+            "sampled_at": datetime.utcnow().isoformat(),
+        })
+    EVAL_DATASET_FILE.write_text(json.dumps(dataset, indent=2))
+    print(f"Saved {len(dataset)} eval examples → {EVAL_DATASET_FILE}")
+    return dataset
+
+
+def _extract_question(trace: dict) -> str:
+    """Pull the user question from a trace record."""
+    inputs = trace.get("inputs", {})
+    if isinstance(inputs, dict):
+        for key in ("question", "query", "input", "user_message"):
+            if key in inputs:
+                return inputs[key]
+    return str(inputs)[:200]
 ```
-
-After handshake, use the server policy:
-
-```text
-hello-ok.policy.tickIntervalMs
-```
-
-Client behavior:
-
-- do not busy-loop reconnects
-- back off
-- reset faster only when the protocol says it is safe
-- treat protocol mismatch as hard failure
-- treat startup unavailable as retryable
-- stop automatic reconnect loops after a failed bounded device-token retry
 
 ---
 
-## 24. Extending the RPC surface
+## 7. A/B Testing Prompts
 
-When adding a new method, use this **checklist**.
+```python
+import hashlib
+import random
+from typing import Callable
 
-### 1. Define the method purpose
+PROMPT_A = """Answer the following question concisely using only facts from the context.
+Context: {context}
+Question: {question}"""
 
-Bad:
+PROMPT_B = """You are a precise technical assistant. Using ONLY the provided context,
+answer the question. If unsure, say "I don't know."
+Context: {context}
+Question: {question}"""
 
-```text
-platform.doEverything
+
+def ab_router(user_id: str, variants: list[str], weights: list[float] | None = None) -> str:
+    """
+    Deterministically assign a user to a prompt variant using their ID hash.
+    Same user always gets the same variant (sticky assignment).
+    """
+    if weights:
+        # Weighted random assignment (not deterministic, for gradual rollout)
+        return random.choices(variants, weights=weights)[0]
+
+    # Deterministic: hash user_id to choose variant
+    hash_int = int(hashlib.md5(user_id.encode()).hexdigest(), 16)
+    return variants[hash_int % len(variants)]
+
+
+class PromptABTest:
+    def __init__(self, variant_a: str, variant_b: str):
+        self.variants = {"A": variant_a, "B": variant_b}
+        self.results: dict[str, list[float]] = {"A": [], "B": []}
+
+    def run(self, user_id: str, context: str, question: str, judge_fn: Callable) -> dict:
+        variant_key = ab_router(user_id, ["A", "B"])
+        prompt = self.variants[variant_key].format(context=context, question=question)
+
+        # Generate answer (mock here)
+        answer = f"[Variant {variant_key}] Answer about: {question[:40]}..."
+
+        # Score the answer
+        score = judge_fn(question=question, reference="ground truth placeholder", answer=answer)
+        self.results[variant_key].append(score["score"])
+
+        return {"variant": variant_key, "answer": answer, "score": score["score"]}
+
+    def report(self) -> dict:
+        report = {}
+        for key, scores in self.results.items():
+            if scores:
+                report[key] = {
+                    "n": len(scores),
+                    "mean_score": round(sum(scores) / len(scores), 2),
+                    "min": min(scores),
+                    "max": max(scores),
+                }
+        winner = max(report, key=lambda k: report[k]["mean_score"]) if report else None
+        return {"variants": report, "winner": winner}
+
+
+# Demo
+# ab = PromptABTest(PROMPT_A, PROMPT_B)
+# for i in range(20):
+#     ab.run(f"user_{i}", context="H100 has 3.35 TB/s bandwidth.", question="H100 bandwidth?", judge_fn=judge_answer)
+# print(ab.report())
 ```
-
-Good:
-
-```text
-artifacts.list
-artifacts.get
-artifacts.download
-```
-
-Keep the method **narrow**.
-
-### 2. Add schema
-
-Define request and response shapes with TypeBox.
-
-### 3. Add scope gate
-
-Examples:
-
-```text
-read-only discovery:
-  operator.read
-
-mutation:
-  operator.write
-
-admin:
-  operator.admin
-
-pairing:
-  operator.pairing
-```
-
-### 4. Add idempotency if side-effecting
-
-If retrying the request could duplicate work, require an idempotency key.
-
-### 5. Advertise in `hello-ok.features.methods`
-
-Clients should discover the method, not guess it.
-
-### 6. Add events if needed
-
-Scope-gate event families too.
-
-### 7. Protect secrets
-
-Never include raw secret values in status, diagnostics, or discovery.
-
-### 8. Add SDK wrappers and generated native models
-
-The public API is **not complete** until clients can use it safely.
 
 ---
 
-## 25. Gateway protocol versus App SDK
+## Key Takeaways
 
-Lecture 22 focused on:
-
-```text
-App SDK
-  oc.agents
-  oc.sessions
-  oc.runs
-  oc.models
-  oc.approvals
-```
-
-This lecture focused on:
-
-```text
-Gateway RPC
-  req/res/event frames
-  handshake
-  scopes
-  pairing
-  features
-  policy limits
-  node transport
-```
-
-Relationship:
-
-```text
-Gateway protocol = wire contract
-App SDK          = developer-friendly wrapper
-```
-
-App authors should normally use the **SDK**.
-
-SDK authors and platform engineers must understand the **Gateway protocol**.
+- **LLM-as-judge** scales evaluation to thousands of examples quickly. Use a rubric with clear integer scores (0-5) and require JSON output for reliable parsing.
+- **RAGAS** gives you four orthogonal RAG metrics. Faithfulness catches hallucinations; context recall diagnoses retrieval gaps.
+- **LangSmith** tracing is zero-code with environment variables set. Always trace in staging even if not in production.
+- **Cost tracking** should accumulate per-session and log per-call. Early visibility on costs prevents budget surprises.
+- **Structured call logging** (JSONL) is your flight recorder — essential for debugging failures and building eval datasets.
+- **A/B testing** with sticky user assignment ensures reproducible experiments. Always run for a statistically meaningful number of samples before declaring a winner.
 
 ---
 
-## 26. Design exercise
+## Exercises
 
-Design a new RPC family:
+### Exercise 1 — Multi-Criteria Judge
 
-```text
-artifacts.*
-```
+Extend the LLM-as-judge to evaluate on three separate criteria: (1) factual accuracy, (2) completeness, and (3) conciseness. Each criterion should return a score of 0–5 with a one-sentence justification. Build a `MultiCriteriaJudge` class that averages the three scores and returns a combined verdict. Test it on at least 5 question-answer pairs from a domain you know well.
 
-Answer:
+### Exercise 2 — RAGAS on Your Own Data
 
-1. Which methods should exist?
-2. Which methods are read-only?
-3. Which scopes are required?
-4. Do any methods need idempotency keys?
-5. Which event family should announce artifact changes?
-6. How should large files avoid `maxPayload` violations?
-7. What should appear in `hello-ok.features.methods`?
-8. What must never appear in diagnostics?
+Create a small corpus of 5–10 documents on any technical topic you choose. Write 5 test questions with known ground-truth answers. Build a simple RAG system (from Lecture 11/10), run it on all 5 questions, and evaluate using RAGAS. Report all four metric scores in a table. For any metric below 0.7, identify one concrete change to the RAG system that would improve it.
 
-Then repeat the same design for:
+### Exercise 3 — Cost Dashboard
 
-```text
-environments.*
-```
-
-Compare the difference between discovery-only APIs and mutation APIs.
+Build a `CostDashboard` class that reads from the JSONL log file produced by `LLMLogger` and renders a summary report. The report should include: total spend, spend by model, average cost per call, top 5 most expensive calls (with their inputs), and a call count time series grouped by hour. The report should be printable as a formatted text table.
 
 ---
 
-## Key takeaways
-
-- Gateway RPC is OpenClaw's WebSocket control plane and node transport.
-- The wire model is small: `req`, `res`, and `event`.
-- The connect handshake negotiates protocol, role, scopes, features, and policy.
-- `hello-ok.features.methods` and `hello-ok.features.events` are the discovery surface.
-- Roles identify the client type; scopes authorize specific actions.
-- Device pairing and device tokens make durable authenticated clients possible.
-- Broadcasts must be scope-gated and ordered per client socket.
-- Side-effecting methods need idempotency keys.
-- TypeBox schemas keep client and server protocol shapes aligned.
-- Diagnostics must summarize state without leaking secrets.
-- Nodes are capability hosts over the same Gateway protocol, not separate gateways.
-- The App SDK wraps this protocol; it should not replace the protocol contract.
-
----
-
-## References
-
-- OpenClaw Gateway protocol: [https://openclaw.knidal.com/gateway-protocol](https://openclaw.knidal.com/gateway-protocol)
-- OpenClaw App SDK: [https://openclaw.knidal.com/openclaw-app-sdk](https://openclaw.knidal.com/openclaw-app-sdk)
-- OpenClaw Nodes: [https://openclaw.knidal.com/nodes](https://openclaw.knidal.com/nodes)
-- OpenClaw Tools Invoke API: [https://openclaw.knidal.com/tools-invoke-api](https://openclaw.knidal.com/tools-invoke-api)
-- Case-study source repo: [OpenClaw](https://github.com/openclaw/openclaw)
-
----
-
-*Next: [Lecture 24 - What Is an AI Agent Harness? The Runtime Around the Model](Lecture-24.md)*
+*Next: [Lecture 24](Lecture-24.md)*

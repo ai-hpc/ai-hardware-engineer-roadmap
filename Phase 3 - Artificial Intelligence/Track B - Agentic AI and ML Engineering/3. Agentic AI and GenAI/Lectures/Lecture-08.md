@@ -1,360 +1,387 @@
-# Lecture 08 — Multi-Agent Systems
+# Lecture 08 — Tool Use & Function Calling
 
-**Track B · Agentic AI & GenAI** | [← Lecture 07](Lecture-07.md) | [Next →](Lecture-09.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 07](Lecture-07.md) | **Next:** [Lecture 09](Lecture-09.md)
 
 ---
 
 ## Learning Objectives
 
-- Design multi-agent topologies (supervisor, pipeline, peer-to-peer)
-- Implement an agent-to-agent communication protocol
-- Use CrewAI for role-based agent teams
-- Prevent coordination failures and infinite loops
+- Define tools with precise schemas that minimize hallucination
+- Implement the tool-use loop correctly (the core of every agent)
+- Handle tool errors gracefully
+- Use parallel tool calls to reduce latency
+- Understand safety boundaries for dangerous tools
 
 ---
 
-## 1. Multi-Agent Topologies
+## 1. What Is Tool Use?
 
-| Topology | Pattern | Best for |
-|----------|---------|----------|
-| **Supervisor** | One orchestrator routes tasks to specialist workers | Complex tasks with clear sub-roles |
-| **Pipeline** | Agent A → Agent B → Agent C → output | Sequential processing stages |
-| **Peer-to-peer** | Agents communicate directly, consensus-based | Debate, code review, adversarial evaluation |
-| **Hierarchical** | Supervisor spawns sub-supervisors | Very large, deeply nested tasks |
+**Tool use** lets the LLM call external functions — search the web, run code, query a database, control a browser. The model doesn't execute code; it outputs a **structured JSON call** that your application executes.
+
+```
+User message
+     ↓
+  [LLM] → stop_reason: "tool_use" → tool call JSON
+     ↓
+Your code executes the tool
+     ↓
+Tool result sent back to LLM as "tool" role message
+     ↓
+  [LLM] → stop_reason: "end_turn" → final answer
+```
 
 ---
 
-## 2. Supervisor Pattern (from scratch)
+## 2. Defining Tools
+
+**Tool schemas** are the most important thing to get right. Vague descriptions cause wrong calls; wrong input types cause parse errors.
+
+```python
+import anthropic
+
+tools = [
+    {
+        "name": "get_gpu_specs",
+        "description": (
+            "Retrieve detailed specifications for an NVIDIA or AMD GPU by model name. "
+            "Returns memory, bandwidth, compute, and TDP. "
+            "Use this when the user asks about specific GPU hardware capabilities."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "model": {
+                    "type": "string",
+                    "description": "GPU model name, e.g. 'H100 SXM5', 'A100 PCIe 80GB', 'RX 7900 XTX'"
+                },
+                "metric": {
+                    "type": "string",
+                    "enum": ["memory", "bandwidth", "compute", "tdp", "all"],
+                    "description": "Which specification to retrieve. Use 'all' if unsure."
+                }
+            },
+            "required": ["model"]
+        }
+    },
+    {
+        "name": "run_cuda_profiler",
+        "description": (
+            "Run Nsight Systems profiler on a CUDA kernel file and return performance metrics. "
+            "Use this to identify bottlenecks: memory bound vs compute bound."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "kernel_path": {
+                    "type": "string",
+                    "description": "Absolute path to the .cu file"
+                },
+                "num_iterations": {
+                    "type": "integer",
+                    "description": "Number of profiling iterations (default: 100)",
+                    "default": 100
+                }
+            },
+            "required": ["kernel_path"]
+        }
+    }
+]
+```
+
+**Schema writing rules:**
+
+| Rule | Why |
+|------|-----|
+| Description explains *when* to call, not just *what* it does | Model decides whether to call based on this |
+| Use `enum` for constrained string values | Eliminates typos and invalid inputs |
+| Mark truly optional fields with `default`, don't put in `required` | Prevents unnecessary calls |
+| Keep parameter names short and clear | Model generates parameter names verbatim |
+
+---
+
+## 3. The Tool-Use Loop
 
 ```python
 import anthropic
 import json
-from typing import Callable
+from typing import Any
 
 client = anthropic.Anthropic()
 
-# ── Worker agents ─────────────────────────────────────────────
+# Mock tool implementations
+def get_gpu_specs(model: str, metric: str = "all") -> dict:
+    specs_db = {
+        "H100 SXM5": {"memory": "80GB HBM3", "bandwidth": "3.35 TB/s",
+                       "compute": "989 TFLOPS FP16", "tdp": "700W"},
+        "A100 PCIe 80GB": {"memory": "80GB HBM2e", "bandwidth": "1.935 TB/s",
+                            "compute": "312 TFLOPS FP16", "tdp": "300W"},
+    }
+    data = specs_db.get(model, {"error": f"GPU '{model}' not found in database"})
+    if metric == "all" or "error" in data:
+        return data
+    return {metric: data.get(metric, "unknown")}
 
-def researcher_agent(task: str) -> str:
-    """Gathers information and facts."""
-    response = client.messages.create(
-        model="your-fast-model-id",
-        max_tokens=1024,
-        system="You are a research specialist. Find relevant facts and technical details. Be thorough.",
-        messages=[{"role": "user", "content": task}]
-    )
-    return response.content[0].text
+def run_cuda_profiler(kernel_path: str, num_iterations: int = 100) -> dict:
+    # In production, actually run nsys/ncu here
+    return {
+        "kernel": kernel_path,
+        "avg_duration_ms": 2.34,
+        "memory_throughput_pct": 78.5,
+        "compute_throughput_pct": 31.2,
+        "bottleneck": "memory_bound",
+        "recommendation": "Improve memory access coalescing"
+    }
 
-def coder_agent(task: str) -> str:
-    """Writes and reviews code."""
-    response = client.messages.create(
-        model="your-agent-model-id",
-        max_tokens=2048,
-        system="You are a senior software engineer. Write clean, well-commented code with examples.",
-        messages=[{"role": "user", "content": task}]
-    )
-    return response.content[0].text
-
-def reviewer_agent(task: str) -> str:
-    """Reviews and critiques work."""
-    response = client.messages.create(
-        model="your-agent-model-id",
-        max_tokens=1024,
-        system="You are a strict technical reviewer. Identify bugs, edge cases, and improvements.",
-        messages=[{"role": "user", "content": task}]
-    )
-    return response.content[0].text
-
-def writer_agent(task: str) -> str:
-    """Writes documentation and explanations."""
-    response = client.messages.create(
-        model="your-fast-model-id",
-        max_tokens=1024,
-        system="You are a technical writer. Create clear, well-structured documentation.",
-        messages=[{"role": "user", "content": task}]
-    )
-    return response.content[0].text
-
-WORKERS: dict[str, Callable[[str], str]] = {
-    "researcher": researcher_agent,
-    "coder": coder_agent,
-    "reviewer": reviewer_agent,
-    "writer": writer_agent,
+TOOL_MAP = {
+    "get_gpu_specs": get_gpu_specs,
+    "run_cuda_profiler": run_cuda_profiler,
 }
 
-# ── Supervisor ────────────────────────────────────────────────
+def run_agent(user_message: str) -> str:
+    """Core agent loop with tool use."""
+    messages = [{"role": "user", "content": user_message}]
 
-SUPERVISOR_TOOLS = [
-    {
-        "name": "delegate_task",
-        "description": "Delegate a subtask to a specialist agent.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "agent": {
-                    "type": "string",
-                    "enum": list(WORKERS.keys()),
-                    "description": "Which specialist to use"
-                },
-                "task": {
-                    "type": "string",
-                    "description": "Specific task description for this agent"
-                }
-            },
-            "required": ["agent", "task"]
-        }
-    },
-    {
-        "name": "finish",
-        "description": "Return the final answer to the user.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "answer": {"type": "string", "description": "Final synthesized answer"}
-            },
-            "required": ["answer"]
-        }
-    }
-]
-
-SUPERVISOR_SYSTEM = """You are a supervisor managing a team of specialist agents:
-- researcher: gathers information and facts
-- coder: writes and explains code
-- reviewer: identifies bugs and improvements
-- writer: creates documentation
-
-Break the user's task into subtasks, delegate each to the right specialist,
-then synthesize the results. Use 'finish' when done."""
-
-def supervisor_agent(user_task: str) -> str:
-    messages = [{"role": "user", "content": user_task}]
-    results = {}
-
-    for _ in range(20):  # max iterations
+    while True:
         response = client.messages.create(
             model="your-agent-model-id",
-            max_tokens=1024,
-            system=SUPERVISOR_SYSTEM,
-            tools=SUPERVISOR_TOOLS,
+            max_tokens=2048,
+            tools=tools,
+            messages=messages
+        )
+
+        # Append assistant response to message history
+        messages.append({"role": "assistant", "content": response.content})
+
+        if response.stop_reason == "end_turn":
+            # Extract final text response
+            for block in response.content:
+                if hasattr(block, "text"):
+                    return block.text
+
+        elif response.stop_reason == "tool_use":
+            # Process all tool calls in this response
+            tool_results = []
+
+            for block in response.content:
+                if block.type == "tool_use":
+                    tool_name = block.name
+                    tool_input = block.input
+
+                    # Execute the tool
+                    if tool_name in TOOL_MAP:
+                        result = TOOL_MAP[tool_name](**tool_input)
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": json.dumps(result)
+                        })
+                    else:
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": f"Error: tool '{tool_name}' not found",
+                            "is_error": True
+                        })
+
+            # Send tool results back to model
+            messages.append({"role": "user", "content": tool_results})
+
+        else:
+            break  # Unexpected stop reason
+
+    return "Agent completed without response."
+
+
+# Test it
+answer = run_agent(
+    "Compare the H100 SXM5 and A100 PCIe 80GB memory bandwidth. "
+    "Which is better for memory-bound kernels?"
+)
+print(answer)
+```
+
+---
+
+## 4. Parallel Tool Calls
+
+When multiple independent tools are needed, Claude can call them **simultaneously** — reducing **round-trips**.
+
+```python
+# Claude may return multiple tool_use blocks in one response
+# Your loop must handle ALL of them before sending results back
+
+for block in response.content:
+    if block.type == "tool_use":
+        # This may execute multiple times per response
+        result = TOOL_MAP[block.name](**block.input)
+        tool_results.append({
+            "type": "tool_result",
+            "tool_use_id": block.id,
+            "content": json.dumps(result)
+        })
+
+# Send ALL results in one message — critical!
+messages.append({"role": "user", "content": tool_results})
+```
+
+**With Python `asyncio` for true parallel execution:**
+
+```python
+import asyncio
+import anthropic
+
+async def execute_tool_async(tool_name: str, tool_input: dict, tool_id: str) -> dict:
+    # Run tool in thread pool (for blocking I/O tools)
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, lambda: TOOL_MAP[tool_name](**tool_input))
+    return {
+        "type": "tool_result",
+        "tool_use_id": tool_id,
+        "content": json.dumps(result)
+    }
+
+async def process_tool_calls(tool_blocks: list) -> list:
+    tasks = [
+        execute_tool_async(b.name, b.input, b.id)
+        for b in tool_blocks if b.type == "tool_use"
+    ]
+    return await asyncio.gather(*tasks)
+```
+
+> **Pro tip:** For I/O-heavy tools (HTTP requests, database queries), parallel async execution can cut multi-tool latency by 3–5×.
+
+---
+
+## 5. Error Handling
+
+Agents must **handle tool failures gracefully** — the LLM can recover if you give it good error messages.
+
+```python
+def safe_tool_call(tool_name: str, tool_input: dict, tool_id: str) -> dict:
+    """Execute a tool with error handling."""
+    try:
+        result = TOOL_MAP[tool_name](**tool_input)
+        return {
+            "type": "tool_result",
+            "tool_use_id": tool_id,
+            "content": json.dumps(result)
+        }
+    except KeyError as e:
+        return {
+            "type": "tool_result",
+            "tool_use_id": tool_id,
+            "content": f"Missing required parameter: {e}",
+            "is_error": True
+        }
+    except Exception as e:
+        return {
+            "type": "tool_result",
+            "tool_use_id": tool_id,
+            "content": f"Tool execution failed: {type(e).__name__}: {e}",
+            "is_error": True
+        }
+```
+
+**When `is_error: True` is set**, Claude will typically:
+1. Acknowledge the error
+2. Try a different approach (different parameters, different tool)
+3. Ask the user for clarification if stuck
+
+---
+
+## 6. Tool Safety Patterns
+
+Some tools are **dangerous** (delete files, send emails, execute shell commands). Add **confirmation gates**.
+
+```python
+DANGEROUS_TOOLS = {"delete_file", "send_email", "execute_shell", "git_push"}
+
+def run_agent_with_confirmation(user_message: str) -> str:
+    messages = [{"role": "user", "content": user_message}]
+
+    while True:
+        response = client.messages.create(
+            model="your-agent-model-id",
+            max_tokens=2048,
+            tools=all_tools,
             messages=messages
         )
 
         messages.append({"role": "assistant", "content": response.content})
 
         if response.stop_reason == "end_turn":
-            return next((b.text for b in response.content if hasattr(b, "text")), "")
+            return next(b.text for b in response.content if hasattr(b, "text"))
 
-        tool_results = []
-        for block in response.content:
-            if block.type != "tool_use":
-                continue
+        elif response.stop_reason == "tool_use":
+            tool_results = []
 
-            if block.name == "finish":
-                return block.input["answer"]
+            for block in response.content:
+                if block.type != "tool_use":
+                    continue
 
-            elif block.name == "delegate_task":
-                agent_name = block.input["agent"]
-                subtask = block.input["task"]
-                print(f"  → delegating to {agent_name}: {subtask[:60]}...")
+                # Human-in-the-loop for dangerous operations
+                if block.name in DANGEROUS_TOOLS:
+                    print(f"\n⚠️  Agent wants to call: {block.name}")
+                    print(f"   Input: {json.dumps(block.input, indent=2)}")
+                    confirm = input("   Allow? (y/n): ").strip().lower()
 
-                agent_result = WORKERS[agent_name](subtask)
-                results[agent_name] = agent_result
+                    if confirm != "y":
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": "User denied this action.",
+                            "is_error": True
+                        })
+                        continue
 
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": f"[{agent_name}]: {agent_result}"
-                })
+                result = safe_tool_call(block.name, block.input, block.id)
+                tool_results.append(result)
 
-        if tool_results:
             messages.append({"role": "user", "content": tool_results})
-
-    return "Supervisor did not complete within iteration limit."
-
-# Test
-result = supervisor_agent(
-    "Build a Python class for a simple LRU cache. Include code, review, and a docstring."
-)
-print(result)
 ```
 
 ---
 
-## 3. Pipeline Pattern
+## 7. Tool Use with `tool_choice`
 
-Simple **sequential hand-off** between agents:
+Force or restrict which tools the model uses:
 
 ```python
-from dataclasses import dataclass
-
-@dataclass
-class PipelineContext:
-    original_task: str
-    artifacts: dict = None
-
-    def __post_init__(self):
-        self.artifacts = {}
-
-def build_pipeline(*stages: tuple[str, Callable[[str, dict], str]]):
-    """Build a linear agent pipeline."""
-    def run(task: str) -> PipelineContext:
-        ctx = PipelineContext(original_task=task)
-        previous_output = task
-
-        for stage_name, stage_fn in stages:
-            print(f"[{stage_name}] running...")
-            output = stage_fn(previous_output, ctx.artifacts)
-            ctx.artifacts[stage_name] = output
-            previous_output = output
-
-        return ctx
-    return run
-
-# Define pipeline stages
-def outline_stage(task: str, artifacts: dict) -> str:
-    response = client.messages.create(
-        model="your-fast-model-id",
-        max_tokens=512,
-        messages=[{"role": "user", "content": f"Create a brief outline for: {task}"}]
-    )
-    return response.content[0].text
-
-def draft_stage(outline: str, artifacts: dict) -> str:
-    response = client.messages.create(
-        model="your-agent-model-id",
-        max_tokens=2048,
-        messages=[{"role": "user", "content": f"Write a technical guide based on this outline:\n{outline}"}]
-    )
-    return response.content[0].text
-
-def review_stage(draft: str, artifacts: dict) -> str:
-    response = client.messages.create(
-        model="your-agent-model-id",
-        max_tokens=1024,
-        system="Identify errors and suggest improvements. Be specific.",
-        messages=[{"role": "user", "content": draft}]
-    )
-    return response.content[0].text
-
-def revise_stage(review: str, artifacts: dict) -> str:
-    draft = artifacts.get("draft_stage", "")
-    response = client.messages.create(
-        model="your-agent-model-id",
-        max_tokens=2048,
-        messages=[{
-            "role": "user",
-            "content": f"Revise this draft based on the review:\n\nDraft:\n{draft}\n\nReview:\n{review}"
-        }]
-    )
-    return response.content[0].text
-
-# Build and run pipeline
-write_guide = build_pipeline(
-    ("outline_stage", outline_stage),
-    ("draft_stage", draft_stage),
-    ("review_stage", review_stage),
-    ("revise_stage", revise_stage),
+# Force the model to use a specific tool
+response = client.messages.create(
+    model="your-agent-model-id",
+    max_tokens=512,
+    tools=tools,
+    tool_choice={"type": "tool", "name": "get_gpu_specs"},  # must call this
+    messages=[{"role": "user", "content": "Tell me about the H100."}]
 )
 
-ctx = write_guide("CUDA shared memory optimization techniques")
-final_guide = ctx.artifacts["revise_stage"]
-print(final_guide[:500])
-```
+# Allow any tool (default)
+tool_choice={"type": "auto"}
 
----
-
-## 4. Adversarial Peer-to-Peer (Debate Pattern)
-
-Two agents **debate**; a **judge** picks the winner or synthesizes:
-
-```python
-def debate_agents(question: str, rounds: int = 2) -> str:
-    """Two agents debate a question, judge synthesizes."""
-
-    def agent_respond(position: str, previous_arguments: list, question: str) -> str:
-        history = "\n".join(
-            f"{pos}: {arg}" for pos, arg in previous_arguments
-        )
-        response = client.messages.create(
-            model="your-agent-model-id",
-            max_tokens=512,
-            system=f"You argue {position}. Be persuasive but technically accurate.",
-            messages=[{
-                "role": "user",
-                "content": f"Question: {question}\n\nArguments so far:\n{history}\n\nYour turn:"
-            }]
-        )
-        return response.content[0].text
-
-    arguments = []
-    for round_num in range(rounds):
-        pro = agent_respond("in favor", arguments, question)
-        arguments.append(("PRO", pro))
-
-        con = agent_respond("against", arguments, question)
-        arguments.append(("CON", con))
-
-    # Judge synthesizes
-    transcript = "\n\n".join(f"{pos}:\n{arg}" for pos, arg in arguments)
-    judge_response = client.messages.create(
-        model="your-agent-model-id",
-        max_tokens=1024,
-        system="You are an impartial judge. Synthesize the strongest points from both sides.",
-        messages=[{
-            "role": "user",
-            "content": f"Question: {question}\n\nDebate:\n{transcript}\n\nSynthesize the best answer:"
-        }]
-    )
-    return judge_response.content[0].text
-
-verdict = debate_agents(
-    "Should ML inference pipelines use dynamic batching or static batching for latency-sensitive workloads?"
-)
-print(verdict)
-```
-
----
-
-## 5. Coordination Failures and Fixes
-
-| Failure | Cause | Fix |
-|---------|-------|-----|
-| **Infinite delegation loop** | Supervisor keeps re-delegating | Track delegation count per task |
-| **Context explosion** | Passing full outputs between agents | Summarize agent outputs before passing |
-| **Role confusion** | Agent goes outside its specialty | Strong system prompts + validation |
-| **Silent failure** | Agent returns empty or error output | Always validate output before passing |
-
-```python
-def safe_delegate(agent_fn: Callable, task: str, max_retries: int = 2) -> str:
-    """Delegate with retry and validation."""
-    for attempt in range(max_retries + 1):
-        result = agent_fn(task)
-        if result and len(result) > 20:  # basic output validation
-            return result
-        if attempt < max_retries:
-            task = f"{task}\n\n(Previous attempt returned insufficient output. Try again.)"
-
-    return f"[Agent failed after {max_retries + 1} attempts]"
+# Prevent any tool use
+tool_choice={"type": "none"}
 ```
 
 ---
 
 ## Key Takeaways
 
-1. **Supervisor pattern**: use for complex tasks where different specialists add value
-2. **Pipeline pattern**: use for sequential stages where each builds on the previous
-3. **Debate pattern**: use when you want balanced, adversarial evaluation
-4. Keep agent outputs short before passing between agents — summarize if > 500 tokens
-5. Always validate agent outputs and implement retry with feedback for failures
+1. The tool loop: call API → check `stop_reason` → execute tools → append results → repeat
+2. Send **all** tool results in one message — never split them
+3. Use `is_error: True` for failures; the model will try to recover
+4. Parallel tool calls are automatic — your code must handle multiple blocks per response
+5. Gate dangerous operations with human-in-the-loop confirmation
+6. `tool_choice` forces or prevents tool use — useful for structured extraction workflows
 
 ---
 
 ## Exercises
 
-1. Build a 4-agent code review system: planner → coder → security-reviewer → test-writer
-2. Implement a "consensus" multi-agent system where 3 agents vote on the best answer to a question
-3. Add a delegation counter to the supervisor — if the same subtask is delegated twice, escalate to human
+1. Build a weather + calculator dual-tool agent. Test it with a query that requires both tools in one response.
+2. Add retry logic to `safe_tool_call` — retry up to 3 times with exponential backoff on network errors.
+3. Implement a `max_tool_calls` safety limit that stops the agent after N tool calls to prevent infinite loops.
 
 ---
 
-**Previous:** [Lecture 07](Lecture-07.md) | **Next:** [Lecture 09 — RAG: Ingestion & Embeddings](Lecture-09.md)
+**Previous:** [Lecture 07](Lecture-07.md) | **Next:** [Lecture 09](Lecture-09.md)

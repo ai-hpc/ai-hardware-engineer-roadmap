@@ -1,1203 +1,857 @@
-# Lecture 14 - Deterministic Startup for AI Agent Systems
+# Lecture 14 - Efficient Local RAG Stack: Qwen3.5-4B INT4 and Granite Embeddings
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 13](Lecture-13.md) | **Next:** [Lecture 15](Lecture-15.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 13](Lecture-13.md) | **Next:** [Lecture 15](Lecture-15.md)
 
 ---
 
-## Why this lecture exists
+**Efficient local RAG** is not about using the largest model you can fit.
 
-An AI agent system is not just a model call.
+It is about spending memory and compute **where they improve answer quality**.
 
-It is usually a stack of moving parts:
+A strong edge RAG stack looks like:
 
-- configuration files
-- environment variables
-- model clients
-- prompts
-- tools
-- memory stores
-- vector indexes
-- workflow graphs
-- schedulers
-- background workers
-- auth providers
-- observability
-- runtime policies
+```text
+User query
+  -> Granite embedding model
+  -> Qdrant or pgvector
+  -> top-k retrieval
+  -> optional reranker
+  -> compact retrieved context
+  -> Qwen3.5-4B INT4 generator
+  -> grounded answer
+```
 
-If those parts start in a different order every time, the system becomes hard to debug.
+This architecture is useful for:
 
-If one dependency is half-ready, the agent may run with missing tools, stale memory, wrong prompts, broken retrieval, or unsafe permissions.
+- Jetson Orin
+- local/private AI
+- edge agents
+- coding assistants
+- multilingual RAG
+- low-power inference
+- small office knowledge bases
+- factory or robotics documentation assistants
 
-That is why production agent systems need **deterministic startup**.
+The central idea:
 
-Deterministic startup means:
+```text
+retrieval precision + small fast generator
+beats weak retrieval + huge generator
+```
 
-> Given the same code, config, secrets, data snapshot, and environment, the agent system boots into the same known-good state every time.
+Most RAG failures are **not model-size failures**.
 
-This does not mean model outputs become deterministic. LLMs may still produce different text.
-
-It means the **system around the model** starts **predictably**.
+They are **retrieval, chunking, context, and memory-budget failures**.
 
 ---
 
 ## Learning objectives
 
-By the end of this lecture you will be able to:
+By the end of this lecture, you should be able to:
 
-1. Explain deterministic startup in simple terms.
-2. Identify why agent systems fail when startup order is unclear.
-3. Design a startup sequence with explicit phases.
-4. Validate config, prompts, tools, model clients, memory, indexes, policies, and workers before serving traffic.
-5. Build readiness checks that prevent half-started agents from accepting requests.
-6. Separate startup, warmup, recovery, and normal serving.
-7. Write a startup manifest for a real AI agent application.
-8. Understand why deterministic startup matters for edge AI devices and always-on assistants.
+1. Design a local RAG stack around a 4B-class generator and compact embedding model.
+2. Explain why Granite 97M Multilingual R2 is attractive for edge retrieval.
+3. Choose between Qdrant and pgvector for local vector search.
+4. Estimate memory pressure for INT4 generator deployment.
+5. Choose chunk sizes for code, docs, PDFs, and manuals.
+6. Explain why reranking matters more than dumping many chunks into the prompt.
+7. Compare llama.cpp, vLLM, and TensorRT-LLM for local/edge RAG.
+8. Use prompt constraints, KV-cache optimization, prefix caching, and speculative decoding to improve small-model RAG.
+9. Avoid common efficient-RAG failure modes.
 
 ---
 
-## 1. The simple mental model
+## 1. Target architecture
 
-Think of an AI agent system like a smart factory.
-
-Before the factory opens, you do not want workers randomly turning on machines in any order.
-
-You want a checklist:
-
-1. Power is stable.
-2. Safety guards are installed.
-3. Machines are calibrated.
-4. Materials are loaded.
-5. Operators are assigned.
-6. Emergency stop works.
-7. Quality checks pass.
-8. Production starts.
-
-Agent systems need the same discipline.
-
-A bad startup looks like this:
+The recommended stack:
 
 ```text
-server starts
-  -> accepts request
-  -> model client is ready
-  -> tool registry is still loading
-  -> vector index is stale
-  -> memory migration is incomplete
-  -> policy engine has old rules
-  -> agent acts incorrectly
+generator:
+  Qwen/Qwen3.5-4B
+
+generator quantization:
+  INT4 class quantization
+  AWQ / GPTQ / GGUF Q4_K_M depending on runtime
+
+embedding:
+  ibm-granite/granite-embedding-97m-multilingual-r2
+
+vector database:
+  Qdrant for edge-first service
+  pgvector if PostgreSQL integration is already required
+
+retrieval:
+  top_k = 8
+  rerank to 3
+  compress before generation
+
+runtime:
+  llama.cpp for embedded/low-RAM
+  vLLM for server and batching
+  TensorRT-LLM for maximum NVIDIA optimization work
 ```
 
-A deterministic startup looks like this:
+This is not the only valid stack.
+
+It is a **strong default** because it keeps each component small enough to reason about.
+
+The goal is:
 
 ```text
-load config
-  -> validate schema
-  -> connect dependencies
-  -> register tools
-  -> load prompts
-  -> load policies
-  -> hydrate memory
-  -> verify indexes
-  -> warm model paths
-  -> run startup self-test
-  -> mark service ready
-  -> accept traffic
+good retrieval quality
+  + low VRAM
+  + short prompts
+  + fast decode
+  + private/local operation
 ```
 
-The system should not serve users until the full **startup contract** passes.
-
 ---
 
-## 2. What deterministic startup is not
+## 2. Generator: Qwen3.5-4B
 
-Deterministic startup does **not** mean:
+Qwen3.5-4B is a **4B-class Qwen model** available on Hugging Face.
 
-- the model always returns the same answer
-- temperature must always be `0`
-- every request follows the same path
-- the agent cannot adapt at runtime
-- the system never fails
+The model card includes examples for Transformers, vLLM, SGLang, and Docker model runner usage.
 
-It means:
+For this lecture, the reason it is interesting is the size/capability tradeoff:
 
-- startup order is explicit
-- startup checks are repeatable
-- configuration is validated
-- tools are registered predictably
-- prompts and policies have known versions
-- dependencies are either ready or the service refuses traffic
-- failures happen early instead of silently during user requests
+- small enough for local and edge experiments
+- stronger than many older sub-7B models
+- useful for coding and multilingual tasks
+- suitable for grounded answer generation when retrieval is good
 
-In professional systems, startup should be boring.
-
-If startup is surprising, production will be worse.
-
----
-
-## 3. Why agent systems especially need this
-
-Normal web services need deterministic startup too.
-
-Agent systems need it more because the model can hide infrastructure problems behind fluent language.
-
-Example:
+Important caveat:
 
 ```text
-User:
-What did customer ACME order last month?
-
-Agent problem:
-CRM tool did not register at startup.
-
-Bad agent behavior:
-"ACME likely ordered standard parts based on previous demand."
+Always verify the exact model variant, chat template, modality mode,
+license, quantization artifact, and serving backend before deployment.
 ```
 
-The answer sounds plausible, but it is wrong.
+The Hugging Face card for `Qwen/Qwen3.5-4B` is tagged around image-text-to-text usage, while many local RAG stacks use text-only chat/completion paths.
 
-Another example:
+That means you should validate:
 
-```text
-User:
-Summarize the safety procedure.
+- tokenizer behavior
+- chat template
+- thinking mode or reasoning controls
+- vLLM support
+- llama.cpp/GGUF support if using GGUF
+- memory use at your target context length
+- answer quality on your documents
 
-Agent problem:
-Vector index failed to load the latest safety manual.
-
-Bad agent behavior:
-Answers from an old version of the manual.
-```
-
-With normal software, a missing dependency often causes an obvious error.
-
-With AI systems, missing dependencies can cause **confident wrong behavior**.
-
-That is the core risk.
+Do **not assume all Qwen3.5-4B variants behave identically**.
 
 ---
 
-## 4. The startup contract
+## 3. Quantization strategy
 
-A **startup contract** is a written promise about what must be true before the system accepts traffic.
+For edge RAG, **INT4-class quantization** is usually the right starting point.
 
-Example:
+Common formats:
 
-```text
-This agent service is ready only when:
-
-- required environment variables are present
-- config schema validates
-- model provider is reachable
-- prompt bundle version is known
-- tool registry contains exactly the expected tools
-- tool permissions are loaded
-- vector index version matches the document snapshot
-- memory store schema is migrated
-- policy engine has loaded the active policy bundle
-- tracing and audit logging are writable
-- health and readiness checks pass
-```
-
-This contract should be enforced by code.
-
-Do not rely on a README checklist alone.
-
----
-
-## 5. Startup phases
-
-Use **phases** instead of random initialization.
-
-### Phase 0 - process starts
-
-The process exists, but nothing should serve traffic yet.
-
-### Phase 1 - load static configuration
-
-Load:
-
-- config files
-- environment variables
-- deployment profile
-- feature flags
-- model names
-- prompt bundle version
-- tool allowlist
-- policy bundle version
-
-Rule:
-
-> No network calls yet. Just load and validate local inputs.
-
-### Phase 2 - validate configuration
-
-Check:
-
-- required fields exist
-- paths are valid
-- model names are allowed
-- tool names are known
-- numeric limits are sane
-- dangerous feature flags are not enabled by accident
-
-Fail fast if config is invalid.
-
-### Phase 3 - connect dependencies
-
-Connect to:
-
-- model provider
-- vector database
-- relational database
-- cache
-- queue
-- memory store
-- object storage
-- auth provider
-- observability backend
-
-Rule:
-
-> Connect, verify, and record versions. Do not silently continue with missing dependencies unless the app explicitly supports degraded mode.
-
-### Phase 4 - register tools
-
-Build the tool registry.
-
-For each tool, register:
-
-- name
-- description
-- input schema
-- risk level
-- timeout
-- permission rule
-- owner
-- audit policy
-- idempotency behavior
-
-Do not let tools appear dynamically without control.
-
-### Phase 5 - load prompts and policies
-
-Load:
-
-- system prompts
-- agent role prompts
-- RAG prompt templates
-- tool-use instructions
-- runtime security policies
-- refusal policies
-- human approval rules
-
-Each should have a version.
-
-### Phase 6 - hydrate memory and state
-
-Load:
-
-- session state
-- long-term memory
-- user preferences
-- workflow checkpoints
-- agent graph checkpoints
-- task queues
-
-Run migrations before serving.
-
-### Phase 7 - verify retrieval indexes
-
-Check:
-
-- index exists
-- document snapshot version matches expected version
-- embedding model version matches the stored vectors
-- top-k retrieval smoke test works
-- access control filters are installed
-
-### Phase 8 - warm critical paths
-
-Warm:
-
-- model client
-- tokenizer or local model runtime
-- embedding model
-- vector search path
-- common prompt template rendering
-- common tool schema validation
-
-This reduces first-request surprises.
-
-### Phase 9 - startup self-test
-
-Run a short self-test:
-
-- safe prompt call
-- safe retrieval query
-- read-only tool call
-- policy block test
-- audit log write
-- readiness report
-
-### Phase 10 - mark ready
-
-Only now should `/readyz` return success.
-
-Before this point, `/livez` may be true, but `/readyz` should be false.
-
----
-
-## 6. Liveness vs readiness
-
-This distinction matters.
-
-| Check | Meaning | Should traffic be sent? |
+| Format | Typical runtime | Notes |
 |---|---|---|
-| Liveness | The process is alive | Not necessarily |
-| Readiness | The service is ready to handle requests | Yes |
+| AWQ | vLLM / TensorRT-LLM | good server-oriented weight-only quantization path |
+| GPTQ | ExLlama / vLLM | mature local/server quantization path |
+| GGUF Q4_K_M | llama.cpp | practical low-RAM local deployment format |
+| FP8 | Hopper/Blackwell-class paths | useful on supported GPUs, not the default Jetson path |
 
-An agent service can be alive but not ready.
+Planning estimates for Qwen3.5-4B INT4:
+
+| Component | Rough memory |
+|---|---:|
+| weights | 2.2-2.8 GB |
+| KV cache | 0.5-3 GB |
+| runtime overhead | 0.5-1 GB |
+
+Typical active VRAM planning range:
+
+| Context | Rough VRAM |
+|---|---:|
+| 4K | 4-5 GB |
+| 8K | 5-7 GB |
+| 16K | 8-10 GB |
+
+These are **planning numbers, not guarantees**.
+
+Measure on your exact stack:
+
+```text
+model revision
+quantization format
+backend
+batch size
+context length
+KV dtype
+GPU memory allocator
+embedding placement
+vector DB placement
+```
+
+---
+
+## 4. Embedding model: Granite 97M Multilingual R2
+
+Use:
+
+```text
+ibm-granite/granite-embedding-97m-multilingual-r2
+```
+
+IBM's model card describes it as a **97M-parameter dense embedding model** with:
+
+- 384-dimensional embeddings
+- up to 32,768-token context
+- multilingual support
+- code retrieval support
+- Apache-2.0 license
+- ONNX and OpenVINO deployment paths
+- vLLM embedding serving support
+- GGUF conversion option for llama.cpp-style embedding
+
+Why it is a strong edge fit:
+
+- much smaller than the 311M Granite multilingual variant
+- lower memory pressure
+- lower latency
+- easier batching
+- good multilingual retrieval quality for its size
+- practical for Jetson and CPU-side embedding paths
+
+The 311M version may improve quality in larger server deployments.
+
+For edge RAG, the 97M model is usually the **better default**.
+
+---
+
+## 5. Retrieval matters more than generator size
+
+A small generator can answer well **if the prompt contains the right evidence**.
+
+A large generator can **still fail if retrieval is poor**.
+
+Bad retrieval causes:
+
+- hallucinated answers
+- overconfident missing information
+- irrelevant citations
+- excessive prompt length
+- slow decode
+- context window waste
+
+The working rule:
+
+```text
+better top-3 evidence
+  > bigger model reading 20 weak chunks
+```
+
+Good retrieval pipeline:
+
+```text
+embed query
+  -> vector search top 8
+  -> metadata filter
+  -> rerank top 8
+  -> keep top 3
+  -> optionally compress
+  -> generate answer
+```
+
+Do **not dump all retrieved chunks** into the generator.
+
+Small models need **high signal**.
+
+---
+
+## 6. Chunking strategy
+
+Chunking often matters **more than model selection**.
+
+Recommended starting ranges:
+
+| Content type | Chunk size |
+|---|---:|
+| code | 256-512 tokens |
+| documentation | 512-1024 tokens |
+| PDFs/manuals | 768-1536 tokens |
+
+Overlap:
+
+```text
+10-20%
+```
+
+Common starting point:
+
+```text
+chunk_size = 512 tokens
+overlap = 64 tokens
+```
+
+Why not giant chunks?
+
+```text
+giant chunks reduce retrieval precision
+```
+
+If every chunk contains too many topics, vector search **cannot identify the exact relevant passage**.
+
+Bad chunking symptoms:
+
+- retrieved chunks are broadly related but not answer-bearing
+- answer requires many chunks
+- reranker struggles to choose
+- model sees too much irrelevant context
+- citations point to generic sections
+
+Use structure-aware chunking:
+
+- preserve headings
+- preserve code blocks
+- preserve function/class boundaries
+- include file path metadata
+- include section title metadata
+- include document version metadata
+
+---
+
+## 7. Vector database choice
+
+### Qdrant
+
+Use Qdrant when you want:
+
+- edge-friendly vector search
+- Rust implementation
+- HNSW dense vector index
+- payload metadata filtering
+- standalone service deployment
+- hybrid search options
+- clean API for local agents
+
+Qdrant is usually the better Jetson/local default when you do not already need PostgreSQL.
+
+### pgvector
+
+Use pgvector when:
+
+- PostgreSQL is already part of the product
+- SQL joins and relational metadata matter
+- you want one operational database
+- enterprise app integration matters more than raw vector-specialized deployment
+
+The choice is not ideological.
+
+Use:
+
+```text
+Qdrant:
+  edge-first vector service
+
+pgvector:
+  SQL-first application integration
+```
+
+---
+
+## 8. Reranking
+
+Reranking is often the **highest-leverage quality improvement**.
+
+Vector search gets **candidates**.
+
+The reranker picks the **best evidence**.
+
+Recommended pattern:
+
+```text
+retrieve top 8
+rerank top 8
+keep top 3
+```
+
+Small reranker candidates:
+
+| Reranker | Good fit |
+|---|---|
+| bge-reranker-base | strong general quality |
+| Granite reranker | IBM/Granite ecosystem |
+| Jina reranker | multilingual workflows |
+
+If latency is tight:
+
+- rerank only top 8 or top 10
+- run reranker on CPU if GPU is reserved for generator
+- cache rerank results for repeated queries
+- skip reranker for exact metadata hits
+
+If quality matters:
+
+```text
+rerank before increasing generator size
+```
+
+---
+
+## 9. Context management for small models
+
+Small models are **sensitive to noisy prompts**.
+
+Recommended final prompt structure:
+
+```text
+system instructions
+  -> compact retrieved context
+  -> user question
+  -> answer format requirements
+```
+
+Target retrieved context:
+
+```text
+~2K tokens for many edge RAG tasks
+```
+
+Instead of:
+
+```text
+retrieve 20 chunks
+send everything
+hope the model finds the answer
+```
+
+Do:
+
+```text
+retrieve 8
+rerank to 3
+compress
+answer with citations
+```
+
+Compression can be:
+
+- extract only answer-bearing paragraphs
+- remove boilerplate
+- preserve headings and citations
+- keep code snippets intact
+- deduplicate repeated passages
+
+Small models **reward discipline**.
+
+---
+
+## 10. Prompt design
+
+Use **strict grounded prompts**.
 
 Example:
 
 ```text
-/livez  -> 200 OK
-/readyz -> 503 Not Ready
+You are a retrieval-grounded assistant.
+Answer only from the retrieved context.
+If the context does not contain enough evidence, say "insufficient information."
+Include citations using the provided source IDs.
+Do not use outside knowledge unless explicitly asked.
 ```
 
-This is correct while startup is still running.
+Why this helps:
 
-Bad design:
+- reduces hallucination
+- forces uncertainty
+- improves citation behavior
+- prevents over-answering
+- makes failures easier to detect
+
+For code RAG:
 
 ```text
-/health -> 200 OK
+Use only the provided repository snippets.
+If a function or file is not present in context, say which file is missing.
+Do not invent APIs.
 ```
 
-even though tools, memory, or policies are missing.
-
-Professional rule:
-
-> Liveness asks "should this process be restarted?" Readiness asks "should this process receive user traffic?"
-
----
-
-## 7. Startup manifest
-
-A startup manifest is a simple document that describes exactly what the agent expects at boot.
-
-Example:
-
-```yaml
-service: hardware_support_agent
-version: 0.4.2
-
-startup:
-  required_env:
-    - MODEL_PROVIDER
-    - MODEL_API_KEY
-    - VECTOR_DB_URL
-    - AUDIT_LOG_URL
-
-  models:
-    chat:
-      name: gpt-example-prod
-      required: true
-    embedding:
-      name: text-embedding-example
-      required: true
-
-  prompts:
-    bundle: hardware_support_prompts
-    version: 2026-04-23
-
-  retrieval:
-    index: hardware_docs_index
-    document_snapshot: docs_2026_04_20
-    embedding_model: text-embedding-example
-
-  tools:
-    - name: search_docs
-      risk: low
-      required: true
-    - name: create_ticket
-      risk: medium
-      required: true
-    - name: send_email
-      risk: high
-      required: false
-
-  policies:
-    bundle: agent_runtime_policy
-    version: 8
-
-  readiness:
-    require_audit_log: true
-    require_policy_engine: true
-    require_retrieval_smoke_test: true
-```
-
-The manifest makes startup reviewable.
-
-If something changes, the diff is visible.
-
----
-
-## 8. Config validation example
-
-Use **structured config** instead of loose environment access scattered through the codebase.
-
-```python
-from pydantic import BaseModel, Field, HttpUrl
-
-
-class ModelConfig(BaseModel):
-    chat_model: str
-    embedding_model: str
-    temperature: float = Field(ge=0.0, le=2.0)
-    max_tokens: int = Field(gt=0, le=8192)
-
-
-class RetrievalConfig(BaseModel):
-    vector_db_url: HttpUrl
-    index_name: str
-    document_snapshot: str
-    top_k: int = Field(gt=0, le=50)
-
-
-class RuntimePolicyConfig(BaseModel):
-    policy_bundle: str
-    policy_version: int = Field(gt=0)
-    require_human_approval_for_high_risk_tools: bool = True
-
-
-class AgentConfig(BaseModel):
-    service_name: str
-    environment: str
-    models: ModelConfig
-    retrieval: RetrievalConfig
-    policy: RuntimePolicyConfig
-
-
-def load_config(raw: dict) -> AgentConfig:
-    config = AgentConfig.model_validate(raw)
-
-    if config.environment == "prod" and config.models.temperature > 0.7:
-        raise ValueError("production temperature is too high for this agent")
-
-    return config
-```
-
-Important point:
-
-> Configuration errors should fail during startup, not during the first customer request.
-
----
-
-## 9. Tool registry determinism
-
-The **tool registry** must be predictable.
-
-Bad pattern:
-
-```python
-tools = discover_all_tools_from_folder("tools/")
-```
-
-Why this is risky:
-
-- file ordering may vary
-- accidental tools may load
-- experimental tools may appear in production
-- permissions may not match the tool set
-- review is difficult
-
-Better pattern:
-
-```python
-EXPECTED_TOOLS = [
-    "search_docs",
-    "create_ticket",
-    "lookup_part_number",
-    "summarize_datasheet",
-]
-
-
-def build_tool_registry(tool_factories: dict) -> dict:
-    registry = {}
-
-    for name in EXPECTED_TOOLS:
-        if name not in tool_factories:
-            raise RuntimeError(f"missing required tool: {name}")
-
-        tool = tool_factories[name]()
-        validate_tool_schema(tool)
-        validate_tool_policy(tool)
-        registry[name] = tool
-
-    extra_tools = set(tool_factories) - set(EXPECTED_TOOLS)
-    if extra_tools:
-        raise RuntimeError(f"unexpected tools available: {sorted(extra_tools)}")
-
-    return registry
-```
-
-Professional rule:
-
-> Production tools should be explicitly registered, versioned, and policy-checked.
-
----
-
-## 10. Prompt determinism
-
-Prompts are code-like assets.
-
-They should have:
-
-- names
-- versions
-- owners
-- tests
-- changelogs
-- rollback path
-
-Bad pattern:
-
-```python
-SYSTEM_PROMPT = "You are helpful."
-```
-
-Better pattern:
-
-```yaml
-prompt_bundle: hardware_support_agent
-version: 2026-04-23
-
-prompts:
-  system:
-    file: prompts/system.md
-    sha256: "..."
-  tool_router:
-    file: prompts/tool_router.md
-    sha256: "..."
-  rag_answer:
-    file: prompts/rag_answer.md
-    sha256: "..."
-```
-
-At startup, verify:
-
-- files exist
-- hashes match
-- required variables are present
-- rendering works with test data
-- prompt versions are logged
-
-This makes incidents easier to investigate.
-
-If a model produces bad output, you need to know which prompt version was active.
-
----
-
-## 11. Retrieval determinism
-
-**RAG startup** must verify that retrieval is not silently broken.
-
-Check:
-
-- vector database reachable
-- index exists
-- expected document count range
-- embedding dimension matches
-- embedding model version matches
-- access-control filters exist
-- sample query returns expected documents
-
-Example startup smoke test:
-
-```python
-def verify_retrieval(index, expected_snapshot: str):
-    metadata = index.get_metadata()
-
-    if metadata["snapshot"] != expected_snapshot:
-        raise RuntimeError(
-            f"index snapshot mismatch: expected {expected_snapshot}, "
-            f"got {metadata['snapshot']}"
-        )
-
-    results = index.search("ESP32-C6 UART pin configuration", top_k=3)
-    ids = {item.document_id for item in results}
-
-    if "esp32c6_uart_guide" not in ids:
-        raise RuntimeError("retrieval smoke test failed")
-```
-
-Do not rely on "the vector DB connection works."
-
-Connection success only proves that the database answered.
-
-It does not prove that the right index is loaded.
-
----
-
-## 12. Memory determinism
-
-Agent memory is powerful but dangerous.
-
-At startup, decide:
-
-- which memory stores are loaded
-- which sessions are resumed
-- which memories are expired
-- which memories are quarantined
-- which schema migrations must run
-- which checkpoint version is supported
-
-Bad pattern:
+For multilingual RAG:
 
 ```text
-load all previous memory into context automatically
+Answer in the user's language unless the task requests otherwise.
+Preserve technical identifiers exactly.
 ```
 
-Better pattern:
+---
+
+## 11. Runtime choices
+
+### llama.cpp
+
+Use when:
+
+- Jetson or embedded deployment
+- low RAM
+- GGUF quantization
+- CPU/GPU mixed execution
+- simple local server
+- offline/private deployment
+
+Best for:
 
 ```text
-load only memory that:
-  - belongs to this user
-  - belongs to this tenant
-  - matches current schema
-  - is not expired
-  - is not quarantined
-  - is relevant to the current task
+Qwen3.5-4B Q4_K_M
+4K-8K context
+single-user local RAG
 ```
 
-Memory startup checks:
+### vLLM
 
-- schema version matches
-- migrations completed
-- memory count is within expected range
-- quarantine table is readable
-- checkpoint replay works for one test session
+Use when:
 
-Professional rule:
+- server deployment
+- continuous batching
+- multiple users
+- OpenAI-compatible API
+- embedding endpoint support
+- model serving at higher concurrency
 
-> Memory is not just data. It is future prompt context. Treat it like executable influence.
-
----
-
-## 13. Policy determinism
-
-**Runtime security policies** must load before tools are usable.
-
-Bad startup:
+Best for:
 
 ```text
-agent starts
-  -> tools register
-  -> service accepts traffic
-  -> policy engine loads later
+Qwen3.5-4B AWQ/GPTQ
+Granite embedding endpoint
+multi-user local server
 ```
 
-This creates a window where tools may run without enforcement.
+### TensorRT-LLM
 
-Correct startup:
+Use when:
+
+- NVIDIA-specific maximum performance
+- production CUDA optimization
+- Tensor Core paths matter
+- static-ish deployment configuration
+- kernel tuning is worth the complexity
+
+Best for:
 
 ```text
-load policy bundle
-  -> validate policy syntax
-  -> register tools
-  -> bind tool to policy
-  -> run allow/block self-test
-  -> mark tool layer ready
+Orin optimization work
+L4/Hopper/Blackwell server optimization
+latency-sensitive production inference
 ```
 
-Self-test example:
+The runtime choice **changes the whole system**.
 
-```python
-def verify_policy_engine(policy_engine):
-    allowed = policy_engine.evaluate(
-        user_role="engineer",
-        tool="search_docs",
-        arguments={"query": "Jetson audio setup"},
-    )
-    assert allowed.decision == "allow"
-
-    blocked = policy_engine.evaluate(
-        user_role="guest",
-        tool="export_customer_records",
-        arguments={"format": "csv"},
-    )
-    assert blocked.decision == "block"
-```
-
-If the block test fails, the service should not start.
+**Benchmark before committing.**
 
 ---
 
-## 14. Model client determinism
+## 12. Jetson-oriented deployment
 
-**Model clients** should not be created lazily without checks.
-
-At startup, verify:
-
-- provider credentials exist
-- selected model is allowed
-- timeout is configured
-- retry policy is configured
-- circuit breaker is configured
-- fallback model is known
-- model response path works for a tiny test request
-
-Do not run an expensive prompt at startup.
-
-Use a cheap sanity check:
-
-```python
-def verify_model_client(client):
-    response = client.generate(
-        messages=[
-            {"role": "system", "content": "Return exactly OK."},
-            {"role": "user", "content": "health check"},
-        ],
-        max_tokens=4,
-        temperature=0,
-        timeout=5,
-    )
-
-    if "OK" not in response.text:
-        raise RuntimeError("model client health check failed")
-```
-
-This does not prove model quality.
-
-It proves the model path is reachable and correctly configured.
-
----
-
-## 15. Deterministic graph startup
-
-Workflow agents often use a graph:
+Good embedded default:
 
 ```text
-planner -> retriever -> tool_router -> executor -> reviewer -> responder
+generator:
+  Qwen3.5-4B GGUF Q4_K_M
+
+embedding:
+  Granite 97M Multilingual R2
+  ONNX/OpenVINO/Transformers depending on hardware path
+
+vector DB:
+  Qdrant
+
+context:
+  4K-8K
+
+retrieval:
+  top_k = 8
+  rerank = 3
+
+runtime:
+  llama.cpp or carefully tested vLLM path
 ```
 
-At startup, verify:
-
-- all nodes exist
-- all edges are valid
-- no unreachable required node exists
-- cycles are intentional
-- checkpointing is enabled where needed
-- human approval nodes exist for high-risk paths
-- graph version is logged
-
-Example graph manifest:
-
-```yaml
-graph: support_agent_graph
-version: 12
-
-nodes:
-  - planner
-  - retriever
-  - tool_router
-  - executor
-  - reviewer
-  - responder
-
-edges:
-  planner:
-    - retriever
-    - tool_router
-  retriever:
-    - responder
-  tool_router:
-    - executor
-    - reviewer
-  executor:
-    - reviewer
-  reviewer:
-    - responder
-```
-
-Startup should reject a graph that references a missing node.
-
----
-
-## 16. Idempotent startup
-
-Startup should be **safe to run more than once**.
-
-This matters because containers, systemd services, edge devices, and cloud platforms may restart processes.
-
-Idempotent startup means repeated startup does not duplicate state or corrupt data.
-
-Bad examples:
-
-- create duplicate background jobs every restart
-- re-send "startup complete" notifications every restart
-- recreate indexes without checking version
-- run destructive migrations automatically
-- append duplicate system memories
-
-Better examples:
-
-- create queue only if missing
-- run migrations with version tracking
-- register worker lease with expiration
-- load prompt bundle by immutable version
-- write startup event with unique boot ID
-
-Use a boot ID:
-
-```python
-import uuid
-
-BOOT_ID = str(uuid.uuid4())
-```
-
-Attach it to logs:
-
-```json
-{
-  "boot_id": "2d8b...",
-  "event": "startup_phase_complete",
-  "phase": "tool_registry",
-  "status": "ok"
-}
-```
-
-Now you can group all startup logs from one process boot.
-
----
-
-## 17. Degraded mode
-
-Sometimes a service can start with **limited capability**.
-
-Example:
-
-- chat works, but RAG is unavailable
-- read-only tools work, but write tools are disabled
-- local model works, but cloud fallback is unavailable
-
-This is acceptable only if the degraded mode is explicit.
-
-Bad degraded mode:
+Expected active memory planning:
 
 ```text
-retrieval broken, but agent answers from memory without telling anyone
+5-7 GB active VRAM for many 4K-8K configurations
 ```
 
-Good degraded mode:
+But on Jetson, also consider unified memory pressure:
+
+- model weights
+- KV cache
+- embedding model
+- vector index
+- OS and desktop services
+- Python runtime
+- Qdrant memory
+- buffers and temporary tensors
+
+For Jetson, do **not run every component on GPU**.
+
+Often:
 
 ```text
-retrieval unavailable
-  -> readiness reports degraded
-  -> RAG features disabled
-  -> agent tells user it cannot access documents
-  -> alert is emitted
+GPU:
+  generator
+
+CPU / optimized runtime:
+  embedding
+  vector search
+  reranker if latency allows
 ```
-
-Represent this in readiness:
-
-```json
-{
-  "ready": true,
-  "mode": "degraded",
-  "disabled_features": ["rag_search"],
-  "reason": "vector index unavailable"
-}
-```
-
-For high-risk systems, degraded mode may not be allowed.
 
 ---
 
-## 18. Startup timeline example
+## 13. Server-oriented deployment
 
-A clean startup log should tell a story.
-
-Example:
+Good small GPU server stack:
 
 ```text
-00.000 boot_id=42 service=assistant start
-00.018 phase=config_load ok config_version=prod-17
-00.026 phase=config_validate ok
-00.143 phase=dependency_connect ok vector_db=ready cache=ready audit=ready
-00.181 phase=prompt_load ok prompt_bundle=assistant_prompts@2026-04-23
-00.214 phase=policy_load ok policy_bundle=runtime_policy@8
-00.266 phase=tool_registry ok tools=7 high_risk=2
-00.402 phase=memory_migration ok schema=5
-00.611 phase=retrieval_verify ok snapshot=docs_2026_04_20
-00.902 phase=model_warmup ok model=prod-small latency_ms=288
-01.104 phase=self_test ok
-01.105 readiness=true
+generator:
+  Qwen3.5-4B AWQ or GPTQ
+
+embedding:
+  Granite 311M if quality matters and memory allows
+  Granite 97M if latency/cost matters
+
+runtime:
+  vLLM
+
+vector DB:
+  Qdrant
+
+optimization:
+  FlashInfer backend where applicable
+  continuous batching
+  prefix caching
+  KV-cache optimization
 ```
 
-Bad startup log:
+Good when:
+
+- many users
+- concurrent local agents
+- OpenAI-compatible endpoint desired
+- larger context windows
+- multiple models served behind routing
+
+The server stack should measure:
+
+- throughput
+- p95 latency
+- TTFT
+- ITL
+- GPU memory
+- retrieval latency
+- reranker latency
+- prompt token count
+- answer correctness
+
+---
+
+## 14. Advanced optimization
+
+### KV-cache quantization
+
+KV cache can **dominate long-context decode memory**.
+
+Options:
+
+- INT8 KV
+- FP8 KV on supported hardware/backend
+- paged KV cache
+
+Use when:
+
+- context length grows
+- concurrency matters
+- decode is memory-bound
+
+Connect to Lecture 43 for FP8 KV-cache tradeoffs.
+
+### Prefix caching
+
+Agents often reuse:
+
+- system prompt
+- tool instructions
+- safety policy
+- RAG answer format
+
+Cache stable prefixes when runtime supports it.
+
+This avoids **recomputing the same prompt prefix** repeatedly.
+
+### Speculative decoding
+
+Use:
 
 ```text
-server started
+small draft model
+  -> larger verifier model
 ```
 
-That tells you almost nothing.
+For a 4B verifier, a 0.5B-1B draft can improve throughput if acceptance rate is high.
+
+Speculative decoding is **not free**.
+
+Measure:
+
+- acceptance rate
+- extra memory
+- added complexity
+- latency distribution
 
 ---
 
-## 19. Deterministic startup on edge devices
+## 15. Evaluation plan
 
-This roadmap cares about Jetson-class and embedded AI systems.
+Efficient RAG needs **both retrieval and generation evals**.
 
-**Edge startup** is harder because:
+Measure retrieval:
 
-- power may be unstable
-- network may be unavailable
-- local models may take time to load
-- sensors may appear late
-- audio devices may enumerate differently
-- accelerators may need warmup
-- storage may be slow
-- device clocks may be wrong at boot
+- recall@k
+- MRR
+- nDCG
+- exact source hit rate
+- multilingual retrieval accuracy
+- code symbol retrieval accuracy
 
-For an AI smart speaker or local assistant, deterministic startup might include:
+Measure answer quality:
+
+- groundedness
+- citation correctness
+- abstention when context is insufficient
+- multilingual answer quality
+- code correctness
+- hallucination rate
+
+Measure systems performance:
+
+- query embedding latency
+- vector search latency
+- rerank latency
+- prompt assembly time
+- TTFT
+- ITL
+- total response latency
+- VRAM
+- RAM
+- watts if on Jetson
+
+The decision rule:
 
 ```text
-system boot
-  -> audio device detected
-  -> wake-word engine loaded
-  -> local ASR model loaded
-  -> TTS voice loaded
-  -> tool registry loaded
-  -> home devices paired
-  -> memory store mounted
-  -> network state detected
-  -> cloud fallback optional
-  -> readiness announced
+optimize retrieval before increasing model size
 ```
 
-If the microphone array is not ready, the assistant should not pretend it is listening.
+---
 
-If the smart-home controller is unavailable, device-control commands should be disabled.
+## 16. Biggest mistakes
 
-Edge agent rule:
+Avoid:
 
-> Local AI products must know which capabilities are actually available after boot.
+- giant chunks
+- too many retrieved chunks
+- no reranking
+- huge prompts
+- FP16 everywhere
+- no caching
+- no metadata filtering
+- no citation checks
+- no abstention behavior
+- evaluating only final answers
+- ignoring retrieval metrics
+- running embedding, vector DB, reranker, and generator all on the GPU without measuring pressure
+
+The **best engineering insight**:
+
+```text
+efficient RAG is mostly memory bandwidth and context-quality engineering,
+not raw parameter count
+```
+
+The winning systems optimize:
+
+- retrieval precision
+- KV cache
+- prompt size
+- chunk quality
+- batching
+- token efficiency
+- cache reuse
+- metadata filtering
 
 ---
 
-## 20. Startup test plan
-
-Test startup like you test features.
-
-### Test 1 - clean boot
-
-Expected:
-
-- all startup phases pass
-- readiness becomes true
-- startup time is within budget
-
-### Test 2 - missing config
-
-Remove a required environment variable.
-
-Expected:
-
-- startup fails early
-- clear error message
-- no traffic accepted
-
-### Test 3 - missing tool
-
-Remove a required tool implementation.
-
-Expected:
-
-- tool registry phase fails
-- service stays not ready
-
-### Test 4 - broken vector index
-
-Point to the wrong document snapshot.
-
-Expected:
-
-- retrieval verification fails
-- RAG disabled or startup fails depending on policy
-
-### Test 5 - policy engine failure
-
-Load an invalid policy file.
-
-Expected:
-
-- policy validation fails
-- high-risk tools never become available
-
-### Test 6 - restart idempotency
-
-Start, stop, start again.
-
-Expected:
-
-- no duplicate jobs
-- no duplicate memories
-- no duplicate indexes
-- same manifest version
-
-### Test 7 - cold edge boot
-
-Reboot the device from power-off.
-
-Expected:
-
-- sensors and audio devices are detected
-- local models load
-- service reports real capability status
-
----
-
-## 21. Practical startup checklist
-
-Before you call an agent system production-ready, answer these questions.
-
-### Configuration
-
-- Are all required config fields validated?
-- Are unsafe defaults rejected in production?
-- Are model, prompt, policy, and graph versions logged?
-
-### Dependencies
-
-- Does startup verify every required dependency?
-- Is degraded mode explicit?
-- Are timeouts and retries configured?
-
-### Tools
-
-- Is the tool registry explicit?
-- Are unexpected tools rejected?
-- Are high-risk tools bound to policies?
-- Are tool schemas validated?
-
-### Retrieval and memory
-
-- Is the vector index version checked?
-- Is the embedding model version checked?
-- Are memory migrations complete before serving?
-- Are quarantined memories excluded?
-
-### Runtime safety
-
-- Does the policy engine load before tools are usable?
-- Does a block-policy self-test run?
-- Are audit logs writable before readiness?
-
-### Operations
-
-- Are `/livez` and `/readyz` separate?
-- Is startup time measured?
-- Is every startup phase logged?
-- Is there a boot ID?
-- Can the system restart safely?
-
----
-
-## 22. Common mistakes
-
-### Mistake 1 - serving traffic before readiness
-
-The process starts, the port opens, and traffic begins before tools, memory, or policy are ready.
-
-Fix:
-
-> Keep `/readyz` false until the full startup contract passes.
-
-### Mistake 2 - lazy-loading critical tools
-
-The first user request discovers that a tool is broken.
-
-Fix:
-
-> Load and validate required tools at startup.
-
-### Mistake 3 - relying on whatever files are present
-
-The system discovers prompts, tools, or configs dynamically and accidentally loads experimental assets.
-
-Fix:
-
-> Use explicit manifests and allowlists.
-
-### Mistake 4 - no version record
-
-The system cannot tell which prompt, policy, graph, model, or index version caused an incident.
-
-Fix:
-
-> Log versions at startup and attach them to request traces.
-
-### Mistake 5 - treating edge boot as normal server boot
-
-Audio, sensors, local models, and hardware devices may not be ready when the process starts.
-
-Fix:
-
-> Add hardware capability checks and feature-level readiness.
-
----
-
-## 23. Design exercise
-
-Design deterministic startup for this system:
-
-> A local AI engineering assistant runs on a Jetson. It supports voice input, local RAG over hardware docs, code editing inside a project folder, and smart-lab device control through Zigbee.
-
-Create a startup manifest with:
-
-- required environment variables
-- required local devices
-- model paths
-- prompt bundle version
-- vector index snapshot
-- tool registry
-- policy bundle
-- readiness checks
-- degraded mode rules
-
-Then answer:
-
-1. Which features can run offline?
-2. Which features require network?
-3. Which features require human approval?
-4. Which startup failures should block the whole service?
-5. Which startup failures should only disable one feature?
+## Mini-lab: design a Jetson RAG stack
+
+Design a local RAG system for technical documentation on Jetson Orin 16GB.
+
+Fill this out:
+
+```text
+Generator:
+Quantization:
+Context length:
+Embedding model:
+Embedding runtime:
+Vector DB:
+Chunk size:
+Overlap:
+Top-K:
+Rerank strategy:
+Prompt budget:
+Backend:
+Expected VRAM:
+Expected RAM:
+Latency target:
+Evaluation set:
+Failure threshold:
+```
+
+Then write a decision:
+
+```text
+Use Qwen3.5-4B INT4 because:
+Use Granite 97M because:
+Use Qdrant because:
+Need reranking because:
+Do not increase context beyond:
+First optimization to try:
+First metric to monitor:
+```
 
 ---
 
 ## Key takeaways
 
-- Deterministic startup means the agent system boots into a known-good state before accepting traffic.
-- It does not make LLM outputs deterministic. It makes the surrounding system predictable.
-- Startup should be phase-based, logged, validated, and testable.
-- Required tools, prompts, policies, memory, retrieval indexes, and model clients should be verified before readiness.
-- `/livez` and `/readyz` must be separate.
-- Tool registries should be explicit and policy-bound.
-- RAG startup must verify the right index, snapshot, and embedding model.
-- Memory startup must handle schema, expiration, quarantine, and checkpoint compatibility.
-- Edge AI systems need capability-aware startup because hardware and network state may vary at boot.
-- A production agent should fail early rather than serve traffic in a half-ready state.
+- Efficient local RAG is retrieval-quality engineering plus memory discipline.
+- Qwen3.5-4B INT4 is a plausible small generator target, but exact variant/backend behavior must be validated.
+- Granite 97M Multilingual R2 is a strong edge embedding model because it is compact, multilingual, and retrieval-oriented.
+- Qdrant is usually a good edge-first vector database; pgvector is better when PostgreSQL integration dominates.
+- Chunking and reranking often improve quality more than increasing generator size.
+- Small models need compact, high-signal retrieved context and strict grounded prompts.
+- llama.cpp is strong for embedded GGUF deployment; vLLM is strong for server batching; TensorRT-LLM is for deeper NVIDIA optimization.
+- KV-cache optimization, prefix caching, and speculative decoding can improve local agent throughput.
+- Measure retrieval, answer quality, latency, VRAM, RAM, and power before declaring the stack "efficient."
 
 ---
 
 ## References
 
-- [Kubernetes probes: liveness, readiness, and startup probes](https://kubernetes.io/docs/concepts/configuration/liveness-readiness-startup-probes/)
-- [Twelve-Factor App: Config](https://12factor.net/config)
-- [OpenTelemetry](https://opentelemetry.io/)
-- [OWASP Top 10 for Large Language Model Applications](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
+- Qwen/Qwen3.5-4B model card: [https://huggingface.co/Qwen/Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B)
+- Granite 97M Multilingual R2 model card: [https://huggingface.co/ibm-granite/granite-embedding-97m-multilingual-r2](https://huggingface.co/ibm-granite/granite-embedding-97m-multilingual-r2)
+- IBM Granite Embedding docs: [https://www.ibm.com/us-en/granite/docs/models/embedding](https://www.ibm.com/us-en/granite/docs/models/embedding)
+- Qdrant indexing documentation: [https://qdrant.tech/documentation/manage-data/indexing/](https://qdrant.tech/documentation/manage-data/indexing/)
+- llama.cpp: [https://github.com/ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp)
+- vLLM documentation: [https://docs.vllm.ai](https://docs.vllm.ai)
+- TensorRT-LLM: [https://github.com/NVIDIA/TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM)
+- Lecture 43 - FP8 KV-Cache in vLLM: [Lecture-43.md](Lecture-43.md)
+- Lecture 47 - MLSys 2026 Kernel Contest: [Lecture-47.md](Lecture-47.md)
 
 ---
 
-*Next: [Lecture 15 - OpenClaw Case Study: Why Real Agents Need a Gateway](Lecture-15.md)*
+*Next: [Lecture 15](Lecture-15.md)*

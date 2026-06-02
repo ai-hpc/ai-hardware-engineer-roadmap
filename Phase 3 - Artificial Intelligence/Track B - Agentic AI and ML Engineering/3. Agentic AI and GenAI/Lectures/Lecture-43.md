@@ -1,42 +1,37 @@
-# Lecture 43 - MLSys 2026 Kernel Contest: AI-Assisted Blackwell LLM Kernel Optimization
+# Lecture 43 - FP8 KV-Cache in vLLM: Long-Context Serving for Agent Workloads
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 42](Lecture-42.md) | **Next:** [Lecture 44](Lecture-44.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 42](Lecture-42.md) | **Next:** [Lecture 44](Lecture-44.md)
 
 ---
 
-The **MLSys 2026 FlashInfer AI Kernel Generation Contest** is a compact map of where AI systems work is going.
+**Long-context agents** are memory systems.
 
-It asks participants to create **high-performance GPU kernels** for modern LLM inference operations on NVIDIA Blackwell B200 GPUs.
+They keep:
 
-The important part is **not only the kernel work**.
+- system prompts
+- session history
+- retrieved documents
+- tool outputs
+- planner traces
+- multimodal context
+- generated reasoning
 
-The contest explicitly welcomes:
+Underneath the API, the model server stores this context in a **KV cache**.
+
+For standard full-attention decoder models, that cache can **dominate GPU memory** at long contexts, and every decode step must read a large fraction of it.
+
+The core serving problem:
 
 ```text
-expert-crafted seed kernels with agent-assisted evolution
-fully agent-generated kernel solutions
+longer context
+  -> larger KV cache
+  -> more GPU memory
+  -> more memory traffic per generated token
+  -> higher inter-token latency
+  -> lower concurrency
 ```
 
-That makes it a case study in:
-
-```text
-GPU kernel optimization
-  + LLM inference runtime internals
-  + AI-assisted systems engineering
-```
-
-This is the **layer below ordinary agent apps**.
-
-It is where agent workloads become:
-
-- Tensor Core instructions
-- HBM traffic
-- shared-memory layouts
-- sparse indexers
-- expert routing
-- register pressure
-- occupancy tradeoffs
-- benchmark win rates
+vLLM's **FP8 KV-cache** work matters because it attacks that bottleneck directly.
 
 ---
 
@@ -44,1359 +39,680 @@ It is where agent workloads become:
 
 By the end of this lecture, you should be able to:
 
-1. Explain why the MLSys 2026 contest is an AI systems/runtime signal, not a normal hackathon.
-2. Identify the three competition tracks and the inference bottleneck each targets.
-3. Understand why NVIDIA Blackwell B200 changes the optimization target.
-4. Connect FP8 MoE, sparse attention, and Gated Delta Net kernels to modern LLM inference.
-5. Explain how FlashInfer-Bench evaluates correctness, speed, and win rate against baselines.
-6. Distinguish human-written, agent-assisted, and fully agent-generated kernel workflows.
-7. Design a kernel optimization loop with profiling, correctness checks, and benchmark discipline.
-8. Map this contest to career paths in AI runtime, GPU compiler, and accelerator software engineering.
+1. Explain why long-context serving becomes KV-cache and memory-bandwidth bound.
+2. Distinguish TTFT, ITL, prefill, decode, and throughput under load.
+3. Understand what `--kv-cache-dtype fp8` changes in vLLM.
+4. Explain why Hopper needed a two-level accumulation fix for long-context FP8 accuracy.
+5. Understand why small sliding-window layers should often stay BF16.
+6. Identify when FP8 KV-cache helps, when it hurts, and when calibration is required.
+7. Design a benchmark plan for FP8 KV-cache on agent workloads.
+8. Connect KV-cache quantization to OpenClaw-style long-running agents, cron jobs, RAG, and multimodal sessions.
 
 ---
 
-## 1. What the contest is
+## 1. Why KV cache dominates long-context serving
 
-The contest page describes the challenge as:
+During autoregressive inference, the model generates one token at a time.
 
-```text
-create optimized CUDA kernels for cutting-edge LLM operations
-for NVIDIA Blackwell B200 GPUs
-```
+For each generated token, attention needs keys and values from the previous context.
 
-The evaluation platform is **FlashInfer-Bench**.
-
-Submissions compete on:
-
-- correctness
-- speed
-- win rate against FlashInfer baselines
-
-The contest tracks target three operations that matter in modern inference:
+That stored state is the KV cache:
 
 ```text
-Track A:
-  Fused MoE with FP8 support
-
-Track B:
-  DeepSeek Sparse Attention
-
-Track C:
-  Gated Delta Net
+K = keys for previous tokens
+V = values for previous tokens
 ```
 
-Participants can use:
+At short context, **model compute** may dominate.
 
-- CUDA
-- Triton
-- CuTe DSL
-- TileLang
-- cuTile
-- other kernel programming systems
+At long context, decode often becomes **memory-bound**:
 
-That tool list is the **real signal**.
+```text
+generated token
+  -> read KV cache
+  -> compute attention
+  -> produce next token
+```
 
-The frontier of inference engineering is **not one API**.
+If the cache is large, every token generation pays for moving a lot of data.
 
-It is a **stack of DSLs, compilers, profilers, runtimes, and benchmark harnesses**.
+This is why long-context agents can become slow even when the model's **raw FLOPs** look sufficient.
 
 ---
 
-## 2. Why this belongs in an agent course
+## 2. Prefill vs decode
 
-Agentic AI is usually taught from the top:
+Long-context serving has two different phases.
 
-```text
-prompts
-tools
-RAG
-workflows
-agent orchestration
-```
+### Prefill
 
-But production agents create **inference demand**.
-
-That demand becomes:
+The model processes the entire input prompt:
 
 ```text
-low latency
-high throughput
-long context
-multi-user concurrency
-tool-loop responsiveness
-local or edge deployment
-cost per generated token
+system prompt + history + retrieved context + user message
 ```
 
-Those requirements eventually land on kernels.
+This is **time-to-first-token** work.
 
-The contest sits at the bottom of the stack:
+Metric:
 
 ```text
-agent workload
-  -> model server
-  -> inference runtime
-  -> attention / MoE / recurrent-state kernels
-  -> GPU architecture
+TTFT = time to first token
 ```
 
-If you want to build serious agent infrastructure, you need to understand the **lower layers**.
+For full attention, prefill cost can grow **roughly quadratically** with input length.
 
-Not every agent engineer writes CUDA.
+### Decode
 
-But the best systems engineers know **which kernel bottleneck they are paying for**.
+The model emits new tokens one at a time.
+
+Metric:
+
+```text
+ITL = inter-token latency
+```
+
+For long contexts, ITL tends to grow **roughly linearly** with input length because each new token attends over the cache.
+
+Serving engineers must track both:
+
+```text
+TTFT: how long until the user sees the first token?
+ITL: how fast do later tokens stream?
+```
+
+An optimization can **improve one and hurt the other**.
 
 ---
 
-## 3. Track A: Fused FP8 MoE
+## 3. What FP8 KV-cache does
 
-**Mixture-of-experts** models activate only a subset of experts per token.
+vLLM exposes:
 
-That saves compute, but it creates **systems problems**:
-
-- dynamic routing
-- irregular memory access
-- token-to-expert dispatch
-- expert load imbalance
-- small or fragmented GEMMs
-- scaling and reduction overhead
-- top-k expert selection
-- FP8 quantization and dequantization
-
-The contest's Track A focuses on **fused MoE kernels with FP8 support**.
-
-The optimization target:
-
-```text
-routing + dispatch + GEMM + scaling + output assembly
+```bash
+vllm serve meta-llama/Llama-3.1-8B --kv-cache-dtype fp8
 ```
 
-The reason to fuse:
+This stores KV cache in **FP8** and runs attention's QK and ScoreV matrix multiplications in FP8 on the supported paths described by vLLM.
+
+The simplest mental model:
 
 ```text
-fewer kernel launches
-less HBM traffic
-better Tensor Core utilization
-less intermediate materialization
+BF16 KV cache
+  -> larger cache
+  -> more memory traffic
+
+FP8 KV cache
+  -> roughly half cache storage
+  -> less memory traffic
+  -> potentially lower decode latency and higher concurrency
 ```
 
-Important performance questions:
+But the real result depends on:
 
-```text
-Are tokens grouped efficiently by expert?
-Are FP8 block scales loaded efficiently?
-Are GEMMs large enough to use Tensor Cores well?
-Is expert imbalance causing tail latency?
-Are intermediate buffers hitting HBM unnecessarily?
-Does fusion increase register pressure too much?
-```
+- GPU architecture
+- attention backend
+- head dimension
+- context length
+- prefill/decode mix
+- sliding-window layers
+- quantization scales
+- model sensitivity
 
-This connects directly to modern MoE models:
+FP8 is a **strong default candidate** for long-context decode-heavy workloads.
 
-- DeepSeek-style expert systems
-- Mixtral-style routing
-- Qwen MoE variants
-- small active-parameter models such as Lecture 40's ZAYA1-8B
-
-MoE is **not "free sparsity."**
-
-It is a **routing and memory-layout problem**.
+It is **not a universal win**.
 
 ---
 
-## 4. Track B: Sparse Attention
+## 4. The accuracy problem vLLM found
 
-**Dense attention** scales poorly with sequence length.
+The vLLM team found a serious **Hopper/FlashAttention-3 issue** under stress testing.
 
-The basic cost pattern:
-
-```text
-full attention:
-  every query attends over many keys
-  KV cache traffic grows with context
-```
-
-**Sparse attention** reduces work by selecting a subset of relevant tokens or blocks.
-
-The contest's Track B targets **DeepSeek Sparse Attention** with separate indexer and attention kernels.
-
-That split matters:
+On a 128k needle-in-a-haystack task:
 
 ```text
-indexer:
-  choose which blocks/tokens matter
-
-attention:
-  compute attention over selected sparse structure
+BF16 baseline accuracy: 91%
+FP8 before fix:         13%
+FP8 after fix:          89%
 ```
 
-Sparse attention bottlenecks:
+The issue was not "FP8 is bad" in the abstract.
 
-- top-k index generation
-- block sparse metadata
-- irregular KV reads
-- memory coalescing
-- cache locality
-- branch divergence
-- load balancing across queries
-- interaction with paged KV cache
-- FP8 data paths
+It was **accumulation precision** during long-context attention.
 
-Sparse attention is hard because it **trades arithmetic for control flow and memory indirection**.
-
-The key question:
+In long-context inference:
 
 ```text
-Does the sparsity saved enough memory traffic and compute
-to pay for indexer overhead and irregular access?
+Softmax(AttentionScore) * V
 ```
 
-This connects to:
+has a contraction dimension corresponding to context length.
 
-- Lecture 36: FP8 KV-cache
-- Lecture 37: trace-driven performance analysis
-- long-context agent sessions
-- DeepSeek-style inference systems
+At very large context lengths, imprecise intermediate accumulation caused severe numerical errors.
 
-For long-context agents, sparse attention is a **direct path to lower memory traffic**.
+vLLM and FlashAttention added a **two-level accumulation** strategy to restore accuracy.
 
-But it must be **profiled, not assumed**.
+Tradeoff:
+
+```text
+accuracy restored
+  -> more register pressure
+  -> possible prefill slowdown, especially head_dim > 128
+```
+
+This is the core hardware lesson:
+
+```text
+low precision is a systems contract,
+not just a dtype flag
+```
+
+**Kernel details matter.**
 
 ---
 
-## 5. Track C: Gated Delta Net
+## 5. The performance metric: ITL slope
 
-**Gated Delta Net** is a sequence-modeling approach used in Qwen3-Next.
-
-The contest includes decode and prefill kernels.
-
-This matters because GDN-style systems represent a broader shift:
+For concurrency 1, vLLM models ITL as:
 
 ```text
-not every future long-context model will be standard dense attention
+ITL = slope * input_len + intercept
 ```
 
-State-space, recurrent, delta-rule, and hybrid models try to reduce attention cost by **maintaining compact state**.
+Interpretation:
 
-The GPU problems change:
+| Term | Meaning |
+|---|---|
+| slope | extra decode latency added by each cached token |
+| intercept | fixed per-token overhead independent of input length |
 
-- state update kernels
-- recurrent dependency handling
-- scan-like computation
-- chunking
-- prefill/decode split
-- memory layout for persistent state
-- low-latency decode
-- high-throughput prefill
+FP8 is attractive when it **lowers the slope** enough to overcome any intercept overhead.
 
-Track C is therefore not just "one more kernel."
-
-It is a signal that inference runtimes must support **model families beyond standard transformers**.
-
-For systems engineers, that means:
+That produces a **break-even context length**:
 
 ```text
-runtime design must be model-architecture aware
+below break-even: BF16 may be faster
+above break-even: FP8 decode is faster
 ```
 
-An inference runtime optimized only for dense attention may **underperform on hybrid architectures**.
-
----
-
-## 6. Why Blackwell B200 matters
-
-The contest targets NVIDIA Blackwell B200 GPUs.
-
-That matters because kernel optimization is **hardware-specific**.
-
-Questions change by architecture:
-
-- Tensor Core throughput
-- FP8/FP4 paths
-- memory bandwidth
-- shared memory capacity and behavior
-- register file pressure
-- scheduler behavior
-- warp-group MMA support
-- TMA or async copy behavior
-- occupancy tradeoffs
-
-Optimizing for B200 is **not the same** as optimizing for A100 or H100.
-
-A kernel that wins on one generation may lose on another because:
-
-- the compute/memory balance changes
-- Tensor Core instruction choices change
-- memory hierarchy changes
-- compiler lowering changes
-- occupancy limits change
-
-That is why **official evaluation on bare metal** matters.
-
-The contest page notes that Modal scores are reference-only because clock frequency cannot be locked, while official evaluations run on bare-metal machines.
-
-This is a good performance-engineering rule:
+This is a better way to reason than simply saying:
 
 ```text
-cloud convenience is useful for iteration
-bare metal is needed for final claims
+FP8 is faster
+```
+
+You should ask:
+
+```text
+At what context length?
+For which model?
+On which backend?
+With what head dimension?
 ```
 
 ---
 
-## 7. FlashInfer-Bench
+## 6. Llama-class result
 
-FlashInfer-Bench is the contest evaluation platform.
-
-The benchmark model:
+For Llama-3.1-8B on H100 with the improved FP8 path, vLLM reports:
 
 ```text
-kernel spec
-  -> candidate kernel
-  -> correctness tests
-  -> speed measurement
-  -> comparison against FlashInfer baseline
-  -> win rate
+BF16 ITL slope: 4.37e-05 ms/token
+FP8 ITL slope:  2.37e-05 ms/token
+FP8 slope:      54% of BF16
+break-even:     ~7k tokens
 ```
 
-This is the right structure for kernel work.
-
-A kernel is **not useful because it compiles**.
-
-It must:
-
-- match numerical expectations
-- handle shape variations
-- beat or match a strong baseline
-- avoid pathological cases
-- be reproducible
-- be explainable in a writeup
-
-The contest requires tagged GitHub commits for evaluation and a technical report.
-
-That encourages the correct discipline:
+Under load:
 
 ```text
-code
-  -> benchmark
-  -> profile
-  -> explain
-  -> reproduce
+150 requests
+concurrency 8
+~20k input tokens
+~2k output tokens
+```
+
+vLLM reports for Llama-3.1-8B:
+
+```text
+BF16 output throughput: 450.3 tok/s
+FP8 output throughput:  517.5 tok/s
+gain:                  14.9%
+```
+
+The serving takeaway:
+
+```text
+single-request ITL slope improvements can translate into real throughput gains,
+but the end-to-end gain is smaller than the raw slope reduction
+```
+
+That is normal because real serving also includes **scheduling, prefill, batching, and non-attention work**.
+
+---
+
+## 7. Hybrid attention and sliding-window layers
+
+Hybrid models may include both:
+
+- global attention layers
+- sliding-window attention layers
+
+**Sliding-window layers** attend only over a bounded recent window.
+
+Example:
+
+```text
+window size = 128
+```
+
+For these layers, KV-cache size **does not grow** with full context length.
+
+Quantizing small bounded windows may **add overhead** without enough memory-traffic savings.
+
+vLLM added:
+
+```bash
+--kv-cache-dtype-skip-layers sliding_window
+```
+
+Example:
+
+```bash
+vllm serve gpt-oss-20b \
+  --kv-cache-dtype fp8 \
+  --kv-cache-dtype-skip-layers sliding_window
+```
+
+For gpt-oss-20b on H100, vLLM reports:
+
+```text
+BF16 ITL slope:        8.94e-06 ms/token
+full FP8 slope:        7.14e-06 ms/token  (80% of BF16)
+FP8 skip-SW slope:     6.34e-06 ms/token  (71% of BF16)
+break-even skip-SW:    ~7.7k tokens
+```
+
+Design rule:
+
+```text
+Quantize the layers where KV-cache memory traffic dominates.
+Do not quantize small bounded windows just because a global dtype flag exists.
 ```
 
 ---
 
-## 8. Human plus agent kernel generation
+## 8. Head dimension 256 caveat
 
-The contest explicitly allows two approaches:
+**Large head dimensions** change the tradeoff.
 
-```text
-expert-crafted seed kernels with agent-assisted evolution
-fully agent-generated solutions
-```
+For a model with `head_dim = 256`, vLLM reports that FP8 **improves decode ITL** but can **worsen TTFT** because two-level accumulation increases register pressure.
 
-These are **different workflows**.
-
-### Human plus agent
-
-The human writes:
-
-- baseline kernel structure
-- tiling strategy
-- memory layout
-- correctness harness
-- profiling plan
-
-The agent helps:
-
-- generate variants
-- tune constants
-- try layout changes
-- refactor code
-- run benchmarks
-- summarize profiling results
-
-### Fully agent-generated
-
-The agent owns more of the loop:
-
-- read kernel spec
-- generate code
-- run tests
-- benchmark
-- mutate kernel
-- select winners
-- produce reproducibility scripts
-
-The contest page requires agent solutions to open-source scripts that reproduce kernels.
-
-That is important.
-
-For AI-generated systems code, the artifact is **not only the final kernel**.
-
-The artifact is also:
+Example from gemma-4-E2B on H100:
 
 ```text
-the generation process
+BF16 ITL slope: 5.30e-05 ms/token
+FP8 ITL slope:  3.60e-05 ms/token
+FP8 slope:      68% of BF16
+
+BF16 TTFT quadratic coefficient: 6.93e-07
+FP8 TTFT quadratic coefficient:  1.12e-06
 ```
 
-That process must be **reproducible**.
+Interpretation:
+
+```text
+decode improves
+prefill slows down
+```
+
+If your workload is **decode-heavy**, FP8 may still help.
+
+If your workload is **prefill-heavy**, especially with very long prompts and short outputs, BF16 may be better.
+
+Agent implication:
+
+| Workload | Risk |
+|---|---|
+| long RAG prompt, short answer | TTFT dominates |
+| long reasoning output | decode dominates |
+| chat with repeated long history | both matter |
+
+**Do not optimize blindly.**
+
+Measure the **phase that dominates** your workload.
 
 ---
 
-## 9. The optimization loop
+## 9. Hopper vs Blackwell
 
-A serious kernel optimization loop looks like this:
+vLLM's post distinguishes H100/Hopper and B200/Blackwell paths.
+
+On Hopper with FlashAttention-3:
+
+- two-level accumulation was needed to address long-context FP8 accuracy
+- optimized tile sizes improved prefill/decode behavior
+
+On Blackwell B200 with FlashInfer:
+
+- the accumulation issue is described as fixed on that path
+- FP8 still reduces decode slope
+
+Examples reported:
 
 ```text
-1. Read the kernel spec.
-2. Implement a correct baseline.
-3. Build correctness tests.
-4. Benchmark against the reference.
-5. Profile the bottleneck.
-6. Generate one controlled optimization variant.
-7. Re-test correctness.
-8. Re-benchmark.
-9. Record the delta.
-10. Repeat.
+Llama-3.1-8B on B200:
+BF16 slope: 1.80e-05
+FP8 slope:  9.72e-06
+break-even: ~4k tokens
+
+gpt-oss-20b on B200:
+BF16 slope: 3.56e-06
+FP8 slope:  2.06e-06
+break-even: ~13k tokens
 ```
 
-**Do not change five things at once.**
+**Hardware generation and attention backend** are part of the configuration.
 
-Kernel work is **full of traps**:
+Do not assume H100 results **transfer exactly** to B200, or vice versa.
 
-- a faster kernel may be numerically wrong
-- a change may help one shape and hurt another
-- a local benchmark may not match official clocks
-- register pressure may erase fusion gains
-- memory coalescing may be broken by a layout change
-- branch divergence may dominate sparse kernels
+---
 
-The right unit of progress:
+## 10. Accuracy results
+
+The vLLM team tested:
+
+- reasoning benchmarks such as AIME25, GPQA:Diamond, MATH500, LiveCodeBench-v6
+- long-context MRCR evaluations up to 1M tokens
+- decoder-only and MoE models
+- BF16 and FP8 weight/activation settings
+- Hopper and Blackwell paths
+
+High-level findings:
+
+- Qwen3-30B-A3B-Thinking-2507 reasoning changed by about 1-2 points with FP8 KV-cache plus FP8 attention.
+- Qwen3.5-27B reasoning showed sub-point differences in the reported aggregate scores.
+- Llama-3.3-70B-Instruct recovered about 97-98% of baseline AUC at 128k MRCR.
+- Qwen3-30B-A3B-Instruct-2507 recovered roughly 94-98% AUC at 256k depending on model setting.
+- Qwen3.5-27B matched aggregate AUC up to 1M in the reported setup.
+
+The post intentionally uses simple per-tensor **uncalibrated scale** `1.0` as a reproducible lower bound.
+
+That matters because:
 
 ```text
-one hypothesis
-one variant
-one measurement
-one retained or rejected change
+if uncalibrated works, deployment is simple
+if uncalibrated shows systematic degradation, calibration is the next step
 ```
 
 ---
 
-## 10. Profiling checklist
+## 11. When to calibrate
 
-Use Nsight Compute, Nsight Systems, FlashInfer-Bench outputs, and trace tools where appropriate.
+Start simple:
+
+```text
+--kv-cache-dtype fp8
+```
+
+Then evaluate your workload.
+
+Calibrate if you see:
+
+- systematic downward accuracy shift
+- model-specific degradation
+- non-standard attention backend behavior
+- task-specific sensitivity
+- long-context retrieval failures
+
+vLLM specifically notes **Kimi-K2.5 with FlashMLA** as an example where uncalibrated FP8 showed consistent negative shift, making calibration worth considering.
+
+**Calibration is not free.**
+
+It adds:
+
+- dataset selection work
+- evaluation work
+- deployment complexity
+- possible per-head/per-tensor scale management
+
+Use it when the **accuracy evidence** justifies it.
+
+---
+
+## 12. When to avoid FP8 KV-cache
+
+Stay with BF16, or at least be cautious, when:
+
+| Condition | Reason |
+|---|---|
+| contexts are short, roughly below 7k tokens | FP8 overhead may not amortize |
+| `head_dim = 256` and prefill matters | two-level accumulation can slow TTFT |
+| uncalibrated accuracy drops below your threshold | calibration or BF16 may be needed |
+| many small sliding-window layers | FP8 overhead may not pay off |
+| backend/model path is not well validated | hidden accuracy/performance regressions possible |
+
+Decision rule:
+
+```text
+FP8 KV-cache is a default candidate for long-context decode-heavy serving.
+It is not a default truth.
+```
+
+---
+
+## 13. OpenClaw and agent workload mapping
+
+OpenClaw-style agents create several long-context serving patterns.
+
+| Agent pattern | Serving shape |
+|---|---|
+| long chat session | growing KV cache and repeated decode |
+| RAG over large docs | heavy prefill, often shorter decode |
+| code agent with logs | long prompt and medium decode |
+| reasoning agent | short/medium prefill, long decode |
+| cron summarizer | batch-like prefill plus summary decode |
+| multimodal perception handoff | large context compression plus downstream decode |
+
+FP8 KV-cache is most attractive when:
+
+```text
+many concurrent sessions
+long contexts
+meaningful output lengths
+decode is memory-bound
+accuracy passes workload evals
+```
+
+It is less compelling when:
+
+```text
+short prompts
+short outputs
+prefill dominates
+model has sensitive attention backend
+hybrid small-window layers dominate
+```
+
+---
+
+## 14. Benchmark plan for your agent server
+
+Do not rely only on **public benchmark numbers**.
+
+Run your **own matrix**:
+
+```text
+models:
+  - primary chat model
+  - reasoning model
+  - code model
+  - multimodal/context model if served through vLLM
+
+configs:
+  - BF16 KV cache
+  - FP8 KV cache
+  - FP8 skip sliding-window layers where relevant
+  - calibrated FP8 if uncalibrated drops
+
+workloads:
+  - short chat
+  - long chat
+  - RAG long prefill / short decode
+  - code agent logs / medium decode
+  - reasoning long decode
+  - concurrent sessions
+```
 
 Measure:
 
-- achieved occupancy
-- register count
-- shared memory usage
-- Tensor Core utilization
-- memory throughput
-- L2 hit rate
-- global load/store efficiency
-- warp divergence
-- instruction mix
-- kernel launch overhead
-- achieved TFLOPS or effective bandwidth
-- latency distribution across shapes
-
-Interpretation examples:
-
 ```text
-low Tensor Core utilization:
-  tiling, dtype path, or GEMM shape may be poor
-
-high HBM bandwidth with low compute:
-  memory-bound kernel; optimize layout and traffic
-
-high register pressure:
-  fusion or unrolling may be too aggressive
-
-high divergence:
-  sparse indexing or routing path may be unbalanced
-
-good average but bad tail:
-  expert imbalance or sparse metadata distribution may matter
+TTFT
+ITL
+output tokens/sec
+requests/sec
+GPU memory
+max concurrency before OOM
+accuracy / task pass rate
+long-context retrieval correctness
+cost per task
 ```
 
-This connects to Lecture 37:
+The winner is **workload-dependent**.
+
+---
+
+## 15. Practical commands
+
+Basic:
+
+```bash
+vllm serve meta-llama/Llama-3.1-8B \
+  --kv-cache-dtype fp8
+```
+
+Hybrid attention model with small sliding-window layers:
+
+```bash
+vllm serve gpt-oss-20b \
+  --kv-cache-dtype fp8 \
+  --kv-cache-dtype-skip-layers sliding_window
+```
+
+Benchmarking shape:
+
+```bash
+vllm bench serve \
+  --model <model> \
+  --num-prompts 150 \
+  --request-rate inf
+```
+
+Treat commands as **starting points**.
+
+Pin **vLLM version, GPU backend, model revision, and benchmark dataset** before comparing results.
+
+---
+
+## 16. Hardware engineer view
+
+FP8 KV-cache is a **hardware/software co-design** example.
+
+The optimization involves:
+
+- lower precision storage
+- tensor core behavior
+- attention kernel design
+- register pressure
+- tiling
+- memory bandwidth
+- quantization scales
+- model architecture
+- serving scheduler behavior
+
+The key insight:
 
 ```text
-performance claims need trace and profiling evidence
+Quantization is not just a model-compression trick.
+It changes the memory traffic and kernel behavior of the serving system.
+```
+
+For GPU engineers, the interesting questions are:
+
+```text
+Where is the bottleneck: memory bandwidth, compute, registers, or scheduler?
+Does the dtype reduce traffic enough to pay for conversion overhead?
+Does the attention backend preserve accuracy at long context?
+Does the workload benefit from higher concurrency or lower ITL?
 ```
 
 ---
 
-## 11. Toolchain choices
+## Mini-lab: FP8 KV-cache deployment decision
 
-The contest allows multiple implementation paths.
+Pick one vLLM-served model.
 
-Do not treat them as interchangeable.
-
-Each tool sits at a different abstraction level:
+Run three configurations:
 
 ```text
-FlashInfer:
-  LLM inference kernel/runtime library and benchmark baseline
-
-CUDA:
-  lowest-level mainstream NVIDIA GPU programming interface
-
-Triton:
-  Python-like GPU kernel DSL optimized for fast iteration
-
-TileLang:
-  tile-level kernel DSL for composable AI kernels
-
-CuTe DSL:
-  Python DSL around CUTLASS/CuTe layout and tensor abstractions
-
-cuTile:
-  NVIDIA CUDA Tile Python DSL targeting Tile IR and portable tensor-core kernels
-
-OpenEvolve:
-  evolutionary coding agent for automated program optimization
-
-Modal:
-  serverless GPU/cloud execution environment for iteration and reference runs
-
-Blackwell B200:
-  target hardware that determines what "fast" actually means
+BF16
+FP8
+FP8 with skip sliding-window layers, if relevant
 ```
 
-The practical rule:
+Use two workloads:
 
 ```text
-choose the tool that gives you the fastest correct iteration
-for the bottleneck you actually have
+long prefill / short output
+medium prefill / long output
 ```
 
-But for this contest, the real skill is knowing when to drop down a level.
-
----
-
-### 11.1 FlashInfer
-
-FlashInfer is the **center of gravity** for this contest.
-
-It is an LLM serving kernel library focused on **high-performance inference primitives**:
-
-- attention
-- paged KV-cache operations
-- sampling
-- normalization
-- MoE-related kernels
-- quantization-aware serving paths
-- decode and prefill helpers
-
-In the contest, FlashInfer plays three roles:
+Record:
 
 ```text
-reference implementation:
-  the baseline your kernel must beat
-
-benchmark environment:
-  FlashInfer-Bench measures correctness and speed
-
-runtime context:
-  the operations are real LLM serving bottlenecks, not toy kernels
+TTFT
+median ITL
+output tok/s
+GPU memory
+max concurrency before OOM
+task accuracy
 ```
 
-Why this matters:
+Then write a deployment decision:
 
 ```text
-If you beat a naive PyTorch baseline, that proves little.
-
-If you beat FlashInfer on a real inference primitive,
-that is a meaningful systems result.
+Use FP8 KV-cache for:
+Avoid FP8 KV-cache for:
+Need calibration for:
+Need further testing for:
 ```
-
-What to study in FlashInfer:
-
-- API shape for decode and prefill kernels
-- tensor layout conventions
-- page/block abstractions for KV cache
-- supported dtypes and quantization paths
-- baseline kernel behavior
-- benchmark input distributions
-- numerical tolerances
-
-Common mistake:
-
-```text
-optimizing against the wrong mental model
-```
-
-FlashInfer kernels are **already specialized**. You need to understand what the baseline is doing **before assuming an optimization opportunity exists**.
-
-For example, if a sparse attention kernel is slow, the bottleneck may not be the attention math. It may be:
-
-- sparse index generation
-- metadata reads
-- poor memory coalescing
-- shape-specific occupancy
-- scale loading
-- page table indirection
-
-FlashInfer is where **LLM theory becomes concrete runtime layout**.
-
----
-
-### 11.2 CUDA
-
-CUDA is the **most direct and controllable** path.
-
-Use CUDA when you need:
-
-- explicit thread/block mapping
-- warp-level control
-- shared memory control
-- vectorized global memory access
-- explicit synchronization
-- custom Tensor Core instruction paths
-- fine-grained launch configuration
-- maximum control over register pressure and occupancy
-
-CUDA is the right tool when the kernel is blocked by details the compiler DSL does not expose.
-
-Examples:
-
-```text
-FP8 MoE:
-  custom token grouping, expert dispatch, scale loading, epilogue fusion
-
-Sparse attention:
-  custom sparse metadata traversal and memory coalescing
-
-Gated Delta Net:
-  specialized state update and decode loop scheduling
-```
-
-CUDA gives you control, but it also **gives you enough rope**.
-
-Common CUDA failure modes:
-
-- out-of-bounds memory access
-- bank conflicts
-- uncoalesced loads
-- excessive register use
-- low occupancy
-- branch divergence
-- poor Tensor Core utilization
-- excessive synchronization
-- numerically wrong accumulation
-- shape-specific regressions
-
-CUDA debugging discipline:
-
-```text
-1. correctness first
-2. one optimization at a time
-3. inspect generated SASS/PTX when needed
-4. profile register/shared-memory occupancy
-5. test multiple shapes, not one cherry-picked shape
-```
-
-Use CUDA when you need a **hand-tuned final kernel** or when you need to understand exactly why a higher-level kernel is losing.
-
----
-
-### 11.3 Triton
-
-Triton is a **Python-like language** for writing GPU kernels.
-
-It is valuable because it **shortens the edit-test-profile loop**.
-
-Use Triton when you need:
-
-- fast prototyping
-- parameterized kernels
-- autotuning
-- Python-native iteration
-- easier agent-generated variants
-- compact expression of tile-level math
-
-Triton is often a good first implementation path for:
-
-- elementwise fusion
-- reductions
-- small GEMM-like kernels
-- custom attention prototypes
-- shape-specialized kernels
-
-Why agents like Triton:
-
-```text
-less boilerplate than CUDA
-Python syntax
-shorter kernels
-faster mutation loop
-easier benchmark automation
-```
-
-Where Triton can struggle:
-
-- extremely irregular sparse access
-- full control over warp-level primitives
-- newest NVIDIA architecture features before compiler support catches up
-- complex Tensor Core scheduling
-- cases where generated code choices are opaque
-
-Triton is **not "slower CUDA."**
-
-It is a **different abstraction boundary**.
-
-For agentic kernel search, a practical path is:
-
-```text
-Triton prototype
-  -> find algorithm and tiling idea
-  -> benchmark shapes
-  -> port hot winner to CUDA or CuTe if deeper control is needed
-```
-
----
-
-### 11.4 TileLang
-
-TileLang is a **tile-oriented DSL** for writing high-performance AI kernels.
-
-The key abstraction is that you describe computation **in terms of tiles**, rather than manually managing every thread-level operation.
-
-This is useful because AI kernels usually have tiled structure:
-
-- matrix multiplication
-- attention blocks
-- reductions
-- normalization
-- block sparse compute
-- fused epilogues
-
-Use TileLang when you want:
-
-- a higher-level tiled programming model
-- composable kernel descriptions
-- faster search over tile sizes and schedules
-- kernels that are easier for agents to mutate than low-level CUDA
-
-The mental model:
-
-```text
-CUDA:
-  think threads, warps, shared memory, synchronization
-
-TileLang:
-  think tiles, loops over tiles, memory scopes, schedule choices
-```
-
-Why this matters for the contest:
-
-```text
-agent-generated kernels benefit from abstractions
-that reduce the number of ways to write invalid code
-```
-
-TileLang can be a better target for automated exploration because the search space is closer to the math.
-
-But you **still need profiling**.
-
-A tile abstraction can **hide**:
-
-- bad memory layout
-- excessive register use
-- poor generated code
-- compiler limitations
-- shape-specific scheduling failures
-
-Use TileLang as a rapid kernel-generation layer, then validate with FlashInfer-Bench and Nsight.
-
----
-
-### 11.5 CuTe DSL
-
-CuTe DSL is NVIDIA's **Python DSL around CUTLASS/CuTe** concepts.
-
-CuTe is fundamentally about **tensor layouts and tiled tensor algebra**.
-
-This matters because many high-performance kernels are layout problems.
-
-A good kernel is not only:
-
-```text
-do the right math
-```
-
-It is:
-
-```text
-map the math to hardware-friendly tiled layouts
-```
-
-CuTe-style thinking emphasizes:
-
-- layout composition
-- tile shapes
-- memory hierarchy
-- tensor views
-- copy atoms
-- MMA atoms
-- pipeline stages
-- warp and warpgroup organization
-
-Use CuTe DSL when:
-
-- the kernel is GEMM-like
-- Tensor Core utilization is central
-- layouts are complex
-- you need CUTLASS-grade abstractions without raw C++ template pain
-- you care about SM90/SM100-style features and structured tiling
-
-Cost:
-
-- steep learning curve
-- layout algebra is unforgiving
-- compiler/runtime stack maturity matters
-- debugging requires understanding generated lower-level behavior
-
-Why it matters for Blackwell:
-
-```text
-Blackwell optimization is heavily about feeding tensor cores
-and moving data through the memory hierarchy correctly.
-```
-
-CuTe DSL gives you a way to express that **more directly than Triton** in some cases, while staying **higher level than hand-written CUDA**.
-
-For contest work, CuTe DSL is most relevant to Track A FP8 MoE and any GEMM-like subproblem.
-
----
-
-### 11.6 cuTile
-
-cuTile is NVIDIA's **Python implementation of the CUDA Tile** programming model.
-
-The official docs describe cuTile as a Python-based DSL where kernels operate on tiles, using functions such as:
-
-- `ct.load`
-- `ct.store`
-- tile arithmetic
-- reductions
-- matrix multiply
-- `ct.launch`
-
-Important distinction:
-
-```text
-arrays:
-  global-memory objects passed from host
-
-tiles:
-  immutable kernel-local tensor-like values with compile-time shapes
-```
-
-This is a **major abstraction shift**.
-
-Instead of writing:
-
-```text
-thread i loads element i
-```
-
-you write:
-
-```text
-load this tile
-operate on this tile
-store this tile
-```
-
-Why cuTile matters:
-
-- it targets NVIDIA's tile programming model
-- it aims to expose hardware features through tile abstractions
-- it can be easier to modify than deep CUDA/CUTLASS templates
-- it is aligned with agent-assisted kernel translation work
-
-This connects directly to **Lecture 35**, where cuTile Python to cuTile.jl translation was used as a concrete Agent Skills example.
-
-For the MLSys contest:
-
-```text
-cuTile may be useful when you want tile-level expression
-without writing full CUDA boilerplate.
-```
-
-But treat it as a young, hardware-sensitive toolchain.
-
-Validate:
-
-- supported GPU architecture
-- CUDA Toolkit version
-- generated kernel performance
-- limitations for your target op
-- debugging workflow
-
----
-
-### 11.7 OpenEvolve
-
-OpenEvolve is **not a GPU kernel language**.
-
-It is an **evolutionary coding agent framework**.
-
-Its role in this contest is **search**.
-
-A normal kernel workflow:
-
-```text
-human writes variant
-human benchmarks variant
-human reads result
-human writes next variant
-```
-
-An OpenEvolve-style workflow:
-
-```text
-population of candidate kernels
-  -> correctness filter
-  -> benchmark score
-  -> select winners
-  -> mutate/crossover/generate new candidates
-  -> repeat
-```
-
-Why this fits GPU kernels:
-
-- performance landscapes are rugged
-- small code changes can produce large speed changes
-- many variants fail correctness
-- many optimizations are shape-specific
-- humans cannot manually explore the full schedule space
-
-What OpenEvolve needs to be useful:
-
-- deterministic benchmark command
-- fast correctness check
-- objective score
-- saved artifacts
-- mutation boundaries
-- timeout policy
-- rollback policy
-- result database
-
-For kernel optimization, the fitness function should not be just:
-
-```text
-fastest one run
-```
-
-It should include:
-
-- correctness
-- median latency
-- variance
-- shape coverage
-- compile success
-- code size or complexity
-- no forbidden APIs
-- no benchmark cheating
-
-This is where the contest's agent-generated-kernel track becomes serious.
-
-The best agent is **not the one that writes the prettiest CUDA**.
-
-It is the one that can run a **disciplined generate-test-profile-select loop**.
-
----
-
-### 11.8 Modal
-
-Modal is a **serverless cloud platform** for running compute-intensive workloads.
-
-In this contest context, Modal is useful for **iteration and reference execution**.
-
-Use Modal for:
-
-- repeatable containerized benchmark runs
-- GPU access without owning hardware
-- quick starter-kit experiments
-- parallel search jobs
-- artifact collection
-- CI-like evaluation pipelines
-
-But the contest page explicitly warns that Modal scores are reference-only because GPU clocks cannot be locked.
-
-That means:
-
-```text
-Modal is good for iteration.
-Bare metal is required for official performance claims.
-```
-
-Good Modal workflow:
-
-```text
-1. package benchmark container
-2. run correctness tests
-3. run rough performance screen
-4. collect logs and artifacts
-5. promote promising candidates to bare-metal validation
-```
-
-Do **not overfit to Modal timing noise**.
-
-Use it to reduce the number of bad candidates, **not to prove final speed**.
-
----
-
-### 11.9 Blackwell B200
-
-Blackwell B200 is the **target hardware**.
-
-That determines **what optimizations matter**.
-
-Official NVIDIA docs identify B200 as compute capability 10.0 in the Blackwell tuning guide and describe the architecture as targeting generative AI and accelerated computing.
-
-The practical B200 concerns for this contest:
-
-- FP8 and lower-precision Tensor Core paths
-- high HBM bandwidth
-- large memory capacity
-- Blackwell-specific scheduling behavior
-- architecture-specific compiler lowering
-- Tensor Core feeding and pipeline design
-- shared-memory/L1 behavior
-- register pressure and occupancy balance
-- support for newer CUDA features
-
-Do **not assume Hopper instincts transfer perfectly**.
-
-Questions to ask on B200:
-
-```text
-Does this kernel use the right dtype path?
-Does it keep Tensor Cores busy?
-Is it memory bandwidth bound?
-Is shared memory helping or hurting?
-Is register pressure limiting occupancy?
-Does the compiler generate Blackwell-appropriate instructions?
-Does performance change across B200 vs H100?
-```
-
-For Track A, Blackwell matters because FP8 MoE wants strong Tensor Core utilization and efficient scale handling.
-
-For Track B, Blackwell matters because sparse attention may be memory and metadata bound.
-
-For Track C, Blackwell matters because recurrent-state kernels may stress different latency and memory paths than dense attention.
-
-The key lesson:
-
-```text
-hardware generation is part of the algorithm.
-```
-
-An inference kernel is **not just math**. It is **math mapped onto a specific machine**.
-
----
-
-### 11.10 Tool selection matrix
-
-Use this matrix as a starting point.
-
-| Need | Best first tool | Why |
-|---|---|---|
-| Understand contest baseline | FlashInfer | It defines the reference runtime and benchmark target |
-| Maximum low-level control | CUDA | Explicit control over threads, memory, and synchronization |
-| Fast prototype and autotune | Triton | Shorter Python-like kernels and fast iteration |
-| Tiled AI kernel exploration | TileLang | Tile-level abstraction for AI workloads |
-| Tensor Core / layout-heavy GEMM-like work | CuTe DSL | Strong layout and tiled tensor abstractions |
-| Pythonic CUDA Tile experiments | cuTile | Tile IR-oriented Python DSL for NVIDIA GPUs |
-| Automated variant search | OpenEvolve | Evolutionary loop around code generation and benchmark scores |
-| Cloud iteration | Modal | Convenient GPU jobs and artifact collection |
-| Final performance claim | Bare-metal B200 | Official target with controlled clocks and reproducibility |
-
-The strongest workflow combines tools:
-
-```text
-FlashInfer-Bench:
-  tells you whether you are winning
-
-Triton / TileLang / cuTile:
-  help explore algorithmic variants quickly
-
-CUDA / CuTe DSL:
-  help turn the winning idea into a hardware-tuned kernel
-
-OpenEvolve:
-  scales search over variants
-
-Modal:
-  scales early experimentation
-
-Bare-metal B200:
-  validates the final result
-```
-
----
-
-## 12. Agentic kernel optimization workflow
-
-A useful AI-assisted workflow:
-
-```text
-human:
-  defines benchmark target and constraints
-
-agent:
-  reads spec and prior results
-  proposes variants
-  edits one kernel at a time
-  runs correctness tests
-  runs benchmark
-  records deltas
-  rejects bad variants
-
-human:
-  reviews profiling evidence
-  adjusts search direction
-```
-
-Required guardrails:
-
-- deterministic benchmark scripts
-- strict correctness tests
-- one-variant-at-a-time discipline
-- no silent benchmark cherry-picking
-- raw results stored
-- code diffs reviewed
-- shape coverage maintained
-
-This is where **agent skills matter**.
-
-A good kernel-optimization skill should encode:
-
-- profiling checklist
-- common CUDA failure modes
-- benchmark protocol
-- correctness rules
-- allowed search space
-- reporting template
-
-Then use Lecture 39's skill eval pattern to test whether the skill improves kernel work.
-
----
-
-## 13. What to learn before competing
-
-Core prerequisites:
-
-```text
-GPU architecture:
-  SMs, warps, occupancy, memory hierarchy, Tensor Cores
-
-CUDA programming:
-  blocks, threads, shared memory, synchronization, vectorized loads
-
-LLM inference:
-  prefill, decode, KV cache, paged attention, MoE routing
-
-Numerics:
-  FP8 formats, block scaling, accumulation, error tolerances
-
-Profiling:
-  Nsight Systems, Nsight Compute, benchmark discipline
-
-Runtime systems:
-  FlashInfer, vLLM, TensorRT-LLM concepts
-
-Agent workflows:
-  reproducible code generation, patching, test loops
-```
-
-If you lack these, start with a smaller kernel:
-
-- vector add
-- layernorm
-- small GEMM
-- attention score kernel
-- top-k indexer
-
-Then move toward the contest kernels.
-
----
-
-## 14. Career signal
-
-The contest points toward roles such as:
-
-- AI runtime engineer
-- GPU kernel engineer
-- inference infrastructure engineer
-- GPU compiler engineer
-- accelerator software engineer
-- AI systems researcher
-- autonomous optimization systems engineer
-
-These roles sit between:
-
-```text
-model architecture
-hardware architecture
-compiler/runtime software
-production inference serving
-```
-
-They are rarer than AI application roles because they require:
-
-- low-level performance instincts
-- ML workload knowledge
-- systems debugging
-- mathematical numerics
-- hardware awareness
-- benchmark integrity
-
-If you want to move from AI application work into AI systems work, this contest is a **strong practice target**.
-
----
-
-## 15. How this maps to this roadmap
-
-Relevant earlier lectures:
-
-- Lecture 32: LLM internals and inference mechanics
-- Lecture 35: agent skills for GPU kernel translation
-- Lecture 36: FP8 KV-cache and attention quantization
-- Lecture 37: TraceLens and trace-driven performance analysis
-- Lecture 38: AutoSP and compiler-generated sequence parallelism
-- Lecture 40: small MoE reasoning model deployment tradeoffs
-- Lecture 42: durable agent harnesses for tool-oriented long-running work
-
-The contest combines all of them:
-
-```text
-kernel optimization:
-  low-level GPU work
-
-LLM inference:
-  real model bottlenecks
-
-agent generation:
-  automated search and code synthesis
-
-benchmarking:
-  correctness and performance evidence
-
-runtime thinking:
-  kernels as part of the serving stack
-```
-
-This is a **bridge from agent engineering to AI hardware/software co-design**.
-
----
-
-## Mini-lab: build a contest preparation plan
-
-Pick one track:
-
-```text
-Track A: FP8 MoE
-Track B: Sparse Attention
-Track C: Gated Delta Net
-```
-
-Write a preparation plan:
-
-```text
-Track:
-Target kernel:
-Hardware:
-Baseline:
-Correctness tests:
-Benchmark command:
-Profiler:
-First bottleneck hypothesis:
-First three variants:
-Expected risk:
-Acceptance threshold:
-Writeup evidence:
-Agent role:
-Human review points:
-```
-
-Then write a one-week schedule:
-
-```text
-Day 1:
-  reproduce starter kit
-
-Day 2:
-  understand baseline and shapes
-
-Day 3:
-  profile bottleneck
-
-Day 4:
-  implement first variant
-
-Day 5:
-  benchmark and reject/keep
-
-Day 6:
-  agent-assisted search
-
-Day 7:
-  write results and next plan
-```
-
-The goal is **not to win immediately**.
-
-The goal is to build a **disciplined kernel optimization loop**.
 
 ---
 
 ## Key takeaways
 
-- The MLSys 2026 FlashInfer contest is about real LLM inference kernels on NVIDIA Blackwell B200 GPUs.
-- The tracks target high-value inference bottlenecks: FP8 MoE, sparse attention, and Gated Delta Net.
-- MoE optimization is a routing, memory-layout, Tensor Core, and fusion problem.
-- Sparse attention trades dense compute for indexing and irregular memory access.
-- Gated Delta Net points toward non-standard transformer alternatives and recurrent-state inference.
-- FlashInfer-Bench emphasizes correctness, speed, and win rate against strong baselines.
-- CUDA gives maximum control; Triton, TileLang, CuTe DSL, and cuTile trade some control for faster iteration and higher-level tiled abstractions.
-- OpenEvolve-style agents are useful when correctness and benchmark scripts define a reliable evolutionary search loop.
-- Modal is useful for iteration, but final claims need controlled bare-metal B200 measurement.
-- Blackwell B200 changes the optimization target; do not assume Hopper-tuned kernels transfer unchanged.
-- Agent-generated kernels must be reproducible, not just fast once.
-- Serious kernel work requires hypothesis-driven profiling and benchmark integrity.
-- This contest is a strong career signal for AI runtime, GPU compiler, and inference infrastructure engineering.
+- Long-context agent serving is often KV-cache and memory-bandwidth bound.
+- FP8 KV-cache can roughly halve cache storage and reduce decode memory traffic.
+- vLLM's FP8 path is now a strong starting point for many long-context decode-heavy deployments.
+- Hopper required a two-level accumulation fix to recover long-context FP8 accuracy in FlashAttention-3.
+- Sliding-window layers with small windows often should stay BF16 using `--kv-cache-dtype-skip-layers sliding_window`.
+- `head_dim = 256` can make prefill slower under two-level accumulation even when decode improves.
+- Use uncalibrated FP8 first for simplicity, but calibrate if workload accuracy shows systematic degradation.
+- Always benchmark TTFT, ITL, throughput, memory, concurrency, and task accuracy on your real agent workload.
 
 ---
 
 ## References
 
-- MLSys 2026 FlashInfer AI Kernel Generation Contest: [https://github.com/flashinfer-ai/mlsys26-contest/blob/main/index.html](https://github.com/flashinfer-ai/mlsys26-contest/blob/main/index.html)
+- vLLM Blog, "The State of FP8 KV-Cache and Attention Quantization in vLLM": [https://vllm.ai/blog/fp8-kvcache](https://vllm.ai/blog/fp8-kvcache)
+- vLLM documentation: [https://docs.vllm.ai](https://docs.vllm.ai)
+- FlashAttention: [https://github.com/Dao-AILab/flash-attention](https://github.com/Dao-AILab/flash-attention)
 - FlashInfer: [https://github.com/flashinfer-ai/flashinfer](https://github.com/flashinfer-ai/flashinfer)
-- FlashInfer-Bench: [https://bench.flashinfer.ai](https://bench.flashinfer.ai)
-- Starter kit: [https://github.com/flashinfer-ai/flashinfer-bench-starter-kit](https://github.com/flashinfer-ai/flashinfer-bench-starter-kit)
-- Agent baseline: [https://github.com/flashinfer-ai/mlsys26-agent-baseline](https://github.com/flashinfer-ai/mlsys26-agent-baseline)
-- FlashInfer documentation: [https://docs.flashinfer.ai](https://docs.flashinfer.ai)
-- CUDA C++ Programming Guide: [https://docs.nvidia.com/cuda/cuda-c-programming-guide/](https://docs.nvidia.com/cuda/cuda-c-programming-guide/)
-- NVIDIA Blackwell Tuning Guide: [https://docs.nvidia.com/cuda/blackwell-tuning-guide/](https://docs.nvidia.com/cuda/blackwell-tuning-guide/)
-- Triton documentation: [https://triton-lang.org/main/index.html](https://triton-lang.org/main/index.html)
-- OpenAI, "Introducing Triton": [https://openai.com/research/triton](https://openai.com/research/triton)
-- TileLang repository: [https://github.com/tile-ai/tilelang](https://github.com/tile-ai/tilelang)
-- CuTe DSL documentation: [https://docs.nvidia.com/cutlass/latest/media/docs/pythonDSL/cute_dsl.html](https://docs.nvidia.com/cutlass/latest/media/docs/pythonDSL/cute_dsl.html)
-- CUDA Tile and cuTile Python: [https://developer.nvidia.com/cuda/tile](https://developer.nvidia.com/cuda/tile)
-- cuTile Python documentation: [https://docs.nvidia.com/cuda/cutile-python](https://docs.nvidia.com/cuda/cutile-python)
-- OpenEvolve repository: [https://github.com/algorithmicsuperintelligence/openevolve](https://github.com/algorithmicsuperintelligence/openevolve)
-- Modal documentation: [https://modal.com/docs](https://modal.com/docs)
-- Lecture 35 - Agent Skills for GPU Kernel Translation: [Lecture-35.md](Lecture-35.md)
-- Lecture 36 - FP8 KV-Cache in vLLM: [Lecture-36.md](Lecture-36.md)
-- Lecture 37 - TraceLens: [Lecture-37.md](Lecture-37.md)
+- LLM Compressor: [https://github.com/vllm-project/llm-compressor](https://github.com/vllm-project/llm-compressor)
+- Lecture 06 - LLM From Scratch: [Lecture-06.md](Lecture-06.md)
+- Lecture 20 - Nemotron 3 Nano Omni: [Lecture-20.md](Lecture-20.md)
 
 ---
 
-*Next: [Lecture 44 - Efficient Local RAG Stack](Lecture-44.md)*
+*Next: [Lecture 44](Lecture-44.md)*

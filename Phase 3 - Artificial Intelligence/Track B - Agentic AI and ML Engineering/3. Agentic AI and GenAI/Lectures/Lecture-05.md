@@ -1,360 +1,242 @@
-# Lecture 05 — Memory Systems
+# Lecture 05 — LLM Fundamentals for Agents
 
-**Track B · Agentic AI & GenAI** | [← Lecture 04](Lecture-04.md) | [Next →](Lecture-06.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 04](Lecture-04.md) | **Next:** [Lecture 06](Lecture-06.md)
 
 ---
 
 ## Learning Objectives
 
-- Distinguish the four types of agent memory
-- Implement in-context, external, and episodic memory
-- Choose the right memory strategy for a given use case
-- Manage context window growth in long-running agents
+By the end of this lecture you will be able to:
+
+- Explain how transformer inference works at a high level (prefill vs. decode)
+- Calculate token counts and context window costs
+- Choose the right model for a given agent task
+- Understand why latency, throughput, and TTFT matter for agentic loops
 
 ---
 
-## 1. The Four Memory Types
+## 1. How Transformers Generate Text
 
-| Type | Where stored | Lifespan | Retrieval |
-|------|-------------|----------|-----------|
-| **In-context (working)** | LLM context window | Current session | Automatic (LLM sees it) |
-| **External (long-term)** | Vector DB, SQL, files | Persistent | Semantic search or lookup |
-| **Episodic** | Database of past interactions | Persistent | Similarity search |
-| **Semantic (knowledge)** | Vector DB of facts/docs | Persistent until updated | RAG retrieval |
+An LLM does one thing: given a sequence of tokens, **predict the next token**. An **agent** is just a loop that keeps calling this function.
+
+```
+Input tokens → [Transformer] → Logits → Sample → Output token
+                                                        ↓
+                                              Append to context
+                                                        ↓
+                                              Repeat until stop
+```
+
+**Two phases of inference:**
+
+| Phase | What happens | Compute bound |
+|-------|-------------|---------------|
+| **Prefill** | Process all input tokens in parallel (matrix multiply) | Compute (FLOP-bound) |
+| **Decode** | Generate one token at a time (autoregressive) | Memory bandwidth |
+
+> **Hardware implication:** Prefill saturates GPU compute. Decode is bottlenecked by how fast you can stream weights from HBM. This is why inference accelerators (Groq, Etched) focus on memory bandwidth, not just FLOPS.
 
 ---
 
-## 2. In-Context Memory (Working Memory)
+## 2. Tokens and Context Windows
 
-The simplest form — everything in the current **message list**.
+**Tokens ≠ words**. Rule of thumb: **1 token ≈ 0.75 English words** (4 characters).
 
 ```python
+import os
 import anthropic
-from collections import deque
 
 client = anthropic.Anthropic()
 
-class ConversationAgent:
-    def __init__(self, system: str, max_history: int = 20):
-        self.system = system
-        self.messages = []
-        self.max_history = max_history  # sliding window
-
-    def chat(self, user_input: str) -> str:
-        self.messages.append({"role": "user", "content": user_input})
-
-        # Sliding window: keep only recent messages
-        if len(self.messages) > self.max_history:
-            # Always keep first message (task context) + recent messages
-            self.messages = self.messages[:2] + self.messages[-(self.max_history-2):]
-
-        response = client.messages.create(
-            model="your-agent-model-id",
-            max_tokens=1024,
-            system=self.system,
-            messages=self.messages
-        )
-
-        reply = response.content[0].text
-        self.messages.append({"role": "assistant", "content": reply})
-        return reply
+# Count tokens before sending
+response = client.messages.count_tokens(
+    model=os.environ.get("ANTHROPIC_MODEL", "your-model-id"),
+    messages=[{"role": "user", "content": "Hello, how are you?"}]
+)
+print(response.input_tokens)  # → 10
 ```
 
-### Context Compression
+**Context windows change quickly. Think in categories instead of memorizing one snapshot:**
 
-When context grows too large, **summarize old turns**:
+| Category | Typical use | Engineering concern |
+|----------|-------------|---------------------|
+| Small/fast chat model | routing, classification, short summaries | low latency and low cost |
+| Balanced agent model | tool use, JSON extraction, code review | reliable structure and good reasoning |
+| Long-context model | repo analysis, large documents, multi-file tasks | context cost, retrieval quality, memory pressure |
+| Local/open-weight model | edge inference, privacy, offline demos | VRAM, quantization, throughput |
+| Embedding model | RAG indexing and retrieval | vector dimension, recall, index cost |
+
+Always **verify current context limits** in the provider documentation before designing a production agent around a specific window size.
+
+**Why context size matters for agents:**
+- Multi-step reasoning accumulates tokens fast
+- Tool call results land in context
+- Long documents fed to RAG agent must fit
+
+---
+
+## 3. Inference Parameters
 
 ```python
-def compress_history(messages: list, keep_recent: int = 6) -> list:
-    """Summarize old messages, keep recent ones verbatim."""
-    if len(messages) <= keep_recent:
-        return messages
+import os
 
-    old_messages = messages[:-keep_recent]
-    recent_messages = messages[-keep_recent:]
+response = client.messages.create(
+    model=os.environ.get("ANTHROPIC_MODEL", "your-model-id"),
+    max_tokens=1024,
+    temperature=0.0,    # 0 = deterministic (good for agents/tools)
+                        # 1 = creative (good for writing)
+    top_p=1.0,
+    messages=[{"role": "user", "content": "What is 2+2?"}]
+)
+```
 
-    # Summarize old messages
-    history_text = "\n".join(
-        f"{m['role'].upper()}: {m['content'] if isinstance(m['content'], str) else '[tool call]'}"
-        for m in old_messages
-    )
+| Parameter | Effect | Agent recommendation |
+|-----------|--------|---------------------|
+| `temperature` | Randomness of sampling | 0.0–0.3 for tool use / reasoning |
+| `top_p` | Nucleus sampling cutoff | Leave at 1.0 (let temperature do the work) |
+| `max_tokens` | Hard output limit | Set generously — truncation breaks JSON |
 
-    summary_response = client.messages.create(
-        model="your-fast-model-id",
-        max_tokens=512,
-        messages=[{
-            "role": "user",
-            "content": f"Summarize this conversation history concisely, preserving key facts and decisions:\n\n{history_text}"
-        }]
-    )
+> **Pro tip:** For tool-use agents, always use `temperature=0` or close to it. Randomness in function call generation causes JSON parse errors and unpredictable behavior.
 
-    summary = summary_response.content[0].text
-    summary_message = {
-        "role": "user",
-        "content": f"[Conversation summary — {len(old_messages)} earlier messages]\n{summary}"
+---
+
+## 4. The Anatomy of an API Call
+
+```python
+import os
+import anthropic
+
+client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
+
+response = client.messages.create(
+    model=os.environ.get("ANTHROPIC_MODEL", "your-model-id"),
+    max_tokens=2048,
+    system="You are a helpful assistant.",       # system prompt
+    messages=[
+        {"role": "user",    "content": "Tell me about CUDA."},
+        {"role": "assistant","content": "CUDA is..."},  # prior turn
+        {"role": "user",    "content": "How does it compare to ROCm?"},
+    ]
+)
+
+print(response.content[0].text)
+print(f"Input tokens:  {response.usage.input_tokens}")
+print(f"Output tokens: {response.usage.output_tokens}")
+print(f"Stop reason:   {response.stop_reason}")  # end_turn | tool_use | max_tokens
+```
+
+**`stop_reason` values for agents:**
+
+| Value | Meaning |
+|-------|---------|
+| `end_turn` | Model finished naturally |
+| `tool_use` | Model wants to call a tool — your loop must handle this |
+| `max_tokens` | Hit the limit — increase or handle gracefully |
+
+---
+
+## 5. Model Selection for Agent Tasks
+
+Not every task needs the most powerful model. **Cost and latency** add up in **multi-step loops**.
+
+```python
+# Router pattern: use fast/cheap model for simple steps
+def route_model(task_type: str) -> str:
+    fast_model = "provider-fast-model"
+    balanced_model = "provider-balanced-agent-model"
+    reasoning_model = "provider-reasoning-model"
+
+    routing = {
+        "classification": fast_model,
+        "summarization": fast_model,
+        "tool_use": balanced_model,
+        "complex_reasoning": reasoning_model,
+        "coding": balanced_model,
     }
-
-    return [summary_message] + recent_messages
+    return routing.get(task_type, balanced_model)
 ```
+
+| Task | Recommended model class | Why |
+|------|-------------------------|-----|
+| Simple Q&A, routing | fast model | low latency and cost |
+| Tool use, JSON extraction | balanced agent model | reliable structured output |
+| Complex reasoning, long context | reasoning or long-context model | stronger planning and larger working set |
+| Embeddings | embedding model | specialized vector representation |
 
 ---
 
-## 3. External Long-Term Memory (Vector Store)
+## 6. Streaming for Responsive Agents
 
-Store facts, user preferences, and past results in a **vector database** for retrieval across sessions.
+In agentic UIs, **streaming** dramatically improves **perceived responsiveness**.
 
 ```python
-import chromadb
-from chromadb.utils import embedding_functions
-import json
-from datetime import datetime
+import os
+import anthropic
 
-class LongTermMemory:
-    def __init__(self, collection_name: str = "agent_memory"):
-        self.client = chromadb.Client()
-        self.ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        )
-        self.collection = self.client.get_or_create_collection(
-            name=collection_name,
-            embedding_function=self.ef
-        )
+client = anthropic.Anthropic()
 
-    def remember(self, content: str, metadata: dict = None) -> str:
-        """Store a memory with optional metadata."""
-        memory_id = f"mem_{datetime.now().timestamp()}"
-        self.collection.add(
-            documents=[content],
-            ids=[memory_id],
-            metadatas=[metadata or {"timestamp": datetime.now().isoformat()}]
-        )
-        return memory_id
+with client.messages.stream(
+    model=os.environ.get("ANTHROPIC_MODEL", "your-model-id"),
+    max_tokens=1024,
+    messages=[{"role": "user", "content": "Explain transformer attention."}]
+) as stream:
+    for text in stream.text_stream:
+        print(text, end="", flush=True)
 
-    def recall(self, query: str, n_results: int = 5) -> list[dict]:
-        """Retrieve relevant memories by semantic similarity."""
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=n_results
-        )
-        memories = []
-        for doc, meta, dist in zip(
-            results["documents"][0],
-            results["metadatas"][0],
-            results["distances"][0]
-        ):
-            memories.append({
-                "content": doc,
-                "metadata": meta,
-                "relevance": 1 - dist  # convert distance to similarity
-            })
-        return memories
-
-    def forget(self, memory_id: str):
-        """Remove a specific memory."""
-        self.collection.delete(ids=[memory_id])
-
-
-class MemoryAugmentedAgent:
-    def __init__(self):
-        self.memory = LongTermMemory()
-        self.messages = []
-
-    def chat(self, user_input: str) -> str:
-        # Retrieve relevant memories
-        memories = self.memory.recall(user_input, n_results=3)
-        memory_context = ""
-        if memories:
-            memory_context = "Relevant context from memory:\n" + "\n".join(
-                f"- {m['content']} (relevance: {m['relevance']:.2f})"
-                for m in memories if m['relevance'] > 0.5
-            )
-
-        # Build augmented message
-        augmented_input = user_input
-        if memory_context:
-            augmented_input = f"{memory_context}\n\nUser: {user_input}"
-
-        self.messages.append({"role": "user", "content": augmented_input})
-
-        response = client.messages.create(
-            model="your-agent-model-id",
-            max_tokens=1024,
-            system="You are a helpful assistant with access to long-term memory.",
-            messages=self.messages
-        )
-
-        reply = response.content[0].text
-        self.messages.append({"role": "assistant", "content": reply})
-
-        # Store important information from this exchange
-        self._extract_and_store(user_input, reply)
-
-        return reply
-
-    def _extract_and_store(self, user_input: str, reply: str):
-        """Extract facts worth remembering."""
-        extract_response = client.messages.create(
-            model="your-fast-model-id",
-            max_tokens=256,
-            system="""Extract facts worth remembering from this exchange.
-Return a JSON array of strings. Return [] if nothing notable.
-Focus on: user preferences, decisions made, facts learned.""",
-            messages=[{
-                "role": "user",
-                "content": f"User said: {user_input}\nAssistant replied: {reply[:500]}"
-            }]
-        )
-        try:
-            facts = json.loads(extract_response.content[0].text)
-            for fact in facts:
-                self.memory.remember(fact, {"source": "conversation", "type": "fact"})
-        except json.JSONDecodeError:
-            pass  # No facts to store
+# Access final message with usage stats
+final = stream.get_final_message()
+print(f"\nTokens used: {final.usage.input_tokens} in, {final.usage.output_tokens} out")
 ```
 
 ---
 
-## 4. Episodic Memory (Past Interactions)
-
-Store and retrieve complete **past task executions** — useful for **learning from experience**.
+## 7. Cost Estimation
 
 ```python
-import sqlite3
-from dataclasses import dataclass
+# Rough cost calculator.
+# Do not hardcode provider prices in production. Load this from a config file
+# maintained from the provider pricing page.
+PRICING = {
+    "provider-fast-model": {"input": 0.15, "output": 0.60},       # example only, per 1M tokens
+    "provider-balanced-agent-model": {"input": 3.00, "output": 15.00},
+    "provider-reasoning-model": {"input": 15.00, "output": 75.00},
+}
 
-@dataclass
-class Episode:
-    task: str
-    approach: str
-    result: str
-    success: bool
-    timestamp: str
+def estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
+    p = PRICING[model]
+    return (input_tokens * p["input"] + output_tokens * p["output"]) / 1_000_000
 
-class EpisodicMemory:
-    def __init__(self, db_path: str = "episodes.db"):
-        self.conn = sqlite3.connect(db_path)
-        self._create_table()
-        self.vector_index = LongTermMemory("episodes")
-
-    def _create_table(self):
-        self.conn.execute("""
-            CREATE TABLE IF NOT EXISTS episodes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                task TEXT,
-                approach TEXT,
-                result TEXT,
-                success INTEGER,
-                timestamp TEXT
-            )
-        """)
-        self.conn.commit()
-
-    def store_episode(self, episode: Episode) -> int:
-        cursor = self.conn.execute(
-            "INSERT INTO episodes VALUES (NULL,?,?,?,?,?)",
-            (episode.task, episode.approach, episode.result,
-             int(episode.success), episode.timestamp)
-        )
-        self.conn.commit()
-        episode_id = cursor.lastrowid
-
-        # Also index in vector store for semantic search
-        self.vector_index.remember(
-            f"Task: {episode.task}\nApproach: {episode.approach}\nSuccess: {episode.success}",
-            metadata={"episode_id": str(episode_id), "success": str(episode.success)}
-        )
-        return episode_id
-
-    def recall_similar_episodes(self, task: str, n: int = 3) -> list[Episode]:
-        """Find similar past tasks and what worked."""
-        memories = self.vector_index.recall(task, n_results=n)
-        episodes = []
-        for mem in memories:
-            if mem["relevance"] > 0.4:
-                episode_id = int(mem["metadata"]["episode_id"])
-                row = self.conn.execute(
-                    "SELECT * FROM episodes WHERE id=?", (episode_id,)
-                ).fetchone()
-                if row:
-                    episodes.append(Episode(
-                        task=row[1], approach=row[2], result=row[3],
-                        success=bool(row[4]), timestamp=row[5]
-                    ))
-        return episodes
-
-
-def agent_with_episodic_memory(task: str) -> str:
-    episodic = EpisodicMemory()
-
-    # Check if we've done something similar before
-    similar = episodic.recall_similar_episodes(task)
-    prior_context = ""
-    if similar:
-        successful = [e for e in similar if e.success]
-        if successful:
-            prior_context = f"\nSimilar past successes:\n" + "\n".join(
-                f"- Task: {e.task}\n  Approach: {e.approach}"
-                for e in successful[:2]
-            )
-
-    response = client.messages.create(
-        model="your-agent-model-id",
-        max_tokens=1024,
-        system=f"You are a task executor.{prior_context}",
-        messages=[{"role": "user", "content": task}]
-    )
-
-    result = response.content[0].text
-    success = "error" not in result.lower() and "failed" not in result.lower()
-
-    episodic.store_episode(Episode(
-        task=task,
-        approach="Direct LLM response",
-        result=result[:500],
-        success=success,
-        timestamp=datetime.now().isoformat()
-    ))
-
-    return result
+# A 10-step agent loop with a balanced agent model
+steps = 10
+per_step_input  = 2000   # context grows each step
+per_step_output = 500
+total = sum(
+    estimate_cost("provider-balanced-agent-model", per_step_input * i, per_step_output)
+    for i in range(1, steps + 1)
+)
+print(f"Estimated loop cost: ${total:.4f}")
 ```
 
----
-
-## 5. Memory Strategy Selection Guide
-
-```
-Does the agent need to remember things across sessions?
-├── No → In-context memory only (sliding window)
-└── Yes → External memory needed
-    │
-    ├── Remember facts/preferences about the user?
-    │   → Long-term vector store (semantic recall)
-    │
-    ├── Remember how to do tasks (what worked)?
-    │   → Episodic memory (SQLite + vector index)
-    │
-    └── Answer questions from documents/knowledge?
-        → RAG / semantic memory (covered in Lectures 09-10)
-```
+> **Key insight:** In a 10-step agent loop, context grows linearly — step 10 has 10× the input tokens of step 1. This is why context management (summarization, pruning) is critical in production.
 
 ---
 
 ## Key Takeaways
 
-1. Use **sliding window** to prevent context overflow in long conversations
-2. **Compress old history** with a cheap model (Haiku) before it fills the window
-3. **Vector stores** enable semantic recall across sessions — use `all-MiniLM-L6-v2` for cost efficiency
-4. **Episodic memory** lets agents learn from past successes/failures
-5. Extract and store facts selectively — storing everything creates noise at retrieval time
+1. LLM inference = prefill (compute-bound) + decode (memory-bandwidth-bound)
+2. Use `temperature=0` for tool-use agents; reserve higher values for creative tasks
+3. Check `stop_reason` — `tool_use` means your loop must call the tool and continue
+4. Route tasks to cheaper models where possible; the cost compounds in multi-step loops
+5. Context grows each step — plan for summarization or windowing in long-running agents
 
 ---
 
 ## Exercises
 
-1. Build a `ConversationAgent` with auto-compression that triggers when context exceeds 80% of the model's limit.
-2. Implement a user profile system using `LongTermMemory` that persists preferences (communication style, expertise level, interests).
-3. Create an episodic memory that tracks which tools succeeded vs. failed for given task types, and uses that to guide tool selection.
+1. Write a script that counts tokens for a 10-page PDF before sending it to the API.
+2. Build a simple cost logger that wraps `client.messages.create` and prints cumulative cost.
+3. Implement a model router that uses a fast model for tasks under 200 input tokens and a balanced agent model otherwise.
 
 ---
 
-**Previous:** [Lecture 04](Lecture-04.md) | **Next:** [Lecture 06 — LangGraph: Stateful Workflows](Lecture-06.md)
+**Next:** [Lecture 07 — Prompt Engineering & Structured Output](Lecture-07.md)

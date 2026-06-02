@@ -1,242 +1,145 @@
-# Lecture 01 — LLM Fundamentals for Agents
+# Lecture 01 - The Modern AI Agent in 2026: What Changed
 
-**Track B · Agentic AI & GenAI** | [← Index](README.md) | [Next →](Lecture-02.md)
-
----
-
-## Learning Objectives
-
-By the end of this lecture you will be able to:
-
-- Explain how transformer inference works at a high level (prefill vs. decode)
-- Calculate token counts and context window costs
-- Choose the right model for a given agent task
-- Understand why latency, throughput, and TTFT matter for agentic loops
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Course Guide](../Guide.md) | **Next:** [Lecture 02](Lecture-02.md)
 
 ---
 
-## 1. How Transformers Generate Text
+This is the opener for **AI Agent Development 2026**. Before any code, we set the frame: what a "modern AI agent" actually means in 2026, what changed to make agents work now when they mostly didn't in 2023, and why the interesting engineering has moved *out of the model and into the harness around it*.
 
-An LLM does one thing: given a sequence of tokens, **predict the next token**. An **agent** is just a loop that keeps calling this function.
+This lecture covers:
 
-```
-Input tokens → [Transformer] → Logits → Sample → Output token
-                                                        ↓
-                                              Append to context
-                                                        ↓
-                                              Repeat until stop
-```
-
-**Two phases of inference:**
-
-| Phase | What happens | Compute bound |
-|-------|-------------|---------------|
-| **Prefill** | Process all input tokens in parallel (matrix multiply) | Compute (FLOP-bound) |
-| **Decode** | Generate one token at a time (autoregressive) | Memory bandwidth |
-
-> **Hardware implication:** Prefill saturates GPU compute. Decode is bottlenecked by how fast you can stream weights from HBM. This is why inference accelerators (Groq, Etched) focus on memory bandwidth, not just FLOPS.
+1. The one-sentence definition — and what is *not* an agent.
+2. What actually changed between 2023 and 2026.
+3. The **harness era** — where the engineering lives now.
+4. Two reference systems worth studying.
+5. What separates a real agent from a demo.
+6. How this course is organized.
 
 ---
 
-## 2. Tokens and Context Windows
+## 1. What is a modern AI agent?
 
-**Tokens ≠ words**. Rule of thumb: **1 token ≈ 0.75 English words** (4 characters).
+> **An agent is a system that independently accomplishes a multi-step task on your behalf** — using an LLM to drive control flow over tools, within guardrails.
 
-```python
-import os
-import anthropic
+The load-bearing word is **independently**. A workflow is a sequence of steps toward a goal (resolve a ticket, ship a code change, reconcile an invoice). Conventional software lets a person *run* that workflow faster. An agent **runs it for them**: it decides the next step, calls tools to gather context and take action, notices when it's done or stuck, and corrects or hands back control.
 
-client = anthropic.Anthropic()
-
-# Count tokens before sending
-response = client.messages.count_tokens(
-    model=os.environ.get("ANTHROPIC_MODEL", "your-model-id"),
-    messages=[{"role": "user", "content": "Hello, how are you?"}]
-)
-print(response.input_tokens)  # → 10
-```
-
-**Context windows change quickly. Think in categories instead of memorizing one snapshot:**
-
-| Category | Typical use | Engineering concern |
-|----------|-------------|---------------------|
-| Small/fast chat model | routing, classification, short summaries | low latency and low cost |
-| Balanced agent model | tool use, JSON extraction, code review | reliable structure and good reasoning |
-| Long-context model | repo analysis, large documents, multi-file tasks | context cost, retrieval quality, memory pressure |
-| Local/open-weight model | edge inference, privacy, offline demos | VRAM, quantization, throughput |
-| Embedding model | RAG indexing and retrieval | vector dimension, recall, index cost |
-
-Always **verify current context limits** in the provider documentation before designing a production agent around a specific window size.
-
-**Why context size matters for agents:**
-- Multi-step reasoning accumulates tokens fast
-- Tool call results land in context
-- Long documents fed to RAG agent must fit
+**What is *not* an agent:** a chatbot, a single-turn LLM call, a sentiment classifier, a RAG "chat with your docs" box. They use a model; they don't let the model *control execution*. Wrapping a completion is not agency. (We make this precise in [Lecture 03](Lecture-03.md).)
 
 ---
 
-## 3. Inference Parameters
+## 2. What changed (2023 → 2026)
 
-```python
-import os
+Agents were demoed in 2023 and mostly fell over in production. Several independent shifts — not one breakthrough — made them reliable enough to ship. None of these are about a single model release; they're durable changes in the stack.
 
-response = client.messages.create(
-    model=os.environ.get("ANTHROPIC_MODEL", "your-model-id"),
-    max_tokens=1024,
-    temperature=0.0,    # 0 = deterministic (good for agents/tools)
-                        # 1 = creative (good for writing)
-    top_p=1.0,
-    messages=[{"role": "user", "content": "What is 2+2?"}]
-)
-```
+<div class="lecture-map" markdown>
 
-| Parameter | Effect | Agent recommendation |
-|-----------|--------|---------------------|
-| `temperature` | Randomness of sampling | 0.0–0.3 for tool use / reasoning |
-| `top_p` | Nucleus sampling cutoff | Leave at 1.0 (let temperature do the work) |
-| `max_tokens` | Hard output limit | Set generously — truncation breaks JSON |
+| Axis | ~2023 | 2026 |
+|------|-------|------|
+| **Reasoning** | One-pass completion; brittle multi-step | **Reasoning models** that plan, self-check, and recover mid-task |
+| **Interface** | One chat turn in → one answer out | **Run loops** — the model takes many steps until an exit condition |
+| **Tools** | Bespoke, per-app function calling | **Standard tool protocols (MCP)**; computer-use for legacy UIs with no API |
+| **Context** | 4K–8K tokens | **100K–1M tokens** — whole repos, long sessions (at real KV-cache cost) |
+| **Modality** | Text only | **Multimodal** — vision/audio perception as sub-agents |
+| **Deployment** | A hosted chat page | **Persistent, local-first control planes**; on-device / edge |
+| **Economics** | Too expensive for long sessions | Cheap enough for **long-running, tool-rich background work** |
 
-> **Pro tip:** For tool-use agents, always use `temperature=0` or close to it. Randomness in function call generation causes JSON parse errors and unpredictable behavior.
+</div>
 
----
+The combined effect: a model can now stay on a task across **dozens of steps and tool calls**, over a context large enough to hold the real working set, cheaply enough to run continuously. That is the difference between a chat demo and a coding agent that opens a PR.
 
-## 4. The Anatomy of an API Call
-
-```python
-import os
-import anthropic
-
-client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
-
-response = client.messages.create(
-    model=os.environ.get("ANTHROPIC_MODEL", "your-model-id"),
-    max_tokens=2048,
-    system="You are a helpful assistant.",       # system prompt
-    messages=[
-        {"role": "user",    "content": "Tell me about CUDA."},
-        {"role": "assistant","content": "CUDA is..."},  # prior turn
-        {"role": "user",    "content": "How does it compare to ROCm?"},
-    ]
-)
-
-print(response.content[0].text)
-print(f"Input tokens:  {response.usage.input_tokens}")
-print(f"Output tokens: {response.usage.output_tokens}")
-print(f"Stop reason:   {response.stop_reason}")  # end_turn | tool_use | max_tokens
-```
-
-**`stop_reason` values for agents:**
-
-| Value | Meaning |
-|-------|---------|
-| `end_turn` | Model finished naturally |
-| `tool_use` | Model wants to call a tool — your loop must handle this |
-| `max_tokens` | Hit the limit — increase or handle gracefully |
+> **Currency caveat.** Specific model names, context limits, and prices move every few months — this course deliberately teaches the *stable* layer (run loops, tool protocols, sessions, guardrails). Treat any version number you see as a snapshot.
 
 ---
 
-## 5. Model Selection for Agent Tasks
+## 3. The harness era — where the engineering lives now
 
-Not every task needs the most powerful model. **Cost and latency** add up in **multi-step loops**.
+Here is the single most important mental shift in this course:
 
-```python
-# Router pattern: use fast/cheap model for simple steps
-def route_model(task_type: str) -> str:
-    fast_model = "provider-fast-model"
-    balanced_model = "provider-balanced-agent-model"
-    reasoning_model = "provider-reasoning-model"
+> **The hard part of an agent is not the model — it's the harness around it.**
 
-    routing = {
-        "classification": fast_model,
-        "summarization": fast_model,
-        "tool_use": balanced_model,
-        "complex_reasoning": reasoning_model,
-        "coding": balanced_model,
-    }
-    return routing.get(task_type, balanced_model)
-```
+The model gives you reasoning and tool selection. Everything that makes an agent *reliable* is the runtime wrapped around it:
 
-| Task | Recommended model class | Why |
-|------|-------------------------|-----|
-| Simple Q&A, routing | fast model | low latency and cost |
-| Tool use, JSON extraction | balanced agent model | reliable structured output |
-| Complex reasoning, long context | reasoning or long-context model | stronger planning and larger working set |
-| Embeddings | embedding model | specialized vector representation |
+* the **run loop** (when to keep going, when to stop, max turns, error handling),
+* **sessions** and durable state (so a crash mid-stream doesn't lose the task),
+* **tool wiring** and permissions,
+* **memory** and retrieval,
+* **guardrails** (relevance, safety, PII, tool-risk, human-in-the-loop),
+* **telemetry** and recovery.
+
+This is what people mean by **"harness AI."** Two agents on the *same* model can differ enormously in reliability purely because of their harness. The rest of this course is, in large part, about building a good harness — which is why Module 1 continues straight into [Lecture 02 — *What is an AI agent harness?*](Lecture-02.md).
 
 ---
 
-## 6. Streaming for Responsive Agents
+## 4. Two reference systems worth studying
 
-In agentic UIs, **streaming** dramatically improves **perceived responsiveness**.
+Modern agents are easiest to understand through systems that actually run in production-like usage, not demos:
 
-```python
-import os
-import anthropic
+* **Coding agents** (e.g., Claude Code) — agents that read a repo, plan changes across files, run tests, commit, open PRs, connect tools over MCP, and run in CI. The clearest example of agents becoming a *software-worker* category.
+* **Local-first personal assistants** (e.g., OpenClaw) — a long-lived **control plane** that owns channels, sessions, tools, and events across many surfaces, treating inbound messages as untrusted input. **Module 4** dissects OpenClaw piece by piece.
 
-client = anthropic.Anthropic()
-
-with client.messages.stream(
-    model=os.environ.get("ANTHROPIC_MODEL", "your-model-id"),
-    max_tokens=1024,
-    messages=[{"role": "user", "content": "Explain transformer attention."}]
-) as stream:
-    for text in stream.text_stream:
-        print(text, end="", flush=True)
-
-# Access final message with usage stats
-final = stream.get_final_message()
-print(f"\nTokens used: {final.usage.input_tokens} in, {final.usage.output_tokens} out")
-```
+Both show the same lesson: the product *is* the harness.
 
 ---
 
-## 7. Cost Estimation
+## 5. A real agent vs a demo
 
-```python
-# Rough cost calculator.
-# Do not hardcode provider prices in production. Load this from a config file
-# maintained from the provider pricing page.
-PRICING = {
-    "provider-fast-model": {"input": 0.15, "output": 0.60},       # example only, per 1M tokens
-    "provider-balanced-agent-model": {"input": 3.00, "output": 15.00},
-    "provider-reasoning-model": {"input": 15.00, "output": 75.00},
-}
+A demo optimizes for a happy-path transcript. A production agent is judged on four axes — the same engineering discipline as the rest of this roadmap:
 
-def estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
-    p = PRICING[model]
-    return (input_tokens * p["input"] + output_tokens * p["output"]) / 1_000_000
+* **Reliability** — does it finish the task, and fail safely when it can't?
+* **Latency** — time-to-first-token and per-step time, across a multi-step loop.
+* **Cost** — $/task across all the tool calls and tokens, not $/token in isolation.
+* **Safety** — does it resist prompt injection, respect permissions, and escalate high-risk actions to a human?
 
-# A 10-step agent loop with a balanced agent model
-steps = 10
-per_step_input  = 2000   # context grows each step
-per_step_output = 500
-total = sum(
-    estimate_cost("provider-balanced-agent-model", per_step_input * i, per_step_output)
-    for i in range(1, steps + 1)
-)
-print(f"Estimated loop cost: ${total:.4f}")
-```
-
-> **Key insight:** In a 10-step agent loop, context grows linearly — step 10 has 10× the input tokens of step 1. This is why context management (summarization, pruning) is critical in production.
+Agents are **systems engineering**, not prompt-craft. Prompts matter, but a clever prompt with no guardrails, no eval, and no recovery is a liability, not a product.
 
 ---
 
-## Key Takeaways
+## 6. How this course is organized
 
-1. LLM inference = prefill (compute-bound) + decode (memory-bandwidth-bound)
-2. Use `temperature=0` for tool-use agents; reserve higher values for creative tasks
-3. Check `stop_reason` — `tool_use` means your loop must call the tool and continue
-4. Route tasks to cheaper models where possible; the cost compounds in multi-step loops
-5. Context grows each step — plan for summarization or windowing in long-running agents
+**AI Agent Development 2026** is a theory-first path (full module map in the [course Guide](../Guide.md)):
+
+<div class="lecture-map" markdown>
+
+| Module | What you learn |
+|--------|----------------|
+| **1 · Start here** | What changed, the harness, and how to build an agent (model/tools/instructions → orchestration/guardrails) |
+| **2 · Fundamentals** | How the model works and how you talk to it |
+| **3 · Core building blocks** | Tools, memory, RAG, orchestration, multimodal, skills, eval — one by one |
+| **4 · Production & runtime** | Security, durable state, startup, runtime choice, deployment |
+| **5 · Example: OpenClaw** | A real harness, taken apart |
+| **6 · Practice: genie-claw** | Build your own minimal harness end-to-end |
+
+</div>
+
+The capstone, **genie-claw**, is your own minimal agent harness — a local LLM runtime plus an OpenClaw-style gateway, with the run loop, tools, and guardrails you control. Everything between here and there is in service of building it.
 
 ---
 
-## Exercises
+## Key takeaways
 
-1. Write a script that counts tokens for a 10-page PDF before sending it to the API.
-2. Build a simple cost logger that wraps `client.messages.create` and prints cumulative cost.
-3. Implement a model router that uses a fast model for tasks under 200 input tokens and a balanced agent model otherwise.
+* A **modern agent independently runs a multi-step workflow** by letting an LLM control tool use within guardrails — not a wrapped completion.
+* Agents work in 2026 because of **converging shifts**: reasoning models, run loops, standard tool protocols (MCP), long context, multimodality, cheap inference, and local-first deployment.
+* The engineering has moved **from the model to the harness**. Reliability, latency, cost, and safety are *harness* properties.
+* This is **systems engineering**; the course builds toward your own harness, **genie-claw**.
 
 ---
 
-**Next:** [Lecture 02 — Prompt Engineering & Structured Output](Lecture-02.md)
+## Self-check
+
+1. Give the one-sentence definition of an agent, and explain why a RAG "chat with your docs" box doesn't qualify.
+2. Name three shifts since 2023 that made agents production-viable, and why each matters.
+3. What does "the hard part is the harness, not the model" mean? List three harness responsibilities.
+4. Two teams ship agents on the *same* model; one is far more reliable. Where does that difference come from?
+5. Which of the four production axes (reliability / latency / cost / safety) is most often ignored in demos, and what's the consequence?
+
+---
+
+## References
+
+* OpenAI — *A Practical Guide to Building Agents* (agent definition, when-to-build, foundations) — expanded in [Lecture 03](Lecture-03.md) / [Lecture 04](Lecture-04.md).
+* Reference systems: **Claude Code** (agentic coding) · **OpenClaw** (local-first control plane) — dissected in Module 4.
+* Cross-reference: [Lecture 02 — What is an AI agent harness?](Lecture-02.md) · [Course Guide — full curriculum](../Guide.md)
+
+---
+
+*Next: [Lecture 02](Lecture-02.md)*

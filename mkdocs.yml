@@ -283,53 +283,53 @@ nav:
         - Guide: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Guide.md
         - Lectures:
           - Index: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/README.md
-          - "00: The Modern AI Agent in 2026": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-00.md
-          - "01: LLM Fundamentals": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-01.md
-          - "02: Prompt Engineering": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-02.md
-          - "03: Tool Use": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-03.md
-          - "04: Agent Architecture": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-04.md
-          - "05: Memory Systems": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-05.md
-          - "06: LangGraph": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-06.md
-          - "07: Agent SDKs and Runtime APIs": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-07.md
-          - "08: Multi-Agent Systems": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-08.md
-          - "09: RAG — Ingestion": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-09.md
-          - "10: RAG — Retrieval": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-10.md
-          - "11: Evaluation": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-11.md
-          - "12: Production": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-12.md
-          - "13: Runtime Discipline": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-13.md
-          - "14: Deterministic Startup": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-14.md
-          - "15: OpenClaw Gateway": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-15.md
-          - "16: Routing and Sessions": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-16.md
-          - "17: Isolation and Memory": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-17.md
-          - "18: Operations and Security": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-18.md
-          - "19: Agent Loop": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-19.md
-          - "20: Cron and Scheduled Agent Runs": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-20.md
-          - "21: System Prompt Architecture": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-21.md
-          - "22: App SDK and Typed RPCs": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-22.md
-          - "23: Gateway RPC Protocol": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-23.md
-          - "24: What Is an AI Agent Harness?": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-24.md
-          - "24b: Session as Source of Truth": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-24b.md
-          - "25: Building Agents I — Foundations": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-25.md
-          - "26: Building Agents II — Orchestration & Guardrails": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-26.md
-          - "27: AI Agent Security Engineer Roadmap": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-27.md
-          - "28: Pi - Minimal Agent Beneath OpenClaw": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-28.md
-          - "29: Agent Skills": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-29.md
-          - "30: Agentic SDLC": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-30.md
-          - "31: Runtime Strategy for Agent Systems": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-31.md
-          - "32: LLM From Scratch": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-32.md
-          - "33: Structured Tools Beat Computer Use": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-33.md
-          - "34: Nemotron 3 Nano Omni": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-34.md
-          - "35: GPU Kernel Translation Skills": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-35.md
-          - "36: FP8 KV-Cache in vLLM": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-36.md
-          - "37: TraceLens": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-37.md
-          - "38: AutoSP": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-38.md
-          - "39: Agent Skills Eval": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-39.md
-          - "40: ZAYA1-8B": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-40.md
-          - "41: OpenClaw Threat Model": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-41.md
-          - "42: OpenAI Agents SDK": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-42.md
-          - "43: MLSys Kernel Contest": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-43.md
-          - "44: Efficient Local RAG": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-44.md
-          - "45: Vector Stores and Embeddings": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-45.md
+          - "01: The Modern AI Agent in 2026: What Changed": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-01.md
+          - "02: What Is an AI Agent Harness? The Runtime Around the Model": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-02.md
+          - "03: Building Agents I: Foundations (Model, Tools, Instructions)": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-03.md
+          - "04: Building Agents II: Orchestration & Guardrails": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-04.md
+          - "05: LLM Fundamentals for Agents": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-05.md
+          - "06: LLM From Scratch: Model Mechanics for Agent and GPU Engineers": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-06.md
+          - "07: Prompt Engineering & Structured Output": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-07.md
+          - "08: Tool Use & Function Calling": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-08.md
+          - "09: Structured Tools Beat Computer Use: Interface Hierarchy for Agents": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-09.md
+          - "10: Memory Systems": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-10.md
+          - "11: RAG: Ingestion & Embeddings": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-11.md
+          - "12: RAG: Retrieval & Reranking": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-12.md
+          - "13: Qdrant, pgvector, and Embedding Model Selection": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-13.md
+          - "14: Efficient Local RAG Stack: Qwen3.5-4B INT4 and Granite Embeddings": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-14.md
+          - "15: Agent Architecture Patterns": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-15.md
+          - "16: LangGraph: Stateful Workflows": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-16.md
+          - "17: Agent SDKs and Runtime APIs": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-17.md
+          - "18: OpenAI Agents SDK: Native Sandbox and Durable Agent Harness": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-18.md
+          - "19: Multi-Agent Systems": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-19.md
+          - "20: Nemotron 3 Nano Omni: Multimodal Perception Sub-Agents for Agent Systems": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-20.md
+          - "21: Agent Skills: Workflow Discipline for Reliable Coding Agents": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-21.md
+          - "22: Agent Skills Eval: Benchmarking SKILL.md Files": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-22.md
+          - "23: Evaluation & Observability": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-23.md
+          - "24: Runtime Discipline and AI Runtime Security": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-24.md
+          - "25: AI Agent Security Engineer: A Practitioner's Roadmap": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-25.md
+          - "26: Session as Source of Truth: Event-Sourced Agent State": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-26.md
+          - "27: Deterministic Startup for AI Agent Systems": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-27.md
+          - "28: Runtime Strategy for Agent Systems: Node, Bun, Rust, and Edge Packaging": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-28.md
+          - "29: Agentic SDLC: Explore Fast, Ship Safely": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-29.md
+          - "30: Production Deployment": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-30.md
+          - "31: OpenClaw Case Study: Why Real Agents Need a Gateway": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-31.md
+          - "32: OpenClaw Case Study: Channels, Routing, and Session Design": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-32.md
+          - "33: OpenClaw Case Study: Multi-Agent Isolation, Workspaces, and Memory": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-33.md
+          - "34: OpenClaw Case Study: Operating and Securing a Persistent Agent System": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-34.md
+          - "35: OpenClaw Case Study: The Agent Loop": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-35.md
+          - "36: OpenClaw Case Study: Cron, Scheduled Agent Runs, and Automation Reliability": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-36.md
+          - "37: OpenClaw Case Study: System Prompt Architecture": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-37.md
+          - "38: OpenClaw Case Study: App SDK Dogfooding and Typed Gateway RPCs": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-38.md
+          - "39: OpenClaw Case Study: Gateway RPC Protocol": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-39.md
+          - "40: OpenClaw Threat Model: MITRE ATLAS for Agent Security": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-40.md
+          - "41: Pi (pi-mono): A Detail Reading of a Minimal Coding Agent": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-41.md
+          - "42: Agent Skills for GPU Kernel Translation: cuTile Python to cuTile.jl": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-42.md
+          - "43: FP8 KV-Cache in vLLM: Long-Context Serving for Agent Workloads": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-43.md
+          - "44: TraceLens: Trace-Driven AI Performance Analysis": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-44.md
+          - "45: AutoSP: Compiler-Generated Sequence Parallelism for Long-Context Training": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-45.md
+          - "46: ZAYA1-8B: Small MoE Reasoning, AMD Training, and Test-Time Compute": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-46.md
+          - "47: MLSys 2026 Kernel Contest: AI-Assisted Blackwell LLM Kernel Optimization": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-47.md
         - Labs:
           - "Lab 01: Research Agent": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-01-Research-Agent.md
           - "Lab 02: Multi-Agent Pipeline": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-02-Multi-Agent-Pipeline.md

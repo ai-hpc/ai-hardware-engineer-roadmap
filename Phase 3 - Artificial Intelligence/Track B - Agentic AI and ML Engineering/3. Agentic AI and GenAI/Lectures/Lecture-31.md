@@ -1,655 +1,473 @@
-# Lecture 31 - Runtime Strategy for Agent Systems: Node, Bun, Rust, and Edge Packaging
+# Lecture 31 - OpenClaw Case Study: Why Real Agents Need a Gateway
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 30](Lecture-30.md) | **Next:** [Lecture 32](Lecture-32.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 30](Lecture-30.md) | **Next:** [Lecture 32](Lecture-32.md)
 
 ---
 
-OpenClaw currently lives mostly in the **Node/TypeScript world**.
+## Why this lecture exists
 
-That is a pragmatic choice:
-
-- TypeScript is productive.
-- Node has the ecosystem.
-- npm packages cover almost every integration surface.
-- agent products move quickly.
-
-But the runtime layer is becoming **strategic**.
-
-Bun's public Zig-to-Rust porting work is a useful signal. It does **not** mean Bun has already become a Rust runtime. The specific commit we are using as evidence is an initial Phase-A porting guide and helper script. The signal is narrower and more useful:
+Many agent tutorials still teach the same simple pattern:
 
 ```text
-fast runtimes are not enough
-runtime ecosystems, maintainability, tooling, and packaging now matter as product strategy
+user -> prompt -> model -> answer
 ```
 
-That matters for agent systems because an agent runtime is **not a normal web server**.
+That is useful for learning, but it is too small to explain how modern agent products actually work.
 
-It is a **long-running, tool-using, streaming, subprocess-heavy, policy-gated** execution platform.
+Real agent systems need to handle:
+
+- many users
+- many channels
+- long-lived sessions
+- tools
+- memory
+- device clients
+- background work
+- health and operations
+- routing and identity
+
+That is where **OpenClaw** becomes a useful case study.
+
+OpenClaw is not just "an app that calls an LLM." It is a **control plane** for **persistent agents**.
+
+This lecture uses OpenClaw to teach a more realistic system model:
+
+> an agent is not only a model call. It is a long-running service with routing, state, safety, and operations.
 
 ---
 
 ## Learning objectives
 
-By the end of this lecture, you should be able to:
+By the end of this lecture you will be able to:
 
-1. Explain what Bun is and why its runtime strategy matters.
-2. Distinguish confirmed Bun porting work from overhyped "Bun is now Rust" claims.
-3. Compare Node, Bun, and Rust as agent-runtime layers.
-4. Explain why agent workloads stress runtimes differently from standard web workloads.
-5. Identify which parts of an OpenClaw-style system should stay in TypeScript and which parts may belong in Rust.
-6. Design a runtime migration experiment without breaking compatibility.
-7. Define measurements for startup, memory, event-loop behavior, subprocess orchestration, and packaging.
-8. Connect runtime choices to edge/on-device AI deployment.
+1. Explain why a real agent product often needs a gateway or control plane.
+2. Describe OpenClaw's high-level architecture in simple terms.
+3. Separate channels, clients, nodes, and agents.
+4. Explain the difference between a one-shot inference call and an agent loop.
+5. Understand why session serialization matters.
+6. Explain why "one long-lived gateway" is different from "one model endpoint."
 
 ---
 
-## 1. What Bun is
+## 1. The simple mental model
 
-Bun is an **alternative JavaScript runtime** and tooling stack.
-
-It tries to collapse several pieces into one distribution:
+The easiest way to understand OpenClaw is this:
 
 ```text
-JavaScript runtime
-package manager
-test runner
-transpiler
-bundler-style tooling
+OpenClaw Gateway = a central station for agent traffic
 ```
 
-Where Node traditionally relies on a surrounding ecosystem:
+Messages and control requests arrive from many places:
+
+- Telegram
+- WhatsApp
+- Slack
+- Discord
+- Web UI
+- CLI
+- mobile devices
+
+The gateway is the place that:
+
+- receives the message
+- decides which agent should handle it
+- loads the right session
+- runs the agent loop
+- streams tool and assistant events
+- stores state
+- sends the reply back through the correct channel
+
+So instead of:
 
 ```text
-node
-npm / yarn / pnpm
-tsx / ts-node
-jest / vitest
-esbuild / swc / webpack
+web app -> model API
 ```
 
-Bun's product argument is:
+you get:
 
 ```text
-one fast integrated toolchain
+channel/client/node
+  -> gateway
+  -> session + routing
+  -> agent loop
+  -> tools + memory
+  -> reply back to the same surface
 ```
 
-Important implementation detail:
-
-- Node uses V8.
-- Bun uses JavaScriptCore.
-- Bun has historically used a large amount of Zig.
-
-The runtime is **not just "where JavaScript executes."**
-
-It shapes:
-
-- startup latency
-- package install speed
-- subprocess behavior
-- native dependency handling
-- test-loop speed
-- single-binary packaging options
-- edge-device deployment ergonomics
+That is a much better mental model for production agents.
 
 ---
 
-## 2. What the Zig-to-Rust signal actually says
+## 2. Why a gateway exists at all
 
-The referenced Bun commit is titled:
+When people first see a gateway-style system, they often ask:
 
-```text
-docs: add Phase-A porting guide
-```
+> Why not let every client call the model directly?
 
-It adds a `docs/PORTING.md` guide and a helper script.
+Because direct calls break down once you need **shared behavior**.
 
-The guide describes a staged Zig-to-Rust translation process:
+A gateway gives you one place for:
 
-```text
-Phase A: draft .rs next to .zig, logic faithful, does not need to compile
-Phase B: make it compile crate-by-crate
-```
-
-It also gives strong constraints:
-
-- keep the Zig structure during the draft phase
-- do not invent crate layouts
-- avoid common Rust async/runtime crates such as Tokio, Rayon, Hyper, async-trait, and futures
-- avoid `std::fs`, `std::net`, and `std::process` for Bun-owned runtime paths
-- preserve Bun's event loop and syscall ownership
-- annotate `unsafe` blocks with the equivalent Zig invariant
-
-The confirmed takeaway:
-
-```text
-Bun maintainers are documenting how to port parts of Bun from Zig to Rust.
-```
-
-The unconfirmed overreach:
-
-```text
-"Bun has completed a Rust rewrite."
-```
-
-Do not build architecture decisions on the **overreach**.
-
-Use this as a **strategic signal**, not a migration trigger.
-
----
-
-## 3. Why Zig made sense
-
-Zig is attractive for **runtime infrastructure** because it gives:
-
-- low-level control
-- straightforward C interop
-- explicit memory management
-- simple cross-compilation story
-- small runtime assumptions
-- performance-oriented ergonomics
-
-For a runtime like Bun, those are real advantages.
-
-The tradeoff is **ecosystem**.
-
-Zig's ecosystem and hiring pool are **smaller than Rust's**.
-
-For a fast-moving runtime, that can matter as much as language design.
-
----
-
-## 4. Why Rust might win long-term
-
-Rust is attractive for **platform infrastructure** because it offers:
-
-- memory safety without garbage collection
-- strong concurrency guarantees
-- mature crates ecosystem
-- strong tooling
-- large contributor pool
-- good supply-chain/security tooling
-- credibility in production systems
-
-The tradeoff is **complexity**.
-
-Rust has:
-
-- a steeper learning curve
-- borrow-checker friction
-- compile-time cost
-- more up-front type and lifetime design
-
-But for long-term platform work, Rust often wins because **maintainability and contributor scale** matter.
-
-The practical interpretation:
-
-```text
-Zig can be excellent for a focused systems codebase.
-Rust can be better for a broad, long-lived runtime ecosystem.
-```
-
-This is **not ideology**.
-
-It is **platform economics**.
-
----
-
-## 5. Why this matters for agent systems
-
-Agent workloads differ from **normal backend workloads**.
-
-They have:
-
-- long-running sessions
-- streaming model output
-- many subprocesses
-- tool calls with unpredictable latency
-- file watching
-- terminal/PTY handling
-- browser automation
-- local sockets
-- WebSocket control planes
-- prompt/context assembly
-- memory and artifact writes
-- approval and policy checks
-- crash recovery
-
-That makes the runtime a **product surface**.
-
-If the runtime mishandles:
-
-- child processes
-- signals
-- file descriptors
-- backpressure
-- timers
-- memory growth
-- native dependencies
-
-then the agent product feels **unreliable** even if the model is strong.
-
-The model **reasons**.
-
-The runtime **survives contact with the operating system**.
-
----
-
-## 6. OpenClaw today: Node 24 as stable target
-
-For OpenClaw-style development today, the stable baseline is:
-
-```text
-Node 24
-TypeScript
-pnpm
-native helpers where necessary
-```
-
-This is the **correct default** because:
-
-- compatibility matters more than novelty
-- plugin ecosystems assume Node
-- many SDKs ship Node-first
-- debugging tools are mature
-- long-running service behavior is well understood
-- contributor onboarding is easier
-
-For OpenClaw, the runtime decision is not:
-
-```text
-Should everything move to Bun tomorrow?
-```
-
-The better question:
-
-```text
-Which runtime properties do agent systems need long-term?
-```
-
----
-
-## 7. Runtime properties that matter
-
-For agent systems, measure:
-
-| Property | Why it matters |
-|---|---|
-| Cold start | CLI agents, hooks, short-lived tools, serverless tasks |
-| Warm memory | long-running Gateway, sessions, event logs |
-| Subprocess handling | shell tools, build tools, node hosts, approvals |
-| WebSocket behavior | Gateway RPC, streaming, nodes, dashboards |
-| File watching | code agents, local workspaces, reload loops |
-| Native dependency story | browser automation, speech, ML helpers |
-| Cross-platform packaging | macOS, Linux, Windows, Jetson |
-| Debug tooling | production incident analysis |
-| Ecosystem compatibility | SDKs, plugins, auth libraries, package managers |
-| Security surface | sandboxing, supply chain, permission boundaries |
-
-Startup speed alone is **not enough**.
-
-A runtime can be fast and still be a **poor control-plane substrate**.
-
----
-
-## 8. Where Bun could help agents
-
-Bun may be useful in agent systems for:
-
-### Fast CLI startup
-
-Short-lived commands benefit from faster startup:
-
-```text
-agent helper
-hook runner
-test probe
-small local tool
-```
-
-### Integrated test and run tooling
-
-Fewer moving parts can simplify developer loops:
-
-```bash
-bun install
-bun test
-bun run
-```
-
-### Packaging direction
-
-Agent products often want a **small local install footprint**.
-
-Single-binary or tightly bundled toolchains are valuable for:
-
-- local-first assistants
-- desktop apps
-- CI agents
-- edge devices
-- classroom/lab setups
-
-### TypeScript-first developer experience
-
-If Bun can run enough of a project without extra transpilation layers, **local iteration gets simpler**.
-
----
-
-## 9. Where Bun is risky
-
-Do not assume Bun is a **drop-in replacement** for every Node workload.
-
-Risk areas:
-
-- Node API compatibility edge cases
-- native module behavior
-- long-running process stability under agent loops
-- debugging and profiling maturity
-- subprocess and PTY edge cases
-- WebSocket/control-plane stress
-- package manager differences
-- CI parity with production
-
-For a personal prototype, these may be **acceptable**.
-
-For an agent gateway, they **must be measured**.
-
----
-
-## 10. Where Rust belongs
-
-Rust does **not need to replace TypeScript** to be useful.
-
-Better split:
-
-```text
-TypeScript:
-  product logic
-  Gateway RPC schemas
-  plugins
-  user-facing SDKs
-  fast iteration
-
-Rust:
-  local daemon
-  PTY/session supervisor
-  file watching core
-  sandbox executor
-  artifact store
-  vector/indexing service
-  audio pipeline helper
-  packaging-critical native service
-```
-
-This matches patterns already visible in local-first agent workspaces:
-
-```text
-TypeScript gives product velocity.
-Rust gives OS-facing reliability.
-```
-
-Do not **rewrite just to rewrite**.
-
-Move the parts where Rust's properties **pay for themselves**.
-
----
-
-## 11. Three-layer runtime strategy
-
-A realistic OpenClaw-adjacent strategy:
-
-### Phase 1: Node stability
-
-```text
-Node 24
-pnpm
-strict tests
-known deployment path
-```
-
-Use this for:
-
-- Gateway
-- App SDK
-- plugins
-- docs
-- standard developer workflows
-
-### Phase 2: Bun experiments
-
-```text
-run selected CLI/helper paths under Bun
-measure startup, memory, compatibility, test behavior
-keep production on Node until evidence says otherwise
-```
-
-Use this for:
-
-- short-lived helpers
-- tests
-- local tooling
-- packaging experiments
-
-### Phase 3: Rust offload
-
-```text
-move OS-facing or performance-critical services into Rust
-keep TypeScript as the orchestration/product layer
-```
-
-Use this for:
-
-- node host
-- PTY supervision
-- sandboxed exec
-- audio/video helpers
-- local vector store
-- hardware/device services
-
----
-
-## 12. How to evaluate Bun for OpenClaw-style work
-
-Do not ask:
-
-```text
-Does Bun feel fast?
-```
-
-Ask:
-
-```text
-Which OpenClaw paths pass under Bun?
-Which fail?
-Why?
-Is the failure fixable or structural?
-```
-
-Experiment matrix:
-
-| Test | What to measure |
-|---|---|
-| CLI startup | time to `--help`, config read, simple status |
-| Gateway boot | startup time, memory, plugin load failures |
-| App SDK smoke | connect, agents list, run, stream, wait, cancel |
-| WebSocket stress | event ordering, reconnects, backpressure |
-| tool execution | subprocess env, stdout/stderr, signals |
-| file watcher | reload behavior under edit storms |
-| docs/test runner | parity with Node CI |
-| native deps | browser automation, speech, canvas, SQLite |
-
-Result format:
-
-```text
-Path:
-Node result:
-Bun result:
-Failure class:
-Workaround:
-Decision:
-```
-
-This keeps runtime decisions evidence-backed.
-
----
-
-## 13. Edge and Jetson angle
-
-For edge AI systems, runtime packaging matters because devices have:
-
-- limited RAM
-- slow storage
-- thermal constraints
-- fragile setup processes
-- long unattended operation
-- mixed CPU/GPU/native dependencies
-
-Node is often acceptable on Jetson-class devices.
-
-But an agent system may also need:
-
-- native audio capture helpers
-- CUDA/TensorRT services
-- Rust or C++ device daemons
-- watchdogs
-- process supervisors
-- deterministic startup
-
-The practical architecture:
-
-```text
-TypeScript Gateway
-  -> Rust/C++ hardware services
-  -> Python/ML inference services where needed
-  -> explicit RPC boundaries
-```
-
-Do not force all logic into one language.
-
-Use clear process boundaries and typed contracts.
-
----
-
-## 14. The agent-runtime platform view
-
-The larger shift is not:
-
-```text
-Bun vs Node
-```
-
-It is:
-
-```text
-JavaScript runtime
-  -> agent execution platform
-```
-
-Agent platforms need:
-
-- fast startup
-- streaming
-- subprocess control
+- session ownership
+- identity checks
+- channel integrations
 - tool policy
-- session durability
-- artifact storage
-- local device access
-- predictable packaging
-- security reviewability
-- ecosystem compatibility
+- model routing
+- logging
+- streaming events
+- memory access
+- health checks
+- operations
 
-This is why Bun's runtime strategy matters.
+Without a gateway, each client must reimplement these concerns.
 
-It shows that runtime builders are optimizing for integrated platform experience, not just JavaScript execution.
+That leads to:
+
+- duplicated logic
+- inconsistent safety rules
+- mismatched session state
+- difficult debugging
+- poor auditability
+
+The gateway solves this by **centralizing the agent runtime**.
 
 ---
 
-## 15. Recommended stance
+## 3. The OpenClaw architecture in plain English
 
-For OpenClaw-style work:
+Based on the local OpenClaw docs, the core design is:
 
-```text
-Stay on Node 24 for production stability.
-Experiment with Bun in narrow paths.
-Use Rust for OS-facing, performance-sensitive, or packaging-critical services.
-Measure before moving anything broad.
-```
+- one long-lived **Gateway**
+- many **channels**
+- many **clients**
+- optional **nodes**
+- one or more **agents**
+- each agent with its own workspace and session store
 
-Decision table:
+### Gateway
 
-| Question | Default answer |
+The gateway is the **long-lived daemon process**.
+
+It:
+
+- owns messaging surfaces
+- exposes WebSocket and HTTP APIs
+- validates requests
+- emits events
+- manages sessions
+- runs the agent loop
+
+### Clients
+
+Clients are operator-facing tools such as:
+
+- CLI
+- web admin UI
+- macOS companion app
+
+They do not own the agent state. They connect to the gateway.
+
+### Nodes
+
+Nodes are attached devices, such as:
+
+- iOS node
+- Android node
+- headless device node
+
+They connect to the same gateway but identify themselves as devices with capabilities.
+
+### Channels
+
+Channels are message surfaces like:
+
+- Telegram
+- WhatsApp
+- Slack
+- Discord
+- Signal
+- WebChat
+
+Channels deliver messages in and out. They are not the same as agents.
+
+### Agents
+
+An **agent** is the "brain" that handles a conversation or workflow.
+
+In OpenClaw, one gateway can host:
+
+- one default agent
+- or many isolated agents side by side
+
+That is an important production idea:
+
+> one runtime process can host many isolated agent personalities and workspaces
+
+---
+
+## 4. The most important architecture shift
+
+The biggest lesson from OpenClaw is this:
+
+> A serious agent system is not just model inference. It is message routing plus state plus execution plus operations.
+
+That sounds abstract, so compare the two worlds directly.
+
+| Simple demo app | Real agent system |
 |---|---|
-| Should Gateway move to Bun now? | No, not without compatibility evidence. |
-| Should CLI/helper paths be tested under Bun? | Yes. |
-| Should native daemons be written in Rust? | Often, if they own OS-facing reliability. |
-| Should TypeScript be abandoned? | No. It remains strong for product iteration and SDKs. |
-| Should runtime strategy be tracked? | Yes. It affects packaging, edge deployment, and contributor experience. |
+| one chat box | many channels and clients |
+| one prompt | multiple prompts, system files, and context sources |
+| one request-response | long-lived sessions |
+| stateless backend | persistent state and memory |
+| no tool orchestration | tool calls and device capabilities |
+| no session ownership | session routing and isolation |
+| model call logs only | full runtime events and operational visibility |
+
+This is why studying real systems matters.
+
+If you only study notebook demos, your mental model stays too small.
 
 ---
 
-## Mini-lab: runtime evaluation harness
+## 5. The OpenClaw agent loop
 
-Create a small runtime compatibility matrix for one OpenClaw-style project.
+OpenClaw documents the **agent loop** explicitly.
 
-Test under Node first, then Bun where possible:
-
-```bash
-node --version
-bun --version
-
-time node ./scripts/smoke.js
-time bun ./scripts/smoke.js
-```
-
-Measure:
-
-- startup time
-- peak memory
-- package install time
-- subprocess behavior
-- WebSocket behavior
-- test parity
-- native dependency failures
-
-Write a one-page result:
+The high-level shape is:
 
 ```text
-Runtime:
-Version:
-What passed:
-What failed:
-Why it failed:
-Would we ship this:
-Next experiment:
+intake
+  -> context assembly
+  -> model inference
+  -> tool execution
+  -> streaming
+  -> persistence
 ```
 
-The goal is not to prove Bun is better or worse.
+This is a much better teaching model than "call the model and print the response."
 
-The goal is to make runtime decisions measurable.
+### Why this matters
+
+Each step has a distinct engineering concern:
+
+| Step | Engineering concern |
+|---|---|
+| intake | validate request, route session, identify sender |
+| context assembly | build prompts, load workspace files, memory, and tools |
+| inference | model selection, cost, latency, timeouts |
+| tool execution | policy, safety, retries, serialization |
+| streaming | user experience and observability |
+| persistence | session history, replay, recovery, audit |
+
+That means the agent loop is not only about the model.
+
+It is the full runtime path from inbound event to durable result.
+
+---
+
+## 6. Why session serialization matters
+
+OpenClaw's docs emphasize that runs are **serialized per session**.
+
+That means one session should not have many overlapping agent runs mutating it at the same time.
+
+Why?
+
+Because concurrency bugs in agents are subtle.
+
+Imagine this broken case:
+
+```text
+message A arrives
+message B arrives one second later
+both runs share the same session
+both read old context
+both call tools
+both write memory
+both reply
+```
+
+Now you get:
+
+- duplicated tool calls
+- mixed replies
+- inconsistent state
+- broken summaries
+- confusing memory
+
+Session serialization avoids that.
+
+This is a key production lesson:
+
+> agent correctness often depends on controlling concurrency, not just improving prompts
+
+---
+
+## 7. One gateway, many surfaces
+
+OpenClaw is useful because it shows how **one agent runtime** can support **many communication surfaces**.
+
+A single agent can be reachable through:
+
+- Telegram
+- Slack
+- WebChat
+- mobile node
+- CLI
+
+That means "the agent" is not the same thing as "the UI."
+
+This is one of the most important design upgrades students need to make.
+
+Bad beginner mental model:
+
+> the agent is the chat app
+
+Better production mental model:
+
+> the agent is a service, and chat apps are only surfaces connected to it
+
+This leads to better architecture decisions:
+
+- the agent owns logic
+- channels own transport
+- clients own interaction style
+- the gateway owns orchestration
+
+---
+
+## 8. Example: from Telegram message to final reply
+
+Here is a simplified OpenClaw-style flow:
+
+```text
+Telegram user sends a message
+  -> Telegram channel adapter receives it
+  -> gateway validates the inbound event
+  -> routing logic picks an agent
+  -> session key is resolved
+  -> session state is loaded
+  -> workspace files and prompt context are assembled
+  -> model runs
+  -> tool is called if needed
+  -> assistant text streams
+  -> session transcript is updated
+  -> reply goes back to Telegram
+```
+
+What is important here is not the specific transport.
+
+What matters is that:
+
+- channel selection
+- agent selection
+- session selection
+- tool execution
+- persistence
+
+are all explicit runtime steps.
+
+That is real agent engineering.
+
+---
+
+## 9. Why OpenClaw is a strong teaching example
+
+OpenClaw is useful for this roadmap because it is **not limited to one narrow pattern**.
+
+It combines:
+
+- message channels
+- persistent sessions
+- multi-agent routing
+- device nodes
+- skills and plugins
+- gateway operations
+- safety boundaries
+- long-lived local-first control
+
+That makes it a high-signal example of what a 2026 agent product actually looks like.
+
+It teaches students that:
+
+- an agent can be a system, not just a function
+- local-first designs matter
+- channels are product surfaces
+- sessions are first-class state
+- runtime safety and operations are core features
+
+---
+
+## 10. A minimal OpenClaw-style design exercise
+
+Imagine you are building a home AI assistant using the OpenClaw architecture pattern.
+
+It should:
+
+- answer chat questions
+- receive Telegram messages
+- receive voice notes from a mobile node
+- search local notes
+- control a few approved devices
+
+Your architecture sketch should include:
+
+| Part | Your decision |
+|---|---|
+| Gateway | one always-on process on Jetson |
+| Agent | one default personal assistant agent |
+| Channels | Telegram + WebChat |
+| Nodes | one phone node |
+| Session policy | DMs isolated per sender |
+| Tools | note search, calendar lookup, device control |
+| Safety | pairing, tool policy, audit logs |
+
+This already gives you a much stronger design than:
+
+> "I have a chatbot with a prompt."
+
+---
+
+## 11. What to remember
+
+The main lesson is simple:
+
+> A real agent product needs a runtime shape.
+
+OpenClaw gives you a strong example of that shape:
+
+- long-lived gateway
+- many surfaces
+- routed sessions
+- explicit agent loop
+- persistent state
+- operational visibility
+
+If you understand this model, you are much closer to building serious agents than if you only know prompting.
 
 ---
 
 ## Key takeaways
 
-- Bun's Zig-to-Rust work is currently an initial porting plan, not a completed rewrite.
-- The strategic signal is that runtime maintainability and ecosystem scale matter, not only raw speed.
-- Agent workloads stress runtimes through streaming, subprocesses, sessions, tools, file watching, and native helpers.
-- Node 24 remains the stable OpenClaw baseline today.
-- Bun is worth testing in narrow CLI/helper/tooling paths.
-- Rust is a strong fit for OS-facing services, sandboxing, PTY/session supervision, and device-local helpers.
-- The winning architecture is likely hybrid: TypeScript for product velocity, Rust/C++ for hard runtime boundaries, and clear RPC contracts between them.
+- A gateway exists because real agents need shared control over routing, sessions, tools, and operations.
+- OpenClaw is a useful case study because it treats the agent as a long-lived service, not a one-shot prompt call.
+- Channels, clients, nodes, and agents are different roles in the system.
+- The agent loop is a full runtime path: intake, context, inference, tools, streaming, persistence.
+- Session serialization is a production requirement, not an optional optimization.
+- A serious agent product is a control plane plus runtime, not only a model endpoint.
 
 ---
 
 ## References
 
-- Bun commit `46d3bc2`, "docs: add Phase-A porting guide": [https://github.com/oven-sh/bun/commit/46d3bc29f270fa881dd5730ef1549e88407701a5](https://github.com/oven-sh/bun/commit/46d3bc29f270fa881dd5730ef1549e88407701a5)
-- Bun Phase-A porting guide at that commit: [https://raw.githubusercontent.com/oven-sh/bun/46d3bc29f270fa881dd5730ef1549e88407701a5/docs/PORTING.md](https://raw.githubusercontent.com/oven-sh/bun/46d3bc29f270fa881dd5730ef1549e88407701a5/docs/PORTING.md)
-- Bun repository: [https://github.com/oven-sh/bun](https://github.com/oven-sh/bun)
-- Node.js releases: [https://nodejs.org/en/about/previous-releases](https://nodejs.org/en/about/previous-releases)
-- Lecture 24 - Agent Harness: [Lecture-24.md](Lecture-24.md)
-- Lecture 28 - Pi: [Lecture-28.md](Lecture-28.md)
-- Lecture 30 - Agentic SDLC: [Lecture-30.md](Lecture-30.md)
+- Case-study source repo: [OpenClaw](https://github.com/openclaw/openclaw)
+- Practitioner reference: [The OpenClaw Book](https://openclawconsultant.com/openclaw-book/)
+- OpenClaw concepts:
+  - `docs/concepts/architecture.md`
+  - `docs/concepts/agent-loop.md`
+  - `docs/concepts/features.md`
+  - `docs/gateway/index.md`
 
 ---
 
-*Next: [Lecture 32 - LLM From Scratch: Model Mechanics for Agent and GPU Engineers](Lecture-32.md)*
+*Next: [Lecture 32](Lecture-32.md)*

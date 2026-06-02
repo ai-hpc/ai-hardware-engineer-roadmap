@@ -1,19 +1,30 @@
-# Lecture 28 - Pi (pi-mono): A Detail Reading of a Minimal Coding Agent
+# Lecture 28 - Runtime Strategy for Agent Systems: Node, Bun, Rust, and Edge Packaging
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 27](Lecture-27.md) | **Next:** [Lecture 29](Lecture-29.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 27](Lecture-27.md) | **Next:** [Lecture 29](Lecture-29.md)
 
 ---
 
-This lecture is a close reading of the actual Pi repository: [github.com/badlogic/pi-mono](https://github.com/badlogic/pi-mono). Pi is the **coding-agent substrate** that sits beneath OpenClaw and several other agent products. Rather than describe the surface, this lecture pulls apart the repo and shows you how each design decision is wired in code: which packages exist, which tools are built in, how extensions register, how sessions are stored as branchable JSONL, what hot reload actually reloads, and what `No MCP` looks like as a real engineering stance with a concrete workaround.
+OpenClaw currently lives mostly in the **Node/TypeScript world**.
 
-Primary sources:
+That is a pragmatic choice:
 
-- [`badlogic/pi-mono`](https://github.com/badlogic/pi-mono) — the repository itself, MIT-licensed, currently at v0.73.0 with 212 releases and 44.9k stars.
-- [`packages/coding-agent` README](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/README.md) — the CLI / TUI surface.
-- [`packages/agent` README](https://github.com/badlogic/pi-mono/tree/main/packages/agent) — the agent runtime framework.
-- Armin Ronacher, *Pi: The Minimal Agent Within OpenClaw* (Jan 31, 2026) — context and motivation.
+- TypeScript is productive.
+- Node has the ecosystem.
+- npm packages cover almost every integration surface.
+- agent products move quickly.
 
-Where this lecture quotes specifics (slash commands, file paths, command-line flags, CLI tool names), those come from the project's own README at the time of writing.
+But the runtime layer is becoming **strategic**.
+
+Bun's public Zig-to-Rust porting work is a useful signal. It does **not** mean Bun has already become a Rust runtime. The specific commit we are using as evidence is an initial Phase-A porting guide and helper script. The signal is narrower and more useful:
+
+```text
+fast runtimes are not enough
+runtime ecosystems, maintainability, tooling, and packaging now matter as product strategy
+```
+
+That matters for agent systems because an agent runtime is **not a normal web server**.
+
+It is a **long-running, tool-using, streaming, subprocess-heavy, policy-gated** execution platform.
 
 ---
 
@@ -21,530 +32,624 @@ Where this lecture quotes specifics (slash commands, file paths, command-line fl
 
 By the end of this lecture, you should be able to:
 
-1. Name the five packages in pi-mono and explain what each one does.
-2. List Pi's four built-in tools and the three optional ones available via CLI flags.
-3. Read a Pi session JSONL file and explain how `id` / `parentId` produce a tree.
-4. Explain the difference between `/tree`, `/fork`, and `/clone` semantically.
-5. Write a minimal Pi extension that registers one tool, one slash command, and one event handler.
-6. Explain what `/reload` reloads, what hot-reloads automatically, and what does not reload at all.
-7. Tell a beginner why Pi has no MCP and what to do instead when MCP is required.
-8. Map every Pi design decision back to a section of Lecture 24 (harness concerns) and Lecture 24b (event-sourced session).
+1. Explain what Bun is and why its runtime strategy matters.
+2. Distinguish confirmed Bun porting work from overhyped "Bun is now Rust" claims.
+3. Compare Node, Bun, and Rust as agent-runtime layers.
+4. Explain why agent workloads stress runtimes differently from standard web workloads.
+5. Identify which parts of an OpenClaw-style system should stay in TypeScript and which parts may belong in Rust.
+6. Design a runtime migration experiment without breaking compatibility.
+7. Define measurements for startup, memory, event-loop behavior, subprocess orchestration, and packaging.
+8. Connect runtime choices to edge/on-device AI deployment.
 
 ---
 
-## 1. What Pi actually is
+## 1. What Bun is
 
-Pi (`pi-mono`) is a TypeScript monorepo that ships, as its primary product, a coding-agent CLI installed with one command:
+Bun is an **alternative JavaScript runtime** and tooling stack.
+
+It tries to collapse several pieces into one distribution:
+
+```text
+JavaScript runtime
+package manager
+test runner
+transpiler
+bundler-style tooling
+```
+
+Where Node traditionally relies on a surrounding ecosystem:
+
+```text
+node
+npm / yarn / pnpm
+tsx / ts-node
+jest / vitest
+esbuild / swc / webpack
+```
+
+Bun's product argument is:
+
+```text
+one fast integrated toolchain
+```
+
+Important implementation detail:
+
+- Node uses V8.
+- Bun uses JavaScriptCore.
+- Bun has historically used a large amount of Zig.
+
+The runtime is **not just "where JavaScript executes."**
+
+It shapes:
+
+- startup latency
+- package install speed
+- subprocess behavior
+- native dependency handling
+- test-loop speed
+- single-binary packaging options
+- edge-device deployment ergonomics
+
+---
+
+## 2. What the Zig-to-Rust signal actually says
+
+The referenced Bun commit is titled:
+
+```text
+docs: add Phase-A porting guide
+```
+
+It adds a `docs/PORTING.md` guide and a helper script.
+
+The guide describes a staged Zig-to-Rust translation process:
+
+```text
+Phase A: draft .rs next to .zig, logic faithful, does not need to compile
+Phase B: make it compile crate-by-crate
+```
+
+It also gives strong constraints:
+
+- keep the Zig structure during the draft phase
+- do not invent crate layouts
+- avoid common Rust async/runtime crates such as Tokio, Rayon, Hyper, async-trait, and futures
+- avoid `std::fs`, `std::net`, and `std::process` for Bun-owned runtime paths
+- preserve Bun's event loop and syscall ownership
+- annotate `unsafe` blocks with the equivalent Zig invariant
+
+The confirmed takeaway:
+
+```text
+Bun maintainers are documenting how to port parts of Bun from Zig to Rust.
+```
+
+The unconfirmed overreach:
+
+```text
+"Bun has completed a Rust rewrite."
+```
+
+Do not build architecture decisions on the **overreach**.
+
+Use this as a **strategic signal**, not a migration trigger.
+
+---
+
+## 3. Why Zig made sense
+
+Zig is attractive for **runtime infrastructure** because it gives:
+
+- low-level control
+- straightforward C interop
+- explicit memory management
+- simple cross-compilation story
+- small runtime assumptions
+- performance-oriented ergonomics
+
+For a runtime like Bun, those are real advantages.
+
+The tradeoff is **ecosystem**.
+
+Zig's ecosystem and hiring pool are **smaller than Rust's**.
+
+For a fast-moving runtime, that can matter as much as language design.
+
+---
+
+## 4. Why Rust might win long-term
+
+Rust is attractive for **platform infrastructure** because it offers:
+
+- memory safety without garbage collection
+- strong concurrency guarantees
+- mature crates ecosystem
+- strong tooling
+- large contributor pool
+- good supply-chain/security tooling
+- credibility in production systems
+
+The tradeoff is **complexity**.
+
+Rust has:
+
+- a steeper learning curve
+- borrow-checker friction
+- compile-time cost
+- more up-front type and lifetime design
+
+But for long-term platform work, Rust often wins because **maintainability and contributor scale** matter.
+
+The practical interpretation:
+
+```text
+Zig can be excellent for a focused systems codebase.
+Rust can be better for a broad, long-lived runtime ecosystem.
+```
+
+This is **not ideology**.
+
+It is **platform economics**.
+
+---
+
+## 5. Why this matters for agent systems
+
+Agent workloads differ from **normal backend workloads**.
+
+They have:
+
+- long-running sessions
+- streaming model output
+- many subprocesses
+- tool calls with unpredictable latency
+- file watching
+- terminal/PTY handling
+- browser automation
+- local sockets
+- WebSocket control planes
+- prompt/context assembly
+- memory and artifact writes
+- approval and policy checks
+- crash recovery
+
+That makes the runtime a **product surface**.
+
+If the runtime mishandles:
+
+- child processes
+- signals
+- file descriptors
+- backpressure
+- timers
+- memory growth
+- native dependencies
+
+then the agent product feels **unreliable** even if the model is strong.
+
+The model **reasons**.
+
+The runtime **survives contact with the operating system**.
+
+---
+
+## 6. OpenClaw today: Node 24 as stable target
+
+For OpenClaw-style development today, the stable baseline is:
+
+```text
+Node 24
+TypeScript
+pnpm
+native helpers where necessary
+```
+
+This is the **correct default** because:
+
+- compatibility matters more than novelty
+- plugin ecosystems assume Node
+- many SDKs ship Node-first
+- debugging tools are mature
+- long-running service behavior is well understood
+- contributor onboarding is easier
+
+For OpenClaw, the runtime decision is not:
+
+```text
+Should everything move to Bun tomorrow?
+```
+
+The better question:
+
+```text
+Which runtime properties do agent systems need long-term?
+```
+
+---
+
+## 7. Runtime properties that matter
+
+For agent systems, measure:
+
+| Property | Why it matters |
+|---|---|
+| Cold start | CLI agents, hooks, short-lived tools, serverless tasks |
+| Warm memory | long-running Gateway, sessions, event logs |
+| Subprocess handling | shell tools, build tools, node hosts, approvals |
+| WebSocket behavior | Gateway RPC, streaming, nodes, dashboards |
+| File watching | code agents, local workspaces, reload loops |
+| Native dependency story | browser automation, speech, ML helpers |
+| Cross-platform packaging | macOS, Linux, Windows, Jetson |
+| Debug tooling | production incident analysis |
+| Ecosystem compatibility | SDKs, plugins, auth libraries, package managers |
+| Security surface | sandboxing, supply chain, permission boundaries |
+
+Startup speed alone is **not enough**.
+
+A runtime can be fast and still be a **poor control-plane substrate**.
+
+---
+
+## 8. Where Bun could help agents
+
+Bun may be useful in agent systems for:
+
+### Fast CLI startup
+
+Short-lived commands benefit from faster startup:
+
+```text
+agent helper
+hook runner
+test probe
+small local tool
+```
+
+### Integrated test and run tooling
+
+Fewer moving parts can simplify developer loops:
 
 ```bash
-npm install -g @mariozechner/pi-coding-agent
-export ANTHROPIC_API_KEY=sk-ant-...
-pi
+bun install
+bun test
+bun run
 ```
 
-Authentication can also use `/login` for subscription-based providers; the CLI then runs as an interactive TUI. The package is one of five in the monorepo, all MIT-licensed, all under the `@mariozechner/*` npm scope.
+### Packaging direction
 
-The repo description: *"Tools for building AI agents."* That is more accurate than calling Pi "a coding agent" — Pi is an **agent runtime kit**, of which the coding-agent CLI is the most visible product but not the only one.
+Agent products often want a **small local install footprint**.
+
+Single-binary or tightly bundled toolchains are valuable for:
+
+- local-first assistants
+- desktop apps
+- CI agents
+- edge devices
+- classroom/lab setups
+
+### TypeScript-first developer experience
+
+If Bun can run enough of a project without extra transpilation layers, **local iteration gets simpler**.
 
 ---
 
-## 2. The monorepo, package by package
+## 9. Where Bun is risky
 
-```
-pi-mono/
-  packages/
-    ai/               @mariozechner/pi-ai             multi-provider LLM API
-    agent/            @mariozechner/pi-agent-core     agent runtime + tool calling
-    coding-agent/     @mariozechner/pi-coding-agent   the `pi` CLI / TUI
-    tui/              @mariozechner/pi-tui            differential-rendered TUI library
-    web-ui/           @mariozechner/pi-web-ui         web components for chat UI
-  .pi/                                                 self-config for development
-  .github/                                             CI workflows
-  scripts/                                             build / release scripts
-```
+Do not assume Bun is a **drop-in replacement** for every Node workload.
 
-Read top-down, this is a **stack**: `ai` is the model abstraction, `agent` is the runtime that calls models and dispatches tools, `coding-agent` is the CLI that wires `agent` to a TUI, `tui` is the rendering library, `web-ui` is the equivalent surface for a browser. Each package is **independently published**; consumers can pick the layer they need.
+Risk areas:
 
-A consequence: **a non-coding-agent product (a Slack bot, a Telegram bot, OpenClaw itself) consumes `@mariozechner/pi-agent-core` and `@mariozechner/pi-ai` directly** and supplies its own front-end. The coding-agent CLI is one consumer of the runtime, not the only one.
+- Node API compatibility edge cases
+- native module behavior
+- long-running process stability under agent loops
+- debugging and profiling maturity
+- subprocess and PTY edge cases
+- WebSocket/control-plane stress
+- package manager differences
+- CI parity with production
+
+For a personal prototype, these may be **acceptable**.
+
+For an agent gateway, they **must be measured**.
 
 ---
 
-## 3. The built-in tool surface
+## 10. Where Rust belongs
 
-Pi's **default** tool set is four:
+Rust does **not need to replace TypeScript** to be useful.
 
-| Tool | Purpose |
+Better split:
+
+```text
+TypeScript:
+  product logic
+  Gateway RPC schemas
+  plugins
+  user-facing SDKs
+  fast iteration
+
+Rust:
+  local daemon
+  PTY/session supervisor
+  file watching core
+  sandbox executor
+  artifact store
+  vector/indexing service
+  audio pipeline helper
+  packaging-critical native service
+```
+
+This matches patterns already visible in local-first agent workspaces:
+
+```text
+TypeScript gives product velocity.
+Rust gives OS-facing reliability.
+```
+
+Do not **rewrite just to rewrite**.
+
+Move the parts where Rust's properties **pay for themselves**.
+
+---
+
+## 11. Three-layer runtime strategy
+
+A realistic OpenClaw-adjacent strategy:
+
+### Phase 1: Node stability
+
+```text
+Node 24
+pnpm
+strict tests
+known deployment path
+```
+
+Use this for:
+
+- Gateway
+- App SDK
+- plugins
+- docs
+- standard developer workflows
+
+### Phase 2: Bun experiments
+
+```text
+run selected CLI/helper paths under Bun
+measure startup, memory, compatibility, test behavior
+keep production on Node until evidence says otherwise
+```
+
+Use this for:
+
+- short-lived helpers
+- tests
+- local tooling
+- packaging experiments
+
+### Phase 3: Rust offload
+
+```text
+move OS-facing or performance-critical services into Rust
+keep TypeScript as the orchestration/product layer
+```
+
+Use this for:
+
+- node host
+- PTY supervision
+- sandboxed exec
+- audio/video helpers
+- local vector store
+- hardware/device services
+
+---
+
+## 12. How to evaluate Bun for OpenClaw-style work
+
+Do not ask:
+
+```text
+Does Bun feel fast?
+```
+
+Ask:
+
+```text
+Which OpenClaw paths pass under Bun?
+Which fail?
+Why?
+Is the failure fixable or structural?
+```
+
+Experiment matrix:
+
+| Test | What to measure |
 |---|---|
-| `read` | Read a file's contents |
-| `write` | Create or overwrite a file |
-| `edit` | Structural edit on an existing file |
-| `bash` | Execute a shell command |
+| CLI startup | time to `--help`, config read, simple status |
+| Gateway boot | startup time, memory, plugin load failures |
+| App SDK smoke | connect, agents list, run, stream, wait, cancel |
+| WebSocket stress | event ordering, reconnects, backpressure |
+| tool execution | subprocess env, stdout/stderr, signals |
+| file watcher | reload behavior under edit storms |
+| docs/test runner | parity with Node CI |
+| native deps | browser automation, speech, canvas, SQLite |
 
-Three more are available through CLI flags but are not enabled by default:
+Result format:
 
-| Tool | Purpose |
+```text
+Path:
+Node result:
+Bun result:
+Failure class:
+Workaround:
+Decision:
+```
+
+This keeps runtime decisions evidence-backed.
+
+---
+
+## 13. Edge and Jetson angle
+
+For edge AI systems, runtime packaging matters because devices have:
+
+- limited RAM
+- slow storage
+- thermal constraints
+- fragile setup processes
+- long unattended operation
+- mixed CPU/GPU/native dependencies
+
+Node is often acceptable on Jetson-class devices.
+
+But an agent system may also need:
+
+- native audio capture helpers
+- CUDA/TensorRT services
+- Rust or C++ device daemons
+- watchdogs
+- process supervisors
+- deterministic startup
+
+The practical architecture:
+
+```text
+TypeScript Gateway
+  -> Rust/C++ hardware services
+  -> Python/ML inference services where needed
+  -> explicit RPC boundaries
+```
+
+Do not force all logic into one language.
+
+Use clear process boundaries and typed contracts.
+
+---
+
+## 14. The agent-runtime platform view
+
+The larger shift is not:
+
+```text
+Bun vs Node
+```
+
+It is:
+
+```text
+JavaScript runtime
+  -> agent execution platform
+```
+
+Agent platforms need:
+
+- fast startup
+- streaming
+- subprocess control
+- tool policy
+- session durability
+- artifact storage
+- local device access
+- predictable packaging
+- security reviewability
+- ecosystem compatibility
+
+This is why Bun's runtime strategy matters.
+
+It shows that runtime builders are optimizing for integrated platform experience, not just JavaScript execution.
+
+---
+
+## 15. Recommended stance
+
+For OpenClaw-style work:
+
+```text
+Stay on Node 24 for production stability.
+Experiment with Bun in narrow paths.
+Use Rust for OS-facing, performance-sensitive, or packaging-critical services.
+Measure before moving anything broad.
+```
+
+Decision table:
+
+| Question | Default answer |
 |---|---|
-| `grep` | Text search across the workspace |
-| `find` | File-name search |
-| `ls` | Directory listing |
-
-The README's framing is exact: *"by default, pi gives the model four tools: `read`, `write`, `edit`, and `bash`."* The optional three exist for cases where the model would otherwise burn tokens spawning `bash -c "grep ..."`; they are convenience, not capability expansion.
-
-The structural argument for keeping the default at four: **most filesystem and shell capabilities compose from `bash`**. A model that can write a script and run it can do `grep`, `find`, `ls`, `git`, `curl`, `npm`, and any other CLI without each one having to be a separately registered tool whose schema lives in the prompt. This is the same principle as Lecture 24 §6.5: too many tools confuse selection and waste tokens.
+| Should Gateway move to Bun now? | No, not without compatibility evidence. |
+| Should CLI/helper paths be tested under Bun? | Yes. |
+| Should native daemons be written in Rust? | Often, if they own OS-facing reliability. |
+| Should TypeScript be abandoned? | No. It remains strong for product iteration and SDKs. |
+| Should runtime strategy be tracked? | Yes. It affects packaging, edge deployment, and contributor experience. |
 
 ---
 
-## 4. The slash command surface
+## Mini-lab: runtime evaluation harness
 
-Pi ships approximately twenty built-in slash commands. They group into clear categories.
+Create a small runtime compatibility matrix for one OpenClaw-style project.
 
-**Authentication and identity**
+Test under Node first, then Bun where possible:
 
-```
-/login          OAuth flow for subscription-based providers
-/logout         Drop credentials
-/model          Switch the active model
-/scoped-models  Mark which models cycle under Ctrl+P
-/settings       Thinking level, theme, message delivery, transport
-```
+```bash
+node --version
+bun --version
 
-**Session control**
-
-```
-/new            Start a new session
-/resume         Pick from previous sessions
-/name <name>    Set the current session's display name
-/session        Show session info
-/quit           Quit
+time node ./scripts/smoke.js
+time bun ./scripts/smoke.js
 ```
 
-**Tree navigation (the interesting part)**
+Measure:
 
-```
-/tree           Jump to any point in the current session's tree
-/fork           Create a NEW session file from a previous user message
-/clone          Duplicate the current active branch into a new session file
-/compact        Manually compact context (with optional prompt)
-/reload         Reload keybindings, extensions, skills, prompts, context files
-```
+- startup time
+- peak memory
+- package install time
+- subprocess behavior
+- WebSocket behavior
+- test parity
+- native dependency failures
 
-**Output and sharing**
+Write a one-page result:
 
-```
-/copy           Copy last assistant message to clipboard
-/export [file]  Export session to HTML
-/share          Upload as a private GitHub gist
-/changelog      Show version history
-/hotkeys        Show all keyboard shortcuts
-```
-
-**Extension surface**
-
-```
-/skill:<name>   Invoke a registered skill
-/<templatename> Expand a prompt template
+```text
+Runtime:
+Version:
+What passed:
+What failed:
+Why it failed:
+Would we ship this:
+Next experiment:
 ```
 
-That last category is important: **anything not built in is reachable through the same `/` syntax**. Extensions register their own commands and templates and they appear here without ceremony.
+The goal is not to prove Bun is better or worse.
 
----
-
-## 5. System prompt assembly
-
-Pi assembles its system prompt from **layered files**, with override and append semantics.
-
-```
-priority order (highest to lowest):
-
-  .pi/SYSTEM.md                 project-level full replacement
-  ~/.pi/agent/SYSTEM.md         global-level full replacement
-  default system prompt         shipped in the binary
-
-  + .pi/APPEND_SYSTEM.md        project-level appended after replacement target
-  + ~/.pi/agent/APPEND_SYSTEM.md  global appended after replacement target
-
-  + AGENTS.md / CLAUDE.md       walked from cwd upward to root, all concatenated
-  + skill files                 all matching files concatenated
-```
-
-This is the prompt-assembly pattern from Lecture 21 (OpenClaw System Prompt Architecture) made even simpler: a small fixed default, replaceable, with append hooks for project-specific guidance, plus walk-up context files (`AGENTS.md`, `CLAUDE.md`) the way every recent agent has settled on.
-
-The `CLAUDE.md` filename being honored alongside `AGENTS.md` is a deliberate **compatibility move**: a workspace already configured for Claude Code drops cleanly into Pi without renaming files.
-
----
-
-## 6. The session model
-
-Sessions are **JSONL files** stored under `~/.pi/agent/sessions/`, organized by working directory. The on-disk shape is the simplest possible event log:
-
-```jsonl
-{"id":"a","parentId":null,"role":"user","content":"refactor this fn"}
-{"id":"b","parentId":"a","role":"assistant","content":"…"}
-{"id":"c","parentId":"b","role":"toolResult","name":"read","data":"…"}
-{"id":"d","parentId":"c","role":"assistant","content":"…"}
-{"id":"e","parentId":"a","role":"user","content":"actually try a different approach"}
-{"id":"f","parentId":"e","role":"assistant","content":"…"}
-```
-
-Each line carries an `id` and a `parentId`. Most lines extend the active branch (their `parentId` is the previous line's `id`). When the user takes a side-quest, a new line is written whose `parentId` is **not** the previous line — it is some earlier ancestor. The result is a tree, in one file:
-
-```
-                    a (user: refactor this fn)
-                   / \
-                  b   e (user: actually try a different approach)
-                  |   |
-                  c   f
-                  |
-                  d
-```
-
-Both branches `[a → b → c → d]` and `[a → e → f]` live in the same JSONL file. The active branch is determined by which leaf the runtime considers current.
-
-The format is **Lecture 24b's "session is source of truth" principle** at minimum cost: one append-only file, one `parentId` field, no separate database. This is also why replay works trivially: re-read the file, fold events along whichever branch you select, derive the context window from there.
-
----
-
-## 7. `/tree`, `/fork`, and `/clone` — three different things
-
-The naming matters. From the README:
-
-| Command | Effect | Files affected |
-|---|---|---|
-| `/tree` | Jump to any point in the current session's tree, switch branches in place | One file (the current session); just changes the active leaf |
-| `/fork` | Create a **new session file** from a previous user message; copies the active path up to that point; selected prompt placed in the editor for modification | Two files (original untouched; new session created) |
-| `/clone` | Duplicate the current active branch into a **new session file** at the current position; full active-path history kept; opens with empty editor | Two files (original untouched; new session created) |
-
-The mental model:
-
-- `/tree` is *navigation* within one session.
-- `/fork` is *what-if from a past prompt*, with that prompt loaded for editing — you are saying "I want to ask this differently."
-- `/clone` is *snapshot at the current state into a new session* — you are saying "I want to take this conversation somewhere else without polluting the original."
-
-These three primitives cover the realistic side-quest design space:
-
-- Try a different approach to an old prompt → `/fork` from that prompt.
-- Go investigate something orthogonal without losing the main thread → `/clone`, work in the clone, come back.
-- Move between branches that already exist → `/tree`.
-
-A **linear-only session log** can do none of these without additional machinery.
-
----
-
-## 8. The Extension API
-
-Extensions live in two well-known locations:
-
-```
-~/.pi/agent/extensions/    global, available everywhere
-.pi/extensions/            project-local
-```
-
-A third path is "pi packages" (npm packages discoverable through the normal Node resolution chain). Extensions can be disabled per-run with `--no-extensions` or explicitly loaded with `-e`.
-
-Each extension is a TypeScript module with a default export: a function that takes an `ExtensionAPI` object and registers everything it wants:
-
-```typescript
-export default function (pi: ExtensionAPI) {
-  pi.registerTool({
-    name: "deploy",
-    label: "Deploy",
-    description: "Deploy the current branch to staging",
-    parameters: Type.Object({
-      target: Type.String({ description: "staging | production" })
-    }),
-    execute: async (toolCallId, params, signal, onUpdate) => {
-      // ...
-    }
-  });
-
-  pi.registerCommand("stats", {
-    description: "Show cost and token usage for this session",
-    handler: async (ctx) => { /* ... */ }
-  });
-
-  pi.on("tool_call", async (event, ctx) => {
-    // observe every tool call, with full context
-  });
-}
-```
-
-What `ExtensionAPI` exposes (from the README):
-
-- **`registerTool()`** — add an LLM-visible tool (Lecture 24 §2.1 dispatch surface)
-- **`registerCommand()`** — add a slash command (out-of-context, user-visible)
-- **`on(event, handler)`** — subscribe to runtime events such as `tool_call`
-- Custom UI components, status lines, headers, footers, in-place editors
-- Async extension factories (so extensions can do startup work)
-
-Two structural notes on this API:
-
-1. **The extension surface is the same as Lecture 24's two extension surfaces** (in-context LLM tools vs out-of-context TUI). `registerTool()` is the former; `registerCommand()` and the UI hooks are the latter. The decision rule from Lecture 24 §5.3 applies directly.
-
-2. **Event handlers are first-class.** This is what makes "the agent extends itself" practical: an extension can observe tool calls, react to them, modify them, log them, gate them. The same hook surface that audit / security / telemetry would use is the one extensions see.
-
----
-
-## 9. The Agent runtime — `pi-agent-core`
-
-If the coding-agent CLI is the visible surface, `pi-agent-core` is the **substrate**. It is what OpenClaw, a Telegram bot, or your own front-end consumes when they want Pi-style agent behavior without the CLI.
-
-The exposed shape:
-
-```typescript
-agent.state.systemPrompt  = "..."
-agent.state.model         = getModel(...)
-agent.state.tools         = [tool1, tool2]
-agent.state.messages      = [...]    // top-level array; copied on assign
-
-await agent.waitForIdle()
-agent.abort()
-agent.reset()
-
-// read-only:
-agent.isStreaming
-agent.streamingMessage
-agent.pendingToolCalls
-agent.errorMessage
-```
-
-Tool definitions use a TypeBox-based interface:
-
-```typescript
-const readFileTool: AgentTool = {
-  name:           "read_file",
-  label:          "Read File",
-  description:    "Read a file's contents",
-  parameters:     Type.Object({ path: Type.String() }),
-  executionMode:  "sequential",   // or default parallel
-  execute: async (toolCallId, params, signal, onUpdate) => {
-    // tool body
-    // returns a result, or throws on failure
-    // may include `terminate: true` to skip the next LLM call
-  }
-};
-```
-
-Two specifics that matter:
-
-- **`executionMode: "sequential"`** — opt-out of parallel tool execution for tools that must not run concurrently. By default the runtime can execute non-conflicting tool calls in parallel.
-- **`terminate: true`** — a tool result can flag the agent to skip the automatic follow-up LLM call. Useful for tools whose result is the answer (e.g., a `commit` tool that succeeded; nothing more to say).
-
-Custom message types are added by **declaration merging** on a `CustomAgentMessages` interface, then filtered out of the LLM-bound subset by `convertToLlm()`. This is the "custom messages in the session log" pattern from §6 made operational at the type level.
-
----
-
-## 10. Hot reload — what actually reloads
-
-Pi's hot-reload story is more specific than "edit and save."
-
-**`/reload`** is a manual command that re-reads:
-
-- keybindings
-- extensions
-- skills
-- prompts
-- context files (`AGENTS.md` / `CLAUDE.md`)
-
-**Themes hot-reload automatically** — modify the active theme file and the change applies immediately, no `/reload` needed.
-
-**What does NOT reload at runtime:**
-
-- the underlying agent runtime / TUI itself (requires process restart)
-- already-running tool executions (sequential ones especially)
-- model API state (cache prefixes etc.)
-
-The structural lesson: hot reload in an agent runtime is *not* "every layer is hot-reloadable." It is specifically the *configuration and extension layers* that are hot-reloaded; the runtime core stays stable. This is exactly the right line to draw — it gives you the "agent extends itself" loop without inviting the bug class where a tool is half-reloaded mid-execution.
-
----
-
-## 11. Configuration paths
-
-| Path | Purpose | Scope |
-|---|---|---|
-| `~/.pi/agent/settings.json` | Settings (theme, thinking level, transport, etc.) | Global |
-| `.pi/settings.json` | Settings overrides | Project |
-| `~/.pi/agent/SYSTEM.md` | System prompt full replacement | Global |
-| `.pi/SYSTEM.md` | System prompt full replacement | Project |
-| `~/.pi/agent/APPEND_SYSTEM.md` | System prompt append | Global |
-| `.pi/APPEND_SYSTEM.md` | System prompt append | Project |
-| `~/.pi/agent/extensions/` | Extensions | Global |
-| `.pi/extensions/` | Extensions | Project |
-| `~/.pi/agent/sessions/` | Session JSONL files (organized by cwd) | Per-cwd within global |
-| `~/.pi/agent/skills/` | Skills | Global |
-| `.pi/skills/` | Skills | Project |
-| `AGENTS.md`, `CLAUDE.md` | Context files | Walked up from cwd |
-
-The whole config tree is overridable via the `PI_CODING_AGENT_DIR` environment variable, which is useful for testing and for running multiple isolated Pi instances.
-
-The convention is the well-trodden one: a hidden dotted directory (`.pi`) in the project, a corresponding `~/.pi/agent/` for globals, and a single env var for everything-else cases. No surprises.
-
----
-
-## 12. The "No MCP" stance, made concrete
-
-The README is direct: *"No MCP. Build CLI tools with READMEs (see Skills), or build an extension that adds MCP support."*
-
-The structural argument was previewed in Lecture 24 §2.1 and Lecture 27 §14.6. In Pi-specific terms:
-
-- Pi expects to **mutate the tool surface mid-session** (extensions register tools; skills are loaded on demand; `/reload` re-reads everything).
-- MCP, as deployed across most providers, expects the tool catalog to be **stable for the session** so it can sit in the cached prompt prefix.
-- These two are in direct tension. Pi resolves it by not adopting MCP at the protocol level.
-
-What you do instead:
-
-1. **Build CLI tools and put a README on them.** Pi's `bash` tool reaches them by name; the README is what teaches the model how to use them. Skills make this idiomatic — a skill is a directory with a few markdown files and supporting scripts.
-2. **Build an MCP-bridge extension** if you genuinely need MCP. The extension can spawn `mcporter` (or similar), translate calls, register the methods as Pi tools dynamically, and clean up on exit.
-
-The lesson is broader than Pi: **a harness's tool-surface mutability and its protocol choice are coupled architectural decisions**. You cannot pick "tools defined as MCP, mounted at session start" and "agent extends itself by writing tools" without paying for the conflict somewhere.
-
----
-
-## 13. Keyboard shortcuts as a UX primitive
-
-Pi ships a keyboard-first TUI. The shortcuts are not decoration; they are the actual interaction model.
-
-Selected from the README:
-
-| Key | Action |
-|---|---|
-| `Ctrl+C` | Clear editor (single press) |
-| `Ctrl+C` × 2 | Quit |
-| `Escape` | Cancel / abort |
-| `Escape` × 2 | Open `/tree` |
-| `Ctrl+L` | Open model selector |
-| `Ctrl+P` / `Shift+Ctrl+P` | Cycle scoped models forward / backward |
-| `Shift+Tab` | Cycle thinking level |
-| `Ctrl+O` | Collapse / expand tool output |
-| `Ctrl+T` | Collapse / expand thinking blocks |
-| `Shift+Enter` | Multi-line editor (`Ctrl+Enter` on Windows Terminal) |
-| `Tab` | Path completion |
-| `Ctrl+V` | Paste images (`Alt+V` on Windows) |
-| `Enter` | Queue steering message (mid-stream) |
-| `Alt+Enter` | Queue follow-up message |
-| `Ctrl+G` | Open external editor |
-
-Three of these are agent-specific innovations worth calling out:
-
-- **`Enter` queues a steering message during a running stream.** You do not have to abort; you tell the agent something while it is working and it picks the message up at the next safe point.
-- **`Alt+Enter` queues a follow-up.** Same idea but applies after the current turn completes rather than mid-stream.
-- **`Escape` × 2 jumps to `/tree`.** Branch navigation is one keystroke away from anywhere.
-
-These all reflect the same design choice: **the human is in the loop continuously**, not just at turn boundaries. The TUI gives you the affordances to act mid-stream, and the agent runtime is built to accept those signals without breaking.
-
----
-
-## 14. The pi-mono ecosystem
-
-The repo names two sister projects worth knowing:
-
-- **[`badlogicgames/pi-share-hf`](https://github.com/badlogicgames/pi-share-hf)** — publish a Pi session to Hugging Face. The pattern is "session as artifact": once you have a tree-structured event log, sharing it is just publishing the file.
-- **[`earendil-works/pi-chat`](https://github.com/earendil-works/pi-chat)** — Slack/chat automation workflows on top of Pi. Pi is the runtime; this is one of several front-ends that demonstrate `pi-agent-core` is meant to be embedded.
-
-The branding domain is `pi.dev`.
-
-The 44.9k-star count and 212 releases at v0.73.0 (May 2026) suggest a project that ships frequently and has reached a substantial user base. For a learner: **the version cadence is itself a signal** that the architectural choices in this lecture are not theoretical — they have to survive contact with users in production weekly.
-
----
-
-## 15. Mapping every Pi decision back to Lectures 24 and 24b
-
-Pi is the most concrete public instantiation of the general harness theory in this course. Walking the mapping:
-
-| Pi decision | Lecture 24 / 24b principle |
-|---|---|
-| Four built-in tools (read, write, edit, bash) | §2.1 dispatch surface; §6.5 too-many-tools anti-pattern |
-| `~/.pi/agent/sessions/*.jsonl` append-only | Lecture 24b §1 session as source of truth |
-| `id` + `parentId` tree | Lecture 24b §2 event sourcing for cognition |
-| Custom message types via declaration merging | Lecture 24b §3 schema; §10 anti-pattern eliminated |
-| `/reload` for extensions, themes auto-reload | §2.6 extensibility; §5 stateless interpreter pattern |
-| `.pi/SYSTEM.md` overrides + `APPEND_SYSTEM.md` | §2.3 context construction; Lecture 21 prompt assembly |
-| `registerCommand` (TUI) vs `registerTool` (LLM) | §5.1 / §5.2 / §5.3 the decision rule |
-| `executionMode: "sequential"` opt-out | §2.4 planning and recovery; tool-call ordering |
-| `terminate: true` in tool result | §2.4 turn-loop control |
-| Walk-up `AGENTS.md` / `CLAUDE.md` | §2.3 context construction |
-| `PI_CODING_AGENT_DIR` env var | §2.5 policy and permission isolation between instances |
-| No MCP, with `bash`-and-CLI workaround | §2.1 dispatch boundary; §2.6 extensibility tradeoff |
-| `/tree`, `/fork`, `/clone` | Lecture 24b §2 capabilities (branching is the unlocked one) |
-| Mid-stream `Enter` to steer | §2.4 planning and recovery; human-in-the-loop |
-
-This table is the answer to "should I copy Pi's design decisions into my own harness?" Yes, except the No-MCP one — that is contingent on whether you also adopt mid-session mutability. Adopt both or neither.
-
----
-
-## 16. Hardware-track tie-in
-
-For learners on the Jetson / edge AI track, Pi is structurally interesting in three specific ways:
-
-**Minimal core, minimal cold start.** A four-tool harness has a smaller prompt-cache surface and a faster cold start than feature-bloated alternatives. On a Jetson AGX with limited unified memory (Lecture VLA Deployment on Edge GPUs §5), every ~10 KB of system prompt costs decode latency on the first turn. Pi's minimum is small enough that it does not dominate.
-
-**Provider-agnostic SDK enables hybrid routing.** `pi-ai` abstracts model providers cleanly enough that one session can mix a remote Anthropic call with a local on-device model (vLLM, llama.cpp, ONNX Runtime, the VLA stack from `vla-deploy-jetson`). The session log captures provider metadata per turn so replay still works. This is the right primitive for the hybrid cloud-vs-edge deployment pattern.
-
-**Tree-structured sessions as a multi-agent edge primitive.** Two robots branching from a shared parent session expresses coordination without forcing a master-slave ordering. A Pi-on-Jetson fleet has a natural way to do this without bolting orchestration on top.
-
-The VLA deploy guide in Phase 4 / Track B / ML and AI / `vla-deploy-jetson` is the closest sibling: **same engineering posture (minimal substrate, hot-reloadable composition, edge-aware design), different target workload**.
-
----
-
-## 17. Build it
-
-Two concrete artifacts, in increasing difficulty.
-
-**Beginner — write a Pi extension.** Pick a capability you actually want: a `/diff` command that shows the current uncommitted diff in a TUI overlay, a `/cost` command that surfaces session cost and tokens, a `/scratchpad` command that opens an external editor for a quick note appended to the session as a custom message. Register one slash command, one event handler, and (optionally) one LLM tool. Land it in `.pi/extensions/` in your own working tree.
-
-**Intermediate — embed `pi-agent-core` in a non-CLI front-end.** Build a small Discord bot, Slack bot, or web chat that uses `@mariozechner/pi-ai` and `@mariozechner/pi-agent-core` directly. Implement the four-tool default (or a subset). Persist sessions to JSONL with the same `id` / `parentId` shape. The point: prove to yourself that the substrate is consumable independent of the CLI.
-
-**Advanced — write your own minimal harness in a different language**, applying every principle from the §15 mapping table. Same four built-in tools, same JSONL session format with `parentId` tree, same two extension surfaces. You will know you have understood the architecture when your harness can host an extension written by a model, hot-reload it, and continue the same session afterward.
+The goal is to make runtime decisions measurable.
 
 ---
 
 ## Key takeaways
 
-- pi-mono is a TypeScript monorepo of five packages: `pi-ai`, `pi-agent-core`, `pi-coding-agent`, `pi-tui`, `pi-web-ui`. The CLI is one product; the runtime is meant to be embedded.
-- The default tool set is exactly four: `read`, `write`, `edit`, `bash`. Three more (`grep`, `find`, `ls`) are CLI-toggleable.
-- Sessions are JSONL files keyed by `id` and `parentId` — a tree in one file. `/tree` navigates, `/fork` branches from a past prompt, `/clone` snapshots the active branch into a new session.
-- Extensions live in `~/.pi/agent/extensions/` or `.pi/extensions/` and register through an `ExtensionAPI` that exposes both LLM-tool registration and TUI / slash-command registration. Event handlers (`pi.on("tool_call", ...)`) make extensions first-class observers.
-- Hot reload is targeted, not universal: `/reload` re-reads keybindings, extensions, skills, prompts, and context files; themes hot-reload automatically; the runtime core does not reload.
-- "No MCP" is a structural choice driven by Pi's mid-session mutability requirement, not a roadmap gap. Use CLI tools with READMEs, or write an extension to bridge MCP, or use `bash` to invoke `mcporter`.
-- Custom message types (declaration-merged into `CustomAgentMessages`) are how extensions persist state into the same append-only session log. This is Lecture 24b's principle made operational.
-- Mid-stream steering (`Enter` queues a message; `Alt+Enter` queues follow-up; `Escape × 2` opens `/tree`) is a UX primitive built on the assumption that the human is in the loop continuously, not only at turn boundaries.
-- Every major Pi design decision maps back to a section of Lecture 24 (harness concerns) and Lecture 24b (event-sourced session). Pi is the cleanest public instance of those principles in shipping code.
-- For hardware-track learners: minimal cores, provider-agnostic SDKs, and tree-structured sessions are exactly the substrate properties edge AI deployments need.
+- Bun's Zig-to-Rust work is currently an initial porting plan, not a completed rewrite.
+- The strategic signal is that runtime maintainability and ecosystem scale matter, not only raw speed.
+- Agent workloads stress runtimes through streaming, subprocesses, sessions, tools, file watching, and native helpers.
+- Node 24 remains the stable OpenClaw baseline today.
+- Bun is worth testing in narrow CLI/helper/tooling paths.
+- Rust is a strong fit for OS-facing services, sandboxing, PTY/session supervision, and device-local helpers.
+- The winning architecture is likely hybrid: TypeScript for product velocity, Rust/C++ for hard runtime boundaries, and clear RPC contracts between them.
 
 ---
 
 ## References
 
-### Primary sources
-
-- pi-mono repository — [https://github.com/badlogic/pi-mono](https://github.com/badlogic/pi-mono)
-- `packages/coding-agent` README — [https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/README.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/README.md)
-- `packages/agent` README — [https://github.com/badlogic/pi-mono/tree/main/packages/agent](https://github.com/badlogic/pi-mono/tree/main/packages/agent)
-- npm: `@mariozechner/pi-coding-agent` — [https://www.npmjs.com/package/@mariozechner/pi-coding-agent](https://www.npmjs.com/package/@mariozechner/pi-coding-agent)
-- npm: `@mariozechner/pi-agent-core` — [https://www.npmjs.com/package/@mariozechner/pi-agent-core](https://www.npmjs.com/package/@mariozechner/pi-agent-core)
-- npm: `@mariozechner/pi-ai` — [https://www.npmjs.com/package/@mariozechner/pi-ai](https://www.npmjs.com/package/@mariozechner/pi-ai)
-- npm: `@mariozechner/pi-tui` — [https://www.npmjs.com/package/@mariozechner/pi-tui](https://www.npmjs.com/package/@mariozechner/pi-tui)
-
-### Sister and consumer projects
-
-- `badlogicgames/pi-share-hf` — session publishing to Hugging Face: [https://github.com/badlogicgames/pi-share-hf](https://github.com/badlogicgames/pi-share-hf)
-- `earendil-works/pi-chat` — Slack / chat workflows on Pi: [https://github.com/earendil-works/pi-chat](https://github.com/earendil-works/pi-chat)
-- OpenClaw — multi-channel agent platform consuming Pi as a runtime: [https://github.com/openclaw/openclaw](https://github.com/openclaw/openclaw)
-- pi.dev — the project's primary domain.
-
-### Context
-
-- Armin Ronacher, *Pi: The Minimal Agent Within OpenClaw* (Jan 31, 2026) — the framing essay that introduced this lecture's subject.
-
-### Curriculum cross-references
-
-- [Lecture 21 - OpenClaw System Prompt Architecture](Lecture-21.md)
-- [Lecture 24 - What Is an AI Agent Harness?](Lecture-24.md)
-- [Lecture 24b - Session as Source of Truth](Lecture-24b.md)
-- [Lecture 25 - OpenCoven Local Harness Substrate](Lecture-25.md)
-- [Lecture 26 - OpenKnots Trustworthy Agent Interfaces](Lecture-26.md)
-- [Lecture 27 - AI Agent Security Engineer Roadmap](Lecture-27.md)
-- [Phase 4 / Track B / VLA Deployment on Edge GPUs](../../../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/5.%20Application%20Development/5.%20ML%20and%20AI/vla-deploy-jetson/Guide.md) — sibling minimal-substrate engineering posture for VLA workloads.
+- Bun commit `46d3bc2`, "docs: add Phase-A porting guide": [https://github.com/oven-sh/bun/commit/46d3bc29f270fa881dd5730ef1549e88407701a5](https://github.com/oven-sh/bun/commit/46d3bc29f270fa881dd5730ef1549e88407701a5)
+- Bun Phase-A porting guide at that commit: [https://raw.githubusercontent.com/oven-sh/bun/46d3bc29f270fa881dd5730ef1549e88407701a5/docs/PORTING.md](https://raw.githubusercontent.com/oven-sh/bun/46d3bc29f270fa881dd5730ef1549e88407701a5/docs/PORTING.md)
+- Bun repository: [https://github.com/oven-sh/bun](https://github.com/oven-sh/bun)
+- Node.js releases: [https://nodejs.org/en/about/previous-releases](https://nodejs.org/en/about/previous-releases)
+- Lecture 02 - Agent Harness: [Lecture-02.md](Lecture-02.md)
+- Lecture 41 - Pi: [Lecture-41.md](Lecture-41.md)
+- Lecture 29 - Agentic SDLC: [Lecture-29.md](Lecture-29.md)
 
 ---
 
-*Next: [Lecture 29 - Agent Skills: Workflow Discipline for Reliable Coding Agents](Lecture-29.md)*
+*Next: [Lecture 29](Lecture-29.md)*

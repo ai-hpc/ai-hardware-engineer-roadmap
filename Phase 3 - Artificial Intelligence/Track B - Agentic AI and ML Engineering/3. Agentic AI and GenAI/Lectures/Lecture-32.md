@@ -1,569 +1,405 @@
-# Lecture 32 - LLM From Scratch: Model Mechanics for Agent and GPU Engineers
+# Lecture 32 - OpenClaw Case Study: Channels, Routing, and Session Design
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 31](Lecture-31.md) | **Next:** [Lecture 33](Lecture-33.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 31](Lecture-31.md) | **Next:** [Lecture 33](Lecture-33.md)
 
 ---
 
-**Agent engineers** usually work above the model:
+## Why this lecture exists
 
-```text
-prompt
-  -> tool calls
-  -> memory
-  -> Gateway
-  -> runtime
-  -> UI
-```
+Once you move beyond a single chat window, agent design becomes a **routing problem**.
 
-**GPU and systems engineers** need to understand what happens below the API:
+You must decide:
 
-```text
-tokens
-  -> embeddings
-  -> attention
-  -> MLP
-  -> logits
-  -> sampling
-```
+- which inbound message goes to which agent
+- which session should hold the context
+- when two messages should share state
+- when two users must be isolated
+- how replies return to the correct channel
 
-The `angelos-p/llm-from-scratch` repository is useful because it strips the problem down to a **workshop-sized GPT**. The project walks through writing a tokenizer, transformer model, training loop, and generation code, then trains a small Shakespeare-style model on a laptop-class machine.
+OpenClaw is a strong example because it makes these decisions explicit.
 
-The key lesson for this roadmap:
+This lecture uses OpenClaw to teach one of the most important practical lessons in agent systems:
 
-```text
-If you understand the model loop, agent-runtime bottlenecks stop looking mysterious.
-```
+> session design is product design
+
+If session boundaries are wrong, the whole agent experience becomes **unsafe or confusing**.
 
 ---
 
 ## Learning objectives
 
-By the end of this lecture, you should be able to:
+By the end of this lecture you will be able to:
 
-1. Explain what a small GPT training pipeline contains.
-2. Understand why tokenization changes the shape of the whole workload.
-3. Map transformer blocks to GPU kernels and memory movement.
-4. Distinguish training-time cost from inference-time cost.
-5. Explain prefill, decode, KV cache, logits, and sampling in practical terms.
-6. Connect model internals to agent system behavior: latency, context growth, streaming, and batching.
-7. Use an from-scratch LLM workshop as a bridge from agent engineering to GPU/kernel engineering.
+1. Explain the difference between channel, account, agent, and session.
+2. Understand why routing rules are a first-class part of agent design.
+3. Explain the session-key idea in simple terms.
+4. Decide when DMs should share context and when they must be isolated.
+5. Design a routing policy for a multi-surface agent product.
 
 ---
 
-## 1. Why this belongs in an agent course
+## 1. Four things students often mix up
 
-Most **agent failures** are not caused by attention math.
+When reading a real agent system, students often mix up:
 
-They are caused by **harness, tool, memory, policy, and product issues**.
+- channel
+- account
+- agent
+- session
 
-Still, model mechanics matter because agents create **unusual inference workloads**:
+OpenClaw is useful because it separates them clearly.
 
-- long context windows
-- many short turns
-- tool-call interruptions
-- streaming tokens
-- retries and repair loops
-- multiple subagents
-- background cron runs
-- local/edge deployment
+### Channel
 
-If you do not understand the model under the API, you will **misdiagnose performance**.
+A **channel** is the communication surface.
 
 Examples:
 
-| Symptom | Model-level explanation |
-|---|---|
-| first token is slow | prefill over the full prompt/context is expensive |
-| later tokens stream steadily | decode reuses KV cache and generates one token at a time |
-| long sessions get slower | attention and KV memory grow with context |
-| batch serving helps throughput | multiple requests share GPU work more efficiently |
-| tool-heavy agents feel bursty | execution alternates between CPU/IO tools and GPU inference |
+- Telegram
+- WhatsApp
+- Slack
+- Discord
+- WebChat
 
-Agent systems are **runtime systems**, but their runtime behavior is shaped by **transformer inference**.
+### Account
 
----
+An **account** is a specific identity on a channel.
 
-## 2. What the reference repo builds
+Examples:
 
-The reference project is a hands-on workshop titled **Train Your Own LLM From Scratch**.
+- one Telegram bot token
+- one WhatsApp number
+- one Slack app installation
 
-It targets a **small GPT-style model**, not a production-scale frontier model.
+You can have multiple accounts on the same channel type.
 
-The project has learners write:
+### Agent
 
-- character-level tokenizer
-- transformer model architecture
-- training loop
-- text generation and sampling
-- experiments on real data
+An **agent** is the isolated brain:
 
-The repository describes three workshop model sizes:
+- workspace
+- instructions
+- tools
+- sessions
+- auth profiles
 
-| Config | Approx params | Layers | Heads | Embedding dim | Example train time |
-|---|---:|---:|---:|---:|---|
-| Tiny | ~0.5M | 2 | 2 | 128 | minutes |
-| Small | ~4M | 4 | 4 | 256 | tens of minutes |
-| Medium | ~10M | 6 | 6 | 384 | under an hour on an M3 Pro-class machine |
+One gateway can host multiple agents.
 
-This scale is intentionally small.
+### Session
 
-That is the point.
+A **session** is the context bucket for a conversation or workflow.
 
-You can see **every component** without distributed training, tokenizer complexity, or cluster infrastructure hiding the basics.
+It decides which messages **share memory** and transcript history.
 
----
+This distinction is essential.
 
-## 3. Pipeline overview
-
-A minimal GPT pipeline:
-
-```text
-raw text
-  -> tokenizer
-  -> token ids
-  -> token embedding + position embedding
-  -> repeated transformer blocks
-  -> final layer norm
-  -> linear projection to logits
-  -> loss during training
-  -> sampling during inference
-```
-
-Training path:
-
-```text
-token batch
-  -> forward pass
-  -> logits
-  -> cross-entropy loss
-  -> backward pass
-  -> optimizer step
-```
-
-Inference path:
-
-```text
-prompt tokens
-  -> forward pass
-  -> next-token logits
-  -> sample/select token
-  -> append token
-  -> repeat
-```
-
-The same model is used in both paths.
-
-The workload is different.
-
-Training does forward and backward over batches.
-
-Inference usually does prefill once and decode repeatedly.
+One user may contact the same agent through many channels, but whether those conversations share context is a **design choice**.
 
 ---
 
-## 4. Tokenization is not a detail
+## 2. The routing problem
 
-The workshop uses **character-level tokenization** for Shakespeare.
+An inbound message is not just "text for the model."
+
+It first raises a routing question:
+
+> Which agent and which session should own this message?
+
+That question depends on:
+
+- channel
+- sender
+- account
+- group or room
+- thread
+- configured bindings
+
+This is why OpenClaw uses **explicit bindings**.
+
+Instead of letting the model decide, the **host configuration** decides.
+
+That is the right design.
+
+The model should not choose:
+
+- which human it is serving
+- which workspace it is using
+- which account should answer
+
+Those are **control-plane decisions**.
+
+---
+
+## 3. Session keys in simple language
+
+OpenClaw documents the idea of a **session key**.
+
+The easiest explanation is:
+
+> a session key is the label on the conversation bucket
+
+Messages with the same bucket label **share context**.
+
+Messages with different bucket labels **stay isolated**.
+
+Examples from the OpenClaw model:
+
+- one direct-message session
+- one session per group chat
+- one session per room
+- one session per thread
+
+This is extremely practical.
+
+It means the system can say:
+
+- all messages in this Slack thread belong together
+- this Telegram group must not mix with that Discord room
+- these DMs should share one private session
+- these two users must never share context
+
+---
+
+## 4. DM isolation is not optional in multi-user systems
+
+OpenClaw's session docs are very clear here:
+
+If many people can message the bot, default shared-DM behavior can **leak context**.
+
+That is a big teaching point.
+
+A beginner might think:
+
+> one assistant should have one big memory
+
+But in a multi-user product, that is often wrong.
+
+Example of a bad design:
+
+```text
+Alice messages the assistant privately.
+Bob messages the same assistant privately.
+Both share one DM session.
+The assistant now carries Alice's context into Bob's chat.
+```
+
+This is not just awkward. It can be a **privacy issue**.
+
+That is why OpenClaw supports DM scope settings like:
+
+- one shared main session
+- per-peer isolation
+- per-channel-peer isolation
+
+For a serious product, session scoping is a **security and UX feature**.
+
+---
+
+## 5. Channel routing as a product decision
+
+OpenClaw's routing rules show that agent assignment can depend on:
+
+- exact peer
+- account
+- channel
+- group
+- team
+- guild
+- role
+
+That means routing is not merely **technical plumbing**.
+
+It is **product behavior**.
+
+Example:
+
+```text
+Telegram support bot -> support agent
+Slack engineering room -> engineering agent
+WhatsApp family group -> family assistant agent
+Discord moderator room -> moderation agent
+```
+
+These are different products running inside one gateway.
+
+So routing design is how you turn one runtime into many useful behaviors.
+
+---
+
+## 6. Example: the same agent across multiple surfaces
+
+Suppose you want one personal assistant to exist in:
+
+- Telegram DM
+- WebChat
+- mobile node voice input
+
+You now have a design choice:
+
+### Option A - one shared session
+
+Pros:
+
+- continuity across surfaces
+- the agent remembers context everywhere
+
+Cons:
+
+- context can become messy
+- one accidental message on one surface affects the others
+
+### Option B - isolated sessions per surface
+
+Pros:
+
+- cleaner history
+- easier debugging
+- less accidental cross-surface contamination
+
+Cons:
+
+- weaker continuity
+
+This is why session design is a **product tradeoff**, not a default you should ignore.
+
+---
+
+## 7. Example config pattern
+
+Here is a simplified OpenClaw-style pattern:
+
+```json5
+{
+  agents: {
+    list: [
+      { id: "support", workspace: "~/.openclaw/workspace-support" },
+      { id: "personal", workspace: "~/.openclaw/workspace-personal" }
+    ]
+  },
+  bindings: [
+    { match: { channel: "slack", teamId: "T123" }, agentId: "support" },
+    { match: { channel: "telegram", peer: { kind: "direct", id: "user_42" } }, agentId: "personal" }
+  ],
+  session: {
+    dmScope: "per-channel-peer"
+  }
+}
+```
+
+You do not need to memorize the exact config.
+
+The lesson is:
+
+- agents are explicit
+- bindings are explicit
+- session policy is explicit
+
+That is good architecture.
+
+---
+
+## 8. Groups, threads, and rooms
+
+A serious agent product must understand that:
+
+- a direct message is not the same as a group
+- a group is not the same as a thread
+- a room is not the same as a one-to-one chat
+
+OpenClaw models this by keeping many of these session types isolated.
+
+That is the right default for collaborative systems.
 
 Why?
 
-Because the dataset is small.
+Because threads often represent **separate sub-conversations**.
 
-A GPT-2-style **BPE vocabulary** has roughly 50k tokens. On a tiny dataset, many token patterns are **too rare** for a small model to learn useful structure.
+If they all collapse into one bucket, the agent becomes **noisy and unreliable**.
 
-Character-level tokenization gives a tiny vocabulary:
+This is the same lesson you should apply when building:
 
-```text
-vocab_size ≈ tens of characters
-```
-
-Tradeoff:
-
-| Tokenizer | Benefit | Cost |
-|---|---|---|
-| Character-level | simple, works on small data, easy to inspect | longer sequences |
-| BPE/subword | shorter sequences, production-like | needs larger data and more machinery |
-
-Hardware implication:
-
-```text
-tokenizer choice changes sequence length,
-sequence length changes attention cost,
-attention cost changes memory and latency.
-```
-
-For agent systems, tokenization affects:
-
-- prompt size
-- context-window usage
-- retrieval chunk size
-- cost accounting
-- KV-cache memory
-- latency
+- support agents
+- research agents
+- team copilots
+- personal assistants
 
 ---
 
-## 5. Transformer block anatomy
+## 9. Reply routing should be deterministic
 
-A basic GPT block:
+OpenClaw's channel-routing docs make an important point:
 
-```text
-x
-  -> LayerNorm
-  -> self-attention
-  -> residual add
-  -> LayerNorm
-  -> MLP / feed-forward
-  -> residual add
-```
+> the model does not choose the channel
 
-Key components:
+That choice belongs to the **host system**.
 
-| Component | Job |
+This is a good professional rule.
+
+The model should help decide:
+
+- what to say
+- which tool to use
+- how to summarize
+
+The control plane should decide:
+
+- where to reply
+- which account to use
+- which session to mutate
+- which agent is in scope
+
+This reduces a whole class of failure where the model **invents the wrong operational path**.
+
+---
+
+## 10. Design exercise
+
+Design routing for this product:
+
+> One family assistant and one engineering assistant run on the same host.
+
+Requirements:
+
+- Telegram DMs from family members go to the family assistant.
+- Slack messages in the engineering workspace go to the engineering assistant.
+- WebChat should talk only to the engineering assistant.
+- DMs must not share context across users.
+
+Fill this table:
+
+| Decision area | Your answer |
 |---|---|
-| token embedding | maps token IDs to vectors |
-| position embedding | tells model where tokens are in sequence |
-| Q/K/V projections | create query, key, value vectors for attention |
-| attention scores | decide which earlier tokens matter |
-| softmax | turns scores into weights |
-| attention output | mixes value vectors according to weights |
-| MLP | per-token nonlinear transformation |
-| residuals | preserve information and stabilize optimization |
-| layer norm | stabilizes activations |
-
-GPU view:
-
-```text
-linear layers = matrix multiplies
-attention = matmul + softmax + matmul
-MLP = large matrix multiplies + activation
-```
-
-This is where CUDA/TensorRT/kernel engineers enter.
-
----
-
-## 6. Training loop mechanics
-
-Minimal training loop:
-
-```text
-for each step:
-  sample batch
-  forward model
-  compute cross-entropy loss
-  zero gradients
-  backward loss
-  clip gradients if needed
-  optimizer step
-  update learning rate schedule
-  periodically evaluate/generate sample text
-```
-
-Important pieces:
-
-| Piece | Why it matters |
-|---|---|
-| batch size | affects throughput and memory |
-| block size | sequence length per sample |
-| loss | tells model how wrong next-token prediction was |
-| AdamW | common optimizer for transformer training |
-| gradient clipping | prevents unstable updates |
-| learning-rate schedule | avoids bad convergence |
-
-Training is not just inference repeated.
-
-**Backward pass and optimizer state** dominate memory.
-
-For a small workshop model, that is manageable.
-
-For production-scale models, it becomes a **distributed systems problem**.
-
----
-
-## 7. Inference and sampling
-
-Generation loop:
-
-```text
-prompt tokens
-  -> model
-  -> logits for next token
-  -> adjust logits with temperature/top-k
-  -> sample next token
-  -> append token
-  -> repeat
-```
-
-Important concepts:
-
-| Concept | Meaning |
-|---|---|
-| logits | raw scores for each possible next token |
-| temperature | controls randomness |
-| top-k | restricts sampling to the k strongest candidates |
-| autoregressive decoding | generated token becomes input for the next step |
-
-Agent implication:
-
-Every assistant response is a **decode loop**.
-
-**Streaming** is just exposing that loop token-by-token or chunk-by-chunk.
-
-Tool use interrupts the loop:
-
-```text
-model emits tool call
-  -> runtime executes tool
-  -> tool result enters context
-  -> model continues
-```
-
-That is why agent latency is partly **model latency** and partly **harness/tool latency**.
-
----
-
-## 8. Prefill and decode
-
-Inference has two important phases:
-
-### Prefill
-
-The model processes the existing prompt/context:
-
-```text
-system prompt + history + retrieved context + user message
-```
-
-This is usually **compute-heavy** and grows with context length.
-
-### Decode
-
-The model generates one new token at a time while **reusing KV cache**.
-
-This is often **memory-bandwidth-sensitive**.
-
-Agent runtime connection:
-
-| Agent behavior | Model-level effect |
-|---|---|
-| huge system prompt | larger prefill |
-| long session history | larger prefill and KV cache |
-| many retrieved docs | larger prefill |
-| verbose tool outputs | context bloat |
-| concise context compaction | lower prefill cost |
-| streaming response | exposes decode phase |
-
-This directly connects to previous lectures on context hygiene, TokenJuice, system prompts, and agent skills.
-
----
-
-## 9. GPU/kernel-level view
-
-A small from-scratch model helps you map **Python code to GPU work**.
-
-Common hot paths:
-
-| Model operation | Kernel-level concern |
-|---|---|
-| embedding lookup | memory access pattern |
-| linear projection | GEMM throughput |
-| attention score matmul | sequence-length scaling |
-| softmax | numerical stability and memory bandwidth |
-| attention value matmul | GEMM plus data layout |
-| MLP up/down projection | dense matrix multiply |
-| GELU/ReLU | elementwise kernel fusion |
-| layer norm | reduction and memory bandwidth |
-| logits projection | vocab-size-dependent GEMM |
-
-This is why transformer inference optimization focuses on:
-
-- fused kernels
-- FlashAttention-style attention kernels
-- KV-cache layout
-- quantization
-- batching
-- memory bandwidth
-- tensor parallelism
-- graph capture
-
-The workshop code will not implement all of those.
-
-It gives you the mental map needed to understand them.
-
----
-
-## 10. Why small models are still useful
-
-Do not dismiss a 10M parameter GPT as a toy.
-
-It is a **microscope**.
-
-Small models let you:
-
-- inspect every tensor shape
-- see loss curves quickly
-- test tokenizer changes
-- understand sampling behavior
-- profile a full training loop locally
-- experiment without cluster cost
-
-What transfers:
-
-- architecture concepts
-- training loop structure
-- inference loop structure
-- tensor shape reasoning
-- performance intuition
-
-What does not transfer directly:
-
-- distributed training complexity
-- production tokenizer/data pipelines
-- large-scale optimizer state management
-- serving at high concurrency
-- frontier-model behavior
-
-Use small models to understand **mechanisms**.
-
-Use large systems to understand **scaling**.
-
----
-
-## 11. Connection to agent skills and SDLC
-
-From Lecture 29:
-
-```text
-skills require evidence
-```
-
-From Lecture 30:
-
-```text
-tests and intent are durable assets
-```
-
-For model work, evidence changes shape:
-
-| Work item | Evidence |
-|---|---|
-| tokenizer change | vocab size, sample encoding/decoding, sequence length distribution |
-| model change | parameter count, tensor shape checks, loss curve |
-| training loop change | stable loss, gradient norms, eval loss |
-| generation change | sample outputs, temperature/top-k comparison |
-| performance change | tokens/sec, memory use, profiler trace |
-
-A model-focused skill should not accept **"it trains"** as enough.
-
-It should ask:
-
-```text
-What changed?
-What metric moved?
-What got slower?
-What got less stable?
-What evidence proves the behavior?
-```
-
----
-
-## 12. Mini-lab: trace one token through the model
-
-Use the reference repo or your own minimal GPT code.
-
-Trace:
-
-```text
-input character
-  -> token id
-  -> embedding vector
-  -> attention block
-  -> logits
-  -> sampled next token
-```
-
-Record:
-
-- token ID
-- tensor shapes at each stage
-- parameter count
-- sequence length
-- one generated sample
-- training/eval loss after a short run
-
-Then answer:
-
-```text
-Which operation is most expensive?
-Which tensor grows with context length?
-Where would KV cache matter?
-Where would quantization help?
-```
-
----
-
-## 13. Design exercise: from scratch to serving
-
-Take the workshop model and imagine serving it behind an agent runtime.
-
-Design:
-
-```text
-HTTP/WebSocket API
-request format
-streaming token output
-batching strategy
-KV-cache ownership
-context limit
-tool-call interruption model
-metrics
-failure modes
-```
-
-Then compare:
-
-```text
-training script
-  vs
-serving runtime
-  vs
-agent harness
-```
-
-This separation is the **central architecture lesson**.
-
-The **training script** creates weights.
-
-The **serving runtime** turns weights into tokens.
-
-The **harness** turns tokens and tools into work.
+| Agents | `family`, `engineering` |
+| Channels | Telegram, Slack, WebChat |
+| DM scope | `per-channel-peer` |
+| Support binding | Slack workspace -> `engineering` |
+| Family binding | Telegram direct peers -> `family` |
+| Web binding | WebChat -> `engineering` |
+
+This is a better system design exercise than "write a prompt for a helpful assistant."
 
 ---
 
 ## Key takeaways
 
-- Agent engineers benefit from understanding the model loop underneath the API.
-- A from-scratch GPT workshop teaches tokenizer, architecture, training, and generation without hiding the basics.
-- Tokenization changes sequence length, which changes attention cost and context behavior.
-- Training and inference stress hardware differently.
-- Prefill and decode explain much of agent latency.
-- GPU optimization maps directly to transformer operations: GEMM, softmax, layer norm, KV cache, and memory layout.
-- Small models are useful because they make mechanisms visible.
-- The agent stack is layered: model mechanics, serving runtime, harness, tools, and product interface are different concerns.
+- Channel, account, agent, and session are different concepts and should stay separate in your mind.
+- Session design decides who shares context with whom.
+- Routing is a product feature, not just backend plumbing.
+- DMs should usually be isolated in multi-user systems.
+- Reply routing should be deterministic and host-controlled, not model-chosen.
+- OpenClaw is a strong example of how real agent products treat routing and session state as first-class concerns.
 
 ---
 
 ## References
 
-- Train Your Own LLM From Scratch: [https://github.com/angelos-p/llm-from-scratch](https://github.com/angelos-p/llm-from-scratch)
-- nanoGPT: [https://github.com/karpathy/nanoGPT](https://github.com/karpathy/nanoGPT)
-- Attention Is All You Need: [https://arxiv.org/abs/1706.03762](https://arxiv.org/abs/1706.03762)
-- GPT-2 paper: [https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)
-- TinyStories: [https://arxiv.org/abs/2305.07759](https://arxiv.org/abs/2305.07759)
-- Lecture 01 - LLM Fundamentals: [Lecture-01.md](Lecture-01.md)
-- Lecture 31 - Runtime Strategy: [Lecture-31.md](Lecture-31.md)
+- Case-study source repo: [OpenClaw](https://github.com/openclaw/openclaw)
+- OpenClaw concepts:
+  - `docs/channels/channel-routing.md`
+  - `docs/concepts/session.md`
+  - `docs/concepts/multi-agent.md`
+  - `docs/channels/pairing.md`
 
 ---
 
-*Next: [Lecture 33 - Structured Tools Beat Computer Use: Interface Hierarchy for Agents](Lecture-33.md)*
+*Next: [Lecture 33](Lecture-33.md)*

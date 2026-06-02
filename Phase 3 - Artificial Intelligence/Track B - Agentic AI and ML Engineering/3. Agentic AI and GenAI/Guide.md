@@ -34,10 +34,10 @@ The conceptual core of the whole course: what changed in 2026, the **harness** (
 
 | # | Lecture |
 |---|---------|
-| [00](Lectures/Lecture-00.md) | The modern AI agent in 2026 — what changed *(start here)* |
-| [24](Lectures/Lecture-24.md) | What is an AI agent harness? — the runtime around the model |
-| [25](Lectures/Lecture-25.md) | Building agents I — foundations (model, tools, instructions) |
-| [26](Lectures/Lecture-26.md) | Building agents II — orchestration & guardrails |
+| [01](Lectures/Lecture-01.md) | The modern AI agent in 2026 — what changed *(start here)* |
+| [02](Lectures/Lecture-02.md) | What is an AI agent harness? — the runtime around the model |
+| [03](Lectures/Lecture-03.md) | Building agents I — foundations (model, tools, instructions) |
+| [04](Lectures/Lecture-04.md) | Building agents II — orchestration & guardrails |
 
 </div>
 
@@ -49,9 +49,9 @@ How the model actually works, and how you talk to it.
 
 | # | Lecture |
 |---|---------|
-| [01](Lectures/Lecture-01.md) | LLM fundamentals for agents |
-| [32](Lectures/Lecture-32.md) | LLM from scratch — model mechanics |
-| [02](Lectures/Lecture-02.md) | Prompt engineering & structured output |
+| [05](Lectures/Lecture-05.md) | LLM fundamentals for agents |
+| [06](Lectures/Lecture-06.md) | LLM from scratch — model mechanics |
+| [07](Lectures/Lecture-07.md) | Prompt engineering & structured output |
 
 </div>
 
@@ -63,22 +63,22 @@ Each part of an agent in dependency order: tools → memory → retrieval → or
 
 | # | Lecture |
 |---|---------|
-| [03](Lectures/Lecture-03.md) | Tool use & function calling |
-| [33](Lectures/Lecture-33.md) | Structured tools beat computer use |
-| [05](Lectures/Lecture-05.md) | Memory systems |
-| [09](Lectures/Lecture-09.md) | RAG — ingestion & embeddings |
-| [10](Lectures/Lecture-10.md) | RAG — retrieval & reranking |
-| [45](Lectures/Lecture-45.md) | Vector stores & embedding model selection |
-| [44](Lectures/Lecture-44.md) | Efficient local RAG stack |
-| [04](Lectures/Lecture-04.md) | Agent architecture patterns (ReAct, plan-execute, reflexion) |
-| [06](Lectures/Lecture-06.md) | LangGraph — stateful workflows |
-| [07](Lectures/Lecture-07.md) | Agent SDKs & runtime APIs |
-| [42](Lectures/Lecture-42.md) | OpenAI Agents SDK |
-| [08](Lectures/Lecture-08.md) | Multi-agent systems |
-| [34](Lectures/Lecture-34.md) | Multimodal sub-agents |
-| [29](Lectures/Lecture-29.md) | Agent skills — workflow discipline |
-| [39](Lectures/Lecture-39.md) | Agent skills eval |
-| [11](Lectures/Lecture-11.md) | Evaluation & observability |
+| [08](Lectures/Lecture-08.md) | Tool use & function calling |
+| [09](Lectures/Lecture-09.md) | Structured tools beat computer use |
+| [10](Lectures/Lecture-10.md) | Memory systems |
+| [11](Lectures/Lecture-11.md) | RAG — ingestion & embeddings |
+| [12](Lectures/Lecture-12.md) | RAG — retrieval & reranking |
+| [13](Lectures/Lecture-13.md) | Vector stores & embedding model selection |
+| [14](Lectures/Lecture-14.md) | Efficient local RAG stack |
+| [15](Lectures/Lecture-15.md) | Agent architecture patterns (ReAct, plan-execute, reflexion) |
+| [16](Lectures/Lecture-16.md) | LangGraph — stateful workflows |
+| [17](Lectures/Lecture-17.md) | Agent SDKs & runtime APIs |
+| [18](Lectures/Lecture-18.md) | OpenAI Agents SDK |
+| [19](Lectures/Lecture-19.md) | Multi-agent systems |
+| [20](Lectures/Lecture-20.md) | Multimodal sub-agents |
+| [21](Lectures/Lecture-21.md) | Agent skills — workflow discipline |
+| [22](Lectures/Lecture-22.md) | Agent skills eval |
+| [23](Lectures/Lecture-23.md) | Evaluation & observability |
 
 </div>
 
@@ -90,13 +90,13 @@ Making an agent reliable, safe, and shippable: security, durable state, determin
 
 | # | Lecture |
 |---|---------|
-| [13](Lectures/Lecture-13.md) | Runtime discipline & AI runtime security |
-| [27](Lectures/Lecture-27.md) | AI agent security engineer |
-| [24b](Lectures/Lecture-24b.md) | Session as source of truth — event-sourced agent state |
-| [14](Lectures/Lecture-14.md) | Deterministic startup |
-| [31](Lectures/Lecture-31.md) | Runtime strategy — Node, Bun, Rust, and edge packaging |
-| [30](Lectures/Lecture-30.md) | Agentic SDLC |
-| [12](Lectures/Lecture-12.md) | Production deployment |
+| [24](Lectures/Lecture-24.md) | Runtime discipline & AI runtime security |
+| [25](Lectures/Lecture-25.md) | AI agent security engineer |
+| [26](Lectures/Lecture-26.md) | Session as source of truth — event-sourced agent state |
+| [27](Lectures/Lecture-27.md) | Deterministic startup |
+| [28](Lectures/Lecture-28.md) | Runtime strategy — Node, Bun, Rust, and edge packaging |
+| [29](Lectures/Lecture-29.md) | Agentic SDLC |
+| [30](Lectures/Lecture-30.md) | Production deployment |
 
 </div>
 
@@ -108,17 +108,17 @@ A production-style, local-first assistant taken apart piece by piece — the con
 
 | # | Lecture |
 |---|---------|
-| [15](Lectures/Lecture-15.md) | Gateway architecture |
-| [16](Lectures/Lecture-16.md) | Routing & sessions |
-| [17](Lectures/Lecture-17.md) | Multi-agent isolation |
-| [18](Lectures/Lecture-18.md) | Operations & security |
-| [19](Lectures/Lecture-19.md) | The agent loop |
-| [20](Lectures/Lecture-20.md) | Cron & scheduled agent runs |
-| [21](Lectures/Lecture-21.md) | System prompt architecture |
-| [22](Lectures/Lecture-22.md) | App SDK & typed RPCs |
-| [23](Lectures/Lecture-23.md) | Gateway RPC protocol |
-| [41](Lectures/Lecture-41.md) | OpenClaw threat model (MITRE ATLAS for agent security) |
-| [28](Lectures/Lecture-28.md) | Pi — the minimal agent beneath OpenClaw |
+| [31](Lectures/Lecture-31.md) | Gateway architecture |
+| [32](Lectures/Lecture-32.md) | Routing & sessions |
+| [33](Lectures/Lecture-33.md) | Multi-agent isolation |
+| [34](Lectures/Lecture-34.md) | Operations & security |
+| [35](Lectures/Lecture-35.md) | The agent loop |
+| [36](Lectures/Lecture-36.md) | Cron & scheduled agent runs |
+| [37](Lectures/Lecture-37.md) | System prompt architecture |
+| [38](Lectures/Lecture-38.md) | App SDK & typed RPCs |
+| [39](Lectures/Lecture-39.md) | Gateway RPC protocol |
+| [40](Lectures/Lecture-40.md) | OpenClaw threat model (MITRE ATLAS for agent security) |
+| [41](Lectures/Lecture-41.md) | Pi — the minimal agent beneath OpenClaw |
 
 </div>
 
@@ -147,12 +147,12 @@ Inference- and kernel-leaning deep dives that overlap the **AI Inference Enginee
 
 | # | Lecture |
 |---|---------|
-| [35](Lectures/Lecture-35.md) | GPU kernel translation (cuTile) |
-| [36](Lectures/Lecture-36.md) | FP8 KV-cache in vLLM |
-| [37](Lectures/Lecture-37.md) | TraceLens — trace-driven performance analysis |
-| [38](Lectures/Lecture-38.md) | AutoSP — compiler-generated sequence parallelism |
-| [40](Lectures/Lecture-40.md) | ZAYA1-8B — small MoE reasoning |
-| [43](Lectures/Lecture-43.md) | MLSys 2026 kernel contest |
+| [42](Lectures/Lecture-42.md) | GPU kernel translation (cuTile) |
+| [43](Lectures/Lecture-43.md) | FP8 KV-cache in vLLM |
+| [44](Lectures/Lecture-44.md) | TraceLens — trace-driven performance analysis |
+| [45](Lectures/Lecture-45.md) | AutoSP — compiler-generated sequence parallelism |
+| [46](Lectures/Lecture-46.md) | ZAYA1-8B — small MoE reasoning |
+| [47](Lectures/Lecture-47.md) | MLSys 2026 kernel contest |
 
 </div>
 
@@ -255,7 +255,7 @@ Product behavior belongs in your runtime contract.
 Security decisions belong outside the LLM.
 ```
 
-This is why Lecture 07 teaches SDKs and runtime APIs as a general layer instead of treating one vendor SDK as the architecture.
+This is why Lecture 17 teaches SDKs and runtime APIs as a general layer instead of treating one vendor SDK as the architecture.
 
 ### 5. Multi-Agent Structure Is Becoming Practical, Not Theoretical
 

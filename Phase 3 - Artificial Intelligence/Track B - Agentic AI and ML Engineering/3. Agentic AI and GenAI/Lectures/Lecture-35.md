@@ -1,603 +1,687 @@
-# Lecture 35 - Agent Skills for GPU Kernel Translation: cuTile Python to cuTile.jl
+# Lecture 35 - OpenClaw Case Study: The Agent Loop
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 34](Lecture-34.md) | **Next:** [Lecture 36](Lecture-36.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 34](Lecture-34.md) | **Next:** [Lecture 36](Lecture-36.md)
 
 ---
 
-This lecture is where the **"Agent Skills"** idea becomes concrete for GPU systems work.
+## Why this lecture exists
 
-The NVIDIA cuTile Python to cuTile.jl case study is important because the hard part is **not generating code**.
+The agent loop is the **core execution engine** of an agent system.
 
-The hard part is:
+Once you understand the loop, the surrounding pieces become easier to reason about:
 
-```text
-translating domain semantics correctly
-when the compiler will not catch many wrong translations
-```
+- cron decides **when** to run
+- hooks decide **where to intercept**
+- tools decide **what actions are available**
+- sessions decide **what state is visible**
+- the agent loop decides **how one complete run executes**
 
-That is exactly the class of work where **naive agents fail**.
+This lecture uses OpenClaw's agent loop as the case study.
 
-They can produce plausible code, but **plausible GPU kernel code is not enough**.
+The short definition:
 
-You need:
+> an agent loop is one complete, controlled execution of an AI agent from input to actions to final output, while preserving consistency, safety, streaming, and session state
 
-- domain rules
-- API mappings
-- worked examples
-- static validators
-- reference tests
-- debugging guides
-- tolerance rules
-- repeatable workflow
+It is not only an LLM call.
 
-In other words:
-
-```text
-agent skill + validator + tests = reusable systems knowledge
-```
+It is a **stateful, tool-using, streaming workflow pipeline**.
 
 ---
 
 ## Learning objectives
 
-By the end of this lecture, you should be able to:
+By the end of this lecture you will be able to:
 
-1. Explain why cross-DSL GPU kernel translation is a strong use case for agent skills.
-2. Describe the differences between cuTile Python and cuTile.jl that cause silent wrong results.
-3. Understand why 0-based vs 1-based indexing and row-major vs column-major layout are semantic hazards.
-4. Explain how TileGym packages conversion knowledge into a reusable skill.
-5. Design a skill directory with rules, API mappings, examples, validation scripts, and tests.
-6. Apply the same pattern to CUDA, Triton, MLIR, TVM, tinygrad, and custom accelerator DSLs.
-7. Connect agent-generated GPU code to verification evidence and hardware-aware review.
-
----
-
-## 1. Why this case study matters
-
-Most agent-skill examples are **web or app-development workflows**.
-
-This one is different.
-
-It targets **GPU kernel translation**.
-
-That matters because GPU DSLs are full of **subtle semantic traps**:
-
-- indexing base changes
-- memory layout changes
-- broadcasting changes
-- loop syntax changes
-- accumulator shape changes
-- padding enum changes
-- type-conversion differences
-- matrix multiply API differences
-
-The scary part:
-
-```text
-many mistakes compile
-and then silently produce wrong numbers
-```
-
-For GPU engineers, this is a high-value agent use case because the knowledge is:
-
-- specific
-- repeatable
-- rule-heavy
-- testable
-- easy to encode in a repo
+1. Explain the full lifecycle of an agent run.
+2. Understand why OpenClaw serializes runs per session.
+3. Describe the role of session locks, queues, streaming, tools, hooks, and persistence.
+4. Explain how `agent`, `agent.wait`, CLI runs, cron, and hooks connect to the same core runtime.
+5. Identify where failures, timeouts, compaction, and early exits happen.
+6. Design an agent loop for your own production assistant.
 
 ---
 
-## 2. What cuTile is
+## 1. What an agent loop really is
 
-**NVIDIA CUDA Tile**, or cuTile, is a tile-based GPU kernel programming model.
-
-Instead of manually coordinating every thread, warp, and shared-memory operation, the programmer works with **tile-level operations**:
+At a high level:
 
 ```text
-load tile
-compute on tile
-matrix multiply-accumulate
-store tile
+input -> validate -> prepare context -> run model -> call tools -> stream output -> finalize -> persist
 ```
 
-This does not eliminate low-level thinking.
+That looks simple, but each step hides real engineering concerns.
 
-It raises the abstraction level enough that many kernels can be expressed in a more portable, structured way.
+The loop must answer:
 
-**cuTile.jl** brings that style to Julia.
+- which session is this run using?
+- what model and auth profile should execute it?
+- what tools are allowed?
+- who can write to the transcript?
+- how are partial replies streamed?
+- what happens if a tool fails?
+- what happens if context is too large?
+- what final output should the user see?
+- what gets saved for the next turn?
 
-That is valuable for Julia's scientific computing ecosystem:
+So a more accurate definition is:
 
-- differential equations
-- probabilistic programming
-- physics simulations
-- custom numeric kernels
-- research code that needs GPU acceleration
-
-The translation target is not "Python code to Julia syntax."
-
-The target is:
-
-```text
-preserve GPU kernel semantics across two DSLs
-```
+> the agent loop is a deterministic, serialized, observable execution pipeline for AI agents with tools and memory
 
 ---
 
-## 3. The semantic traps
+## 2. The full lifecycle
 
-High-level differences:
+OpenClaw's loop can be understood as this sequence:
 
-| Category | cuTile Python | cuTile.jl |
+```text
+1. Intake request
+2. Validate parameters
+3. Resolve session
+4. Queue by session lane
+5. Prepare workspace, skills, and bootstrap context
+6. Acquire session write lock
+7. Assemble prompt
+8. Resolve model and auth
+9. Run model with streaming
+10. Execute tools when requested
+11. Shape final reply
+12. Persist transcript and metadata
+13. Emit lifecycle end or error
+```
+
+The key point:
+
+> the loop has a beginning, middle, and end that the system can observe
+
+That is why OpenClaw can support live UI updates, `agent.wait`, cron run history, hooks, and debugging.
+
+---
+
+## 3. Entry points
+
+The same loop can start from several places.
+
+| Entry point | Example | Meaning |
 |---|---|---|
-| indexing | 0-based, `ct.bid(0)` | 1-based, `ct.bid(1)` |
-| broadcasting | implicit, `a + b` | explicit dot syntax, `a .+ b` |
-| memory layout | row-major | column-major |
-| kernel definition | `@ct.kernel` decorator | plain Julia function |
-| constants | `ct.Constant[int]` in signature | `param::Int`, `ct.Constant(val)` at launch |
-| type conversion | `tile.astype(ct.float32)` | `convert(ct.Tile{Float32}, tile)` |
-| MMA | `ct.mma(a, b, acc=acc)` | `muladd(a, b, acc)` |
+| Gateway RPC | `agent` | enqueue an agent run and return quickly |
+| Gateway RPC wait | `agent.wait` | wait for lifecycle completion of a specific run |
+| CLI | `openclaw agent ...` | local command-line invocation |
+| Cron | `openclaw cron run <job-id>` | scheduled job triggers an agent run |
+| Hook | webhook, Gmail, message hook | event-driven trigger starts or modifies a run |
 
-None of these are conceptually impossible.
+The important design choice is that these entry points should **converge into one runtime path**.
 
-Together, they create a translation surface where a **single missed rule can corrupt results**.
+That gives the product consistent behavior:
 
-Example:
-
-```text
-ct.bid(0) left unchanged
-  -> wrong tile loaded
-  -> wrong output
-  -> no compiler warning
-```
-
-Example:
-
-```text
-a * b in Julia
-  -> matrix multiply
-
-a .* b
-  -> element-wise multiply
-```
-
-For kernel code, that difference is **decisive**.
+- same tool policy
+- same session semantics
+- same logging
+- same streaming events
+- same failure handling
 
 ---
 
-## 4. Matmul as the teaching example
+## 4. Intake and validation
 
-**Matrix multiplication** is a useful translation example because it combines several hazards:
+At the boundary, the gateway **validates the request** and resolves run metadata.
 
-- block/tile indices
-- K-loop over tiles
-- accumulator initialization
-- type conversion for TF32
-- matrix multiply-accumulate
-- row-major to column-major layout shift
-- store index correctness
+It needs to determine:
 
-Python-style shape thinking:
+- target agent
+- session key or session id
+- message body
+- model and thinking overrides
+- trace/verbose settings
+- delivery or caller context
+- timeout behavior
 
-```text
-A(M, K)
-B(K, N)
-C(M, N)
+Then it can return an accepted response such as:
+
+```json
+{
+  "runId": "run_...",
+  "acceptedAt": "2026-04-29T12:00:00Z"
+}
 ```
 
-Julia column-major thinking often forces the translated kernel to reason differently about:
+This reflects an async-first design:
 
-- tile orientation
-- accumulator shape
-- load indices
-- store indices
+> accepting a run is not the same as finishing a run
 
-The common failure:
-
-```text
-accumulator shape looks plausible
-but is transposed for the target layout
-```
-
-This is exactly why a skill needs **worked examples**.
-
-The model should not **rediscover matmul layout rules** from scratch every time.
+The Gateway can **accept work, queue it, stream progress**, and let clients wait separately.
 
 ---
 
-## 5. Softmax as the harder example
+## 5. Queueing and serialization
 
-Softmax adds **algorithmic invariants**, not just syntax.
+One of the most important OpenClaw design rules:
 
-The NVIDIA post describes three Julia strategies:
+> only one agent loop should run per session lane at a time
 
-- TMA single-tile
-- online softmax
-- chunked softmax
+Why this matters:
 
-Softmax translation must preserve:
+- prevents two runs from writing the same transcript concurrently
+- avoids interleaved tool results
+- keeps conversation history deterministic
+- avoids duplicate or contradictory final replies
 
-- running maximum
-- running sum
-- numerical stability
-- reduction axis semantics
-- broadcast syntax
-- chunking strategy
-- dtype tolerance
+The mental model:
+
+```text
+session A: run 1 -> run 2 -> run 3
+session B: run 1 -> run 2
+session C: run 1
+```
+
+Each session lane is **serial**.
+
+Different session lanes can still make progress **independently**, subject to global concurrency controls.
+
+This explains why isolated cron and subagent sessions matter: they let background work proceed without **blocking the user's main session lane**.
+
+---
+
+## 6. Session write locks
+
+Queueing handles **logical order**.
+
+Locks handle **actual file/state mutation**.
+
+OpenClaw protects transcript writes with a **process-aware session write lock**.
+
+That matters because multiple processes may exist:
+
+- Gateway process
+- CLI process
+- maintenance or doctor commands
+- test workers
+- automation scripts
+
+The rule:
+
+> any transcript write, rewrite, compaction, or truncation must acquire the same session write lock
+
+By default, the lock should **not be reentrant**. Code that intentionally nests the same lock must opt in explicitly.
+
+This is a strong production lesson:
+
+> session state is shared mutable state, so it needs a real concurrency boundary
+
+---
+
+## 7. Session and workspace preparation
+
+Before the model is called, the loop prepares the run environment.
+
+Typical preparation includes:
+
+- resolving workspace
+- creating workspace if needed
+- applying sandbox workspace root when sandboxed
+- loading a skills snapshot
+- resolving bootstrap context files
+- preparing environment variables
+- preparing the session manager
+
+This is where "agent behavior" becomes **more than a prompt**.
+
+The model sees the world through:
+
+- workspace
+- tools
+- skills
+- bootstrap context
+- session history
+- policy and runtime settings
+
+**Bad preparation** leads to confusing agent behavior later.
+
+---
+
+## 8. Prompt assembly
+
+The model does not see one string called "the prompt."
+
+It sees **assembled context**.
+
+OpenClaw-style prompt material includes:
+
+```text
+base system prompt
++ skills prompt
++ bootstrap context
++ session history
++ per-run overrides
++ hook-injected context
+```
+
+The runtime must also account for:
+
+- model-specific token limits
+- compaction reserve tokens
+- truncation behavior
+- tool schemas
+- reasoning or thinking configuration
+
+The important rule:
+
+> prompt assembly is runtime behavior, not just prompt writing
+
+A production system should be able to answer:
+
+- what model saw which instructions?
+- which skill snapshot was active?
+- which bootstrap files were injected?
+- which hook changed the prompt?
+- why was context compacted?
+
+---
+
+## 9. Model execution
+
+In OpenClaw's architecture, the embedded agent runner handles model execution.
+
+Conceptually, this phase does:
+
+- resolve provider and model
+- resolve auth profile
+- start the model request
+- subscribe to model and tool events
+- enforce abort and timeout behavior
+- return final payloads and usage metadata
+
+This is the "thinking" phase, but it is still **runtime-controlled**.
+
+The model may:
+
+- emit assistant text
+- request tools
+- stream reasoning chunks when supported
+- hit idle timeout
+- trigger model switch behavior
+- fail with provider or network errors
+
+The loop wraps that uncertainty in a **stable contract**.
+
+---
+
+## 10. Streaming events
+
+OpenClaw streams more than final text.
+
+A useful event model is:
+
+| Stream | What it carries |
+|---|---|
+| `lifecycle` | `start`, `end`, `error` |
+| `assistant` | text deltas, block replies, optional reasoning chunks |
+| `tool` | tool start, update, result, end |
+
+This is what makes live UI and channel updates possible.
+
+For example:
+
+```text
+lifecycle:start
+assistant:delta "I will check..."
+tool:start read_file
+tool:end read_file
+assistant:delta "The file shows..."
+lifecycle:end
+```
+
+Streaming matters because long-running agent work should not feel like a **black box**.
+
+It also gives operators a way to debug where a run got stuck:
+
+- no lifecycle start means intake/queue issue
+- lifecycle start but no assistant deltas means model or prompt issue
+- tool start with no tool end means tool execution issue
+- lifecycle error means the runtime saw a terminal failure
+
+---
+
+## 11. Tool execution
+
+When the model requests a tool, the loop becomes an **action engine**.
+
+The basic tool path:
+
+```text
+model requests tool
+-> emit tool start
+-> validate tool call
+-> run tool
+-> sanitize result
+-> emit tool result
+-> feed result back to model
+```
+
+Tool results should be:
+
+- size-limited
+- sanitized
+- safe to persist
+- safe to stream
+- connected to the originating call
+
+Some tools can send messages directly to users.
+
+That introduces a reply-shaping issue:
+
+if a messaging tool already sent the useful answer, the final assistant confirmation may be redundant.
+
+OpenClaw tracks messaging tool sends so **duplicate confirmations** can be suppressed.
+
+---
+
+## 12. Hooks as interception points
+
+Hooks let the product **intercept the loop**.
+
+OpenClaw has internal Gateway hooks and plugin hooks. The important concept is that hooks can run at different lifecycle points.
+
+Useful hook categories:
+
+| Hook area | Example | Purpose |
+|---|---|---|
+| Model selection | `before_model_resolve` | choose or override provider/model |
+| Prompt assembly | `before_prompt_build` | inject context or system prompt material |
+| Reply control | `before_agent_reply` | claim, override, or silence a turn |
+| Tool policy | `before_tool_call` | block or modify a tool call |
+| Tool output | `after_tool_call`, `tool_result_persist` | audit or transform tool results |
+| Messaging | `message_received`, `message_sending`, `message_sent` | route, cancel, or audit messages |
+| Lifecycle | `agent_end`, `gateway_start`, `gateway_stop` | observe system state |
+| Compaction | `before_compaction`, `after_compaction` | inspect summarization behavior |
+
+Terminal hook decisions are important.
 
 Examples:
 
-```text
-ct.max -> maximum
-ct.sum -> sum
-axis must shift by +1
-ct.maximum(a, b) -> max.(a, b)
-ct.exp(ct.sub(a, b)) -> exp.(a .- b)
+```json
+{ "block": true }
 ```
 
-The hard part is not renaming functions.
+or:
 
-The hard part is preserving the **mathematical invariant**.
-
-For systems work, this is the recurring theme:
-
-```text
-syntax is cheap
-semantics are expensive
+```json
+{ "cancel": true }
 ```
+
+These stop lower-priority handling in their hook chain.
+
+The production lesson:
+
+> hooks are powerful because they can change runtime behavior, so their ordering and terminal semantics must be explicit
 
 ---
 
-## 6. TileGym's skill structure
+## 13. Reply shaping
 
-The project packages the translation workflow into a **repository skill**:
+At the end of a run, the runtime decides what is **user-visible**.
 
-```text
-.claude/skills/converting-cutile-to-julia/
-  SKILL.md
-  translations/
-    workflow.md
-  references/
-    api-mapping.md
-    critical-rules.md
-    debugging.md
-    testing.md
-  scripts/
-    validate_cutile_jl.py
-  examples/
-    01_add/
-    02_matmul/
-    03_softmax/
+Final payload assembly may include:
+
+- assistant text
+- block replies
+- tool summaries when verbose and allowed
+- error messages when needed
+
+Then the runtime applies cleanup rules:
+
+- suppress exact silent tokens such as `NO_REPLY` or `no_reply`
+- remove messaging-tool duplicate confirmations
+- emit a fallback tool error reply if no renderable output remains and the user has not already seen a reply
+- avoid replaying stale acknowledgement-only text when a better descendant result exists
+
+This phase exists because models often produce text that is **not the right final user output**.
+
+The agent loop must shape output into **product behavior**.
+
+---
+
+## 14. Persistence
+
+After the run, the system writes:
+
+- user message
+- assistant message
+- tool calls and tool results
+- metadata
+- usage information
+- lifecycle state
+
+Persistence must happen under the **session write lock**.
+
+This protects the transcript from **races** and gives future turns a coherent history.
+
+The practical rule:
+
+> if it affects future context, persist it carefully
+
+This is also why streaming and persistence are different concerns. A user can see partial output before the final transcript is fully committed.
+
+---
+
+## 15. `agent.wait`
+
+The `agent` RPC starts a run.
+
+The `agent.wait` RPC waits for a run to reach lifecycle `end` or `error`.
+
+A wait result looks conceptually like:
+
+```json
+{
+  "status": "ok",
+  "startedAt": "2026-04-29T12:00:00Z",
+  "endedAt": "2026-04-29T12:00:10Z"
+}
 ```
 
-This structure matters.
+or:
 
-Each file has a job:
+```json
+{
+  "status": "timeout"
+}
+```
 
-| File | Job |
+Important distinction:
+
+> `agent.wait` timeout does not necessarily stop the agent run
+
+It only means the **waiter stopped waiting**.
+
+This is the same concept as watching a background job: your terminal can time out while the job continues.
+
+---
+
+## 16. Compaction and retry
+
+Agent context grows.
+
+Eventually the transcript may become too large for the model context window or for the configured reserve budget.
+
+When that happens, the loop may trigger compaction:
+
+```text
+detect context pressure
+-> emit compaction event
+-> summarize or rewrite context
+-> retry the run
+```
+
+On retry, the runtime must reset in-memory buffers and tool summaries so output does not duplicate.
+
+This matters because compaction is **not just a storage task**.
+
+It affects:
+
+- what the model sees
+- what the user sees
+- which messages remain detailed
+- whether the rerun repeats old output
+
+---
+
+## 17. Timeouts and aborts
+
+OpenClaw-style systems have multiple timeout layers.
+
+| Timeout | What it affects |
 |---|---|
-| `SKILL.md` | entry point and workflow overview |
-| `workflow.md` | step-by-step conversion process |
-| `api-mapping.md` | Python to Julia API mapping |
-| `critical-rules.md` | known semantic traps |
-| `debugging.md` | how to diagnose common failures |
-| `testing.md` | test patterns and tolerances |
-| `validate_cutile_jl.py` | static checker for anti-patterns |
-| examples | worked source/target translations |
+| agent runtime timeout | maximum agent run duration |
+| LLM idle timeout | aborts a model request when no chunks arrive |
+| `agent.wait` timeout | how long the caller waits |
+| cron outer timeout | scheduled-job-level control |
 
-The key design principle:
+OpenClaw's documented defaults include:
 
-```text
-put reusable domain knowledge beside the code it governs
-```
+- agent runtime default can be configured through `agents.defaults.timeoutSeconds`, with documented examples around long 48-hour runs
+- `agent.wait` defaults to a short wait window
+- LLM idle timeout can be configured separately
+- cron-triggered runs may rely on outer cron control when no explicit LLM/agent timeout is set
 
-Do not leave it as a **one-off prompt** in chat history.
+The lesson:
 
----
+> timeout semantics must say what gets cancelled and what only stops waiting
 
-## 7. What the validator catches
-
-The validator catches **patterns before the GPU runs**.
-
-Examples from the post include:
-
-- leftover `ct.bid(0)`
-- Python-style type names
-- unsupported loop forms
-- common cuTile.jl anti-patterns
-
-This is the important step:
-
-```text
-LLM generates candidate
-  -> static validator catches known mistakes
-  -> tests catch semantic errors
-  -> debugging guide routes fixes
-```
-
-The model is **not trusted blindly**.
-
-The skill creates a **workflow around it**.
-
-This is the same principle from Lecture 29:
-
-```text
-No evidence, no completion.
-```
-
-For GPU code, evidence must include numeric correctness.
+Without that distinction, operators **misread system behavior**.
 
 ---
 
-## 8. Test design for translated kernels
+## 18. Where runs can end early
 
-The Julia subproject contains:
+An agent loop may end early because of:
 
-```text
-julia/
-  Project.toml
-  kernels/
-    add.jl
-    matmul.jl
-    softmax.jl
-  test/
-    runtests.jl
-    test_add.jl
-    test_matmul.jl
-    test_softmax.jl
-```
+- agent runtime timeout
+- abort signal
+- gateway disconnect
+- RPC wait timeout
+- model failure
+- tool failure
+- hook block or cancel decision
+- compaction failure
 
-Good tests compare against **CPU references** with dtype-specific tolerances.
-
-They also test boundary cases:
-
-- dimensions not aligned to tile sizes
-- dtype differences
-- padding behavior
-- reduction axes
-- edge shapes
-
-For GPU translation, "passes one happy path" is not enough.
-
-You want:
+Good runtime design still attempts to emit lifecycle events:
 
 ```text
-reference implementation
-edge shapes
-dtypes
-tolerances
-boundary tiles
+lifecycle:error
 ```
 
-This makes the agent output **reviewable by numbers, not vibes**.
+That gives clients a final state and helps `agent.wait`, UI, cron, and logs agree about what happened.
 
 ---
 
-## 9. Why this is better than a prompt
+## 19. How this connects to cron
 
-Prompt:
+Now the previous lecture on cron becomes easier.
 
-```text
-Be careful with indexing, broadcasting, and memory layout.
-```
+Cron does not do the **agent work** itself.
 
-Skill:
+Cron **schedules the work**:
 
 ```text
-Here are the 17 rules.
-Here is the API mapping.
-Here are add, matmul, softmax examples.
-Here is a validator.
-Here are tests and tolerances.
-Here is the debugging guide.
+cron schedule
+-> due job
+-> agent RPC
+-> agent loop
+-> delivery/logging
 ```
 
-The difference:
+So:
 
-```text
-prompt = reminder
-skill = executable domain process
-```
+- cron answers **when**
+- the agent loop answers **how**
+- tools answer **what actions**
+- hooks answer **where policy intervenes**
+- sessions answer **what state**
 
-This is why agent skills are relevant to **hardware and compiler work**.
-
-The model should not rediscover the same **domain pitfalls** repeatedly.
-
-The project should **accumulate them**.
+This is the architecture pattern behind serious persistent agents.
 
 ---
 
-## 10. Result pattern
+## 20. Example: one OpenClaw-style run
 
-The NVIDIA post reports that a representative GEMM conversion took about:
+Imagine a user sends:
 
-```text
-4 minutes
-~78K tokens
-no manual intervention
-```
+> Check the repo and summarize today's failing tests.
 
-Do not overgeneralize this number.
-
-The important point is not the exact time or token count.
-
-The important pattern is:
+The loop might behave like this:
 
 ```text
-first port teaches the skill
-later ports reuse the skill
-each kernel gets cheaper and safer
+1. Gateway receives message.
+2. Gateway resolves session key.
+3. Run enters that session lane queue.
+4. Session lock is acquired.
+5. Workspace and skills are prepared.
+6. Prompt is assembled with history and bootstrap context.
+7. Model starts streaming.
+8. Model calls a shell/test-inspection tool.
+9. Tool result is sanitized and streamed.
+10. Model writes a final summary.
+11. Duplicate tool-send confirmations are suppressed.
+12. Transcript and metadata are persisted.
+13. lifecycle:end is emitted.
+14. The chat channel sends the final response.
 ```
 
-This is how agentic systems improve **without fine-tuning the model**.
+The user experiences **one reply**.
 
-They improve by **versioning the workflow, rules, examples, and validators**.
+The system executed a **controlled transaction-like runtime path**.
 
 ---
 
-## 11. Generalizing beyond cuTile
+## 21. Design exercise
 
-The same pattern applies to many GPU and compiler workflows:
+Design an agent loop for a local engineering assistant.
 
-| Source | Target | Skill focus |
-|---|---|---|
-| CUDA C++ | Triton | memory layout, block mapping, vectorization |
-| Triton | CUDA C++ | explicit shared memory and warp details |
-| PyTorch op | CUDA kernel | shape contracts, dtype, autograd |
-| CUDA | HIP/ROCm | API mapping, wavefront size, library differences |
-| Python DSL | MLIR | types, affine maps, lowering rules |
-| TVM schedule | Triton | tiling, memory hierarchy, reduction axes |
-| tinygrad op | custom accelerator | shape tracker semantics, memory movement |
+Fill in this table:
 
-Good skill candidates share traits:
-
-- finite recurring rules
-- silent semantic failure modes
-- reference examples
-- static validation possible
-- runtime tests possible
-- high review cost if done manually
-
----
-
-## 12. OpenClaw and agent harness mapping
-
-In an OpenClaw-style harness:
-
-```text
-source kernel
-  -> skill selection
-  -> read API mapping and critical rules
-  -> generate target kernel
-  -> run static validator
-  -> run tests on GPU
-  -> capture logs/artifacts
-  -> summarize diff and evidence
-```
-
-Runtime pieces:
-
-| Harness part | Role |
+| Area | Your design |
 |---|---|
-| skill router | choose cuTile translation skill |
-| tool policy | allow file reads/writes and test commands only in workspace |
-| exec approval | gate GPU test commands if needed |
-| artifacts | store validator output and test logs |
-| session log | preserve translation reasoning and fixes |
-| final-answer hook | require validation evidence |
+| Entry points | CLI, Web UI, Slack, cron |
+| Session lane rule | one run at a time per session |
+| Global queue | max 2 concurrent model runs |
+| Write lock | required for transcript writes and compaction |
+| Prompt inputs | base prompt, skills, repo context, session history |
+| Tools | read, search, test runner, issue lookup |
+| Tool policy | write and deploy require approval |
+| Hooks | block deploy from unpaired channels |
+| Streaming | lifecycle, assistant, tool |
+| Final reply shaping | suppress `NO_REPLY`, remove duplicate confirmations |
+| Timeout model | wait timeout separate from runtime timeout |
+| Persistence | transcript, tool outputs, usage, run metadata |
 
-The LLM writes **candidate code**.
-
-The harness makes the work **safe and reviewable**.
-
----
-
-## 13. GPU engineer review checklist
-
-When reviewing agent-translated kernels, inspect:
-
-```text
-index base
-memory layout
-tile shape
-accumulator shape
-reduction axis
-broadcast semantics
-dtype conversion
-padding behavior
-loop bounds
-boundary tiles
-reference test tolerance
-performance assumptions
-```
-
-Ask:
-
-```text
-Could this produce correct results only for square matrices?
-Could this pass fp32 but fail lower precision?
-Could this fail on non-divisible dimensions?
-Could this silently transpose output?
-Could this be correct but much slower?
-```
-
-Agentic kernel work still requires **human domain review**.
-
-The skill **reduces review burden**.
-
-It does not remove **engineering responsibility**.
-
----
-
-## 14. Mini-lab: write a DSL translation skill
-
-Pick one translation pair:
-
-- CUDA C++ to Triton
-- Triton to CUDA C++
-- PyTorch reference to CUDA kernel
-- CUDA to HIP
-- tinygrad op to CUDA
-- cuTile Python to cuTile.jl
-
-Create:
-
-```text
-SKILL.md
-references/api-mapping.md
-references/critical-rules.md
-references/testing.md
-scripts/validate_translation.py
-examples/01_simple/
-examples/02_reduction/
-examples/03_matmul_or_softmax/
-```
-
-Minimum critical rules:
-
-```text
-indexing
-layout
-broadcasting
-dtype
-boundary conditions
-reduction axes
-memory aliasing
-test tolerance
-```
-
-Then run one translation and require:
-
-```text
-static validator output
-CPU reference comparison
-GPU test output
-summary of known risks
-```
+The value of this exercise is that it forces you to treat the agent as **infrastructure**, not as a single API call.
 
 ---
 
 ## Key takeaways
 
-- Cross-DSL GPU kernel translation is a strong agent-skill use case because the rules are finite, recurring, and testable.
-- The hard part is semantic preservation, not syntax conversion.
-- cuTile Python to cuTile.jl has traps around indexing, broadcasting, memory layout, constants, type conversion, and MMA APIs.
-- TileGym packages translation knowledge into a skill with rules, mappings, examples, validator, tests, and debugging docs.
-- Static validation plus runtime tests make agent-generated GPU code reviewable.
-- The broader lesson is that systems work needs version-controlled domain skills, not one-off prompts.
+- The agent loop is the execution engine of an agent product.
+- It is a serialized, observable pipeline from input to persisted final state.
+- Per-session queueing prevents transcript and tool races.
+- Session write locks protect durable state across processes.
+- Prompt assembly, model execution, tool execution, streaming, reply shaping, and persistence are separate runtime concerns.
+- Hooks are policy and extension points inside the loop.
+- `agent.wait` waits for lifecycle completion; it does not define the entire run.
+- Cron triggers agent loops, but cron is not the agent loop.
 
 ---
 
 ## References
 
-- NVIDIA Technical Blog, "Automating GPU Kernel Translation with AI Agents: cuTile Python to cuTile.jl": [https://developer.nvidia.com/blog/automating-gpu-kernel-translation-with-ai-agents-cutile-python-to-cutile-jl/](https://developer.nvidia.com/blog/automating-gpu-kernel-translation-with-ai-agents-cutile-python-to-cutile-jl/)
-- NVIDIA TileGym repository: [https://github.com/NVIDIA/TileGym](https://github.com/NVIDIA/TileGym)
-- cuTile Python documentation: [https://nvidia.github.io/cutlass/latest/media/docs/pythonDSL/cute_dsl_api/cute.html](https://nvidia.github.io/cutlass/latest/media/docs/pythonDSL/cute_dsl_api/cute.html)
-- CUDA.jl: [https://cuda.juliagpu.org/stable/](https://cuda.juliagpu.org/stable/)
-- Lecture 29 - Agent Skills: [Lecture-29.md](Lecture-29.md)
-- Lecture 32 - LLM From Scratch: [Lecture-32.md](Lecture-32.md)
+- OpenClaw agent loop: [https://openclaw.knidal.com/agent-loop](https://openclaw.knidal.com/agent-loop)
+- Case-study source repo: [OpenClaw](https://github.com/openclaw/openclaw)
+- OpenClaw concepts:
+  - `docs/automation/cron-jobs.md`
+  - `docs/cli/cron.md`
+  - `docs/tools/subagents.md`
+  - `docs/concepts/session.md`
+  - `docs/reference/session-management-compaction.md`
 
 ---
 
-*Next: [Lecture 36 - FP8 KV-Cache in vLLM: Long-Context Serving for Agent Workloads](Lecture-36.md)*
+*Next: [Lecture 36](Lecture-36.md)*

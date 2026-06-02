@@ -1,307 +1,569 @@
-# Lecture 06 — LangGraph: Stateful Workflows
+# Lecture 06 - LLM From Scratch: Model Mechanics for Agent and GPU Engineers
 
-**Track B · Agentic AI & GenAI** | [← Lecture 05](Lecture-05.md) | [Next →](Lecture-07.md)
-
----
-
-## Learning Objectives
-
-- Understand why graph-based orchestration beats raw loops for complex agents
-- Build nodes, edges, and state schemas with LangGraph
-- Implement conditional branching and cycles
-- Add checkpointing and human-in-the-loop interrupts
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 05](Lecture-05.md) | **Next:** [Lecture 07](Lecture-07.md)
 
 ---
 
-## 1. Why LangGraph?
+**Agent engineers** usually work above the model:
 
-Raw `while` loops work for simple ReAct agents, but break down when you need:
-
-- **Branching** — different paths based on tool results
-- **Parallel execution** — run multiple steps concurrently
-- **Checkpointing** — pause, resume, replay
-- **Human-in-the-loop** — wait for approval before continuing
-- **Cycles with exit conditions** — retry loops, reflection cycles
-
-LangGraph models agents as a **directed graph** where nodes are functions and edges are transitions.
-
----
-
-## 2. Core Concepts
-
-```
-State: TypedDict that flows between nodes
-Node:  function(state) → updated_state
-Edge:  connection from node A to node B (static or conditional)
+```text
+prompt
+  -> tool calls
+  -> memory
+  -> Gateway
+  -> runtime
+  -> UI
 ```
 
-```python
-from langgraph.graph import StateGraph, END
-from typing import TypedDict, Annotated
-import operator
+**GPU and systems engineers** need to understand what happens below the API:
 
-# 1. Define state
-class AgentState(TypedDict):
-    messages: list           # conversation history
-    task: str                # original task
-    plan: list[str]          # steps to execute
-    current_step: int        # which step we're on
-    results: list[str]       # accumulated results
-    error_count: int         # for retry logic
+```text
+tokens
+  -> embeddings
+  -> attention
+  -> MLP
+  -> logits
+  -> sampling
+```
 
-# 2. Define nodes (functions that transform state)
-def planner_node(state: AgentState) -> AgentState:
-    """Generate a plan from the task."""
-    import anthropic
-    client = anthropic.Anthropic()
+The `angelos-p/llm-from-scratch` repository is useful because it strips the problem down to a **workshop-sized GPT**. The project walks through writing a tokenizer, transformer model, training loop, and generation code, then trains a small Shakespeare-style model on a laptop-class machine.
 
-    response = client.messages.create(
-        model="your-agent-model-id",
-        max_tokens=512,
-        messages=[{
-            "role": "user",
-            "content": f"Break this task into 3-5 steps (numbered list only):\n{state['task']}"
-        }]
-    )
-    lines = [l.strip() for l in response.content[0].text.split("\n") if l.strip()]
-    plan = [l.split(". ", 1)[-1] for l in lines if l[0].isdigit()]
+The key lesson for this roadmap:
 
-    return {**state, "plan": plan, "current_step": 0}
-
-def executor_node(state: AgentState) -> AgentState:
-    """Execute the current step of the plan."""
-    import anthropic
-    client = anthropic.Anthropic()
-
-    step = state["plan"][state["current_step"]]
-    context = "\n".join(state["results"])
-
-    response = client.messages.create(
-        model="your-agent-model-id",
-        max_tokens=512,
-        messages=[{
-            "role": "user",
-            "content": f"Execute this step:\n{step}\n\nContext:\n{context}"
-        }]
-    )
-
-    result = response.content[0].text
-    new_results = state["results"] + [f"Step {state['current_step']+1}: {result}"]
-
-    return {**state, "results": new_results, "current_step": state["current_step"] + 1}
-
-def synthesizer_node(state: AgentState) -> AgentState:
-    """Synthesize all results into a final answer."""
-    import anthropic
-    client = anthropic.Anthropic()
-
-    all_results = "\n".join(state["results"])
-    response = client.messages.create(
-        model="your-agent-model-id",
-        max_tokens=1024,
-        messages=[{
-            "role": "user",
-            "content": f"Task: {state['task']}\n\nResults:\n{all_results}\n\nWrite the final answer."
-        }]
-    )
-
-    final = response.content[0].text
-    return {**state, "results": state["results"] + [f"FINAL: {final}"]}
-
-# 3. Define routing logic
-def should_continue(state: AgentState) -> str:
-    """Decide whether to execute more steps or synthesize."""
-    if state["current_step"] >= len(state["plan"]):
-        return "synthesize"
-    return "execute"
-
-# 4. Build the graph
-def build_agent_graph():
-    workflow = StateGraph(AgentState)
-
-    # Add nodes
-    workflow.add_node("planner", planner_node)
-    workflow.add_node("executor", executor_node)
-    workflow.add_node("synthesizer", synthesizer_node)
-
-    # Add edges
-    workflow.set_entry_point("planner")
-    workflow.add_edge("planner", "executor")
-
-    # Conditional edge: after executor, go back or synthesize
-    workflow.add_conditional_edges(
-        "executor",
-        should_continue,
-        {
-            "execute": "executor",   # loop back
-            "synthesize": "synthesizer"
-        }
-    )
-    workflow.add_edge("synthesizer", END)
-
-    return workflow.compile()
-
-# 5. Run it
-app = build_agent_graph()
-result = app.invoke({
-    "task": "Explain the memory hierarchy in NVIDIA H100 and its implications for kernel optimization",
-    "messages": [],
-    "plan": [],
-    "current_step": 0,
-    "results": [],
-    "error_count": 0
-})
-print(result["results"][-1])  # FINAL answer
+```text
+If you understand the model loop, agent-runtime bottlenecks stop looking mysterious.
 ```
 
 ---
 
-## 3. Checkpointing (Pause & Resume)
+## Learning objectives
 
-```python
-from langgraph.checkpoint.memory import MemorySaver
-from langgraph.checkpoint.sqlite import SqliteSaver
+By the end of this lecture, you should be able to:
 
-# In-memory checkpointing (for testing)
-memory_checkpointer = MemorySaver()
+1. Explain what a small GPT training pipeline contains.
+2. Understand why tokenization changes the shape of the whole workload.
+3. Map transformer blocks to GPU kernels and memory movement.
+4. Distinguish training-time cost from inference-time cost.
+5. Explain prefill, decode, KV cache, logits, and sampling in practical terms.
+6. Connect model internals to agent system behavior: latency, context growth, streaming, and batching.
+7. Use an from-scratch LLM workshop as a bridge from agent engineering to GPU/kernel engineering.
 
-# Persistent SQLite checkpointing (for production)
-sqlite_checkpointer = SqliteSaver.from_conn_string("checkpoints.db")
+---
 
-# Compile with checkpointer
-app = workflow.compile(checkpointer=sqlite_checkpointer)
+## 1. Why this belongs in an agent course
 
-# Each run needs a thread_id to track its checkpoint
-config = {"configurable": {"thread_id": "task-001"}}
+Most **agent failures** are not caused by attention math.
 
-# First run
-result = app.invoke(initial_state, config=config)
+They are caused by **harness, tool, memory, policy, and product issues**.
 
-# Resume from checkpoint (after a crash or restart)
-result = app.invoke(None, config=config)  # None = resume from last checkpoint
+Still, model mechanics matter because agents create **unusual inference workloads**:
 
-# View checkpoint state
-state = app.get_state(config)
-print(state.values)  # Current state
-print(state.next)    # Next node to execute
+- long context windows
+- many short turns
+- tool-call interruptions
+- streaming tokens
+- retries and repair loops
+- multiple subagents
+- background cron runs
+- local/edge deployment
+
+If you do not understand the model under the API, you will **misdiagnose performance**.
+
+Examples:
+
+| Symptom | Model-level explanation |
+|---|---|
+| first token is slow | prefill over the full prompt/context is expensive |
+| later tokens stream steadily | decode reuses KV cache and generates one token at a time |
+| long sessions get slower | attention and KV memory grow with context |
+| batch serving helps throughput | multiple requests share GPU work more efficiently |
+| tool-heavy agents feel bursty | execution alternates between CPU/IO tools and GPU inference |
+
+Agent systems are **runtime systems**, but their runtime behavior is shaped by **transformer inference**.
+
+---
+
+## 2. What the reference repo builds
+
+The reference project is a hands-on workshop titled **Train Your Own LLM From Scratch**.
+
+It targets a **small GPT-style model**, not a production-scale frontier model.
+
+The project has learners write:
+
+- character-level tokenizer
+- transformer model architecture
+- training loop
+- text generation and sampling
+- experiments on real data
+
+The repository describes three workshop model sizes:
+
+| Config | Approx params | Layers | Heads | Embedding dim | Example train time |
+|---|---:|---:|---:|---:|---|
+| Tiny | ~0.5M | 2 | 2 | 128 | minutes |
+| Small | ~4M | 4 | 4 | 256 | tens of minutes |
+| Medium | ~10M | 6 | 6 | 384 | under an hour on an M3 Pro-class machine |
+
+This scale is intentionally small.
+
+That is the point.
+
+You can see **every component** without distributed training, tokenizer complexity, or cluster infrastructure hiding the basics.
+
+---
+
+## 3. Pipeline overview
+
+A minimal GPT pipeline:
+
+```text
+raw text
+  -> tokenizer
+  -> token ids
+  -> token embedding + position embedding
+  -> repeated transformer blocks
+  -> final layer norm
+  -> linear projection to logits
+  -> loss during training
+  -> sampling during inference
+```
+
+Training path:
+
+```text
+token batch
+  -> forward pass
+  -> logits
+  -> cross-entropy loss
+  -> backward pass
+  -> optimizer step
+```
+
+Inference path:
+
+```text
+prompt tokens
+  -> forward pass
+  -> next-token logits
+  -> sample/select token
+  -> append token
+  -> repeat
+```
+
+The same model is used in both paths.
+
+The workload is different.
+
+Training does forward and backward over batches.
+
+Inference usually does prefill once and decode repeatedly.
+
+---
+
+## 4. Tokenization is not a detail
+
+The workshop uses **character-level tokenization** for Shakespeare.
+
+Why?
+
+Because the dataset is small.
+
+A GPT-2-style **BPE vocabulary** has roughly 50k tokens. On a tiny dataset, many token patterns are **too rare** for a small model to learn useful structure.
+
+Character-level tokenization gives a tiny vocabulary:
+
+```text
+vocab_size ≈ tens of characters
+```
+
+Tradeoff:
+
+| Tokenizer | Benefit | Cost |
+|---|---|---|
+| Character-level | simple, works on small data, easy to inspect | longer sequences |
+| BPE/subword | shorter sequences, production-like | needs larger data and more machinery |
+
+Hardware implication:
+
+```text
+tokenizer choice changes sequence length,
+sequence length changes attention cost,
+attention cost changes memory and latency.
+```
+
+For agent systems, tokenization affects:
+
+- prompt size
+- context-window usage
+- retrieval chunk size
+- cost accounting
+- KV-cache memory
+- latency
+
+---
+
+## 5. Transformer block anatomy
+
+A basic GPT block:
+
+```text
+x
+  -> LayerNorm
+  -> self-attention
+  -> residual add
+  -> LayerNorm
+  -> MLP / feed-forward
+  -> residual add
+```
+
+Key components:
+
+| Component | Job |
+|---|---|
+| token embedding | maps token IDs to vectors |
+| position embedding | tells model where tokens are in sequence |
+| Q/K/V projections | create query, key, value vectors for attention |
+| attention scores | decide which earlier tokens matter |
+| softmax | turns scores into weights |
+| attention output | mixes value vectors according to weights |
+| MLP | per-token nonlinear transformation |
+| residuals | preserve information and stabilize optimization |
+| layer norm | stabilizes activations |
+
+GPU view:
+
+```text
+linear layers = matrix multiplies
+attention = matmul + softmax + matmul
+MLP = large matrix multiplies + activation
+```
+
+This is where CUDA/TensorRT/kernel engineers enter.
+
+---
+
+## 6. Training loop mechanics
+
+Minimal training loop:
+
+```text
+for each step:
+  sample batch
+  forward model
+  compute cross-entropy loss
+  zero gradients
+  backward loss
+  clip gradients if needed
+  optimizer step
+  update learning rate schedule
+  periodically evaluate/generate sample text
+```
+
+Important pieces:
+
+| Piece | Why it matters |
+|---|---|
+| batch size | affects throughput and memory |
+| block size | sequence length per sample |
+| loss | tells model how wrong next-token prediction was |
+| AdamW | common optimizer for transformer training |
+| gradient clipping | prevents unstable updates |
+| learning-rate schedule | avoids bad convergence |
+
+Training is not just inference repeated.
+
+**Backward pass and optimizer state** dominate memory.
+
+For a small workshop model, that is manageable.
+
+For production-scale models, it becomes a **distributed systems problem**.
+
+---
+
+## 7. Inference and sampling
+
+Generation loop:
+
+```text
+prompt tokens
+  -> model
+  -> logits for next token
+  -> adjust logits with temperature/top-k
+  -> sample next token
+  -> append token
+  -> repeat
+```
+
+Important concepts:
+
+| Concept | Meaning |
+|---|---|
+| logits | raw scores for each possible next token |
+| temperature | controls randomness |
+| top-k | restricts sampling to the k strongest candidates |
+| autoregressive decoding | generated token becomes input for the next step |
+
+Agent implication:
+
+Every assistant response is a **decode loop**.
+
+**Streaming** is just exposing that loop token-by-token or chunk-by-chunk.
+
+Tool use interrupts the loop:
+
+```text
+model emits tool call
+  -> runtime executes tool
+  -> tool result enters context
+  -> model continues
+```
+
+That is why agent latency is partly **model latency** and partly **harness/tool latency**.
+
+---
+
+## 8. Prefill and decode
+
+Inference has two important phases:
+
+### Prefill
+
+The model processes the existing prompt/context:
+
+```text
+system prompt + history + retrieved context + user message
+```
+
+This is usually **compute-heavy** and grows with context length.
+
+### Decode
+
+The model generates one new token at a time while **reusing KV cache**.
+
+This is often **memory-bandwidth-sensitive**.
+
+Agent runtime connection:
+
+| Agent behavior | Model-level effect |
+|---|---|
+| huge system prompt | larger prefill |
+| long session history | larger prefill and KV cache |
+| many retrieved docs | larger prefill |
+| verbose tool outputs | context bloat |
+| concise context compaction | lower prefill cost |
+| streaming response | exposes decode phase |
+
+This directly connects to previous lectures on context hygiene, TokenJuice, system prompts, and agent skills.
+
+---
+
+## 9. GPU/kernel-level view
+
+A small from-scratch model helps you map **Python code to GPU work**.
+
+Common hot paths:
+
+| Model operation | Kernel-level concern |
+|---|---|
+| embedding lookup | memory access pattern |
+| linear projection | GEMM throughput |
+| attention score matmul | sequence-length scaling |
+| softmax | numerical stability and memory bandwidth |
+| attention value matmul | GEMM plus data layout |
+| MLP up/down projection | dense matrix multiply |
+| GELU/ReLU | elementwise kernel fusion |
+| layer norm | reduction and memory bandwidth |
+| logits projection | vocab-size-dependent GEMM |
+
+This is why transformer inference optimization focuses on:
+
+- fused kernels
+- FlashAttention-style attention kernels
+- KV-cache layout
+- quantization
+- batching
+- memory bandwidth
+- tensor parallelism
+- graph capture
+
+The workshop code will not implement all of those.
+
+It gives you the mental map needed to understand them.
+
+---
+
+## 10. Why small models are still useful
+
+Do not dismiss a 10M parameter GPT as a toy.
+
+It is a **microscope**.
+
+Small models let you:
+
+- inspect every tensor shape
+- see loss curves quickly
+- test tokenizer changes
+- understand sampling behavior
+- profile a full training loop locally
+- experiment without cluster cost
+
+What transfers:
+
+- architecture concepts
+- training loop structure
+- inference loop structure
+- tensor shape reasoning
+- performance intuition
+
+What does not transfer directly:
+
+- distributed training complexity
+- production tokenizer/data pipelines
+- large-scale optimizer state management
+- serving at high concurrency
+- frontier-model behavior
+
+Use small models to understand **mechanisms**.
+
+Use large systems to understand **scaling**.
+
+---
+
+## 11. Connection to agent skills and SDLC
+
+From Lecture 21:
+
+```text
+skills require evidence
+```
+
+From Lecture 29:
+
+```text
+tests and intent are durable assets
+```
+
+For model work, evidence changes shape:
+
+| Work item | Evidence |
+|---|---|
+| tokenizer change | vocab size, sample encoding/decoding, sequence length distribution |
+| model change | parameter count, tensor shape checks, loss curve |
+| training loop change | stable loss, gradient norms, eval loss |
+| generation change | sample outputs, temperature/top-k comparison |
+| performance change | tokens/sec, memory use, profiler trace |
+
+A model-focused skill should not accept **"it trains"** as enough.
+
+It should ask:
+
+```text
+What changed?
+What metric moved?
+What got slower?
+What got less stable?
+What evidence proves the behavior?
 ```
 
 ---
 
-## 4. Human-in-the-Loop
+## 12. Mini-lab: trace one token through the model
 
-Interrupt the graph before **sensitive operations** and wait for **human approval**.
+Use the reference repo or your own minimal GPT code.
 
-```python
-from langgraph.graph import StateGraph, END, START
+Trace:
 
-class ReviewState(TypedDict):
-    code: str
-    review_comments: str
-    approved: bool
-    final_code: str
+```text
+input character
+  -> token id
+  -> embedding vector
+  -> attention block
+  -> logits
+  -> sampled next token
+```
 
-def generate_code_node(state: ReviewState) -> ReviewState:
-    """Generate code based on a task."""
-    response = client.messages.create(
-        model="your-agent-model-id",
-        max_tokens=1024,
-        messages=[{"role": "user", "content": "Write a CUDA kernel for matrix multiplication."}]
-    )
-    return {**state, "code": response.content[0].text}
+Record:
 
-def human_review_node(state: ReviewState) -> ReviewState:
-    """This node will be interrupted — human reviews here."""
-    # In a real app, this would send a notification and wait
-    # The graph pauses here until .update_state() is called
-    print("\n--- Code ready for review ---")
-    print(state["code"][:500])
-    return state  # State unchanged — human will update it
+- token ID
+- tensor shapes at each stage
+- parameter count
+- sequence length
+- one generated sample
+- training/eval loss after a short run
 
-def apply_review_node(state: ReviewState) -> ReviewState:
-    if not state["approved"]:
-        # Regenerate with feedback
-        response = client.messages.create(
-            model="your-agent-model-id",
-            max_tokens=1024,
-            messages=[{
-                "role": "user",
-                "content": f"Fix this code based on review:\n{state['code']}\nFeedback: {state['review_comments']}"
-            }]
-        )
-        return {**state, "final_code": response.content[0].text}
-    return {**state, "final_code": state["code"]}
+Then answer:
 
-# Build with interrupt
-workflow = StateGraph(ReviewState)
-workflow.add_node("generate", generate_code_node)
-workflow.add_node("review", human_review_node)
-workflow.add_node("apply", apply_review_node)
-
-workflow.set_entry_point("generate")
-workflow.add_edge("generate", "review")
-workflow.add_edge("review", "apply")
-workflow.add_edge("apply", END)
-
-checkpointer = MemorySaver()
-app = workflow.compile(
-    checkpointer=checkpointer,
-    interrupt_before=["review"]  # Pause before human_review_node
-)
-
-config = {"configurable": {"thread_id": "review-001"}}
-
-# Run until interrupt
-app.invoke({"code": "", "review_comments": "", "approved": False, "final_code": ""}, config=config)
-print("Graph paused at review node.")
-
-# Human reviews and updates state
-app.update_state(config, {"approved": True, "review_comments": "Looks good"})
-
-# Resume
-final = app.invoke(None, config=config)
-print("Final code:", final["final_code"][:200])
+```text
+Which operation is most expensive?
+Which tensor grows with context length?
+Where would KV cache matter?
+Where would quantization help?
 ```
 
 ---
 
-## 5. Parallel Execution (Fan-Out / Fan-In)
+## 13. Design exercise: from scratch to serving
 
-```python
-# Fan-out: run multiple nodes in parallel
-workflow.add_node("research_gpu", research_gpu_node)
-workflow.add_node("research_cpu", research_cpu_node)
-workflow.add_node("research_memory", research_memory_node)
-workflow.add_node("synthesize", synthesize_node)
+Take the workshop model and imagine serving it behind an agent runtime.
 
-workflow.add_edge("start", "research_gpu")
-workflow.add_edge("start", "research_cpu")
-workflow.add_edge("start", "research_memory")
+Design:
 
-# Fan-in: all parallel nodes must complete before synthesize
-workflow.add_edge("research_gpu", "synthesize")
-workflow.add_edge("research_cpu", "synthesize")
-workflow.add_edge("research_memory", "synthesize")
+```text
+HTTP/WebSocket API
+request format
+streaming token output
+batching strategy
+KV-cache ownership
+context limit
+tool-call interruption model
+metrics
+failure modes
 ```
 
+Then compare:
+
+```text
+training script
+  vs
+serving runtime
+  vs
+agent harness
+```
+
+This separation is the **central architecture lesson**.
+
+The **training script** creates weights.
+
+The **serving runtime** turns weights into tokens.
+
+The **harness** turns tokens and tools into work.
+
 ---
 
-## Key Takeaways
+## Key takeaways
 
-1. LangGraph is a graph where nodes = functions, edges = transitions
-2. State is a `TypedDict` that flows through every node — always return `{**state, ...updated_fields}`
-3. Conditional edges enable branching and loops — the backbone of ReAct in LangGraph
-4. Checkpointing enables pause/resume across process restarts — use SQLite for production
-5. `interrupt_before` pauses the graph for human review — resume with `.invoke(None, config)`
-
----
-
-## Exercises
-
-1. Build a code-review graph: generate → lint → test → human review (if tests fail) → revise
-2. Add error recovery: if `executor_node` fails 3 times (`error_count >= 3`), route to a fallback node
-3. Implement a parallel research graph that fetches info from 3 different sources, then synthesizes
+- Agent engineers benefit from understanding the model loop underneath the API.
+- A from-scratch GPT workshop teaches tokenizer, architecture, training, and generation without hiding the basics.
+- Tokenization changes sequence length, which changes attention cost and context behavior.
+- Training and inference stress hardware differently.
+- Prefill and decode explain much of agent latency.
+- GPU optimization maps directly to transformer operations: GEMM, softmax, layer norm, KV cache, and memory layout.
+- Small models are useful because they make mechanisms visible.
+- The agent stack is layered: model mechanics, serving runtime, harness, tools, and product interface are different concerns.
 
 ---
 
-**Previous:** [Lecture 05](Lecture-05.md) | **Next:** [Lecture 07 - Agent SDKs and Runtime APIs](Lecture-07.md)
+## References
+
+- Train Your Own LLM From Scratch: [https://github.com/angelos-p/llm-from-scratch](https://github.com/angelos-p/llm-from-scratch)
+- nanoGPT: [https://github.com/karpathy/nanoGPT](https://github.com/karpathy/nanoGPT)
+- Attention Is All You Need: [https://arxiv.org/abs/1706.03762](https://arxiv.org/abs/1706.03762)
+- GPT-2 paper: [https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)
+- TinyStories: [https://arxiv.org/abs/2305.07759](https://arxiv.org/abs/2305.07759)
+- Lecture 05 - LLM Fundamentals: [Lecture-05.md](Lecture-05.md)
+- Lecture 28 - Runtime Strategy: [Lecture-28.md](Lecture-28.md)
+
+---
+
+*Next: [Lecture 07](Lecture-07.md)*

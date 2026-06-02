@@ -1,62 +1,35 @@
-# Lecture 45 - Qdrant, pgvector, and Embedding Model Selection
+# Lecture 45 - AutoSP: Compiler-Generated Sequence Parallelism for Long-Context Training
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 44](Lecture-44.md) | **Next:** [Lab 01](Lab-01-Research-Agent.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 44](Lecture-44.md) | **Next:** [Lecture 46](Lecture-46.md)
 
 ---
 
-Qdrant and pgvector solve the same broad problem:
+**Long-context agents** create long-context model requirements.
+
+**Serving** long contexts is one problem.
+
+**Training** models to handle long contexts is another.
+
+Lecture 43 covered vLLM FP8 KV-cache for long-context inference. This lecture covers the training-side complement: AutoSP.
+
+**AutoSP** is a compiler-based system that automatically transforms ordinary transformer training code into **sequence-parallel** training code across multiple GPUs. The goal is direct:
 
 ```text
-Given a query embedding, find the stored vectors that are most similar.
+write standard transformer training code
+  -> compile with AutoSP
+  -> train longer contexts across GPUs
+  -> avoid hand-writing sequence-parallel plumbing
 ```
 
-They are **not the same kind of system**.
+The important idea is not just "sequence parallelism exists."
 
-Qdrant is a **dedicated vector search engine**.
-
-pgvector is a **PostgreSQL extension** that adds vector search to Postgres.
-
-The practical rule:
+The important idea is:
 
 ```text
-Use pgvector when SQL integration is the main constraint.
-Use Qdrant when retrieval performance and vector-search features are the main constraint.
+distributed training strategies are moving into compiler passes
 ```
 
-The same logic applies to embedding models.
-
-There is **no universal "best embedding model."**
-
-There is a best model for:
-
-- your corpus
-- your languages
-- your chunk size
-- your latency budget
-- your memory budget
-- your deployment target
-- your query distribution
-- your relevance metric
-
-For local and edge RAG, the winning design is usually:
-
-```text
-compact embedding model
-  + strong chunking
-  + good metadata filters
-  + hybrid retrieval when needed
-  + reranking
-  + small grounded generator
-```
-
-not:
-
-```text
-giant embedding model
-  + unfiltered top-k
-  + huge prompt
-  + hope the LLM fixes retrieval mistakes
-```
+That has consequences for **model scientists, systems engineers, and hardware engineers**.
 
 ---
 
@@ -64,1474 +37,696 @@ giant embedding model
 
 By the end of this lecture, you should be able to:
 
-1. Explain what a vector database does in a RAG system.
-2. Explain the difference between Qdrant and pgvector.
-3. Describe dense, sparse, and multi-vector retrieval.
-4. Explain HNSW and IVFFlat at a practical systems level.
-5. Choose Qdrant or pgvector based on architecture, scale, filters, and operations.
-6. Compare Granite embeddings with BGE, E5, OpenAI, Cohere, Voyage, and other alternatives.
-7. Design an embedding evaluation plan instead of trusting generic leaderboards.
-8. Estimate vector storage pressure from embedding dimension and data type.
-9. Plan an embedding migration without corrupting retrieval quality.
+1. Explain why long-context training OOMs even with conventional data-parallel scaling.
+2. Understand sequence parallelism as sharding the token dimension across GPUs.
+3. Explain what AutoSP automates compared with hand-written sequence parallelism.
+4. Understand how AutoSP integrates with DeepSpeed and DeepCompile.
+5. Describe why AutoSP targets DeepSpeed-Ulysses and where that strategy is limited.
+6. Explain sequence-aware activation checkpointing and why long-context training changes checkpointing tradeoffs.
+7. Understand how AutoSP composes with ZeRO 0/1 and why ZeRO/FSDP alone are not sufficient.
+8. Identify AutoSP's limitations around graph breaks and whole-model compilation.
+9. Design a benchmark and trace plan for validating AutoSP on real long-context workloads.
 
 ---
 
-## 1. The core RAG storage problem
+## 1. Why long-context training runs out of memory
 
-A RAG system has two kinds of data:
+Training a transformer stores much more than model weights.
 
-```text
-source data:
-  docs, markdown, PDFs, code, tickets, emails, manuals
+It stores:
 
-retrieval data:
-  chunks, embeddings, metadata, indexes, scores, citations
-```
+- parameters
+- gradients
+- optimizer state
+- input activations
+- intermediate activations
+- attention intermediates
+- communication buffers
+- recomputation metadata
 
-The LLM does **not search your raw documents directly**.
+For long-context training, **activation memory** becomes severe.
 
-A typical pipeline is:
-
-```text
-document
-  -> chunk
-  -> embed each chunk
-  -> store vector + chunk text + metadata
-  -> embed user query
-  -> search nearest vectors
-  -> rerank/filter
-  -> send selected evidence to LLM
-```
-
-The vector store owns this part:
+The token dimension grows:
 
 ```text
-stored vectors + metadata + nearest-neighbor index + query API
+8k tokens
+  -> 32k tokens
+  -> 100k+ tokens
 ```
 
-Each stored item is usually a "point" or row:
+That increases memory pressure inside attention and MLP blocks.
 
-```json
-{
-  "id": "doc-17#chunk-03",
-  "vector": [0.012, -0.044, 0.331],
-  "payload": {
-    "document_id": "doc-17",
-    "path": "manuals/orin/power.md",
-    "section": "Thermals",
-    "language": "en",
-    "created_at": "2026-05-28",
-    "source_hash": "..."
-  },
-  "text": "The chunk text may live here or in another store."
+**Data parallelism alone** does not solve this.
+
+With ordinary data parallelism, every GPU still sees the full sequence for its local microbatch:
+
+```text
+GPU 0: full sequence
+GPU 1: full sequence
+GPU 2: full sequence
+GPU 3: full sequence
+```
+
+Adding more data-parallel GPUs increases total throughput, but it does **not reduce per-GPU sequence activation memory**.
+
+**ZeRO and FSDP** help shard parameters, gradients, and optimizer state.
+
+They do **not automatically shard the token dimension**.
+
+For 100k+ context training, that difference matters.
+
+---
+
+## 2. Sequence parallelism
+
+**Sequence parallelism** shards the sequence dimension across devices.
+
+Instead of:
+
+```text
+GPU 0: tokens 0..99999
+GPU 1: tokens 0..99999
+GPU 2: tokens 0..99999
+GPU 3: tokens 0..99999
+```
+
+you can distribute:
+
+```text
+GPU 0: tokens 0..24999
+GPU 1: tokens 25000..49999
+GPU 2: tokens 50000..74999
+GPU 3: tokens 75000..99999
+```
+
+This increases the **effective context length** you can train because activation memory is spread across GPUs.
+
+But transformer layers are **not embarrassingly parallel** across sequence.
+
+Attention, normalization, projections, masks, position IDs, and backward gradients all need correct data movement.
+
+Hand-written SP requires:
+
+- partitioning input tokens
+- partitioning intermediate activations
+- inserting collectives
+- coordinating forward and backward communication
+- preserving masks and position IDs
+- overlapping communication with computation
+- validating numerical correctness
+- composing with data parallelism and optimizer sharding
+
+That is **invasive systems work**.
+
+AutoSP tries to move that work **into the compiler**.
+
+---
+
+## 3. What AutoSP automates
+
+AutoSP automatically converts standard transformer training code into multi-GPU sequence-parallel code.
+
+The PyTorch blog describes it as integrated with **DeepSpeed through DeepCompile**, a compiler ecosystem for distributed training optimizations.
+
+The user-facing workflow is intentionally small:
+
+1. Tag input tensors for AutoSP analysis.
+2. Enable DeepCompile.
+3. Add the `autosp` compiler pass.
+4. Set `sequence_parallel_size`.
+5. Compile the model.
+
+Representative configuration:
+
+```python
+config = {
+    "train_micro_batch_size_per_gpu": 1,
+    "train_batch_size": 2,
+    "zero_optimization": {
+        "stage": 1,
+    },
+    "compile": {
+        "deepcompile": True,
+        "passes": ["autosp"],
+    },
+    "sequence_parallel_size": 4,
+    "gradient_clipping": 1.0,
 }
+
+model, _, _ = deepspeed.initialize(config=config, model=model)
+model.compile(compile_kwargs={"dynamic": True})
 ```
 
-The **metadata matters as much as the vector**.
+Then the training loop tags inputs:
 
-Example query:
+```python
+inputs, labels, positions, mask = prepare_auto_sp_inputs(batch)
+
+loss = model(
+    input_ids=inputs,
+    labels=labels,
+    position_ids=positions,
+    attention_mask=mask,
+)
+```
+
+The **compiler pass** handles the sequence-parallel code transformation.
+
+This is the same trend we saw in Lecture 42:
 
 ```text
-"How do I reduce Jetson Orin power draw during idle?"
+Do not just prompt the agent or user to remember systems rules.
+Encode the workflow into reusable machinery.
 ```
 
-Good retrieval does not just ask:
-
-```text
-Which chunks are semantically close?
-```
-
-It asks:
-
-```text
-Which chunks are semantically close,
-inside the right product docs,
-in the right version,
-in the right language,
-from trusted sources,
-and recent enough to answer safely?
-```
-
-That is why **vector search and filtering need to be designed together**.
+Here, the machinery is a compiler pass.
 
 ---
 
-## 2. What is Qdrant?
+## 4. Why this matters for model scientists
 
-Qdrant is a **standalone vector database and search engine**.
+Without AutoSP, long-context research often requires **rewriting the training stack**.
 
-It is designed around collections of points:
+Researchers who want to test model behavior at 64k, 128k, or longer contexts may be forced to become **distributed-systems engineers** first.
 
-```text
-collection
-  -> points
-      -> id
-      -> vector or named vectors
-      -> payload metadata
-```
-
-The key design idea:
+AutoSP changes the workflow:
 
 ```text
-Qdrant is optimized for vector-native retrieval first.
+before:
+  modify DeepSpeed/HuggingFace internals
+  hand-insert communication
+  debug forward/backward layout bugs
+  tune activation checkpointing
+  repeat per model and hardware stack
+
+after:
+  write normal model code
+  enable AutoSP pass
+  compile
+  benchmark and validate
 ```
 
-Useful features:
+This does not remove the need for **performance engineering**.
 
-- dense vector search
-- sparse vector search
-- named vectors
-- multi-vector retrieval patterns
-- payload metadata filtering
-- payload indexes
-- HNSW indexing
-- quantization options
-- horizontal scaling through sharding and replication
-- HTTP/gRPC APIs
-- client libraries
-- local, cloud, private-cloud, and edge deployment patterns
+It changes **where the complexity lives**.
 
-Qdrant is a good fit when retrieval is a **product-critical path**.
-
-Examples:
-
-- local RAG server
-- semantic search API
-- AI coding assistant over repositories
-- recommendation systems
-- hybrid search over technical docs
-- multi-tenant knowledge retrieval
-- edge assistant with a local vector service
-
-The important distinction:
-
-```text
-Qdrant is not your relational database.
-It is your vector retrieval engine.
-```
-
-You may still keep canonical business data in Postgres, SQLite, object storage, or a document store.
-
-In that design, Qdrant stores:
-
-```text
-id + vector + retrieval metadata + optional text snippet
-```
-
-The source system stores:
-
-```text
-full document + permissions + owner + audit history + business state
-```
-
-That separation is **normal**.
+The complexity moves from every model implementation into a **reusable compiler system**.
 
 ---
 
-## 3. What is pgvector?
+## 5. DeepSpeed-Ulysses as the target SP strategy
 
-pgvector is an **extension for PostgreSQL**.
+AutoSP targets **DeepSpeed-Ulysses-style** sequence parallelism.
 
-It adds **vector types, distance operators, and approximate indexes** to Postgres.
+The PyTorch blog notes two important points:
 
-The key design idea:
+- Ulysses communication overhead can stay constant with increasing GPU counts on NVLink or fat-tree topologies.
+- Ulysses SP size is limited by the number of attention heads.
 
-```text
-pgvector brings vector search into an existing SQL database.
-```
+That second point is operationally important.
 
-A minimal table:
+If a model has 32 heads, Ulysses cannot scale sequence parallelism past that **head-count limit**.
 
-```sql
-CREATE EXTENSION vector;
+This means AutoSP does **not remove topology and architecture constraints**.
 
-CREATE TABLE document_chunks (
-  id bigserial PRIMARY KEY,
-  document_id text NOT NULL,
-  path text NOT NULL,
-  chunk text NOT NULL,
-  embedding vector(384)
-);
-```
+It automates a specific strategy with known tradeoffs.
 
-A basic nearest-neighbor query:
-
-```sql
-SELECT id, path, chunk
-FROM document_chunks
-ORDER BY embedding <=> $1
-LIMIT 8;
-```
-
-`<=>` is cosine distance.
-
-The biggest advantage is **architectural simplicity**:
+The useful mental model:
 
 ```text
-same database
-same backup path
-same SQL permissions
-same transactions
-same app connection pool
-same operational team
+AutoSP is not magic distributed training.
+AutoSP is compiler-generated Ulysses-style sequence parallelism plus long-context-aware checkpointing.
 ```
 
-This is valuable if your application is already centered on Postgres.
-
-pgvector is a good fit when:
-
-- you already use PostgreSQL
-- your vector corpus is moderate
-- you want SQL joins with vector results
-- relational consistency matters
-- operational simplicity matters more than specialized retrieval features
-- vector search is a feature, not the whole product
-
-Example:
-
-```sql
-SELECT c.id, c.path, c.chunk, p.owner_id
-FROM document_chunks c
-JOIN projects p ON p.id = c.project_id
-WHERE p.organization_id = $org_id
-ORDER BY c.embedding <=> $query_embedding
-LIMIT 8;
-```
-
-That query is the reason pgvector exists.
-
-You can combine **vector similarity with normal relational conditions** in one SQL path.
+That is still valuable because the hand-written version is **difficult and error-prone**.
 
 ---
 
-## 4. Qdrant vs pgvector: the real comparison
+## 6. Sequence-aware activation checkpointing
 
-| Dimension | Qdrant | pgvector |
-|---|---|---|
-| System type | Dedicated vector database | PostgreSQL extension |
-| Best default use | Retrieval-heavy AI systems | SQL-first apps adding vector search |
-| API | HTTP/gRPC/client libraries | SQL |
-| Data model | Collections, points, vectors, payloads | Tables, rows, vector columns |
-| Scaling model | Standalone service or cluster | Scale PostgreSQL |
-| Filtering | Payload filtering and payload indexes | SQL `WHERE`, partial indexes, partitioning |
-| Hybrid search | Dense + sparse + multi-representation patterns | Combine with Postgres full-text search and rank fusion |
-| Operations | Extra service to deploy and monitor | Uses existing Postgres operations |
-| Strength | Search features and vector-native performance | Simplicity and relational integration |
-| Risk | Data sync with source DB | Postgres can become overloaded |
+**Activation checkpointing** saves memory by discarding selected intermediate activations during forward pass and recomputing them during backward pass.
 
-The decision is **not ideological**.
-
-Ask:
+Generic activation checkpointing asks:
 
 ```text
-Is vector retrieval a side feature of my SQL app,
-or is it a core runtime service?
+Which activations should we store?
+Which should we recompute?
 ```
 
-If it is a side feature:
+AutoSP adds a long-context-specific strategy called **sequence-aware activation checkpointing**, or SAC.
+
+The reason is that long-context workloads change the **compute/memory balance**.
+
+At long sequence length:
+
+- activation memory grows sharply
+- some intermediates become too expensive to keep
+- recomputation may be cheaper than OOM
+- generic checkpoint policies can be overly conservative
+
+SAC targets this regime.
+
+The tradeoff:
 
 ```text
-pgvector is often enough.
+SAC enabled
+  -> lower activation memory
+  -> longer trainable context
+  -> some throughput cost from recomputation
+
+SAC disabled
+  -> faster when memory fits
+  -> may OOM at longer contexts
 ```
 
-If it is a core runtime service:
+This is a **deployment decision**, not a checkbox.
 
-```text
-Qdrant is usually the cleaner architecture.
-```
+Use SAC when it **enables the context length you need** or substantially reduces memory pressure.
 
 ---
 
-## 5. Dense, sparse, and multi-vector retrieval
+## 7. Composition with ZeRO
 
-Vector search is **not one thing**.
+AutoSP composes with ZeRO 0/1 according to the PyTorch post.
 
-There are **several retrieval representations**.
-
-### Dense vectors
-
-**Dense vectors** are fixed-length arrays of floats.
-
-Example:
+That is important because sequence parallelism and ZeRO solve **different memory problems**.
 
 ```text
-384 dimensions
-768 dimensions
-1024 dimensions
-1536 dimensions
-3072 dimensions
+ZeRO/FSDP:
+  shard optimizer state, gradients, and parameters
+
+Sequence parallelism:
+  shard the token/activation dimension
 ```
 
-They capture semantic similarity.
-
-Good at:
-
-- paraphrases
-- conceptual similarity
-- multilingual semantic search
-- fuzzy document retrieval
-- "meaning" rather than exact words
-
-Bad at:
-
-- exact identifiers
-- error codes
-- part numbers
-- rare API names
-- very precise keyword constraints
-
-Example failure:
+For long-context training, you often need both:
 
 ```text
-Query: "NV_ERR_INVALID_STATE"
+large model
+  -> shard parameters and optimizer state
+
+long sequence
+  -> shard sequence activations
 ```
 
-A dense model might retrieve generic "invalid state" content and miss the exact error-code page.
-
-### Sparse vectors
-
-**Sparse vectors** are high-dimensional vectors where most values are zero.
-
-They are closer to **keyword and lexical retrieval**.
-
-Examples:
-
-- BM25
-- SPLADE
-- learned sparse retrievers
-
-Good at:
-
-- exact keywords
-- identifiers
-- names
-- rare terms
-- technical symbols
-
-Bad at:
-
-- paraphrase-only queries
-- cross-lingual semantic matching
-- conceptual retrieval when words do not overlap
-
-### Multi-vector retrieval
-
-**Multi-vector systems** store multiple vectors for one document or chunk.
-
-Examples:
-
-- one vector per passage segment
-- ColBERT-style late interaction vectors
-- image + text vectors
-- title vector + body vector
-- query-specific representations
-
-Good at:
-
-- precise matching inside long documents
-- retrieval where one single pooled vector loses details
-- high-quality search over complex docs
-
-Cost:
-
-- more storage
-- more compute
-- more complicated ranking
-- more operational complexity
-
-### Hybrid retrieval
-
-**Hybrid retrieval** combines dense and sparse signals.
-
-Simple pattern:
+A practical design could look like:
 
 ```text
-dense top 20
-+ sparse/BM25 top 20
--> reciprocal rank fusion
--> rerank top 10
--> keep top 3
+data parallel group
+  -> improves global batch throughput
+
+ZeRO group
+  -> reduces optimizer/parameter memory
+
+sequence parallel group
+  -> increases maximum context length
 ```
 
-Why this works:
+The challenge is making those parallel dimensions **compose without breaking correctness or performance**.
 
-```text
-dense catches meaning
-sparse catches exact terms
-reranker chooses final evidence
-```
-
-For technical docs, codebases, and enterprise manuals, hybrid retrieval is **often better than dense-only retrieval**.
+AutoSP's value is that it **handles that composition** for its supported cases rather than requiring every user to implement it manually.
 
 ---
 
-## 6. HNSW and IVFFlat
+## 8. Compiler pass requirements
 
-Nearest-neighbor search has two broad modes:
+AutoSP needs to **see the model graph**.
 
-```text
-exact search:
-  compare query against every vector
+The blog calls out two key limitations.
 
-approximate search:
-  use an index to find likely nearest neighbors faster
-```
+First, the transformer must be compiled as **one compilable artifact**.
 
-Exact search has perfect recall but becomes expensive as the corpus grows.
+If a project compiles many small functions separately and stitches them together, AutoSP cannot globally analyze and propagate sequence-sharding information through the whole model.
 
-Approximate nearest neighbor search **trades some recall for speed**.
+Second, **graph breaks are disallowed** inside the compilable artifact.
 
-### HNSW
+Graph breaks complicate:
 
-HNSW means **Hierarchical Navigable Small World**.
+- tensor sharding propagation
+- layout reasoning
+- communication insertion
+- backward-pass correctness
+- activation checkpointing
 
-At a practical level:
+This is a **compiler reality**.
 
-```text
-Build a graph where nearby vectors are connected.
-Search by walking the graph toward better candidates.
-```
+If the compiler cannot see the whole computation, it cannot **safely transform** the whole computation.
 
-Strengths:
-
-- strong speed/recall tradeoff
-- works well for many production search workloads
-- no separate training step
-- can be built before or as data arrives
-
-Costs:
-
-- more memory than simpler indexes
-- slower index build than IVFFlat
-- parameters matter
-
-Important knobs:
+For users, the implication is concrete:
 
 ```text
-m:
-  graph connectivity
+AutoSP-friendly code:
+  full transformer compiles as one graph
+  tensor metadata is visible
+  no graph breaks
+  inputs are tagged
 
-ef_construction:
-  candidate list size during build
-
-ef_search:
-  candidate list size during query
+AutoSP-hostile code:
+  Python control flow that breaks graphs
+  custom ops without compiler visibility
+  fragmented compile regions
+  dynamic behavior the pass cannot analyze
 ```
 
-Increasing `ef_search` usually **improves recall but increases latency**.
+This is not just an AutoSP issue.
 
-### IVFFlat
-
-IVFFlat means **inverted file flat**.
-
-At a practical level:
-
-```text
-Cluster vectors into lists.
-At query time, search only the closest lists.
-```
-
-Strengths:
-
-- faster build than HNSW
-- lower memory pressure
-- useful when index size matters
-
-Costs:
-
-- usually weaker speed/recall tradeoff than HNSW
-- requires representative data before index creation
-- needs tuning of lists/probes
-
-Important knobs:
-
-```text
-lists:
-  number of partitions
-
-probes:
-  number of lists searched per query
-```
-
-Increasing `probes` improves recall but increases latency.
-
-### Practical guidance
-
-For most app-level RAG:
-
-```text
-Start with HNSW.
-Measure recall@k and latency.
-Tune search width before changing database.
-```
-
-Use IVFFlat when:
-
-- memory is tighter
-- build time matters
-- data is mostly static
-- you know how to tune list/probe tradeoffs
+It is a **general rule** for compiler-based distributed training.
 
 ---
 
-## 7. Filtering is where systems diverge
+## 9. Performance portability
 
-RAG **needs filters**.
+The AutoSP paper argues that putting SP into the compiler can improve **performance portability** across hardware.
 
-Examples:
-
-```text
-only docs user can access
-only version 2.1 docs
-only English docs
-only source = official_manual
-only product = Jetson Orin
-only updated after 2026-01-01
-```
-
-**Bad filtering can break retrieval.**
-
-The hard case:
+The reason:
 
 ```text
-Find nearest neighbors, but only among 2% of the corpus.
+manual SP implementation
+  -> tied to one framework path, one backend, one set of assumptions
+
+compiler pass
+  -> can lower the same high-level transformation differently per backend
 ```
 
-There are three common strategies:
+This matters for:
+
+- NVIDIA clusters
+- AMD clusters
+- mixed backend research
+- cloud portability
+- future interconnect generations
+
+**Do not overstate this.**
+
+Compiler portability does **not mean every backend is automatically optimal**.
+
+It means the abstraction boundary is better:
 
 ```text
-pre-filter:
-  reduce candidate set first, then vector search
-
-post-filter:
-  vector search first, then filter results
-
-integrated filtered ANN:
-  search the vector index with filter awareness
+model code expresses intent
+compiler/runtime chooses distributed lowering
+trace/profiler validates the actual result
 ```
 
-Post-filtering can **silently reduce recall**.
+This pairs directly with Lecture 44.
 
-Example:
-
-```text
-top_k = 10
-filter matches 10% of rows
-approximate index returns 10 candidates
-after filtering, only 1 candidate remains
-```
-
-That is **not a language-model problem**.
-
-That is a **retrieval planning problem**.
-
-Qdrant's payload indexes are designed to make filtered vector search a first-class retrieval path.
-
-pgvector uses SQL filtering, partial indexes, partitioning, iterative scans, and planner behavior to manage this problem.
-
-Both can work.
-
-But when your product depends heavily on filtered ANN retrieval, **test this explicitly**.
+Use **TraceLens** or equivalent profiler analysis to verify whether the generated SP code is **actually efficient** on your hardware.
 
 ---
 
-## 8. Qdrant architecture patterns
+## 10. What to measure
 
-### Pattern A: local sidecar
+For AutoSP, benchmark **both capability and cost**.
 
-Good for local agents and edge RAG.
+Capability metrics:
 
-```text
-OpenClaw / local app
-  -> Qdrant on localhost
-  -> local embedding model
-  -> local generator
-```
+- maximum trainable context length before OOM
+- peak GPU memory
+- whether target batch size fits
+- correctness versus baseline loss
+- gradient consistency if doing deeper validation
 
-Benefits:
+Performance metrics:
 
-- simple network boundary
-- local data
-- good retrieval performance
-- easy replacement of app database
+- tokens/s
+- step time
+- forward time
+- backward time
+- exposed communication time
+- all-to-all latency and bandwidth
+- recomputation overhead
+- GPU idle time
+- compile time
 
-Risks:
+Quality metrics:
 
-- another process to supervise
-- data sync if canonical docs live elsewhere
+- loss curve agreement
+- downstream long-context validation
+- stability at target sequence length
+- numerical differences versus hand-written baseline
 
-### Pattern B: retrieval service
-
-Good for production AI apps.
-
-```text
-agent runtime
-  -> retrieval API
-      -> Qdrant
-      -> reranker
-      -> citation formatter
-```
-
-Benefits:
-
-- one retrieval contract
-- service-level caching
-- centralized logging
-- easier A/B tests
-
-Risks:
-
-- more service architecture
-- need clear access-control enforcement
-
-### Pattern C: edge cache of central index
-
-Good for remote/local-first systems.
+For a real report, do not only say:
 
 ```text
-central corpus
-  -> sync selected docs
-  -> edge Qdrant collection
-  -> local agent queries edge index
+AutoSP works.
 ```
 
-Benefits:
+Say:
 
-- lower latency
-- private/offline operation
-- reduced cloud dependency
+```text
+AutoSP increased max sequence length from A to B
+with C% step-time overhead,
+D GB lower peak memory,
+E communication exposure,
+and loss difference within threshold F.
+```
 
-Risks:
-
-- sync correctness
-- stale docs
-- permission drift
+That is the **engineering standard**.
 
 ---
 
-## 9. pgvector architecture patterns
+## 11. Where AutoSP sits in the long-context stack
 
-### Pattern A: SQL app with vector search
-
-Good when Postgres is already the source of truth.
+Long-context systems have **both training and inference paths**.
 
 ```text
-web app
-  -> Postgres
-      -> relational tables
-      -> pgvector columns
-      -> full-text search
+training:
+  sequence parallelism
+  activation checkpointing
+  ZeRO/FSDP
+  tensor/pipeline parallelism
+  distributed optimizer state
+
+serving:
+  KV-cache memory
+  prefill/decode scheduling
+  paged attention
+  FP8 KV-cache
+  batching and routing
+  request concurrency
 ```
 
-Benefits:
+AutoSP belongs to the **training side**.
 
-- simplest architecture
-- easy joins
-- one backup/restore path
-- one permission model
+vLLM FP8 KV-cache belongs to the **serving side**.
 
-Risks:
+TraceLens belongs to **evidence and diagnosis** across both.
 
-- vector workload competes with OLTP workload
-- index tuning can affect database resources
-- horizontal vector scaling is not as clean as a dedicated vector service
-
-### Pattern B: hybrid SQL retrieval
-
-Combine full-text search and vector search.
-
-```sql
--- Dense candidates
-SELECT id, 1.0 / (60 + row_number() OVER ()) AS dense_score
-FROM document_chunks
-ORDER BY embedding <=> $query_embedding
-LIMIT 50;
-
--- Text candidates
-SELECT id, ts_rank_cd(textsearch, query) AS text_score
-FROM document_chunks, plainto_tsquery($query_text) query
-WHERE textsearch @@ query
-LIMIT 50;
-```
-
-Then fuse in SQL or app code:
+Together:
 
 ```text
-reciprocal rank fusion
-cross-encoder rerank
-weighted score fusion
+AutoSP:
+  train long-context models
+
+vLLM FP8 KV-cache:
+  serve long-context models efficiently
+
+TraceLens:
+  prove where performance changed
 ```
 
-Benefits:
+For agent systems, these are connected because persistent agents create demand for:
 
-- no separate search engine
-- strong for SQL-heavy apps
-- easy to filter by relational state
+- longer sessions
+- larger retrieved context
+- long tool traces
+- multimodal history
+- extended planning state
+- larger evaluation prompts
 
-Risks:
-
-- more query complexity
-- planner/index tuning matters
-- recall must be measured
+**Training and serving** must both adapt.
 
 ---
 
-## 10. Embedding model selection
+## 12. Hardware engineer view
 
-An embedding model **maps text to a vector**.
+AutoSP exposes the **hardware bottlenecks** behind long-context training.
 
-Different models optimize for different tradeoffs:
+Key questions:
 
 ```text
-quality
-latency
-dimension
-context length
-license
-language coverage
-code retrieval
-domain retrieval
-image/document support
-local deployability
-cloud API convenience
+Memory capacity:
+  Does sequence sharding make the target context fit?
+
+Memory bandwidth:
+  Does recomputation or communication increase pressure elsewhere?
+
+Interconnect:
+  Are collectives exposed on the critical path?
+
+Topology:
+  Does Ulysses map cleanly onto NVLink, xGMI, or a fat-tree network?
+
+Compiler:
+  Can the graph stay intact enough for whole-model transformation?
+
+Kernel quality:
+  Do generated shapes hit efficient GEMM and attention kernels?
+
+Scheduling:
+  Is communication overlapped with useful compute?
 ```
 
-The **first mistake** is asking:
+This is why long-context training is a **full-stack problem**.
+
+It is **not solved only by bigger HBM**.
+
+It needs:
+
+- model architecture choices
+- compiler transformations
+- communication topology
+- kernel efficiency
+- memory planning
+- profiler-backed validation
+
+---
+
+## 13. Practical usage checklist
+
+Before trying AutoSP on a real model, check:
+
+- The model is transformer-like and compiles as one artifact.
+- The training path avoids graph breaks.
+- Input IDs, labels, position IDs, and attention masks can be tagged.
+- The DeepSpeed version includes the relevant DeepCompile/AutoSP support.
+- The desired ZeRO stage is supported by your AutoSP path.
+- The model head count supports the requested Ulysses SP size.
+- Your hardware topology can sustain the required collectives.
+- You have a baseline for correctness and step time.
+
+Start small:
 
 ```text
-What is the best embedding model?
+short sequence
+small model
+few layers
+sp_size = 2
+deterministic test
+compare loss
 ```
 
-Ask instead:
+Then scale:
 
 ```text
-What is the best embedding model for this corpus and deployment budget?
+increase sequence length
+increase SP size
+enable SAC if needed
+add ZeRO
+measure traces
+compare with hand-written or compiled baseline
 ```
 
 ---
 
-## 11. Granite embeddings
+## 14. Failure modes
 
-Granite embeddings are **IBM embedding models** for retrieval and search.
-
-The useful local/edge target from Lecture 44:
+Common failure modes to expect:
 
 ```text
-ibm-granite/granite-embedding-97m-multilingual-r2
+graph break
+  -> compiler cannot apply AutoSP safely
+
+wrong masks or position IDs
+  -> correctness failure
+
+SP size exceeds head constraints
+  -> invalid or inefficient configuration
+
+communication dominates
+  -> topology or overlap issue
+
+SAC recomputation too expensive
+  -> context fits but throughput regresses
+
+dynamic behavior not captured
+  -> compile failure or fallback path
+
+loss diverges from baseline
+  -> sharding, mask, communication, or numerical issue
 ```
 
-Why it is attractive:
+The right response is **not to guess**.
 
-- compact 97M-class model
-- multilingual retrieval
-- code retrieval support
-- long context for an embedding model
-- Apache-2.0 license
-- practical deployment paths
-- good memory/latency fit for edge RAG
+Use:
 
-Use Granite 97M when:
-
-- local/private RAG matters
-- multilingual retrieval matters
-- you want permissive licensing
-- memory is constrained
-- you want a compact default for Jetson/edge
-
-Use Granite 311M when:
-
-- server resources are available
-- retrieval quality is more important than low memory
-- the corpus is harder or more multilingual
-- latency budget allows a larger encoder
-
-The important point:
-
-```text
-Granite 97M is a strong default for efficient local RAG,
-not a universal winner for every retrieval task.
-```
+- correctness tests
+- trace comparison
+- per-rank loss logging
+- memory reports
+- collective analysis
+- event replay for slow kernels where possible
 
 ---
 
-## 12. Open-source alternatives to Granite
+## Mini-lab: AutoSP evaluation plan
 
-### BGE-M3
+You do **not need an 8-GPU node** to design the experiment.
 
-`BAAI/bge-m3` is a **strong open model** when you want one model that supports:
+Write an evaluation plan for a Llama-style transformer.
 
-- dense retrieval
-- sparse retrieval
-- multi-vector retrieval
-- multilingual retrieval
-- long-ish input up to 8192 tokens
-
-Use BGE-M3 when:
-
-- hybrid retrieval matters
-- you want dense + sparse from one model family
-- multilingual search matters
-- you can afford more compute than a tiny edge model
-
-Tradeoff:
+Include:
 
 ```text
-more retrieval capability
-usually more runtime cost than compact embedding models
+Model:
+GPU type:
+GPU count:
+baseline strategy:
+AutoSP strategy:
+SP size:
+ZeRO stage:
+sequence lengths:
+batch size:
+activation checkpointing policy:
+correctness metric:
+performance metric:
+trace/profiler plan:
+failure threshold:
+deployment decision rule:
 ```
 
-### Multilingual E5
+If you have access to multiple GPUs, run a small correctness test first:
 
-`intfloat/multilingual-e5-large` is a **mature multilingual dense embedding model**.
-
-Use E5 when:
-
-- multilingual text retrieval is central
-- you want a widely used baseline
-- 512-token truncation is acceptable for your chunks
-- you can afford a larger encoder
-
-Tradeoff:
-
-```text
-strong baseline, but shorter context than long-context embedding models
+```bash
+cd benchmarks/autosp
+./run_autosp.sh \
+  --compile autosp \
+  --batch-size 1 \
+  --seq-length 64 \
+  --sp-size 2 \
+  --num-layers 1 \
+  --steps 1 \
+  --deterministic
 ```
 
-### Nomic Embed
-
-Nomic embedding models are useful **open-weight baselines**, especially for local development and reproducible experiments.
-
-Use Nomic-style models when:
-
-- you want local inference
-- English retrieval is enough
-- you need simple open-weight deployment
-
-### Jina embeddings
-
-Jina embedding models are useful when you care about:
-
-- multilingual retrieval
-- multimodal retrieval in newer model families
-- code/doc retrieval tasks
-- deployment flexibility
-
-Use Jina when the corpus includes varied web, code, or multimodal-ish documents and you are willing to test model-specific behavior.
-
-### Snowflake Arctic Embed
-
-Snowflake Arctic Embed models are another useful open retrieval family.
-
-Use them when:
-
-- you want strong open retrieval baselines
-- English or multilingual enterprise retrieval is the target
-- you are comparing several open models under the same evaluation harness
-
----
-
-## 13. API-based embedding alternatives
-
-API embeddings are useful when you want **quality and simplicity more than local control**.
-
-### OpenAI embeddings
-
-OpenAI's embedding models are **simple to operate** through an API.
-
-Use them when:
-
-- cloud API use is acceptable
-- you want strong general-purpose retrieval quality
-- you do not want to host embedding infrastructure
-- latency and cost are acceptable
-
-Tradeoffs:
-
-- external API dependency
-- token cost
-- privacy/compliance review
-- provider lock-in
-
-### Cohere Embed
-
-Cohere Embed v4 is useful for:
-
-- multilingual search
-- business documents
-- image/document screenshot embeddings
-- configurable output dimensions
-- compressed output types
-
-Use Cohere when:
-
-- enterprise document retrieval matters
-- multimodal document surfaces matter
-- you want managed embedding infrastructure
-
-### Voyage embeddings
-
-Voyage models are useful for:
-
-- high-quality managed retrieval
-- code retrieval
-- finance/law/domain-specific retrieval
-- configurable dimensions and output dtypes in newer model families
-
-Use Voyage when:
-
-- retrieval quality is critical
-- cloud API is acceptable
-- your domain matches one of their specialized models
-
----
-
-## 14. Embedding recommendation matrix
-
-Use this as a starting point, not a law.
-
-| Use case | Good starting model |
-|---|---|
-| Jetson/local multilingual RAG | Granite 97M Multilingual R2 |
-| Local hybrid retrieval | BGE-M3 |
-| Mature multilingual dense baseline | Multilingual E5 |
-| Server-side IBM/open enterprise stack | Granite 311M Multilingual R2 |
-| Cloud general-purpose retrieval | OpenAI embedding model or Voyage general model |
-| Cloud enterprise document search | Cohere Embed v4 |
-| Code-heavy retrieval | BGE-M3, Granite, or Voyage code model |
-| Image-rich PDFs/slides/screenshots | Cohere Embed v4 or a dedicated multimodal document retriever |
-| SQL-only prototype | Any embedding model + pgvector |
-| Retrieval product/API | Embedding model + Qdrant + reranker |
-
-The real answer should come from your **evaluation set**.
-
----
-
-## 15. Vector database alternatives
-
-Qdrant and pgvector are not the only options.
-
-| Tool | Best fit |
-|---|---|
-| Milvus | large-scale vector infrastructure, distributed retrieval |
-| Weaviate | semantic app layer, hybrid search, GraphQL/module ecosystem |
-| Pinecone | managed vector DB with low operational overhead |
-| Elasticsearch/OpenSearch | text search first, vector search added to existing search stack |
-| LanceDB | embedded/serverless-style vector storage, data/AI workflows |
-| Chroma | local development and prototypes |
-| FAISS | library-level vector indexing, not a full database |
-
-Practical guidance:
-
-```text
-Prototype:
-  Chroma, LanceDB, pgvector, or local Qdrant
-
-SQL app:
-  pgvector
-
-Production retrieval service:
-  Qdrant, Milvus, Weaviate, Pinecone
-
-Text-search-heavy app:
-  Elasticsearch/OpenSearch or hybrid Qdrant
-
-Lowest-level custom indexing:
-  FAISS
-```
-
-For this roadmap, focus on Qdrant and pgvector first because they represent the two most common architecture choices:
-
-```text
-dedicated vector service vs SQL-integrated vector search
-```
-
----
-
-## 16. Storage and memory math
-
-Embedding dimension **affects storage directly**.
-
-Approximate raw vector storage:
-
-```text
-float32 bytes = vector_count * dimension * 4
-float16 bytes = vector_count * dimension * 2
-int8 bytes    = vector_count * dimension * 1
-binary bytes  = vector_count * dimension / 8
-```
-
-Example for 1 million chunks:
-
-| Dimension | float32 raw vectors | float16 raw vectors |
-|---:|---:|---:|
-| 384 | ~1.5 GB | ~0.75 GB |
-| 768 | ~3.1 GB | ~1.5 GB |
-| 1024 | ~4.1 GB | ~2.0 GB |
-| 1536 | ~6.1 GB | ~3.1 GB |
-| 3072 | ~12.3 GB | ~6.1 GB |
-
-This excludes:
-
-- HNSW graph memory
-- payload metadata
-- text/chunk storage
-- database overhead
-- WAL/replication
-- indexes
-- cache
-- snapshots/backups
-
-The lesson:
-
-```text
-embedding dimension is an infrastructure decision,
-not just a model-card detail.
-```
-
-For edge RAG:
-
-```text
-384-dimensional embeddings can be a major advantage.
-```
-
-For max-quality server retrieval:
-
-```text
-larger embeddings may be worth the storage and memory cost.
-```
-
-**Measure both.**
-
----
-
-## 17. How to evaluate embedding models
-
-Do **not choose from vibes**.
-
-Build a **retrieval evaluation set**.
-
-Minimum dataset:
-
-```text
-100-300 representative questions
-ground-truth relevant chunk ids or document ids
-query language labels
-query type labels
-expected citation requirements
-```
-
-Query type labels:
-
-```text
-conceptual
-exact keyword
-API name
-error code
-code search
-cross-lingual
-long-document
-ambiguous
-permission-sensitive
-```
-
-Metrics:
-
-| Metric | Meaning |
-|---|---|
-| recall@k | Did the relevant chunk appear in top-k? |
-| MRR | How high was the first relevant result? |
-| nDCG | Did the ranking quality match graded relevance? |
-| answer faithfulness | Did generation stay grounded in retrieved context? |
-| citation accuracy | Did cited chunks actually support the answer? |
-| p95 latency | Is retrieval fast enough under load? |
-| memory/RAM/VRAM | Does it fit deployment constraints? |
-| index build time | Can you refresh the corpus operationally? |
-
-Evaluation loop:
-
-```text
-for each embedding model:
-  ingest same chunks
-  use same metadata
-  build index
-  run same queries
-  measure recall@3, recall@8, MRR, latency
-  rerank same candidate count
-  run final answer eval
-```
-
-Important:
-
-```text
-Changing chunking changes the benchmark.
-Changing embedding model changes the benchmark.
-Changing top-k changes the benchmark.
-Changing filters changes the benchmark.
-```
-
-Only compare **one major variable at a time**.
-
----
-
-## 18. Reranking
-
-Embedding retrieval is **first-stage retrieval**.
-
-Reranking is **second-stage retrieval**.
-
-Pattern:
-
-```text
-vector search top 30
-  -> reranker scores query + candidate text
-  -> keep top 3 to 5
-  -> send to LLM
-```
-
-Why reranking helps:
-
-- dense embeddings are coarse
-- chunks can be semantically close but not answer the question
-- cross-encoders inspect query and candidate together
-- rerankers reduce prompt waste
-
-Common reranker choices:
-
-- BGE reranker family
-- Granite reranker
-- Jina reranker
-- Cohere Rerank
-- custom cross-encoder for domain-specific search
-
-When to add reranking:
-
-```text
-if recall@20 is good but answer quality is weak,
-add reranking before changing the generator.
-```
-
-If recall@20 is bad, reranking **will not save you**.
-
-Fix:
-
-- chunking
-- embedding model
-- hybrid retrieval
-- metadata filters
-- corpus coverage
-
----
-
-## 19. Migration rule: never mix embeddings casually
-
-Vectors from different embedding models do **not live in the same comparable space**.
-
-Bad migration:
-
-```text
-old chunks embedded with Model A
-new chunks embedded with Model B
-same vector column
-same index
-same distance metric
-```
-
-This **corrupts retrieval**.
-
-Correct migration:
-
-```text
-create new collection or new vector column
-backfill all chunks with new model
-dual-write new chunks during migration
-run retrieval eval against old and new
-switch traffic gradually
-keep rollback path
-delete old index after confidence
-```
-
-Qdrant pattern:
-
-```text
-collection_docs_v1_granite97
-collection_docs_v2_bge_m3
-```
-
-pgvector pattern:
-
-```sql
-ALTER TABLE document_chunks ADD COLUMN embedding_v2 vector(1024);
-CREATE INDEX document_chunks_embedding_v2_hnsw
-ON document_chunks USING hnsw (embedding_v2 vector_cosine_ops);
-```
-
-Keep model metadata:
-
-```text
-embedding_model
-embedding_dimension
-embedding_normalization
-embedding_created_at
-chunker_version
-source_hash
-```
-
-Without this, debugging retrieval regressions becomes **guesswork**.
-
----
-
-## 20. Security and permissions
-
-Vector databases can **leak data if filtering is wrong**.
-
-Common failure:
-
-```text
-query embeds user request
-vector search retrieves private chunks
-LLM summarizes private chunks to unauthorized user
-```
-
-Do **not rely on the LLM to enforce access control**.
-
-Access control belongs **before generation**:
-
-```text
-authorized document ids
-  -> retrieval filter
-  -> rerank only authorized candidates
-  -> prompt only authorized context
-```
-
-Minimum metadata:
-
-```text
-tenant_id
-organization_id
-project_id
-visibility
-source
-document_id
-version
-deleted_at
-```
-
-For Qdrant:
-
-```text
-use payload filters and payload indexes
-```
-
-For pgvector:
-
-```text
-use SQL WHERE clauses, row-level security if appropriate,
-partial indexes, and partitioning where needed
-```
-
-**Never send unauthorized chunks** to the model and expect a prompt to save you.
-
----
-
-## 21. Decision framework
-
-### Choose Qdrant if:
-
-- vector retrieval is central to the product
-- you need high-performance filtered vector search
-- you want dense + sparse + hybrid retrieval
-- you want a dedicated retrieval service
-- you need horizontal scaling options
-- you are building edge/local RAG as a service
-- you expect heavy retrieval traffic
-- you want to evolve retrieval independently from the app database
-
-### Choose pgvector if:
-
-- your app already uses PostgreSQL
-- vectors are attached to relational entities
-- SQL joins and transactions matter
-- you want one operational system
-- the corpus is modest or moderate
-- vector search is not the dominant workload
-- your team is stronger in Postgres than vector DB operations
-
-### Choose Granite 97M if:
-
-- local/edge inference matters
-- memory is constrained
-- multilingual retrieval matters
-- Apache-2.0 licensing matters
-- compact embeddings are a strategic advantage
-
-### Choose BGE-M3 if:
-
-- hybrid dense/sparse retrieval matters
-- you want one open model for multiple retrieval modes
-- multilingual and long-ish documents matter
-- you can afford more retrieval compute
-
-### Choose API embeddings if:
-
-- you want minimal hosting work
-- cloud data flow is acceptable
-- quality and speed-to-market matter more than local control
-- provider cost is acceptable
-
----
-
-## 22. Recommended defaults
-
-### Local Jetson-style RAG
-
-```text
-embedding:
-  Granite 97M Multilingual R2
-
-vector DB:
-  Qdrant local service
-
-retrieval:
-  dense top 8
-  rerank top 3 if latency allows
-
-generator:
-  Qwen3.5-4B INT4 or similar 4B-class model
-
-reason:
-  compact, private, low memory, good enough to iterate
-```
-
-### Existing SaaS app on Postgres
-
-```text
-embedding:
-  OpenAI / Cohere / Voyage / Granite depending on policy
-
-vector DB:
-  pgvector
-
-retrieval:
-  SQL WHERE filters
-  HNSW index
-  optional Postgres full-text search + rank fusion
-
-reason:
-  one database and simple app integration
-```
-
-### Search-heavy AI product
-
-```text
-embedding:
-  evaluate Granite, BGE-M3, OpenAI, Cohere, Voyage
-
-vector DB:
-  Qdrant
-
-retrieval:
-  dense + sparse hybrid
-  metadata filters
-  reranker
-  retrieval telemetry
-
-reason:
-  retrieval quality and latency are product features
-```
-
-### Codebase assistant
-
-```text
-embedding:
-  BGE-M3, Granite, Voyage code model, or a code-specialized model
-
-vector DB:
-  Qdrant if repo search is a service
-  pgvector if it is part of a Postgres-backed app
-
-retrieval:
-  hybrid search
-  path/language filters
-  symbol-aware chunking
-  reranking
-```
-
----
-
-## Mini-lab: choose a vector store and embedding model
-
-Design a RAG stack for one of these:
-
-- Jetson local assistant over hardware manuals
-- coding assistant over a monorepo
-- internal company knowledge base
-- multilingual support bot
-- PDF-heavy enterprise search tool
-
-Fill this out:
-
-```text
-Corpus:
-Languages:
-Chunk types:
-Estimated chunks:
-Average chunk tokens:
-Strict metadata filters:
-Permission model:
-Latency target:
-Memory target:
-Embedding candidates:
-Vector DB candidates:
-Reranker candidates:
-Evaluation query count:
-Primary metric:
-Secondary metric:
-```
-
-Then answer:
-
-```text
-I choose Qdrant/pgvector because:
-I choose this embedding model because:
-I reject the alternatives because:
-My first recall@k target is:
-My p95 retrieval latency target is:
-My migration plan is:
-```
-
-If you cannot justify the choice with measurements, you are **still guessing**.
+Then compare against a baseline mode and record whether per-rank losses match within your threshold.
 
 ---
 
 ## Key takeaways
 
-- Qdrant is a dedicated vector retrieval engine; pgvector is vector search inside PostgreSQL.
-- Qdrant is usually better when retrieval is the product path; pgvector is usually better when SQL integration is the product path.
-- Dense retrieval captures meaning; sparse retrieval captures exact terms; hybrid retrieval often wins for technical docs.
-- HNSW is the common default ANN index; IVFFlat can be useful when memory/build-time tradeoffs matter.
-- Filtering is not a detail. Permission and metadata filters are core retrieval correctness.
-- Granite 97M is a strong compact local/edge embedding model, but BGE-M3, E5, OpenAI, Cohere, Voyage, Jina, and others can win depending on corpus and constraints.
-- Embedding dimension directly affects storage, RAM, index size, and edge viability.
-- Do not mix embeddings from different models in one vector space without a controlled migration.
-- The only reliable answer to "what is best?" is a retrieval eval on your own data.
+- Long-context training can OOM because activation memory grows with sequence length.
+- ZeRO and FSDP help model-state memory but do not automatically shard the token dimension.
+- Sequence parallelism shards the sequence dimension across GPUs, enabling longer context training.
+- Hand-written SP is invasive because it requires partitioning activations and inserting correct collectives in forward and backward passes.
+- AutoSP moves Ulysses-style sequence parallelism into a DeepSpeed/DeepCompile compiler pass.
+- Sequence-aware activation checkpointing trades recomputation for longer trainable contexts.
+- AutoSP composes with supported ZeRO stages, but it has strict compiler requirements.
+- Whole-model compilation and no graph breaks are core constraints.
+- Validate AutoSP with max context, memory, step time, communication exposure, and correctness, not only whether the run starts.
+- Compiler-generated distributed training should be paired with trace-driven analysis.
 
 ---
 
 ## References
 
-- Qdrant overview: [https://qdrant.tech/documentation/overview/](https://qdrant.tech/documentation/overview/)
-- Qdrant indexing: [https://qdrant.tech/documentation/concepts/indexing/](https://qdrant.tech/documentation/concepts/indexing/)
-- Qdrant search docs: [https://qdrant.tech/documentation/search/](https://qdrant.tech/documentation/search/)
-- pgvector README: [https://github.com/pgvector/pgvector](https://github.com/pgvector/pgvector)
-- IBM Granite Embedding docs: [https://www.ibm.com/granite/docs/models/embedding](https://www.ibm.com/granite/docs/models/embedding)
-- Granite 97M Multilingual R2 model card: [https://huggingface.co/ibm-granite/granite-embedding-97m-multilingual-r2](https://huggingface.co/ibm-granite/granite-embedding-97m-multilingual-r2)
-- BGE-M3 model card: [https://huggingface.co/BAAI/bge-m3](https://huggingface.co/BAAI/bge-m3)
-- Multilingual E5 model card: [https://huggingface.co/intfloat/multilingual-e5-large](https://huggingface.co/intfloat/multilingual-e5-large)
-- OpenAI embedding model docs: [https://developers.openai.com/api/docs/models/text-embedding-3-large](https://developers.openai.com/api/docs/models/text-embedding-3-large)
-- Cohere embeddings docs: [https://docs.cohere.com/docs/embeddings](https://docs.cohere.com/docs/embeddings)
-- Voyage embeddings docs: [https://docs.voyageai.com/docs/embeddings](https://docs.voyageai.com/docs/embeddings)
-- Lecture 44 - Efficient Local RAG Stack: [Lecture-44.md](Lecture-44.md)
+- PyTorch Blog, "Introducing AutoSP": [https://pytorch.org/blog/introducing-autosp/](https://pytorch.org/blog/introducing-autosp/)
+- AutoSP paper, "AutoSP: Unlocking Long-Context LLM Training via Compiler-Based Sequence Parallelism": [https://openreview.net/pdf?id=0fgsHvmBBI](https://openreview.net/pdf?id=0fgsHvmBBI)
+- DeepSpeed AutoSP examples: [https://github.com/deepspeedai/DeepSpeedExamples/tree/master/benchmarks/autosp](https://github.com/deepspeedai/DeepSpeedExamples/tree/master/benchmarks/autosp)
+- DeepCompile paper: [https://arxiv.org/abs/2504.09983](https://arxiv.org/abs/2504.09983)
+- Lecture 43 - FP8 KV-Cache in vLLM: [Lecture-43.md](Lecture-43.md)
+- Lecture 44 - TraceLens: [Lecture-44.md](Lecture-44.md)
 
 ---
 
-*Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)*
+*Next: [Lecture 46](Lecture-46.md)*

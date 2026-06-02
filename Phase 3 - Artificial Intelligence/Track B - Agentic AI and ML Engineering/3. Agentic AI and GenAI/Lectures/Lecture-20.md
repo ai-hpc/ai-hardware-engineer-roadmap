@@ -1,716 +1,592 @@
-# Lecture 20 - OpenClaw Case Study: Cron, Scheduled Agent Runs, and Automation Reliability
+# Lecture 20 - Nemotron 3 Nano Omni: Multimodal Perception Sub-Agents for Agent Systems
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 19](Lecture-19.md) | **Next:** [Lecture 21](Lecture-21.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 19](Lecture-19.md) | **Next:** [Lecture 21](Lecture-21.md)
 
 ---
 
-## Why this lecture exists
-
-Cron looks simple from the outside:
-
-> run something at a scheduled time
-
-But in an agent system, scheduling is **not just a timer**.
-
-The scheduled job may need:
-
-- a model
-- a session
-- a prompt
-- tool permissions
-- delivery routing
-- retries
-- logs
-- failure notifications
-- cleanup
-
-OpenClaw is a useful case study because its cron system is not just classic Unix cron. It is a **scheduler for agent work**.
-
-The better mental model is:
+Many agent systems still look like this:
 
 ```text
-traditional cron:
-  schedule -> run command -> exit
-
-OpenClaw cron:
-  schedule -> run agent task -> manage session -> deliver output -> retry -> log -> clean up
+screen model
+  -> OCR/document model
+  -> audio transcription model
+  -> video understanding model
+  -> text reasoning model
+  -> planner/executor
 ```
 
-This lecture teaches the **scheduling layer** that sits between "always-on gateway" and "agent execution."
+That works, but it creates a **fragmented perception stack**:
+
+- more inference hops
+- more orchestration code
+- more context handoffs
+- more failure points
+- weaker cross-modal consistency
+- higher cost under sustained workloads
+
+**NVIDIA Nemotron 3 Nano Omni** is interesting because it argues for a different role:
+
+```text
+one efficient multimodal model
+  -> perception and context sub-agent
+  -> planner/executor gets cleaner structured context
+```
+
+The durable lesson is not "always use this exact model."
+
+The durable lesson is:
+
+```text
+multimodal perception should be an explicit sub-agent role,
+not an accidental chain of unrelated vision, audio, OCR, and text calls.
+```
 
 ---
 
 ## Learning objectives
 
-By the end of this lecture you will be able to:
+By the end of this lecture, you should be able to:
 
-1. Explain what cron expressions mean.
-2. Compare one-shot, interval, and cron schedules.
-3. Explain how OpenClaw turns schedules into agent runs.
-4. Choose the right session mode for scheduled automation.
-5. Understand delivery fallback, failure alerts, retries, logs, and retention.
-6. Debug a cron job that fired but produced no visible output.
-7. Explain why cron validation belongs before job creation.
+1. Explain why fragmented multimodal chains create orchestration and cost problems.
+2. Describe Nemotron 3 Nano Omni as a multimodal perception/context sub-agent.
+3. Understand the 30B-A3B hybrid MoE design at a system level.
+4. Explain why Mamba layers, transformer layers, EVS, 3D convolutions, and modality encoders matter.
+5. Map multimodal model features to agent workloads: video, audio, screenshots, documents, and computer-use context.
+6. Explain why throughput at a fixed interactivity threshold is a better serving metric than raw concurrency alone.
+7. Design an OpenClaw-style architecture that uses a multimodal perception sub-agent without making it the planner or executor.
+8. Identify what to benchmark before choosing a multimodal model for production.
 
 ---
 
-## 1. Cron from first principles
+## 1. Why multimodal chains are hard
 
-Cron is a **scheduler**.
+Agentic systems increasingly need to **reason across** modalities:
 
-Its job is to answer one question:
+- screenshots
+- documents
+- forms
+- charts
+- video
+- audio
+- speech
+- on-screen text
+- user messages
+- tool results
 
-> when should this task run?
-
-Classic Unix cron has a **background daemon** that reads job definitions and launches shell commands at matching times.
-
-Example:
-
-```cron
-0 7 * * *
-```
-
-This means:
-
-> run at 07:00 every day
-
-The common 5-field format is:
+A naive design uses separate models:
 
 ```text
-minute hour day-of-month month day-of-week
+ASR model for audio
+OCR model for text in images
+VLM for screenshots
+video captioner for video
+LLM for reasoning
+planner for actions
 ```
 
-Written as a diagram:
+This creates three problems.
+
+### Cost
+
+Every hop costs **inference time and orchestration overhead**.
+
+### Context drift
+
+Each model compresses its input differently. Important **cross-modal details** can be lost.
+
+### Engineering complexity
+
+The harness must stitch together timestamps, frames, transcripts, OCR boxes, image regions, and textual summaries.
+
+**Unified multimodal models** try to reduce this fragmentation.
+
+---
+
+## 2. What Nemotron 3 Nano Omni is
+
+NVIDIA describes Nemotron 3 Nano Omni as an **open model** for unified video, audio, image, and text reasoning.
+
+The important system framing:
 
 ```text
-minute        0-59
-| hour        0-23
-| | day       1-31
-| | | month   1-12
-| | | | week  0-6 or names, depending on parser
-| | | | |
-* * * * *
+Nemotron 3 Nano Omni = multimodal perception and context sub-agent
 ```
 
-Common examples:
+It is designed to sit inside a larger agent system:
 
-| Expression | Meaning |
+```text
+multimodal inputs
+  -> Nemotron 3 Nano Omni
+  -> perception/context output
+  -> planner/reasoning model
+  -> tool/action layer
+```
+
+That matters because a multimodal model should **not automatically own all agent authority**.
+
+It should usually answer:
+
+```text
+What is in this video/audio/document/screenshot?
+What evidence supports that?
+What context should the planner receive?
+```
+
+The executor should still be controlled by **structured tools, policies, and approval gates**.
+
+---
+
+## 3. The architecture claim
+
+NVIDIA describes Nemotron 3 Nano Omni as:
+
+```text
+30B-A3B hybrid mixture-of-experts model
+```
+
+Interpretation:
+
+- total parameter capacity is around 30B
+- active parameters per token/task are around 3B
+- experts are activated depending on the task and modality
+
+Why this matters:
+
+```text
+large total capability
+  + smaller active compute path
+  -> higher throughput potential
+```
+
+**MoE is a serving tradeoff**.
+
+It can reduce active compute but introduces **routing, expert placement, memory, and kernel complexity**.
+
+For hardware engineers, this is not just a model design detail.
+
+It affects:
+
+- GPU memory placement
+- expert parallelism
+- batching behavior
+- quantization strategy
+- serving engine support
+- interconnect pressure
+
+---
+
+## 4. Hybrid Mamba + transformer core
+
+NVIDIA says the model combines:
+
+- Mamba layers for sequence and memory efficiency
+- transformer layers for precise reasoning
+
+System-level intuition:
+
+| Layer family | Strength |
 |---|---|
-| `0 * * * *` | every hour |
-| `*/10 * * * *` | every 10 minutes |
-| `0 9 * * 1` | every Monday at 09:00 |
-| `0 0 1 * *` | first day of every month |
-| `0 7 * * *` | every day at 07:00 |
+| Mamba/state-space style layers | efficient long-sequence processing and memory behavior |
+| Transformer layers | strong token-to-token reasoning and flexible attention |
 
-OpenClaw supports 5-field and 6-field cron expressions through Croner. A 6-field expression includes seconds.
-
----
-
-## 2. The first trap: cron is a language, not just a string
-
-Students often treat cron expressions like harmless text.
-
-They are not.
-
-They are a **small scheduling language** with edge cases:
-
-- timezone interpretation
-- seconds vs no seconds
-- day-of-month and day-of-week behavior
-- parser-specific syntax
-- invalid ranges
-- impossible dates
-
-OpenClaw's docs call out a specific Croner behavior:
-
-when both day-of-month and day-of-week are non-wildcard, Croner follows Vixie cron-style **OR** logic.
-
-Example:
-
-```cron
-0 9 15 * 1
-```
-
-Many people expect:
-
-> run at 09:00 on the 15th only when it is Monday
-
-But the usual cron behavior is:
-
-> run at 09:00 on every 15th and at 09:00 on every Monday
-
-That is a system-design lesson:
-
-> schedule syntax must be treated as executable configuration
-
-Invalid or surprising schedules should be **caught early**, before the job becomes durable state.
-
----
-
-## 3. What OpenClaw cron adds
-
-OpenClaw cron runs inside the Gateway process.
-
-It persists:
-
-- job definitions in `~/.openclaw/cron/jobs.json`
-- runtime state in `~/.openclaw/cron/jobs-state.json`
-- run history under `~/.openclaw/cron/runs/`
-
-That matters because a scheduled task should **survive a Gateway restart**.
-
-OpenClaw cron also creates background task records, so a scheduled agent run can be inspected as operational work, not just as a hidden timer callback.
-
-The runtime shape is:
+Why this matters for multimodal agents:
 
 ```text
-[ Gateway scheduler ]
-        |
-        v
-[ Job definition + runtime state ]
-        |
-        v
-[ Agent execution or system event ]
-        |
-        v
-[ Delivery router ]
-        |
-        v
-[ Run log + retry/failure policy ]
+video + audio + documents
+  -> long contexts
+  -> expensive attention if handled naively
 ```
 
-This is why it is closer to a **small workflow system** than to a plain crontab.
+A **hybrid architecture** is trying to preserve reasoning while reducing the cost of sustained long-context perception.
+
+You should still **benchmark the actual workload**.
+
+Architecture claims are useful, but **serving measurements decide deployment**.
 
 ---
 
-## 4. Schedule types in OpenClaw
+## 5. Video: 3D convolution and efficient video sampling
 
-OpenClaw has three schedule types.
+Video is **not just a sequence of images**.
 
-| Kind | CLI flag | Best for |
-|---|---|---|
-| `at` | `--at` | one-shot reminder or one-time automation |
-| `every` | `--every` | fixed interval checks |
-| `cron` | `--cron` | calendar-style schedules |
+The model needs **motion and temporal structure**.
 
-Example one-shot:
+NVIDIA describes two relevant mechanisms:
 
-```bash
-openclaw cron add \
-  --name "Calendar check" \
-  --at "20m" \
-  --session main \
-  --system-event "Next heartbeat: check calendar." \
-  --wake now
-```
-
-Example recurring cron:
-
-```bash
-openclaw cron add \
-  --name "Morning brief" \
-  --cron "0 7 * * *" \
-  --tz "America/Los_Angeles" \
-  --session isolated \
-  --message "Summarize overnight updates." \
-  --announce
-```
-
-One-shot jobs delete after success by default. Use `--keep-after-run` when you want to preserve the job after it completes.
-
-Recurring top-of-hour schedules may be staggered to reduce load spikes. Use `--exact` for precise cron boundaries or `--stagger 30s` for an explicit spread window.
-
----
-
-## 5. What actually runs
-
-Traditional cron usually runs a command:
-
-```text
-run this shell script at 07:00
-```
-
-OpenClaw can run different kinds of scheduled work.
-
-Two important modes:
-
-| Work type | Example | Meaning |
-|---|---|---|
-| System event | `--system-event "Reminder: check calendar"` | enqueue an event into a session |
-| Agent turn | `--message "Summarize overnight updates"` | start an agent run with a prompt |
-
-This distinction matters.
-
-A main-session reminder is more like:
-
-```text
-put this reminder into the normal assistant flow
-```
-
-An isolated cron job is more like:
-
-```text
-start a clean background agent task and send the result somewhere
-```
-
-That is why scheduled agent work needs **session design**.
-
----
-
-## 6. Session modes
-
-OpenClaw cron supports several session targets.
-
-| `--session` value | Behavior | Use it for |
-|---|---|---|
-| `main` | use the agent's main session | reminders and ordinary wakeups |
-| `isolated` | create a fresh `cron:<jobId>` run session | reports, checks, background chores |
-| `current` | bind to the active session at job creation | context-aware recurring tasks |
-| `session:<id>` | use a persistent named session | workflows that deliberately build history |
-
-The most important one is `isolated`.
-
-An isolated cron run gets a **fresh transcript/session id** for each run. It does not inherit ambient conversation context such as channel routing, queue policy, elevation, origin, or stale runtime bindings.
-
-It may still carry safe preferences such as:
-
-- selected model/auth overrides
-- thinking/fast/verbose preferences
-- labels
-
-The lesson:
-
-> use isolated sessions when repeated automation should behave like a clean task, not like a long conversation
-
-Good uses:
-
-- daily reports
-- monitoring checks
-- inbox summaries
-- periodic project sweeps
-
-Bad uses:
-
-- jobs that intentionally need accumulated conversation memory
-- long-running workflows where yesterday's result should shape today's run
-
-For those, use `session:<id>`.
-
----
-
-## 7. Delivery is part of the job
-
-A scheduled agent run is **not complete** until someone can see the result or the system intentionally suppresses it.
-
-OpenClaw's delivery modes are:
-
-| Mode | Meaning |
+| Mechanism | Purpose |
 |---|---|
-| `announce` | fallback-deliver final text to a chat target if the agent did not send directly |
-| `webhook` | POST the finished event payload to a URL |
-| `none` | no runner fallback delivery |
+| 3D convolution | captures spatial and temporal patterns across frames |
+| Efficient Video Sampling (EVS) | compresses high-density visual tokens into a smaller set for the LLM |
 
-CLI mapping:
-
-```bash
---announce     # enable announce fallback
---no-deliver   # delivery.mode = none
-```
-
-The important detail is **"fallback."**
-
-For isolated jobs, chat delivery is shared between:
-
-- the agent itself, which may use the `message` tool when a chat route exists
-- the runner, which can announce the final reply if the agent did not send it
-
-So `--announce` does not mean "always duplicate the message." It means:
-
-> if the agent did not already send the result to the target, deliver the final reply
-
-This prevents common **silent failures**.
-
-Example:
-
-```bash
-openclaw cron add \
-  --name "Morning brief" \
-  --cron "0 7 * * *" \
-  --session isolated \
-  --message "Summarize overnight AI and hardware news." \
-  --announce \
-  --channel telegram \
-  --to "-1001234567890"
-```
-
----
-
-## 8. Failure delivery
-
-Scheduled automation must **report failures**.
-
-Otherwise cron turns into:
-
-> the system did nothing, and no one knows why
-
-OpenClaw resolves failure notifications in this order:
-
-1. job-specific `delivery.failureDestination`
-2. global `cron.failureDestination`
-3. the job's primary announce target, when the job already uses announce delivery
-
-This gives you a safe default:
-
-if a scheduled report normally posts to a chat, failures can fall back to the same target unless you configure a more specific destination.
-
-Configuration shape:
-
-```json5
-{
-  cron: {
-    failureDestination: {
-      mode: "announce",
-      channel: "last",
-      to: "channel:C1234567890"
-    }
-  }
-}
-```
-
-This is **operational design**, not UI polish.
-
-For autonomous scheduled jobs, failure delivery is a **control-plane requirement**.
-
----
-
-## 9. Retry behavior
-
-OpenClaw has two retry stories.
-
-One-shot jobs use configured transient-error retry:
-
-```json5
-{
-  cron: {
-    retry: {
-      maxAttempts: 3,
-      backoffMs: [30000, 60000, 300000],
-      retryOn: ["rate_limit", "overloaded", "network", "timeout", "server_error"]
-    }
-  }
-}
-```
-
-Recurring jobs use a recurring failure backoff pattern:
+Why this matters:
 
 ```text
-30s -> 1m -> 5m -> 15m -> 60m
+raw frames are too dense
+agent context windows are finite
+video tokens can overwhelm the model
 ```
 
-The backoff **resets** after the next successful run.
+EVS is important because it turns video from:
 
-This is a major difference from a **simple prompt loop**.
+```text
+many frames -> too many tokens
+```
 
-Without backoff:
+into:
 
-- a dead local model endpoint can be hammered repeatedly
-- provider outages can create request storms
-- a broken job can spam users or logs
+```text
+sampled/compressed video evidence -> tractable multimodal context
+```
 
-OpenClaw also has provider preflight behavior for isolated jobs that target local providers such as Ollama or OpenAI-compatible local endpoints. If the endpoint is unreachable, the run can be recorded as `skipped` rather than beginning a doomed model call. Matching dead endpoints are cached briefly to avoid many jobs hitting the same broken local service.
+This connects directly to Lecture 09:
+
+```text
+screenshots and video are expensive inputs
+so perception layers must compress them before planning/action loops
+```
 
 ---
 
-## 10. Model selection for isolated cron
+## 6. Audio and visual encoders
 
-Scheduled tasks need **predictable model behavior**.
+The NVIDIA post describes audio integration built around **NVIDIA Parakeet** and specialized datasets, moving beyond simple transcription.
 
-OpenClaw resolves isolated cron model selection in this order:
+It also describes visual processing using **C-RADIOv4-H** for high-resolution image understanding and OCR-sensitive detail.
 
-1. Gmail-hook model override, when the run came from Gmail and the override is allowed
-2. per-job `--model`
-3. stored cron-session model override
-4. agent/default model selection
+System view:
 
-Example:
+```text
+audio encoder
+  -> speech, sound, temporal cues
 
-```bash
-openclaw cron add \
-  --name "Weekly deep analysis" \
-  --cron "0 6 * * 1" \
-  --session isolated \
-  --message "Analyze project progress and risks." \
-  --model "opus" \
-  --thinking high \
-  --announce
+vision encoder
+  -> images, documents, screenshots, video patches
+
+text decoder
+  -> unified reasoning/output space
 ```
 
-OpenClaw treats `--model` as a job primary, not as a normal chat-session `/model` override.
+The key design question:
 
-That means:
+```text
+Does the model only transcribe/caption?
+Or does it preserve enough multimodal structure for reasoning?
+```
 
-- configured fallback chains can still apply
-- per-job `fallbacks` can replace the configured fallback list
-- `fallbacks: []` makes the job strict
-- invalid or disallowed model refs fail clearly instead of silently using another model
+For agentic systems, **captioning alone is often insufficient**.
 
-The lesson:
+You need **grounded context**:
 
-> scheduled jobs should be explicit about model intent, because they may run when no human is watching
+- what was visible
+- when it happened
+- where in the document or frame it appeared
+- what uncertainty remains
+- which details should be passed to tools or planner
 
 ---
 
-## 11. Logging and retention
+## 7. Training scale and openness
 
-OpenClaw cron keeps run history.
+NVIDIA says the release includes access to **weights, datasets, and training recipes**.
 
-Useful commands:
+The blog reports:
 
-```bash
-openclaw cron list
-openclaw cron show <job-id>
-openclaw cron runs --id <job-id> --limit 50
+- adapter/encoder training across mixed modalities
+- supervised fine-tuning that expands context length from 16K to 49K to 262K
+- post-SFT reinforcement learning across 25 environment configurations
+- more than 2.3M environment rollouts
+- roughly 127B mixed-modality adapter/encoder training tokens
+- roughly 124M curated multimodal post-training examples
+- 20 RL datasets across 25 environments for multimodal tasks
+- synthetic-data pipelines contributing about 11.4M visual QA pairs
+
+What matters for this course:
+
+```text
+multimodal agent behavior is trained, evaluated, and aligned as a system,
+not only assembled from pretrained single-modality parts.
 ```
 
-Run history includes delivery diagnostics such as:
+For enterprise and research users, open weights and recipes matter because they enable:
 
-- intended target
-- resolved target
-- message-tool sends
-- fallback use
-- delivered/not delivered status
+- private deployment
+- domain adaptation
+- audit of data/model assumptions
+- reproducibility work
+- local or on-premise variants
 
-Retention controls:
-
-```json5
-{
-  cron: {
-    sessionRetention: "24h",
-    runLog: {
-      maxBytes: "2mb",
-      keepLines: 2000
-    }
-  }
-}
-```
-
-This matters because isolated cron jobs create sessions and transcripts. Without retention, automation creates **state forever**.
-
-The production pattern is:
-
-> keep enough history to debug, prune enough history to avoid state growth
+**License and data terms** still need review before commercial deployment.
 
 ---
 
-## 12. Manual execution
+## 8. Serving and hardware efficiency
 
-Cron jobs should be testable without waiting for the next scheduled time.
+NVIDIA reports support for:
 
-OpenClaw supports:
+- NVIDIA Ampere
+- NVIDIA Hopper
+- NVIDIA Blackwell
+- vLLM
+- TensorRT-LLM
+- FP8
+- NVFP4
+- optimized kernels
 
-```bash
-openclaw cron run <job-id>
+The blog reports that, at fixed interactivity thresholds:
+
+- video reasoning can sustain up to about 9.2x higher effective system capacity than alternative open omni models
+- multi-document reasoning can sustain up to about 7.4x higher effective system capacity than alternative open omni models
+
+The phrase **"fixed interactivity threshold"** is important.
+
+It means the comparison holds **per-user responsiveness constant** and measures how much total work the system can sustain.
+
+This is a better serving metric for agents than **raw maximum throughput** alone.
+
+Agent users care about:
+
+```text
+does my interaction stay responsive?
+how many simultaneous agents can the system support at that responsiveness?
 ```
 
-This force-runs by default and returns once the run is queued.
+---
 
-Successful responses include:
+## 9. Where this fits in an agent architecture
+
+Recommended architecture:
+
+```text
+raw multimodal input
+  -> multimodal perception sub-agent
+  -> structured context + citations/evidence
+  -> planner/reasoning agent
+  -> structured tools / Gateway RPC
+  -> execution policy and audit
+```
+
+**Do not collapse everything** into the multimodal model.
+
+**Keep roles separate**:
+
+| Role | Responsibility |
+|---|---|
+| Perception sub-agent | understand video/audio/image/document inputs |
+| Planner | decide task decomposition |
+| Tool executor | call typed tools under policy |
+| Verifier | check results and evidence |
+| Gateway/harness | enforce identity, sessions, approvals, logs |
+
+This is the same lesson repeated across this course:
+
+```text
+model capability does not replace harness discipline
+```
+
+---
+
+## 10. OpenClaw mapping
+
+In an OpenClaw-style system:
+
+```text
+OpenClaw Gateway
+  -> session and task state
+  -> tool policy and approvals
+  -> node/device inputs
+  -> multimodal perception agent
+  -> planner/executor agent
+  -> artifacts and evidence
+```
+
+Potential use cases:
+
+| Use case | Perception sub-agent output |
+|---|---|
+| video meeting analysis | timeline, speakers, slides, visual events, action items |
+| technical video QA | cited visual/audio evidence and frame ranges |
+| screen recording debug | UI sequence, error point, visible logs |
+| document intelligence | tables, OCR, charts, cross-document facts |
+| voice + screen assistant | unified state from spoken request and visible UI |
+| robotics/edge AI | scene/audio context for downstream planner |
+
+The planner should receive **structured context**, not raw unbounded video tokens.
+
+Example output shape:
 
 ```json
-{ "ok": true, "enqueued": true, "runId": "..." }
+{
+  "summary": "...",
+  "evidence": [
+    {
+      "modality": "video",
+      "time_range": "00:02:10-00:02:42",
+      "observation": "Chart shows revenue decline in Q3",
+      "confidence": 0.86
+    }
+  ],
+  "open_questions": ["..."],
+  "recommended_next_tool": "query_document_index"
+}
 ```
-
-Then inspect:
-
-```bash
-openclaw cron runs --id <job-id> --limit 50
-```
-
-Use:
-
-```bash
-openclaw cron run <job-id> --due
-```
-
-when you want "run only if currently due" behavior.
-
-Manual run support is important because scheduled work must be **debuggable on demand**.
 
 ---
 
-## 13. Runtime cleanup
+## 11. Relation to structured tools vs computer use
 
-Cron jobs can touch tools and runtimes.
+Lecture 09 argued:
 
-For isolated jobs, OpenClaw includes cleanup behavior such as:
+```text
+structured tools beat screenshots when an interface exists
+```
 
-- best-effort browser cleanup for the cron session
-- cleanup of bundled MCP runtime instances created for the job
-- suppression of stale acknowledgement-only replies
-- structured handling of execution denial metadata
+This lecture adds:
 
-This is an important design point.
+```text
+when raw multimodal perception is unavoidable,
+use a perception model to compress and ground context before planning
+```
 
-A scheduled run should not leave **hidden long-lived resources** behind.
+The hierarchy becomes:
 
-If a daily report opens browser tabs or starts MCP child processes, the scheduler should have a cleanup path. Otherwise, scheduled automation slowly becomes **system drift**.
+```text
+structured API/tool call
+  -> direct CLI/exec
+  -> DOM/accessibility
+  -> multimodal perception model
+  -> raw vision clicking loop
+```
+
+Nemotron 3 Nano Omni belongs in the **perception layer**.
+
+It should help the agent understand what is in multimodal inputs.
+
+It should not be the reason the agent clicks around blindly when a structured API exists.
 
 ---
 
-## 14. Debugging ladder
+## 12. What to benchmark before adopting
 
-Use a **boring command ladder** before guessing.
+Before choosing any multimodal model, **measure your actual workload**.
 
-```bash
-openclaw status
-openclaw gateway status
-openclaw cron status
-openclaw cron list
-openclaw cron show <job-id>
-openclaw cron runs --id <job-id> --limit 20
-openclaw system heartbeat last
-openclaw logs --follow
-openclaw doctor
-```
+Benchmark:
 
-Common cases:
-
-| Symptom | Likely area |
+| Metric | Why it matters |
 |---|---|
-| job never fires | `cron.enabled`, Gateway not running, timezone, bad schedule |
-| manual `--due` says not due | schedule is valid but not currently due |
-| job runs but no chat output | delivery mode, route resolution, silent token, channel auth |
-| local model job is skipped | provider preflight failed |
-| blocked command reports failure | tool policy or execution denial |
-| repeated failures slow down | recurring retry backoff is working |
+| input modality mix | image-only, video, audio, docs, screenshots |
+| context length | long documents and video timelines stress memory |
+| time-to-first-token | perceived interactivity |
+| tokens/sec/user | responsiveness |
+| aggregate throughput | number of concurrent agents |
+| cost per task | model and infrastructure economics |
+| grounding quality | whether answers cite the correct frame/page/clip |
+| hallucination rate | especially for video and chart reasoning |
+| tool handoff quality | whether structured planner context is clean |
+| deployment target | workstation, Jetson, data center, cloud |
 
-The key is to separate:
+Do not benchmark only accuracy.
 
-- schedule problem
-- execution problem
-- model problem
-- delivery problem
-- retention/logging problem
+For agent systems, benchmark:
 
----
-
-## 15. Validation belongs before job creation
-
-This is the clean layering rule:
-
-> invalid schedules should fail before durable job creation
-
-Why?
-
-Because once a job is persisted, the system has to answer harder questions:
-
-- should it appear in `cron list`?
-- should it be editable?
-- should it fail every Gateway startup?
-- should the runtime parser throw later?
-- should `jobs-state.json` track it?
-
-For `--cron`, validation should happen at the boundary where CLI/API input becomes a job definition.
-
-The same principle applies to:
-
-- bad timezones
-- invalid delivery targets
-- unsupported session targets
-- disallowed models
-- invalid tool restrictions
-
-This is a general production lesson:
-
-> configuration validation should be closest to the write boundary, not deferred to the runtime loop
-
-Runtime code can still defend itself, but it should not be the **first place** a user learns that their schedule string was invalid.
-
----
-
-## 16. Example: morning operations brief
-
-Command:
-
-```bash
-openclaw cron add \
-  --name "Morning Ops Brief" \
-  --cron "0 7 * * 1-5" \
-  --tz "America/Los_Angeles" \
-  --session isolated \
-  --message "Summarize overnight incidents, open deployment risks, and unresolved alerts. Keep it concise and include next actions." \
-  --agent ops \
-  --model "opus" \
-  --thinking high \
-  --announce \
-  --channel slack \
-  --to "channel:C1234567890"
+```text
+accuracy
+latency
+throughput
+cost
+evidence quality
+handoff quality
+failure mode
 ```
 
-What happens:
+---
 
-1. Gateway scheduler computes the next due time.
-2. At 07:00 on weekdays, it creates a cron run.
-3. The run uses the `ops` agent.
-4. The run starts in an isolated session.
-5. The model is resolved from the job's model selection.
-6. The agent receives the message.
-7. If the agent sends directly to the Slack target, fallback announce is skipped.
-8. If the agent does not send, the runner announces the final reply.
-9. The run is logged.
-10. Failures follow job/global/primary failure delivery rules.
+## 13. Hardware engineer view
 
-This is not just **"scheduled prompting."**
+For GPU and edge engineers, Nemotron 3 Nano Omni highlights several **workload trends**:
 
-It is scheduled agent work with **routing, isolation, delivery, retry, and auditability**.
+- hybrid MoE serving
+- active-parameter efficiency
+- low-precision inference with FP8/NVFP4
+- long-context multimodal serving
+- video token compression
+- multimodal batching
+- KV-cache pressure
+- MoE expert placement
+- disaggregated serving and routing
+
+Questions to ask:
+
+```text
+Where are the experts placed?
+How does routing behave under mixed modalities?
+How large is the KV cache for video/document workloads?
+Can the serving stack batch across modality mixes?
+How does quantization affect OCR and audio reasoning?
+What is the failure mode on smaller GPUs?
+```
+
+This is why multimodal agents are a hardware-relevant topic.
+
+They stress **memory, bandwidth, scheduling, and serving engines** differently from text-only chat.
 
 ---
 
-## 17. Design exercise
+## 14. Mini-lab: design a multimodal sub-agent
 
-Design three jobs for a persistent engineering assistant.
+Design a perception sub-agent for one workflow:
 
-| Job | Schedule | Session | Delivery | Failure policy |
-|---|---|---|---|---|
-| Morning brief | `0 7 * * 1-5` | `isolated` | Slack announce | failure to ops-alerts |
-| Weekly planning summary | `0 16 * * 5` | `session:weekly-planning` | webhook to dashboard | failure to Slack |
-| Local model health probe | `*/30 * * * *` | `isolated` | `none` | alert after 3 failures |
+1. video lecture summarization
+2. screen recording debug
+3. medical/industrial document review
+4. robotics scene/audio context
+5. meeting + slide analysis
 
-For each job, answer:
+Define:
 
-- Should this job remember previous runs?
-- Who should see the output?
-- What tools should it be allowed to use?
-- What happens if the model provider is down?
-- How long should run logs be retained?
-- Should a skipped run alert anyone?
+```text
+input modalities
+output schema
+evidence format
+planner handoff
+tool handoff
+latency target
+privacy boundary
+deployment target
+fallback model
+verification method
+```
 
-That is the **professional version** of "add a cron job."
+Then answer:
+
+```text
+What should this sub-agent decide?
+What must it never decide?
+What evidence should it preserve?
+When should it call structured tools instead of looking at pixels?
+```
 
 ---
 
 ## Key takeaways
 
-- Cron is a scheduling language, not just a text field.
-- OpenClaw cron runs inside the Gateway and persists job definitions, runtime state, and run history.
-- `--at`, `--every`, and `--cron` solve different scheduling problems.
-- Isolated sessions are the default shape for clean recurring agent work.
-- Delivery is a first-class part of cron because scheduled results should not disappear.
-- Failure destinations, retries, logs, and retention are reliability features, not extras.
-- Model selection for cron must be explicit and inspectable.
-- Schedule validation should happen before job creation.
+- Nemotron 3 Nano Omni is best understood as a multimodal perception/context sub-agent for larger agent systems.
+- The model is described as a 30B-A3B hybrid MoE that combines Mamba and transformer layers.
+- It unifies text, image, video, and audio inputs to reduce fragmented multimodal chains.
+- Efficient video sampling, 3D visual processing, modality encoders, FP8/NVFP4, and optimized serving engines are the system-level details that matter.
+- NVIDIA reports higher effective system capacity at fixed interactivity thresholds for video and multi-document workloads; validate claims on your own workload before adopting.
+- Keep perception, planning, execution, verification, and policy as separate harness roles.
+- For OpenClaw-style systems, multimodal models should produce structured context and evidence for the planner, not bypass structured tools or approvals.
 
 ---
 
 ## References
 
-- Case-study source repo: [OpenClaw](https://github.com/openclaw/openclaw)
-- OpenClaw docs:
-  - `docs/automation/cron-jobs.md`
-  - `docs/cli/cron.md`
-  - `docs/gateway/configuration-reference.md`
-  - `docs/reference/session-management-compaction.md`
+- NVIDIA Technical Blog, "NVIDIA Nemotron 3 Nano Omni Powers Multimodal Agent Reasoning in a Single Efficient Open Model": [https://developer.nvidia.com/blog/nvidia-nemotron-3-nano-omni-powers-multimodal-agent-reasoning-in-a-single-efficient-open-model/](https://developer.nvidia.com/blog/nvidia-nemotron-3-nano-omni-powers-multimodal-agent-reasoning-in-a-single-efficient-open-model/)
+- NVIDIA Nemotron 3 Nano Omni on Hugging Face: [https://huggingface.co/nvidia/Nemotron-3-Nano-Omni-30B-A3B](https://huggingface.co/nvidia/Nemotron-3-Nano-Omni-30B-A3B)
+- NVIDIA Nemotron model family: [https://huggingface.co/collections/nvidia/nemotron-3-68f03d30beec3d477b293a12](https://huggingface.co/collections/nvidia/nemotron-3-68f03d30beec3d477b293a12)
+- Lecture 28 - Runtime Strategy: [Lecture-28.md](Lecture-28.md)
+- Lecture 09 - Structured Tools Beat Computer Use: [Lecture-09.md](Lecture-09.md)
 
 ---
 
-*Next: [Lecture 21 - OpenClaw Case Study: System Prompt Architecture](Lecture-21.md)*
+*Next: [Lecture 21](Lecture-21.md)*

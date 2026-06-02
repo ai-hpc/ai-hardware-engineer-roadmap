@@ -1,405 +1,307 @@
-# Lecture 16 - OpenClaw Case Study: Channels, Routing, and Session Design
+# Lecture 16 — LangGraph: Stateful Workflows
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 15](Lecture-15.md) | **Next:** [Lecture 17](Lecture-17.md)
-
----
-
-## Why this lecture exists
-
-Once you move beyond a single chat window, agent design becomes a **routing problem**.
-
-You must decide:
-
-- which inbound message goes to which agent
-- which session should hold the context
-- when two messages should share state
-- when two users must be isolated
-- how replies return to the correct channel
-
-OpenClaw is a strong example because it makes these decisions explicit.
-
-This lecture uses OpenClaw to teach one of the most important practical lessons in agent systems:
-
-> session design is product design
-
-If session boundaries are wrong, the whole agent experience becomes **unsafe or confusing**.
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 15](Lecture-15.md) | **Next:** [Lecture 17](Lecture-17.md)
 
 ---
 
-## Learning objectives
+## Learning Objectives
 
-By the end of this lecture you will be able to:
-
-1. Explain the difference between channel, account, agent, and session.
-2. Understand why routing rules are a first-class part of agent design.
-3. Explain the session-key idea in simple terms.
-4. Decide when DMs should share context and when they must be isolated.
-5. Design a routing policy for a multi-surface agent product.
+- Understand why graph-based orchestration beats raw loops for complex agents
+- Build nodes, edges, and state schemas with LangGraph
+- Implement conditional branching and cycles
+- Add checkpointing and human-in-the-loop interrupts
 
 ---
 
-## 1. Four things students often mix up
+## 1. Why LangGraph?
 
-When reading a real agent system, students often mix up:
+Raw `while` loops work for simple ReAct agents, but break down when you need:
 
-- channel
-- account
-- agent
-- session
+- **Branching** — different paths based on tool results
+- **Parallel execution** — run multiple steps concurrently
+- **Checkpointing** — pause, resume, replay
+- **Human-in-the-loop** — wait for approval before continuing
+- **Cycles with exit conditions** — retry loops, reflection cycles
 
-OpenClaw is useful because it separates them clearly.
-
-### Channel
-
-A **channel** is the communication surface.
-
-Examples:
-
-- Telegram
-- WhatsApp
-- Slack
-- Discord
-- WebChat
-
-### Account
-
-An **account** is a specific identity on a channel.
-
-Examples:
-
-- one Telegram bot token
-- one WhatsApp number
-- one Slack app installation
-
-You can have multiple accounts on the same channel type.
-
-### Agent
-
-An **agent** is the isolated brain:
-
-- workspace
-- instructions
-- tools
-- sessions
-- auth profiles
-
-One gateway can host multiple agents.
-
-### Session
-
-A **session** is the context bucket for a conversation or workflow.
-
-It decides which messages **share memory** and transcript history.
-
-This distinction is essential.
-
-One user may contact the same agent through many channels, but whether those conversations share context is a **design choice**.
+LangGraph models agents as a **directed graph** where nodes are functions and edges are transitions.
 
 ---
 
-## 2. The routing problem
+## 2. Core Concepts
 
-An inbound message is not just "text for the model."
-
-It first raises a routing question:
-
-> Which agent and which session should own this message?
-
-That question depends on:
-
-- channel
-- sender
-- account
-- group or room
-- thread
-- configured bindings
-
-This is why OpenClaw uses **explicit bindings**.
-
-Instead of letting the model decide, the **host configuration** decides.
-
-That is the right design.
-
-The model should not choose:
-
-- which human it is serving
-- which workspace it is using
-- which account should answer
-
-Those are **control-plane decisions**.
-
----
-
-## 3. Session keys in simple language
-
-OpenClaw documents the idea of a **session key**.
-
-The easiest explanation is:
-
-> a session key is the label on the conversation bucket
-
-Messages with the same bucket label **share context**.
-
-Messages with different bucket labels **stay isolated**.
-
-Examples from the OpenClaw model:
-
-- one direct-message session
-- one session per group chat
-- one session per room
-- one session per thread
-
-This is extremely practical.
-
-It means the system can say:
-
-- all messages in this Slack thread belong together
-- this Telegram group must not mix with that Discord room
-- these DMs should share one private session
-- these two users must never share context
-
----
-
-## 4. DM isolation is not optional in multi-user systems
-
-OpenClaw's session docs are very clear here:
-
-If many people can message the bot, default shared-DM behavior can **leak context**.
-
-That is a big teaching point.
-
-A beginner might think:
-
-> one assistant should have one big memory
-
-But in a multi-user product, that is often wrong.
-
-Example of a bad design:
-
-```text
-Alice messages the assistant privately.
-Bob messages the same assistant privately.
-Both share one DM session.
-The assistant now carries Alice's context into Bob's chat.
+```
+State: TypedDict that flows between nodes
+Node:  function(state) → updated_state
+Edge:  connection from node A to node B (static or conditional)
 ```
 
-This is not just awkward. It can be a **privacy issue**.
+```python
+from langgraph.graph import StateGraph, END
+from typing import TypedDict, Annotated
+import operator
 
-That is why OpenClaw supports DM scope settings like:
+# 1. Define state
+class AgentState(TypedDict):
+    messages: list           # conversation history
+    task: str                # original task
+    plan: list[str]          # steps to execute
+    current_step: int        # which step we're on
+    results: list[str]       # accumulated results
+    error_count: int         # for retry logic
 
-- one shared main session
-- per-peer isolation
-- per-channel-peer isolation
+# 2. Define nodes (functions that transform state)
+def planner_node(state: AgentState) -> AgentState:
+    """Generate a plan from the task."""
+    import anthropic
+    client = anthropic.Anthropic()
 
-For a serious product, session scoping is a **security and UX feature**.
+    response = client.messages.create(
+        model="your-agent-model-id",
+        max_tokens=512,
+        messages=[{
+            "role": "user",
+            "content": f"Break this task into 3-5 steps (numbered list only):\n{state['task']}"
+        }]
+    )
+    lines = [l.strip() for l in response.content[0].text.split("\n") if l.strip()]
+    plan = [l.split(". ", 1)[-1] for l in lines if l[0].isdigit()]
 
----
+    return {**state, "plan": plan, "current_step": 0}
 
-## 5. Channel routing as a product decision
+def executor_node(state: AgentState) -> AgentState:
+    """Execute the current step of the plan."""
+    import anthropic
+    client = anthropic.Anthropic()
 
-OpenClaw's routing rules show that agent assignment can depend on:
+    step = state["plan"][state["current_step"]]
+    context = "\n".join(state["results"])
 
-- exact peer
-- account
-- channel
-- group
-- team
-- guild
-- role
+    response = client.messages.create(
+        model="your-agent-model-id",
+        max_tokens=512,
+        messages=[{
+            "role": "user",
+            "content": f"Execute this step:\n{step}\n\nContext:\n{context}"
+        }]
+    )
 
-That means routing is not merely **technical plumbing**.
+    result = response.content[0].text
+    new_results = state["results"] + [f"Step {state['current_step']+1}: {result}"]
 
-It is **product behavior**.
+    return {**state, "results": new_results, "current_step": state["current_step"] + 1}
 
-Example:
+def synthesizer_node(state: AgentState) -> AgentState:
+    """Synthesize all results into a final answer."""
+    import anthropic
+    client = anthropic.Anthropic()
 
-```text
-Telegram support bot -> support agent
-Slack engineering room -> engineering agent
-WhatsApp family group -> family assistant agent
-Discord moderator room -> moderation agent
+    all_results = "\n".join(state["results"])
+    response = client.messages.create(
+        model="your-agent-model-id",
+        max_tokens=1024,
+        messages=[{
+            "role": "user",
+            "content": f"Task: {state['task']}\n\nResults:\n{all_results}\n\nWrite the final answer."
+        }]
+    )
+
+    final = response.content[0].text
+    return {**state, "results": state["results"] + [f"FINAL: {final}"]}
+
+# 3. Define routing logic
+def should_continue(state: AgentState) -> str:
+    """Decide whether to execute more steps or synthesize."""
+    if state["current_step"] >= len(state["plan"]):
+        return "synthesize"
+    return "execute"
+
+# 4. Build the graph
+def build_agent_graph():
+    workflow = StateGraph(AgentState)
+
+    # Add nodes
+    workflow.add_node("planner", planner_node)
+    workflow.add_node("executor", executor_node)
+    workflow.add_node("synthesizer", synthesizer_node)
+
+    # Add edges
+    workflow.set_entry_point("planner")
+    workflow.add_edge("planner", "executor")
+
+    # Conditional edge: after executor, go back or synthesize
+    workflow.add_conditional_edges(
+        "executor",
+        should_continue,
+        {
+            "execute": "executor",   # loop back
+            "synthesize": "synthesizer"
+        }
+    )
+    workflow.add_edge("synthesizer", END)
+
+    return workflow.compile()
+
+# 5. Run it
+app = build_agent_graph()
+result = app.invoke({
+    "task": "Explain the memory hierarchy in NVIDIA H100 and its implications for kernel optimization",
+    "messages": [],
+    "plan": [],
+    "current_step": 0,
+    "results": [],
+    "error_count": 0
+})
+print(result["results"][-1])  # FINAL answer
 ```
 
-These are different products running inside one gateway.
-
-So routing design is how you turn one runtime into many useful behaviors.
-
 ---
 
-## 6. Example: the same agent across multiple surfaces
+## 3. Checkpointing (Pause & Resume)
 
-Suppose you want one personal assistant to exist in:
+```python
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 
-- Telegram DM
-- WebChat
-- mobile node voice input
+# In-memory checkpointing (for testing)
+memory_checkpointer = MemorySaver()
 
-You now have a design choice:
+# Persistent SQLite checkpointing (for production)
+sqlite_checkpointer = SqliteSaver.from_conn_string("checkpoints.db")
 
-### Option A - one shared session
+# Compile with checkpointer
+app = workflow.compile(checkpointer=sqlite_checkpointer)
 
-Pros:
+# Each run needs a thread_id to track its checkpoint
+config = {"configurable": {"thread_id": "task-001"}}
 
-- continuity across surfaces
-- the agent remembers context everywhere
+# First run
+result = app.invoke(initial_state, config=config)
 
-Cons:
+# Resume from checkpoint (after a crash or restart)
+result = app.invoke(None, config=config)  # None = resume from last checkpoint
 
-- context can become messy
-- one accidental message on one surface affects the others
-
-### Option B - isolated sessions per surface
-
-Pros:
-
-- cleaner history
-- easier debugging
-- less accidental cross-surface contamination
-
-Cons:
-
-- weaker continuity
-
-This is why session design is a **product tradeoff**, not a default you should ignore.
-
----
-
-## 7. Example config pattern
-
-Here is a simplified OpenClaw-style pattern:
-
-```json5
-{
-  agents: {
-    list: [
-      { id: "support", workspace: "~/.openclaw/workspace-support" },
-      { id: "personal", workspace: "~/.openclaw/workspace-personal" }
-    ]
-  },
-  bindings: [
-    { match: { channel: "slack", teamId: "T123" }, agentId: "support" },
-    { match: { channel: "telegram", peer: { kind: "direct", id: "user_42" } }, agentId: "personal" }
-  ],
-  session: {
-    dmScope: "per-channel-peer"
-  }
-}
+# View checkpoint state
+state = app.get_state(config)
+print(state.values)  # Current state
+print(state.next)    # Next node to execute
 ```
 
-You do not need to memorize the exact config.
+---
 
-The lesson is:
+## 4. Human-in-the-Loop
 
-- agents are explicit
-- bindings are explicit
-- session policy is explicit
+Interrupt the graph before **sensitive operations** and wait for **human approval**.
 
-That is good architecture.
+```python
+from langgraph.graph import StateGraph, END, START
+
+class ReviewState(TypedDict):
+    code: str
+    review_comments: str
+    approved: bool
+    final_code: str
+
+def generate_code_node(state: ReviewState) -> ReviewState:
+    """Generate code based on a task."""
+    response = client.messages.create(
+        model="your-agent-model-id",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": "Write a CUDA kernel for matrix multiplication."}]
+    )
+    return {**state, "code": response.content[0].text}
+
+def human_review_node(state: ReviewState) -> ReviewState:
+    """This node will be interrupted — human reviews here."""
+    # In a real app, this would send a notification and wait
+    # The graph pauses here until .update_state() is called
+    print("\n--- Code ready for review ---")
+    print(state["code"][:500])
+    return state  # State unchanged — human will update it
+
+def apply_review_node(state: ReviewState) -> ReviewState:
+    if not state["approved"]:
+        # Regenerate with feedback
+        response = client.messages.create(
+            model="your-agent-model-id",
+            max_tokens=1024,
+            messages=[{
+                "role": "user",
+                "content": f"Fix this code based on review:\n{state['code']}\nFeedback: {state['review_comments']}"
+            }]
+        )
+        return {**state, "final_code": response.content[0].text}
+    return {**state, "final_code": state["code"]}
+
+# Build with interrupt
+workflow = StateGraph(ReviewState)
+workflow.add_node("generate", generate_code_node)
+workflow.add_node("review", human_review_node)
+workflow.add_node("apply", apply_review_node)
+
+workflow.set_entry_point("generate")
+workflow.add_edge("generate", "review")
+workflow.add_edge("review", "apply")
+workflow.add_edge("apply", END)
+
+checkpointer = MemorySaver()
+app = workflow.compile(
+    checkpointer=checkpointer,
+    interrupt_before=["review"]  # Pause before human_review_node
+)
+
+config = {"configurable": {"thread_id": "review-001"}}
+
+# Run until interrupt
+app.invoke({"code": "", "review_comments": "", "approved": False, "final_code": ""}, config=config)
+print("Graph paused at review node.")
+
+# Human reviews and updates state
+app.update_state(config, {"approved": True, "review_comments": "Looks good"})
+
+# Resume
+final = app.invoke(None, config=config)
+print("Final code:", final["final_code"][:200])
+```
 
 ---
 
-## 8. Groups, threads, and rooms
+## 5. Parallel Execution (Fan-Out / Fan-In)
 
-A serious agent product must understand that:
+```python
+# Fan-out: run multiple nodes in parallel
+workflow.add_node("research_gpu", research_gpu_node)
+workflow.add_node("research_cpu", research_cpu_node)
+workflow.add_node("research_memory", research_memory_node)
+workflow.add_node("synthesize", synthesize_node)
 
-- a direct message is not the same as a group
-- a group is not the same as a thread
-- a room is not the same as a one-to-one chat
+workflow.add_edge("start", "research_gpu")
+workflow.add_edge("start", "research_cpu")
+workflow.add_edge("start", "research_memory")
 
-OpenClaw models this by keeping many of these session types isolated.
-
-That is the right default for collaborative systems.
-
-Why?
-
-Because threads often represent **separate sub-conversations**.
-
-If they all collapse into one bucket, the agent becomes **noisy and unreliable**.
-
-This is the same lesson you should apply when building:
-
-- support agents
-- research agents
-- team copilots
-- personal assistants
+# Fan-in: all parallel nodes must complete before synthesize
+workflow.add_edge("research_gpu", "synthesize")
+workflow.add_edge("research_cpu", "synthesize")
+workflow.add_edge("research_memory", "synthesize")
+```
 
 ---
 
-## 9. Reply routing should be deterministic
+## Key Takeaways
 
-OpenClaw's channel-routing docs make an important point:
-
-> the model does not choose the channel
-
-That choice belongs to the **host system**.
-
-This is a good professional rule.
-
-The model should help decide:
-
-- what to say
-- which tool to use
-- how to summarize
-
-The control plane should decide:
-
-- where to reply
-- which account to use
-- which session to mutate
-- which agent is in scope
-
-This reduces a whole class of failure where the model **invents the wrong operational path**.
+1. LangGraph is a graph where nodes = functions, edges = transitions
+2. State is a `TypedDict` that flows through every node — always return `{**state, ...updated_fields}`
+3. Conditional edges enable branching and loops — the backbone of ReAct in LangGraph
+4. Checkpointing enables pause/resume across process restarts — use SQLite for production
+5. `interrupt_before` pauses the graph for human review — resume with `.invoke(None, config)`
 
 ---
 
-## 10. Design exercise
+## Exercises
 
-Design routing for this product:
-
-> One family assistant and one engineering assistant run on the same host.
-
-Requirements:
-
-- Telegram DMs from family members go to the family assistant.
-- Slack messages in the engineering workspace go to the engineering assistant.
-- WebChat should talk only to the engineering assistant.
-- DMs must not share context across users.
-
-Fill this table:
-
-| Decision area | Your answer |
-|---|---|
-| Agents | `family`, `engineering` |
-| Channels | Telegram, Slack, WebChat |
-| DM scope | `per-channel-peer` |
-| Support binding | Slack workspace -> `engineering` |
-| Family binding | Telegram direct peers -> `family` |
-| Web binding | WebChat -> `engineering` |
-
-This is a better system design exercise than "write a prompt for a helpful assistant."
+1. Build a code-review graph: generate → lint → test → human review (if tests fail) → revise
+2. Add error recovery: if `executor_node` fails 3 times (`error_count >= 3`), route to a fallback node
+3. Implement a parallel research graph that fetches info from 3 different sources, then synthesizes
 
 ---
 
-## Key takeaways
-
-- Channel, account, agent, and session are different concepts and should stay separate in your mind.
-- Session design decides who shares context with whom.
-- Routing is a product feature, not just backend plumbing.
-- DMs should usually be isolated in multi-user systems.
-- Reply routing should be deterministic and host-controlled, not model-chosen.
-- OpenClaw is a strong example of how real agent products treat routing and session state as first-class concerns.
-
----
-
-## References
-
-- Case-study source repo: [OpenClaw](https://github.com/openclaw/openclaw)
-- OpenClaw concepts:
-  - `docs/channels/channel-routing.md`
-  - `docs/concepts/session.md`
-  - `docs/concepts/multi-agent.md`
-  - `docs/channels/pairing.md`
-
----
-
-*Next: [Lecture 17 - OpenClaw Case Study: Multi-Agent Isolation, Workspaces, and Memory](Lecture-17.md)*
+**Previous:** [Lecture 15](Lecture-15.md) | **Next:** [Lecture 17](Lecture-17.md)

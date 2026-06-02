@@ -12,9 +12,9 @@ The point is not to use a framework — it's to *build the harness yourself*, so
 
 > **What "genie-claw" is.** A capstone you build — not an existing repo. The name nods to the two reference systems: a **genie**-style local LLM runtime (you can target the GeniePod [`genie-ai-runtime`](https://github.com/GeniePod/genie-ai-runtime), llama.cpp, vLLM, Ollama, or any OpenAI-compatible endpoint) wrapped in an OpenClaw-style **gateway** harness.
 
-**Prerequisites:** the whole course, especially [L24 harness](Lecture-24.md), [L24b sessions](Lecture-24b.md), [L25/L26 building agents](Lecture-25.md), [L03/L33 tools](Lecture-03.md), [L05 memory](Lecture-05.md), [L13 runtime discipline](Lecture-13.md), and the OpenClaw case study (L15–L23).
+**Prerequisites:** the whole course, especially [L02 harness](Lecture-02.md), [L26 sessions](Lecture-26.md), [L03/L04 building agents](Lecture-03.md), [L08/L09 tools](Lecture-08.md), [L10 memory](Lecture-10.md), [L24 runtime discipline](Lecture-24.md), and the OpenClaw case study (L31–L39).
 
-**You may use any language.** Examples are Python-flavored pseudocode; a Node/Bun/Rust implementation is equally valid (see [L31 runtime strategy](Lecture-31.md)).
+**You may use any language.** Examples are Python-flavored pseudocode; a Node/Bun/Rust implementation is equally valid (see [L28 runtime strategy](Lecture-28.md)).
 
 ---
 
@@ -29,7 +29,7 @@ The point is not to use a framework — it's to *build the harness yourself*, so
             └──────────────── durable session log ───────────────┘
 ```
 
-Build it in **six stages**, each with an acceptance test. Don't start a stage until the previous one passes — this is the deterministic-startup discipline from [L14](Lecture-14.md) applied to your own build.
+Build it in **six stages**, each with an acceptance test. Don't start a stage until the previous one passes — this is the deterministic-startup discipline from [L27](Lecture-27.md) applied to your own build.
 
 ---
 
@@ -39,7 +39,7 @@ Wire up a thin client to a **local** OpenAI-compatible chat endpoint. No agent l
 
 * Point it at your runtime (`genie-ai-runtime`, `vllm serve`, `llama.cpp --server`, or `ollama`).
 * One function: `complete(messages, tools=None) -> {content, tool_calls}`.
-* Pin the model id, temperature, and max tokens in config (currency discipline, [L00](Lecture-00.md)).
+* Pin the model id, temperature, and max tokens in config (currency discipline, [L01](Lecture-01.md)).
 
 **✅ Acceptance:** `complete([{role:"user", content:"ping"}])` returns text from your *local* model. No cloud calls.
 
@@ -47,7 +47,7 @@ Wire up a thin client to a **local** OpenAI-compatible chat endpoint. No agent l
 
 ## Stage 2 — The run loop (this is what makes it an agent)
 
-Turn a single completion into a **loop** that runs until an exit condition — the core idea from [L26 §2](Lecture-26.md).
+Turn a single completion into a **loop** that runs until an exit condition — the core idea from [L04 §2](Lecture-04.md).
 
 ```python
 def run(agent, user_msg, max_turns=8):
@@ -71,12 +71,12 @@ Implement all four exit conditions from the lecture: **final answer (no tool cal
 
 ## Stage 3 — Tools (data + action)
 
-Give the agent a tool registry with **standardized definitions** ([L03](Lecture-03.md), [L25 §5](Lecture-25.md)). Start with one **data** tool and one **action** tool:
+Give the agent a tool registry with **standardized definitions** ([L08](Lecture-08.md), [L03 §5](Lecture-03.md)). Start with one **data** tool and one **action** tool:
 
 * `read_file(path)` — data (read-only).
 * `write_note(text)` — action (writes to a local file).
 
-Each tool needs a name, JSON-schema parameters, and a description good enough that the model selects it correctly. Prefer **structured tools over computer-use** ([L33](Lecture-33.md)).
+Each tool needs a name, JSON-schema parameters, and a description good enough that the model selects it correctly. Prefer **structured tools over computer-use** ([L09](Lecture-09.md)).
 
 **✅ Acceptance:** the model, unprompted on *which* tool, correctly calls `read_file` to answer a question about a file and `write_note` to save a result — and a malformed tool call is caught and returned to the model as an error, not crashed.
 
@@ -84,7 +84,7 @@ Each tool needs a name, JSON-schema parameters, and a description good enough th
 
 ## Stage 4 — Durable sessions (survive a crash)
 
-Make the session the **source of truth**, not the in-memory message list ([L24b](Lecture-24b.md), [L16 sessions](Lecture-16.md)).
+Make the session the **source of truth**, not the in-memory message list ([L26](Lecture-26.md), [L32 sessions](Lecture-32.md)).
 
 * Append every event (user msg, model msg, tool call, tool result) to a **session log** (JSONL on disk is fine).
 * On startup, `session.load(id)` **replays** the log to rebuild state.
@@ -96,7 +96,7 @@ Make the session the **source of truth**, not the in-memory message list ([L24b]
 
 ## Stage 5 — Guardrails (layered defense)
 
-Add guardrails that run **before** the agent acts ([L26 §5](Lecture-26.md), [L13](Lecture-13.md), [L27](Lecture-27.md)). Minimum set:
+Add guardrails that run **before** the agent acts ([L04 §5](Lecture-04.md), [L24](Lecture-24.md), [L25](Lecture-25.md)). Minimum set:
 
 * **Rules-based:** input length limit + a blocklist/regex.
 * **Safety/relevance:** an LLM (or small classifier) tripwire that flags prompt-injection / off-topic input and **short-circuits** the run.
@@ -108,10 +108,10 @@ Add guardrails that run **before** the agent acts ([L26 §5](Lecture-26.md), [L1
 
 ## Stage 6 — Human-in-the-loop + telemetry
 
-Close the loop with the two production essentials ([L26 §6](Lecture-26.md), [L11 observability](Lecture-11.md)):
+Close the loop with the two production essentials ([L04 §6](Lecture-04.md), [L23 observability](Lecture-23.md)):
 
 * **Human intervention:** on exceeding a failure threshold (e.g., 3 failed turns) or on a **high-risk action**, pause and ask the user to approve/deny.
-* **Telemetry:** log per-run metrics — turns, tokens, tool calls, latency, $/task (even at local-runtime $0, log tokens) — so you can *measure* the four axes from [L00](Lecture-00.md).
+* **Telemetry:** log per-run metrics — turns, tokens, tool calls, latency, $/task (even at local-runtime $0, log tokens) — so you can *measure* the four axes from [L01](Lecture-01.md).
 
 **✅ Acceptance:** a high-risk action triggers an approval prompt; the run trace shows turns, tools, and latency for one completed task.
 
@@ -126,7 +126,7 @@ A short report + the running harness demonstrating:
 3. A guardrail blocking a destructive injection.
 4. A telemetry trace with reliability / latency / cost / safety observations.
 
-**Stretch goals:** add a second **channel** (CLI + a simple web/WhatsApp-style adapter, à la OpenClaw L15–L18); add a **second agent** and a handoff ([L26 §4](Lecture-26.md)); swap the local runtime for a different backend and compare latency ([L31](Lecture-31.md)).
+**Stretch goals:** add a second **channel** (CLI + a simple web/WhatsApp-style adapter, à la OpenClaw L31–L34); add a **second agent** and a handoff ([L04 §4](Lecture-04.md)); swap the local runtime for a different backend and compare latency ([L28](Lecture-28.md)).
 
 > You have now built, from scratch, the thing every agent framework is: a model client wrapped in a run loop, with tools, durable sessions, and guardrails. That is the whole course in one artifact.
 
@@ -134,9 +134,9 @@ A short report + the running harness demonstrating:
 
 ## What to study alongside
 
-- Harness responsibilities: [Lecture 24](Lecture-24.md) · sessions: [Lecture 24b](Lecture-24b.md)
-- Foundations & orchestration & guardrails: [Lecture 25](Lecture-25.md) · [Lecture 26](Lecture-26.md)
-- A real harness to copy patterns from: OpenClaw case study, [Lecture 15](Lecture-15.md)–[Lecture 23](Lecture-23.md), and [Pi, the minimal agent](Lecture-28.md)
+- Harness responsibilities: [Lecture 02](Lecture-02.md) · sessions: [Lecture 26](Lecture-26.md)
+- Foundations & orchestration & guardrails: [Lecture 03](Lecture-03.md) · [Lecture 04](Lecture-04.md)
+- A real harness to copy patterns from: OpenClaw case study, [Lecture 31](Lecture-31.md)–[Lecture 39](Lecture-39.md), and [Pi, the minimal agent](Lecture-41.md)
 - Local runtime: GeniePod [`genie-ai-runtime`](https://github.com/GeniePod/genie-ai-runtime)
 
 ---

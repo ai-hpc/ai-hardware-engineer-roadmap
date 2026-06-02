@@ -17,7 +17,7 @@ The durable concepts in this course are:
 - **Product control plane:** gateways, channels, sessions, routing, identities, and audit logs.
 - **Runtime security:** least privilege, policy gates, telemetry, incident response, and evidence.
 
-Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-45 focus on production discipline, OpenClaw-style gateway systems, local agent workspaces, trustworthy agent interfaces, agent skills, the agentic software-development lifecycle, runtime strategy, model-under-the-hood mechanics, structured tool interfaces, multimodal perception sub-agents, GPU-kernel translation workflows, long-context serving optimization, trace-driven AI performance analysis, compiler-generated sequence parallelism, skill evaluation, small-model reasoning systems, AI-agent threat modeling, productized agent harness infrastructure, AI-assisted GPU kernel optimization, efficient local RAG systems, and vector-store/embedding model selection.
+The lectures are numbered 01–47 in the recommended reading order. They group into six modules — *start here* (the modern agent, the harness, and how to build one), *fundamentals*, *core building blocks*, *production & runtime*, the *OpenClaw* example, and the *genie-claw* practice capstone — plus an advanced MLSys-adjacent appendix. See the **[course Guide](../Guide.md)** for the full module breakdown.
 
 ## Lecture Index
 
@@ -25,53 +25,53 @@ Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, a
 
 | # | Title | Topics |
 |---|-------|--------|
-| [Lecture 00](Lecture-00.md) | The Modern AI Agent in 2026: What Changed | Agent definition, 2023→2026 shifts, harness AI, reference systems, course map |
-| [Lecture 01](Lecture-01.md) | LLM Fundamentals for Agents | Transformers, tokenization, inference mechanics, context windows |
-| [Lecture 02](Lecture-02.md) | Prompt Engineering & Structured Output | System prompts, few-shot, JSON mode, function calling |
-| [Lecture 03](Lecture-03.md) | Tool Use & Function Calling | Tool schemas, parallel calls, error handling, safety |
-| [Lecture 04](Lecture-04.md) | Agent Architecture Patterns | ReAct, CoT, Reflexion, plan-and-execute |
-| [Lecture 05](Lecture-05.md) | Memory Systems | Short-term, long-term, episodic, semantic memory |
-| [Lecture 06](Lecture-06.md) | LangGraph — Stateful Workflows | Nodes, edges, state, checkpointing, human-in-the-loop |
-| [Lecture 07](Lecture-07.md) | Agent SDKs and Runtime APIs | SDKs, provider adapters, MCP, handoffs, streaming, runtime policy |
-| [Lecture 08](Lecture-08.md) | Multi-Agent Systems | CrewAI, AutoGen, supervisor patterns, coordination |
-| [Lecture 09](Lecture-09.md) | RAG — Ingestion & Embeddings | Chunking, embedding models, vector stores, indexing |
-| [Lecture 10](Lecture-10.md) | RAG — Retrieval & Reranking | Hybrid search, MMR, cross-encoder reranking, evaluation |
-| [Lecture 11](Lecture-11.md) | Evaluation & Observability | LLM-as-judge, RAGAS, tracing, cost tracking |
-| [Lecture 12](Lecture-12.md) | Production Deployment | Streaming, caching, model routing, safety, scaling |
-| [Lecture 13](Lecture-13.md) | Runtime Discipline & AI Runtime Security | Runtime controls, tool policy, telemetry, auditability, agent risk |
-| [Lecture 14](Lecture-14.md) | Deterministic Startup for AI Agent Systems | Startup contracts, readiness gates, tool registries, prompt versions, memory hydration |
-| [Lecture 15](Lecture-15.md) | OpenClaw Case Study - Gateway Architecture | Control plane, channels, clients, nodes, agent loop |
-| [Lecture 16](Lecture-16.md) | OpenClaw Case Study - Routing and Sessions | Channel routing, session keys, DM isolation, reply determinism |
-| [Lecture 17](Lecture-17.md) | OpenClaw Case Study - Multi-Agent Isolation | Workspaces, state, sessions, memory boundaries |
-| [Lecture 18](Lecture-18.md) | OpenClaw Case Study - Operations and Security | Pairing, supervision, sandbox, tool policy, remote access |
-| [Lecture 19](Lecture-19.md) | OpenClaw Case Study - The Agent Loop | Intake, queues, locks, streaming, tools, hooks, persistence |
-| [Lecture 20](Lecture-20.md) | OpenClaw Case Study - Cron and Scheduled Agent Runs | Cron expressions, isolated jobs, delivery, retries, logs, validation |
-| [Lecture 21](Lecture-21.md) | OpenClaw Case Study - System Prompt Architecture | Prompt ownership, bootstrap context, skills, prompt modes, provider overlays |
-| [Lecture 22](Lecture-22.md) | OpenClaw Case Study - App SDK Dogfooding and Typed Gateway RPCs | App SDK, happy path, event normalization, future RPC surfaces |
-| [Lecture 23](Lecture-23.md) | OpenClaw Case Study - Gateway RPC Protocol | WebSocket frames, handshake, roles, scopes, pairing, features, node transport |
-| [Lecture 24](Lecture-24.md) | What Is an AI Agent Harness? The Runtime Around the Model | Harness vs model, six core responsibilities, Claude Code / Cursor / Codex compared, hardware impact |
-| [Lecture 24b](Lecture-24b.md) | Session as Source of Truth: Event-Sourced Agent State | Session vs context window, event schema, `wake(sessionId)`, streaming-crash recovery, tool idempotency |
-| [Lecture 25](Lecture-25.md) | Building Agents I: Foundations (Model, Tools, Instructions) | What an agent is, when to build one, and the three components — model, tools, instructions |
-| [Lecture 26](Lecture-26.md) | Building Agents II: Orchestration & Guardrails | Single vs multi-agent, manager & decentralized patterns, guardrail types, human-in-the-loop |
-| [Lecture 27](Lecture-27.md) | AI Agent Security Engineer - A Practitioner's Roadmap | 8-phase curriculum, prompt-injection trust boundaries, sandboxing tiers, red-team practice, audit log discipline, hardware-rooted trust |
-| [Lecture 28](Lecture-28.md) | Pi - A Minimal Coding Agent and the Substrate Beneath OpenClaw | Tiny core (4 tools), no-MCP rationale, custom messages in session log, hot reload, tree-structured sessions, TUI vs LLM-tool surfaces |
-| [Lecture 29](Lecture-29.md) | Agent Skills - Workflow Discipline for Reliable Coding Agents | Skill workflows, anti-rationalization, verification evidence, progressive disclosure, scope discipline |
-| [Lecture 30](Lecture-30.md) | Agentic SDLC - Explore Fast, Ship Safely | Cheap code, implementation as exploration, tests as contracts, evolving specs, dual-mode agents |
-| [Lecture 31](Lecture-31.md) | Runtime Strategy for Agent Systems - Node, Bun, Rust, and Edge Packaging | Bun Zig-to-Rust signal, Node baseline, Rust offload, runtime measurements, edge packaging |
-| [Lecture 32](Lecture-32.md) | LLM From Scratch - Model Mechanics for Agent and GPU Engineers | Tokenizers, transformer blocks, training loop, inference, prefill/decode, GPU kernel intuition |
-| [Lecture 33](Lecture-33.md) | Structured Tools Beat Computer Use - Interface Hierarchy for Agents | Reflex benchmark, structured API vs vision, tool schemas, verification, security, OpenClaw tool design |
-| [Lecture 34](Lecture-34.md) | Nemotron 3 Nano Omni - Multimodal Perception Sub-Agents | Unified video/audio/image/text reasoning, hybrid MoE, EVS, throughput, OpenClaw sub-agent architecture |
-| [Lecture 35](Lecture-35.md) | Agent Skills for GPU Kernel Translation - cuTile Python to cuTile.jl | cuTile semantics, Julia layout/indexing traps, TileGym skill structure, validators, GPU tests |
-| [Lecture 36](Lecture-36.md) | FP8 KV-Cache in vLLM - Long-Context Serving for Agents | KV-cache memory, FP8 attention, ITL/TTFT, sliding-window skips, calibration, deployment decisions |
-| [Lecture 37](Lecture-37.md) | TraceLens - Trace-Driven AI Performance Analysis | Trace2Tree, hierarchical bottleneck reports, roofline metrics, collective skew, trace diff, event replay |
-| [Lecture 38](Lecture-38.md) | AutoSP - Compiler-Generated Sequence Parallelism for Long-Context Training | DeepCompile, DeepSpeed-Ulysses, sequence-aware activation checkpointing, ZeRO composition, graph-break limits |
-| [Lecture 39](Lecture-39.md) | Agent Skills Eval - Benchmarking SKILL.md Files | with-skill vs baseline evals, LLM judge assertions, artifacts, CI gates, OpenClaw skill regression testing |
-| [Lecture 40](Lecture-40.md) | ZAYA1-8B - Small MoE Reasoning, AMD Training, and Test-Time Compute | 760M active parameters, AMD MI300X training, Markovian RSA, math/coding specialization, weak agentic scores |
-| [Lecture 41](Lecture-41.md) | OpenClaw Threat Model - MITRE ATLAS for Agent Security | threat matrix, attack chains, trust boundaries, prompt injection, skill supply chain, tool execution controls |
-| [Lecture 42](Lecture-42.md) | OpenAI Agents SDK - Native Sandbox and Durable Agent Harness | sandbox agents, manifests, shell/apply_patch, MCP, skills, AGENTS.md, state recovery, harness/compute separation |
-| [Lecture 43](Lecture-43.md) | MLSys 2026 Kernel Contest - AI-Assisted Blackwell LLM Kernel Optimization | FlashInfer-Bench, B200, FP8 MoE, sparse attention, Gated Delta Net, CUDA/Triton/CuTe, agent-generated kernels |
-| [Lecture 44](Lecture-44.md) | Efficient Local RAG Stack - Qwen3.5-4B INT4 and Granite Embeddings | Jetson RAG, Granite 97M, Qdrant, chunking, reranking, INT4, llama.cpp, vLLM, TensorRT-LLM, KV cache |
-| [Lecture 45](Lecture-45.md) | Qdrant, pgvector, and Embedding Model Selection | vector stores, HNSW, IVFFlat, dense/sparse/hybrid retrieval, Granite alternatives, embedding evals, migration |
+| [Lecture 01](Lecture-01.md) | The Modern AI Agent in 2026: What Changed | Agent definition, 2023→2026 shifts, harness AI, reference systems, course map |
+| [Lecture 02](Lecture-02.md) | What Is an AI Agent Harness? The Runtime Around the Model | Harness vs model, six core responsibilities, Claude Code / Cursor / Codex compared, hardware impact |
+| [Lecture 03](Lecture-03.md) | Building Agents I: Foundations (Model, Tools, Instructions) | What an agent is, when to build one, and the three components — model, tools, instructions |
+| [Lecture 04](Lecture-04.md) | Building Agents II: Orchestration & Guardrails | Single vs multi-agent, manager & decentralized patterns, guardrail types, human-in-the-loop |
+| [Lecture 05](Lecture-05.md) | LLM Fundamentals for Agents | Transformers, tokenization, inference mechanics, context windows |
+| [Lecture 06](Lecture-06.md) | LLM From Scratch - Model Mechanics for Agent and GPU Engineers | Tokenizers, transformer blocks, training loop, inference, prefill/decode, GPU kernel intuition |
+| [Lecture 07](Lecture-07.md) | Prompt Engineering & Structured Output | System prompts, few-shot, JSON mode, function calling |
+| [Lecture 08](Lecture-08.md) | Tool Use & Function Calling | Tool schemas, parallel calls, error handling, safety |
+| [Lecture 09](Lecture-09.md) | Structured Tools Beat Computer Use - Interface Hierarchy for Agents | Reflex benchmark, structured API vs vision, tool schemas, verification, security, OpenClaw tool design |
+| [Lecture 10](Lecture-10.md) | Memory Systems | Short-term, long-term, episodic, semantic memory |
+| [Lecture 11](Lecture-11.md) | RAG — Ingestion & Embeddings | Chunking, embedding models, vector stores, indexing |
+| [Lecture 12](Lecture-12.md) | RAG — Retrieval & Reranking | Hybrid search, MMR, cross-encoder reranking, evaluation |
+| [Lecture 13](Lecture-13.md) | Qdrant, pgvector, and Embedding Model Selection | vector stores, HNSW, IVFFlat, dense/sparse/hybrid retrieval, Granite alternatives, embedding evals, migration |
+| [Lecture 14](Lecture-14.md) | Efficient Local RAG Stack - Qwen3.5-4B INT4 and Granite Embeddings | Jetson RAG, Granite 97M, Qdrant, chunking, reranking, INT4, llama.cpp, vLLM, TensorRT-LLM, KV cache |
+| [Lecture 15](Lecture-15.md) | Agent Architecture Patterns | ReAct, CoT, Reflexion, plan-and-execute |
+| [Lecture 16](Lecture-16.md) | LangGraph — Stateful Workflows | Nodes, edges, state, checkpointing, human-in-the-loop |
+| [Lecture 17](Lecture-17.md) | Agent SDKs and Runtime APIs | SDKs, provider adapters, MCP, handoffs, streaming, runtime policy |
+| [Lecture 18](Lecture-18.md) | OpenAI Agents SDK - Native Sandbox and Durable Agent Harness | sandbox agents, manifests, shell/apply_patch, MCP, skills, AGENTS.md, state recovery, harness/compute separation |
+| [Lecture 19](Lecture-19.md) | Multi-Agent Systems | CrewAI, AutoGen, supervisor patterns, coordination |
+| [Lecture 20](Lecture-20.md) | Nemotron 3 Nano Omni - Multimodal Perception Sub-Agents | Unified video/audio/image/text reasoning, hybrid MoE, EVS, throughput, OpenClaw sub-agent architecture |
+| [Lecture 21](Lecture-21.md) | Agent Skills - Workflow Discipline for Reliable Coding Agents | Skill workflows, anti-rationalization, verification evidence, progressive disclosure, scope discipline |
+| [Lecture 22](Lecture-22.md) | Agent Skills Eval - Benchmarking SKILL.md Files | with-skill vs baseline evals, LLM judge assertions, artifacts, CI gates, OpenClaw skill regression testing |
+| [Lecture 23](Lecture-23.md) | Evaluation & Observability | LLM-as-judge, RAGAS, tracing, cost tracking |
+| [Lecture 24](Lecture-24.md) | Runtime Discipline & AI Runtime Security | Runtime controls, tool policy, telemetry, auditability, agent risk |
+| [Lecture 25](Lecture-25.md) | AI Agent Security Engineer - A Practitioner's Roadmap | 8-phase curriculum, prompt-injection trust boundaries, sandboxing tiers, red-team practice, audit log discipline, hardware-rooted trust |
+| [Lecture 26](Lecture-26.md) | Session as Source of Truth: Event-Sourced Agent State | Session vs context window, event schema, `wake(sessionId)`, streaming-crash recovery, tool idempotency |
+| [Lecture 27](Lecture-27.md) | Deterministic Startup for AI Agent Systems | Startup contracts, readiness gates, tool registries, prompt versions, memory hydration |
+| [Lecture 28](Lecture-28.md) | Runtime Strategy for Agent Systems - Node, Bun, Rust, and Edge Packaging | Bun Zig-to-Rust signal, Node baseline, Rust offload, runtime measurements, edge packaging |
+| [Lecture 29](Lecture-29.md) | Agentic SDLC - Explore Fast, Ship Safely | Cheap code, implementation as exploration, tests as contracts, evolving specs, dual-mode agents |
+| [Lecture 30](Lecture-30.md) | Production Deployment | Streaming, caching, model routing, safety, scaling |
+| [Lecture 31](Lecture-31.md) | OpenClaw Case Study - Gateway Architecture | Control plane, channels, clients, nodes, agent loop |
+| [Lecture 32](Lecture-32.md) | OpenClaw Case Study - Routing and Sessions | Channel routing, session keys, DM isolation, reply determinism |
+| [Lecture 33](Lecture-33.md) | OpenClaw Case Study - Multi-Agent Isolation | Workspaces, state, sessions, memory boundaries |
+| [Lecture 34](Lecture-34.md) | OpenClaw Case Study - Operations and Security | Pairing, supervision, sandbox, tool policy, remote access |
+| [Lecture 35](Lecture-35.md) | OpenClaw Case Study - The Agent Loop | Intake, queues, locks, streaming, tools, hooks, persistence |
+| [Lecture 36](Lecture-36.md) | OpenClaw Case Study - Cron and Scheduled Agent Runs | Cron expressions, isolated jobs, delivery, retries, logs, validation |
+| [Lecture 37](Lecture-37.md) | OpenClaw Case Study - System Prompt Architecture | Prompt ownership, bootstrap context, skills, prompt modes, provider overlays |
+| [Lecture 38](Lecture-38.md) | OpenClaw Case Study - App SDK Dogfooding and Typed Gateway RPCs | App SDK, happy path, event normalization, future RPC surfaces |
+| [Lecture 39](Lecture-39.md) | OpenClaw Case Study - Gateway RPC Protocol | WebSocket frames, handshake, roles, scopes, pairing, features, node transport |
+| [Lecture 40](Lecture-40.md) | OpenClaw Threat Model - MITRE ATLAS for Agent Security | threat matrix, attack chains, trust boundaries, prompt injection, skill supply chain, tool execution controls |
+| [Lecture 41](Lecture-41.md) | Pi - A Minimal Coding Agent and the Substrate Beneath OpenClaw | Tiny core (4 tools), no-MCP rationale, custom messages in session log, hot reload, tree-structured sessions, TUI vs LLM-tool surfaces |
+| [Lecture 42](Lecture-42.md) | Agent Skills for GPU Kernel Translation - cuTile Python to cuTile.jl | cuTile semantics, Julia layout/indexing traps, TileGym skill structure, validators, GPU tests |
+| [Lecture 43](Lecture-43.md) | FP8 KV-Cache in vLLM - Long-Context Serving for Agents | KV-cache memory, FP8 attention, ITL/TTFT, sliding-window skips, calibration, deployment decisions |
+| [Lecture 44](Lecture-44.md) | TraceLens - Trace-Driven AI Performance Analysis | Trace2Tree, hierarchical bottleneck reports, roofline metrics, collective skew, trace diff, event replay |
+| [Lecture 45](Lecture-45.md) | AutoSP - Compiler-Generated Sequence Parallelism for Long-Context Training | DeepCompile, DeepSpeed-Ulysses, sequence-aware activation checkpointing, ZeRO composition, graph-break limits |
+| [Lecture 46](Lecture-46.md) | ZAYA1-8B - Small MoE Reasoning, AMD Training, and Test-Time Compute | 760M active parameters, AMD MI300X training, Markovian RSA, math/coding specialization, weak agentic scores |
+| [Lecture 47](Lecture-47.md) | MLSys 2026 Kernel Contest - AI-Assisted Blackwell LLM Kernel Optimization | FlashInfer-Bench, B200, FP8 MoE, sparse attention, Gated Delta Net, CUDA/Triton/CuTe, agent-generated kernels |
 
 </div>
 

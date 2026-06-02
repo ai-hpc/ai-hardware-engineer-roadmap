@@ -1,425 +1,748 @@
-# Lecture 18 - OpenClaw Case Study: Operating and Securing a Persistent Agent System
+# Lecture 18 - OpenAI Agents SDK: Native Sandbox and Durable Agent Harness
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 17](Lecture-17.md) | **Next:** [Lecture 19](Lecture-19.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 17](Lecture-17.md) | **Next:** [Lecture 19](Lecture-19.md)
 
 ---
 
-## Why this lecture exists
+**Agent runtime infrastructure** is becoming product infrastructure.
 
-A lot of agent education stops after:
+The important signal in OpenAI's April 2026 Agents SDK update is **not only that the SDK can call tools**.
 
-- prompting
-- tools
-- memory
-- maybe orchestration
+The important signal is that **baseline agent platforms** now need:
 
-But a real agent product also has to **stay alive, stay safe, and stay operable**.
+- filesystem workspaces
+- sandbox execution
+- shell tools
+- patch tools
+- manifests
+- resumable state
+- skills
+- MCP
+- repo instructions
+- approval and interruption surfaces
+- provider-aware orchestration
 
-OpenClaw is a useful case study because it documents:
+That is the same direction this course has been tracking through OpenClaw:
 
-- gateway startup and health
-- supervision
-- pairing
-- sandboxing
-- tool policy
-- elevated execution
-- remote access
+```text
+model
+  -> harness
+  -> tools
+  -> sandbox
+  -> state
+  -> audit and recovery
+```
 
-This lecture turns that into a bigger lesson:
+The **model alone is no longer the product**.
 
-> operating an agent system is part of building an agent system
+The **harness is becoming part of the product**.
 
 ---
 
 ## Learning objectives
 
-By the end of this lecture you will be able to:
+By the end of this lecture, you should be able to:
 
-1. Explain why persistent agents need day-1 and day-2 operations.
-2. Understand the difference between startup, status, health, and supervision.
-3. Explain pairing as an approval boundary.
-4. Understand the difference between sandbox, tool policy, and elevated execution.
-5. Design a safer operational model for an always-on agent product.
-
----
-
-## 1. One always-on process changes everything
-
-OpenClaw's gateway runbook teaches an important lesson:
-
-many agent systems are **not short-lived jobs**.
-
-They are:
-
-- long-lived processes
-- always-on services
-- message routers
-- control-plane endpoints
-
-That means the **engineering mindset** changes.
-
-You now care about:
-
-- startup order
-- supervision
-- health
-- reloads
-- restarts
-- logs
-- secrets
-- pairing
-- remote access
-
-This connects directly to the earlier lectures on:
-
-- runtime discipline
-- deterministic startup
-
-Those ideas are not theoretical. They are what an always-on agent needs to survive in production.
+1. Explain why file/tool-oriented long-running agents need a harness.
+2. Describe the updated OpenAI Agents SDK sandbox model.
+3. Understand manifests as portable workspace contracts.
+4. Explain why separating harness from compute improves security, durability, and scale.
+5. Understand how shell, `apply_patch`, MCP, skills, and `AGENTS.md` fit into an agent runtime.
+6. Compare OpenAI's SDK direction with OpenClaw's Gateway and node architecture.
+7. Identify where provider-native harnesses help and where application-owned policy is still required.
+8. Design a minimal evaluation plan for sandboxed durable agent workflows.
 
 ---
 
-## 2. Day-1 vs day-2 operations
+## 1. The shift: from chat calls to agent harnesses
 
-This is a simple but useful distinction.
+Early LLM integrations looked like:
 
-### Day 1
+```text
+prompt
+  -> model
+  -> response
+```
 
-Getting the system up:
+Tool-using agents changed that:
 
-- install
-- configure
-- start the gateway
-- connect channels
-- verify health
+```text
+prompt
+  -> model
+  -> tool call
+  -> tool result
+  -> model
+  -> final response
+```
 
-### Day 2
+Long-running agents add more requirements:
 
-Keeping the system reliable:
+```text
+workspace
+  -> inspect files
+  -> run commands
+  -> edit files
+  -> checkpoint state
+  -> recover after interruption
+  -> continue work safely
+```
 
-- restart safely
-- inspect logs
-- rotate secrets
-- pair new devices
-- recover broken channels
-- check audits
-- update configuration
-- monitor health
+That is no longer **just model invocation**.
 
-Students often learn **Day 1** only.
+It is a **runtime system**.
 
-Real agent engineers must learn **Day 2** as well.
-
----
-
-## 3. Health is not just "the process exists"
-
-OpenClaw's runbook uses status and health-oriented commands.
-
-That reflects a mature idea:
-
-> a running process is not automatically a healthy service
-
-You need to know:
-
-- is the gateway process alive?
-- is the RPC surface responding?
-- are channels actually connected?
-- are agents loaded?
-- are background services healthy?
-
-This is the same idea as **readiness vs liveness** from the deterministic startup lecture.
-
-Persistent agent systems need:
-
-- startup checks
-- runtime health checks
-- recoverability
-
-Without them, you only notice failure **after users complain**.
+The OpenAI Agents SDK update **productizes that runtime layer** for OpenAI model workflows.
 
 ---
 
-## 4. Pairing as an approval boundary
+## 2. What changed in the Agents SDK
 
-OpenClaw's pairing model is one of the best teaching examples in the repo.
+OpenAI describes the updated Agents SDK as adding a **more capable harness** for agents that work with documents, files, and systems.
 
-It uses pairing for:
+The notable primitives:
 
-1. **DM pairing** — who is allowed to talk to the bot
-2. **Node pairing** — which devices are allowed to join the gateway
+- configurable memory
+- sandbox-aware orchestration
+- filesystem-oriented tools
+- MCP tool use
+- skills
+- `AGENTS.md` instructions
+- shell execution
+- `apply_patch` file edits
+- sandbox manifests
+- snapshotting and rehydration
+- resumable state after interruptions
 
-This is a strong lesson because it shows:
+These are the **same primitives** that show up in production coding agents.
 
-not every message sender or device should be **trusted automatically**.
+The pattern:
 
-In plain English:
+```text
+agent task
+  -> controlled workspace
+  -> explicit instructions
+  -> bounded tools
+  -> durable run state
+  -> reviewed artifacts
+```
 
-> pairing is the explicit approval step that turns an unknown actor into an allowed actor
+For OpenClaw-style architecture, this validates a key design thesis:
 
-That is a very useful general pattern for agent products.
-
-You can apply it to:
-
-- chat senders
-- mobile nodes
-- browsers
-- automation clients
-- devices that request control authority
-
-This is far better than:
-
-> anyone who can reach the endpoint can use the agent
-
----
-
-## 5. Why pairing matters for AI systems
-
-In a normal chat demo, no one thinks about pairing.
-
-In a real persistent agent, it matters because the agent may have:
-
-- memory
-- tools
-- device control
-- file access
-- outbound messaging ability
-
-So "who can talk to the agent" is really:
-
-> who can spend the agent's attention and possibly trigger its authority
-
-That makes pairing a **security boundary**, not a UX detail.
+```text
+agent systems need a harness, not just a chat loop
+```
 
 ---
 
-## 6. Sandbox vs tool policy vs elevated execution
+## 3. Native sandbox execution
 
-This is one of the highest-value operational lessons in OpenClaw.
+The updated Agents SDK supports **sandbox execution natively**.
 
-These three things sound similar, but they are not.
+The sandbox gives the agent a controlled environment where it can:
 
-### Sandbox
+- read files
+- write files
+- run code
+- use installed dependencies
+- produce artifacts
+- operate without directly sharing the application host
 
-Sandbox controls **where tools run**.
+OpenAI's docs describe `SandboxAgent` as the agent abstraction for this path.
 
-Example:
+The simplified flow:
 
-- on host
-- in a sandboxed container
+```text
+Manifest
+  -> SandboxAgent
+  -> sandbox client
+  -> Runner.run(...)
+  -> artifacts and result state
+```
 
-This is an **execution-environment boundary**.
+This is important because many useful agents need a **workspace**.
 
-### Tool policy
+Examples:
 
-Tool policy controls **which tools are allowed**.
+- audit a data room
+- inspect a repository
+- patch code
+- cluster support exports
+- run tests
+- generate a report from mounted inputs
 
-Example:
+Without a sandbox, teams often **improvise their own filesystem and execution layer**.
 
-- `read` allowed
-- `write` denied
-- `exec` denied
-
-This is an **availability boundary**.
-
-### Elevated execution
-
-Elevated execution is a special path for `exec`-style work outside the normal sandbox rules.
-
-This is an **escape-hatch boundary**.
-
-The big teaching point is:
-
-> these are three different control layers
-
-Do not confuse:
-
-- "the tool exists"
-- "the tool is allowed"
-- "the tool runs in a safe place"
-
-Those are separate questions.
+That is **risky and inconsistent**.
 
 ---
 
-## 7. Why this distinction matters
+## 4. Manifest as workspace contract
 
-Imagine a coding agent.
+The SDK's `Manifest` describes the initial sandbox workspace.
 
-You might think:
+It can specify:
 
-> if it is sandboxed, it is safe
+- input files
+- directories
+- repositories
+- mounted storage
+- output directories
+- environment values
+- sandbox-local users and groups where supported
 
-But that is incomplete.
+The key design idea:
 
-A sandboxed agent may still have:
+```text
+manifest = fresh-session workspace contract
+```
 
-- too many tools
-- too much file access through binds
-- dangerous elevated paths
+It is not necessarily the full source of truth for every live sandbox, because a run may continue from:
 
-Or you might think:
+- a live sandbox session
+- serialized session state
+- a snapshot chosen at runtime
+- persistent storage
 
-> if `exec` is denied, we are safe
+Good manifest design:
 
-But the agent might still have powerful non-exec tools.
+- put input artifacts in the manifest
+- put output directories in the manifest
+- keep paths workspace-relative
+- avoid absolute paths and `..` escapes
+- scope mounted storage to the task
+- keep secrets out of persisted workspace state
 
-So the correct mental model is **layered**:
+This is the sandbox equivalent of an **API schema**.
 
-| Layer | Question |
-|---|---|
-| Sandbox | where does execution happen? |
-| Tool policy | what is allowed to be called? |
-| Elevated | is there an exception path outside normal boundaries? |
-
-This is exactly the kind of professional distinction students need early.
-
----
-
-## 8. Remote access and trust
-
-OpenClaw's gateway docs recommend controlled remote access like:
-
-- Tailscale
-- VPN
-- SSH tunnel
-
-The deeper lesson is not "use this specific tunnel."
-
-The lesson is:
-
-> remote convenience should never bypass the trust model
-
-That means:
-
-- authentication still matters
-- pairing still matters
-- identity still matters
-- logging still matters
-
-This is highly relevant for **local-first assistants** and **edge AI systems**.
-
-Many teams wrongly assume:
-
-> it is on my local network, so it is trusted
-
-That is not a strong security assumption.
+It makes the agent's environment **explicit and reviewable**.
 
 ---
 
-## 9. A good operational model
+## 5. Filesystem tools, shell, and apply_patch
 
-Using the OpenClaw case study, a mature persistent agent system should have:
+The OpenAI article calls out Codex-like filesystem tools.
 
-### Startup
+Two primitives matter for coding and document agents:
 
-- explicit config loading
-- deterministic startup phases
-- ready/not-ready status
+```text
+shell:
+  run commands in a sandboxed environment
 
-### Runtime health
+apply_patch:
+  make structured file edits
+```
 
-- status endpoint or command
-- logs
-- channel readiness checks
-- service supervision
+This is a **major product signal**.
 
-### Security boundaries
+Agent platforms are **converging on the same low-level tool set**:
 
-- pairing for senders and devices
-- sandbox configuration
-- tool allow/deny policy
-- explicit elevated path controls
+- inspect files
+- search files
+- run shell commands
+- edit files through patch operations
+- test changes
+- produce artifacts
 
-### Recovery
+Why `apply_patch` matters:
 
-- restart procedures
-- secrets reload procedures
-- broken-channel diagnostics
-- safe degraded behavior
+```text
+free-form file writes are hard to review
+patch operations are easier to audit, replay, and constrain
+```
 
-This is much closer to **infrastructure engineering** than to toy prompt engineering.
+Why shell matters:
 
----
+```text
+many real tasks require execution:
+tests, scripts, linters, data transforms, builds, profilers
+```
 
-## 10. Example: a local family assistant on Jetson
+But shell must be **policy-gated**.
 
-Suppose you run a local family assistant on a Jetson box at home.
+A sandbox reduces **blast radius**.
 
-It supports:
-
-- Telegram messages
-- WebChat
-- one mobile node
-- note search
-- calendar lookup
-- home automation
-
-Now apply the OpenClaw-style operational questions:
-
-| Area | Good design choice |
-|---|---|
-| Startup | gateway supervised, readiness checked |
-| Access | only paired Telegram senders allowed |
-| Devices | only approved mobile node may connect |
-| Tools | home-control tools allowed, raw shell denied |
-| Sandbox | risky tools isolated |
-| Elevated | disabled by default |
-| Remote access | VPN/Tailscale only |
-| Logs | audit actions and routing decisions |
-
-This is the right way to think about an always-on agent appliance.
+It does **not remove** the need for approvals, allowlists, logs, and network controls.
 
 ---
 
-## 11. Design exercise
+## 6. Skills and AGENTS.md
 
-You are building a persistent engineering assistant for a small team.
+The updated SDK also standardizes two instruction surfaces that coding agents already use in practice.
 
-It has:
+### Skills
 
-- Slack channel access
-- Web UI
-- one coding toolchain
-- one deployment tool
-- one mobile node for operator alerts
+OpenAI's skills docs describe a skill as a versioned bundle of files plus a `SKILL.md` manifest.
 
-Fill in this table:
+Skills codify procedures:
 
-| Operational area | Your policy |
-|---|---|
-| Who may message it? | paired Slack workspace users only |
-| Who may attach devices? | explicitly approved nodes only |
-| Where do tools run? | sandbox by default |
-| Which tools are high-risk? | deployment and exec tools |
-| Is elevated execution enabled? | only for trusted operator paths |
-| How do you inspect health? | gateway status + logs + channel probe |
-| How do you restart safely? | supervised service restart |
+- style guides
+- spreadsheet workflows
+- maintenance workflows
+- analysis recipes
+- company conventions
+- multi-step tool use
 
-The value of this exercise is that it forces you to think like an **operator**, not only like a prompt writer.
+The model sees skill metadata and can load the full `SKILL.md` instructions when needed.
+
+Security caveat:
+
+```text
+skills influence planning, tool use, and command execution
+```
+
+Treat them as **privileged code-adjacent behavior**.
+
+### AGENTS.md
+
+`AGENTS.md` is a repo-local instruction file.
+
+It lets the workspace tell the agent:
+
+- project conventions
+- test commands
+- code style
+- repository-specific rules
+- safety notes
+- contribution workflow
+
+The important architecture point:
+
+```text
+global prompt
+  -> agent policy
+  -> skill instructions
+  -> repo-local instructions
+  -> task prompt
+```
+
+You need clear **priority and trust rules** for each layer.
+
+---
+
+## 7. MCP and external tools
+
+MCP appears in the updated SDK as a standard way to connect tools.
+
+The design point:
+
+```text
+agent harness
+  -> MCP server
+  -> external system tools/resources
+```
+
+MCP helps **decouple the harness** from every tool implementation.
+
+But it creates a **trust boundary**.
+
+Questions to ask:
+
+- Who controls the MCP server?
+- What scopes does it expose?
+- Can it read secrets?
+- Can it write external systems?
+- Are tool schemas precise?
+- Are destructive actions approval-gated?
+- Are outputs treated as untrusted?
+- Are calls logged?
+
+MCP is an **interface**.
+
+It is **not a security policy** by itself.
+
+---
+
+## 8. Durable execution: state, snapshots, and rehydration
+
+Long-running agents fail.
+
+Containers expire.
+
+Approvals pause.
+
+Networks break.
+
+Runs need human review.
+
+The updated SDK emphasizes **durable execution** by separating state from the sandbox compute environment.
+
+The official article describes a model where externalized state allows a run to continue after a sandbox fails or expires, using snapshotting and rehydration.
+
+The Agents SDK results docs also expose state surfaces for interruptions and approvals:
+
+```text
+interruptions:
+  pending tool calls that need a decision
+
+state / to_state():
+  resumable snapshot to pass back after approval or rejection
+```
+
+The runtime design principle:
+
+```text
+compute is replaceable
+state is durable
+```
+
+This matches the **event-sourced session model** in Lecture 26.
+
+If the sandbox dies, the application should not lose:
+
+- user intent
+- tool-call history
+- pending approvals
+- workspace artifacts
+- agent ownership
+- continuation state
+
+---
+
+## 9. Separating harness from compute
+
+OpenAI explicitly frames **harness/compute separation** as a security, durability, and scale improvement.
+
+Security:
+
+```text
+keep credentials out of environments where model-generated code executes
+```
+
+Durability:
+
+```text
+if a sandbox dies, restore state into a fresh environment
+```
+
+Scale:
+
+```text
+use one sandbox or many,
+invoke sandboxes only when needed,
+route subagents to isolated environments,
+parallelize work across containers
+```
+
+This should be a default design principle for agent platforms.
+
+Do **not put everything in one process** with one filesystem and one credential set.
+
+Prefer:
+
+```text
+harness:
+  owns identity, policy, state, approvals, routing
+
+compute sandbox:
+  owns temporary execution, files, dependencies, artifacts
+```
+
+The sandbox should be **disposable**.
+
+The harness should be **auditable**.
+
+---
+
+## 10. OpenAI SDK versus OpenClaw Gateway
+
+OpenAI Agents SDK and OpenClaw solve overlapping but different layers.
+
+OpenAI Agents SDK:
+
+- provider-native model harness
+- sandbox-aware orchestration
+- OpenAI model alignment
+- OpenAI tool primitives
+- Python-first release for new sandbox features
+- managed API pricing and tool usage
+
+OpenClaw Gateway:
+
+- local-first control plane
+- channels and sessions
+- device pairing
+- remote nodes
+- multi-provider routing
+- local tools and app SDKs
+- explicit Gateway RPC protocol
+- user-owned deployment boundary
+
+Comparison:
+
+```text
+OpenAI Agents SDK:
+  strong provider-native harness for OpenAI model workflows
+
+OpenClaw:
+  broader local control plane for multi-channel, multi-node, user-owned agent operation
+```
+
+The useful direction is **not necessarily replacement**.
+
+It is **integration and architectural learning**.
+
+An OpenClaw-style system can learn from the SDK's productized sandbox abstractions.
+
+An OpenAI SDK app can learn from OpenClaw's explicit gateway, pairing, threat model, and node architecture.
+
+---
+
+## 11. What becomes baseline infrastructure
+
+This release is a useful **market signal**.
+
+The following are no longer "advanced extras" for serious agents:
+
+```text
+filesystem workspace
+sandbox boundary
+shell execution
+patch-based edits
+tool registry
+skills
+repo-local instructions
+state snapshots
+human approval interruptions
+observability
+artifact review
+MCP integration
+secrets separation
+```
+
+If an agent platform lacks these, it is probably a **prototype or a narrow wrapper**.
+
+Production users will expect:
+
+- reliable continuation
+- safe execution
+- inspectable artifacts
+- bounded tool access
+- replayable history
+- policy enforcement
+- integration with their own storage and sandbox providers
+
+---
+
+## 12. Security implications
+
+Native sandboxing is useful, but it is **not a complete security model**.
+
+Threats remain:
+
+- malicious skills
+- prompt injection through files
+- malicious repository instructions
+- unsafe shell commands
+- artifact exfiltration
+- overbroad mounts
+- secrets copied into workspace
+- MCP server compromise
+- tool-result injection
+- approval prompt manipulation
+
+Controls:
+
+- minimal manifests
+- scoped mounts
+- secrets outside sandbox when possible
+- explicit approval for high-impact actions
+- network egress policy
+- skill review
+- `AGENTS.md` trust rules
+- output artifact review
+- audit logs
+- snapshot redaction
+- deterministic tool policy
+
+Tie this back to Lecture 40:
+
+```text
+sandbox is a boundary,
+not a trust substitute
+```
+
+---
+
+## 13. Evaluation plan
+
+To evaluate a durable sandboxed agent harness, do **not only ask whether it can complete one task**.
+
+Evaluate:
+
+```text
+task success:
+  correct final artifact
+
+durability:
+  can resume after interruption?
+
+sandbox safety:
+  can it only access mounted files?
+
+tool correctness:
+  did shell/apply_patch calls match policy?
+
+state quality:
+  is continuation faithful after rehydration?
+
+artifact quality:
+  are outputs inspectable and reproducible?
+
+security:
+  does prompt injection fail to cross authority boundaries?
+
+latency/cost:
+  does sandbox startup or snapshotting dominate?
+```
+
+Example test:
+
+```text
+1. Mount a small repo and task file.
+2. Ask the agent to fix a bug.
+3. Require it to run tests.
+4. Interrupt before a high-impact command.
+5. Serialize state.
+6. Resume in a fresh sandbox.
+7. Verify final patch, logs, and artifacts.
+8. Confirm no files outside the manifest were read.
+```
+
+That is the right level of test for the new baseline.
+
+---
+
+## 14. Hardware and systems view
+
+For AI hardware engineers, this release matters because it changes workload shape.
+
+Long-running sandboxed agents create:
+
+- bursty inference
+- tool-heavy pauses
+- background mode runs
+- file I/O around model calls
+- shell execution outside the model server
+- checkpoint and snapshot events
+- parallel subagent workloads
+- larger context from files and histories
+
+The GPU is not the only bottleneck.
+
+The full system includes:
+
+```text
+model serving latency
+sandbox startup time
+filesystem throughput
+network egress
+tool runtime
+snapshot size
+orchestration queueing
+approval latency
+```
+
+That means agent performance must be measured end-to-end.
+
+Use model metrics, but also collect:
+
+- sandbox lifecycle timing
+- tool-call timing
+- artifact size
+- resume time
+- queue delay
+- token usage
+- error/retry counts
+
+---
+
+## Mini-lab: durable sandbox agent design
+
+Design a small agent app using the updated harness model.
+
+Scenario:
+
+```text
+An agent reviews a repository, edits one file, runs tests,
+and produces a patch plus a short report.
+```
+
+Specify:
+
+```text
+Manifest:
+  mounted repo:
+  output directory:
+  task file:
+  environment:
+
+Tools:
+  shell:
+  apply_patch:
+  MCP:
+  skills:
+
+Policy:
+  allowed commands:
+  denied commands:
+  approval-required commands:
+  network policy:
+
+Durability:
+  snapshot trigger:
+  state serialization:
+  rehydration test:
+
+Security:
+  untrusted files:
+  secrets boundary:
+  prompt-injection test:
+
+Evidence:
+  logs:
+  final patch:
+  test output:
+  artifact review:
+```
+
+Then write the acceptance criteria:
+
+```text
+Task passes only if:
+  tests pass
+  patch is minimal
+  state resumes correctly after interruption
+  no out-of-scope file access occurs
+  artifact report cites exact files changed
+```
 
 ---
 
 ## Key takeaways
 
-- Persistent agents need operational discipline, not only model quality.
-- A running process is not the same as a healthy agent service.
-- Pairing is an approval boundary for users and devices.
-- Sandbox, tool policy, and elevated execution solve different problems and should not be confused.
-- Remote access must preserve the trust model, not bypass it.
-- OpenClaw is a strong case study for what day-1 and day-2 agent operations really look like.
+- The OpenAI Agents SDK update productizes infrastructure that serious agent systems already need.
+- Native sandbox execution gives agents controlled workspaces for files, tools, dependencies, and artifacts.
+- Manifests make sandbox workspaces explicit, portable, and reviewable.
+- Shell and `apply_patch` are becoming baseline tools for file-oriented agents.
+- Skills, MCP, and `AGENTS.md` standardize reusable instructions and tool ecosystems.
+- Durable state, interruptions, snapshotting, and rehydration are required for long-running work.
+- Separating harness from compute improves security, durability, and scale.
+- Provider-native harnesses are useful, but application-owned policy, threat modeling, and evals remain necessary.
+- OpenClaw and OpenAI Agents SDK point toward the same baseline: agents need a real runtime around the model.
 
 ---
 
 ## References
 
-- Case-study source repo: [OpenClaw](https://github.com/openclaw/openclaw)
-- OpenClaw concepts:
-  - `docs/gateway/index.md`
-  - `docs/channels/pairing.md`
-  - `docs/gateway/sandbox-vs-tool-policy-vs-elevated.md`
-  - `docs/gateway/health.md`
+- OpenAI, "The next evolution of the Agents SDK": [https://openai.com/index/the-next-evolution-of-the-agents-sdk/](https://openai.com/index/the-next-evolution-of-the-agents-sdk/)
+- OpenAI Agents SDK guide: [https://developers.openai.com/api/docs/guides/agents](https://developers.openai.com/api/docs/guides/agents)
+- OpenAI Sandbox Agents guide: [https://developers.openai.com/api/docs/guides/agents/sandboxes](https://developers.openai.com/api/docs/guides/agents/sandboxes)
+- OpenAI Results and state guide: [https://developers.openai.com/api/docs/guides/agents/results](https://developers.openai.com/api/docs/guides/agents/results)
+- OpenAI Skills guide: [https://developers.openai.com/api/docs/guides/tools-skills](https://developers.openai.com/api/docs/guides/tools-skills)
+- Lecture 26 - Event-Sourced Agent State: [Lecture-26.md](Lecture-26.md)
+- Lecture 21 - Agent Skills: [Lecture-21.md](Lecture-21.md)
+- Lecture 40 - OpenClaw Threat Model: [Lecture-40.md](Lecture-40.md)
 
 ---
 
-*Next: [Lecture 19 - OpenClaw Case Study: The Agent Loop](Lecture-19.md)*
+*Next: [Lecture 19](Lecture-19.md)*

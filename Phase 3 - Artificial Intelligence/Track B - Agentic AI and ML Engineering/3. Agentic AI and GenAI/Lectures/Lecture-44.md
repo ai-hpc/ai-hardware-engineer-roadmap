@@ -1,47 +1,34 @@
-# Lecture 44 - Efficient Local RAG Stack: Qwen3.5-4B INT4 and Granite Embeddings
+# Lecture 44 - TraceLens: Trace-Driven AI Performance Analysis
 
-**Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 43](Lecture-43.md) | **Next:** [Lecture 45](Lecture-45.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 43](Lecture-43.md) | **Next:** [Lecture 45](Lecture-45.md)
 
 ---
 
-**Efficient local RAG** is not about using the largest model you can fit.
+Performance optimization is **not a vibes problem**.
 
-It is about spending memory and compute **where they improve answer quality**.
-
-A strong edge RAG stack looks like:
+For AI systems, the hard part is often not collecting data. It is turning a huge profiler trace into a **specific diagnosis**:
 
 ```text
-User query
-  -> Granite embedding model
-  -> Qdrant or pgvector
-  -> top-k retrieval
-  -> optional reranker
-  -> compact retrieved context
-  -> Qwen3.5-4B INT4 generator
-  -> grounded answer
+What was slow?
+Where in the model did it happen?
+Was the GPU computing, communicating, copying, or waiting?
+Did the new kernel actually help?
+Can we reproduce the slow op without the full model?
 ```
 
-This architecture is useful for:
+**TraceLens** is useful because it treats profiler traces as **structured data**, not screenshots for humans to manually inspect.
 
-- Jetson Orin
-- local/private AI
-- edge agents
-- coding assistants
-- multilingual RAG
-- low-power inference
-- small office knowledge bases
-- factory or robotics documentation assistants
+It consumes traces from frameworks such as PyTorch and JAX, then produces **summaries, comparisons, roofline-style metrics**, collective communication analysis, and minimal operation reproducers.
 
-The central idea:
+For this course, TraceLens is the missing evidence layer between:
 
 ```text
-retrieval precision + small fast generator
-beats weak retrieval + huge generator
+agent workload
+  -> model server
+  -> GPU kernels and collectives
+  -> performance claim
+  -> trace-backed diagnosis
 ```
-
-Most RAG failures are **not model-size failures**.
-
-They are **retrieval, chunking, context, and memory-budget failures**.
 
 ---
 
@@ -49,809 +36,821 @@ They are **retrieval, chunking, context, and memory-budget failures**.
 
 By the end of this lecture, you should be able to:
 
-1. Design a local RAG stack around a 4B-class generator and compact embedding model.
-2. Explain why Granite 97M Multilingual R2 is attractive for edge retrieval.
-3. Choose between Qdrant and pgvector for local vector search.
-4. Estimate memory pressure for INT4 generator deployment.
-5. Choose chunk sizes for code, docs, PDFs, and manuals.
-6. Explain why reranking matters more than dumping many chunks into the prompt.
-7. Compare llama.cpp, vLLM, and TensorRT-LLM for local/edge RAG.
-8. Use prompt constraints, KV-cache optimization, prefix caching, and speculative decoding to improve small-model RAG.
-9. Avoid common efficient-RAG failure modes.
+1. Explain why raw AI profiler traces are hard to analyze manually.
+2. Understand Trace2Tree as a hierarchical trace intermediate representation.
+3. Use top-down performance breakdowns to locate bottlenecks.
+4. Interpret GPU timeline, operator category, dispatch-level, and shape-level reports.
+5. Understand TraceLens roofline metrics such as TFLOPS/s and TB/s.
+6. Diagnose multi-GPU scaling with communication latency, bandwidth, and synchronization skew.
+7. Use trace comparison to quantify regressions across hardware, drivers, kernels, or software versions.
+8. Understand event replay as a way to produce minimal, IP-safe performance reproducers.
+9. Apply TraceLens to OpenClaw-style agent serving and vLLM optimization workflows.
 
 ---
 
-## 1. Target architecture
+## 1. The profiler trace problem
 
-The recommended stack:
+Modern AI workloads generate large traces:
 
-```text
-generator:
-  Qwen/Qwen3.5-4B
+- Python module calls
+- PyTorch or JAX framework operations
+- CPU dispatches
+- runtime launch events
+- GPU kernels
+- memory copies
+- collective communication
+- synchronization gaps
 
-generator quantization:
-  INT4 class quantization
-  AWQ / GPTQ / GGUF Q4_K_M depending on runtime
+Tools such as **Perfetto** are useful for visual inspection, but the **manual workflow does not scale**.
 
-embedding:
-  ibm-granite/granite-embedding-97m-multilingual-r2
-
-vector database:
-  Qdrant for edge-first service
-  pgvector if PostgreSQL integration is already required
-
-retrieval:
-  top_k = 8
-  rerank to 3
-  compress before generation
-
-runtime:
-  llama.cpp for embedded/low-RAM
-  vLLM for server and batching
-  TensorRT-LLM for maximum NVIDIA optimization work
-```
-
-This is not the only valid stack.
-
-It is a **strong default** because it keeps each component small enough to reason about.
-
-The goal is:
+The engineer ends up asking:
 
 ```text
-good retrieval quality
-  + low VRAM
-  + short prompts
-  + fast decode
-  + private/local operation
+Which kernels belong to this model layer?
+Which aten op launched this slow kernel?
+Is this memcpy from my code or from AMP/framework behavior?
+Did communication overlap with compute?
+Did a new software version shift time into a different op?
 ```
+
+Raw traces are **too flat**.
+
+They show events, but **not enough intent**.
+
+TraceLens adds **structure**.
 
 ---
 
-## 2. Generator: Qwen3.5-4B
+## 2. Trace2Tree: from flat trace to hierarchy
 
-Qwen3.5-4B is a **4B-class Qwen model** available on Hugging Face.
+The central idea is **Trace2Tree**.
 
-The model card includes examples for Transformers, vLLM, SGLang, and Docker model runner usage.
-
-For this lecture, the reason it is interesting is the size/capability tradeoff:
-
-- small enough for local and edge experiments
-- stronger than many older sub-7B models
-- useful for coding and multilingual tasks
-- suitable for grounded answer generation when retrieval is good
-
-Important caveat:
+TraceLens converts **flat events into a tree**:
 
 ```text
-Always verify the exact model variant, chat template, modality mode,
-license, quantization artifact, and serving backend before deployment.
+Python module / function
+  -> framework op
+    -> CPU dispatch
+      -> runtime launch
+        -> GPU kernel
 ```
 
-The Hugging Face card for `Qwen/Qwen3.5-4B` is tagged around image-text-to-text usage, while many local RAG stacks use text-only chat/completion paths.
+Example shape:
 
-That means you should validate:
+```text
+nn.Module: Linear
+  -> aten::linear
+    -> aten::to
+      -> aten::copy_
+        -> elementwise kernel
+    -> aten::addmm
+      -> matrix multiply kernel
+```
 
-- tokenizer behavior
-- chat template
-- thinking mode or reasoning controls
-- vLLM support
-- llama.cpp/GGUF support if using GGUF
-- memory use at your target context length
-- answer quality on your documents
+This matters because many expensive events are **hidden at the Python level**.
 
-Do **not assume all Qwen3.5-4B variants behave identically**.
+Common examples:
+
+- automatic mixed precision casts
+- implicit copies
+- layout conversions
+- unfused bias additions
+- framework-generated elementwise kernels
+- backend-specific convolution or attention kernels
+
+Without a tree, a kernel is just a name and timestamp.
+
+With a tree, the kernel has ownership:
+
+```text
+This exact module launched this exact framework op,
+which launched this exact kernel.
+```
+
+That is the difference between **tracing and diagnosis**.
 
 ---
 
-## 3. Quantization strategy
+## 3. Top-down bottleneck analysis
 
-For edge RAG, **INT4-class quantization** is usually the right starting point.
+TraceLens reports are designed to move from **coarse to precise**.
 
-Common formats:
-
-| Format | Typical runtime | Notes |
-|---|---|---|
-| AWQ | vLLM / TensorRT-LLM | good server-oriented weight-only quantization path |
-| GPTQ | ExLlama / vLLM | mature local/server quantization path |
-| GGUF Q4_K_M | llama.cpp | practical low-RAM local deployment format |
-| FP8 | Hopper/Blackwell-class paths | useful on supported GPUs, not the default Jetson path |
-
-Planning estimates for Qwen3.5-4B INT4:
-
-| Component | Rough memory |
-|---|---:|
-| weights | 2.2-2.8 GB |
-| KV cache | 0.5-3 GB |
-| runtime overhead | 0.5-1 GB |
-
-Typical active VRAM planning range:
-
-| Context | Rough VRAM |
-|---|---:|
-| 4K | 4-5 GB |
-| 8K | 5-7 GB |
-| 16K | 8-10 GB |
-
-These are **planning numbers, not guarantees**.
-
-Measure on your exact stack:
+The useful progression is:
 
 ```text
-model revision
-quantization format
-backend
-batch size
-context length
-KV dtype
-GPU memory allocator
-embedding placement
-vector DB placement
+GPU timeline
+  -> operator category
+  -> framework op
+  -> unique input shape
+  -> exact kernel or replay case
 ```
+
+This is the right order.
+
+Do not start with **kernel names**.
+
+Start by asking **how the system spent time**.
 
 ---
 
-## 4. Embedding model: Granite 97M Multilingual R2
+## 4. GPU timeline: was the GPU doing useful work?
 
-Use:
+The GPU timeline report separates time into categories such as:
+
+- computation
+- exposed communication
+- exposed memory copy
+- busy time
+- idle time
+- total communication
+- total memory copy
+
+This answers the first diagnostic question:
 
 ```text
-ibm-granite/granite-embedding-97m-multilingual-r2
+Is the GPU compute-bound, communication-bound, copy-bound, or idle?
 ```
 
-IBM's model card describes it as a **97M-parameter dense embedding model** with:
+Example interpretations:
 
-- 384-dimensional embeddings
-- up to 32,768-token context
-- multilingual support
-- code retrieval support
-- Apache-2.0 license
-- ONNX and OpenVINO deployment paths
-- vLLM embedding serving support
-- GGUF conversion option for llama.cpp-style embedding
+```text
+high computation time
+  -> optimize kernels, shapes, dtype, fusion, algorithm
 
-Why it is a strong edge fit:
+high exposed communication time
+  -> improve overlap, collective strategy, tensor parallel layout, network path
 
-- much smaller than the 311M Granite multilingual variant
-- lower memory pressure
-- lower latency
-- easier batching
-- good multilingual retrieval quality for its size
-- practical for Jetson and CPU-side embedding paths
+high exposed memcpy time
+  -> inspect dtype casts, host/device movement, layout conversions
 
-The 311M version may improve quality in larger server deployments.
+high idle time
+  -> inspect CPU dispatch, dataloader, synchronization, scheduling, dynamic shapes
+```
 
-For edge RAG, the 97M model is usually the **better default**.
+The ROCm blog's Llama FSDP example shows a GPU timeline where the GPU is mostly busy, but **total communication** is still a large fraction of the run. That distinction matters: communication can be **present but hidden** under compute, or it can be **exposed and directly hurt** wall time.
 
 ---
 
-## 5. Retrieval matters more than generator size
+## 5. Operator category view: what kind of work dominates?
 
-A small generator can answer well **if the prompt contains the right evidence**.
+After the timeline, group work by operation family:
 
-A large generator can **still fail if retrieval is poor**.
+- GEMM
+- attention / SDPA
+- convolution
+- elementwise
+- reduce
+- Triton-generated kernels
+- multi-tensor apply
+- other backend kernels
 
-Bad retrieval causes:
+This tells you **where to spend engineering effort**.
 
-- hallucinated answers
-- overconfident missing information
-- irrelevant citations
-- excessive prompt length
-- slow decode
-- context window waste
+If GEMM and attention dominate most of the time, optimizing a small elementwise kernel will not move end-to-end performance unless it blocks fusion, causes copies, or sits on the critical path.
 
-The working rule:
-
-```text
-better top-3 evidence
-  > bigger model reading 20 weak chunks
-```
-
-Good retrieval pipeline:
+For transformer training and serving, the usual dominant categories are:
 
 ```text
-embed query
-  -> vector search top 8
-  -> metadata filter
-  -> rerank top 8
-  -> keep top 3
-  -> optionally compress
-  -> generate answer
+GEMM
+attention
+communication
+memory movement
 ```
 
-Do **not dump all retrieved chunks** into the generator.
+The point is not that other ops are irrelevant.
 
-Small models need **high signal**.
+The point is **prioritization**.
+
+Performance work should **follow the trace**.
 
 ---
 
-## 6. Chunking strategy
+## 6. Dispatch-level view: stable names across backends
 
-Chunking often matters **more than model selection**.
+GPU kernel names change across:
 
-Recommended starting ranges:
+- CUDA vs ROCm
+- driver versions
+- compiler versions
+- library backends
+- hardware generations
+- autotuning choices
 
-| Content type | Chunk size |
-|---|---:|
-| code | 256-512 tokens |
-| documentation | 512-1024 tokens |
-| PDFs/manuals | 768-1536 tokens |
+**Framework dispatch names** are often more stable.
 
-Overlap:
-
-```text
-10-20%
-```
-
-Common starting point:
+Examples:
 
 ```text
-chunk_size = 512 tokens
-overlap = 64 tokens
+aten::mm
+aten::linear
+aten::copy_
+flash_attn::_flash_attn_forward
+flash_attn::_flash_attn_backward
 ```
 
-Why not giant chunks?
+TraceLens uses this level to make comparisons more meaningful.
+
+Instead of asking:
 
 ```text
-giant chunks reduce retrieval precision
+Why did kernel igemm_fwd_gtcx3_... change?
 ```
 
-If every chunk contains too many topics, vector search **cannot identify the exact relevant passage**.
+you can ask:
 
-Bad chunking symptoms:
+```text
+Did aten::convolution become slower?
+Did aten::mm improve for this shape?
+Did flash attention regress after the backend update?
+```
 
-- retrieved chunks are broadly related but not answer-bearing
-- answer requires many chunks
-- reranker struggles to choose
-- model sees too much irrelevant context
-- citations point to generic sections
-
-Use structure-aware chunking:
-
-- preserve headings
-- preserve code blocks
-- preserve function/class boundaries
-- include file path metadata
-- include section title metadata
-- include document version metadata
+That abstraction is important when comparing **CUDA and ROCm**, or comparing two software versions on the same platform.
 
 ---
 
-## 7. Vector database choice
+## 7. Shape-level view: the real root cause
 
-### Qdrant
+**Operator names are not enough.**
 
-Use Qdrant when you want:
+The same operation can have **very different performance** depending on:
 
-- edge-friendly vector search
-- Rust implementation
-- HNSW dense vector index
-- payload metadata filtering
-- standalone service deployment
-- hybrid search options
-- clean API for local agents
+- tensor dimensions
+- strides
+- dtype
+- layout
+- batch size
+- sequence length
+- head count
+- head dimension
+- padding
+- transposition
 
-Qdrant is usually the better Jetson/local default when you do not already need PostgreSQL.
+TraceLens breaks down operations by unique input shape and arguments.
 
-### pgvector
-
-Use pgvector when:
-
-- PostgreSQL is already part of the product
-- SQL joins and relational metadata matter
-- you want one operational database
-- enterprise app integration matters more than raw vector-specialized deployment
-
-The choice is not ideological.
-
-Use:
-
-```text
-Qdrant:
-  edge-first vector service
-
-pgvector:
-  SQL-first application integration
-```
-
----
-
-## 8. Reranking
-
-Reranking is often the **highest-leverage quality improvement**.
-
-Vector search gets **candidates**.
-
-The reranker picks the **best evidence**.
-
-Recommended pattern:
-
-```text
-retrieve top 8
-rerank top 8
-keep top 3
-```
-
-Small reranker candidates:
-
-| Reranker | Good fit |
-|---|---|
-| bge-reranker-base | strong general quality |
-| Granite reranker | IBM/Granite ecosystem |
-| Jina reranker | multilingual workflows |
-
-If latency is tight:
-
-- rerank only top 8 or top 10
-- run reranker on CPU if GPU is reserved for generator
-- cache rerank results for repeated queries
-- skip reranker for exact metadata hits
-
-If quality matters:
-
-```text
-rerank before increasing generator size
-```
-
----
-
-## 9. Context management for small models
-
-Small models are **sensitive to noisy prompts**.
-
-Recommended final prompt structure:
-
-```text
-system instructions
-  -> compact retrieved context
-  -> user question
-  -> answer format requirements
-```
-
-Target retrieved context:
-
-```text
-~2K tokens for many edge RAG tasks
-```
-
-Instead of:
-
-```text
-retrieve 20 chunks
-send everything
-hope the model finds the answer
-```
-
-Do:
-
-```text
-retrieve 8
-rerank to 3
-compress
-answer with citations
-```
-
-Compression can be:
-
-- extract only answer-bearing paragraphs
-- remove boilerplate
-- preserve headings and citations
-- keep code snippets intact
-- deduplicate repeated passages
-
-Small models **reward discipline**.
-
----
-
-## 10. Prompt design
-
-Use **strict grounded prompts**.
+This is where **many real optimizations start**.
 
 Example:
 
 ```text
-You are a retrieval-grounded assistant.
-Answer only from the retrieved context.
-If the context does not contain enough evidence, say "insufficient information."
-Include citations using the provided source IDs.
-Do not use outside knowledge unless explicitly asked.
+aten::mm with shape A
+  -> high TFLOPS/s
+
+aten::mm with shape B
+  -> poor TFLOPS/s
 ```
 
-Why this helps:
+Possible causes:
 
-- reduces hallucination
-- forces uncertainty
-- improves citation behavior
-- prevents over-answering
-- makes failures easier to detect
+- bad tile shape
+- small batch dimension
+- unfavorable alignment
+- memory-bound shape
+- layout conversion nearby
+- low occupancy
+- poor backend algorithm selection
 
-For code RAG:
+For agent workloads, this is especially useful because **context length and output length** change request by request.
+
+A model may be **fast at one sequence length and slow at another**.
+
+---
+
+## 8. Roofline-style compute modeling
+
+Kernel duration answers:
 
 ```text
-Use only the provided repository snippets.
-If a function or file is not present in context, say which file is missing.
-Do not invent APIs.
+How long did it take?
 ```
 
-For multilingual RAG:
+It does not answer:
 
 ```text
-Answer in the user's language unless the task requests otherwise.
-Preserve technical identifiers exactly.
+Was that good?
+```
+
+TraceLens estimates **theoretical work** from operator arguments.
+
+For GEMM:
+
+```text
+FLOPs = 2 * M * N * K
+Bytes = (M*K + K*N + M*N) * element_size
+```
+
+Then it combines that with actual trace timing:
+
+```text
+TFLOPS/s = FLOPs / time
+TB/s     = bytes / time
+```
+
+This gives a roofline-style view:
+
+```text
+high arithmetic intensity + low TFLOPS/s
+  -> compute kernel may be underutilizing the GPU
+
+low arithmetic intensity + high TB/s
+  -> operation may be memory-bandwidth bound
+
+unexpected bytes or copies nearby
+  -> inspect layout, dtype, or framework-generated movement
+```
+
+Important distinction:
+
+TraceLens estimates useful **theoretical work** from framework semantics.
+
+Hardware profilers measure **what the GPU actually executed**.
+
+Use both:
+
+```text
+TraceLens:
+  "What work did the model intend?"
+
+Hardware counters:
+  "What did the GPU actually do?"
+```
+
+The gap between those two is often **where the optimization lives**.
+
+---
+
+## 9. Multi-GPU communication analysis
+
+Distributed training and serving add another failure mode:
+
+```text
+total collective time != pure network time
+```
+
+Collective operations can include synchronization skew.
+
+One rank may enter the collective late because:
+
+- its compute was slower
+- its batch was heavier
+- it hit a local scheduling delay
+- it had a CPU dispatch stall
+- it waited on a prior dependency
+
+If you only look at total collective duration, you may **blame the network for workload imbalance**.
+
+TraceLens separates:
+
+- payload size
+- collective latency
+- algorithmic bandwidth
+- bus bandwidth
+- synchronization skew
+
+Useful diagnostic patterns:
+
+```text
+high communication latency, low skew
+  -> likely network or collective implementation bottleneck
+
+high skew, reasonable bandwidth
+  -> likely imbalance or late-arriving ranks
+
+high exposed communication time
+  -> overlap is insufficient
+
+high total communication but low exposed communication
+  -> communication exists but is mostly hidden under compute
+```
+
+For hardware engineers, this matters because **AI scaling bottlenecks are often misdiagnosed**.
+
+The right question is not:
+
+```text
+How much time did all-reduce take?
+```
+
+The better question is:
+
+```text
+How much pure communication time was exposed on the critical path,
+and how much was rank skew?
 ```
 
 ---
 
-## 11. Runtime choices
+## 10. Trace comparison: prove the delta
 
-### llama.cpp
-
-Use when:
-
-- Jetson or embedded deployment
-- low RAM
-- GGUF quantization
-- CPU/GPU mixed execution
-- simple local server
-- offline/private deployment
-
-Best for:
+Most performance work is **comparative**:
 
 ```text
-Qwen3.5-4B Q4_K_M
-4K-8K context
-single-user local RAG
+old kernel vs new kernel
+CUDA vs ROCm
+H100 vs MI300X
+driver A vs driver B
+BF16 vs FP8
+FlashAttention backend vs FlashInfer backend
+baseline vLLM vs optimized vLLM
 ```
 
-### vLLM
+TraceLens can compare reports and identify where time changed.
 
-Use when:
+For simple cases, matching happens at the same operator level.
 
-- server deployment
-- continuous batching
-- multiple users
-- OpenAI-compatible API
-- embedding endpoint support
-- model serving at higher concurrency
+For more complex cases, TraceLens can use **morphological comparison**: it aligns trees and finds the lowest point where the call stacks diverge.
 
-Best for:
+That is useful when two backends implement the same framework op differently.
+
+Example:
 
 ```text
-Qwen3.5-4B AWQ/GPTQ
-Granite embedding endpoint
-multi-user local server
+aten::_convolution
+  -> ROCm backend subtree
+  -> CUDA backend subtree
 ```
 
-### TensorRT-LLM
+The framework-level intent is the same, but the backend subtree differs.
 
-Use when:
-
-- NVIDIA-specific maximum performance
-- production CUDA optimization
-- Tensor Core paths matter
-- static-ish deployment configuration
-- kernel tuning is worth the complexity
-
-Best for:
+Trace comparison lets you say:
 
 ```text
-Orin optimization work
-L4/Hopper/Blackwell server optimization
-latency-sensitive production inference
+This change improved convolution backward by X ms.
+This change regressed aten::mm by Y ms.
+This backend moved time from one subtree into another.
 ```
 
-The runtime choice **changes the whole system**.
-
-**Benchmark before committing.**
+That is the **standard you should use** for optimization claims.
 
 ---
 
-## 12. Jetson-oriented deployment
+## 11. Event replay: isolate the slow operation
 
-Good embedded default:
+Finding a slow operation is **only half the job**.
+
+You still need a **reproducer**.
+
+Full model reproducers are often difficult to share because they include:
+
+- proprietary model architecture
+- private weights
+- production input data
+- distributed launch setup
+- complex environment state
+
+TraceLens **event replay** generates a minimal script from trace metadata:
+
+- operation type
+- tensor shapes
+- dtypes
+- strides
+- relevant arguments
+
+This produces a focused benchmark case.
+
+Why this matters:
 
 ```text
-generator:
-  Qwen3.5-4B GGUF Q4_K_M
-
-embedding:
-  Granite 97M Multilingual R2
-  ONNX/OpenVINO/Transformers depending on hardware path
-
-vector DB:
-  Qdrant
-
-context:
-  4K-8K
-
-retrieval:
-  top_k = 8
-  rerank = 3
-
-runtime:
-  llama.cpp or carefully tested vLLM path
+model team finds a slow op
+  -> event replay creates minimal reproducer
+  -> kernel/compiler/vendor team debugs it
+  -> fix is validated against original trace
 ```
 
-Expected active memory planning:
+This is how you turn model-level performance debugging into **systems engineering**.
+
+---
+
+## 12. Where TraceLens fits in the agent stack
+
+Agent systems need performance evidence at multiple layers:
 
 ```text
-5-7 GB active VRAM for many 4K-8K configurations
-```
+application:
+  user latency, tool latency, session throughput
 
-But on Jetson, also consider unified memory pressure:
+agent runtime:
+  planning time, tool-call count, retry count, context growth
 
-- model weights
-- KV cache
-- embedding model
-- vector index
-- OS and desktop services
-- Python runtime
-- Qdrant memory
-- buffers and temporary tensors
+model server:
+  TTFT, ITL, output tokens/s, queueing, KV-cache memory
 
-For Jetson, do **not run every component on GPU**.
-
-Often:
-
-```text
 GPU:
-  generator
+  kernels, copies, collectives, idle time, roofline metrics
+```
 
-CPU / optimized runtime:
-  embedding
-  vector search
-  reranker if latency allows
+TraceLens focuses on the **lower layers**, but it should be connected to the higher layers.
+
+For OpenClaw-style systems, a useful workflow is:
+
+```text
+run representative agent workload
+  -> collect model-server trace
+  -> generate TraceLens report
+  -> identify bottleneck
+  -> create event replay if needed
+  -> change model/backend/kernel/config
+  -> compare traces
+  -> attach report to deployment decision
+```
+
+This pairs directly with **Lecture 43**.
+
+If you enable FP8 KV-cache, do not only report:
+
+```text
+It feels faster.
+```
+
+Report:
+
+```text
+TTFT
+ITL
+output tokens/s
+GPU memory
+operator-level time
+attention kernel time
+copy time
+communication exposure
+accuracy
+trace comparison delta
 ```
 
 ---
 
-## 13. Server-oriented deployment
+## 13. Practical workflow
 
-Good small GPU server stack:
+Install TraceLens:
 
-```text
-generator:
-  Qwen3.5-4B AWQ or GPTQ
-
-embedding:
-  Granite 311M if quality matters and memory allows
-  Granite 97M if latency/cost matters
-
-runtime:
-  vLLM
-
-vector DB:
-  Qdrant
-
-optimization:
-  FlashInfer backend where applicable
-  continuous batching
-  prefix caching
-  KV-cache optimization
+```bash
+pip install git+https://github.com/AMD-AGI/TraceLens.git
 ```
 
-Good when:
+Generate a performance report from a PyTorch trace:
 
-- many users
-- concurrent local agents
-- OpenAI-compatible endpoint desired
-- larger context windows
-- multiple models served behind routing
+```bash
+TraceLens_generate_perf_report_pytorch \
+  --profile_json_path path/to/your/trace.json
+```
 
-The server stack should measure:
+Compare two reports:
 
-- throughput
-- p95 latency
-- TTFT
-- ITL
-- GPU memory
-- retrieval latency
-- reranker latency
-- prompt token count
-- answer correctness
+```bash
+TraceLens_compare_perf_reports_pytorch \
+  baseline.xlsx candidate.xlsx \
+  --names baseline candidate \
+  --sheets all \
+  -o comparison.xlsx
+```
+
+Generate a multi-rank collective report:
+
+```bash
+TraceLens_generate_multi_rank_collective_report_pytorch \
+  --trace_dir /path/to/traces \
+  --world_size 8
+```
+
+For ROCm `rocprofv3` Perfetto-style traces:
+
+```bash
+rocprofv3 \
+  --hip-trace \
+  --kernel-trace \
+  --memory-copy-trace \
+  --rccl-trace \
+  --output-format pftrace \
+  -d ./v3_traces \
+  -- python3 your_app.py
+
+TraceLens_generate_perf_report_pftrace_hip_activity \
+  --trace_path sample.pftrace \
+  --write_md
+```
+
+Use these commands as **starting points**, not a complete profiling policy.
+
+For reliable comparisons, also pin:
+
+- model revision
+- input workload
+- batch/concurrency
+- sequence lengths
+- dtype policy
+- GPU clocks if relevant
+- driver/runtime versions
+- backend flags
+- warmup count
+- random seeds if accuracy is involved
 
 ---
 
-## 14. Advanced optimization
+## 14. Diagnostic playbook
 
-### KV-cache quantization
+Use TraceLens reports to **choose the next action**.
 
-KV cache can **dominate long-context decode memory**.
+### Case: high idle time
 
-Options:
+Likely causes:
 
-- INT8 KV
-- FP8 KV on supported hardware/backend
-- paged KV cache
+- CPU dataloader bottleneck
+- Python overhead
+- synchronization
+- dynamic shape recompilation
+- queue starvation
+- model server scheduling gap
 
-Use when:
+Next actions:
 
-- context length grows
-- concurrency matters
-- decode is memory-bound
+- inspect CPU dispatch timeline
+- check batch construction
+- reduce Python in the hot path
+- verify warmup and compile behavior
+- correlate with request-level telemetry
 
-Connect to Lecture 36 for FP8 KV-cache tradeoffs.
+### Case: GEMM dominates but TFLOPS/s is low
 
-### Prefix caching
+Likely causes:
 
-Agents often reuse:
+- small or awkward matrix shapes
+- poor alignment
+- bad layout
+- backend algorithm choice
+- unnecessary transposes
+- low occupancy
 
-- system prompt
-- tool instructions
-- safety policy
-- RAG answer format
+Next actions:
 
-Cache stable prefixes when runtime supports it.
+- inspect shape-level rows
+- compare against hardware peak and expected roofline
+- generate event replay for the slow shape
+- test alternative kernels or layouts
 
-This avoids **recomputing the same prompt prefix** repeatedly.
+### Case: attention dominates long-context serving
 
-### Speculative decoding
+Likely causes:
 
-Use:
+- KV-cache memory traffic
+- head dimension issue
+- backend selection
+- context length distribution
+- low-precision conversion overhead
 
-```text
-small draft model
-  -> larger verifier model
-```
+Next actions:
 
-For a 4B verifier, a 0.5B-1B draft can improve throughput if acceptance rate is high.
+- compare BF16 vs FP8 traces
+- inspect attention kernel time
+- test skip policies for sliding-window layers
+- validate accuracy on real prompts
+- connect to Lecture 43's TTFT/ITL benchmark plan
 
-Speculative decoding is **not free**.
+### Case: exposed communication is high
 
-Measure:
+Likely causes:
 
-- acceptance rate
-- extra memory
-- added complexity
-- latency distribution
+- poor overlap
+- collective algorithm issue
+- rank imbalance
+- network bottleneck
+- tensor-parallel or FSDP layout mismatch
 
----
+Next actions:
 
-## 15. Evaluation plan
+- inspect skew vs pure communication time
+- compare algorithmic and bus bandwidth
+- inspect per-rank timelines
+- adjust sharding, bucket sizes, or overlap strategy
 
-Efficient RAG needs **both retrieval and generation evals**.
+### Case: regression after a software update
 
-Measure retrieval:
+Likely causes:
 
-- recall@k
-- MRR
-- nDCG
-- exact source hit rate
-- multilingual retrieval accuracy
-- code symbol retrieval accuracy
+- backend kernel selection changed
+- compiler changed generated code
+- framework changed dispatch path
+- dtype/layout behavior changed
+- fusion changed
 
-Measure answer quality:
+Next actions:
 
-- groundedness
-- citation correctness
-- abstention when context is insufficient
-- multilingual answer quality
-- code correctness
-- hallucination rate
-
-Measure systems performance:
-
-- query embedding latency
-- vector search latency
-- rerank latency
-- prompt assembly time
-- TTFT
-- ITL
-- total response latency
-- VRAM
-- RAM
-- watts if on Jetson
-
-The decision rule:
-
-```text
-optimize retrieval before increasing model size
-```
+- run TraceLens comparison
+- identify the largest positive deltas
+- inspect lowest divergent subtree
+- replay the slow op
+- keep the trace report with the change review
 
 ---
 
-## 16. Biggest mistakes
+## 15. How this connects to agent reliability
 
-Avoid:
+Earlier lectures focused on **agent skills, structured tools, and verification**.
 
-- giant chunks
-- too many retrieved chunks
-- no reranking
-- huge prompts
-- FP16 everywhere
-- no caching
-- no metadata filtering
-- no citation checks
-- no abstention behavior
-- evaluating only final answers
-- ignoring retrieval metrics
-- running embedding, vector DB, reranker, and generator all on the GPU without measuring pressure
-
-The **best engineering insight**:
+TraceLens applies the **same idea to performance**:
 
 ```text
-efficient RAG is mostly memory bandwidth and context-quality engineering,
-not raw parameter count
+claim:
+  "This optimization improves long-context serving."
+
+required evidence:
+  trace report
+  before/after comparison
+  workload description
+  bottleneck explanation
+  accuracy check
+  deployment decision
 ```
 
-The winning systems optimize:
+This matters because agent systems invite **vague performance claims**:
 
-- retrieval precision
-- KV cache
-- prompt size
-- chunk quality
-- batching
-- token efficiency
-- cache reuse
-- metadata filtering
+- "The model is slow."
+- "The GPU is the bottleneck."
+- "Communication is killing scaling."
+- "FP8 is faster."
+- "The new backend regressed."
+
+TraceLens helps turn those into **falsifiable statements**:
+
+```text
+On this workload, aten::mm for this shape regressed by X ms.
+On this run, exposed communication is Y% and skew is Z us.
+On this model, attention kernel time dropped but copy time increased.
+On this backend, GPU idle time is dominated by CPU dispatch gaps.
+```
+
+That is the **engineering standard**.
 
 ---
 
-## Mini-lab: design a Jetson RAG stack
+## Mini-lab: Trace a model change
 
-Design a local RAG system for technical documentation on Jetson Orin 16GB.
+Choose one small but real workload:
 
-Fill this out:
+- a PyTorch transformer block
+- a vLLM benchmark
+- a multi-GPU training step
+- a custom CUDA/ROCm kernel path
+- an OpenClaw agent workload that calls a local model server
 
-```text
-Generator:
-Quantization:
-Context length:
-Embedding model:
-Embedding runtime:
-Vector DB:
-Chunk size:
-Overlap:
-Top-K:
-Rerank strategy:
-Prompt budget:
-Backend:
-Expected VRAM:
-Expected RAM:
-Latency target:
-Evaluation set:
-Failure threshold:
-```
-
-Then write a decision:
+Run two configurations:
 
 ```text
-Use Qwen3.5-4B INT4 because:
-Use Granite 97M because:
-Use Qdrant because:
-Need reranking because:
-Do not increase context beyond:
-First optimization to try:
-First metric to monitor:
+baseline
+candidate
 ```
+
+Examples:
+
+```text
+BF16 vs FP8
+old backend vs new backend
+CUDA vs ROCm
+single GPU vs multi-GPU
+eager vs compiled
+with fusion vs without fusion
+```
+
+Collect traces, then generate TraceLens reports.
+
+Write a short performance note:
+
+```text
+Workload:
+Hardware:
+Software versions:
+Main bottleneck:
+Biggest improvement:
+Biggest regression:
+Evidence:
+Deployment decision:
+Next experiment:
+```
+
+If you find one slow operation, generate an event replay and treat it as a kernel debugging task.
 
 ---
 
 ## Key takeaways
 
-- Efficient local RAG is retrieval-quality engineering plus memory discipline.
-- Qwen3.5-4B INT4 is a plausible small generator target, but exact variant/backend behavior must be validated.
-- Granite 97M Multilingual R2 is a strong edge embedding model because it is compact, multilingual, and retrieval-oriented.
-- Qdrant is usually a good edge-first vector database; pgvector is better when PostgreSQL integration dominates.
-- Chunking and reranking often improve quality more than increasing generator size.
-- Small models need compact, high-signal retrieved context and strict grounded prompts.
-- llama.cpp is strong for embedded GGUF deployment; vLLM is strong for server batching; TensorRT-LLM is for deeper NVIDIA optimization.
-- KV-cache optimization, prefix caching, and speculative decoding can improve local agent throughput.
-- Measure retrieval, answer quality, latency, VRAM, RAM, and power before declaring the stack "efficient."
+- Raw profiler traces are too large and flat for reliable manual analysis.
+- TraceLens turns framework traces into hierarchical, queryable evidence.
+- Trace2Tree connects Python modules, CPU dispatches, runtime launches, and GPU kernels.
+- Start diagnosis at the GPU timeline, then drill into categories, ops, shapes, and kernels.
+- Roofline-style metrics help distinguish "slow" from "inefficient."
+- Multi-GPU collective time must be separated into pure communication and synchronization skew.
+- Trace comparison is the right way to prove a performance change.
+- Event replay turns trace metadata into minimal reproducers for kernel and backend debugging.
+- For agent systems, performance claims should be backed by traces, comparisons, and workload descriptions.
 
 ---
 
 ## References
 
-- Qwen/Qwen3.5-4B model card: [https://huggingface.co/Qwen/Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B)
-- Granite 97M Multilingual R2 model card: [https://huggingface.co/ibm-granite/granite-embedding-97m-multilingual-r2](https://huggingface.co/ibm-granite/granite-embedding-97m-multilingual-r2)
-- IBM Granite Embedding docs: [https://www.ibm.com/us-en/granite/docs/models/embedding](https://www.ibm.com/us-en/granite/docs/models/embedding)
-- Qdrant indexing documentation: [https://qdrant.tech/documentation/manage-data/indexing/](https://qdrant.tech/documentation/manage-data/indexing/)
-- llama.cpp: [https://github.com/ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp)
-- vLLM documentation: [https://docs.vllm.ai](https://docs.vllm.ai)
-- TensorRT-LLM: [https://github.com/NVIDIA/TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM)
-- Lecture 36 - FP8 KV-Cache in vLLM: [Lecture-36.md](Lecture-36.md)
-- Lecture 43 - MLSys 2026 Kernel Contest: [Lecture-43.md](Lecture-43.md)
+- AMD ROCm Blog, "TraceLens: Democratizing AI Performance Analysis": [https://rocm.blogs.amd.com/software-tools-optimization/tracelens/README.html](https://rocm.blogs.amd.com/software-tools-optimization/tracelens/README.html)
+- TraceLens GitHub repository: [https://github.com/AMD-AGI/TraceLens](https://github.com/AMD-AGI/TraceLens)
+- PyTorch profiler documentation: [https://docs.pytorch.org/docs/stable/profiler.html](https://docs.pytorch.org/docs/stable/profiler.html)
+- Perfetto trace viewer: [https://ui.perfetto.dev](https://ui.perfetto.dev)
+- Lecture 43 - FP8 KV-Cache in vLLM: [Lecture-43.md](Lecture-43.md)
 
 ---
 
-*Next: [Lecture 45 - Qdrant, pgvector, and Embedding Model Selection](Lecture-45.md)*
+*Next: [Lecture 45](Lecture-45.md)*

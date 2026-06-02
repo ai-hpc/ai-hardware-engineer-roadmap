@@ -745,7 +745,7 @@ Research complete!
 
 Once the basic agent works, try these improvements:
 
-1. **Web UI** — Wrap `run_streaming` in a FastAPI endpoint with SSE (see Lecture 12).
+1. **Web UI** — Wrap `run_streaming` in a FastAPI endpoint with SSE (see Lecture 30).
 2. **More tools** — Add `calculate(expression: str)`, `read_pdf(path: str)`, or `run_python(code: str)`.
 3. **Parallel tool calls** — The current loop executes tools sequentially. Try executing independent tool calls with `asyncio.gather`.
 4. **Smarter memory** — Instead of prepending all sessions, embed past summaries and retrieve only the most relevant ones (RAG over your own notes).
