@@ -81,6 +81,82 @@ This is the architecture every 7B–72B dense LLM ships today. Mastering it = po
 
 ---
 
+## 1.1 RMSNorm — what it actually does
+
+Applied twice per block (pre-attention, pre-MLP), so 160 times across 80 layers. Worth understanding cold, not just naming.
+
+### The problem it solves
+
+Neural networks produce activations that drift in scale as they pass through layers:
+
+```text
+Layer 1 output: small values (~0.1)
+Layer 40 output: large values (~50)
+Layer 80 output: exploding or vanishing
+```
+
+Without normalization, gradients explode or vanish and training fails for deep stacks.
+
+### The formula
+
+```text
+RMSNorm(x) = γ ⊙ (x / RMS(x))
+
+where RMS(x) = sqrt( (1/d) · Σ xᵢ² )
+```
+
+### Intuition: RMS = "typical magnitude"
+
+Take `x = [2, -2, 1, -1]`:
+
+```text
+Step 1 — square (removes sign): [4, 4, 1, 1]
+Step 2 — average:               (4+4+1+1)/4 = 2.5
+Step 3 — square root:           √2.5 ≈ 1.58
+```
+
+Why square? Because positive and negative values cancel if you average directly:
+
+```text
+[+5, -5] → average = 0  ❌  (looks empty; the signal is actually strong)
+[+5, -5] → RMS     = 5  ✔  (captures the true energy)
+```
+
+RMS measures **signal energy**, not center.
+
+### The two-step operation
+
+**Step A — measure scale:** divide by RMS → vector now has stable unit magnitude.
+
+**Step B — re-scale (learned):** multiply by learned weight `γ` → the model decides how loud each layer should be.
+
+```text
+Before:  x = [3, -4]    → RMS = √((9+16)/2) ≈ 3.54  (magnitude uncontrolled)
+After:   x / RMS ≈ [0.85, -1.13]                     (stable ~unit magnitude)
+With γ:  γ ⊙ [0.85, -1.13]                           (model-learned scale)
+```
+
+> **Analogy:** think of each token vector as an audio signal. RMS = volume meter. RMSNorm = automatic gain control. No matter how loud the layer gets, it keeps the signal at a stable, learnable loudness.
+
+### Why not LayerNorm?
+
+LayerNorm also subtracts the mean (centers the distribution). In practice, centering adds computation without consistent benefit for transformer activations — the scale matters far more than the center. RMSNorm drops the centering:
+
+```text
+LayerNorm:  center (subtract mean) + scale
+RMSNorm:    scale only
+```
+
+Result: simpler, ~10% faster, essentially the same quality for deep decoders. All modern dense LLMs (Llama, Qwen, Mistral, Gemma) use RMSNorm for this reason.
+
+### What this means for inference engineering
+
+* **Cost:** elementwise, bandwidth-bound at decode (reads activations once, writes once). Negligible FLOPs — ~0.5 FLOP/B, well below the roofline ridge. Two calls per block × 80 blocks = 160 calls per token, but each is cheap.
+* **ε (epsilon):** `1e-6` for Qwen 2.5 72B, `1e-5` for Llama 3.3 70B. Adds to the denominator to prevent division by zero when activations are near-zero. Inference-irrelevant in practice.
+* **γ weights:** 1 vector of `d_model` floats per RMSNorm call × 2 per block × 80 blocks = 160 × 8192 ≈ 1.3M params — tiny fraction of 72B, but each must be loaded from HBM at decode.
+
+---
+
 ## 2. The four differences
 
 ### 2.1 Width — nearly identical (and a cautionary tale)

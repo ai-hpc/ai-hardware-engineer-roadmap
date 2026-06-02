@@ -32,6 +32,8 @@ output: hidden states for all P positions
 
 Concretely, for each of the L transformer layers:
 
+> **RMSNorm** rescales each token vector to a stable magnitude before every sub-layer (pre-norm). It is elementwise, bandwidth-bound, and costs ~0.5 FLOP/B — cheap individually but called 160 times across 80 layers per token. For the full intuition (what RMS measures, why it replaces LayerNorm, and what ε does) see [Part 2 → Lecture 01 §1.1](../Part%202%20-%20Dense%20at%20Hopper/Lecture-01.md#11-rmsnorm--what-it-actually-does).
+
 ```text
 x ── RMSNorm ─► QKV projection ──► (Q, K, V each of shape [P, h_q × head_dim] / [P, h_kv × head_dim])
                                     │
