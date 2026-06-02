@@ -1,6 +1,6 @@
 # Part 2 — Dense Decoder-Only Inference at Hopper
 
-The end-to-end production inference stack for 70B-class dense models on Hopper-class hardware (H100 / H200). Six lectures, anchored on a side-by-side comparison of two of the most-deployed dense models in 2025–2026:
+The end-to-end production inference stack for 70B-class dense models on Hopper-class hardware (H100 / H200). Seven lectures, anchored on a side-by-side comparison of two of the most-deployed dense models in 2025–2026:
 
 * **Llama 3.3 70B Instruct** — the canonical Western dense workhorse, 8192 hidden, 28672 FFN, GQA (64 Q / 8 KV), bias-free attention.
 * **Qwen 2.5 72B Instruct** — the canonical Chinese dense counterpart, dimensionally near-identical (8192 hidden, *slightly* wider 29568 FFN, same GQA 64 Q / 8 KV), differing in QKV bias (present) and a larger multilingual tokenizer (152K vocab). *(Beware secondary sources that misquote Qwen as 12288 / 49152 — Lecture 01 §2.1 shows why that fails a parameter-count check.)*
@@ -21,6 +21,7 @@ By the end of Part 2 you should be able to ship either model to production on 4�
 | 04 | [Single-node multi-GPU serving — tensor parallelism on 8× H100/H200](Lecture-04.md) | How does TP scale, where do the collectives dominate, and what's the runtime-specific config? |
 | 05 | [Modern serving stack — continuous batching, paged KV, prefix cache, speculation](Lecture-05.md) | Which knobs move which metric, on this hardware, on these models? |
 | 06 | [Long context at 128K on Hopper — KV scaling, YaRN, chunked prefill, prefix sharing](Lecture-06.md) | What breaks at 128K and what is the precision recipe at that context? |
+| 07 | [Inside the communication layer — NCCL, custom all-reduce, the vLLM communicator stack](Lecture-07.md) | How does a runtime actually move bytes between GPUs, and which collective path wins at decode? |
 
 </div>
 

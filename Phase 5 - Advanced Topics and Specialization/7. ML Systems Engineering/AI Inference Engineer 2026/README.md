@@ -44,7 +44,7 @@ Run it locally: `git clone https://github.com/ai-hpc/llm-inference-viz && cd llm
 
 ---
 
-## Course Map (3 parts, 16 lectures)
+## Course Map (3 parts, 17 lectures)
 
 ### 🧭 Part 1 — Fundamentals of AI Inference / MLSys (5 lectures)
 
@@ -62,7 +62,7 @@ The mental model, the metrics, the math, and the runtime landscape. Anyone who f
 
 </div>
 
-### ⚙️ Part 2 — Dense Decoder-Only Inference at Hopper (6 lectures)
+### ⚙️ Part 2 — Dense Decoder-Only Inference at Hopper (7 lectures)
 
 The end-to-end Hopper stack for 70B-class dense models. Anchored on a **Llama 3.3 70B ↔ Qwen 2.5 72B** comparison so every concept lands on two concrete deployable systems.
 
@@ -76,6 +76,7 @@ The end-to-end Hopper stack for 70B-class dense models. Anchored on a **Llama 3.
 | 04 | [Single-node multi-GPU serving — tensor parallelism on 8× H100/H200](Part%202%20-%20Dense%20at%20Hopper/Lecture-04.md) |
 | 05 | [Modern serving stack — continuous batching, paged KV, prefix cache, speculation](Part%202%20-%20Dense%20at%20Hopper/Lecture-05.md) |
 | 06 | [Long context at 128K on Hopper — KV scaling, YaRN, chunked prefill, prefix sharing](Part%202%20-%20Dense%20at%20Hopper/Lecture-06.md) |
+| 07 | [Inside the communication layer — NCCL, custom all-reduce, the vLLM communicator stack](Part%202%20-%20Dense%20at%20Hopper/Lecture-07.md) |
 
 </div>
 

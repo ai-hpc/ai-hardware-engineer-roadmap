@@ -6,6 +6,12 @@ When a lecture is refreshed, update its `## Current as of YYYY-MM` line *and* ad
 
 ---
 
+## 2026-06 — New lecture: Part 2 Lecture 07 (the communication layer)
+
+Added **Part 2 Lecture 07 — "Inside the Communication Layer: NCCL, Custom All-Reduce, and the vLLM Communicator Stack."** How a serving runtime actually moves bytes between GPUs, using vLLM's `distributed/device_communicators/` as the worked example: the three-layer architecture (router → engines → primitives), the small-message latency problem that motivates a custom one-shot/two-shot all-reduce over the NCCL ring, the fused all-reduce+RMSNorm path (FlashInfer), the runtime routing/fallback ladder, and all2all as a forward pointer to Part 3 MoE. Mechanistically explains Lecture 04's "TP=8 decode is comm-bound." Part 2 is now 7 lectures (course total 16 → 17); updated the Part 2 README, course README counts/maps, Lecture 06 footer, and the root roadmap README. Module names pinned to the vLLM 0.22-era lineage and hedged as version-dependent.
+
+---
+
 ## 2026-06 — Add FlashInfer (shared kernel engine) + InferenceX (live benchmark reference)
 
 - **FlashInfer** — added to **Part 2 Lecture 05 §2.4** as the shared, JIT-compiled attention + sampling kernel engine that vLLM / SGLang / TensorRT-LLM / MLC-LLM build on (paged/ragged attention, sorting-free sampling, customizable variants). Framed as the "which attention backend" knob (`VLLM_ATTENTION_BACKEND=FLASHINFER`, SGLang `--attention-backend flashinfer`). Source: [arXiv:2501.01005](https://arxiv.org/abs/2501.01005) (MLSys 2025), Apache-2.0, `flashinfer-ai`.

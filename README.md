@@ -245,7 +245,7 @@ The deepest, most current technical content lives in these Phase 5 lectures — 
 | 5 | [Qwen2.5-72B Multi-GPU FP16](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/Lecture-04.md) | TP=8 partitioning, NCCL hot path, paged attention, YaRN, runtime recipes |
 | 6 | [Cross-Model & Production Serving](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/Lecture-05.md) | Speculative decoding pairings, edge/cloud routing, observability, capacity planning |
 | 7 | [Batched GEMM vs Normal GEMM](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/Lecture-06.md) | cuBLAS API forms, column-major dance, tensor cores, bit-exact reproducibility |
-| 8 | [AI Inference Engineer 2026 — special course](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/7.%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/README.md) | The full 2026 production inference stack as a 16-lecture arc: dense → MoE, Hopper → Blackwell, FP16 → FP8 → FP4, vLLM / SGLang / TensorRT-LLM, tensor parallelism, disaggregated prefill/decode, rooflines |
+| 8 | [AI Inference Engineer 2026 — special course](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/7.%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/README.md) | The full 2026 production inference stack as a 17-lecture arc: dense → MoE, Hopper → Blackwell, FP16 → FP8 → FP4, vLLM / SGLang / TensorRT-LLM, tensor parallelism, collective/communication internals, disaggregated prefill/decode, rooflines |
 
 </div>
 
