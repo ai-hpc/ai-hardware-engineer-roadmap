@@ -1,11 +1,11 @@
-# Module 3B — Agentic AI & GenAI
+# AI Agent Development 2026
 
 <div class="course-identity auto-course" style="--course-accent: #0f766e; --course-accent-rgb: 15, 118, 110;" markdown="1">
-<div class="course-identity__icon">M3AA</div>
+<div class="course-identity__icon">AAD</div>
 <div markdown="1">
-<p class="course-identity__eyebrow">Deep Dive · AI Workloads</p>
-<p class="course-identity__title">Specialized course identity for Module 3B — Agentic AI & GenAI.</p>
-<p class="course-identity__meta">Artifact: model or workload study · Measure: accuracy, latency, memory, throughput</p>
+<p class="course-identity__eyebrow">Deep Dive · AI Agents</p>
+<p class="course-identity__title">AI Agent Development 2026 — from the modern agent harness to a working build.</p>
+<p class="course-identity__meta">Artifact: a working agent (genie-claw) · Measure: reliability, latency, cost, safety</p>
 </div>
 </div>
 
@@ -20,43 +20,129 @@
 
 ---
 
-## Lecture Series
+## Curriculum — recommended learning order
 
-45 numbered lectures, one supplemental Lecture 24b, and 5 hands-on labs covering everything from LLM fundamentals to production multi-agent systems. **[→ Start here](Lectures/README.md)**
+A **theory-first path**: start from what a modern agent *is* in 2026, learn the fundamentals, build the core parts one by one, study a real harness (**OpenClaw**), then build your own (**genie-claw**). Lecture *files* keep their original numbers — this is the recommended **reading order**, not a renumbering. **[→ Flat lecture index](Lectures/README.md)**
 
-**Course currency note:** exact model names, context windows, SDK features, and pricing change quickly. This module teaches stable interfaces and system patterns: model APIs, tool protocols, runtime loops, workflow graphs, gateways, telemetry, and policy boundaries. Always check provider documentation before copying model IDs or prices into a real deployment.
+**Currency note:** model names, context windows, SDK features, and pricing change fast. This course teaches the *stable* layer — model APIs, tool protocols, run loops, workflow graphs, gateways, telemetry, and policy boundaries. Always check provider docs before copying model IDs or prices into production.
+
+### Module 1 · The modern AI agent (2026) — what changed
+
+The shift from chat boxes to persistent, tool-using systems — and the rise of the **harness**, the runtime *around* the model that turns a chat completion into an agent.
 
 <div class="lecture-map" markdown>
 
-| # | Lecture | # | Lecture |
-|---|---------|---|---------|
-| [01](Lectures/Lecture-01.md) | LLM Fundamentals | [24](Lectures/Lecture-24.md) | Agent Harness |
-| [02](Lectures/Lecture-02.md) | Prompt Engineering | [24b](Lectures/Lecture-24b.md) | Event-Sourced Agent State |
-| [03](Lectures/Lecture-03.md) | Tool Use | [25](Lectures/Lecture-25.md) | Building Agents I: Foundations |
-| [04](Lectures/Lecture-04.md) | Agent Architecture | [26](Lectures/Lecture-26.md) | Building Agents II: Orchestration |
-| [05](Lectures/Lecture-05.md) | Memory Systems | [27](Lectures/Lecture-27.md) | Agent Security Engineer |
-| [06](Lectures/Lecture-06.md) | LangGraph | [28](Lectures/Lecture-28.md) | Pi Minimal Agent |
-| [07](Lectures/Lecture-07.md) | Agent SDKs | [29](Lectures/Lecture-29.md) | Agent Skills |
-| [08](Lectures/Lecture-08.md) | Multi-Agent Systems | [30](Lectures/Lecture-30.md) | Agentic SDLC |
-| [09](Lectures/Lecture-09.md) | RAG — Ingestion | [31](Lectures/Lecture-31.md) | Runtime Strategy |
-| [10](Lectures/Lecture-10.md) | RAG — Retrieval | [32](Lectures/Lecture-32.md) | LLM From Scratch |
-| [11](Lectures/Lecture-11.md) | Evaluation | [33](Lectures/Lecture-33.md) | Structured Tools |
-| [12](Lectures/Lecture-12.md) | Production | [34](Lectures/Lecture-34.md) | Multimodal Sub-Agents |
-| [13](Lectures/Lecture-13.md) | Runtime Discipline | [35](Lectures/Lecture-35.md) | GPU Kernel Translation |
-| [14](Lectures/Lecture-14.md) | Deterministic Startup | [36](Lectures/Lecture-36.md) | FP8 KV-Cache |
-| [15](Lectures/Lecture-15.md) | OpenClaw Gateway | [37](Lectures/Lecture-37.md) | TraceLens |
-| [16](Lectures/Lecture-16.md) | Routing and Sessions | [38](Lectures/Lecture-38.md) | AutoSP |
-| [17](Lectures/Lecture-17.md) | Isolation and Memory | [39](Lectures/Lecture-39.md) | Agent Skills Eval |
-| [18](Lectures/Lecture-18.md) | Operations and Security | [40](Lectures/Lecture-40.md) | ZAYA1-8B |
-| [19](Lectures/Lecture-19.md) | Agent Loop | [41](Lectures/Lecture-41.md) | OpenClaw Threat Model |
-| [20](Lectures/Lecture-20.md) | Cron and Scheduled Agent Runs | [42](Lectures/Lecture-42.md) | OpenAI Agents SDK |
-| [21](Lectures/Lecture-21.md) | System Prompt Architecture | [43](Lectures/Lecture-43.md) | MLSys Kernel Contest |
-| [22](Lectures/Lecture-22.md) | App SDK and Typed RPCs | [44](Lectures/Lecture-44.md) | Efficient Local RAG |
-| [23](Lectures/Lecture-23.md) | Gateway RPC Protocol | [45](Lectures/Lecture-45.md) | Vector Stores and Embeddings |
+| # | Lecture |
+|---|---------|
+| [24](Lectures/Lecture-24.md) | What is an AI agent harness? — the runtime around the model |
+| [24b](Lectures/Lecture-24b.md) | Session as source of truth — event-sourced agent state |
+| [31](Lectures/Lecture-31.md) | Runtime strategy — Node, Bun, Rust, and edge packaging |
 
 </div>
 
-**Labs:** [Lab 01 — Research Agent](Lectures/Lab-01-Research-Agent.md) · [Lab 02 — Multi-Agent Pipeline](Lectures/Lab-02-Multi-Agent-Pipeline.md) · [Lab 03 — Production RAG](Lectures/Lab-03-Production-RAG.md) · [Lab 04 — TokenJuice Output Compaction](Lectures/Lab-04-TokenJuice-Output-Compaction.md) · [Lab 05 — OpenMeow App SDK Dogfood](Lectures/Lab-05-OpenMeow-App-SDK-Dogfood.md)
+### Module 2 · Fundamentals
+
+How the model underneath actually works, and how you talk to it.
+
+<div class="lecture-map" markdown>
+
+| # | Lecture |
+|---|---------|
+| [01](Lectures/Lecture-01.md) | LLM fundamentals for agents |
+| [32](Lectures/Lecture-32.md) | LLM from scratch — model mechanics |
+| [02](Lectures/Lecture-02.md) | Prompt engineering & structured output |
+
+</div>
+
+### Module 3 · Core parts of an agent (one by one)
+
+The building blocks, in dependency order — the **foundations spine** first, then tools, memory, retrieval, orchestration, skills, evaluation, and safety.
+
+<div class="lecture-map" markdown>
+
+| # | Lecture |
+|---|---------|
+| [25](Lectures/Lecture-25.md) | Building agents I — foundations (model, tools, instructions) |
+| [26](Lectures/Lecture-26.md) | Building agents II — orchestration & guardrails |
+| [03](Lectures/Lecture-03.md) | Tool use & function calling |
+| [33](Lectures/Lecture-33.md) | Structured tools beat computer use |
+| [05](Lectures/Lecture-05.md) | Memory systems |
+| [09](Lectures/Lecture-09.md) | RAG — ingestion & embeddings |
+| [10](Lectures/Lecture-10.md) | RAG — retrieval & reranking |
+| [45](Lectures/Lecture-45.md) | Vector stores & embedding model selection |
+| [44](Lectures/Lecture-44.md) | Efficient local RAG stack |
+| [04](Lectures/Lecture-04.md) | Agent architecture patterns (ReAct, plan-execute, reflexion) |
+| [06](Lectures/Lecture-06.md) | LangGraph — stateful workflows |
+| [07](Lectures/Lecture-07.md) | Agent SDKs & runtime APIs |
+| [42](Lectures/Lecture-42.md) | OpenAI Agents SDK |
+| [08](Lectures/Lecture-08.md) | Multi-agent systems |
+| [34](Lectures/Lecture-34.md) | Multimodal sub-agents |
+| [29](Lectures/Lecture-29.md) | Agent skills — workflow discipline |
+| [39](Lectures/Lecture-39.md) | Agent skills eval |
+| [11](Lectures/Lecture-11.md) | Evaluation & observability |
+| [13](Lectures/Lecture-13.md) | Runtime discipline & AI runtime security |
+| [27](Lectures/Lecture-27.md) | AI agent security engineer |
+| [14](Lectures/Lecture-14.md) | Deterministic startup |
+| [30](Lectures/Lecture-30.md) | Agentic SDLC |
+| [12](Lectures/Lecture-12.md) | Production deployment |
+
+</div>
+
+### Module 4 · Example — anatomy of a real harness (OpenClaw)
+
+A production-style, local-first assistant taken apart piece by piece — the concepts of Module 3 made concrete in one system.
+
+<div class="lecture-map" markdown>
+
+| # | Lecture |
+|---|---------|
+| [15](Lectures/Lecture-15.md) | Gateway architecture |
+| [16](Lectures/Lecture-16.md) | Routing & sessions |
+| [17](Lectures/Lecture-17.md) | Multi-agent isolation |
+| [18](Lectures/Lecture-18.md) | Operations & security |
+| [19](Lectures/Lecture-19.md) | The agent loop |
+| [20](Lectures/Lecture-20.md) | Cron & scheduled agent runs |
+| [21](Lectures/Lecture-21.md) | System prompt architecture |
+| [22](Lectures/Lecture-22.md) | App SDK & typed RPCs |
+| [23](Lectures/Lecture-23.md) | Gateway RPC protocol |
+| [41](Lectures/Lecture-41.md) | OpenClaw threat model (MITRE ATLAS for agent security) |
+| [28](Lectures/Lecture-28.md) | Pi — the minimal agent beneath OpenClaw |
+
+</div>
+
+### Module 5 · Practice — build **genie-claw**
+
+The capstone: apply Modules 1–4 by building **genie-claw** — your own minimal agent harness that pairs a local LLM runtime (the GeniePod [`genie-ai-runtime`](https://github.com/GeniePod/genie-ai-runtime)) with an OpenClaw-style gateway: sessions, tools, guardrails, and a run loop you control end-to-end. The labs below are the stepping stones.
+
+<div class="lecture-map" markdown>
+
+| Lab | Build |
+|-----|-------|
+| [Lab 01](Lectures/Lab-01-Research-Agent.md) | Research agent with tool use |
+| [Lab 02](Lectures/Lab-02-Multi-Agent-Pipeline.md) | Multi-agent code-review pipeline |
+| [Lab 03](Lectures/Lab-03-Production-RAG.md) | Production RAG system |
+| [Lab 04](Lectures/Lab-04-TokenJuice-Output-Compaction.md) | TokenJuice output compaction |
+| [Lab 05](Lectures/Lab-05-OpenMeow-App-SDK-Dogfood.md) | OpenMeow App SDK dogfood (macOS) |
+| **Capstone** | **genie-claw** — a local-first agent harness wiring it all together |
+
+</div>
+
+### Appendix · Advanced / MLSys-adjacent
+
+Inference- and kernel-leaning deep dives that overlap the **AI Inference Engineer 2026** course (Phase 5 → ML Systems Engineering) — optional unless you're going down to the metal.
+
+<div class="lecture-map" markdown>
+
+| # | Lecture |
+|---|---------|
+| [35](Lectures/Lecture-35.md) | GPU kernel translation (cuTile) |
+| [36](Lectures/Lecture-36.md) | FP8 KV-cache in vLLM |
+| [37](Lectures/Lecture-37.md) | TraceLens — trace-driven performance analysis |
+| [38](Lectures/Lecture-38.md) | AutoSP — compiler-generated sequence parallelism |
+| [40](Lectures/Lecture-40.md) | ZAYA1-8B — small MoE reasoning |
+| [43](Lectures/Lecture-43.md) | MLSys 2026 kernel contest |
+
+</div>
 
 ---
 

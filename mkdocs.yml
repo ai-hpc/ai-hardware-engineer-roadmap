@@ -279,7 +279,7 @@ nav:
       - 5. Voice AI: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/5. Voice AI/Guide.md
       - 6. Edge AI & Optimization: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/6. Edge AI and Model Optimization/Guide.md
     - "Track B: Agentic AI & ML":
-      - 3. Agentic AI & GenAI:
+      - 3. AI Agent Development 2026:
         - Guide: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Guide.md
         - Lectures:
           - Index: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/README.md
@@ -308,8 +308,8 @@ nav:
           - "23: Gateway RPC Protocol": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-23.md
           - "24: What Is an AI Agent Harness?": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-24.md
           - "24b: Session as Source of Truth": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-24b.md
-          - "25: OpenCoven Agent Workspace": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-25.md
-          - "26: OpenKnots Agent Interfaces": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-26.md
+          - "25: Building Agents I — Foundations": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-25.md
+          - "26: Building Agents II — Orchestration & Guardrails": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-26.md
           - "27: AI Agent Security Engineer Roadmap": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-27.md
           - "28: Pi - Minimal Agent Beneath OpenClaw": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-28.md
           - "29: Agent Skills": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-29.md

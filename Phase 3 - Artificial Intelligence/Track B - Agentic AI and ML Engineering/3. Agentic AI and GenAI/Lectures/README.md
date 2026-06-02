@@ -1,6 +1,8 @@
-# Agentic AI Development - Lecture Series
+# AI Agent Development 2026 — Lecture Index
 
-A hands-on lecture series building from LLM fundamentals to production multi-agent systems.
+A hands-on lecture series building from the modern agent harness, through fundamentals and the core parts of an agent, to a real harness case study (OpenClaw) and a capstone build (**genie-claw**).
+
+> This is the **flat, numbered index** of all lectures. For the recommended **theory-first reading order** grouped into modules, see the **[course Guide](../Guide.md)**.
 
 ## How to Read This Course in 2026
 
