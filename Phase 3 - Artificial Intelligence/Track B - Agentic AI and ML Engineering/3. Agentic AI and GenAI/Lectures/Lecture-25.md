@@ -1,780 +1,185 @@
-# Lecture 25 - OpenCoven Case Study: Agent-Native Workspace and Local Harness Substrate
+# Lecture 25 - Building Agents I: Foundations (Model, Tools, Instructions)
 
 **Course:** [Agentic AI & GenAI](../Guide.md) | **Previous:** [Lecture 24b](Lecture-24b.md) | **Next:** [Lecture 26](Lecture-26.md)
 
 ---
 
-Modern agent products are no longer just **chat boxes**.
+This lecture and the next distill the **practitioner framework for building agents** — the design choices that separate a reliable production agent from a demo. It follows the structure popularized by OpenAI's practical guidance on building agents, grounded in patterns seen across many real deployments.
 
-They are becoming **workspaces**:
-
-```text
-agents
-  + codebases
-  + terminals
-  + browsers
-  + desktop apps
-  + sessions
-  + approvals
-  + traces
-  + local tools
-  + external clients
-```
-
-OpenCoven is a useful case study because it is organized around this idea:
-
-> an open-source AI-native workspace for agentic builders
-
-The important lesson is not one specific repository.
-
-The lesson is how to split an agent workspace into **clean runtime pieces** without collapsing everything into one unsafe monolith.
+This lecture covers the **foundations**: what an agent actually is, when you should (and should not) build one, and the three components every agent is made of — **model, tools, and instructions**. Lecture 26 covers orchestration and guardrails.
 
 ---
 
-## Learning objectives
+## 1. What is an agent?
 
-By the end of this lecture, you should be able to:
+> **Agents are systems that independently accomplish tasks on your behalf.**
 
-1. Explain what an agent-native workspace is.
-2. Describe the OpenCoven ecosystem at a high level.
-3. Understand Coven as a local harness substrate for project-scoped agent sessions.
-4. Explain why the Rust daemon is the authority boundary in Coven.
-5. Distinguish OpenClaw, OpenCoven, Coven, OpenMeow, desktop-use, and PsiClaw.
-6. Understand why external app SDKs and internal plugin SDKs must stay separate.
-7. Explain how desktop automation should be isolated behind a narrow adapter.
-8. Describe observable, attachable PTY sessions as a product primitive.
-9. Identify safety boundaries for local agents that can run tools and touch files.
-10. Design a local-first agent workspace for hardware and AI systems work.
+Conventional software lets a user *streamline and automate* a workflow. An agent goes further: it performs the workflow **on the user's behalf, with a high degree of independence**.
 
----
+A **workflow** is a sequence of steps that must be executed to meet a goal — resolving a support ticket, booking a reservation, committing a code change, generating a report.
 
-## 1. The problem OpenCoven is addressing
+**What is *not* an agent:** applications that integrate an LLM but don't use it to *control workflow execution* — simple chatbots, single-turn LLM calls, sentiment classifiers. Wrapping a model call is not agency.
 
-Most agent systems start with this shape:
+An agent has two core characteristics that let it act reliably on a user's behalf:
 
-```text
-user
-  -> chat UI
-  -> model
-  -> tool calls
-```
-
-That is **too small** for real engineering work.
-
-Real builders move across:
-
-- repositories
-- terminals
-- code editors
-- browser sessions
-- design documents
-- local model tools
-- long-running agents
-- multiple harnesses such as Codex and Claude Code
-- external clients such as desktop apps and dashboards
-
-The failure mode is **fragmentation**:
-
-```text
-one tool owns the terminal
-another owns the chat
-another owns traces
-another owns approvals
-another owns desktop automation
-another owns session history
-```
-
-The workspace becomes **impossible to reason about**.
-
-OpenCoven's direction is to make these surfaces coherent while keeping the **authority boundaries explicit**.
+1. **It uses an LLM to manage workflow execution and make decisions.** It recognizes when a workflow is complete, can proactively correct its own actions, and — on failure — can halt and **transfer control back to the user**.
+2. **It has access to tools** to interact with external systems (both to gather context and to take action) and **dynamically selects** the right tool for the current state — always within **clearly defined guardrails**.
 
 ---
 
-## 2. The OpenCoven ecosystem map
+## 2. When should you build an agent?
 
-OpenCoven is an **organization/ecosystem**, not one single runtime.
+Building an agent means rethinking how your system makes decisions. Agents shine exactly where **deterministic, rule-based automation falls short**.
 
-The useful mental model:
+The canonical example is **payment fraud analysis**. A traditional rules engine works like a *checklist*, flagging transactions against preset criteria. An LLM agent works more like a **seasoned investigator** — weighing context, considering subtle patterns, and catching suspicious activity even when no hard rule is violated. That nuanced reasoning is what lets agents handle complex, ambiguous situations.
 
-```text
-OpenCoven ecosystem
-  |
-  +-- Coven
-  |     local Rust harness substrate for project-scoped sessions
-  |
-  +-- OpenMeow SDK architecture
-  |     app-client dogfood path for OpenClaw's external SDK
-  |
-  +-- desktop-use
-  |     external desktop automation adapter for OpenClaw/OpenCoven surfaces
-  |
-  +-- PsiClaw
-  |     desktop companion model workspace, operator console, eval harness prototype
-  |
-  +-- distribution repos
-        downloads, Homebrew tap, package plumbing
-```
+Prioritize workflows that have **resisted automation**, especially where traditional methods hit friction:
 
-The architectural theme:
+<div class="lecture-map" markdown>
 
-```text
-Each component owns one job.
-Each boundary has a contract.
-No component should silently widen another component's authority.
-```
+| Signal | What it looks like | Example |
+|--------|--------------------|---------|
+| **Complex decision-making** | Nuanced judgment, exceptions, context-sensitive calls | Refund approval in customer service |
+| **Difficult-to-maintain rules** | Rulesets grown unwieldy; updates costly or error-prone | Vendor security reviews |
+| **Heavy reliance on unstructured data** | Interpreting natural language, extracting from documents, conversational interaction | Processing a home-insurance claim |
 
-That is the **main production lesson**.
+</div>
+
+> **Validate first.** Before committing to an agent, confirm your use case clearly meets these criteria. If it doesn't, a **deterministic solution may suffice** — and will be cheaper, faster, and easier to reason about. (Same discipline as the inference course: don't reach for the heavy tool when a simple one fits.)
 
 ---
 
-## 3. The workspace architecture pattern
+## 3. Agent design foundations — the three components
 
-An agent-native workspace needs at least five layers.
+In its most fundamental form, an agent has three components:
 
-```text
-UI layer
-  - desktop client
-  - cockpit
-  - inbox
-  - web console
+<div class="lecture-map" markdown>
 
-SDK / protocol layer
-  - typed app SDK
-  - Gateway RPC
-  - local socket API
-  - normalized events
+| # | Component | Role |
+|---|-----------|------|
+| 01 | **Model** | The LLM powering the agent's reasoning and decision-making |
+| 02 | **Tools** | External functions or APIs the agent can use to take action |
+| 03 | **Instructions** | Explicit guidelines and guardrails defining how the agent behaves |
 
-Runtime layer
-  - agent loop
-  - harness sessions
-  - PTY lifecycle
-  - approvals
+</div>
 
-Tool and automation layer
-  - desktop-use
-  - terminal
-  - browser
-  - file system
-  - APIs
+In code (using an agents framework), this is as small as:
 
-Memory / trace layer
-  - session events
-  - task logs
-  - eval traces
-  - durable memories
+```python
+weather_agent = Agent(
+    name="Weather agent",
+    instructions="You are a helpful agent who can talk to users about the weather.",
+    tools=[get_weather],
+)
 ```
 
-OpenCoven is interesting because its pieces map onto these layers instead of pretending **one app should own everything**.
+The rest of this lecture takes each component in turn.
 
 ---
 
-## 4. Coven: the local harness substrate
+## 4. Selecting your model
 
-Coven is the **clearest technical center** of the OpenCoven ecosystem.
+Different models trade off **task complexity, latency, and cost**. Not every task needs the smartest model — a simple retrieval or intent-classification step can run on a smaller, faster model, while a hard decision (approve a refund?) benefits from a more capable one. You will often use **a mix of models** across one workflow.
 
-Its thesis:
+The approach that works: **prototype with the most capable model for every task to establish a performance baseline.** Then swap in smaller models and see whether they still hit your accuracy target. This way you never prematurely cap the agent's ability, and you learn exactly where small models succeed or fail.
 
-```text
-One project. Any harness. Visible work.
-```
+The principles for choosing a model:
 
-Coven runs coding agents and future harnesses inside **explicit local project boundaries**.
+1. **Set up evals** to establish a performance baseline.
+2. **Meet your accuracy target** with the best models available.
+3. **Optimize for cost and latency** by replacing larger models with smaller ones where possible.
 
-The first target harnesses are local CLI-style agents such as:
-
-- Codex
-- Claude Code
-- future harness adapters
-
-Core capabilities:
-
-| Capability | Meaning |
-|---|---|
-| Project-root boundary | every run is tied to an explicit repository/project root |
-| Harness-neutral runtime | supports different agent CLIs through adapters |
-| Attachable PTY sessions | users can follow and reattach to live work |
-| Local daemon API | clients can list, launch, observe, attach, input, and kill |
-| SQLite-backed history | session metadata and event logs survive restarts |
-| Rust authority layer | launch, cwd, input, kill, and path checks are revalidated in Rust |
-
-This is **not "another chat UI."**
-
-It is closer to:
-
-```text
-local process supervisor + PTY manager + session/event database + safe project boundary
-```
+> This is the agent-layer mirror of the inference course's whole thesis: the model is a knob you tune against a measured target, not a default you accept.
 
 ---
 
-## 5. Coven command flow
+## 5. Defining tools
 
-The user-facing loop is **intentionally simple**:
+Tools extend an agent by calling the **APIs** of underlying applications. For **legacy systems without APIs**, agents can fall back on **computer-use models** that drive web and application UIs directly — just as a human would.
 
-```bash
-cd /path/to/project
-coven doctor
-coven daemon start
-coven run codex "fix the failing tests"
-coven run claude "polish this UI"
-coven sessions
-coven attach <session-id>
+Each tool should have a **standardized, well-documented, tested, reusable definition**. That enables flexible many-to-many relationships between tools and agents, improves discoverability, simplifies versioning, and prevents redundant definitions.
+
+Broadly, agents need three types of tools:
+
+<div class="lecture-map" markdown>
+
+| Type | What it does | Examples |
+|------|--------------|----------|
+| **Data** | Retrieve the context needed to execute the workflow | Query a transaction DB or CRM, read a PDF, search the web |
+| **Action** | Interact with systems to *do* something | Send an email/text, update a CRM record, hand a ticket off to a human |
+| **Orchestration** | Other **agents used as tools** (see the Manager pattern, Lecture 26) | Refund agent, research agent, writing agent |
+
+</div>
+
+```python
+from agents import Agent, WebSearchTool, function_tool
+
+@function_tool
+def save_results(output):
+    db.insert({"output": output, "timestamp": datetime.time()})
+    return "File saved"
+
+search_agent = Agent(
+    name="Search agent",
+    instructions="Help the user search the internet and save results if asked.",
+    tools=[WebSearchTool(), save_results],
+)
 ```
 
-What happens underneath:
-
-```text
-coven run
-  -> validate project root
-  -> validate cwd is inside project root
-  -> choose known harness adapter
-  -> launch harness through managed PTY
-  -> persist session metadata
-  -> append session events
-  -> expose status and events through local socket API
-```
-
-This gives agents a shared **"room"** to run in.
-
-The user or another client can **attach later** instead of losing the work when a terminal closes.
+As the number of required tools grows, **consider splitting tasks across multiple agents** (Lecture 26, Orchestration).
 
 ---
 
-## 6. The local API as the product contract
+## 6. Configuring instructions
 
-Coven exposes a **small local API** over a Unix socket.
+High-quality **instructions** are essential for any LLM app and *especially* critical for agents: clear instructions reduce ambiguity, improve decision-making, and produce smoother execution with fewer errors.
 
-The important endpoints:
+**Best practices for agent instructions:**
 
-| Endpoint | Purpose |
-|---|---|
-| `GET /health` | daemon health and metadata |
-| `GET /sessions` | list sessions |
-| `POST /sessions` | launch a session |
-| `GET /sessions/:id` | fetch one session |
-| `GET /events?sessionId=...` | read session events |
-| `POST /sessions/:id/input` | send input to a live session |
-| `POST /sessions/:id/kill` | kill a live session |
+<div class="lecture-map" markdown>
 
-Design rule:
+| Practice | Why |
+|----------|-----|
+| **Use existing documents** | Turn SOPs, support scripts, and policy docs into LLM-friendly **routines**. In customer service, routines roughly map to individual knowledge-base articles. |
+| **Prompt agents to break down tasks** | Smaller, clearer steps from dense resources minimize ambiguity and help the model follow along. |
+| **Define clear actions** | Every step should map to a specific action or output (ask for the order number; call an API). Being explicit — even about the wording of a user-facing message — leaves less room for misinterpretation. |
+| **Capture edge cases** | Real interactions create decision points (incomplete info, unexpected questions). Anticipate common variations with conditional steps and branches. |
 
-```text
-The socket API is the contract.
-The Rust daemon is the authority.
-Clients are presentation/integration layers.
-```
+</div>
 
-This matters because it prevents a UI or plugin from becoming the **real policy engine by accident**.
-
----
-
-## 7. Why Rust is the authority boundary
-
-Coven's operational model puts authority in the Rust layer.
-
-That means Rust owns:
-
-- project-root validation
-- cwd canonicalization
-- symlink escape rejection
-- PTY lifecycle
-- process launch
-- input forwarding
-- kill requests
-- daemon state
-- event persistence
-- local socket behavior
-
-TypeScript, UI clients, OpenClaw plugins, and wrappers may validate inputs for UX.
-
-But they do not get **final authority**.
-
-Correct model:
+A practical accelerator: use an advanced model to **auto-generate instructions from existing documents**, e.g.:
 
 ```text
-Client validates for convenience.
-Rust revalidates for authority.
+You are an expert in writing instructions for an LLM agent. Convert the following
+help-center document into a clear, unambiguous, numbered set of instructions,
+written as directions for an agent. The document to convert is: {{help_center_doc}}
 ```
-
-Wrong model:
-
-```text
-The UI checked the path, so the daemon can trust it.
-```
-
-For local agents that can edit repositories and run commands, this boundary is **not optional**.
-
----
-
-## 8. OpenClaw integration: external plugin, not core merge
-
-OpenCoven's docs are explicit about one important boundary:
-
-```text
-OpenClaw core does not include Coven code.
-OpenClaw integrates through an external @opencoven/coven plugin.
-```
-
-The flow:
-
-```text
-OpenClaw ACP runtime
-  -> external @opencoven/coven plugin
-  -> local Coven socket
-  -> Rust daemon
-  -> harness PTY
-```
-
-OpenClaw remains responsible for:
-
-- chat/session routing
-- ACP bindings
-- task state
-- permissions UX
-- user-facing delivery
-
-Coven remains responsible for:
-
-- local harness supervision
-- project-root enforcement
-- PTY lifecycle
-- socket contract
-- session/event persistence
-
-This is a clean integration pattern:
-
-```text
-OpenClaw orchestrates.
-Coven supervises local harness sessions.
-The plugin adapts between them.
-```
-
-**Do not collapse these roles.**
-
----
-
-## 9. OpenMeow: dogfooding the App SDK boundary
-
-OpenMeow is a native macOS notch/inbox style client direction.
-
-The OpenMeow SDK architecture repo is useful because it clarifies the app SDK boundary.
-
-The key rule:
-
-```text
-OpenMeow should call @openclaw/sdk.
-@openclaw/sdk should call OpenClaw Gateway RPCs.
-OpenMeow should not import OpenClaw internals or shell out to private commands.
-```
-
-Architecture:
-
-```text
-OpenMeow app
-  -> OpenMeow SDK adapter
-  -> @openclaw/sdk
-  -> OpenClaw Gateway WebSocket RPC
-  -> OpenClaw runtime
-```
-
-This is the same product lesson as Coven:
-
-```text
-Use a boring public contract.
-Do not build apps against internals.
-```
-
-For external apps, the stable nouns are:
-
-- agents
-- sessions
-- runs
-- models
-- tools
-- approvals
-- normalized events
-
-The app should build UI state from **normalized events**, not from provider-specific raw streams.
-
----
-
-## 10. desktop-use: keep OS automation outside the core
-
-Desktop automation is **powerful and dangerous**.
-
-OpenCoven's `desktop-use` repo takes a narrow-adapter approach.
-
-The pattern:
-
-```text
-OpenClaw desktop_use tool
-  -> execFile("coven-desktop-use", args)
-  -> platform backend
-```
-
-The adapter owns platform-specific desktop automation.
-
-OpenClaw owns:
-
-- tool registration
-- tool policy
-- approvals
-- session routing
-- user-visible delivery
-
-The adapter owns:
-
-- screenshots
-- frontmost app inspection
-- clicks
-- typing
-- keypresses
-- scrolls
-- platform-specific implementation details
-
-Safety properties from the current design:
-
-- no shell interpolation
-- process arguments are passed directly
-- interactive actions require `--confirm`
-- typed text is redacted from command echoes and stdout where relevant
-- unsupported platforms return clean JSON instead of pretending support exists
-
-This is a good pattern for computer-use tooling:
-
-```text
-Narrow binary.
-JSON envelope.
-No shell interpolation.
-Explicit confirmation.
-Runtime policy outside the adapter.
-```
-
----
-
-## 11. PsiClaw: desktop companion model and operator console
-
-PsiClaw is a desktop companion model workspace direction.
-
-The repo frames it as:
-
-- training ground
-- evaluation harness
-- operator console
-- specialized VLM workspace for desktop control
-
-Important status note:
-
-```text
-PsiClaw is currently a prototype/UI harness direction, not a fully wired live ML backend.
-```
-
-The interesting product concepts are still valuable:
-
-| Concept | Why it matters |
-|---|---|
-| Desktop-native model | browser-only agents are not enough for local workflows |
-| Operator console | proposed actions should be visible and approvable |
-| Trace explorer | state, reasoning, action, and outcome need replay |
-| Eval dashboard | desktop agents need measurable success and intervention rates |
-| Fine-tuning harness | recovery episodes can become training data |
-
-The safe action loop:
-
-```text
-observe
-  -> route
-  -> propose
-  -> approve or deny
-  -> execute
-  -> re-read state
-  -> trace
-```
-
-This is the correct direction for desktop agents.
-
-An agent that controls a machine must be **observable before it is autonomous**.
-
----
-
-## 12. How OpenCoven relates to OpenClaw
-
-The recent lectures introduced two adjacent pieces:
-
-| System | Primary role |
-|---|---|
-| OpenClaw | Gateway, agent runtime, sessions, tools, nodes, approvals |
-| OpenCoven | agent-native workspace and local harness ecosystem |
-
-Practical split:
-
-```text
-OpenClaw
-  controls agent runtime and gateway protocol
-
-OpenCoven / Coven
-  runs and observes local harness sessions inside project boundaries
-
-OpenMeow
-  presents external app UI through the App SDK
-
-desktop-use
-  performs narrow desktop automation under policy
-
-PsiClaw
-  explores local desktop VLM training, evals, and operator UX
-```
-
-This split is **more important than any individual tool name**.
-
-It teaches a durable architecture principle:
-
-```text
-Separate orchestration, harness execution, UI, desktop actuation, and model training.
-```
-
----
-
-## 13. Why this matters for AI hardware engineers
-
-This course is about AI hardware, but agent workspaces matter because they **shape inference demand**.
-
-OpenCoven-style systems create workloads that look different from simple chatbot inference:
-
-- long-running sessions
-- local model inference
-- multimodal desktop perception
-- event streaming
-- trace storage
-- low-latency action loops
-- tool-heavy execution
-- multiple concurrent harnesses
-- local-first security constraints
-
-For hardware and systems engineers, this affects:
-
-- memory footprint for local VLMs
-- CPU/GPU scheduling under interactive workloads
-- storage and event logging patterns
-- edge inference latency requirements
-- model quantization choices
-- UI perception workload design
-- safe command execution on developer machines
-
-A desktop companion agent is **not just "one model call."**
-
-It is a system of:
-
-```text
-perception + planning + tools + approvals + traces + local process control
-```
-
-That is why **Jetson, Apple Silicon, workstation GPUs, and local inference runtimes** matter.
-
----
-
-## 14. Design principles from OpenCoven
-
-### Principle 1: Make work visible
-
-If an agent is modifying a project, the user should be able to inspect:
-
-- what session exists
-- what harness is running
-- what project root it owns
-- what output has streamed
-- what action is currently pending
-- how to attach or stop it
-
-**Invisible autonomy** is a debugging and safety failure.
-
-### Principle 2: Keep boundaries boring
-
-Good boundaries are small:
-
-```text
-Gateway RPC
-local socket API
-JSON command envelope
-PTY event stream
-SDK event model
-```
-
-Bad boundaries are implicit:
-
-```text
-scrape terminal output
-import private runtime files
-trust UI validation
-let plugin config widen daemon authority
-```
-
-### Principle 3: Revalidate at the authority layer
-
-The daemon that launches processes must revalidate:
-
-- project root
-- cwd
-- harness id
-- kill target
-- input target
-- path-sensitive requests
-
-**Never outsource that to a UI.**
-
-### Principle 4: Prefer adapters over core coupling
-
-OpenClaw should **not absorb every runtime**.
-
-Better:
-
-```text
-OpenClaw plugin
-  -> local socket/API
-  -> external daemon/binary
-```
-
-That keeps **failures, release cycles, and trust roots** separate.
-
-### Principle 5: Treat desktop actions as high risk
-
-Clicks, typing, keypresses, screenshots, file operations, and terminal commands need explicit policy.
-
-Even if the model is good, the action surface is **high-impact**.
-
----
-
-## 15. Practical architecture: local agent workspace for hardware bring-up
-
-Imagine a hardware engineer debugging a Jetson + ESP32-C6 + microphone-array setup.
-
-OpenCoven-style workspace:
-
-```text
-OpenMeow / cockpit UI
-  -> shows tasks, sessions, approvals, traces
-
-OpenClaw Gateway
-  -> routes user messages and agent runs
-
-Trace and memory store
-  -> stores docs, logs, board-specific notes, and session evidence
-
-Coven daemon
-  -> runs Codex or Claude Code inside the repo/project root
-
-desktop-use adapter
-  -> captures screenshots or desktop state when explicitly approved
-
-PsiClaw-style eval harness
-  -> records trace quality and task success over time
-```
-
-Example workflow:
-
-```text
-1. User asks: "Analyze why OTBR stays detached after Thread start."
-2. OpenClaw creates an agent run.
-3. The trace/memory store retrieves previous OTBR logs and kernel config notes.
-4. Coven launches a coding/research harness inside the project repo.
-5. The harness reads docs, proposes a markdown update, and runs local checks.
-6. OpenClaw streams progress and approvals to the UI.
-7. The final trace is saved for future memory/eval.
-```
-
-This is **realistic engineering automation**.
-
-It keeps the agent productive without giving every component **unlimited authority**.
-
----
-
-## 16. Risk checklist
-
-When evaluating or building an OpenCoven-style workspace, check these risks.
-
-| Risk | Failure mode | Practical control |
-|---|---|---|
-| Project escape | agent runs from wrong cwd or follows symlink outside repo | canonicalize and validate in daemon |
-| Shell injection | prompt becomes part of shell command | use argv APIs, avoid `sh -c` |
-| Hidden authority | plugin config expands daemon permissions | daemon revalidates all sensitive requests |
-| Event leakage | logs capture secrets or tokens | redact and avoid intentional secret storage |
-| UI false confidence | UI says safe but daemon acts differently | daemon is source of truth |
-| Desktop overreach | agent clicks/types without user awareness | confirmations and action traces |
-| SDK instability | app depends on private runtime behavior | typed SDK + Gateway RPC only |
-| Unbounded sessions | stale agents keep running | list, attach, kill, timeouts, daemon supervision |
-
-The practical rule:
-
-```text
-If a component can cause external side effects, give it a narrow contract and an observable audit trail.
-```
-
----
-
-## 17. Lab-style exercise
-
-Design a minimal OpenCoven-inspired local agent workspace for this roadmap repo.
-
-Requirements:
-
-1. The user can launch a coding agent only inside the roadmap repository.
-2. The user can list active sessions.
-3. The user can attach to an existing run.
-4. The user can kill a stuck run.
-5. The UI receives normalized events.
-6. The runtime stores session metadata and event history.
-7. Any desktop action requires explicit confirmation.
-8. OpenClaw integration happens through an external plugin, not core code.
-
-Draw the boundary diagram:
-
-```text
-UI client
-  -> SDK / Gateway
-  -> plugin adapter
-  -> local socket API
-  -> Rust daemon
-  -> harness PTY
-```
-
-Then answer:
-
-1. Which layer validates project root?
-2. Which layer owns user-facing approval UX?
-3. Which layer owns process launch?
-4. Which layer owns event normalization?
-5. Which layer stores durable memory?
-6. Which layer should never import OpenClaw internals?
-
-If the answers are unclear, the architecture is **not ready**.
 
 ---
 
 ## Key takeaways
 
-- OpenCoven is an AI-native workspace ecosystem for agentic builders.
-- Coven is the local harness substrate: project-scoped, observable, attachable sessions.
-- The Rust daemon is the authority boundary for launch, cwd, PTY, input, kill, and path-sensitive requests.
-- OpenClaw integration should stay external through a plugin and local socket API.
-- OpenMeow is a useful App SDK dogfood client pattern: apps use `@openclaw/sdk`, not internals.
-- `desktop-use` shows how to keep OS automation in a narrow adapter under runtime policy.
-- PsiClaw is a prototype direction for desktop companion models, operator consoles, traces, and evals.
-- The durable architecture lesson is separation of concerns: workspace UI, gateway runtime, memory, harness supervision, and desktop actuation are different layers.
+* An **agent independently executes a multi-step workflow** using an LLM to drive control flow plus tools — not just a wrapped model call.
+* Build an agent when the workflow needs **nuanced judgment, has unwieldy rules, or leans on unstructured data**; otherwise prefer a deterministic solution.
+* Every agent = **model + tools + instructions**. Baseline with the strongest model, then optimize down; give it **standardized data / action / orchestration tools**; and write **explicit, routine-based instructions that capture edge cases**.
+
+---
+
+## Self-check
+
+1. Give two examples of LLM applications that are **not** agents, and say what they're missing.
+2. Your team wants to automate refund approvals that currently need a human to weigh exceptions. Is this a good agent candidate? Which of the three "when to build" signals applies?
+3. Why prototype with the most capable model first, then swap smaller models in — rather than starting small?
+4. Classify each as a data / action / orchestration tool: `read_pdf`, `send_email`, `research_agent.as_tool()`.
+5. What is the risk of vague instructions for an agent specifically (vs a single-turn chatbot)?
 
 ---
 
 ## References
 
-- OpenCoven GitHub organization: [https://github.com/OpenCoven](https://github.com/OpenCoven)
-- OpenCoven profile README: [https://github.com/OpenCoven/.github/blob/main/profile/README.md](https://github.com/OpenCoven/.github/blob/main/profile/README.md)
-- Coven repository: [https://github.com/OpenCoven/coven](https://github.com/OpenCoven/coven)
-- Coven product spec: [https://github.com/OpenCoven/coven/blob/main/docs/PRODUCT-SPEC.md](https://github.com/OpenCoven/coven/blob/main/docs/PRODUCT-SPEC.md)
-- Coven operational model: [https://github.com/OpenCoven/coven/blob/main/docs/OPERATIONAL-MODEL.md](https://github.com/OpenCoven/coven/blob/main/docs/OPERATIONAL-MODEL.md)
-- OpenMeow SDK architecture: [https://github.com/OpenCoven/open-meow-sdk](https://github.com/OpenCoven/open-meow-sdk)
-- desktop-use adapter: [https://github.com/OpenCoven/desktop-use](https://github.com/OpenCoven/desktop-use)
-- PsiClaw: [https://github.com/OpenCoven/psi-claw](https://github.com/OpenCoven/psi-claw)
-- OpenClaw Gateway protocol: [https://openclaw.knidal.com/gateway-protocol](https://openclaw.knidal.com/gateway-protocol)
+* OpenAI — *A Practical Guide to Building Agents* (the framework this lecture follows: agent definition, when-to-build criteria, model / tools / instructions).
+* Cross-reference: [Lecture 03 — Tool Use & Function Calling](Lecture-03.md) · [Lecture 07 — Agent SDKs and Runtime APIs](Lecture-07.md) · [Lecture 26 — Orchestration & Guardrails](Lecture-26.md)
 
 ---
 
-*Next: [Lecture 26 - OpenKnots Case Study: Trustworthy Agent Interfaces and Local-First Coding Surfaces](Lecture-26.md)*
+*Next: [Lecture 26 - Building Agents II: Orchestration & Guardrails](Lecture-26.md)*

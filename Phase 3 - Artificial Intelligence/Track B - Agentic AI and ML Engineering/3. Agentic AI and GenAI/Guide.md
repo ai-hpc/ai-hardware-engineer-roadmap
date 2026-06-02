@@ -32,8 +32,8 @@
 |---|---------|---|---------|
 | [01](Lectures/Lecture-01.md) | LLM Fundamentals | [24](Lectures/Lecture-24.md) | Agent Harness |
 | [02](Lectures/Lecture-02.md) | Prompt Engineering | [24b](Lectures/Lecture-24b.md) | Event-Sourced Agent State |
-| [03](Lectures/Lecture-03.md) | Tool Use | [25](Lectures/Lecture-25.md) | OpenCoven Workspace |
-| [04](Lectures/Lecture-04.md) | Agent Architecture | [26](Lectures/Lecture-26.md) | OpenKnots Interfaces |
+| [03](Lectures/Lecture-03.md) | Tool Use | [25](Lectures/Lecture-25.md) | Building Agents I: Foundations |
+| [04](Lectures/Lecture-04.md) | Agent Architecture | [26](Lectures/Lecture-26.md) | Building Agents II: Orchestration |
 | [05](Lectures/Lecture-05.md) | Memory Systems | [27](Lectures/Lecture-27.md) | Agent Security Engineer |
 | [06](Lectures/Lecture-06.md) | LangGraph | [28](Lectures/Lecture-28.md) | Pi Minimal Agent |
 | [07](Lectures/Lecture-07.md) | Agent SDKs | [29](Lectures/Lecture-29.md) | Agent Skills |

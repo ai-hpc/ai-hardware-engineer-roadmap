@@ -916,7 +916,7 @@ The artifact for this section, slotted into the Phase 3 / Project A spec from §
 - [Lecture 24 - What Is an AI Agent Harness?](Lecture-24.md)
 - [Lecture 24b - Session as Source of Truth](Lecture-24b.md)
 - [Lecture 25 - OpenCoven: Local Harness Substrate](Lecture-25.md)
-- [Lecture 26 - OpenKnots: Trustworthy Agent Interfaces](Lecture-26.md)
+- [Lecture 26 - Building Agents II: Orchestration & Guardrails](Lecture-26.md)
 
 ### External resources
 

@@ -316,4 +316,4 @@ Why this lecture lives in a hardware roadmap:
 
 ---
 
-*Next: [Lecture 25 - OpenCoven Case Study: Agent-Native Workspace and Local Harness Substrate](Lecture-25.md)*
+*Next: [Lecture 25 - Building Agents I: Foundations (Model, Tools, Instructions)](Lecture-25.md)*
