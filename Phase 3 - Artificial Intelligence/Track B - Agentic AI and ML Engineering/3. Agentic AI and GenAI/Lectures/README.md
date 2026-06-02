@@ -19,33 +19,6 @@ The durable concepts in this course are:
 
 Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, and deployment. Lectures 13-45 focus on production discipline, OpenClaw-style gateway systems, local agent workspaces, trustworthy agent interfaces, agent skills, the agentic software-development lifecycle, runtime strategy, model-under-the-hood mechanics, structured tool interfaces, multimodal perception sub-agents, GPU-kernel translation workflows, long-context serving optimization, trace-driven AI performance analysis, compiler-generated sequence parallelism, skill evaluation, small-model reasoning systems, AI-agent threat modeling, productized agent harness infrastructure, AI-assisted GPU kernel optimization, efficient local RAG systems, and vector-store/embedding model selection.
 
-## External Reference
-
-<div class="lecture-map" markdown>
-
-| Resource | What it covers |
-|----------|----------------|
-| [The OpenClaw Book](https://openclawconsultant.com/openclaw-book/) | Practitioner OpenClaw guide: architecture, setup, skills, prompting, planning, optimization, sub-agents, security |
-| [LangChain Documentation](https://python.langchain.com/docs/) | Agent and RAG framework |
-| [LangGraph Documentation](https://langchain-ai.github.io/langgraph/) | Durable, stateful agent workflows, human-in-the-loop, memory, and tracing |
-| [OpenAI Agents SDK](https://openai.github.io/openai-agents-python/) | Agent loops, tools, handoffs, guardrails, sessions, tracing, and MCP integration |
-| [OpenAI API Agents Guide](https://platform.openai.com/docs/guides/agents) | Code-first agent apps, tools, orchestration, and observability |
-| [Model Context Protocol Specification](https://modelcontextprotocol.io/) | Standard protocol for tools, resources, prompts, hosts, clients, servers, and safety |
-| [Claude Code Overview](https://docs.claude.com/en/docs/claude-code/overview) | Agentic coding workflows, MCP, multi-agent use, and CI patterns |
-| [Claude Code Plugins](https://docs.claude.com/en/docs/claude-code/plugins) | Skills, agents, hooks, MCP servers, plugin structure, and distribution |
-| [Claude Code Repository](https://github.com/anthropics/claude-code) | Public implementation surface, examples, plugins, and project layout |
-| [Anthropic Cookbook](https://github.com/anthropics/anthropic-cookbook) | Practical Claude API examples |
-| OpenClaw Repository | Local-first assistant architecture, channels, gateway model, and security defaults |
-| OpenClaw Gateway Architecture | Long-lived gateway, WS protocol, nodes, pairing, and remote access model |
-| OpenClaw Features | Multi-agent routing, media, channels, tools, apps, and provider support |
-| GitHub Agentic Workflows | Official GitHub framing for agentic CI/CD, permissions, and safe outputs |
-| [OWASP Top 10 for LLM Applications](https://genai.owasp.org/llm-top-10/) | Prompt injection, insecure output handling, tool risk, excessive agency, LLM app security |
-| [NIST AI RMF Generative AI Profile](https://www.nist.gov/itl/ai-risk-management-framework) | Governance and risk-management framing for generative AI systems |
-| [LlamaIndex Documentation](https://docs.llamaindex.ai/) | RAG best practices |
-| [Build a Large Language Model (From Scratch) — Raschka](https://github.com/rasbt/LLMs-from-scratch) | LLM internals |
-
-</div>
-
 ## Lecture Index
 
 <div class="lecture-map" markdown>
@@ -132,3 +105,32 @@ pip install anthropic openai pydantic fastapi uvicorn \
 Install only the packages needed for the lecture you are running. For production work, pin versions in `requirements.txt` or `pyproject.toml` and review provider migration notes before upgrading SDKs.
 
 Code snippets use placeholder model IDs such as `your-agent-model-id`, `your-fast-model-id`, and `your-embedding-model-id`. Replace them with current model IDs from your provider before running the examples.
+
+---
+
+## External References
+
+<div class="lecture-map" markdown>
+
+| Resource | What it covers |
+|----------|----------------|
+| [The OpenClaw Book](https://openclawconsultant.com/openclaw-book/) | Practitioner OpenClaw guide: architecture, setup, skills, prompting, planning, optimization, sub-agents, security |
+| [LangChain Documentation](https://python.langchain.com/docs/) | Agent and RAG framework |
+| [LangGraph Documentation](https://langchain-ai.github.io/langgraph/) | Durable, stateful agent workflows, human-in-the-loop, memory, and tracing |
+| [OpenAI Agents SDK](https://openai.github.io/openai-agents-python/) | Agent loops, tools, handoffs, guardrails, sessions, tracing, and MCP integration |
+| [OpenAI API Agents Guide](https://platform.openai.com/docs/guides/agents) | Code-first agent apps, tools, orchestration, and observability |
+| [Model Context Protocol Specification](https://modelcontextprotocol.io/) | Standard protocol for tools, resources, prompts, hosts, clients, servers, and safety |
+| [Claude Code Overview](https://docs.claude.com/en/docs/claude-code/overview) | Agentic coding workflows, MCP, multi-agent use, and CI patterns |
+| [Claude Code Plugins](https://docs.claude.com/en/docs/claude-code/plugins) | Skills, agents, hooks, MCP servers, plugin structure, and distribution |
+| [Claude Code Repository](https://github.com/anthropics/claude-code) | Public implementation surface, examples, plugins, and project layout |
+| [Anthropic Cookbook](https://github.com/anthropics/anthropic-cookbook) | Practical Claude API examples |
+| OpenClaw Repository | Local-first assistant architecture, channels, gateway model, and security defaults |
+| OpenClaw Gateway Architecture | Long-lived gateway, WS protocol, nodes, pairing, and remote access model |
+| OpenClaw Features | Multi-agent routing, media, channels, tools, apps, and provider support |
+| GitHub Agentic Workflows | Official GitHub framing for agentic CI/CD, permissions, and safe outputs |
+| [OWASP Top 10 for LLM Applications](https://genai.owasp.org/llm-top-10/) | Prompt injection, insecure output handling, tool risk, excessive agency, LLM app security |
+| [NIST AI RMF Generative AI Profile](https://www.nist.gov/itl/ai-risk-management-framework) | Governance and risk-management framing for generative AI systems |
+| [LlamaIndex Documentation](https://docs.llamaindex.ai/) | RAG best practices |
+| [Build a Large Language Model (From Scratch) — Raschka](https://github.com/rasbt/LLMs-from-scratch) | LLM internals |
+
+</div>
