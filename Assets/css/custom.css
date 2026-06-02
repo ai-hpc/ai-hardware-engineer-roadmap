@@ -889,35 +889,35 @@
     "Inter", "Helvetica Neue", Arial, sans-serif;
 }
 
-/* Comfortable body rhythm for long-form reading */
+/* Comfortable body rhythm — ChatGPT-style generous spacing for long-form reading */
 .md-typeset {
-  font-size: 0.82rem;
-  line-height: 1.72;
+  font-size: 0.83rem;
+  line-height: 1.9;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 .md-typeset p,
 .md-typeset li {
-  line-height: 1.72;
+  line-height: 1.9;
 }
 
 .md-typeset p {
-  margin: 0.85em 0;
+  margin: 1em 0;
 }
 
 .md-typeset ul,
 .md-typeset ol {
-  margin: 0.7em 0;
+  margin: 0.85em 0;
 }
 
 .md-typeset li + li {
-  margin-top: 0.32em;
+  margin-top: 0.5em;
 }
 
 .md-typeset li > ul,
 .md-typeset li > ol {
-  margin: 0.3em 0 0.16em;
+  margin: 0.4em 0 0.25em;
 }
 
 /* Headings: a little more breathing room above for clearer section breaks */
