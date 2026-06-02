@@ -26,9 +26,9 @@ A **theory-first path**: start from what a modern agent *is* in 2026, learn the 
 
 **Currency note:** model names, context windows, SDK features, and pricing change fast. This course teaches the *stable* layer — model APIs, tool protocols, run loops, workflow graphs, gateways, telemetry, and policy boundaries. Always check provider docs before copying model IDs or prices into production.
 
-### Module 1 · The modern AI agent (2026) — what changed
+### Module 1 · Start here — what a modern agent is, and how to build one
 
-The shift from chat boxes to persistent, tool-using systems — and the rise of the **harness**, the runtime *around* the model that turns a chat completion into an agent.
+The conceptual core of the whole course: what changed in 2026, the **harness** (the runtime around the model), and the two-part foundations of *building* an agent — model/tools/instructions, then orchestration and guardrails.
 
 <div class="lecture-map" markdown>
 
@@ -36,14 +36,14 @@ The shift from chat boxes to persistent, tool-using systems — and the rise of 
 |---|---------|
 | [00](Lectures/Lecture-00.md) | The modern AI agent in 2026 — what changed *(start here)* |
 | [24](Lectures/Lecture-24.md) | What is an AI agent harness? — the runtime around the model |
-| [24b](Lectures/Lecture-24b.md) | Session as source of truth — event-sourced agent state |
-| [31](Lectures/Lecture-31.md) | Runtime strategy — Node, Bun, Rust, and edge packaging |
+| [25](Lectures/Lecture-25.md) | Building agents I — foundations (model, tools, instructions) |
+| [26](Lectures/Lecture-26.md) | Building agents II — orchestration & guardrails |
 
 </div>
 
-### Module 2 · Fundamentals
+### Module 2 · Fundamentals — the model underneath
 
-How the model underneath actually works, and how you talk to it.
+How the model actually works, and how you talk to it.
 
 <div class="lecture-map" markdown>
 
@@ -55,16 +55,14 @@ How the model underneath actually works, and how you talk to it.
 
 </div>
 
-### Module 3 · Core parts of an agent (one by one)
+### Module 3 · Core building blocks (one by one)
 
-The building blocks, in dependency order — the **foundations spine** first, then tools, memory, retrieval, orchestration, skills, evaluation, and safety.
+Each part of an agent in dependency order: tools → memory → retrieval → orchestration/frameworks → multimodal → skills → evaluation.
 
 <div class="lecture-map" markdown>
 
 | # | Lecture |
 |---|---------|
-| [25](Lectures/Lecture-25.md) | Building agents I — foundations (model, tools, instructions) |
-| [26](Lectures/Lecture-26.md) | Building agents II — orchestration & guardrails |
 | [03](Lectures/Lecture-03.md) | Tool use & function calling |
 | [33](Lectures/Lecture-33.md) | Structured tools beat computer use |
 | [05](Lectures/Lecture-05.md) | Memory systems |
@@ -81,17 +79,30 @@ The building blocks, in dependency order — the **foundations spine** first, th
 | [29](Lectures/Lecture-29.md) | Agent skills — workflow discipline |
 | [39](Lectures/Lecture-39.md) | Agent skills eval |
 | [11](Lectures/Lecture-11.md) | Evaluation & observability |
+
+</div>
+
+### Module 4 · Production discipline & runtime
+
+Making an agent reliable, safe, and shippable: security, durable state, deterministic startup, runtime choice, lifecycle, and deployment.
+
+<div class="lecture-map" markdown>
+
+| # | Lecture |
+|---|---------|
 | [13](Lectures/Lecture-13.md) | Runtime discipline & AI runtime security |
 | [27](Lectures/Lecture-27.md) | AI agent security engineer |
+| [24b](Lectures/Lecture-24b.md) | Session as source of truth — event-sourced agent state |
 | [14](Lectures/Lecture-14.md) | Deterministic startup |
+| [31](Lectures/Lecture-31.md) | Runtime strategy — Node, Bun, Rust, and edge packaging |
 | [30](Lectures/Lecture-30.md) | Agentic SDLC |
 | [12](Lectures/Lecture-12.md) | Production deployment |
 
 </div>
 
-### Module 4 · Example — anatomy of a real harness (OpenClaw)
+### Module 5 · Example — anatomy of a real harness (OpenClaw)
 
-A production-style, local-first assistant taken apart piece by piece — the concepts of Module 3 made concrete in one system.
+A production-style, local-first assistant taken apart piece by piece — the concepts of Modules 1–4 made concrete in one system.
 
 <div class="lecture-map" markdown>
 
@@ -111,9 +122,9 @@ A production-style, local-first assistant taken apart piece by piece — the con
 
 </div>
 
-### Module 5 · Practice — build **genie-claw**
+### Module 6 · Practice — build **genie-claw**
 
-The capstone: apply Modules 1–4 by building **genie-claw** — your own minimal agent harness that pairs a local LLM runtime (the GeniePod [`genie-ai-runtime`](https://github.com/GeniePod/genie-ai-runtime)) with an OpenClaw-style gateway: sessions, tools, guardrails, and a run loop you control end-to-end. The labs below are the stepping stones.
+The capstone: apply Modules 1–5 by building **genie-claw** — your own minimal agent harness that pairs a local LLM runtime (the GeniePod [`genie-ai-runtime`](https://github.com/GeniePod/genie-ai-runtime)) with an OpenClaw-style gateway: sessions, tools, guardrails, and a run loop you control end-to-end. The labs below are the stepping stones.
 
 <div class="lecture-map" markdown>
 

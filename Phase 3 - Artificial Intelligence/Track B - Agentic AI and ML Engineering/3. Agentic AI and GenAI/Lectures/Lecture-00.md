@@ -102,11 +102,12 @@ Agents are **systems engineering**, not prompt-craft. Prompts matter, but a clev
 
 | Module | What you learn |
 |--------|----------------|
-| **1 · The modern agent** | What changed, and the harness around the model |
+| **1 · Start here** | What changed, the harness, and how to build an agent (model/tools/instructions → orchestration/guardrails) |
 | **2 · Fundamentals** | How the model works and how you talk to it |
-| **3 · Core parts** | Tools, memory, RAG, orchestration, skills, eval, safety — one by one |
-| **4 · Example: OpenClaw** | A real harness, taken apart |
-| **5 · Practice: genie-claw** | Build your own minimal harness end-to-end |
+| **3 · Core building blocks** | Tools, memory, RAG, orchestration, multimodal, skills, eval — one by one |
+| **4 · Production & runtime** | Security, durable state, startup, runtime choice, deployment |
+| **5 · Example: OpenClaw** | A real harness, taken apart |
+| **6 · Practice: genie-claw** | Build your own minimal harness end-to-end |
 
 </div>
 
