@@ -13,6 +13,8 @@ By the end of Part 3 you should be able to ship either MoE to production on a mu
 
 ## Lectures
 
+<div class="lecture-map" markdown>
+
 | # | Title | Core question |
 |---|-------|---------------|
 | 01 | [Anatomy of a modern MoE — DeepSeek V3.1 and Qwen3-MoE 235B-A22B](Lecture-01.md) | What's the same, what differs, and how does each difference change inference cost? |
@@ -20,6 +22,8 @@ By the end of Part 3 you should be able to ship either MoE to production on a mu
 | 03 | [Expert parallelism (EP) and the gating hot path](Lecture-03.md) | How is an MoE partitioned across many GPUs, and where does the all-to-all cost dominate? |
 | 04 | [Disaggregated prefill / decode — Mooncake, Splitwise, DistServe](Lecture-04.md) | When does separating prefill GPUs from decode GPUs pay for itself? |
 | 05 | [Production MoE serving — MTP speculation, constrained decode, cost model](Lecture-05.md) | What's the full production recipe, and what's the $/MTok at GB200 NVL72 scale? |
+
+</div>
 
 ## What you ship from Part 3
 

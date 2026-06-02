@@ -37,10 +37,14 @@ The two halves are inseparable: an optimization that you cannot measure against 
 
 ## Lecture map
 
+<div class="lecture-map" markdown>
+
 | # | Title | Focus |
 |---|-------|-------|
 | 01 | [VLA Optimization for Real-Time Control](Lecture-01.md) | What a VLA actually executes per control tick · quantization of the LLM backbone · vision-tower fusion · action-chunk and KV caching · speculative action decoding · Jetson / single-GPU deployment paths |
 | 02 | [The Action-Parity Harness](Lecture-02.md) | Reference vs candidate rollouts · per-step action error · trajectory divergence · closed-loop success-rate parity (LIBERO / RoboCasa / Isaac Lab) · tolerance budgets · CI gating · on-robot canary protocol |
+
+</div>
 
 Each lecture follows the standard *Why it matters → Mental model → Build it → Measure it → Ship it* shape from the [Curriculum Authoring Guide](../../../Curriculum-Authoring-Guide.md), with a self-check and a runnable lab.
 

@@ -11,6 +11,8 @@ By the end of Part 2 you should be able to ship either model to production on 4�
 
 ## Lectures
 
+<div class="lecture-map" markdown>
+
 | # | Title | Core question |
 |---|-------|---------------|
 | 01 | [Anatomy of a 70B-class dense model — Llama 3.3 70B vs Qwen 2.5 72B](Lecture-01.md) | What stays the same between these two and what changes? What does each difference cost or buy? |
@@ -19,6 +21,8 @@ By the end of Part 2 you should be able to ship either model to production on 4�
 | 04 | [Single-node multi-GPU serving — tensor parallelism on 8× H100/H200](Lecture-04.md) | How does TP scale, where do the collectives dominate, and what's the runtime-specific config? |
 | 05 | [Modern serving stack — continuous batching, paged KV, prefix cache, speculation](Lecture-05.md) | Which knobs move which metric, on this hardware, on these models? |
 | 06 | [Long context at 128K on Hopper — KV scaling, YaRN, chunked prefill, prefix sharing](Lecture-06.md) | What breaks at 128K and what is the precision recipe at that context? |
+
+</div>
 
 ## What you ship from Part 2
 

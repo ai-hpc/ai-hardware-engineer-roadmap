@@ -88,6 +88,8 @@ Study the **Operating Systems** lectures first, then map each topic to AGNOS cod
 <a id="all-os-lectures--agnos-overview"></a>
 ## All OS Lectures → AGNOS (Overview)
 
+<div class="lecture-map" markdown>
+
 | # | Lecture | Kernel (agnos-kernel-sdm845) | Builder (agnos-builder) |
 |:-:|--------|-------------------------------|--------------------------|
 | 1 | [Modern OS Architecture & the Linux Kernel](../../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Lectures/Lecture-01.md) | `arch/`, `kernel/`, `mm/`, `drivers/` — monolithic layout | — |
@@ -117,12 +119,16 @@ Study the **Operating Systems** lectures first, then map each topic to AGNOS cod
 | 25 | [Capstone: Custom Linux Images with Yocto](../../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Lectures/Lecture-25.md) | — (Agnos uses its own builder, not Yocto) | **agnos-builder** is the capstone: custom image build (kernel + rootfs) |
 | 26 | [eBPF: Programmable Kernel Observability](../../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Lectures/Lecture-26.md) | `kernel/bpf/`, `net/bpf/` (if enabled in config) | Observability of openpilot on AGNOS via eBPF tools |
 
+</div>
+
 ---
 
 <a id="os-lectures--agnos-development-changes-fork--custom-mods-for-openpilot"></a>
 ## OS Lectures ↔ AGNOS Development Changes (Fork + Custom Mods for openpilot)
 
 The kernel in AGNOS is **forked from Linux and custom modified**. The table below connects each OS lecture to the **kind of development change** comma made in that fork for the **on-the-road openpilot** use case. Use it to see why each OS topic matters in practice.
+
+<div class="lecture-map" markdown>
 
 | # | Lecture topic | Development change in AGNOS (fork / custom work) | Why it matters for openpilot on the road |
 |:-:|----------------|--------------------------------------------------|------------------------------------------|
@@ -151,6 +157,8 @@ The kernel in AGNOS is **forked from Linux and custom modified**. The table belo
 | 24 | OS for AI (L4T vs openpilot OS, RT tuning) | **AGNOS = “openpilot OS”** — the **entire fork and builder** are this. All previous rows (boot, DT, drivers, scheduler, memory, storage) are the “development changes” for AI/RT on the road. L4T is the Jetson counterpart; Agnos is the comma counterpart. | Direct mapping: this lecture describes why Agnos exists and how it’s tuned for openpilot. |
 | 25 | Capstone (custom Linux image) | **agnos-builder** is the **custom image build** for comma devices (not Yocto, but same idea): reproducible kernel + rootfs + boot artifacts. | Delivers the single “AGNOS” image that goes on the device and runs openpilot. |
 | 26 | eBPF observability | **Kernel** may enable CONFIG_BPF; **observability** of openpilot (camerad, modeld, controlsd) with bpftrace/perf runs on this kernel. | Debugging and profiling openpilot in development and in the field. |
+
+</div>
 
 ---
 

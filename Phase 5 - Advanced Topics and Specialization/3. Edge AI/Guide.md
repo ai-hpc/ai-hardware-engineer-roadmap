@@ -64,6 +64,8 @@ By the end, you should be able to:
 
 ## Course Map
 
+<div class="lecture-map" markdown>
+
 | Unit | Focus | Artifact |
 |------|-------|----------|
 | 1 | Edge constraints and platform selection | target-device decision memo |
@@ -74,6 +76,8 @@ By the end, you should be able to:
 | 6 | Sensor pipelines | camera/audio/sensor pipeline benchmark |
 | 7 | Power, thermal, and reliability | long-run stability report |
 | 8 | Fleet and product operation | OTA/telemetry/rollback design |
+
+</div>
 
 ---
 

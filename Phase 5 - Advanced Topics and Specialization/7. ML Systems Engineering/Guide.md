@@ -124,6 +124,8 @@ Avoid vague claims like "this is faster." Use concrete claims:
 
 ## Course Map
 
+<div class="lecture-map" markdown>
+
 | Stage | Focus | Core artifact |
 |-------|-------|---------------|
 | 0 | Measurement discipline | benchmark harness and profiling template |
@@ -135,6 +137,8 @@ Avoid vague claims like "this is faster." Use concrete claims:
 | 6 | AI infrastructure and orchestration | reproducible cluster/runbook with failure recovery |
 | 7 | Compiler and runtime layer | graph lowering, fusion, or memory-planning demo |
 | 8 | Research and source-code loop | paper reproduction or source-code deep dive |
+
+</div>
 
 Recommended order:
 

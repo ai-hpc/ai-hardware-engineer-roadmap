@@ -12,6 +12,8 @@ By the end of Part 1, a reader should be able to open a model card for a model t
 
 ## Lectures
 
+<div class="lecture-map" markdown>
+
 | # | Title | Core question it answers |
 |---|-------|--------------------------|
 | 01 | [The 2026 inference engineer's mental model](Lecture-01.md) | What does the role *do*, day to day, and what metrics decide whether the work was good? |
@@ -19,6 +21,8 @@ By the end of Part 1, a reader should be able to open a model card for a model t
 | 03 | [Roofline, bandwidth, and the memory hierarchy](Lecture-03.md) | Which hardware spec lines move which metric, and which are noise? |
 | 04 | [The precision stack — FP16 → FP8 → FP4 → INT4](Lecture-04.md) | What does each precision floor cost, what does each one buy, and how do we *know* parity? |
 | 05 | [The runtime landscape — vLLM, SGLang, TensorRT-LLM, llama.cpp, MLX](Lecture-05.md) | Given a workload + hardware + SLO, which runtime do we start with — and why? |
+
+</div>
 
 ## What you ship from Part 1
 

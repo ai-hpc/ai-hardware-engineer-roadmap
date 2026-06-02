@@ -19,9 +19,34 @@ Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, a
 
 ## External Reference
 
-- [The OpenClaw Book](https://openclawconsultant.com/openclaw-book/) — practitioner-facing OpenClaw guide covering architecture, setup, skills, prompting, planning, optimization, proactive automation, sub-agents, real-world use cases, and security.
+<div class="lecture-map" markdown>
+
+| Resource | What it covers |
+|----------|----------------|
+| [The OpenClaw Book](https://openclawconsultant.com/openclaw-book/) | Practitioner OpenClaw guide: architecture, setup, skills, prompting, planning, optimization, sub-agents, security |
+| [LangChain Documentation](https://python.langchain.com/docs/) | Agent and RAG framework |
+| [LangGraph Documentation](https://langchain-ai.github.io/langgraph/) | Durable, stateful agent workflows, human-in-the-loop, memory, and tracing |
+| [OpenAI Agents SDK](https://openai.github.io/openai-agents-python/) | Agent loops, tools, handoffs, guardrails, sessions, tracing, and MCP integration |
+| [OpenAI API Agents Guide](https://platform.openai.com/docs/guides/agents) | Code-first agent apps, tools, orchestration, and observability |
+| [Model Context Protocol Specification](https://modelcontextprotocol.io/) | Standard protocol for tools, resources, prompts, hosts, clients, servers, and safety |
+| [Claude Code Overview](https://docs.claude.com/en/docs/claude-code/overview) | Agentic coding workflows, MCP, multi-agent use, and CI patterns |
+| [Claude Code Plugins](https://docs.claude.com/en/docs/claude-code/plugins) | Skills, agents, hooks, MCP servers, plugin structure, and distribution |
+| [Claude Code Repository](https://github.com/anthropics/claude-code) | Public implementation surface, examples, plugins, and project layout |
+| [Anthropic Cookbook](https://github.com/anthropics/anthropic-cookbook) | Practical Claude API examples |
+| OpenClaw Repository | Local-first assistant architecture, channels, gateway model, and security defaults |
+| OpenClaw Gateway Architecture | Long-lived gateway, WS protocol, nodes, pairing, and remote access model |
+| OpenClaw Features | Multi-agent routing, media, channels, tools, apps, and provider support |
+| GitHub Agentic Workflows | Official GitHub framing for agentic CI/CD, permissions, and safe outputs |
+| [OWASP Top 10 for LLM Applications](https://genai.owasp.org/llm-top-10/) | Prompt injection, insecure output handling, tool risk, excessive agency, LLM app security |
+| [NIST AI RMF Generative AI Profile](https://www.nist.gov/itl/ai-risk-management-framework) | Governance and risk-management framing for generative AI systems |
+| [LlamaIndex Documentation](https://docs.llamaindex.ai/) | RAG best practices |
+| [Build a Large Language Model (From Scratch) — Raschka](https://github.com/rasbt/LLMs-from-scratch) | LLM internals |
+
+</div>
 
 ## Lecture Index
+
+<div class="lecture-map" markdown>
 
 | # | Title | Topics |
 |---|-------|--------|
@@ -72,7 +97,11 @@ Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, a
 | [Lecture 44](Lecture-44.md) | Efficient Local RAG Stack - Qwen3.5-4B INT4 and Granite Embeddings | Jetson RAG, Granite 97M, Qdrant, chunking, reranking, INT4, llama.cpp, vLLM, TensorRT-LLM, KV cache |
 | [Lecture 45](Lecture-45.md) | Qdrant, pgvector, and Embedding Model Selection | vector stores, HNSW, IVFFlat, dense/sparse/hybrid retrieval, Granite alternatives, embedding evals, migration |
 
+</div>
+
 ## Lab Index
+
+<div class="lecture-map" markdown>
 
 | # | Title | Build |
 |---|-------|-------|
@@ -81,6 +110,8 @@ Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, a
 | [Lab 03](Lab-03-Production-RAG.md) | Production RAG System | Ingestion pipeline + hybrid search + RAGAS eval |
 | [Lab 04](Lab-04-TokenJuice-Output-Compaction.md) | TokenJuice Output Compaction | Deterministic terminal-output reduction, raw bypasses, artifact recovery, project reducers |
 | [Lab 05](Lab-05-OpenMeow-App-SDK-Dogfood.md) | OpenMeow App SDK Dogfood on macOS | Test the OpenClaw App SDK with OpenCoven's OpenMeow adapter, fixtures, UI reducers, live Gateway smoke tests, and optional Coven sessions |
+
+</div>
 
 ## Prerequisites
 

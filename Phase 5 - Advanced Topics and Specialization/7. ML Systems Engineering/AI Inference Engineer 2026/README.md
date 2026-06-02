@@ -50,6 +50,8 @@ Run it locally: `git clone https://github.com/ai-hpc/llm-inference-viz && cd llm
 
 The mental model, the metrics, the math, and the runtime landscape. Anyone who finishes Part 1 can read any model card in 2026 and predict its inference cost shape.
 
+<div class="lecture-map" markdown>
+
 | # | Title |
 |---|-------|
 | 01 | [The 2026 inference engineer's mental model](Part%201%20-%20Fundamentals/Lecture-01.md) |
@@ -58,9 +60,13 @@ The mental model, the metrics, the math, and the runtime landscape. Anyone who f
 | 04 | [The precision stack — FP16 → FP8 → FP4 → INT4](Part%201%20-%20Fundamentals/Lecture-04.md) |
 | 05 | [The runtime landscape — vLLM, SGLang, TensorRT-LLM, llama.cpp, MLX](Part%201%20-%20Fundamentals/Lecture-05.md) |
 
+</div>
+
 ### ⚙️ Part 2 — Dense Decoder-Only Inference at Hopper (6 lectures)
 
 The end-to-end Hopper stack for 70B-class dense models. Anchored on a **Llama 3.3 70B ↔ Qwen 2.5 72B** comparison so every concept lands on two concrete deployable systems.
+
+<div class="lecture-map" markdown>
 
 | # | Title |
 |---|-------|
@@ -71,9 +77,13 @@ The end-to-end Hopper stack for 70B-class dense models. Anchored on a **Llama 3.
 | 05 | [Modern serving stack — continuous batching, paged KV, prefix cache, speculation](Part%202%20-%20Dense%20at%20Hopper/Lecture-05.md) |
 | 06 | [Long context at 128K on Hopper — KV scaling, YaRN, chunked prefill, prefix sharing](Part%202%20-%20Dense%20at%20Hopper/Lecture-06.md) |
 
+</div>
+
 ### 🧬 Part 3 — MoE Inference at Blackwell (5 lectures)
 
 The Blackwell stack for modern MoE — DeepSeek V3.1 (with MLA + MTP) and Qwen3-MoE (235B-A22B) — at FP4 on GB200 NVL72.
+
+<div class="lecture-map" markdown>
 
 | # | Title |
 |---|-------|
@@ -82,6 +92,8 @@ The Blackwell stack for modern MoE — DeepSeek V3.1 (with MLA + MTP) and Qwen3-
 | 03 | [Expert parallelism (EP) and the gating hot path](Part%203%20-%20MoE%20at%20Blackwell/Lecture-03.md) |
 | 04 | [Disaggregated prefill / decode — Mooncake, Splitwise, DistServe](Part%203%20-%20MoE%20at%20Blackwell/Lecture-04.md) |
 | 05 | [Production MoE serving — MTP speculation, constrained decode, cost model](Part%203%20-%20MoE%20at%20Blackwell/Lecture-05.md) |
+
+</div>
 
 ---
 

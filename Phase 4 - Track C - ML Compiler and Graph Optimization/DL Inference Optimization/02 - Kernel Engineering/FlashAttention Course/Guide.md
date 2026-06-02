@@ -42,6 +42,8 @@ If you do not have a GPU locally, a single L4 / A10 / 3090 in a cloud instance i
 
 ## Syllabus
 
+<div class="lecture-map" markdown>
+
 | # | Lecture | Lab artifact |
 |---|---------|--------------|
 | 1 | [Attention bottleneck + roofline](Lecture%2001%20-%20Attention%20Bottleneck%20and%20Roofline.md) | Notebook: per-shape arithmetic intensity table; roofline plot for one GPU |
@@ -54,6 +56,8 @@ If you do not have a GPU locally, a single L4 / A10 / 3090 in a cloud instance i
 | 8 | [Inference path (KV cache, decode)](Lecture%2008%20-%20Inference%20Path%20KV%20Cache%20and%20Decode.md) | Microbenchmark of decode-step latency with and without paged KV; RoPE / GQA sanity check |
 | 9 | [Hopper / FA3 / FA4](Lecture%2009%20-%20Hopper%20FA3%20FA4.md) | FA3 vs FA2 benchmark on H100 / H200; identify the WGMMA + TMA + warp-specialization paths in the source |
 | 10 | [Capstone](Lecture%2010%20-%20Capstone.md) | One focused kernel-path change + benchmark + correctness + write-up |
+
+</div>
 
 ---
 

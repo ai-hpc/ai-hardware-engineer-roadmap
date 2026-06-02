@@ -234,6 +234,8 @@ You don't have to do all three. But to land at chip design, you want enough of *
 
 The deepest, most current technical content lives in these Phase 5 lectures — read them as a single arc:
 
+<div class="lecture-map" markdown>
+
 | # | Lecture | What it teaches |
 |---|---------|-----------------|
 | 1 | [Edge LLM Inference Internals](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Edge%20LLM%20Inference%20Internals/Lecture-01.md) | GEMV vs GEMM rooflines, K-quants, KV-cache math, Jetson `nvpmodel`/`jetson_clocks` diagnostics |
@@ -244,6 +246,8 @@ The deepest, most current technical content lives in these Phase 5 lectures — 
 | 6 | [Cross-Model & Production Serving](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/Lecture-05.md) | Speculative decoding pairings, edge/cloud routing, observability, capacity planning |
 | 7 | [Batched GEMM vs Normal GEMM](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/Lecture-06.md) | cuBLAS API forms, column-major dance, tensor cores, bit-exact reproducibility |
 | 8 | [AI Inference Engineer 2026 — special course](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/7.%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/README.md) | The full 2026 production inference stack as a 16-lecture arc: dense → MoE, Hopper → Blackwell, FP16 → FP8 → FP4, vLLM / SGLang / TensorRT-LLM, tensor parallelism, disaggregated prefill/decode, rooflines |
+
+</div>
 
 Read them in order if you're new. Skip to whichever solves your current problem if you're not.
 
