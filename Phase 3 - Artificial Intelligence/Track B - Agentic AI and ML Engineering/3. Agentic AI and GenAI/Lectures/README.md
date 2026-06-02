@@ -52,6 +52,7 @@ Lectures 01-08 build the agent mechanics. Lectures 09-12 add data, evaluation, a
 
 | # | Title | Topics |
 |---|-------|--------|
+| [Lecture 00](Lecture-00.md) | The Modern AI Agent in 2026: What Changed | Agent definition, 2023→2026 shifts, harness AI, reference systems, course map |
 | [Lecture 01](Lecture-01.md) | LLM Fundamentals for Agents | Transformers, tokenization, inference mechanics, context windows |
 | [Lecture 02](Lecture-02.md) | Prompt Engineering & Structured Output | System prompts, few-shot, JSON mode, function calling |
 | [Lecture 03](Lecture-03.md) | Tool Use & Function Calling | Tool schemas, parallel calls, error handling, safety |

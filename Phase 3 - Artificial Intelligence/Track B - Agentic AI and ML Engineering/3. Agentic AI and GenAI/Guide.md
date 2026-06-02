@@ -34,6 +34,7 @@ The shift from chat boxes to persistent, tool-using systems — and the rise of 
 
 | # | Lecture |
 |---|---------|
+| [00](Lectures/Lecture-00.md) | The modern AI agent in 2026 — what changed *(start here)* |
 | [24](Lectures/Lecture-24.md) | What is an AI agent harness? — the runtime around the model |
 | [24b](Lectures/Lecture-24b.md) | Session as source of truth — event-sourced agent state |
 | [31](Lectures/Lecture-31.md) | Runtime strategy — Node, Bun, Rust, and edge packaging |
