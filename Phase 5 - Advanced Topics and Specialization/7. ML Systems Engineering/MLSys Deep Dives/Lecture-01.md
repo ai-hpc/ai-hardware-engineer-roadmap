@@ -1,6 +1,6 @@
-# Lecture 42 - Agent Skills for GPU Kernel Translation: cuTile Python to cuTile.jl
+# Lecture 01 - Agent Skills for GPU Kernel Translation: cuTile Python to cuTile.jl
 
-**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 41](Lecture-41.md) | **Next:** [Lecture 43](Lecture-43.md)
+**Collection:** [MLSys Deep Dives](README.md) | **Previous:** [← MLSys Deep Dives index](README.md) | **Next:** [Lecture 02](Lecture-02.md)
 
 ---
 
@@ -595,9 +595,8 @@ summary of known risks
 - NVIDIA TileGym repository: [https://github.com/NVIDIA/TileGym](https://github.com/NVIDIA/TileGym)
 - cuTile Python documentation: [https://nvidia.github.io/cutlass/latest/media/docs/pythonDSL/cute_dsl_api/cute.html](https://nvidia.github.io/cutlass/latest/media/docs/pythonDSL/cute_dsl_api/cute.html)
 - CUDA.jl: [https://cuda.juliagpu.org/stable/](https://cuda.juliagpu.org/stable/)
-- Lecture 21 - Agent Skills: [Lecture-21.md](Lecture-21.md)
-- Lecture 06 - LLM From Scratch: [Lecture-06.md](Lecture-06.md)
-
+- Agent Skills — *AI Agent Development 2026 course*
+- LLM From Scratch — *AI Agent Development 2026 course*
 ---
 
-*Next: [Lecture 43](Lecture-43.md)*
+*Next: [Lecture 02](Lecture-02.md)*

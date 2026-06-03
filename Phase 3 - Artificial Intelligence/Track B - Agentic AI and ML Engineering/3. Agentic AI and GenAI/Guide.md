@@ -139,22 +139,9 @@ The capstone: apply Modules 1–5 by building **genie-claw** — your own minima
 
 </div>
 
-### Appendix · Advanced / MLSys-adjacent
+### Related — MLSys deep dives (relocated)
 
-Inference- and kernel-leaning deep dives that overlap the **AI Inference Engineer 2026** course (Phase 5 → ML Systems Engineering) — optional unless you're going down to the metal.
-
-<div class="lecture-map" markdown>
-
-| # | Lecture |
-|---|---------|
-| [42](Lectures/Lecture-42.md) | GPU kernel translation (cuTile) |
-| [43](Lectures/Lecture-43.md) | FP8 KV-cache in vLLM |
-| [44](Lectures/Lecture-44.md) | TraceLens — trace-driven performance analysis |
-| [45](Lectures/Lecture-45.md) | AutoSP — compiler-generated sequence parallelism |
-| [46](Lectures/Lecture-46.md) | ZAYA1-8B — small MoE reasoning |
-| [47](Lectures/Lecture-47.md) | MLSys 2026 kernel contest |
-
-</div>
+The inference- and kernel-leaning deep dives (GPU kernels, FP8 KV-cache, performance tracing, sequence parallelism, small-MoE reasoning) used to live here as an appendix. They belong with **ML Systems Engineering**, so they now live in the **[MLSys Deep Dives](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/7.%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/README.md)** collection (Phase 5), alongside the [AI Inference Engineer 2026](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/7.%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/README.md) course.
 
 ---
 

@@ -17,7 +17,7 @@ The durable concepts in this course are:
 - **Product control plane:** gateways, channels, sessions, routing, identities, and audit logs.
 - **Runtime security:** least privilege, policy gates, telemetry, incident response, and evidence.
 
-The lectures are numbered 01–47 in the recommended reading order. They group into six modules — *start here* (the modern agent, the harness, and how to build one), *fundamentals*, *core building blocks*, *production & runtime*, the *OpenClaw* example, and the *genie-claw* practice capstone — plus an advanced MLSys-adjacent appendix. See the **[course Guide](../Guide.md)** for the full module breakdown.
+The lectures are numbered 01–41 in the recommended reading order. They group into six modules — *start here* (the modern agent, the harness, and how to build one), *fundamentals*, *core building blocks*, *production & runtime*, the *OpenClaw* example, and the *genie-claw* practice capstone. See the **[course Guide](../Guide.md)** for the full module breakdown.
 
 ## Lecture Index
 
@@ -66,12 +66,6 @@ The lectures are numbered 01–47 in the recommended reading order. They group i
 | [Lecture 39](Lecture-39.md) | OpenClaw Case Study - Gateway RPC Protocol | WebSocket frames, handshake, roles, scopes, pairing, features, node transport |
 | [Lecture 40](Lecture-40.md) | OpenClaw Threat Model - MITRE ATLAS for Agent Security | threat matrix, attack chains, trust boundaries, prompt injection, skill supply chain, tool execution controls |
 | [Lecture 41](Lecture-41.md) | Pi - A Minimal Coding Agent and the Substrate Beneath OpenClaw | Tiny core (4 tools), no-MCP rationale, custom messages in session log, hot reload, tree-structured sessions, TUI vs LLM-tool surfaces |
-| [Lecture 42](Lecture-42.md) | Agent Skills for GPU Kernel Translation - cuTile Python to cuTile.jl | cuTile semantics, Julia layout/indexing traps, TileGym skill structure, validators, GPU tests |
-| [Lecture 43](Lecture-43.md) | FP8 KV-Cache in vLLM - Long-Context Serving for Agents | KV-cache memory, FP8 attention, ITL/TTFT, sliding-window skips, calibration, deployment decisions |
-| [Lecture 44](Lecture-44.md) | TraceLens - Trace-Driven AI Performance Analysis | Trace2Tree, hierarchical bottleneck reports, roofline metrics, collective skew, trace diff, event replay |
-| [Lecture 45](Lecture-45.md) | AutoSP - Compiler-Generated Sequence Parallelism for Long-Context Training | DeepCompile, DeepSpeed-Ulysses, sequence-aware activation checkpointing, ZeRO composition, graph-break limits |
-| [Lecture 46](Lecture-46.md) | ZAYA1-8B - Small MoE Reasoning, AMD Training, and Test-Time Compute | 760M active parameters, AMD MI300X training, Markovian RSA, math/coding specialization, weak agentic scores |
-| [Lecture 47](Lecture-47.md) | MLSys 2026 Kernel Contest - AI-Assisted Blackwell LLM Kernel Optimization | FlashInfer-Bench, B200, FP8 MoE, sparse attention, Gated Delta Net, CUDA/Triton/CuTe, agent-generated kernels |
 
 </div>
 

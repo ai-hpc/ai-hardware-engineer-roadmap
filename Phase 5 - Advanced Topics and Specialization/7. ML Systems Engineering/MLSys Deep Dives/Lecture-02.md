@@ -1,6 +1,6 @@
-# Lecture 43 - FP8 KV-Cache in vLLM: Long-Context Serving for Agent Workloads
+# Lecture 02 - FP8 KV-Cache in vLLM: Long-Context Serving for Agent Workloads
 
-**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 42](Lecture-42.md) | **Next:** [Lecture 44](Lecture-44.md)
+**Collection:** [MLSys Deep Dives](README.md) | **Previous:** [Lecture 01](Lecture-01.md) | **Next:** [Lecture 03](Lecture-03.md)
 
 ---
 
@@ -710,9 +710,8 @@ Need further testing for:
 - FlashAttention: [https://github.com/Dao-AILab/flash-attention](https://github.com/Dao-AILab/flash-attention)
 - FlashInfer: [https://github.com/flashinfer-ai/flashinfer](https://github.com/flashinfer-ai/flashinfer)
 - LLM Compressor: [https://github.com/vllm-project/llm-compressor](https://github.com/vllm-project/llm-compressor)
-- Lecture 06 - LLM From Scratch: [Lecture-06.md](Lecture-06.md)
-- Lecture 20 - Nemotron 3 Nano Omni: [Lecture-20.md](Lecture-20.md)
-
+- LLM From Scratch — *AI Agent Development 2026 course*
+- Nemotron 3 Nano Omni — *AI Agent Development 2026 course*
 ---
 
-*Next: [Lecture 44](Lecture-44.md)*
+*Next: [Lecture 03](Lecture-03.md)*

@@ -643,7 +643,7 @@ Either **improve the skill** or admit the skill is unnecessary.
 - Agent Skills overview: [https://agentskills.io/home](https://agentskills.io/home)
 - Lecture 21 - Agent Skills: [Lecture-21.md](Lecture-21.md)
 - Lecture 29 - Agentic SDLC: [Lecture-29.md](Lecture-29.md)
-- Lecture 42 - Agent Skills for GPU Kernel Translation: [Lecture-42.md](Lecture-42.md)
+- Agent Skills for GPU Kernel Translation → [MLSys Deep Dives · Lecture 01](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/7.%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/Lecture-01.md)
 
 ---
 

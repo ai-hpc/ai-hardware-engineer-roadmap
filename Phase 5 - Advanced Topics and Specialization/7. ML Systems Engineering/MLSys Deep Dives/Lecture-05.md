@@ -1,6 +1,6 @@
-# Lecture 46 - ZAYA1-8B: Small MoE Reasoning, AMD Training, and Test-Time Compute
+# Lecture 05 - ZAYA1-8B: Small MoE Reasoning, AMD Training, and Test-Time Compute
 
-**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 45](Lecture-45.md) | **Next:** [Lecture 47](Lecture-47.md)
+**Collection:** [MLSys Deep Dives](README.md) | **Previous:** [Lecture 04](Lecture-04.md) | **Next:** [Lecture 06](Lecture-06.md)
 
 ---
 
@@ -148,8 +148,8 @@ post-training for reasoning
 This connects to earlier lectures:
 
 - Lecture 06: model mechanics
-- Lecture 43: memory and serving costs
-- Lecture 45: long-context training systems
+- Lecture 02: memory and serving costs
+- Lecture 04: long-context training systems
 
 Small models that compete on reasoning usually require **systems co-design**.
 
@@ -520,7 +520,7 @@ final answer correctness
 
 Use Lecture 22's skill eval approach if the model is meant to execute a skill.
 
-Use Lecture 44's trace approach if you are making performance claims.
+Use Lecture 03's trace approach if you are making performance claims.
 
 ---
 
@@ -589,10 +589,9 @@ Runtime blockers:
 - ZAYA1-8B Hugging Face model card: [https://huggingface.co/Zyphra/ZAYA1-8B](https://huggingface.co/Zyphra/ZAYA1-8B)
 - Firethering summary: [https://firethering.com/zaya1-8b-open-source-math-coding-model/](https://firethering.com/zaya1-8b-open-source-math-coding-model/)
 - Zyphra vLLM fork: [https://github.com/Zyphra/vllm](https://github.com/Zyphra/vllm)
-- Lecture 09 - Structured Tools Beat Computer Use: [Lecture-09.md](Lecture-09.md)
-- Lecture 44 - TraceLens: [Lecture-44.md](Lecture-44.md)
-- Lecture 22 - Agent Skills Eval: [Lecture-22.md](Lecture-22.md)
-
+- Structured Tools Beat Computer Use — *AI Agent Development 2026 course*
+- Lecture 03 - TraceLens: [Lecture 03](Lecture-03.md)
+- Agent Skills Eval — *AI Agent Development 2026 course*
 ---
 
-*Next: [Lecture 47](Lecture-47.md)*
+*Next: [Lecture 06](Lecture-06.md)*

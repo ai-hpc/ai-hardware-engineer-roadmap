@@ -1,6 +1,6 @@
-# Lecture 44 - TraceLens: Trace-Driven AI Performance Analysis
+# Lecture 03 - TraceLens: Trace-Driven AI Performance Analysis
 
-**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 43](Lecture-43.md) | **Next:** [Lecture 45](Lecture-45.md)
+**Collection:** [MLSys Deep Dives](README.md) | **Previous:** [Lecture 02](Lecture-02.md) | **Next:** [Lecture 04](Lecture-04.md)
 
 ---
 
@@ -553,7 +553,7 @@ run representative agent workload
   -> attach report to deployment decision
 ```
 
-This pairs directly with **Lecture 43**.
+This pairs directly with **Lecture 02**.
 
 If you enable FP8 KV-cache, do not only report:
 
@@ -702,7 +702,7 @@ Next actions:
 - inspect attention kernel time
 - test skip policies for sliding-window layers
 - validate accuracy on real prompts
-- connect to Lecture 43's TTFT/ITL benchmark plan
+- connect to Lecture 02's TTFT/ITL benchmark plan
 
 ### Case: exposed communication is high
 
@@ -849,8 +849,8 @@ If you find one slow operation, generate an event replay and treat it as a kerne
 - TraceLens GitHub repository: [https://github.com/AMD-AGI/TraceLens](https://github.com/AMD-AGI/TraceLens)
 - PyTorch profiler documentation: [https://docs.pytorch.org/docs/stable/profiler.html](https://docs.pytorch.org/docs/stable/profiler.html)
 - Perfetto trace viewer: [https://ui.perfetto.dev](https://ui.perfetto.dev)
-- Lecture 43 - FP8 KV-Cache in vLLM: [Lecture-43.md](Lecture-43.md)
+- Lecture 02 - FP8 KV-Cache in vLLM: [Lecture 02](Lecture-02.md)
 
 ---
 
-*Next: [Lecture 45](Lecture-45.md)*
+*Next: [Lecture 04](Lecture-04.md)*

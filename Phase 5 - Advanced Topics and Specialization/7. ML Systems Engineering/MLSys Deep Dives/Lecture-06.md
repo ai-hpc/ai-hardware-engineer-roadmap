@@ -1,6 +1,6 @@
-# Lecture 47 - MLSys 2026 Kernel Contest: AI-Assisted Blackwell LLM Kernel Optimization
+# Lecture 06 - MLSys 2026 Kernel Contest: AI-Assisted Blackwell LLM Kernel Optimization
 
-**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 46](Lecture-46.md) | **Next:** [Lab 01](Lab-01-Research-Agent.md)
+**Collection:** [MLSys Deep Dives](README.md) | **Previous:** [Lecture 05](Lecture-05.md) | **Next:** [MLSys Deep Dives index](README.md)
 
 ---
 
@@ -196,7 +196,7 @@ This connects directly to modern MoE models:
 - DeepSeek-style expert systems
 - Mixtral-style routing
 - Qwen MoE variants
-- small active-parameter models such as Lecture 46's ZAYA1-8B
+- small active-parameter models such as Lecture 05's ZAYA1-8B
 
 MoE is **not "free sparsity."**
 
@@ -253,8 +253,8 @@ to pay for indexer overhead and irregular access?
 
 This connects to:
 
-- Lecture 43: FP8 KV-cache
-- Lecture 44: trace-driven performance analysis
+- Lecture 02: FP8 KV-cache
+- Lecture 03: trace-driven performance analysis
 - long-context agent sessions
 - DeepSeek-style inference systems
 
@@ -521,7 +521,7 @@ good average but bad tail:
   expert imbalance or sparse metadata distribution may matter
 ```
 
-This connects to Lecture 44:
+This connects to Lecture 03:
 
 ```text
 performance claims need trace and profiling evidence
@@ -919,7 +919,7 @@ Why cuTile matters:
 - it can be easier to modify than deep CUDA/CUTLASS templates
 - it is aligned with agent-assisted kernel translation work
 
-This connects directly to **Lecture 42**, where cuTile Python to cuTile.jl translation was used as a concrete Agent Skills example.
+This connects directly to **Lecture 01**, where cuTile Python to cuTile.jl translation was used as a concrete Agent Skills example.
 
 For the MLSys contest:
 
@@ -1267,11 +1267,11 @@ If you want to move from AI application work into AI systems work, this contest 
 Relevant earlier lectures:
 
 - Lecture 06: LLM internals and inference mechanics
-- Lecture 42: agent skills for GPU kernel translation
-- Lecture 43: FP8 KV-cache and attention quantization
-- Lecture 44: TraceLens and trace-driven performance analysis
-- Lecture 45: AutoSP and compiler-generated sequence parallelism
-- Lecture 46: small MoE reasoning model deployment tradeoffs
+- Lecture 01: agent skills for GPU kernel translation
+- Lecture 02: FP8 KV-cache and attention quantization
+- Lecture 03: TraceLens and trace-driven performance analysis
+- Lecture 04: AutoSP and compiler-generated sequence parallelism
+- Lecture 05: small MoE reasoning model deployment tradeoffs
 - Lecture 18: durable agent harnesses for tool-oriented long-running work
 
 The contest combines all of them:
@@ -1393,10 +1393,10 @@ The goal is to build a **disciplined kernel optimization loop**.
 - cuTile Python documentation: [https://docs.nvidia.com/cuda/cutile-python](https://docs.nvidia.com/cuda/cutile-python)
 - OpenEvolve repository: [https://github.com/algorithmicsuperintelligence/openevolve](https://github.com/algorithmicsuperintelligence/openevolve)
 - Modal documentation: [https://modal.com/docs](https://modal.com/docs)
-- Lecture 42 - Agent Skills for GPU Kernel Translation: [Lecture-42.md](Lecture-42.md)
-- Lecture 43 - FP8 KV-Cache in vLLM: [Lecture-43.md](Lecture-43.md)
-- Lecture 44 - TraceLens: [Lecture-44.md](Lecture-44.md)
+- Lecture 01 - Agent Skills for GPU Kernel Translation: [Lecture 01](Lecture-01.md)
+- Lecture 02 - FP8 KV-Cache in vLLM: [Lecture 02](Lecture-02.md)
+- Lecture 03 - TraceLens: [Lecture 03](Lecture-03.md)
 
 ---
 
-*Next: [Lab 01](Lab-01-Research-Agent.md)*
+*Next: [MLSys Deep Dives index](README.md)*

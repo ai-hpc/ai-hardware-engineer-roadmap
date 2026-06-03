@@ -1,6 +1,6 @@
-# Lecture 45 - AutoSP: Compiler-Generated Sequence Parallelism for Long-Context Training
+# Lecture 04 - AutoSP: Compiler-Generated Sequence Parallelism for Long-Context Training
 
-**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 44](Lecture-44.md) | **Next:** [Lecture 46](Lecture-46.md)
+**Collection:** [MLSys Deep Dives](README.md) | **Previous:** [Lecture 03](Lecture-03.md) | **Next:** [Lecture 05](Lecture-05.md)
 
 ---
 
@@ -10,7 +10,7 @@
 
 **Training** models to handle long contexts is another.
 
-Lecture 43 covered vLLM FP8 KV-cache for long-context inference. This lecture covers the training-side complement: AutoSP.
+Lecture 02 covered vLLM FP8 KV-cache for long-context inference. This lecture covers the training-side complement: AutoSP.
 
 **AutoSP** is a compiler-based system that automatically transforms ordinary transformer training code into **sequence-parallel** training code across multiple GPUs. The goal is direct:
 
@@ -192,7 +192,7 @@ loss = model(
 
 The **compiler pass** handles the sequence-parallel code transformation.
 
-This is the same trend we saw in Lecture 42:
+This is the same trend we saw in Lecture 01:
 
 ```text
 Do not just prompt the agent or user to remember systems rules.
@@ -428,7 +428,7 @@ compiler/runtime chooses distributed lowering
 trace/profiler validates the actual result
 ```
 
-This pairs directly with Lecture 44.
+This pairs directly with Lecture 03.
 
 Use **TraceLens** or equivalent profiler analysis to verify whether the generated SP code is **actually efficient** on your hardware.
 
@@ -724,9 +724,9 @@ Then compare against a baseline mode and record whether per-rank losses match wi
 - AutoSP paper, "AutoSP: Unlocking Long-Context LLM Training via Compiler-Based Sequence Parallelism": [https://openreview.net/pdf?id=0fgsHvmBBI](https://openreview.net/pdf?id=0fgsHvmBBI)
 - DeepSpeed AutoSP examples: [https://github.com/deepspeedai/DeepSpeedExamples/tree/master/benchmarks/autosp](https://github.com/deepspeedai/DeepSpeedExamples/tree/master/benchmarks/autosp)
 - DeepCompile paper: [https://arxiv.org/abs/2504.09983](https://arxiv.org/abs/2504.09983)
-- Lecture 43 - FP8 KV-Cache in vLLM: [Lecture-43.md](Lecture-43.md)
-- Lecture 44 - TraceLens: [Lecture-44.md](Lecture-44.md)
+- Lecture 02 - FP8 KV-Cache in vLLM: [Lecture 02](Lecture-02.md)
+- Lecture 03 - TraceLens: [Lecture 03](Lecture-03.md)
 
 ---
 
-*Next: [Lecture 46](Lecture-46.md)*
+*Next: [Lecture 05](Lecture-05.md)*
