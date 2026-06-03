@@ -188,6 +188,7 @@
 * **Hot Chips and ISSCC Conference Proceedings:**  Annual conferences where leading companies present AI chip architectures—primary source for understanding state-of-the-art designs.
 * **"Demystifying AI Chipmakers" (Various analyst reports):**  Business and technology landscape of AI chip startups and incumbents.
 * **RISC-V AI Chip Design and Market Course:**  [Focused course](RISC-V-AI-Chip-Design-and-Market/Guide.md) on SpacemiT, RISC-V vector AI, software enablement, and edge AI market fit.
+* **Agentic Chip Design 2026:**  [Special course](Agentic%20Chip%20Design%202026/Guide.md) on using LLMs and agents across the RTL-to-silicon flow — RTL generation, verification, and agentic EDA — bridging the [AI Agent Development 2026](../../Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Guide.md) course. Grounded in the [Chip-Design-LLM-Zoo](https://iprc-dip.github.io/Chip-Design-LLM-Zoo/) leaderboard.
 
 **Projects:**
 

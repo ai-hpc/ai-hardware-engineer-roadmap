@@ -540,6 +540,9 @@ nav:
     - "F: AI Chip Design":
       - Guide: Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Guide.md
       - RISC-V AI Chip Design and Market: Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/RISC-V-AI-Chip-Design-and-Market/Guide.md
+      - "Agentic Chip Design 2026":
+        - Guide: Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Agentic Chip Design 2026/Guide.md
+        - "01: Why Agents for Chip Design": Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Agentic Chip Design 2026/Lectures/Lecture-01.md
       - Lectures:
         - "01": Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Lectures/Lecture-01.md
         - "02": Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Lectures/Lecture-02.md
