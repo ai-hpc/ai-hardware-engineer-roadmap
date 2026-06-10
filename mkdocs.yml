@@ -553,12 +553,13 @@ nav:
       - Guide: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Guide.md
       - "MLSys Deep Dives":
         - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/README.md
-        - "01: Agent Skills for GPU Kernel Translation (cuTile)": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-01.md
-        - "02: FP8 KV-Cache in vLLM": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-02.md
-        - "03: TraceLens — Trace-Driven Performance Analysis": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-03.md
-        - "04: AutoSP — Sequence Parallelism": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-04.md
-        - "05: ZAYA1-8B — Small MoE Reasoning": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-05.md
-        - "06: MLSys 2026 Kernel Contest": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-06.md
+        - "01: MLSys as the Economic-Value Layer": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-01.md
+        - "02: The Kernel-Language Explosion (Triton, cuTile, TileLang)": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-02.md
+        - "03: Compilers & Runtimes (TVM, Mojo, TensorRT, TileRT)": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-03.md
+        - "04: Beyond the Dense Transformer (Mamba, SSMs, Hybrids)": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-04.md
+        - "05: The 2026 Frontier (Qwen3, Nemotron Ultra, MiMo, DeepSeek)": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-05.md
+        - "06: Making Decode Fast (EAGLE-3, DFlash, Flash kernels)": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-06.md
+        - "07: Edge & Physical-AI Frontier + Capstone": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-07.md
       - "TVM Deep Dives":
         - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/README.md
         - "01: The TVM Stack & Compilation Flow": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/Lecture-01.md

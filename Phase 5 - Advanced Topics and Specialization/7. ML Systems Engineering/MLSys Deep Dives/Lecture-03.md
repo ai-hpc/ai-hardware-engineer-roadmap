@@ -1,34 +1,12 @@
-# Lecture 03 - TraceLens: Trace-Driven AI Performance Analysis
+# Lecture 03 - Compilers and Runtimes: From Autoscheduling to Megakernels
 
-**Collection:** [MLSys Deep Dives](README.md) | **Previous:** [Lecture 02](Lecture-02.md) | **Next:** [Lecture 04](Lecture-04.md)
+**Collection:** [MLSys Deep Dives](README.md) | **Previous:** [← Lecture 02](Lecture-02.md) | **Next:** [Lecture 04](Lecture-04.md)
 
 ---
 
-Performance optimization is **not a vibes problem**.
+Lecture 2 was about *writing* a kernel — you, choosing tiles. This lecture is about the layer that decides what happens when you *don't* want to choose, or when there are ten thousand kernels and a whole graph to schedule, fuse, and keep resident on the device. That is the job of **compilers** (which pick or search for schedules) and **runtimes** (which decide how the resulting kernels actually execute at scale).
 
-For AI systems, the hard part is often not collecting data. It is turning a huge profiler trace into a **specific diagnosis**:
-
-```text
-What was slow?
-Where in the model did it happen?
-Was the GPU computing, communicating, copying, or waiting?
-Did the new kernel actually help?
-Can we reproduce the slow op without the full model?
-```
-
-**TraceLens** is useful because it treats profiler traces as **structured data**, not screenshots for humans to manually inspect.
-
-It consumes traces from frameworks such as PyTorch and JAX, then produces **summaries, comparisons, roofline-style metrics**, collective communication analysis, and minimal operation reproducers.
-
-For this course, TraceLens is the missing evidence layer between:
-
-```text
-agent workload
-  -> model server
-  -> GPU kernels and collectives
-  -> performance claim
-  -> trace-backed diagnosis
-```
+We tour four compilers that sit at different points — **TVM** (search), **Mojo/MAX** (a whole language), **TensorRT-LLM** (closed vendor), **IREE** (portable MLIR) — and then the runtime axis that is quietly where a lot of 2026's throughput gains are coming from: the move from per-op launches to **persistent megakernels**, exemplified by **TileRT**.
 
 ---
 
@@ -36,821 +14,188 @@ agent workload
 
 By the end of this lecture, you should be able to:
 
-1. Explain why raw AI profiler traces are hard to analyze manually.
-2. Understand Trace2Tree as a hierarchical trace intermediate representation.
-3. Use top-down performance breakdowns to locate bottlenecks.
-4. Interpret GPU timeline, operator category, dispatch-level, and shape-level reports.
-5. Understand TraceLens roofline metrics such as TFLOPS/s and TB/s.
-6. Diagnose multi-GPU scaling with communication latency, bandwidth, and synchronization skew.
-7. Use trace comparison to quantify regressions across hardware, drivers, kernels, or software versions.
-8. Understand event replay as a way to produce minimal, IP-safe performance reproducers.
-9. Apply TraceLens to OpenClaw-style agent serving and vLLM optimization workflows.
+1. Distinguish *hand-written DSL* (Lec 2) from *compiler-chosen* schedules, and the three ways compilers choose: heuristic, search, whole-language.
+2. Summarize **TVM** (Relax/TensorIR/MetaSchedule/BYOC/MLC-LLM) as the autoscheduling pole, and know where to go for depth.
+3. Explain **Mojo/MAX** as "a real language, not an eDSL," and the fragmentation argument behind it.
+4. Place **TensorRT-LLM** as the closed-vendor pole and describe its 2025 shift toward PyTorch-native authoring + Dynamo.
+5. Describe the **runtime axis** — eager → CUDA graph → **persistent megakernel** — and why **TileRT**'s megakernel design wins on overhead.
+6. Decide, for a given workload, whether to hand-write, compile/search, or buy the closed engine.
 
 ---
 
-## 1. The profiler trace problem
+## 1. Who chooses the schedule?
 
-Modern AI workloads generate large traces:
-
-- Python module calls
-- PyTorch or JAX framework operations
-- CPU dispatches
-- runtime launch events
-- GPU kernels
-- memory copies
-- collective communication
-- synchronization gaps
-
-Tools such as **Perfetto** are useful for visual inspection, but the **manual workflow does not scale**.
-
-The engineer ends up asking:
+A kernel's performance is mostly its **schedule** — tile sizes, loop order, what's cached in shared memory, how the pipeline overlaps. Lecture 2's DSLs put that choice in *your* hands (Triton hides some; ThunderKittens/CUTLASS expose all). Compilers take the choice *away* from you, in one of three ways:
 
 ```text
-Which kernels belong to this model layer?
-Which aten op launched this slow kernel?
-Is this memcpy from my code or from AMP/framework behavior?
-Did communication overlap with compute?
-Did a new software version shift time into a different op?
+   ① HEURISTIC   compiler applies expert default schedules, no search
+                 (XLA fusion, TVM's dlight, torch.compile's Inductor)        → instant, ~good
+   ② SEARCH      compiler measures many schedules on real hardware, keeps best
+                 (TVM MetaSchedule, Ansor)                                    → slow, ~peak
+   ③ WHOLE LANG  you write ONE language spanning kernel→graph→serving
+                 (Mojo/MAX)                                                   → unified, new ecosystem
 ```
 
-Raw traces are **too flat**.
-
-They show events, but **not enough intent**.
-
-TraceLens adds **structure**.
+This is the *other half* of Lecture 2's ease↔control axis. The DSLs ask "how do you want this scheduled?"; the compilers answer "let me figure it out" — by heuristic (fast, portable, ~80–90% of peak) or by search (slow, peak, target-specific). Neither is strictly better; they're different points on the same effort-vs-peak trade, now automated.
 
 ---
 
-## 2. Trace2Tree: from flat trace to hierarchy
+## 2. TVM — the autoscheduling pole
 
-The central idea is **Trace2Tree**.
-
-TraceLens converts **flat events into a tree**:
+**Apache TVM** is the most complete embodiment of the *search* approach, and the broadest multi-target open compiler. The one-paragraph shape (this course has a whole companion course on it — [TVM Deep Dives](../TVM%20Deep%20Dives/README.md) — so we stay at altitude here):
 
 ```text
-Python module / function
-  -> framework op
-    -> CPU dispatch
-      -> runtime launch
-        -> GPU kernel
+   import model → Relax (graph IR, dynamic shapes) → lower to TensorIR (loop IR)
+        → MetaSchedule SEARCHES schedules, measured on the real device
+        → codegen (CUDA/LLVM/Metal/Vulkan/WebGPU/C) → runtime
+        + BYOC: offload subgraphs to external codegen (CUTLASS/TensorRT/a custom NPU)
+        + MLC-LLM: the whole stack pointed at LLMs, cross-platform
 ```
 
-Example shape:
+What makes TVM matter for this course's thesis:
 
-```text
-nn.Module: Linear
-  -> aten::linear
-    -> aten::to
-      -> aten::copy_
-        -> elementwise kernel
-    -> aten::addmm
-      -> matrix multiply kernel
-```
+* **It searches instead of asking you.** MetaSchedule generates candidate TensorIR schedules, ranks them with a learned cost model, measures the promising ones on the actual GPU (over RPC if it's an edge board), and keeps the winner. You trade tuning *time* for a kernel tuned to *your* exact shape and silicon — which is how TVM can beat vendor libraries on shapes the vendor didn't anticipate.
+* **It is the foundation under newer tools.** **TileLang** (Lec 2) and **TileRT** (§6) are built on TVM infrastructure; **MLC-LLM** is TVM Unity pointed at LLMs across CUDA/Metal/Vulkan/WebGPU. When you learn TVM you learn the substrate of a chunk of the 2026 stack.
+* **dlight** is its *heuristic* mode: default GPU schedules with **no** tuning, used by MLC-LLM precisely because you cannot run a search on every user's phone GPU. TVM contains both poles — heuristic (dlight) and search (MetaSchedule) — and the senior move is knowing which to use where.
 
-This matters because many expensive events are **hidden at the Python level**.
-
-Common examples:
-
-- automatic mixed precision casts
-- implicit copies
-- layout conversions
-- unfused bias additions
-- framework-generated elementwise kernels
-- backend-specific convolution or attention kernels
-
-Without a tree, a kernel is just a name and timestamp.
-
-With a tree, the kernel has ownership:
-
-```text
-This exact module launched this exact framework op,
-which launched this exact kernel.
-```
-
-That is the difference between **tracing and diagnosis**.
+Reach for TVM when you need **portability across many targets** (including edge and web) and are willing to invest tuning time for peak — or when you're bringing up a backend for **new hardware** (its BYOC + autoschedule path is the on-ramp). For the build-it details, take the [TVM Deep Dives](../TVM%20Deep%20Dives/README.md) course.
 
 ---
 
-## 3. Top-down bottleneck analysis
+## 3. Mojo / MAX — a real language, not an eDSL
 
-TraceLens reports are designed to move from **coarse to precise**.
+**Modular's** bet (founded by Chris Lattner — LLVM, Swift, MLIR) is that the whole "1,001 Python eDSLs" situation from Lecture 2 is a symptom of a missing piece: **a real systems language for accelerators**. That language is **Mojo** — a Python-superset built directly on **MLIR**, designed to be "Python-easy, C++/Rust-fast," spanning CPU/GPU/accelerators in one syntax.
 
-The useful progression is:
+The argument, stated fairly: a Python eDSL (Triton, cuTile) "looks like Python but isn't" — it's a restricted subset that traces to a kernel, with its own rules and failure modes. Mojo is instead a *complete* language, so the same code can express a Tensor-Core kernel, a model, and the glue around it without crossing a language boundary. Since mid-2025 Mojo's **standard library** provides portable GPU programming directly (the `gpu` module), and Modular claims one of the largest open repos of CPU+GPU kernels.
+
+**MAX** is the product on top: Modular's **inference engine + graph compiler + serving** stack, with its own FlashAttention/MLA kernels written *in Mojo*, targeting NVIDIA Hopper/Blackwell and AMD MI-series, claiming competitive Blackwell performance.
+
+The open-source timeline matters because it's the main adoption question:
 
 ```text
-GPU timeline
-  -> operator category
-  -> framework op
-  -> unique input shape
-  -> exact kernel or replay case
+   2024-03   Mojo stdlib open-sourced (Apache 2.0)
+   2025-11   all MAX Python API modules open-sourced (v25.7)
+   2026-fall Modular's public commitment to open-source the Mojo LANGUAGE/compiler
 ```
 
-This is the right order.
-
-Do not start with **kernel names**.
-
-Start by asking **how the system spent time**.
+Until the compiler opens, Mojo/MAX is the **most Modular-locked** option here — that is the live risk. But the thesis ("stop writing eDSLs, write a language") is the cleanest counter-argument to the tile-DSL fragmentation, and worth understanding even if you don't adopt it. Reach for it when you want **one language from kernel to serving** and are comfortable betting on Modular's stack and timeline.
 
 ---
 
-## 4. GPU timeline: was the GPU doing useful work?
+## 4. TensorRT-LLM — the closed-vendor pole
 
-The GPU timeline report separates time into categories such as:
+At the opposite end from TVM's open search sits **TensorRT / TensorRT-LLM** (NVIDIA). TensorRT is a closed **builder**: feed it a model, it emits a hardware-specific *engine* using NVIDIA's proprietary kernels (fusion, precision calibration, kernel auto-selection). **TensorRT-LLM** specializes that for LLM serving: custom attention kernels, **in-flight (continuous) batching**, **paged KV cache**, quantization (**FP8/FP4/INT4-AWQ/INT8 SmoothQuant**), speculative decoding, multi-GPU/multi-node.
 
-- computation
-- exposed communication
-- exposed memory copy
-- busy time
-- idle time
-- total communication
-- total memory copy
+Two 2025 shifts you should know, because they change how it's used:
 
-This answers the first diagnostic question:
+* **PyTorch-native authoring.** TRT-LLM moved away from the old "build an opaque engine" flow toward **PyTorch-native model definitions** + a modular Python runtime + a stable production API, and added **AutoDeploy** to deploy PyTorch models with less manual conversion. The closed kernels stay closed; the *authoring* got far more open.
+* **Dynamo + FlashInfer upstreaming.** It integrates with **NVIDIA Dynamo** (datacenter-scale distributed inference) and — notably — NVIDIA is now **publishing its top LLM kernels into the open FlashInfer library** (Lec 6) for reuse by vLLM/SGLang. The "only way to go fast on NVIDIA is TRT-LLM" moat is eroding as open stacks (vLLM, SGLang) + FlashInfer close the gap.
 
-```text
-Is the GPU compute-bound, communication-bound, copy-bound, or idle?
-```
-
-Example interpretations:
-
-```text
-high computation time
-  -> optimize kernels, shapes, dtype, fusion, algorithm
-
-high exposed communication time
-  -> improve overlap, collective strategy, tensor parallel layout, network path
-
-high exposed memcpy time
-  -> inspect dtype casts, host/device movement, layout conversions
-
-high idle time
-  -> inspect CPU dispatch, dataloader, synchronization, scheduling, dynamic shapes
-```
-
-The ROCm blog's Llama FSDP example shows a GPU timeline where the GPU is mostly busy, but **total communication** is still a large fraction of the run. That distinction matters: communication can be **present but hidden** under compute, or it can be **exposed and directly hurt** wall time.
+Reach for TRT-LLM when the deployment is **NVIDIA-only and you want best-in-class latency with least kernel effort**, and you accept closed, non-portable, non-inspectable kernels. It is the productivity-and-peak corner *if* you never leave NVIDIA — the opposite trade from TVM.
 
 ---
 
-## 5. Operator category view: what kind of work dominates?
+## 5. IREE and the MLIR substrate
 
-After the timeline, group work by operation family:
+One layer under almost everything in Lectures 2–3 is **MLIR** — the LLVM-project multi-level IR that Triton, cuTile's Tile IR, Mojo, TVM-adjacent tooling, and IREE all build on. It's the substrate, not a kernel language.
 
-- GEMM
-- attention / SDPA
-- convolution
-- elementwise
-- reduce
-- Triton-generated kernels
-- multi-tensor apply
-- other backend kernels
+**IREE** ("Intermediate Representation Execution Environment") is the MLIR-ecosystem's **retargetable compiler *and* runtime** (part of OpenXLA): AOT + JIT, scaling from datacenter GPUs down to mobile/edge, CPU/GPU/accelerator backends. It overlaps TVM's "portable compiler + runtime" goal but leans on the MLIR/linalg dialect stack rather than TVM's autoschedule-centric design. If your organization is MLIR-committed (or JAX/OpenXLA-centric), IREE is the natural compiler; if you want mature search-based autotuning and the LLM path, TVM/MLC is more developed. (And JAX's **Pallas/Mosaic**, from Lec 2, is the TPU-side tile path in the same ecosystem.)
 
-This tells you **where to spend engineering effort**.
-
-If GEMM and attention dominate most of the time, optimizing a small elementwise kernel will not move end-to-end performance unless it blocks fusion, causes copies, or sits on the critical path.
-
-For transformer training and serving, the usual dominant categories are:
-
-```text
-GEMM
-attention
-communication
-memory movement
-```
-
-The point is not that other ops are irrelevant.
-
-The point is **prioritization**.
-
-Performance work should **follow the trace**.
+The practical takeaway: you rarely "choose MLIR" directly — you choose a compiler (TVM, IREE, Mojo, Triton) and it chooses MLIR underneath. Knowing it's the shared substrate explains why these tools interoperate and why a Tile-IR-for-Triton backend was even possible.
 
 ---
 
-## 6. Dispatch-level view: stable names across backends
+## 6. The runtime axis — and why megakernels are winning
 
-GPU kernel names change across:
-
-- CUDA vs ROCm
-- driver versions
-- compiler versions
-- library backends
-- hardware generations
-- autotuning choices
-
-**Framework dispatch names** are often more stable.
-
-Examples:
+Compilers produce kernels; the **runtime** decides how they execute. This is where a surprising amount of 2026 throughput is hiding, because the naive execution model wastes the GPU between kernels.
 
 ```text
-aten::mm
-aten::linear
-aten::copy_
-flash_attn::_flash_attn_forward
-flash_attn::_flash_attn_backward
+   ① EAGER (per-op launch)     [launch][op][launch][op][launch][op]...     ← gap before every op
+                                                                              kernel-launch overhead
+                                                                              + HBM round-trip per op
+   ② CUDA GRAPH / GRAPH EXEC   [──── replay a captured graph, far fewer launches ────]
+                                                                              amortizes launch cost
+   ③ PERSISTENT MEGAKERNEL     [──────── one resident kernel; warps specialized ───────]
+                                load / compute / comm OVERLAPPED inside; µs-scale overhead,
+                                pipeline stays GPU-resident across the whole forward pass
 ```
 
-TraceLens uses this level to make comparisons more meaningful.
+The trend is rightward. At small batch and short decode steps — exactly the memory-bound regime where LLM decode lives — **kernel-launch overhead and inter-op HBM round-trips become a large fraction of the step time**. Capturing the graph (CUDA Graphs) helps; fusing the *entire* model into a **single persistent "megakernel"** helps more, because the data never leaves on-chip memory between ops and the launch gaps vanish.
 
-Instead of asking:
-
-```text
-Why did kernel igemm_fwd_gtcx3_... change?
-```
-
-you can ask:
-
-```text
-Did aten::convolution become slower?
-Did aten::mm improve for this shape?
-Did flash attention regress after the backend update?
-```
-
-That abstraction is important when comparing **CUDA and ROCm**, or comparing two software versions on the same platform.
+**TileRT** (from the `tile-ai` group, same lineage as TileLang) is the 2026 exemplar: a **persistent-megakernel runtime** that decomposes LLM operators into **fine-grained tile-level tasks** and dynamically **overlaps compute, I/O, and communication** across GPUs, with **warp specialization** keeping the whole pipeline resident and overhead at microsecond scale. It is the runtime behind a headline throughput result you'll meet in Lecture 6 (a 1-trillion-parameter model pushed past **1000 tokens/s** on a single 8-GPU commodity node). For now, hold the principle: **once kernels are fast, the next bottleneck is the gaps between them, and megakernels close the gaps.**
 
 ---
 
-## 7. Shape-level view: the real root cause
+## 7. Choosing — the decision table
 
-**Operator names are not enough.**
+| You want… | Reach for | Why |
+|---|---|---|
+| Portability across many targets + peak via tuning | **TVM** (MetaSchedule) | searches schedules per shape/device; edge→web→LLM |
+| Instant good schedules, no tuning, on any backend | **TVM dlight** / `torch.compile` | heuristic schedules; ship now |
+| One language from kernel → model → serving | **Mojo / MAX** | a real language, not an eDSL (Modular-locked for now) |
+| Best NVIDIA latency, least kernel effort, NV-only | **TensorRT-LLM** | closed vendor kernels + serving features |
+| MLIR/OpenXLA-aligned portable compiler+runtime | **IREE** | retargetable, server→edge, MLIR-native |
+| Kill the gaps between fast kernels | **megakernel runtime (TileRT)** | persistent, overlapped, µs overhead |
 
-The same operation can have **very different performance** depending on:
-
-- tensor dimensions
-- strides
-- dtype
-- layout
-- batch size
-- sequence length
-- head count
-- head dimension
-- padding
-- transposition
-
-TraceLens breaks down operations by unique input shape and arguments.
-
-This is where **many real optimizations start**.
-
-Example:
-
-```text
-aten::mm with shape A
-  -> high TFLOPS/s
-
-aten::mm with shape B
-  -> poor TFLOPS/s
-```
-
-Possible causes:
-
-- bad tile shape
-- small batch dimension
-- unfavorable alignment
-- memory-bound shape
-- layout conversion nearby
-- low occupancy
-- poor backend algorithm selection
-
-For agent workloads, this is especially useful because **context length and output length** change request by request.
-
-A model may be **fast at one sequence length and slow at another**.
+And the meta-decision — **hand-write (Lec 2) vs. compile/search vs. buy-the-closed-engine** — comes down to three questions: *How many shapes/targets?* (many → compile), *How much of my cost is in one kernel?* (concentrated → hand-write that one), *Am I NVIDIA-only and latency-critical?* (yes → TRT-LLM is hard to beat). A mature stack mixes all three: TRT-LLM or vLLM for serving, a hand-written ThunderKittens attention kernel for the hot path, TVM/MLC for the odd target, a megakernel runtime to close the gaps.
 
 ---
 
-## 8. Roofline-style compute modeling
+## 8. Measure it
 
-Kernel duration answers:
-
-```text
-How long did it take?
-```
-
-It does not answer:
+Same discipline as Lecture 2, now at the model level. Compile one model two ways and carry the number to dollars:
 
 ```text
-Was that good?
+   path A: torch.compile (Inductor → Triton)   → tokens/s, $/Mtok
+   path B: TVM + MetaSchedule (tuned)           → tokens/s, $/Mtok, + tuning time
+   path C: TensorRT-LLM (built engine)          → tokens/s, $/Mtok, TTFT
+   (optional) wrap the winner in a megakernel/graph runtime → tokens/s delta from killing gaps
 ```
 
-TraceLens estimates **theoretical work** from operator arguments.
-
-For GEMM:
-
-```text
-FLOPs = 2 * M * N * K
-Bytes = (M*K + K*N + M*N) * element_size
-```
-
-Then it combines that with actual trace timing:
-
-```text
-TFLOPS/s = FLOPs / time
-TB/s     = bytes / time
-```
-
-This gives a roofline-style view:
-
-```text
-high arithmetic intensity + low TFLOPS/s
-  -> compute kernel may be underutilizing the GPU
-
-low arithmetic intensity + high TB/s
-  -> operation may be memory-bandwidth bound
-
-unexpected bytes or copies nearby
-  -> inspect layout, dtype, or framework-generated movement
-```
-
-Important distinction:
-
-TraceLens estimates useful **theoretical work** from framework semantics.
-
-Hardware profilers measure **what the GPU actually executed**.
-
-Use both:
-
-```text
-TraceLens:
-  "What work did the model intend?"
-
-Hardware counters:
-  "What did the GPU actually do?"
-```
-
-The gap between those two is often **where the optimization lives**.
+Report tokens/s, TTFT, TPOT, and `$/Mtok` for each, plus the **one-time cost** each path charged you (TVM's tuning hours, TRT-LLM's build + NVIDIA lock-in, Mojo's ecosystem bet). The right answer is rarely "one compiler" — it's "this path for this part of the workload," justified by the table.
 
 ---
 
-## 9. Multi-GPU communication analysis
+## 9. Mini-lab: three compilers, one model
 
-Distributed training and serving add another failure mode:
+Take a small model you can run end to end.
 
-```text
-total collective time != pure network time
-```
+1. **Baseline:** eager PyTorch. Record tokens/s, TTFT, TPOT, `$/Mtok`.
+2. **Heuristic compile:** `torch.compile`. Record the deltas; note that the kernels underneath are Triton (Lec 2).
+3. **Search compile:** tune the model with **TVM MetaSchedule** (or apply dlight for the instant path). Record deltas *and* the tuning time you spent.
+4. **Closed engine (if on NVIDIA):** build a **TensorRT-LLM** engine. Record deltas and TTFT.
+5. **Reason about gaps:** profile the fastest path; estimate how much time is *between* kernels (launch + idle). That gap is the megakernel opportunity.
 
-Collective operations can include synchronization skew.
-
-One rank may enter the collective late because:
-
-- its compute was slower
-- its batch was heavier
-- it hit a local scheduling delay
-- it had a CPU dispatch stall
-- it waited on a prior dependency
-
-If you only look at total collective duration, you may **blame the network for workload imbalance**.
-
-TraceLens separates:
-
-- payload size
-- collective latency
-- algorithmic bandwidth
-- bus bandwidth
-- synchronization skew
-
-Useful diagnostic patterns:
-
-```text
-high communication latency, low skew
-  -> likely network or collective implementation bottleneck
-
-high skew, reasonable bandwidth
-  -> likely imbalance or late-arriving ranks
-
-high exposed communication time
-  -> overlap is insufficient
-
-high total communication but low exposed communication
-  -> communication exists but is mostly hidden under compute
-```
-
-For hardware engineers, this matters because **AI scaling bottlenecks are often misdiagnosed**.
-
-The right question is not:
-
-```text
-How much time did all-reduce take?
-```
-
-The better question is:
-
-```text
-How much pure communication time was exposed on the critical path,
-and how much was rank skew?
-```
-
----
-
-## 10. Trace comparison: prove the delta
-
-Most performance work is **comparative**:
-
-```text
-old kernel vs new kernel
-CUDA vs ROCm
-H100 vs MI300X
-driver A vs driver B
-BF16 vs FP8
-FlashAttention backend vs FlashInfer backend
-baseline vLLM vs optimized vLLM
-```
-
-TraceLens can compare reports and identify where time changed.
-
-For simple cases, matching happens at the same operator level.
-
-For more complex cases, TraceLens can use **morphological comparison**: it aligns trees and finds the lowest point where the call stacks diverge.
-
-That is useful when two backends implement the same framework op differently.
-
-Example:
-
-```text
-aten::_convolution
-  -> ROCm backend subtree
-  -> CUDA backend subtree
-```
-
-The framework-level intent is the same, but the backend subtree differs.
-
-Trace comparison lets you say:
-
-```text
-This change improved convolution backward by X ms.
-This change regressed aten::mm by Y ms.
-This backend moved time from one subtree into another.
-```
-
-That is the **standard you should use** for optimization claims.
-
----
-
-## 11. Event replay: isolate the slow operation
-
-Finding a slow operation is **only half the job**.
-
-You still need a **reproducer**.
-
-Full model reproducers are often difficult to share because they include:
-
-- proprietary model architecture
-- private weights
-- production input data
-- distributed launch setup
-- complex environment state
-
-TraceLens **event replay** generates a minimal script from trace metadata:
-
-- operation type
-- tensor shapes
-- dtypes
-- strides
-- relevant arguments
-
-This produces a focused benchmark case.
-
-Why this matters:
-
-```text
-model team finds a slow op
-  -> event replay creates minimal reproducer
-  -> kernel/compiler/vendor team debugs it
-  -> fix is validated against original trace
-```
-
-This is how you turn model-level performance debugging into **systems engineering**.
-
----
-
-## 12. Where TraceLens fits in the agent stack
-
-Agent systems need performance evidence at multiple layers:
-
-```text
-application:
-  user latency, tool latency, session throughput
-
-agent runtime:
-  planning time, tool-call count, retry count, context growth
-
-model server:
-  TTFT, ITL, output tokens/s, queueing, KV-cache memory
-
-GPU:
-  kernels, copies, collectives, idle time, roofline metrics
-```
-
-TraceLens focuses on the **lower layers**, but it should be connected to the higher layers.
-
-For OpenClaw-style systems, a useful workflow is:
-
-```text
-run representative agent workload
-  -> collect model-server trace
-  -> generate TraceLens report
-  -> identify bottleneck
-  -> create event replay if needed
-  -> change model/backend/kernel/config
-  -> compare traces
-  -> attach report to deployment decision
-```
-
-This pairs directly with **Lecture 02**.
-
-If you enable FP8 KV-cache, do not only report:
-
-```text
-It feels faster.
-```
-
-Report:
-
-```text
-TTFT
-ITL
-output tokens/s
-GPU memory
-operator-level time
-attention kernel time
-copy time
-communication exposure
-accuracy
-trace comparison delta
-```
-
----
-
-## 13. Practical workflow
-
-Install TraceLens:
-
-```bash
-pip install git+https://github.com/AMD-AGI/TraceLens.git
-```
-
-Generate a performance report from a PyTorch trace:
-
-```bash
-TraceLens_generate_perf_report_pytorch \
-  --profile_json_path path/to/your/trace.json
-```
-
-Compare two reports:
-
-```bash
-TraceLens_compare_perf_reports_pytorch \
-  baseline.xlsx candidate.xlsx \
-  --names baseline candidate \
-  --sheets all \
-  -o comparison.xlsx
-```
-
-Generate a multi-rank collective report:
-
-```bash
-TraceLens_generate_multi_rank_collective_report_pytorch \
-  --trace_dir /path/to/traces \
-  --world_size 8
-```
-
-For ROCm `rocprofv3` Perfetto-style traces:
-
-```bash
-rocprofv3 \
-  --hip-trace \
-  --kernel-trace \
-  --memory-copy-trace \
-  --rccl-trace \
-  --output-format pftrace \
-  -d ./v3_traces \
-  -- python3 your_app.py
-
-TraceLens_generate_perf_report_pftrace_hip_activity \
-  --trace_path sample.pftrace \
-  --write_md
-```
-
-Use these commands as **starting points**, not a complete profiling policy.
-
-For reliable comparisons, also pin:
-
-- model revision
-- input workload
-- batch/concurrency
-- sequence lengths
-- dtype policy
-- GPU clocks if relevant
-- driver/runtime versions
-- backend flags
-- warmup count
-- random seeds if accuracy is involved
-
----
-
-## 14. Diagnostic playbook
-
-Use TraceLens reports to **choose the next action**.
-
-### Case: high idle time
-
-Likely causes:
-
-- CPU dataloader bottleneck
-- Python overhead
-- synchronization
-- dynamic shape recompilation
-- queue starvation
-- model server scheduling gap
-
-Next actions:
-
-- inspect CPU dispatch timeline
-- check batch construction
-- reduce Python in the hot path
-- verify warmup and compile behavior
-- correlate with request-level telemetry
-
-### Case: GEMM dominates but TFLOPS/s is low
-
-Likely causes:
-
-- small or awkward matrix shapes
-- poor alignment
-- bad layout
-- backend algorithm choice
-- unnecessary transposes
-- low occupancy
-
-Next actions:
-
-- inspect shape-level rows
-- compare against hardware peak and expected roofline
-- generate event replay for the slow shape
-- test alternative kernels or layouts
-
-### Case: attention dominates long-context serving
-
-Likely causes:
-
-- KV-cache memory traffic
-- head dimension issue
-- backend selection
-- context length distribution
-- low-precision conversion overhead
-
-Next actions:
-
-- compare BF16 vs FP8 traces
-- inspect attention kernel time
-- test skip policies for sliding-window layers
-- validate accuracy on real prompts
-- connect to Lecture 02's TTFT/ITL benchmark plan
-
-### Case: exposed communication is high
-
-Likely causes:
-
-- poor overlap
-- collective algorithm issue
-- rank imbalance
-- network bottleneck
-- tensor-parallel or FSDP layout mismatch
-
-Next actions:
-
-- inspect skew vs pure communication time
-- compare algorithmic and bus bandwidth
-- inspect per-rank timelines
-- adjust sharding, bucket sizes, or overlap strategy
-
-### Case: regression after a software update
-
-Likely causes:
-
-- backend kernel selection changed
-- compiler changed generated code
-- framework changed dispatch path
-- dtype/layout behavior changed
-- fusion changed
-
-Next actions:
-
-- run TraceLens comparison
-- identify the largest positive deltas
-- inspect lowest divergent subtree
-- replay the slow op
-- keep the trace report with the change review
-
----
-
-## 15. How this connects to agent reliability
-
-Earlier lectures focused on **agent skills, structured tools, and verification**.
-
-TraceLens applies the **same idea to performance**:
-
-```text
-claim:
-  "This optimization improves long-context serving."
-
-required evidence:
-  trace report
-  before/after comparison
-  workload description
-  bottleneck explanation
-  accuracy check
-  deployment decision
-```
-
-This matters because agent systems invite **vague performance claims**:
-
-- "The model is slow."
-- "The GPU is the bottleneck."
-- "Communication is killing scaling."
-- "FP8 is faster."
-- "The new backend regressed."
-
-TraceLens helps turn those into **falsifiable statements**:
-
-```text
-On this workload, aten::mm for this shape regressed by X ms.
-On this run, exposed communication is Y% and skew is Z us.
-On this model, attention kernel time dropped but copy time increased.
-On this backend, GPU idle time is dominated by CPU dispatch gaps.
-```
-
-That is the **engineering standard**.
-
----
-
-## Mini-lab: Trace a model change
-
-Choose one small but real workload:
-
-- a PyTorch transformer block
-- a vLLM benchmark
-- a multi-GPU training step
-- a custom CUDA/ROCm kernel path
-- an OpenClaw agent workload that calls a local model server
-
-Run two configurations:
-
-```text
-baseline
-candidate
-```
-
-Examples:
-
-```text
-BF16 vs FP8
-old backend vs new backend
-CUDA vs ROCm
-single GPU vs multi-GPU
-eager vs compiled
-with fusion vs without fusion
-```
-
-Collect traces, then generate TraceLens reports.
-
-Write a short performance note:
-
-```text
-Workload:
-Hardware:
-Software versions:
-Main bottleneck:
-Biggest improvement:
-Biggest regression:
-Evidence:
-Deployment decision:
-Next experiment:
-```
-
-If you find one slow operation, generate an event replay and treat it as a kernel debugging task.
+Deliverable: a `{eager, torch.compile, TVM, TRT-LLM}` × `{tokens/s, TTFT, TPOT, $/Mtok, one-time cost}` table, plus a paragraph on which path you'd ship and why, and how much headroom the inter-kernel gaps still hold. That synthesis is the lecture.
 
 ---
 
 ## Key takeaways
 
-- Raw profiler traces are too large and flat for reliable manual analysis.
-- TraceLens turns framework traces into hierarchical, queryable evidence.
-- Trace2Tree connects Python modules, CPU dispatches, runtime launches, and GPU kernels.
-- Start diagnosis at the GPU timeline, then drill into categories, ops, shapes, and kernels.
-- Roofline-style metrics help distinguish "slow" from "inefficient."
-- Multi-GPU collective time must be separated into pure communication and synchronization skew.
-- Trace comparison is the right way to prove a performance change.
-- Event replay turns trace metadata into minimal reproducers for kernel and backend debugging.
-- For agent systems, performance claims should be backed by traces, comparisons, and workload descriptions.
+- DSLs (Lec 2) put the schedule in *your* hands; **compilers choose it for you** — by **heuristic** (instant, ~good), **search** (slow, ~peak), or by giving you a **whole language** (Mojo).
+- **TVM** is the autoscheduling pole: Relax + TensorIR + **MetaSchedule** (search) and **dlight** (heuristic), broad targets, the substrate under TileLang/TileRT/MLC-LLM. Depth lives in the companion [TVM Deep Dives](../TVM%20Deep%20Dives/README.md) course.
+- **Mojo/MAX** answers eDSL fragmentation with "a real language" spanning kernel→model→serving — powerful, MLIR-based, but Modular-locked until the compiler opens (committed fall 2026).
+- **TensorRT-LLM** is the closed-vendor pole: peak NVIDIA latency, least kernel effort, NV-only; 2025 made authoring PyTorch-native and began upstreaming kernels into open FlashInfer.
+- The **runtime axis** moves eager → CUDA graph → **persistent megakernel**. Once kernels are fast, the gaps between them dominate; **TileRT**'s megakernel design closes them (the engine behind a 1000-tok/s milestone, Lec 6).
+- There's no single winner — mix hand-written kernels, a compiler, a closed engine, and a megakernel runtime, each justified by tokens/s and `$/Mtok`.
 
 ---
 
 ## References
 
-- AMD ROCm Blog, "TraceLens: Democratizing AI Performance Analysis": [https://rocm.blogs.amd.com/software-tools-optimization/tracelens/README.html](https://rocm.blogs.amd.com/software-tools-optimization/tracelens/README.html)
-- TraceLens GitHub repository: [https://github.com/AMD-AGI/TraceLens](https://github.com/AMD-AGI/TraceLens)
-- PyTorch profiler documentation: [https://docs.pytorch.org/docs/stable/profiler.html](https://docs.pytorch.org/docs/stable/profiler.html)
-- Perfetto trace viewer: [https://ui.perfetto.dev](https://ui.perfetto.dev)
-- Lecture 02 - FP8 KV-Cache in vLLM: [Lecture 02](Lecture-02.md)
+- Apache TVM (Relax/Unity, MetaSchedule, MLC-LLM): [https://tvm.apache.org/docs/](https://tvm.apache.org/docs/) — and the companion [TVM Deep Dives](../TVM%20Deep%20Dives/README.md) course.
+- Modular Mojo & MAX: [https://www.modular.com/open-source/mojo](https://www.modular.com/open-source/mojo) · MAX changelog [https://docs.modular.com/max/changelog/](https://docs.modular.com/max/changelog/)
+- NVIDIA TensorRT-LLM: [https://github.com/NVIDIA/TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) · overview [https://nvidia.github.io/TensorRT-LLM/overview.html](https://nvidia.github.io/TensorRT-LLM/overview.html)
+- IREE (OpenXLA, MLIR compiler + runtime): [https://github.com/iree-org/iree](https://github.com/iree-org/iree)
+- TileRT (tile-ai, persistent-megakernel runtime): [https://github.com/tile-ai/TileRT](https://github.com/tile-ai/TileRT)
+- NVIDIA, "Run high-performance LLM inference kernels from NVIDIA using FlashInfer": [https://developer.nvidia.com/blog/run-high-performance-llm-inference-kernels-from-nvidia-using-flashinfer/](https://developer.nvidia.com/blog/run-high-performance-llm-inference-kernels-from-nvidia-using-flashinfer/)
 
 ---
 
-*Next: [Lecture 04](Lecture-04.md)*
+## Current as of
+
+2026-06. Pins: TVM Unity/Relax mainline (MetaSchedule + dlight); Mojo stdlib open (2024), MAX Python modules open (v25.7, Nov 2025), Mojo language open-source committed "fall 2026"; TensorRT-LLM PyTorch-native + AutoDeploy + Dynamo; TileRT preview (tile-ai). Megakernel throughput claims are workload-specific — see Lecture 6 for the pinned MiMo/TileRT figures and their vendor-reported caveat.
+
+---
+
+*Next: [Lecture 04 — Beyond the dense transformer](Lecture-04.md)*

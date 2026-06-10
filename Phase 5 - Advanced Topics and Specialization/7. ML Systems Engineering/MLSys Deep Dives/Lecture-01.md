@@ -1,40 +1,12 @@
-# Lecture 01 - Agent Skills for GPU Kernel Translation: cuTile Python to cuTile.jl
+# Lecture 01 - MLSys as the Economic-Value Layer
 
 **Collection:** [MLSys Deep Dives](README.md) | **Previous:** [← MLSys Deep Dives index](README.md) | **Next:** [Lecture 02](Lecture-02.md)
 
 ---
 
-This lecture is where the **"Agent Skills"** idea becomes concrete for GPU systems work.
+Before any kernel, compiler, or architecture, one number governs this entire course: **the cost of a token**. Everything an MLSys engineer does — every fused kernel, every quantization scheme, every speculative-decoding head, every hybrid-architecture layer — exists to move that number. So we start there, because if you cannot connect a technique to the cost of a token, you cannot prioritize, defend, or even recognize the work that matters.
 
-The NVIDIA cuTile Python to cuTile.jl case study is important because the hard part is **not generating code**.
-
-The hard part is:
-
-```text
-translating domain semantics correctly
-when the compiler will not catch many wrong translations
-```
-
-That is exactly the class of work where **naive agents fail**.
-
-They can produce plausible code, but **plausible GPU kernel code is not enough**.
-
-You need:
-
-- domain rules
-- API mappings
-- worked examples
-- static validators
-- reference tests
-- debugging guides
-- tolerance rules
-- repeatable workflow
-
-In other words:
-
-```text
-agent skill + validator + tests = reusable systems knowledge
-```
+This lecture builds the spine the other six hang from: **why systems work is now the product**, the metrics that measure it, and the one equation that turns a kernel speedup into a dollar figure.
 
 ---
 
@@ -42,561 +14,188 @@ agent skill + validator + tests = reusable systems knowledge
 
 By the end of this lecture, you should be able to:
 
-1. Explain why cross-DSL GPU kernel translation is a strong use case for agent skills.
-2. Describe the differences between cuTile Python and cuTile.jl that cause silent wrong results.
-3. Understand why 0-based vs 1-based indexing and row-major vs column-major layout are semantic hazards.
-4. Explain how TileGym packages conversion knowledge into a reusable skill.
-5. Design a skill directory with rules, API mappings, examples, validation scripts, and tests.
-6. Apply the same pattern to CUDA, Triton, MLIR, TVM, tinygrad, and custom accelerator DSLs.
-7. Connect agent-generated GPU code to verification evidence and hardware-aware review.
+1. Quantify the 2023–2026 collapse in inference cost and explain what drove it (systems, not silicon).
+2. Decompose **price-per-token** into hardware and MLSys factors, and name the lever each course topic pulls.
+3. Use the metric stack correctly: **tokens/s, TTFT, TPOT, TOK/$, TCO/Mtok, perf/watt** — and say which is the user's and which is the operator's.
+4. Read a perf/$ benchmark (SemiAnalysis-style) and explain why a printed throughput number is a teaching anchor, not deployment truth.
+5. Compute a back-of-envelope **$/Mtok** from GPU rental cost and tokens/s, and show how a 2× systems win halves it.
 
 ---
 
-## 1. Why this case study matters
+## 1. The collapse
 
-Most agent-skill examples are **web or app-development workflows**.
+In November 2022, GPT-3.5-class intelligence cost roughly **$20 per million tokens**. By late 2024 the same capability was available near **$0.07 per million** — about **280× cheaper in two years**. GPT-4-class input fell from **$30/Mtok** at launch (March 2023) to **$2.50** (GPT-4o, 2024) to **~$0.10** (nano-class, 2025) — over **99%**. DeepSeek-V3 arrived in December 2024 at roughly **$0.14/Mtok** for frontier-class quality — about one-hundredth of GPT-4's launch price.
 
-This one is different.
+Epoch AI's rigorous version, holding *capability* fixed: to keep a fixed benchmark score, price falls **between 9× and 900× per year, median ~50×/year**, and faster (median ~200×/year) for the cheapest models since 2024. The declines are **uneven** — cheap, common tasks drop fastest; the frontier of hard reasoning drops slower.
 
-It targets **GPU kernel translation**.
-
-That matters because GPU DSLs are full of **subtle semantic traps**:
-
-- indexing base changes
-- memory layout changes
-- broadcasting changes
-- loop syntax changes
-- accumulator shape changes
-- padding enum changes
-- type-conversion differences
-- matrix multiply API differences
-
-The scary part:
+Here is the part that matters for your career: **almost none of that came from cheaper hardware.** An H100 did not get 280× cheaper. The collapse came from MLSys —
 
 ```text
-many mistakes compile
-and then silently produce wrong numbers
+   FlashAttention & better kernels    → more tokens/s per GPU
+   quantization (FP16→FP8→FP4/INT4)   → more model per byte, more throughput
+   continuous batching, paged KV      → higher GPU utilization
+   speculative decoding               → more tokens per memory pass
+   MoE + MLA + hybrid architectures   → less compute / less KV per token
+   compiler fusion & scheduling       → less wasted memory traffic
 ```
 
-For GPU engineers, this is a high-value agent use case because the knowledge is:
-
-- specific
-- repeatable
-- rule-heavy
-- testable
-- easy to encode in a repo
+Every one of those is a lecture in this course. The collapse *is* the field. When someone asks what an MLSys engineer does, the honest answer is: **we are why intelligence got 280× cheaper, and we are not done.**
 
 ---
 
-## 2. What cuTile is
+## 2. The one equation
 
-**NVIDIA CUDA Tile**, or cuTile, is a tile-based GPU kernel programming model.
-
-Instead of manually coordinating every thread, warp, and shared-memory operation, the programmer works with **tile-level operations**:
+Strip inference economics to its core and you get this:
 
 ```text
-load tile
-compute on tile
-matrix multiply-accumulate
-store tile
+                    energy  +  capital            $ per second to run the box
+   price per token = ──────────────────  =  ───────────────────────────────────
+                       tokens per second        tokens per second it produces
+                       │                          │
+                       └── set by hardware ───────┘
+                              + power + utilization        ← MLSys lives here too
 ```
 
-This does not eliminate low-level thinking.
+Two ways to lower the price of a token: make the box cheaper (hardware, power, financing — mostly not your job), or make the box produce **more tokens per second** (kernels, compilers, architectures, decode algorithms — *entirely* your job). The denominator is the MLSys engineer's whole world.
 
-It raises the abstraction level enough that many kernels can be expressed in a more portable, structured way.
+This is why the course is ordered the way it is. Each layer is a different way to grow the denominator:
 
-**cuTile.jl** brings that style to Julia.
-
-That is valuable for Julia's scientific computing ecosystem:
-
-- differential equations
-- probabilistic programming
-- physics simulations
-- custom numeric kernels
-- research code that needs GPU acceleration
-
-The translation target is not "Python code to Julia syntax."
-
-The target is:
-
-```text
-preserve GPU kernel semantics across two DSLs
-```
-
----
-
-## 3. The semantic traps
-
-High-level differences:
-
-| Category | cuTile Python | cuTile.jl |
+| Layer | Course lectures | How it grows tokens/s |
 |---|---|---|
-| indexing | 0-based, `ct.bid(0)` | 1-based, `ct.bid(1)` |
-| broadcasting | implicit, `a + b` | explicit dot syntax, `a .+ b` |
-| memory layout | row-major | column-major |
-| kernel definition | `@ct.kernel` decorator | plain Julia function |
-| constants | `ct.Constant[int]` in signature | `param::Int`, `ct.Constant(val)` at launch |
-| type conversion | `tile.astype(ct.float32)` | `convert(ct.Tile{Float32}, tile)` |
-| MMA | `ct.mma(a, b, acc=acc)` | `muladd(a, b, acc)` |
+| **Kernel** | 02 | a faster GEMM/attention kernel does the same work in less time |
+| **Compiler / runtime** | 03 | fusion cuts memory traffic; megakernels cut launch overhead |
+| **Architecture** | 04–05 | SSM/MLA shrink the KV cache; MoE cuts compute per token |
+| **Inference algorithm** | 06 | speculative decoding emits multiple tokens per memory pass |
+| **Hardware / deployment** | 07 | the right precision on the right silicon at the right batch |
 
-None of these are conceptually impossible.
-
-Together, they create a translation surface where a **single missed rule can corrupt results**.
-
-Example:
-
-```text
-ct.bid(0) left unchanged
-  -> wrong tile loaded
-  -> wrong output
-  -> no compiler warning
-```
-
-Example:
-
-```text
-a * b in Julia
-  -> matrix multiply
-
-a .* b
-  -> element-wise multiply
-```
-
-For kernel code, that difference is **decisive**.
+Memorize the equation. Every time this course introduces a technique, locate it on the equation. A technique you cannot place there is a technique you do not yet understand.
 
 ---
 
-## 4. Matmul as the teaching example
+## 3. The metric stack
 
-**Matrix multiplication** is a useful translation example because it combines several hazards:
-
-- block/tile indices
-- K-loop over tiles
-- accumulator initialization
-- type conversion for TF32
-- matrix multiply-accumulate
-- row-major to column-major layout shift
-- store index correctness
-
-Python-style shape thinking:
+"Tokens per second" is too coarse to engineer with. The working metrics split into what the **user feels** and what the **operator pays**.
 
 ```text
-A(M, K)
-B(K, N)
-C(M, N)
+   USER-FACING (latency / interactivity)      OPERATOR-FACING (cost / efficiency)
+   ─────────────────────────────────────      ──────────────────────────────────
+   TTFT  time to first token (prefill)         $/GPU-hour   (capital + power + colo)
+   TPOT  time per output token (decode)        throughput   tokens/s per GPU (or node)
+   tokens/s  per-request interactivity         TOK/$   = throughput ÷ ($/s)
+   p50/p99   tail latency                       TCO/Mtok = 1e6 ÷ TOK/$
+                                                perf/watt   tokens/s ÷ watts
 ```
 
-Julia column-major thinking often forces the translated kernel to reason differently about:
-
-- tile orientation
-- accumulator shape
-- load indices
-- store indices
-
-The common failure:
+The two are in tension, and managing that tension is the job. You can almost always buy throughput (TOK/$) with latency (batch harder, more requests share each weight-load) — up to the point where TPOT violates the interactivity SLO. So the real target is never one number:
 
 ```text
-accumulator shape looks plausible
-but is transposed for the target layout
+   the SLO frontier:  maximize tokens/s (and TOK/$)
+                      subject to  TTFT < X ms  and  TPOT < Y ms
 ```
 
-This is exactly why a skill needs **worked examples**.
+Two facts that trip up newcomers:
 
-The model should not **rediscover matmul layout rules** from scratch every time.
+* **Prefill and decode are different machines.** Prefill (processing the prompt) is compute-bound and parallel — TTFT scales with prompt length. Decode (generating tokens) is **memory-bandwidth-bound** — one token at a time streams the whole weight set from HBM. Most of this course's tricks target decode, because decode is where the time and the cost live for long generations.
+* **perf/watt is becoming the binding constraint.** At datacenter scale you are power-limited before you are space-limited. tokens/s/watt is increasingly the number that decides which stack a hyperscaler deploys — which is why FP4 silicon and energy-frugal kernels matter beyond their raw speed.
 
 ---
 
-## 5. Softmax as the harder example
+## 4. Reading a perf/$ benchmark
 
-Softmax adds **algorithmic invariants**, not just syntax.
+The industry now has open, continuously-updated cross-stack benchmarks — most notably **SemiAnalysis InferenceMAX** (open-source) and its **InferenceX** TCO calculator. They do the thing this lecture insists on: normalize **throughput by total cost of ownership**, and express the result as **TCO per million tokens** plotted against interactivity, for different operator types (hyperscaler vs neocloud vs self-host).
 
-The NVIDIA post describes three Julia strategies:
+What they show, and what you should internalize:
 
-- TMA single-tile
-- online softmax
-- chunked softmax
+* TCO is not just the GPU. It is **server capex + power (perf/watt) + colocation/electricity + cost-of-capital**. A cheaper GPU that burns more watts can lose on TCO/Mtok.
+* Generational hardware jumps are large *and* software-multiplied: a GB200 NVL72 has been reported at roughly **15× lower cost-per-million-tokens than the prior generation** on reasoning workloads — but that figure already bakes in a year of kernel and runtime improvements on top of the silicon.
+* **The numbers move monthly.** A throughput figure printed in any lecture (including this course) is a *teaching anchor* — correct in shape, stale in magnitude. At deployment time, you read the live dashboard, not the textbook.
 
-Softmax translation must preserve:
-
-- running maximum
-- running sum
-- numerical stability
-- reduction axis semantics
-- broadcast syntax
-- chunking strategy
-- dtype tolerance
-
-Examples:
-
-```text
-ct.max -> maximum
-ct.sum -> sum
-axis must shift by +1
-ct.maximum(a, b) -> max.(a, b)
-ct.exp(ct.sub(a, b)) -> exp.(a .- b)
-```
-
-The hard part is not renaming functions.
-
-The hard part is preserving the **mathematical invariant**.
-
-For systems work, this is the recurring theme:
-
-```text
-syntax is cheap
-semantics are expensive
-```
+That last point is a discipline, not a disclaimer. When you quote a tokens/s number in a design review, state the date, the stack version, and the hardware — or you are quoting a number that has already rotted.
 
 ---
 
-## 6. TileGym's skill structure
+## 5. The "too cheap to meter" thesis — and why it makes MLSys the job
 
-The project packages the translation workflow into a **repository skill**:
+There is a thesis, riffing on the Atomic-Age promise of "electricity too cheap to meter," that the marginal cost of a token trends toward negligible. The evidence is the §1 collapse: a workload that cost **$10,000/month in 2023 can run for under $200 now**. Whether or not the slope continues, the structural conclusion holds and it is the reason this course exists:
 
-```text
-.claude/skills/converting-cutile-to-julia/
-  SKILL.md
-  translations/
-    workflow.md
-  references/
-    api-mapping.md
-    critical-rules.md
-    debugging.md
-    testing.md
-  scripts/
-    validate_cutile_jl.py
-  examples/
-    01_add/
-    02_matmul/
-    03_softmax/
-```
+> **Once a capability is commoditized, the only remaining differentiator is the cost of delivering it. That cost is set by MLSys.**
 
-This structure matters.
-
-Each file has a job:
-
-| File | Job |
-|---|---|
-| `SKILL.md` | entry point and workflow overview |
-| `workflow.md` | step-by-step conversion process |
-| `api-mapping.md` | Python to Julia API mapping |
-| `critical-rules.md` | known semantic traps |
-| `debugging.md` | how to diagnose common failures |
-| `testing.md` | test patterns and tolerances |
-| `validate_cutile_jl.py` | static checker for anti-patterns |
-| examples | worked source/target translations |
-
-The key design principle:
-
-```text
-put reusable domain knowledge beside the code it governs
-```
-
-Do not leave it as a **one-off prompt** in chat history.
+When every serious lab has a comparable model, the competition moves to **who serves it cheapest and fastest** — which is a kernel, compiler, architecture-co-design, and decode-algorithm contest. The economic value of a model-quality improvement decays as competitors catch up; the economic value of a systems improvement is **immediate and compounding**, because it multiplies TOK/$ across every token the company will ever serve. That is why, in 2026, the inference team is a profit center and the systems engineer is the person turning research into margin.
 
 ---
 
-## 7. What the validator catches
+## 6. Hands-on: build the cost model
 
-The validator catches **patterns before the GPU runs**.
+You will reuse this calculation in every later lecture's "Measure it." Build it once, properly.
 
-Examples from the post include:
+Given a deployment that rents `G` GPUs at `C` dollars/GPU-hour and produces `S` aggregate tokens/second:
 
-- leftover `ct.bid(0)`
-- Python-style type names
-- unsupported loop forms
-- common cuTile.jl anti-patterns
+```python
+def usd_per_mtok(gpus, usd_per_gpu_hr, agg_tokens_per_sec):
+    usd_per_sec   = gpus * usd_per_gpu_hr / 3600.0
+    tokens_per_sec = agg_tokens_per_sec
+    tok_per_usd   = tokens_per_sec / usd_per_sec
+    return 1e6 / tok_per_usd            # $ per million tokens
 
-This is the important step:
+# Illustrative anchors (verify live $/GPU-hr and tokens/s at deployment):
+node = dict(gpus=8, usd_per_gpu_hr=2.50)      # an 8-GPU node at ~$20/hr
 
-```text
-LLM generates candidate
-  -> static validator catches known mistakes
-  -> tests catch semantic errors
-  -> debugging guide routes fixes
+for S in (2_000, 5_000, 10_000, 20_000):
+    print(f"{S:>6} tok/s  ->  ${usd_per_mtok(agg_tokens_per_sec=S, **node):.2f}/Mtok")
 ```
 
-The model is **not trusted blindly**.
-
-The skill creates a **workflow around it**.
-
-This is the same principle from Lecture 21:
+The output is the entire thesis in four lines:
 
 ```text
-No evidence, no completion.
+  2000 tok/s  ->  $2.78/Mtok
+  5000 tok/s  ->  $1.11/Mtok
+ 10000 tok/s  ->  $0.56/Mtok
+ 20000 tok/s  ->  $0.28/Mtok
 ```
 
-For GPU code, evidence must include numeric correctness.
+The hardware cost (`$20/hr`) never changed. Every drop came from the **denominator** — from tokens/s, which is to say from MLSys. A kernel engineer who doubles attention throughput, an architecture that halves the KV cache so you can batch twice as deep, a speculative decoder that emits two tokens per memory pass: each one walks you *down that column*, and the column is dollars.
+
+> **One caveat to keep you honest:** aggregate tokens/s depends on batch size, and batching trades against TPOT. The cost model above is only valid *at a fixed interactivity SLO*. Always quote `$/Mtok` together with the TPOT it was measured at — a cheap token nobody will wait for is not cheap, it is unsold.
 
 ---
 
-## 8. Test design for translated kernels
+## 7. Mini-lab: place the field on the equation
 
-The Julia subproject contains:
+A two-part exercise that sets up the whole course.
 
-```text
-julia/
-  Project.toml
-  kernels/
-    add.jl
-    matmul.jl
-    softmax.jl
-  test/
-    runtests.jl
-    test_add.jl
-    test_matmul.jl
-    test_softmax.jl
-```
+1. **The cost model.** Take a real model + runtime you can run (or a published benchmark). Measure or read its aggregate tokens/s at a fixed TPOT, and compute `$/Mtok` with §6. Record TTFT, TPOT, tokens/s, TOK/$, and `$/Mtok` as your baseline row — you will add rungs to this table in every later lecture.
+2. **The map.** Write the §2 equation at the top of a page. Under the denominator, list the seven lecture topics of this course and, for each, one sentence on *how* it grows tokens/s. If you cannot write the sentence yet, that lecture is where you'll learn it — but the slot on the equation should be obvious even now.
 
-Good tests compare against **CPU references** with dtype-specific tolerances.
-
-They also test boundary cases:
-
-- dimensions not aligned to tile sizes
-- dtype differences
-- padding behavior
-- reduction axes
-- edge shapes
-
-For GPU translation, "passes one happy path" is not enough.
-
-You want:
-
-```text
-reference implementation
-edge shapes
-dtypes
-tolerances
-boundary tiles
-```
-
-This makes the agent output **reviewable by numbers, not vibes**.
-
----
-
-## 9. Why this is better than a prompt
-
-Prompt:
-
-```text
-Be careful with indexing, broadcasting, and memory layout.
-```
-
-Skill:
-
-```text
-Here are the 17 rules.
-Here is the API mapping.
-Here are add, matmul, softmax examples.
-Here is a validator.
-Here are tests and tolerances.
-Here is the debugging guide.
-```
-
-The difference:
-
-```text
-prompt = reminder
-skill = executable domain process
-```
-
-This is why agent skills are relevant to **hardware and compiler work**.
-
-The model should not rediscover the same **domain pitfalls** repeatedly.
-
-The project should **accumulate them**.
-
----
-
-## 10. Result pattern
-
-The NVIDIA post reports that a representative GEMM conversion took about:
-
-```text
-4 minutes
-~78K tokens
-no manual intervention
-```
-
-Do not overgeneralize this number.
-
-The important point is not the exact time or token count.
-
-The important pattern is:
-
-```text
-first port teaches the skill
-later ports reuse the skill
-each kernel gets cheaper and safer
-```
-
-This is how agentic systems improve **without fine-tuning the model**.
-
-They improve by **versioning the workflow, rules, examples, and validators**.
-
----
-
-## 11. Generalizing beyond cuTile
-
-The same pattern applies to many GPU and compiler workflows:
-
-| Source | Target | Skill focus |
-|---|---|---|
-| CUDA C++ | Triton | memory layout, block mapping, vectorization |
-| Triton | CUDA C++ | explicit shared memory and warp details |
-| PyTorch op | CUDA kernel | shape contracts, dtype, autograd |
-| CUDA | HIP/ROCm | API mapping, wavefront size, library differences |
-| Python DSL | MLIR | types, affine maps, lowering rules |
-| TVM schedule | Triton | tiling, memory hierarchy, reduction axes |
-| tinygrad op | custom accelerator | shape tracker semantics, memory movement |
-
-Good skill candidates share traits:
-
-- finite recurring rules
-- silent semantic failure modes
-- reference examples
-- static validation possible
-- runtime tests possible
-- high review cost if done manually
-
----
-
-## 12. OpenClaw and agent harness mapping
-
-In an OpenClaw-style harness:
-
-```text
-source kernel
-  -> skill selection
-  -> read API mapping and critical rules
-  -> generate target kernel
-  -> run static validator
-  -> run tests on GPU
-  -> capture logs/artifacts
-  -> summarize diff and evidence
-```
-
-Runtime pieces:
-
-| Harness part | Role |
-|---|---|
-| skill router | choose cuTile translation skill |
-| tool policy | allow file reads/writes and test commands only in workspace |
-| exec approval | gate GPU test commands if needed |
-| artifacts | store validator output and test logs |
-| session log | preserve translation reasoning and fixes |
-| final-answer hook | require validation evidence |
-
-The LLM writes **candidate code**.
-
-The harness makes the work **safe and reviewable**.
-
----
-
-## 13. GPU engineer review checklist
-
-When reviewing agent-translated kernels, inspect:
-
-```text
-index base
-memory layout
-tile shape
-accumulator shape
-reduction axis
-broadcast semantics
-dtype conversion
-padding behavior
-loop bounds
-boundary tiles
-reference test tolerance
-performance assumptions
-```
-
-Ask:
-
-```text
-Could this produce correct results only for square matrices?
-Could this pass fp32 but fail lower precision?
-Could this fail on non-divisible dimensions?
-Could this silently transpose output?
-Could this be correct but much slower?
-```
-
-Agentic kernel work still requires **human domain review**.
-
-The skill **reduces review burden**.
-
-It does not remove **engineering responsibility**.
-
----
-
-## 14. Mini-lab: write a DSL translation skill
-
-Pick one translation pair:
-
-- CUDA C++ to Triton
-- Triton to CUDA C++
-- PyTorch reference to CUDA kernel
-- CUDA to HIP
-- tinygrad op to CUDA
-- cuTile Python to cuTile.jl
-
-Create:
-
-```text
-SKILL.md
-references/api-mapping.md
-references/critical-rules.md
-references/testing.md
-scripts/validate_translation.py
-examples/01_simple/
-examples/02_reduction/
-examples/03_matmul_or_softmax/
-```
-
-Minimum critical rules:
-
-```text
-indexing
-layout
-broadcasting
-dtype
-boundary conditions
-reduction axes
-memory aliasing
-test tolerance
-```
-
-Then run one translation and require:
-
-```text
-static validator output
-CPU reference comparison
-GPU test output
-summary of known risks
-```
+Deliverable: one baseline cost-model row, and the annotated equation. Keep both; the course is, in a sense, the exercise of filling in that page.
 
 ---
 
 ## Key takeaways
 
-- Cross-DSL GPU kernel translation is a strong agent-skill use case because the rules are finite, recurring, and testable.
-- The hard part is semantic preservation, not syntax conversion.
-- cuTile Python to cuTile.jl has traps around indexing, broadcasting, memory layout, constants, type conversion, and MMA APIs.
-- TileGym packages translation knowledge into a skill with rules, mappings, examples, validator, tests, and debugging docs.
-- Static validation plus runtime tests make agent-generated GPU code reviewable.
-- The broader lesson is that systems work needs version-controlled domain skills, not one-off prompts.
+- Inference cost fell ~**280×** (GPT-3.5-class) and **>99%** (GPT-4-class) from 2023–2026, a **median ~50×/year** at fixed capability — driven by **MLSys, not cheaper silicon**.
+- The governing equation: **price/token = (energy + capital) / tokens-per-second**. Hardware sets the numerator; **MLSys grows the denominator**, and that is the whole job.
+- Metrics split into **user-facing** (TTFT, TPOT, tokens/s, p99) and **operator-facing** (TOK/$, TCO/Mtok, perf/watt). The target is the **SLO frontier**: max throughput subject to latency bounds — never a single number.
+- **Prefill is compute-bound; decode is memory-bound.** Most acceleration targets decode, because that is where long-generation time and cost live.
+- Read perf/$ benchmarks (SemiAnalysis InferenceMAX/InferenceX) by **TCO/Mtok**, and treat any printed throughput as a dated teaching anchor, not deployment truth.
+- Once capability commoditizes, **cost-to-serve is the differentiator** — so every systems win is immediate, compounding economic value. That is why MLSys is the product.
 
 ---
 
 ## References
 
-- NVIDIA Technical Blog, "Automating GPU Kernel Translation with AI Agents: cuTile Python to cuTile.jl": [https://developer.nvidia.com/blog/automating-gpu-kernel-translation-with-ai-agents-cutile-python-to-cutile-jl/](https://developer.nvidia.com/blog/automating-gpu-kernel-translation-with-ai-agents-cutile-python-to-cutile-jl/)
-- NVIDIA TileGym repository: [https://github.com/NVIDIA/TileGym](https://github.com/NVIDIA/TileGym)
-- cuTile Python documentation: [https://nvidia.github.io/cutlass/latest/media/docs/pythonDSL/cute_dsl_api/cute.html](https://nvidia.github.io/cutlass/latest/media/docs/pythonDSL/cute_dsl_api/cute.html)
-- CUDA.jl: [https://cuda.juliagpu.org/stable/](https://cuda.juliagpu.org/stable/)
-- Agent Skills — *AI Agent Development 2026 course*
-- LLM From Scratch — *AI Agent Development 2026 course*
+- Epoch AI, "LLM inference price trends" (median ~50×/year): [https://epoch.ai/data-insights/llm-inference-price-trends](https://epoch.ai/data-insights/llm-inference-price-trends)
+- Token cost / AI price index (GPT-3.5 ~280×, GPT-4 >99%): [https://tokencost.app/blog/ai-price-index](https://tokencost.app/blog/ai-price-index)
+- SemiAnalysis, "InferenceMAX — open-source inference benchmarking": [https://newsletter.semianalysis.com/p/inferencemax-open-source-inference](https://newsletter.semianalysis.com/p/inferencemax-open-source-inference)
+- SemiAnalysis InferenceX TCO calculator: [https://inferencex.semianalysis.com/calculator](https://inferencex.semianalysis.com/calculator)
+- Introl, "Inference unit economics — true cost per million tokens": [https://introl.com/blog/inference-unit-economics-true-cost-per-million-tokens-guide](https://introl.com/blog/inference-unit-economics-true-cost-per-million-tokens-guide)
+- *AI Inference Engineer 2026* — the production serving-stack companion to this course.
+
 ---
 
-*Next: [Lecture 02](Lecture-02.md)*
+## Current as of
+
+2026-06. Cost figures: GPT-3.5-class ~280× (Nov 2022→Oct 2024), GPT-4-class >99% (2023→2025), DeepSeek-V3 ~$0.14/Mtok (Dec 2024), Epoch median ~50×/yr. `$/Mtok` worked example uses an illustrative $2.50/GPU-hr — **verify live GPU rental rates and tokens/s at deployment** via InferenceMAX/InferenceX; the numbers move monthly.
+
+---
+
+*Next: [Lecture 02 — The kernel-language explosion](Lecture-02.md)*

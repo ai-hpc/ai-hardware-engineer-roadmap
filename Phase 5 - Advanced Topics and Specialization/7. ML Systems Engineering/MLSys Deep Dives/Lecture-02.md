@@ -1,37 +1,12 @@
-# Lecture 02 - FP8 KV-Cache in vLLM: Long-Context Serving for Agent Workloads
+# Lecture 02 - The Kernel-Language Explosion: Tiles as the New ISA
 
-**Collection:** [MLSys Deep Dives](README.md) | **Previous:** [Lecture 01](Lecture-01.md) | **Next:** [Lecture 03](Lecture-03.md)
+**Collection:** [MLSys Deep Dives](README.md) | **Previous:** [← Lecture 01](Lecture-01.md) | **Next:** [Lecture 03](Lecture-03.md)
 
 ---
 
-**Long-context agents** are memory systems.
+Lecture 1 said every token's cost is set by tokens-per-second, and tokens-per-second starts at the kernel. So: how does a fast GPU kernel actually get *written* in 2026? The answer changed more in the last three years than in the prior decade, and it changed in one direction — **away from scalar threads and toward tiles**.
 
-They keep:
-
-- system prompts
-- session history
-- retrieved documents
-- tool outputs
-- planner traces
-- multimodal context
-- generated reasoning
-
-Underneath the API, the model server stores this context in a **KV cache**.
-
-For standard full-attention decoder models, that cache can **dominate GPU memory** at long contexts, and every decode step must read a large fraction of it.
-
-The core serving problem:
-
-```text
-longer context
-  -> larger KV cache
-  -> more GPU memory
-  -> more memory traffic per generated token
-  -> higher inter-token latency
-  -> lower concurrency
-```
-
-vLLM's **FP8 KV-cache** work matters because it attacks that bottleneck directly.
+This lecture is the map of that change: why the tile became the unit of GPU programming, and a working tour of the languages fighting to own it — **Triton, CUTLASS/CuTe/cuTile, ThunderKittens, TileLang** — arranged on the one axis that actually distinguishes them: how much control they hand you, versus how much they decide for you.
 
 ---
 
@@ -39,679 +14,222 @@ vLLM's **FP8 KV-cache** work matters because it attacks that bottleneck directly
 
 By the end of this lecture, you should be able to:
 
-1. Explain why long-context serving becomes KV-cache and memory-bandwidth bound.
-2. Distinguish TTFT, ITL, prefill, decode, and throughput under load.
-3. Understand what `--kv-cache-dtype fp8` changes in vLLM.
-4. Explain why Hopper needed a two-level accumulation fix for long-context FP8 accuracy.
-5. Understand why small sliding-window layers should often stay BF16.
-6. Identify when FP8 KV-cache helps, when it hurts, and when calibration is required.
-7. Design a benchmark plan for FP8 KV-cache on agent workloads.
-8. Connect KV-cache quantization to OpenClaw-style long-running agents, cron jobs, RAG, and multimodal sessions.
+1. Explain why the scalar SIMT (thread-centric) model broke down, and why the **tile** is the natural unit on Tensor-Core hardware.
+2. Place the major kernel tools on the **ease ↔ control** spectrum and name what each decides for you vs. exposes.
+3. Write and read a **Triton** tile kernel, and explain its role under `torch.compile`/Inductor.
+4. Distinguish NVIDIA's three on-ramps — **CUTLASS C++ + CuTe**, **CuTe DSL**, **cuTile** — and what "Tile IR" is.
+5. Say what **ThunderKittens** and **TileLang** each optimize for, and when you'd reach for them over Triton.
+6. Connect a kernel choice back to tokens/s and `$/Mtok` from Lecture 1.
 
 ---
 
-## 1. Why KV cache dominates long-context serving
+## 1. Why the thread model broke
 
-During autoregressive inference, the model generates one token at a time.
+For a decade, CUDA's mental model was the **scalar thread**: you wrote what one thread does, launched millions, and reasoned about warps, shared memory, and synchronization by hand. That model matched the hardware — lots of simple scalar lanes.
 
-For each generated token, attention needs keys and values from the previous context.
-
-That stored state is the KV cache:
+Then the hardware stopped being scalar lanes. Modern accelerators are dominated by:
 
 ```text
-K = keys for previous tokens
-V = values for previous tokens
+   Tensor Cores       do a whole MATRIX-TILE multiply-accumulate per instruction (e.g. 16×16×16)
+   TMA                (Tensor Memory Accelerator) moves whole TILES async between HBM and SRAM
+   warp specialization different warps run producer (load) vs consumer (compute) pipelines
+   async pipelines    overlap tile-load and tile-compute across many stages
 ```
 
-At short context, **model compute** may dominate.
-
-At long context, decode often becomes **memory-bound**:
+Against that hardware, the scalar thread is the *wrong abstraction*. The natural unit of work is no longer "what one thread computes" — it is **"what happens to this tile"**: load a tile, matmul-accumulate it, store a tile. Writing that as thousands of coordinated scalar threads is error-prone boilerplate the compiler should handle. So the field converged, independently and explicitly, on the **tile** as the programming primitive.
 
 ```text
-generated token
-  -> read KV cache
-  -> compute attention
-  -> produce next token
+   tile abstraction:  you describe TILES + a GRID of them.
+                      the compiler handles thread partitioning, shared memory,
+                      data movement (TMA), and (often) the pipeline.
+
+   lineage:  CUDA C++ (2012) → Triton (2019) → CuTe (2023)
+                → ThunderKittens (2024) → TileLang (Jan 2025) → cuTile (2025)
 ```
 
-If the cache is large, every token generation pays for moving a lot of data.
-
-This is why long-context agents can become slow even when the model's **raw FLOPs** look sufficient.
+This is the single most important trend in GPU programming right now, and it is *why* there are suddenly five competing kernel languages: they are all racing to own the tile.
 
 ---
 
-## 2. Prefill vs decode
+## 2. The spectrum that organizes everything
 
-Long-context serving has two different phases.
-
-### Prefill
-
-The model processes the entire input prompt:
+Do not memorize five tools as a flat list. Arrange them on **one axis — ease/productivity vs. control/peak-performance** — and the whole landscape snaps into place.
 
 ```text
-system prompt + history + retrieved context + user message
+  EASE / PRODUCTIVITY  ◄──────────────────────────────────────────►  CONTROL / PEAK PERF
+  ┌──────────┬───────────────────────────┬───────────────────────────────┬─────────────────┐
+  │ TensorRT │ cuTile · Triton · Pallas   │ TileLang · CuTe DSL · TKittens │ CUTLASS C++/CUDA│
+  │ (closed, │ (compiler decides thread   │ (you annotate scheduling &      │ (you write every│
+  │  builds  │  & memory layout for you)  │  layout; near hand-tuned perf)  │  thread/barrier)│
+  │ engine)  │                            │                                 │                 │
+  └──────────┴───────────────────────────┴───────────────────────────────┴─────────────────┘
+        ▲
+        └── and ALONGSIDE the DSLs: autoscheduling compilers (TVM, IREE) that SEARCH the
+            schedule space instead of asking you to choose — covered in Lecture 03.
 ```
 
-This is **time-to-first-token** work.
-
-Metric:
-
-```text
-TTFT = time to first token
-```
-
-For full attention, prefill cost can grow **roughly quadratically** with input length.
-
-### Decode
-
-The model emits new tokens one at a time.
-
-Metric:
-
-```text
-ITL = inter-token latency
-```
-
-For long contexts, ITL tends to grow **roughly linearly** with input length because each new token attends over the cache.
-
-Serving engineers must track both:
-
-```text
-TTFT: how long until the user sees the first token?
-ITL: how fast do later tokens stream?
-```
-
-An optimization can **improve one and hurt the other**.
+The trade is always the same: the more the compiler decides, the faster you ship and the more portable you are — but the closer you sit to a performance ceiling someone else set. The more you control, the closer to peak you can get — at the cost of effort and target lock-in. A senior engineer picks a *point on this axis per kernel*, not one tool for life. The 95%-of-cases kernel goes in Triton; the one attention kernel that dominates your cost budget might go in ThunderKittens or CuTe DSL.
 
 ---
 
-## 3. What FP8 KV-cache does
+## 3. Triton — the mindshare leader
 
-vLLM exposes:
+**Triton** (OpenAI, public since 2021, MLIR-based since 2.0) is the tile language most people mean when they say "I wrote a kernel." You write a Python function decorated with `@triton.jit` that operates on **block-level tiles**; the compiler handles coalescing, shared memory, and intra-block scheduling.
 
-```bash
-vllm serve meta-llama/Llama-3.1-8B --kv-cache-dtype fp8
+```python
+import triton
+import triton.language as tl
+
+@triton.jit
+def fused_add_relu(x_ptr, y_ptr, out_ptr, n, BLOCK: tl.constexpr):
+    pid  = tl.program_id(0)                    # which tile this program instance owns
+    offs = pid * BLOCK + tl.arange(0, BLOCK)   # the TILE of indices, not one element
+    mask = offs < n
+    x = tl.load(x_ptr + offs, mask=mask)       # load a whole tile
+    y = tl.load(y_ptr + offs, mask=mask)
+    out = tl.maximum(x + y, 0.0)               # fused add + ReLU, on the tile
+    tl.store(out_ptr + offs, out, mask=mask)
 ```
 
-This stores KV cache in **FP8** and runs attention's QK and ScoreV matrix multiplications in FP8 on the supported paths described by vLLM.
+Note what you did *not* write: no thread indices, no `__shared__`, no `__syncthreads()`. You described a tile; Triton mapped it to threads. For matmul you'd use `tl.dot(a_tile, b_tile)`, which lowers to Tensor Cores. `@triton.autotune` sweeps block sizes, `num_warps`, and `num_stages` to pick a config.
 
-The simplest mental model:
+Why Triton leads mindshare, concretely:
 
-```text
-BF16 KV cache
-  -> larger cache
-  -> more memory traffic
+* **It is the codegen target of `torch.compile`.** PyTorch's TorchInductor (the default backend) **generates Triton** for GPU. Every time someone runs `torch.compile`, Triton kernels are produced underneath. That makes it the de-facto kernel IR of mainstream PyTorch.
+* **It is genuinely cross-vendor.** NVIDIA, AMD (ROCm), Intel (XPU), and an experimental CPU backend — one kernel, many targets. NVIDIA even shipped a **Tile-IR backend for Triton** so it can lower to NVIDIA's new tile virtual-ISA (more on that next).
 
-FP8 KV cache
-  -> roughly half cache storage
-  -> less memory traffic
-  -> potentially lower decode latency and higher concurrency
-```
-
-But the real result depends on:
-
-- GPU architecture
-- attention backend
-- head dimension
-- context length
-- prefill/decode mix
-- sliding-window layers
-- quantization scales
-- model sensitivity
-
-FP8 is a **strong default candidate** for long-context decode-heavy workloads.
-
-It is **not a universal win**.
+The honest critique (made loudly by Chris Lattner / Modular): Triton is a *compiler-decides* model, and independent measurements have shown a meaningful gap — on the order of **~20% on H100** — versus hand-optimized CUDA for the hardest kernels, with weaker portability across GPU generations and lagging support for the newest features (FP8, TMA) until the compiler catches up. Other studies are kinder (62–101% of cuBLAS across platforms with zero arch-specific tuning). The truth is in between, and it is exactly why the control-end tools in §5–6 exist.
 
 ---
 
-## 4. The accuracy problem vLLM found
+## 4. NVIDIA's answer: CUTLASS, CuTe, CuTe DSL, and cuTile
 
-The vLLM team found a serious **Hopper/FlashAttention-3 issue** under stress testing.
+NVIDIA's response to "everyone is writing tiles in not-CUDA" was to provide *official* tile on-ramps — and there are confusingly several, which you must keep straight.
 
-On a 128k needle-in-a-haystack task:
+* **CUTLASS** — the long-standing open C++ template library for peak GEMM/attention on Tensor Cores. This is how NVIDIA itself writes fast kernels. Max control, max effort.
+* **CuTe** — the **layout algebra** at the heart of CUTLASS 3.x: composable `Layout`/`Tensor`/"atom" objects describing the thread-and-data hierarchy as shapes + strides. It is the formal vocabulary the newer DSLs reuse. When you hear "CuTe," think *the math of who-owns-which-element*.
+* **CuTe DSL** (new with CUTLASS 4.0, GTC 2025) — NVIDIA's first **Python** kernel DSL, **low-level** and fully consistent with CuTe C++. You get full thread/data/layout control from Python, JIT-compiled through MLIR + ptxas, with claimed **C++-parity performance** and **~100× faster compilation** than C++ templates. This is the *control end*, in Python.
+* **cuTile** (a.k.a. CUDA Tile, GTC 2025, shipping with CUDA 13.1) — a **separate, higher-level** Python tile DSL. You write tile kernels; the compiler abstracts block parallelism, memory movement, and thread partitioning. This is the *productivity end* — and it is widely read as a **direct response to Triton**. (One ex-CUDA architect: "it's hard not to suspect cuTile was developed directly to counter Triton.")
 
-```text
-BF16 baseline accuracy: 91%
-FP8 before fix:         13%
-FP8 after fix:          89%
-```
+Underneath cuTile is **Tile IR** — a new **virtual ISA for tile programming**, effectively "PTX for tiles." Crucially, NVIDIA built a Tile-IR backend *for Triton too*, so Triton can lower through it. The strategic read: NVIDIA is trying to **reclaim the tile abstraction inside the CUDA platform**, offering both a control on-ramp (CuTe DSL) and a productivity on-ramp (cuTile), both first-class on Blackwell.
 
-The issue was not "FP8 is bad" in the abstract.
-
-It was **accumulation precision** during long-context attention.
-
-In long-context inference:
-
-```text
-Softmax(AttentionScore) * V
-```
-
-has a contraction dimension corresponding to context length.
-
-At very large context lengths, imprecise intermediate accumulation caused severe numerical errors.
-
-vLLM and FlashAttention added a **two-level accumulation** strategy to restore accuracy.
-
-Tradeoff:
-
-```text
-accuracy restored
-  -> more register pressure
-  -> possible prefill slowdown, especially head_dim > 128
-```
-
-This is the core hardware lesson:
-
-```text
-low precision is a systems contract,
-not just a dtype flag
-```
-
-**Kernel details matter.**
+The catch is the obvious one: all of it is **NVIDIA-only**. You trade Triton's portability for deeper hardware integration and (at the CuTe DSL end) near-C++ peak.
 
 ---
 
-## 5. The performance metric: ITL slope
+## 5. ThunderKittens — minimal tiles, maximal attention
 
-For concurrency 1, vLLM models ITL as:
+**ThunderKittens** (Stanford Hazy Research, 2024) takes a different bet: stay **inside CUDA C++** as a small embedded DSL (a header/template library), and ask *how small can the tile abstraction be and still hit SOTA?*
 
-```text
-ITL = slope * input_len + intercept
-```
-
-Interpretation:
-
-| Term | Meaning |
-|---|---|
-| slope | extra decode latency added by each cached token |
-| intercept | fixed per-token overhead independent of input length |
-
-FP8 is attractive when it **lowers the slope** enough to overcome any intercept overhead.
-
-That produces a **break-even context length**:
+Its primitive is literally a **tile sized to the Tensor Core**. The library abstracts the repetitive plumbing — tile layouts, shared-memory allocation, register fragments, TMA tensor maps, Tensor Core descriptors — while keeping you close enough to reason about data movement and scheduling yourself.
 
 ```text
-below break-even: BF16 may be faster
-above break-even: FP8 decode is faster
+   ThunderKittens mental model:
+   ┌──────────────────────────────────────────────────────────┐
+   │  declare register/shared TILES (16×16-ish, TC-shaped)      │
+   │  TMA-load input tiles  →  mma(acc, a_tile, b_tile)  →  store│
+   │  you still schedule the pipeline; TK removes the boilerplate│
+   └──────────────────────────────────────────────────────────┘
 ```
 
-This is a better way to reason than simply saying:
+It is **known for fast attention** — its origin motivation was "FlashAttention is ~1200 lines; how compact can this be?" — and it is used in production by **Together AI, Jump Trading, and Cursor**. **ThunderKittens 2.0** (early 2026) brought full Blackwell support and low-precision **MXFP8 / NVFP4**. There is even a Metal/MLX port ("ThunderMittens").
 
-```text
-FP8 is faster
-```
-
-You should ask:
-
-```text
-At what context length?
-For which model?
-On which backend?
-With what head dimension?
-```
+When to reach for it: the *one* kernel that dominates your cost (usually attention), where you want near-hand-tuned performance and full scheduling control but refuse to write 1200 lines of raw CUTLASS. It is research-led with a smaller ecosystem than Triton — a scalpel, not a default.
 
 ---
 
-## 6. Llama-class result
+## 6. TileLang — decoupling schedule from dataflow
 
-For Llama-3.1-8B on H100 with the improved FP8 path, vLLM reports:
+**TileLang** (open-sourced Jan 2025; from the `tile-ai` group with Microsoft Research and Peking University; built **on Apache TVM's TIR infrastructure**) makes the control-vs-productivity trade *explicit and adjustable* inside one language.
 
-```text
-BF16 ITL slope: 4.37e-05 ms/token
-FP8 ITL slope:  2.37e-05 ms/token
-FP8 slope:      54% of BF16
-break-even:     ~7k tokens
-```
-
-Under load:
+Its core idea: **separate the dataflow (what is computed) from the scheduling space (thread binding, memory layout, `tensorize`, software pipelining), and expose the scheduling as overridable annotations** — with automatic layout inference filling in what you don't specify.
 
 ```text
-150 requests
-concurrency 8
-~20k input tokens
-~2k output tokens
+   Triton:    you write dataflow; the compiler picks ALL scheduling.        (less control)
+   CUTLASS:   you write dataflow AND every scheduling/layout detail.         (all control, all effort)
+   TileLang:  you write dataflow; you OVERRIDE the scheduling you care        (control where it pays,
+              about and let inference handle the rest.                         automation where it doesn't)
 ```
 
-vLLM reports for Llama-3.1-8B:
+That positions it deliberately between Triton (productivity) and CUTLASS (control), and it targets a wide backend set — **CUDA, ROCm/HIP, Metal, WebGPU, and CPU** — with a CuTe DSL backend added late 2025. It is part of a broader stack from the same group: **TileLang** (author kernels) + **TileScale** + the **TileRT** runtime (which you'll meet in Lecture 3 and again in Lecture 6 as the engine behind a notable throughput milestone).
 
-```text
-BF16 output throughput: 450.3 tok/s
-FP8 output throughput:  517.5 tok/s
-gain:                  14.9%
-```
+When to reach for it: you need **more scheduling control than Triton and more portability than CUTLASS**, e.g. shipping the same hand-tuned kernel across NVIDIA *and* AMD *and* Apple. The cost is a smaller ecosystem and a heavier (TVM-based) dependency than Triton.
 
-The serving takeaway:
-
-```text
-single-request ITL slope improvements can translate into real throughput gains,
-but the end-to-end gain is smaller than the raw slope reduction
-```
-
-That is normal because real serving also includes **scheduling, prefill, batching, and non-attention work**.
+*(Honorable mention: **JAX Pallas** — the same tile + `grid` + `BlockSpec` idea, JAX-native, lowering to Triton on GPU and Mosaic on TPU. If you live in JAX/TPU land, Pallas is your tile DSL.)*
 
 ---
 
-## 7. Hybrid attention and sliding-window layers
+## 7. Choosing — a senior engineer's table
 
-Hybrid models may include both:
+| Tool | Owner | Model | Lives where | Targets | Reach for it when |
+|---|---|---|---|---|---|
+| **Triton** | OpenAI | block/tile, `@jit` Python | under `torch.compile` | NV / AMD / Intel / CPU | default — portable, productive, 95% of kernels |
+| **cuTile** | NVIDIA | Python tile, Tile IR | CUDA 13.1 | NVIDIA | NVIDIA-only, want Triton-like ease + deep CUDA integration |
+| **CuTe DSL** | NVIDIA | Python, CuTe-consistent | CUTLASS 4.x | NVIDIA | want C++-parity peak from Python, fast iterate |
+| **CUTLASS C++** | NVIDIA | C++ templates + CuTe | hand-written | NVIDIA | building a library kernel, need absolute peak |
+| **ThunderKittens** | Stanford | tile = TC-shaped, in CUDA | C++ header lib | NV (Blackwell), Metal | the one attention kernel that dominates cost |
+| **TileLang** | tile-ai / MSR / PKU | tiled, schedule⊥dataflow | on TVM | NV / AMD / Metal / WebGPU / CPU | hand-tuned *and* multi-vendor portable |
+| **Pallas** | Google | tile + `BlockSpec` | JAX | GPU (Triton) / TPU (Mosaic) | you're in JAX / on TPU |
 
-- global attention layers
-- sliding-window attention layers
-
-**Sliding-window layers** attend only over a bounded recent window.
-
-Example:
-
-```text
-window size = 128
-```
-
-For these layers, KV-cache size **does not grow** with full context length.
-
-Quantizing small bounded windows may **add overhead** without enough memory-traffic savings.
-
-vLLM added:
-
-```bash
---kv-cache-dtype-skip-layers sliding_window
-```
-
-Example:
-
-```bash
-vllm serve gpt-oss-20b \
-  --kv-cache-dtype fp8 \
-  --kv-cache-dtype-skip-layers sliding_window
-```
-
-For gpt-oss-20b on H100, vLLM reports:
-
-```text
-BF16 ITL slope:        8.94e-06 ms/token
-full FP8 slope:        7.14e-06 ms/token  (80% of BF16)
-FP8 skip-SW slope:     6.34e-06 ms/token  (71% of BF16)
-break-even skip-SW:    ~7.7k tokens
-```
-
-Design rule:
-
-```text
-Quantize the layers where KV-cache memory traffic dominates.
-Do not quantize small bounded windows just because a global dtype flag exists.
-```
+And the meta-point, which is contested and worth knowing both sides of: the convergence on tiles is **not** consolidation. NVIDIA's cuTile/Tile-IR is an attempt to pull the abstraction back into CUDA; Modular's Lattner argues the result is *fragmentation* — "1,001 ways to write CUDA kernels in Python," Python-eDSLs that "look like Python but aren't" — which is the pitch for **Mojo as a real language** instead of an eDSL (next lecture). Both readings are defensible. As an engineer, your job is not to pick the winning ideology; it is to put each kernel at the right point on the §2 axis.
 
 ---
 
-## 8. Head dimension 256 caveat
+## 8. Measure it — tie the kernel back to the token
 
-**Large head dimensions** change the tradeoff.
-
-For a model with `head_dim = 256`, vLLM reports that FP8 **improves decode ITL** but can **worsen TTFT** because two-level accumulation increases register pressure.
-
-Example from gemma-4-E2B on H100:
+A kernel is not done when it runs; it is done when you know its effect on tokens/s. The loop:
 
 ```text
-BF16 ITL slope: 5.30e-05 ms/token
-FP8 ITL slope:  3.60e-05 ms/token
-FP8 slope:      68% of BF16
-
-BF16 TTFT quadratic coefficient: 6.93e-07
-FP8 TTFT quadratic coefficient:  1.12e-06
+   write tile kernel  →  benchmark GFLOP/s and % of roofline peak
+                      →  swap it into the model's hot path
+                      →  measure end-to-end tokens/s delta
+                      →  recompute $/Mtok  (Lecture 1, §6)
 ```
 
-Interpretation:
-
-```text
-decode improves
-prefill slows down
-```
-
-If your workload is **decode-heavy**, FP8 may still help.
-
-If your workload is **prefill-heavy**, especially with very long prompts and short outputs, BF16 may be better.
-
-Agent implication:
-
-| Workload | Risk |
-|---|---|
-| long RAG prompt, short answer | TTFT dominates |
-| long reasoning output | decode dominates |
-| chat with repeated long history | both matter |
-
-**Do not optimize blindly.**
-
-Measure the **phase that dominates** your workload.
+A 1.5× faster attention kernel is interesting; a 1.5× faster attention kernel that lifts end-to-end decode tokens/s by 1.2× and drops `$/Mtok` from $0.56 to $0.47 is **shippable, defensible work**. Always carry the number to the last step. The kernel is the means; the token is the end.
 
 ---
 
-## 9. Hopper vs Blackwell
+## 9. Mini-lab: one kernel, three points on the axis
 
-vLLM's post distinguishes H100/Hopper and B200/Blackwell paths.
+Pick a single op that matters (fused `add+RMSNorm`, or a small matmul).
 
-On Hopper with FlashAttention-3:
+1. **Productivity point:** write it in **Triton** with `@triton.autotune`. Record GFLOP/s and % of roofline.
+2. **Control point:** if you have the hardware, reimplement in **CuTe DSL** or **ThunderKittens** (or hand-CUDA). Record the same.
+3. **Compiler point (preview of Lec 3):** let `torch.compile` generate a Triton kernel for the same op and compare.
+4. **Connect:** put the best kernel in a model's hot path and measure the **end-to-end tokens/s and `$/Mtok`** delta versus the framework default.
 
-- two-level accumulation was needed to address long-context FP8 accuracy
-- optimized tile sizes improved prefill/decode behavior
-
-On Blackwell B200 with FlashInfer:
-
-- the accumulation issue is described as fixed on that path
-- FP8 still reduces decode slope
-
-Examples reported:
-
-```text
-Llama-3.1-8B on B200:
-BF16 slope: 1.80e-05
-FP8 slope:  9.72e-06
-break-even: ~4k tokens
-
-gpt-oss-20b on B200:
-BF16 slope: 3.56e-06
-FP8 slope:  2.06e-06
-break-even: ~13k tokens
-```
-
-**Hardware generation and attention backend** are part of the configuration.
-
-Do not assume H100 results **transfer exactly** to B200, or vice versa.
-
----
-
-## 10. Accuracy results
-
-The vLLM team tested:
-
-- reasoning benchmarks such as AIME25, GPQA:Diamond, MATH500, LiveCodeBench-v6
-- long-context MRCR evaluations up to 1M tokens
-- decoder-only and MoE models
-- BF16 and FP8 weight/activation settings
-- Hopper and Blackwell paths
-
-High-level findings:
-
-- Qwen3-30B-A3B-Thinking-2507 reasoning changed by about 1-2 points with FP8 KV-cache plus FP8 attention.
-- Qwen3.5-27B reasoning showed sub-point differences in the reported aggregate scores.
-- Llama-3.3-70B-Instruct recovered about 97-98% of baseline AUC at 128k MRCR.
-- Qwen3-30B-A3B-Instruct-2507 recovered roughly 94-98% AUC at 256k depending on model setting.
-- Qwen3.5-27B matched aggregate AUC up to 1M in the reported setup.
-
-The post intentionally uses simple per-tensor **uncalibrated scale** `1.0` as a reproducible lower bound.
-
-That matters because:
-
-```text
-if uncalibrated works, deployment is simple
-if uncalibrated shows systematic degradation, calibration is the next step
-```
-
----
-
-## 11. When to calibrate
-
-Start simple:
-
-```text
---kv-cache-dtype fp8
-```
-
-Then evaluate your workload.
-
-Calibrate if you see:
-
-- systematic downward accuracy shift
-- model-specific degradation
-- non-standard attention backend behavior
-- task-specific sensitivity
-- long-context retrieval failures
-
-vLLM specifically notes **Kimi-K2.5 with FlashMLA** as an example where uncalibrated FP8 showed consistent negative shift, making calibration worth considering.
-
-**Calibration is not free.**
-
-It adds:
-
-- dataset selection work
-- evaluation work
-- deployment complexity
-- possible per-head/per-tensor scale management
-
-Use it when the **accuracy evidence** justifies it.
-
----
-
-## 12. When to avoid FP8 KV-cache
-
-Stay with BF16, or at least be cautious, when:
-
-| Condition | Reason |
-|---|---|
-| contexts are short, roughly below 7k tokens | FP8 overhead may not amortize |
-| `head_dim = 256` and prefill matters | two-level accumulation can slow TTFT |
-| uncalibrated accuracy drops below your threshold | calibration or BF16 may be needed |
-| many small sliding-window layers | FP8 overhead may not pay off |
-| backend/model path is not well validated | hidden accuracy/performance regressions possible |
-
-Decision rule:
-
-```text
-FP8 KV-cache is a default candidate for long-context decode-heavy serving.
-It is not a default truth.
-```
-
----
-
-## 13. OpenClaw and agent workload mapping
-
-OpenClaw-style agents create several long-context serving patterns.
-
-| Agent pattern | Serving shape |
-|---|---|
-| long chat session | growing KV cache and repeated decode |
-| RAG over large docs | heavy prefill, often shorter decode |
-| code agent with logs | long prompt and medium decode |
-| reasoning agent | short/medium prefill, long decode |
-| cron summarizer | batch-like prefill plus summary decode |
-| multimodal perception handoff | large context compression plus downstream decode |
-
-FP8 KV-cache is most attractive when:
-
-```text
-many concurrent sessions
-long contexts
-meaningful output lengths
-decode is memory-bound
-accuracy passes workload evals
-```
-
-It is less compelling when:
-
-```text
-short prompts
-short outputs
-prefill dominates
-model has sensitive attention backend
-hybrid small-window layers dominate
-```
-
----
-
-## 14. Benchmark plan for your agent server
-
-Do not rely only on **public benchmark numbers**.
-
-Run your **own matrix**:
-
-```text
-models:
-  - primary chat model
-  - reasoning model
-  - code model
-  - multimodal/context model if served through vLLM
-
-configs:
-  - BF16 KV cache
-  - FP8 KV cache
-  - FP8 skip sliding-window layers where relevant
-  - calibrated FP8 if uncalibrated drops
-
-workloads:
-  - short chat
-  - long chat
-  - RAG long prefill / short decode
-  - code agent logs / medium decode
-  - reasoning long decode
-  - concurrent sessions
-```
-
-Measure:
-
-```text
-TTFT
-ITL
-output tokens/sec
-requests/sec
-GPU memory
-max concurrency before OOM
-accuracy / task pass rate
-long-context retrieval correctness
-cost per task
-```
-
-The winner is **workload-dependent**.
-
----
-
-## 15. Practical commands
-
-Basic:
-
-```bash
-vllm serve meta-llama/Llama-3.1-8B \
-  --kv-cache-dtype fp8
-```
-
-Hybrid attention model with small sliding-window layers:
-
-```bash
-vllm serve gpt-oss-20b \
-  --kv-cache-dtype fp8 \
-  --kv-cache-dtype-skip-layers sliding_window
-```
-
-Benchmarking shape:
-
-```bash
-vllm bench serve \
-  --model <model> \
-  --num-prompts 150 \
-  --request-rate inf
-```
-
-Treat commands as **starting points**.
-
-Pin **vLLM version, GPU backend, model revision, and benchmark dataset** before comparing results.
-
----
-
-## 16. Hardware engineer view
-
-FP8 KV-cache is a **hardware/software co-design** example.
-
-The optimization involves:
-
-- lower precision storage
-- tensor core behavior
-- attention kernel design
-- register pressure
-- tiling
-- memory bandwidth
-- quantization scales
-- model architecture
-- serving scheduler behavior
-
-The key insight:
-
-```text
-Quantization is not just a model-compression trick.
-It changes the memory traffic and kernel behavior of the serving system.
-```
-
-For GPU engineers, the interesting questions are:
-
-```text
-Where is the bottleneck: memory bandwidth, compute, registers, or scheduler?
-Does the dtype reduce traffic enough to pay for conversion overhead?
-Does the attention backend preserve accuracy at long context?
-Does the workload benefit from higher concurrency or lower ITL?
-```
-
----
-
-## Mini-lab: FP8 KV-cache deployment decision
-
-Pick one vLLM-served model.
-
-Run three configurations:
-
-```text
-BF16
-FP8
-FP8 with skip sliding-window layers, if relevant
-```
-
-Use two workloads:
-
-```text
-long prefill / short output
-medium prefill / long output
-```
-
-Record:
-
-```text
-TTFT
-median ITL
-output tok/s
-GPU memory
-max concurrency before OOM
-task accuracy
-```
-
-Then write a deployment decision:
-
-```text
-Use FP8 KV-cache for:
-Avoid FP8 KV-cache for:
-Need calibration for:
-Need further testing for:
-```
+Deliverable: a table of `{Triton, control-tool, torch.compile}` × `{GFLOP/s, % peak, end-to-end tokens/s, $/Mtok}`, plus one paragraph on where each sat on the ease↔control axis and whether the control was worth the effort. That last judgment — *was the control worth it* — is the entire skill of this lecture.
 
 ---
 
 ## Key takeaways
 
-- Long-context agent serving is often KV-cache and memory-bandwidth bound.
-- FP8 KV-cache can roughly halve cache storage and reduce decode memory traffic.
-- vLLM's FP8 path is now a strong starting point for many long-context decode-heavy deployments.
-- Hopper required a two-level accumulation fix to recover long-context FP8 accuracy in FlashAttention-3.
-- Sliding-window layers with small windows often should stay BF16 using `--kv-cache-dtype-skip-layers sliding_window`.
-- `head_dim = 256` can make prefill slower under two-level accumulation even when decode improves.
-- Use uncalibrated FP8 first for simplicity, but calibrate if workload accuracy shows systematic degradation.
-- Always benchmark TTFT, ITL, throughput, memory, concurrency, and task accuracy on your real agent workload.
+- The **scalar thread model broke** because Tensor Cores, TMA, and warp-specialized pipelines made the **tile** the natural unit of work. Every modern kernel language is a race to own the tile.
+- Organize the tools on **one axis: ease/productivity ↔ control/peak**. Pick a point per kernel, not a tool for life.
+- **Triton** leads mindshare: tile-in-Python, the codegen target of `torch.compile`, genuinely cross-vendor — at a ~20%-on-the-hardest-kernels gap vs hand-tuned CUDA.
+- **NVIDIA's on-ramps**: CUTLASS C++/CuTe (peak), **CuTe DSL** (C++-parity from Python), **cuTile** (Triton-like productivity) — all NVIDIA-only, over the new **Tile IR** ("PTX for tiles").
+- **ThunderKittens** = minimal tiles in CUDA, the attention scalpel (used by Together, Cursor). **TileLang** = decouples scheduling from dataflow, hand-tuned *and* multi-vendor, built on TVM.
+- A kernel is finished when you've measured its effect on **end-to-end tokens/s and `$/Mtok`** — not at "it runs."
 
 ---
 
 ## References
 
-- vLLM Blog, "The State of FP8 KV-Cache and Attention Quantization in vLLM": [https://vllm.ai/blog/fp8-kvcache](https://vllm.ai/blog/fp8-kvcache)
-- vLLM documentation: [https://docs.vllm.ai](https://docs.vllm.ai)
-- FlashAttention: [https://github.com/Dao-AILab/flash-attention](https://github.com/Dao-AILab/flash-attention)
-- FlashInfer: [https://github.com/flashinfer-ai/flashinfer](https://github.com/flashinfer-ai/flashinfer)
-- LLM Compressor: [https://github.com/vllm-project/llm-compressor](https://github.com/vllm-project/llm-compressor)
-- LLM From Scratch — *AI Agent Development 2026 course*
-- Nemotron 3 Nano Omni — *AI Agent Development 2026 course*
+- OpenAI Triton: [https://openai.com/index/triton/](https://openai.com/index/triton/) · repo [https://github.com/triton-lang/triton](https://github.com/triton-lang/triton)
+- NVIDIA, "Achieve CUTLASS C++ performance with Python — CuTe DSL": [https://developer.nvidia.com/blog/achieve-cutlass-c-performance-with-python-apis-using-cute-dsl/](https://developer.nvidia.com/blog/achieve-cutlass-c-performance-with-python-apis-using-cute-dsl/)
+- NVIDIA, "Simplify GPU programming with CUDA Tile (cuTile) in Python": [https://developer.nvidia.com/blog/simplify-gpu-programming-with-nvidia-cuda-tile-in-python/](https://developer.nvidia.com/blog/simplify-gpu-programming-with-nvidia-cuda-tile-in-python/)
+- ThunderKittens (Stanford Hazy Research): [https://github.com/HazyResearch/ThunderKittens](https://github.com/HazyResearch/ThunderKittens) · blog [https://hazyresearch.stanford.edu/blog/2024-05-12-tk](https://hazyresearch.stanford.edu/blog/2024-05-12-tk)
+- TileLang: [https://github.com/tile-ai/tilelang](https://github.com/tile-ai/tilelang) · paper arXiv 2504.17577 [https://arxiv.org/abs/2504.17577](https://arxiv.org/abs/2504.17577)
+- Modular, "Democratizing AI Compute, Part 7 — Triton and Python eDSLs": [https://www.modular.com/blog/democratizing-ai-compute-part-7-what-about-triton-and-python-edsls](https://www.modular.com/blog/democratizing-ai-compute-part-7-what-about-triton-and-python-edsls)
+- *TVM Deep Dives* — [Lecture 02 — TensorIR & the schedule space](../TVM%20Deep%20Dives/Lecture-02.md), for the scheduling primitives TileLang exposes.
+
 ---
 
-*Next: [Lecture 03](Lecture-03.md)*
+## Current as of
+
+2026-06. Pins: Triton 3.x (MLIR, Tile-IR backend), CUTLASS 4.x (CuTe DSL, GTC 2025), cuTile / Tile IR with CUDA 13.1, ThunderKittens 2.0 (Blackwell + MXFP8/NVFP4), TileLang open-sourced Jan 2025 on TVM. The ~20% Triton-vs-CUDA gap is a contested, kernel-and-generation-dependent figure — treat as illustrative, re-measure on your hardware.
+
+---
+
+*Next: [Lecture 03 — Compilers & runtimes](Lecture-03.md)*

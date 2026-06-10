@@ -1,42 +1,12 @@
-# Lecture 06 - MLSys 2026 Kernel Contest: AI-Assisted Blackwell LLM Kernel Optimization
+# Lecture 06 - Making Decode Fast: Speculative Decoding, DFlash, and Flash Kernels
 
-**Collection:** [MLSys Deep Dives](README.md) | **Previous:** [Lecture 05](Lecture-05.md) | **Next:** [MLSys Deep Dives index](README.md)
+**Collection:** [MLSys Deep Dives](README.md) | **Previous:** [← Lecture 05](Lecture-05.md) | **Next:** [Lecture 07](Lecture-07.md)
 
 ---
 
-The **MLSys 2026 FlashInfer AI Kernel Generation Contest** is a compact map of where AI systems work is going.
+We have made the kernels fast (Lec 2–3) and the model lean (Lec 4–5). This lecture attacks the last and most stubborn cost: **autoregressive decode is sequential and memory-bound**, and no kernel makes a fundamentally serial loop parallel. The breakthrough of 2023–2026 was algorithmic — **speculative decoding** — a family of tricks that emit *multiple* tokens per pass over the weights, **with provably identical output** to normal decoding.
 
-It asks participants to create **high-performance GPU kernels** for modern LLM inference operations on NVIDIA Blackwell B200 GPUs.
-
-The important part is **not only the kernel work**.
-
-The contest explicitly welcomes:
-
-```text
-expert-crafted seed kernels with agent-assisted evolution
-fully agent-generated kernel solutions
-```
-
-That makes it a case study in:
-
-```text
-GPU kernel optimization
-  + LLM inference runtime internals
-  + AI-assisted systems engineering
-```
-
-This is the **layer below ordinary agent apps**.
-
-It is where agent workloads become:
-
-- Tensor Core instructions
-- HBM traffic
-- shared-memory layouts
-- sparse indexers
-- expert routing
-- register pressure
-- occupancy tradeoffs
-- benchmark win rates
+This is the densest-payoff layer in the stack: speculative decoding routinely delivers 2–6× with *zero* quality loss, and the 2026 frontier (DFlash, the MiMo + TileRT 1000-tok/s milestone) pushes further. We trace the algorithm lineage, the attention kernels that make the verify step cheap (FlashAttention-3, FlashInfer), and the research group at the center of most of it — **Together AI**.
 
 ---
 
@@ -44,1359 +14,230 @@ It is where agent workloads become:
 
 By the end of this lecture, you should be able to:
 
-1. Explain why the MLSys 2026 contest is an AI systems/runtime signal, not a normal hackathon.
-2. Identify the three competition tracks and the inference bottleneck each targets.
-3. Understand why NVIDIA Blackwell B200 changes the optimization target.
-4. Connect FP8 MoE, sparse attention, and Gated Delta Net kernels to modern LLM inference.
-5. Explain how FlashInfer-Bench evaluates correctness, speed, and win rate against baselines.
-6. Distinguish human-written, agent-assisted, and fully agent-generated kernel workflows.
-7. Design a kernel optimization loop with profiling, correctness checks, and benchmark discipline.
-8. Map this contest to career paths in AI runtime, GPU compiler, and accelerator software engineering.
+1. Explain why decode is **memory-bound**, and why verifying K candidate tokens costs ~the same memory traffic as generating one.
+2. Trace the speculative-decoding lineage: **draft model → Medusa → Hydra → Sequoia → Lookahead → EAGLE-1/2/3**, and what each added.
+3. Describe **EAGLE-3** (direct-token prediction, "training-time test") and **DFlash** (block-diffusion drafting) and why they beat predecessors.
+4. Use **acceptance length** as the governing metric and relate it to speedup.
+5. Place **FlashAttention-3, FlashInfer, Flash-Decoding** as the kernels that make the verify/attention step fast.
+6. Read the **MiMo + TileRT** 1000-tok/s result as a *stack* (quantization + DFlash + megakernel), and locate **Together AI**'s research across the whole layer.
 
 ---
 
-## 1. What the contest is
+## 1. Why decode is stuck — and the way out
 
-The contest page describes the challenge as:
-
-```text
-create optimized CUDA kernels for cutting-edge LLM operations
-for NVIDIA Blackwell B200 GPUs
-```
-
-The evaluation platform is **FlashInfer-Bench**.
-
-Submissions compete on:
-
-- correctness
-- speed
-- win rate against FlashInfer baselines
-
-The contest tracks target three operations that matter in modern inference:
+Recall from Lecture 1: **prefill is compute-bound, decode is memory-bound.** Generating one token requires streaming the *entire* weight set (and traversing the whole KV cache) from HBM, to do a tiny amount of matmul. The Tensor Cores sit mostly idle; the bottleneck is bandwidth.
 
 ```text
-Track A:
-  Fused MoE with FP8 support
-
-Track B:
-  DeepSeek Sparse Attention
-
-Track C:
-  Gated Delta Net
+   one decode step (generate 1 token):
+   ┌────────────────────────────────────────────────────────┐
+   │  stream ALL weights + KV from HBM  ───────────────────► │  ← dominates (memory bandwidth)
+   │  matmuls (Tensor Cores ~idle)                           │  ← tiny (compute)
+   │  emit 1 token                                           │
+   └────────────────────────────────────────────────────────┘
 ```
 
-Participants can use:
+Here is the key observation that unlocks everything: **verifying K candidate tokens costs essentially the same memory traffic as generating one** — it's still one pass over the weights. So if you can *guess* the next K tokens cheaply and then *verify* them all in a single pass, you amortize the dominant memory cost across multiple tokens:
 
-- CUDA
-- Triton
-- CuTe DSL
-- TileLang
-- cuTile
-- other kernel programming systems
+```text
+   speculative decoding:
+   ① a cheap DRAFT proposes K tokens ahead
+   ② the big TARGET verifies all K in ONE forward pass
+   ③ accept the longest prefix the target agrees with;  re-draft from there
+   ⇒ same HBM traffic per pass, up to ~K tokens out  →  more tokens per memory pass
+   ⇒ OUTPUT IS PROVABLY IDENTICAL to normal target decoding (lossless)
+```
 
-That tool list is the **real signal**.
-
-The frontier of inference engineering is **not one API**.
-
-It is a **stack of DSLs, compilers, profilers, runtimes, and benchmark harnesses**.
+That last line is what makes speculative decoding special: it is a **free lunch in quality** — same distribution, more speed. The entire research race is about making the draft *cheaper and more accurate* (higher acceptance), so more of the K tokens survive verification.
 
 ---
 
-## 2. Why this belongs in an agent course
+## 2. The governing metric: acceptance length
 
-Agentic AI is usually taught from the top:
-
-```text
-prompts
-tools
-RAG
-workflows
-agent orchestration
-```
-
-But production agents create **inference demand**.
-
-That demand becomes:
+Before the lineage, fix the metric, because every method is measured by it. The verify step proposes a sequence (or tree) of candidate tokens; the target accepts the **longest valid prefix**. The average number accepted per step is the **acceptance length** τ.
 
 ```text
-low latency
-high throughput
-long context
-multi-user concurrency
-tool-loop responsiveness
-local or edge deployment
-cost per generated token
+   speedup  ≈  acceptance_length τ
+              ──────────────────────────────────   (roughly; bounded by draft + verify overhead)
+              1 + (draft cost relative to one step)
+
+   higher τ  →  more tokens per verify  →  more speedup
+   cheaper draft → less overhead per step
 ```
 
-Those requirements eventually land on kernels.
-
-The contest sits at the bottom of the stack:
-
-```text
-agent workload
-  -> model server
-  -> inference runtime
-  -> attention / MoE / recurrent-state kernels
-  -> GPU architecture
-```
-
-If you want to build serious agent infrastructure, you need to understand the **lower layers**.
-
-Not every agent engineer writes CUDA.
-
-But the best systems engineers know **which kernel bottleneck they are paying for**.
+So a method wins by **raising τ** (better drafts → more accepted) or **lowering draft cost** (cheaper to produce the guesses). EAGLE-3 reports τ improvements that translate to ~3–6.5×; DFlash pushes τ higher still with block drafting. When you benchmark spec decode, **τ is the number you report** — it's the mechanism-level truth behind the wall-clock speedup.
 
 ---
 
-## 3. Track A: Fused FP8 MoE
+## 3. The lineage
 
-**Mixture-of-experts** models activate only a subset of experts per token.
-
-That saves compute, but it creates **systems problems**:
-
-- dynamic routing
-- irregular memory access
-- token-to-expert dispatch
-- expert load imbalance
-- small or fragmented GEMMs
-- scaling and reduction overhead
-- top-k expert selection
-- FP8 quantization and dequantization
-
-The contest's Track A focuses on **fused MoE kernels with FP8 support**.
-
-The optimization target:
+Every method is a different answer to "how do I produce good candidate tokens cheaply?"
 
 ```text
-routing + dispatch + GEMM + scaling + output assembly
+   DRAFT MODEL     a small LM drafts K tokens; the big model verifies K in one pass
+        │          (simple, but you must train/host a matched small model)
+   MEDUSA          add lightweight DECODING HEADS to the frozen base; tree-attention
+        │          over candidates. no separate model.            [Tri Dao co-author → Together]
+   HYDRA           make the heads SEQUENTIALLY DEPENDENT (each conditions on prior
+        │          drafted tokens) → ~1.3× over Medusa.
+   SEQUOIA         find the OPTIMAL token-tree topology by dynamic programming;
+        │          temperature-robust; HARDWARE-AWARE tree sizing.  [Together co-author]
+   LOOKAHEAD       draft-FREE: break the sequential dependency with Jacobi iteration,
+        │          generate & verify n-grams in parallel. no aux model.   [Hao AI Lab]
+   EAGLE-1         autoregress at the FEATURE level (predict the target's 2nd-to-top
+        │          hidden feature, reuse its LM head). ~2.7–3.5×.   [Li et al.]
+   EAGLE-2         add a DYNAMIC, context-aware draft TREE (keep high-confidence branches).
+        │
+   EAGLE-3         drop feature-prediction → DIRECT token prediction; fuse multi-layer
+        │          features via "TRAINING-TIME TEST". ~3–6.5×, +20–40% over EAGLE-2,
+        │          and the speedup now SCALES WITH TRAINING DATA. the de-facto baseline.
+   DFLASH          a small BLOCK-DIFFUSION draft predicts a WHOLE BLOCK in one pass.
+                   2–3× over EAGLE-3 on synchronous requests; >6× overall; lossless.
 ```
 
-The reason to fuse:
+A few points a senior engineer holds onto:
 
-```text
-fewer kernel launches
-less HBM traffic
-better Tensor Core utilization
-less intermediate materialization
-```
-
-Important performance questions:
-
-```text
-Are tokens grouped efficiently by expert?
-Are FP8 block scales loaded efficiently?
-Are GEMMs large enough to use Tensor Cores well?
-Is expert imbalance causing tail latency?
-Are intermediate buffers hitting HBM unnecessarily?
-Does fusion increase register pressure too much?
-```
-
-This connects directly to modern MoE models:
-
-- DeepSeek-style expert systems
-- Mixtral-style routing
-- Qwen MoE variants
-- small active-parameter models such as Lecture 05's ZAYA1-8B
-
-MoE is **not "free sparsity."**
-
-It is a **routing and memory-layout problem**.
+* **Self-drafting beat separate drafts.** Medusa/EAGLE attach the draft to the *base model* (heads or a light feature head), removing the need to train and host a separate, well-matched small model — a big operational simplification.
+* **Trees beat chains.** Proposing a *tree* of candidates and verifying it with tree-attention (Medusa → EAGLE-2 → Sequoia) raises τ, because you hedge across multiple plausible continuations in one verify pass. Sequoia made the tree *optimal and hardware-aware*.
+* **EAGLE-3's "training-time test"** is the subtle, important idea: train the draft head under the *same* multi-step autoregressive condition it faces at inference, so train and test distributions match. This is what let EAGLE-3 keep improving with more data where EAGLE-1/2 plateaued.
 
 ---
 
-## 4. Track B: Sparse Attention
+## 4. DFlash — drafting a whole block at once
 
-**Dense attention** scales poorly with sequence length.
-
-The basic cost pattern:
+**DFlash** (the "dfalsh"/"dflash" you may have seen; arXiv 2602.06036, Z-Lab, 2026) is the current frontier and a genuinely different draft mechanism. Instead of an autoregressive head that drafts token-by-token, DFlash uses a small **block-diffusion** draft model that predicts an **entire block of tokens in a single forward pass** — non-causal attention over the verifier's hidden states plus mask embeddings, conditioned on the target's features.
 
 ```text
-full attention:
-  every query attends over many keys
-  KV cache traffic grows with context
+   EAGLE-3 draft:  token → token → token → ...   (sequential head, K small passes)
+   DFlash draft:   [ ▢ ▢ ▢ ▢ ▢ ▢ ] → fill the WHOLE masked block in ONE pass (diffusion)
+                   → bigger blocks drafted cheaper → higher τ, fewer draft passes
 ```
 
-**Sparse attention** reduces work by selecting a subset of relevant tokens or blocks.
-
-The contest's Track B targets **DeepSeek Sparse Attention** with separate indexer and attention kernels.
-
-That split matters:
-
-```text
-indexer:
-  choose which blocks/tokens matter
-
-attention:
-  compute attention over selected sparse structure
-```
-
-Sparse attention bottlenecks:
-
-- top-k index generation
-- block sparse metadata
-- irregular KV reads
-- memory coalescing
-- cache locality
-- branch divergence
-- load balancing across queries
-- interaction with paged KV cache
-- FP8 data paths
-
-Sparse attention is hard because it **trades arithmetic for control flow and memory indirection**.
-
-The key question:
-
-```text
-Does the sparsity saved enough memory traffic and compute
-to pay for indexer overhead and irregular access?
-```
-
-This connects to:
-
-- Lecture 02: FP8 KV-cache
-- Lecture 03: trace-driven performance analysis
-- long-context agent sessions
-- DeepSeek-style inference systems
-
-For long-context agents, sparse attention is a **direct path to lower memory traffic**.
-
-But it must be **profiled, not assumed**.
+Reported: **2–3× larger speedups than EAGLE-3 on synchronous requests**, **>6× overall**, still **lossless**, and it's integrated into **vLLM's "speculators"** framework (with a published checkpoint). It is also the speculative-decoding component inside the MiMo throughput result in §6. The takeaway: the draft mechanism is still actively improving — block-diffusion drafting is the 2026 state of the art, and "what's the best draft?" is a live research front, not a settled question.
 
 ---
 
-## 5. Track C: Gated Delta Net
+## 5. The kernel layer: making the verify step cheap
 
-**Gated Delta Net** is a sequence-modeling approach used in Qwen3-Next.
+Speculative decoding is the *algorithm*; the **attention kernel** still has to run the verify pass fast. Three Flash-family kernels (all closely tied to Tri Dao / Together) make that step efficient — a different axis from spec decode, stacked on top of it:
 
-The contest includes decode and prefill kernels.
+* **FlashAttention-3** (Jul 2024) — the Hopper-specific attention rewrite: **warp specialization** to overlap compute with async Tensor-Core + TMA data movement, interleaved matmul/softmax pipelining, and **FP8** support. Results: **1.5–2.0× over FA-2**, FP16 up to **~740 TFLOP/s (~75% H100 utilization)**, FP8 up to **~1.2 PFLOP/s** with 2.6× lower numerical error than baseline FP8. This is the kernel that makes attention itself near-peak on Hopper.
+* **FlashInfer** (MLSys 2025 **Best Paper**) — not a single kernel but a **serving-oriented attention engine/library**: handles **KV-cache storage heterogeneity** (block-sparse + composable formats), **JIT-compiled customizable attention templates**, and **load-balanced scheduling** compatible with CUDA Graphs. It's adopted by **vLLM, SGLang, and MLC-Engine**, is now NVIDIA-backed (the upstreaming from Lecture 3), and reports **29–69% inter-token-latency reductions** vs compiler backends. When you serve attention in 2026, FlashInfer is very likely underneath.
+* **Flash-Decoding** (Oct 2023) — the decode-phase trick for **long context, small batch**, where query length is 1 and plain FlashAttention uses <1% of the GPU. It **parallelizes the attention reduction across the KV (sequence) dimension** — splitting keys/values across SMs, then a small final combine — giving **near-constant latency to 64K+ tokens** and up to **~8× end-to-end** (and up to ~50× vs FA in the long-seq decode regime).
 
-This matters because GDN-style systems represent a broader shift:
-
-```text
-not every future long-context model will be standard dense attention
-```
-
-State-space, recurrent, delta-rule, and hybrid models try to reduce attention cost by **maintaining compact state**.
-
-The GPU problems change:
-
-- state update kernels
-- recurrent dependency handling
-- scan-like computation
-- chunking
-- prefill/decode split
-- memory layout for persistent state
-- low-latency decode
-- high-throughput prefill
-
-Track C is therefore not just "one more kernel."
-
-It is a signal that inference runtimes must support **model families beyond standard transformers**.
-
-For systems engineers, that means:
-
-```text
-runtime design must be model-architecture aware
-```
-
-An inference runtime optimized only for dense attention may **underperform on hybrid architectures**.
+The mental model: **spec decode reduces *how many* memory passes you need; Flash kernels reduce *how expensive each pass* is.** They multiply. A serving stack runs FlashInfer/FA-3 kernels *and* EAGLE-3/DFlash drafting *together*.
 
 ---
 
-## 6. Why Blackwell B200 matters
+## 6. Case study: MiMo + TileRT past 1000 tokens/s
 
-The contest targets NVIDIA Blackwell B200 GPUs.
-
-That matters because kernel optimization is **hardware-specific**.
-
-Questions change by architecture:
-
-- Tensor Core throughput
-- FP8/FP4 paths
-- memory bandwidth
-- shared memory capacity and behavior
-- register file pressure
-- scheduler behavior
-- warp-group MMA support
-- TMA or async copy behavior
-- occupancy tradeoffs
-
-Optimizing for B200 is **not the same** as optimizing for A100 or H100.
-
-A kernel that wins on one generation may lose on another because:
-
-- the compute/memory balance changes
-- Tensor Core instruction choices change
-- memory hierarchy changes
-- compiler lowering changes
-- occupancy limits change
-
-That is why **official evaluation on bare metal** matters.
-
-The contest page notes that Modal scores are reference-only because clock frequency cannot be locked, while official evaluations run on bare-metal machines.
-
-This is a good performance-engineering rule:
+The 2026 result that stitches this whole course together: **Xiaomi's MiMo team + the TileRT runtime pushed a 1-trillion-parameter MoE model past ~1000 tokens/s** (peaks ~1200) on **a single standard 8-GPU commodity node** — no exotic silicon. It is worth dissecting because it is *every layer of this course stacked*:
 
 ```text
-cloud convenience is useful for iteration
-bare metal is needed for final claims
+   ① ARCHITECTURE   MiMo-V2.5-Pro: a 1T-param MoE (Lec 5), MTP-friendly, sparse-active
+   ② QUANTIZATION   MXFP4 on the MoE expert layers (rest higher precision) → bytes ↓ (Lec 5/7)
+   ③ SPEC DECODE    DFlash block-diffusion drafting (§4) → tokens/memory-pass ↑
+                    (reported acceptance lengths ~6.30 coding / 5.56 math / 4.29 agent)
+   ④ RUNTIME        TileRT persistent MEGAKERNEL (Lec 3): warp-specialized, GPU-resident,
+                    overlaps compute/IO/comm, µs-scale overhead → kills the gaps
+   ─────────────────────────────────────────────────────────────────────────────────
+   ⇒ ~1000–1200 tok/s on a 1T model, one 8-GPU node.  priced ~3× the standard rate for ~10× speed.
 ```
+
+No single trick did it. Architecture (sparse MoE) + precision (MXFP4) + algorithm (DFlash) + runtime (TileRT megakernel) **compounded**. That is the thesis of this course made concrete: the layers are one co-designed system, and the wins multiply.
+
+> **Currency / sourcing flag.** This result was announced ~**2026-06-08** by Xiaomi/TileRT and covered by tech press; the figures (~1200 tok/s, acceptance lengths, MXFP4-on-experts, "8-GPU commodity node" — exact GPU model unspecified) are **vendor-reported and not yet independently reproduced**. Treat as a leading-edge data point, not a settled benchmark. Re-verify before quoting in a design review.
 
 ---
 
-## 7. FlashInfer-Bench
+## 7. Together AI — the research thread through this whole layer
 
-FlashInfer-Bench is the contest evaluation platform.
+If one organization sits at the center of this lecture, it is **Together AI**, largely through **Tri Dao** (its Chief Scientist) and collaborators. Their portfolio *is* the modern decode-acceleration stack:
 
-The benchmark model:
+| Layer | Together-linked work |
+|---|---|
+| Attention kernels | **FlashAttention** (1/2/3), **Flash-Decoding** — IO-aware exact attention |
+| Architecture | **Mamba** (via Dao; Lec 4) — the SSM line |
+| Speculative decode | **Medusa** (Dao co-author), **Sequoia** (Together co-author) |
+| Multi-agent inference | **Mixture-of-Agents (MoA)** — weak proposers + an aggregator; reported **65.1% AlpacaEval LC, beating GPT-4o's 57.5%** with open models |
+| Serving | **Together Inference Engine** — production stack on Blackwell |
 
-```text
-kernel spec
-  -> candidate kernel
-  -> correctness tests
-  -> speed measurement
-  -> comparison against FlashInfer baseline
-  -> win rate
-```
-
-This is the right structure for kernel work.
-
-A kernel is **not useful because it compiles**.
-
-It must:
-
-- match numerical expectations
-- handle shape variations
-- beat or match a strong baseline
-- avoid pathological cases
-- be reproducible
-- be explainable in a writeup
-
-The contest requires tagged GitHub commits for evaluation and a technical report.
-
-That encourages the correct discipline:
-
-```text
-code
-  -> benchmark
-  -> profile
-  -> explain
-  -> reproduce
-```
+The positioning to understand: Together is known for **the full vertical — from the CUDA attention kernel, through efficient architectures, through speculative decoding, to the serving engine and its economics.** Their Inference-Engine marketing claims (e.g. **+31% TPS vs TensorRT-LLM**, **~2× better TTFT at saturation**, "**up to 10× lower cost per token**" on Blackwell, **76% cheaper than Claude Opus** on a coding-agent benchmark) are **vendor benchmarks on specific workloads** — directionally informative, not neutral third-party numbers, and you should treat them as such. The research, though (FlashAttention, Mamba, Medusa, Sequoia), is foundational and independently verifiable.
 
 ---
 
-## 8. Human plus agent kernel generation
+## 8. Hands-on / Measure it
 
-The contest explicitly allows two approaches:
+Enable speculative decoding in a real serving stack and measure the three numbers that matter.
 
-```text
-expert-crafted seed kernels with agent-assisted evolution
-fully agent-generated solutions
+```python
+from vllm import LLM, SamplingParams
+
+# EAGLE-3 speculative decoding in vLLM (API surface evolves across versions — check your vLLM)
+llm = LLM(
+    model="meta-llama/Llama-3.1-8B-Instruct",
+    speculative_config={
+        "method": "eagle3",
+        "model": "yuhuili/EAGLE3-LLaMA3.1-Instruct-8B",
+        "num_speculative_tokens": 5,
+    },
+)
+# simplest baseline to compare against: draft-free n-gram speculation
+#   speculative_config={"method": "ngram", "num_speculative_tokens": 4}
 ```
 
-These are **different workflows**.
-
-### Human plus agent
-
-The human writes:
-
-- baseline kernel structure
-- tiling strategy
-- memory layout
-- correctness harness
-- profiling plan
-
-The agent helps:
-
-- generate variants
-- tune constants
-- try layout changes
-- refactor code
-- run benchmarks
-- summarize profiling results
-
-### Fully agent-generated
-
-The agent owns more of the loop:
-
-- read kernel spec
-- generate code
-- run tests
-- benchmark
-- mutate kernel
-- select winners
-- produce reproducibility scripts
-
-The contest page requires agent solutions to open-source scripts that reproduce kernels.
-
-That is important.
-
-For AI-generated systems code, the artifact is **not only the final kernel**.
-
-The artifact is also:
+Measure, against a no-spec baseline:
 
 ```text
-the generation process
+   1. CORRECTNESS:   outputs identical to no-spec (greedy) — spec decode is LOSSLESS; verify it
+   2. ACCEPTANCE τ:  mean tokens accepted per verify step (vLLM reports this)
+   3. SPEEDUP:       tokens/s with spec ÷ tokens/s without  →  recompute $/Mtok (Lecture 1)
 ```
 
-That process must be **reproducible**.
+A result like "τ = 3.2, 2.4× tokens/s, identical outputs, `$/Mtok` $0.56 → $0.23" is the whole lecture in one line: **more tokens per memory pass, same quality, lower cost.** If τ is low, your draft is poorly matched to the workload — try a different draft method (EAGLE-3 vs ngram vs DFlash) or a domain-matched draft.
 
 ---
 
-## 9. The optimization loop
+## 9. Mini-lab
 
-A serious kernel optimization loop looks like this:
+1. **Baseline:** serve a model with no speculation. Record tokens/s, TTFT, TPOT, `$/Mtok`.
+2. **Spec decode:** enable **EAGLE-3** (and, separately, **ngram**) speculation. Record τ, tokens/s, and confirm outputs are identical to greedy baseline. Compute the new `$/Mtok`.
+3. **Workload sensitivity:** measure τ on two workloads (e.g. code vs open-ended chat). Explain why τ differs (predictable text → higher acceptance).
+4. **(Stretch) stack it:** if your stack supports it, confirm FlashInfer/FA-3 is the attention backend, and reason about how spec decode (fewer passes) and the Flash kernel (cheaper passes) compound.
 
-```text
-1. Read the kernel spec.
-2. Implement a correct baseline.
-3. Build correctness tests.
-4. Benchmark against the reference.
-5. Profile the bottleneck.
-6. Generate one controlled optimization variant.
-7. Re-test correctness.
-8. Re-benchmark.
-9. Record the delta.
-10. Repeat.
-```
-
-**Do not change five things at once.**
-
-Kernel work is **full of traps**:
-
-- a faster kernel may be numerically wrong
-- a change may help one shape and hurt another
-- a local benchmark may not match official clocks
-- register pressure may erase fusion gains
-- memory coalescing may be broken by a layout change
-- branch divergence may dominate sparse kernels
-
-The right unit of progress:
-
-```text
-one hypothesis
-one variant
-one measurement
-one retained or rejected change
-```
-
----
-
-## 10. Profiling checklist
-
-Use Nsight Compute, Nsight Systems, FlashInfer-Bench outputs, and trace tools where appropriate.
-
-Measure:
-
-- achieved occupancy
-- register count
-- shared memory usage
-- Tensor Core utilization
-- memory throughput
-- L2 hit rate
-- global load/store efficiency
-- warp divergence
-- instruction mix
-- kernel launch overhead
-- achieved TFLOPS or effective bandwidth
-- latency distribution across shapes
-
-Interpretation examples:
-
-```text
-low Tensor Core utilization:
-  tiling, dtype path, or GEMM shape may be poor
-
-high HBM bandwidth with low compute:
-  memory-bound kernel; optimize layout and traffic
-
-high register pressure:
-  fusion or unrolling may be too aggressive
-
-high divergence:
-  sparse indexing or routing path may be unbalanced
-
-good average but bad tail:
-  expert imbalance or sparse metadata distribution may matter
-```
-
-This connects to Lecture 03:
-
-```text
-performance claims need trace and profiling evidence
-```
-
----
-
-## 11. Toolchain choices
-
-The contest allows multiple implementation paths.
-
-Do not treat them as interchangeable.
-
-Each tool sits at a different abstraction level:
-
-```text
-FlashInfer:
-  LLM inference kernel/runtime library and benchmark baseline
-
-CUDA:
-  lowest-level mainstream NVIDIA GPU programming interface
-
-Triton:
-  Python-like GPU kernel DSL optimized for fast iteration
-
-TileLang:
-  tile-level kernel DSL for composable AI kernels
-
-CuTe DSL:
-  Python DSL around CUTLASS/CuTe layout and tensor abstractions
-
-cuTile:
-  NVIDIA CUDA Tile Python DSL targeting Tile IR and portable tensor-core kernels
-
-OpenEvolve:
-  evolutionary coding agent for automated program optimization
-
-Modal:
-  serverless GPU/cloud execution environment for iteration and reference runs
-
-Blackwell B200:
-  target hardware that determines what "fast" actually means
-```
-
-The practical rule:
-
-```text
-choose the tool that gives you the fastest correct iteration
-for the bottleneck you actually have
-```
-
-But for this contest, the real skill is knowing when to drop down a level.
-
----
-
-### 11.1 FlashInfer
-
-FlashInfer is the **center of gravity** for this contest.
-
-It is an LLM serving kernel library focused on **high-performance inference primitives**:
-
-- attention
-- paged KV-cache operations
-- sampling
-- normalization
-- MoE-related kernels
-- quantization-aware serving paths
-- decode and prefill helpers
-
-In the contest, FlashInfer plays three roles:
-
-```text
-reference implementation:
-  the baseline your kernel must beat
-
-benchmark environment:
-  FlashInfer-Bench measures correctness and speed
-
-runtime context:
-  the operations are real LLM serving bottlenecks, not toy kernels
-```
-
-Why this matters:
-
-```text
-If you beat a naive PyTorch baseline, that proves little.
-
-If you beat FlashInfer on a real inference primitive,
-that is a meaningful systems result.
-```
-
-What to study in FlashInfer:
-
-- API shape for decode and prefill kernels
-- tensor layout conventions
-- page/block abstractions for KV cache
-- supported dtypes and quantization paths
-- baseline kernel behavior
-- benchmark input distributions
-- numerical tolerances
-
-Common mistake:
-
-```text
-optimizing against the wrong mental model
-```
-
-FlashInfer kernels are **already specialized**. You need to understand what the baseline is doing **before assuming an optimization opportunity exists**.
-
-For example, if a sparse attention kernel is slow, the bottleneck may not be the attention math. It may be:
-
-- sparse index generation
-- metadata reads
-- poor memory coalescing
-- shape-specific occupancy
-- scale loading
-- page table indirection
-
-FlashInfer is where **LLM theory becomes concrete runtime layout**.
-
----
-
-### 11.2 CUDA
-
-CUDA is the **most direct and controllable** path.
-
-Use CUDA when you need:
-
-- explicit thread/block mapping
-- warp-level control
-- shared memory control
-- vectorized global memory access
-- explicit synchronization
-- custom Tensor Core instruction paths
-- fine-grained launch configuration
-- maximum control over register pressure and occupancy
-
-CUDA is the right tool when the kernel is blocked by details the compiler DSL does not expose.
-
-Examples:
-
-```text
-FP8 MoE:
-  custom token grouping, expert dispatch, scale loading, epilogue fusion
-
-Sparse attention:
-  custom sparse metadata traversal and memory coalescing
-
-Gated Delta Net:
-  specialized state update and decode loop scheduling
-```
-
-CUDA gives you control, but it also **gives you enough rope**.
-
-Common CUDA failure modes:
-
-- out-of-bounds memory access
-- bank conflicts
-- uncoalesced loads
-- excessive register use
-- low occupancy
-- branch divergence
-- poor Tensor Core utilization
-- excessive synchronization
-- numerically wrong accumulation
-- shape-specific regressions
-
-CUDA debugging discipline:
-
-```text
-1. correctness first
-2. one optimization at a time
-3. inspect generated SASS/PTX when needed
-4. profile register/shared-memory occupancy
-5. test multiple shapes, not one cherry-picked shape
-```
-
-Use CUDA when you need a **hand-tuned final kernel** or when you need to understand exactly why a higher-level kernel is losing.
-
----
-
-### 11.3 Triton
-
-Triton is a **Python-like language** for writing GPU kernels.
-
-It is valuable because it **shortens the edit-test-profile loop**.
-
-Use Triton when you need:
-
-- fast prototyping
-- parameterized kernels
-- autotuning
-- Python-native iteration
-- easier agent-generated variants
-- compact expression of tile-level math
-
-Triton is often a good first implementation path for:
-
-- elementwise fusion
-- reductions
-- small GEMM-like kernels
-- custom attention prototypes
-- shape-specialized kernels
-
-Why agents like Triton:
-
-```text
-less boilerplate than CUDA
-Python syntax
-shorter kernels
-faster mutation loop
-easier benchmark automation
-```
-
-Where Triton can struggle:
-
-- extremely irregular sparse access
-- full control over warp-level primitives
-- newest NVIDIA architecture features before compiler support catches up
-- complex Tensor Core scheduling
-- cases where generated code choices are opaque
-
-Triton is **not "slower CUDA."**
-
-It is a **different abstraction boundary**.
-
-For agentic kernel search, a practical path is:
-
-```text
-Triton prototype
-  -> find algorithm and tiling idea
-  -> benchmark shapes
-  -> port hot winner to CUDA or CuTe if deeper control is needed
-```
-
----
-
-### 11.4 TileLang
-
-TileLang is a **tile-oriented DSL** for writing high-performance AI kernels.
-
-The key abstraction is that you describe computation **in terms of tiles**, rather than manually managing every thread-level operation.
-
-This is useful because AI kernels usually have tiled structure:
-
-- matrix multiplication
-- attention blocks
-- reductions
-- normalization
-- block sparse compute
-- fused epilogues
-
-Use TileLang when you want:
-
-- a higher-level tiled programming model
-- composable kernel descriptions
-- faster search over tile sizes and schedules
-- kernels that are easier for agents to mutate than low-level CUDA
-
-The mental model:
-
-```text
-CUDA:
-  think threads, warps, shared memory, synchronization
-
-TileLang:
-  think tiles, loops over tiles, memory scopes, schedule choices
-```
-
-Why this matters for the contest:
-
-```text
-agent-generated kernels benefit from abstractions
-that reduce the number of ways to write invalid code
-```
-
-TileLang can be a better target for automated exploration because the search space is closer to the math.
-
-But you **still need profiling**.
-
-A tile abstraction can **hide**:
-
-- bad memory layout
-- excessive register use
-- poor generated code
-- compiler limitations
-- shape-specific scheduling failures
-
-Use TileLang as a rapid kernel-generation layer, then validate with FlashInfer-Bench and Nsight.
-
----
-
-### 11.5 CuTe DSL
-
-CuTe DSL is NVIDIA's **Python DSL around CUTLASS/CuTe** concepts.
-
-CuTe is fundamentally about **tensor layouts and tiled tensor algebra**.
-
-This matters because many high-performance kernels are layout problems.
-
-A good kernel is not only:
-
-```text
-do the right math
-```
-
-It is:
-
-```text
-map the math to hardware-friendly tiled layouts
-```
-
-CuTe-style thinking emphasizes:
-
-- layout composition
-- tile shapes
-- memory hierarchy
-- tensor views
-- copy atoms
-- MMA atoms
-- pipeline stages
-- warp and warpgroup organization
-
-Use CuTe DSL when:
-
-- the kernel is GEMM-like
-- Tensor Core utilization is central
-- layouts are complex
-- you need CUTLASS-grade abstractions without raw C++ template pain
-- you care about SM90/SM100-style features and structured tiling
-
-Cost:
-
-- steep learning curve
-- layout algebra is unforgiving
-- compiler/runtime stack maturity matters
-- debugging requires understanding generated lower-level behavior
-
-Why it matters for Blackwell:
-
-```text
-Blackwell optimization is heavily about feeding tensor cores
-and moving data through the memory hierarchy correctly.
-```
-
-CuTe DSL gives you a way to express that **more directly than Triton** in some cases, while staying **higher level than hand-written CUDA**.
-
-For contest work, CuTe DSL is most relevant to Track A FP8 MoE and any GEMM-like subproblem.
-
----
-
-### 11.6 cuTile
-
-cuTile is NVIDIA's **Python implementation of the CUDA Tile** programming model.
-
-The official docs describe cuTile as a Python-based DSL where kernels operate on tiles, using functions such as:
-
-- `ct.load`
-- `ct.store`
-- tile arithmetic
-- reductions
-- matrix multiply
-- `ct.launch`
-
-Important distinction:
-
-```text
-arrays:
-  global-memory objects passed from host
-
-tiles:
-  immutable kernel-local tensor-like values with compile-time shapes
-```
-
-This is a **major abstraction shift**.
-
-Instead of writing:
-
-```text
-thread i loads element i
-```
-
-you write:
-
-```text
-load this tile
-operate on this tile
-store this tile
-```
-
-Why cuTile matters:
-
-- it targets NVIDIA's tile programming model
-- it aims to expose hardware features through tile abstractions
-- it can be easier to modify than deep CUDA/CUTLASS templates
-- it is aligned with agent-assisted kernel translation work
-
-This connects directly to **Lecture 01**, where cuTile Python to cuTile.jl translation was used as a concrete Agent Skills example.
-
-For the MLSys contest:
-
-```text
-cuTile may be useful when you want tile-level expression
-without writing full CUDA boilerplate.
-```
-
-But treat it as a young, hardware-sensitive toolchain.
-
-Validate:
-
-- supported GPU architecture
-- CUDA Toolkit version
-- generated kernel performance
-- limitations for your target op
-- debugging workflow
-
----
-
-### 11.7 OpenEvolve
-
-OpenEvolve is **not a GPU kernel language**.
-
-It is an **evolutionary coding agent framework**.
-
-Its role in this contest is **search**.
-
-A normal kernel workflow:
-
-```text
-human writes variant
-human benchmarks variant
-human reads result
-human writes next variant
-```
-
-An OpenEvolve-style workflow:
-
-```text
-population of candidate kernels
-  -> correctness filter
-  -> benchmark score
-  -> select winners
-  -> mutate/crossover/generate new candidates
-  -> repeat
-```
-
-Why this fits GPU kernels:
-
-- performance landscapes are rugged
-- small code changes can produce large speed changes
-- many variants fail correctness
-- many optimizations are shape-specific
-- humans cannot manually explore the full schedule space
-
-What OpenEvolve needs to be useful:
-
-- deterministic benchmark command
-- fast correctness check
-- objective score
-- saved artifacts
-- mutation boundaries
-- timeout policy
-- rollback policy
-- result database
-
-For kernel optimization, the fitness function should not be just:
-
-```text
-fastest one run
-```
-
-It should include:
-
-- correctness
-- median latency
-- variance
-- shape coverage
-- compile success
-- code size or complexity
-- no forbidden APIs
-- no benchmark cheating
-
-This is where the contest's agent-generated-kernel track becomes serious.
-
-The best agent is **not the one that writes the prettiest CUDA**.
-
-It is the one that can run a **disciplined generate-test-profile-select loop**.
-
----
-
-### 11.8 Modal
-
-Modal is a **serverless cloud platform** for running compute-intensive workloads.
-
-In this contest context, Modal is useful for **iteration and reference execution**.
-
-Use Modal for:
-
-- repeatable containerized benchmark runs
-- GPU access without owning hardware
-- quick starter-kit experiments
-- parallel search jobs
-- artifact collection
-- CI-like evaluation pipelines
-
-But the contest page explicitly warns that Modal scores are reference-only because GPU clocks cannot be locked.
-
-That means:
-
-```text
-Modal is good for iteration.
-Bare metal is required for official performance claims.
-```
-
-Good Modal workflow:
-
-```text
-1. package benchmark container
-2. run correctness tests
-3. run rough performance screen
-4. collect logs and artifacts
-5. promote promising candidates to bare-metal validation
-```
-
-Do **not overfit to Modal timing noise**.
-
-Use it to reduce the number of bad candidates, **not to prove final speed**.
-
----
-
-### 11.9 Blackwell B200
-
-Blackwell B200 is the **target hardware**.
-
-That determines **what optimizations matter**.
-
-Official NVIDIA docs identify B200 as compute capability 10.0 in the Blackwell tuning guide and describe the architecture as targeting generative AI and accelerated computing.
-
-The practical B200 concerns for this contest:
-
-- FP8 and lower-precision Tensor Core paths
-- high HBM bandwidth
-- large memory capacity
-- Blackwell-specific scheduling behavior
-- architecture-specific compiler lowering
-- Tensor Core feeding and pipeline design
-- shared-memory/L1 behavior
-- register pressure and occupancy balance
-- support for newer CUDA features
-
-Do **not assume Hopper instincts transfer perfectly**.
-
-Questions to ask on B200:
-
-```text
-Does this kernel use the right dtype path?
-Does it keep Tensor Cores busy?
-Is it memory bandwidth bound?
-Is shared memory helping or hurting?
-Is register pressure limiting occupancy?
-Does the compiler generate Blackwell-appropriate instructions?
-Does performance change across B200 vs H100?
-```
-
-For Track A, Blackwell matters because FP8 MoE wants strong Tensor Core utilization and efficient scale handling.
-
-For Track B, Blackwell matters because sparse attention may be memory and metadata bound.
-
-For Track C, Blackwell matters because recurrent-state kernels may stress different latency and memory paths than dense attention.
-
-The key lesson:
-
-```text
-hardware generation is part of the algorithm.
-```
-
-An inference kernel is **not just math**. It is **math mapped onto a specific machine**.
-
----
-
-### 11.10 Tool selection matrix
-
-Use this matrix as a starting point.
-
-| Need | Best first tool | Why |
-|---|---|---|
-| Understand contest baseline | FlashInfer | It defines the reference runtime and benchmark target |
-| Maximum low-level control | CUDA | Explicit control over threads, memory, and synchronization |
-| Fast prototype and autotune | Triton | Shorter Python-like kernels and fast iteration |
-| Tiled AI kernel exploration | TileLang | Tile-level abstraction for AI workloads |
-| Tensor Core / layout-heavy GEMM-like work | CuTe DSL | Strong layout and tiled tensor abstractions |
-| Pythonic CUDA Tile experiments | cuTile | Tile IR-oriented Python DSL for NVIDIA GPUs |
-| Automated variant search | OpenEvolve | Evolutionary loop around code generation and benchmark scores |
-| Cloud iteration | Modal | Convenient GPU jobs and artifact collection |
-| Final performance claim | Bare-metal B200 | Official target with controlled clocks and reproducibility |
-
-The strongest workflow combines tools:
-
-```text
-FlashInfer-Bench:
-  tells you whether you are winning
-
-Triton / TileLang / cuTile:
-  help explore algorithmic variants quickly
-
-CUDA / CuTe DSL:
-  help turn the winning idea into a hardware-tuned kernel
-
-OpenEvolve:
-  scales search over variants
-
-Modal:
-  scales early experimentation
-
-Bare-metal B200:
-  validates the final result
-```
-
----
-
-## 12. Agentic kernel optimization workflow
-
-A useful AI-assisted workflow:
-
-```text
-human:
-  defines benchmark target and constraints
-
-agent:
-  reads spec and prior results
-  proposes variants
-  edits one kernel at a time
-  runs correctness tests
-  runs benchmark
-  records deltas
-  rejects bad variants
-
-human:
-  reviews profiling evidence
-  adjusts search direction
-```
-
-Required guardrails:
-
-- deterministic benchmark scripts
-- strict correctness tests
-- one-variant-at-a-time discipline
-- no silent benchmark cherry-picking
-- raw results stored
-- code diffs reviewed
-- shape coverage maintained
-
-This is where **agent skills matter**.
-
-A good kernel-optimization skill should encode:
-
-- profiling checklist
-- common CUDA failure modes
-- benchmark protocol
-- correctness rules
-- allowed search space
-- reporting template
-
-Then use Lecture 22's skill eval pattern to test whether the skill improves kernel work.
-
----
-
-## 13. What to learn before competing
-
-Core prerequisites:
-
-```text
-GPU architecture:
-  SMs, warps, occupancy, memory hierarchy, Tensor Cores
-
-CUDA programming:
-  blocks, threads, shared memory, synchronization, vectorized loads
-
-LLM inference:
-  prefill, decode, KV cache, paged attention, MoE routing
-
-Numerics:
-  FP8 formats, block scaling, accumulation, error tolerances
-
-Profiling:
-  Nsight Systems, Nsight Compute, benchmark discipline
-
-Runtime systems:
-  FlashInfer, vLLM, TensorRT-LLM concepts
-
-Agent workflows:
-  reproducible code generation, patching, test loops
-```
-
-If you lack these, start with a smaller kernel:
-
-- vector add
-- layernorm
-- small GEMM
-- attention score kernel
-- top-k indexer
-
-Then move toward the contest kernels.
-
----
-
-## 14. Career signal
-
-The contest points toward roles such as:
-
-- AI runtime engineer
-- GPU kernel engineer
-- inference infrastructure engineer
-- GPU compiler engineer
-- accelerator software engineer
-- AI systems researcher
-- autonomous optimization systems engineer
-
-These roles sit between:
-
-```text
-model architecture
-hardware architecture
-compiler/runtime software
-production inference serving
-```
-
-They are rarer than AI application roles because they require:
-
-- low-level performance instincts
-- ML workload knowledge
-- systems debugging
-- mathematical numerics
-- hardware awareness
-- benchmark integrity
-
-If you want to move from AI application work into AI systems work, this contest is a **strong practice target**.
-
----
-
-## 15. How this maps to this roadmap
-
-Relevant earlier lectures:
-
-- Lecture 06: LLM internals and inference mechanics
-- Lecture 01: agent skills for GPU kernel translation
-- Lecture 02: FP8 KV-cache and attention quantization
-- Lecture 03: TraceLens and trace-driven performance analysis
-- Lecture 04: AutoSP and compiler-generated sequence parallelism
-- Lecture 05: small MoE reasoning model deployment tradeoffs
-- Lecture 18: durable agent harnesses for tool-oriented long-running work
-
-The contest combines all of them:
-
-```text
-kernel optimization:
-  low-level GPU work
-
-LLM inference:
-  real model bottlenecks
-
-agent generation:
-  automated search and code synthesis
-
-benchmarking:
-  correctness and performance evidence
-
-runtime thinking:
-  kernels as part of the serving stack
-```
-
-This is a **bridge from agent engineering to AI hardware/software co-design**.
-
----
-
-## Mini-lab: build a contest preparation plan
-
-Pick one track:
-
-```text
-Track A: FP8 MoE
-Track B: Sparse Attention
-Track C: Gated Delta Net
-```
-
-Write a preparation plan:
-
-```text
-Track:
-Target kernel:
-Hardware:
-Baseline:
-Correctness tests:
-Benchmark command:
-Profiler:
-First bottleneck hypothesis:
-First three variants:
-Expected risk:
-Acceptance threshold:
-Writeup evidence:
-Agent role:
-Human review points:
-```
-
-Then write a one-week schedule:
-
-```text
-Day 1:
-  reproduce starter kit
-
-Day 2:
-  understand baseline and shapes
-
-Day 3:
-  profile bottleneck
-
-Day 4:
-  implement first variant
-
-Day 5:
-  benchmark and reject/keep
-
-Day 6:
-  agent-assisted search
-
-Day 7:
-  write results and next plan
-```
-
-The goal is **not to win immediately**.
-
-The goal is to build a **disciplined kernel optimization loop**.
+Deliverable: a `{baseline, ngram, EAGLE-3}` × `{τ, tokens/s, TPOT, $/Mtok, outputs-identical?}` table across two workloads, plus a paragraph on why τ moved and how much `$/Mtok` the *lossless* speedup bought. "Lossless cost reduction" is the most defensible win an MLSys engineer can put in a review — this lab produces one.
 
 ---
 
 ## Key takeaways
 
-- The MLSys 2026 FlashInfer contest is about real LLM inference kernels on NVIDIA Blackwell B200 GPUs.
-- The tracks target high-value inference bottlenecks: FP8 MoE, sparse attention, and Gated Delta Net.
-- MoE optimization is a routing, memory-layout, Tensor Core, and fusion problem.
-- Sparse attention trades dense compute for indexing and irregular memory access.
-- Gated Delta Net points toward non-standard transformer alternatives and recurrent-state inference.
-- FlashInfer-Bench emphasizes correctness, speed, and win rate against strong baselines.
-- CUDA gives maximum control; Triton, TileLang, CuTe DSL, and cuTile trade some control for faster iteration and higher-level tiled abstractions.
-- OpenEvolve-style agents are useful when correctness and benchmark scripts define a reliable evolutionary search loop.
-- Modal is useful for iteration, but final claims need controlled bare-metal B200 measurement.
-- Blackwell B200 changes the optimization target; do not assume Hopper-tuned kernels transfer unchanged.
-- Agent-generated kernels must be reproducible, not just fast once.
-- Serious kernel work requires hypothesis-driven profiling and benchmark integrity.
-- This contest is a strong career signal for AI runtime, GPU compiler, and inference infrastructure engineering.
+- Decode is **memory-bound**: each token streams all weights/KV from HBM. **Verifying K candidates costs ~one pass**, so speculative decoding emits more tokens per memory pass — **losslessly** (provably identical output).
+- The governing metric is **acceptance length τ**: methods win by raising τ (better drafts) or lowering draft cost. Report τ, not just wall-clock.
+- Lineage: **draft model → Medusa → Hydra → Sequoia → Lookahead → EAGLE-1/2/3**. Self-drafting beat separate drafts; trees beat chains; **EAGLE-3** (direct-token + "training-time test", ~3–6.5×) is the de-facto baseline.
+- **DFlash** drafts a **whole block in one pass** (block-diffusion), 2–3× over EAGLE-3, in vLLM speculators — the 2026 frontier draft.
+- **Flash kernels** make the verify/attention step cheap: **FlashAttention-3** (~75% H100 util, FP8), **FlashInfer** (serving attention engine, MLSys'25 best paper, in vLLM/SGLang), **Flash-Decoding** (long-context decode). Spec decode cuts *how many* passes; Flash kernels cut *cost per pass* — they multiply.
+- The **MiMo + TileRT** ~1000-tok/s result = architecture (sparse MoE) + MXFP4 + **DFlash** + **TileRT megakernel** stacked — the course's "layers compound" thesis, made concrete (vendor-reported, June 2026).
+- **Together AI** (via Tri Dao) anchors the whole layer — FlashAttention, Mamba, Medusa, Sequoia, MoA, the Together Inference Engine — research foundational, serving-engine numbers vendor-grade.
 
 ---
 
 ## References
 
-- MLSys 2026 FlashInfer AI Kernel Generation Contest: [https://github.com/flashinfer-ai/mlsys26-contest/blob/main/index.html](https://github.com/flashinfer-ai/mlsys26-contest/blob/main/index.html)
-- FlashInfer: [https://github.com/flashinfer-ai/flashinfer](https://github.com/flashinfer-ai/flashinfer)
-- FlashInfer-Bench: [https://bench.flashinfer.ai](https://bench.flashinfer.ai)
-- Starter kit: [https://github.com/flashinfer-ai/flashinfer-bench-starter-kit](https://github.com/flashinfer-ai/flashinfer-bench-starter-kit)
-- Agent baseline: [https://github.com/flashinfer-ai/mlsys26-agent-baseline](https://github.com/flashinfer-ai/mlsys26-agent-baseline)
-- FlashInfer documentation: [https://docs.flashinfer.ai](https://docs.flashinfer.ai)
-- CUDA C++ Programming Guide: [https://docs.nvidia.com/cuda/cuda-c-programming-guide/](https://docs.nvidia.com/cuda/cuda-c-programming-guide/)
-- NVIDIA Blackwell Tuning Guide: [https://docs.nvidia.com/cuda/blackwell-tuning-guide/](https://docs.nvidia.com/cuda/blackwell-tuning-guide/)
-- Triton documentation: [https://triton-lang.org/main/index.html](https://triton-lang.org/main/index.html)
-- OpenAI, "Introducing Triton": [https://openai.com/research/triton](https://openai.com/research/triton)
-- TileLang repository: [https://github.com/tile-ai/tilelang](https://github.com/tile-ai/tilelang)
-- CuTe DSL documentation: [https://docs.nvidia.com/cutlass/latest/media/docs/pythonDSL/cute_dsl.html](https://docs.nvidia.com/cutlass/latest/media/docs/pythonDSL/cute_dsl.html)
-- CUDA Tile and cuTile Python: [https://developer.nvidia.com/cuda/tile](https://developer.nvidia.com/cuda/tile)
-- cuTile Python documentation: [https://docs.nvidia.com/cuda/cutile-python](https://docs.nvidia.com/cuda/cutile-python)
-- OpenEvolve repository: [https://github.com/algorithmicsuperintelligence/openevolve](https://github.com/algorithmicsuperintelligence/openevolve)
-- Modal documentation: [https://modal.com/docs](https://modal.com/docs)
-- Lecture 01 - Agent Skills for GPU Kernel Translation: [Lecture 01](Lecture-01.md)
-- Lecture 02 - FP8 KV-Cache in vLLM: [Lecture 02](Lecture-02.md)
-- Lecture 03 - TraceLens: [Lecture 03](Lecture-03.md)
+- Li et al., "EAGLE-3," arXiv 2503.01840 · repo [https://github.com/SafeAILab/EAGLE](https://github.com/SafeAILab/EAGLE)
+- Cai et al., "Medusa," arXiv 2401.10774: [https://arxiv.org/abs/2401.10774](https://arxiv.org/abs/2401.10774)
+- Chen et al., "Sequoia," arXiv 2402.12374: [https://arxiv.org/abs/2402.12374](https://arxiv.org/abs/2402.12374)
+- "DFlash: Block Diffusion for Flash Speculative Decoding," arXiv 2602.06036 · vLLM speculators [https://docs.vllm.ai/projects/speculators/](https://docs.vllm.ai/projects/speculators/)
+- Shah et al., "FlashAttention-3," arXiv 2407.08608: [https://arxiv.org/abs/2407.08608](https://arxiv.org/abs/2407.08608)
+- FlashInfer (MLSys 2025 Best Paper): [https://github.com/flashinfer-ai/flashinfer](https://github.com/flashinfer-ai/flashinfer)
+- Flash-Decoding: [https://crfm.stanford.edu/2023/10/12/flashdecoding.html](https://crfm.stanford.edu/2023/10/12/flashdecoding.html)
+- Together AI, Mixture-of-Agents, arXiv 2406.04692: [https://arxiv.org/abs/2406.04692](https://arxiv.org/abs/2406.04692)
+- Xiaomi MiMo + TileRT 1000-tok/s announcement (vendor, Jun 2026): [https://github.com/tile-ai/TileRT](https://github.com/tile-ai/TileRT)
 
 ---
 
-*Next: [MLSys Deep Dives index](README.md)*
+## Current as of
+
+2026-06. Pins: EAGLE-3 (2025, de-facto baseline), DFlash (arXiv 2602.06036, in vLLM speculators), FlashAttention-3 (Jul 2024, Hopper), FlashInfer (MLSys 2025 best paper). **MiMo + TileRT ~1000–1200 tok/s (announced ~2026-06-08) and Together Inference Engine numbers are vendor-reported, not independently reproduced** — flagged in-text. vLLM `speculative_config` API evolves across releases; verify against your version.
+
+---
+
+*Next: [Lecture 07 — The edge & physical-AI frontier](Lecture-07.md)*

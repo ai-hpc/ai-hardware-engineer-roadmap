@@ -1,35 +1,12 @@
-# Lecture 05 - ZAYA1-8B: Small MoE Reasoning, AMD Training, and Test-Time Compute
+# Lecture 05 - The 2026 Frontier as Systems Artifacts: Qwen3, Nemotron Ultra, MiMo, DeepSeek, and MoE
 
-**Collection:** [MLSys Deep Dives](README.md) | **Previous:** [Lecture 04](Lecture-04.md) | **Next:** [Lecture 06](Lecture-06.md)
+**Collection:** [MLSys Deep Dives](README.md) | **Previous:** [← Lecture 04](Lecture-04.md) | **Next:** [Lecture 06](Lecture-06.md)
 
 ---
 
-**ZAYA1-8B** is interesting for this course for three reasons:
+A model card is a systems spec in disguise. By 2026, the headline parameter count tells you almost nothing about cost — a "235B" model might cost you 22B-worth of compute per token, hold 235B-worth of weights in VRAM, and demand an all-to-all every layer. The skill this lecture builds is **reading a frontier model the way an MLSys engineer reads it**: not "how smart is it" but "what shape is its cost, and what will it do to my GPUs."
 
-1. It is a small **mixture-of-experts** reasoning model with less than 1B active parameters.
-2. It was trained **end-to-end on an AMD MI300X stack**.
-3. Its strongest results depend on **model-harness co-design** through Markovian RSA test-time compute.
-
-It is also interesting for a fourth reason:
-
-```text
-The agentic benchmarks are not the headline strength.
-```
-
-That makes it a good **model-selection case study**.
-
-Do not read ZAYA1-8B as:
-
-```text
-small model beats everything
-```
-
-Read it as:
-
-```text
-a specialized small MoE can punch above its active-parameter count
-when architecture, training stack, post-training, and inference harness are co-designed
-```
+We read four of the 2026 frontier as systems artifacts — **Qwen3, Llama Nemotron Ultra 253B, Xiaomi MiMo, DeepSeek V3/R1** — through the one structure that now dominates above ~30B: **Mixture of Experts**, plus the efficiency tricks (MLA, MTP) that travel with it.
 
 ---
 
@@ -37,561 +14,173 @@ when architecture, training stack, post-training, and inference harness are co-d
 
 By the end of this lecture, you should be able to:
 
-1. Explain active parameters versus total parameters in an MoE model.
-2. Understand why a 760M-active-parameter model can still draw from 8B+ total parameters.
-3. Explain why AMD-trained frontier-style results matter for hardware ecosystem diversity.
-4. Describe Markovian RSA as a bounded-context test-time compute harness.
-5. Distinguish base benchmark scores from RSA-boosted scores.
-6. Identify why math/coding specialization does not imply strong tool use.
-7. Understand the deployment caveat around Zyphra's forked vLLM/Transformers support.
-8. Design a fair evaluation plan for using ZAYA1-8B in agent and coding workflows.
+1. Explain **MoE**: total vs active params, why it decouples capacity from compute, and what cost it shifts onto **memory and interconnect**.
+2. Read **Qwen3** (dense + MoE, unified thinking mode), **Nemotron Ultra 253B** (NAS-compressed dense), **MiMo** (MTP, small reasoning), and **DeepSeek V3/R1** (MoE + MLA + MTP + FP8) as systems specs.
+3. Identify the **canonical 2026 efficiency stack** and which model exemplifies each piece.
+4. Extract a model's **systems fingerprint** from its card: active params, KV behavior, routing, precision, draft mechanism, context.
+5. Predict a model's **cost shape** (prefill vs decode, memory- vs comm-bound, rough `$/Mtok`) from that fingerprint.
 
 ---
 
-## 1. What ZAYA1-8B is
+## 1. MoE: the structure that ate the frontier
 
-ZAYA1-8B is a **Zyphra mixture-of-experts** language model.
-
-According to Zyphra's Hugging Face model card:
+A dense model runs **every** parameter for **every** token. A **Mixture-of-Experts** model has many "expert" FFNs per layer and a **router** that sends each token to only a few of them. The consequence is the most important number in 2026 model serving:
 
 ```text
-total parameters: 8.4B
-active parameters: 760M
-license: Apache-2.0
-specialization: math, reasoning, coding
+   DENSE:  token → ALL weights run         compute/token ∝ total params
+   MoE:    token → router picks K of N experts → only K run
+           ┌─────────────────────────────────────────────────────────┐
+           │ TOTAL params  = capacity (must live in VRAM)              │
+           │ ACTIVE params = FLOPs per token  (≪ total)               │
+           └─────────────────────────────────────────────────────────┘
+   e.g.  Qwen3-235B-A22B  → 235B total / 22B active  (~10:1)
+         DeepSeek-V3      → 671B total / 37B active  (~18:1)
 ```
 
-The **active parameter count** is the key.
+This is why MoE dominates above ~30B (reportedly **>60% of 2025 open releases**, and essentially every model atop the intelligence leaderboards): you get the *quality* of a huge model at the *per-token compute* of a small one.
 
-In a dense model:
+But nothing is free — MoE **shifts the cost from FLOPs to memory and interconnect**:
 
 ```text
-every token uses every parameter
+   the bill MoE hands the systems engineer:
+   • MEMORY:      all experts must be resident → large aggregate VRAM (you hold 235B/671B of weights)
+   • INTERCONNECT: experts are scattered across GPUs (expert parallelism) → an ALL-TO-ALL
+                   token shuffle (dispatch + combine) on EVERY MoE layer, every forward pass
+   • LOAD BALANCE: hot experts create stragglers; routing must stay balanced
 ```
 
-In an MoE model:
-
-```text
-each token activates selected experts
-```
-
-So the **inference cost** can be closer to the active parameter count, while model capacity is distributed across a larger pool of total parameters.
-
-This is why ZAYA1-8B is framed as an **intelligence-density model**:
-
-```text
-maximize useful capability per active parameter and per FLOP
-```
-
-That is a **hardware-relevant design target**.
+So an MoE model is **memory- and comm-bound where a dense model is compute-bound**. Dense scaling pays in FLOPs; MoE scaling pays in VRAM and all-to-all bandwidth (NVLink/InfiniBand). Past ~30B, that trade wins — which is why the 2026 frontier is sparse, and why **expert parallelism** and fast all-to-all are core serving skills.
 
 ---
 
-## 2. Why AMD training matters
+## 2. Qwen3 — dense and MoE, with a thinking switch
 
-Zyphra says ZAYA1-8B was pretrained, midtrained, and supervised fine-tuned on an **AMD Instinct MI300 stack**.
+**Qwen3** (Alibaba, Apr 2025) ships as a *family*: dense (0.6B → 32B) and MoE — **Qwen3-30B-A3B** (30B/3B active) and the flagship **Qwen3-235B-A22B** (235B/22B active, **128 experts, 8 activated**), pretrained on ~**36T tokens**, 128K context.
 
-The published Zyphra post describes a cluster with:
+Two systems-relevant facts:
 
-- AMD Instinct MI300X GPUs
-- AMD Pensando Pollara interconnect
-- IBM-built custom training cluster
-- 1,024 MI300X nodes
-
-Why this matters:
-
-```text
-Most LLM infrastructure assumes NVIDIA CUDA first.
-```
-
-An AMD-trained model with strong published reasoning and coding results is evidence that serious model training is **not inherently locked to one vendor stack**.
-
-For a hardware engineer, the questions are:
-
-```text
-How mature is the ROCm software stack?
-How reliable is the collective communication path?
-How much custom infrastructure was required?
-What kernels and compiler paths were missing?
-What parts are reusable by other teams?
-```
-
-The existence of the model does **not prove AMD is automatically a drop-in replacement** for every training workload.
-
-It proves the **alternate path is technically viable** at this scale when the team invests across the stack.
+* **The MoE flagship serves at ~22B-active compute per token** but must hold 235B of weights across an expert-parallel deployment. So its *latency/compute* cost is roughly a 22B dense model's; its *memory/interconnect* cost is a 235B model's. That split is the whole MoE story made concrete.
+* **Unified thinking mode.** A *single* checkpoint toggles **Thinking vs Non-Thinking** via an `enable_thinking` flag or inline `/think` / `/no_think` tags, with a configurable **thinking budget**. There's no separate reasoning model. For the systems engineer this is a *runtime knob on token count*: thinking mode emits far more tokens (reasoning traces), so it trades latency and `$/request` for accuracy — at request time, per request. You schedule and price the two modes differently.
 
 ---
 
-## 3. Architecture signals
+## 3. Llama Nemotron Ultra 253B — architecture search to fit 8 GPUs
 
-Zyphra highlights several architecture choices:
+**Llama-3.1-Nemotron-Ultra-253B** (NVIDIA, Apr 2025) is the model behind "Nemotron Ultra," and it is a pure MLSys artifact: it was **derived from Meta's Llama-3.1-405B via Neural Architecture Search (NAS) + pruning/distillation**, with one explicit goal — **fit a 405B-quality model onto a single 8×H100 node**.
 
-- mixture of experts
-- Compressed Convolutional Attention
-- MLP-based expert router
-- learned residual scaling
-
-The course-level takeaway is not to memorize each mechanism.
-
-The takeaway is that ZAYA1-8B is **not just a small generic transformer**.
-
-It is an architecture built around:
+The NAS produced a **non-uniform, irregular** network (162 layers, non-repeating), using moves that are themselves a lecture in co-design:
 
 ```text
-low active compute
-strong routing
-attention efficiency
-stable depth behavior
-post-training for reasoning
+   skip-attention:   some blocks drop attention entirely (or replace it with one linear layer)
+   variable FFN:     different expansion ratios per block
+   FFN fusion:       where attention was skipped, consecutive FFNs are merged into fewer, wider FFNs
+   → 405B → 253B, engineered to land inside an 8×H100 memory/latency envelope
 ```
 
-This connects to earlier lectures:
-
-- Lecture 06: model mechanics
-- Lecture 02: memory and serving costs
-- Lecture 04: long-context training systems
-
-Small models that compete on reasoning usually require **systems co-design**.
-
-**Architecture alone is not enough.**
+It is **dense** (not MoE), 128K context, with a **reasoning toggle** via system prompt ("detailed thinking on/off"), emitting `<think>` traces when on. An FP8 variant cuts memory further. The systems lesson: **architecture search is a deployment tool** — you can NAS a model *to a hardware budget*, trading a hand-designed uniform stack for an irregular one that fits the GPUs you actually have. This is the same co-design philosophy as Lecture 4, applied to packing rather than to the KV cache.
 
 ---
 
-## 4. Benchmark claims: read carefully
+## 4. Xiaomi MiMo — small, reasoning, and built to be drafted
 
-Zyphra reports **strong performance** on math and coding benchmarks.
+**MiMo-7B** (Xiaomi, 2025) is the "MiMo" you've heard about, and it punches far above 7B on reasoning (its RL variant reportedly surpasses o1-mini on math/code). Two systems-relevant design choices:
 
-The Hugging Face model card reports in-class scores such as:
+* **Multi-Token Prediction (MTP) in pretraining.** MiMo is trained to predict *several* future tokens, not just the next one. This densifies the training signal **and** — the part that matters here — leaves the model with **built-in draft heads for speculative decoding** (Lecture 6). The architecture ships its own accelerator.
+* **Small and single-GPU.** At 7B it is cheap to serve and fits one GPU, the opposite end of the spectrum from the 235B/671B MoEs — and the reason it's a natural fit for edge/on-device (Lecture 7). There are also **MiMo-VL** (vision-language) and **MiMo-Audio** variants.
 
-```text
-AIME'26:          89.1
-HMMT Feb.'26:     71.6
-IMO-AnswerBench: 59.3
-APEX-shortlist:  32.2
-LiveCodeBench:   65.8
-GPQA-Diamond:    71.0
-MMLU-Pro:        74.2
-```
-
-It also reports **weaker relative agentic scores**:
-
-```text
-BFCL-v4: 39.22
-tau2:    43.12
-```
-
-Important caveat:
-
-```text
-Zyphra states the comparison numbers are run on Zyphra's evaluation harness.
-```
-
-That does not make them useless.
-
-It means you should treat them as **vendor-reported** until independently reproduced in your target environment.
-
-Good benchmark reading separates:
-
-```text
-source of numbers
-benchmark task
-inference budget
-base vs test-time compute
-active parameters
-total parameters
-deployment stack
-your actual use case
-```
+MiMo also sets up the course's payoff: the **MiMo-V2.5-Pro** line is what a 2026 throughput milestone was demonstrated on — a **1-trillion-parameter MoE pushed past ~1000 tokens/s** on a single 8-GPU node, by stacking MXFP4 quantization + **DFlash** speculative decoding + the **TileRT** megakernel runtime. We dissect that result in Lecture 6; note here that its *first ingredient is the architecture* (MTP-friendly, MoE), and the rest is the systems stack from Lectures 2–3 and 6.
 
 ---
 
-## 5. Base scores versus RSA-boosted scores
+## 5. DeepSeek V3 / R1 — the canonical efficiency stack
 
-ZAYA1-8B has two different kinds of results:
-
-```text
-base result:
-  one normal model run or standard evaluation configuration
-
-RSA-boosted result:
-  extra test-time compute using Markovian RSA
-```
-
-**Do not compare these casually.**
-
-An RSA-boosted score uses **more inference compute**.
-
-That compute may be acceptable for:
-
-- math contest problems
-- offline code repair
-- scientific reasoning
-- high-value planning
-- batch evaluation
-
-It may be unacceptable for:
-
-- low-latency chat
-- real-time agent loops
-- cheap background automation
-- tool-call-heavy workflows
-
-The correct question:
+**DeepSeek-V3** (Dec 2024) is the cleanest single example of "every 2026 efficiency trick at once," and worth memorizing as a template: **671B total / 37B active** MoE (**256 routed + 1 shared expert, 8 routed activated**), 14.8T tokens. Its four stacked techniques map directly onto this course:
 
 ```text
-What is the quality per dollar, per second, and per watt at the required latency?
+   MoE         671B/37B → compute of a 37B, capacity of a 671B            (this lecture, §1)
+   MLA         multi-head LATENT attention: cache a low-rank latent        (Lecture 4, §6)
+               instead of full per-head K/V → much smaller KV cache
+   MTP         multi-token prediction → denser signal + spec-decode draft  (this lecture §4, Lecture 6)
+   FP8         trained and largely served in FP8 → memory & throughput     (precision floor)
+   + auxiliary-loss-FREE load balancing (bias-based routing) → no aux-loss quality/throughput hit
 ```
 
-Not:
-
-```text
-Which single headline score is highest?
-```
+**R1** is the reasoning model built on the V3 base (RL for long chain-of-thought). The reason DeepSeek-V3 could be served at frontier quality for **~$0.14/Mtok** (Lecture 1) is precisely this stack: MoE cut the compute, MLA cut the KV memory, MTP sped decode, FP8 cut the bytes. It is the worked example of model–systems co-design producing an order-of-magnitude cost result — the whole thesis of this course in one model card.
 
 ---
 
-## 6. Markovian RSA
+## 6. Reading a model card for its systems fingerprint
 
-Zyphra's **Markovian RSA** is a test-time compute method.
-
-It combines two ideas:
+Here is the reusable skill. Given any 2026 model card, extract **six fields** and you can predict its cost shape without running it:
 
 ```text
-parallel candidate reasoning traces
-recursive aggregation
+   ① total / active params  → compute/token (active) AND memory footprint (total)
+   ② attention type         → KV-cache behavior:  MHA/GQA = O(L) big · MLA = O(L) small · SSM/hybrid = O(1)
+   ③ routing                → dense (no all-to-all) vs MoE (#experts/#active → all-to-all cost)
+   ④ dominant precision     → BF16 / FP8 / FP4 / 4-bit → bytes per param, throughput
+   ⑤ draft mechanism        → MTP heads / EAGLE / none → decode-speed headroom (Lecture 6)
+   ⑥ context length         → KV scaling, prefill cost
+   ───────────────────────────────────────────────────────────────────────────────────
+   ⇒ COST SHAPE: prefill- vs decode-dominated, memory- vs compute- vs comm-bound, rough $/Mtok class
 ```
 
-with:
+Applied to the four models:
 
-```text
-fixed-duration reasoning chunks
-only tail context carried forward
-```
+| Model | ① total/active | ② attention/KV | ③ routing | ④ precision | ⑤ draft | ⑥ ctx | Cost shape |
+|---|---|---|---|---|---|---|---|
+| **Qwen3-235B-A22B** | 235B / 22B | GQA, O(L) | MoE 128/8 | BF16·FP8 | — | 128K | memory+comm-bound (MoE), 22B compute/tok |
+| **Nemotron Ultra 253B** | 253B dense | skip-attn (NAS) | dense | BF16·FP8 | — | 128K | compute-bound dense, NAS-fit to 8×H100 |
+| **MiMo-7B** | 7B dense | GQA, O(L) | dense | BF16 | **MTP** | 32K | small, single-GPU, decode-accelerable |
+| **DeepSeek-V3/R1** | 671B / 37B | **MLA**, O(L) small | MoE 256+1/8 | **FP8** | **MTP** | 128K | the full stack: cheap/tok despite 671B |
 
-The goal is to keep the **context window bounded** while allowing extended reasoning.
-
-Simplified flow:
-
-```text
-prompt
-  -> generate multiple reasoning traces in parallel
-  -> keep tail segments
-  -> build aggregation prompts from sampled references
-  -> generate next round
-  -> repeat
-```
-
-This is different from **one huge chain of thought**.
-
-The context **does not grow without bound**.
-
-That matters because long reasoning traces otherwise collide with context limits and memory costs.
-
-The critical Zyphra claim:
-
-```text
-ZAYA1-8B was trained to understand and respond to the Markovian RSA process.
-```
-
-They report that applying the same method to another small model produced **less uplift**.
-
-That is the key systems insight:
-
-```text
-The model and inference harness were co-designed.
-```
+That table *is* the lecture. An interviewer who asks "what would it cost to serve model X" is asking you to fill in this row and reason from it.
 
 ---
 
-## 7. Why this matters for agents
+## 7. Hands-on / Measure it
 
-Agent builders should **not treat ZAYA1-8B as a default general-purpose agent model**.
+1. **Fingerprint three models.** Pull the real cards for Qwen3-235B-A22B, DeepSeek-V3 (or R1), and one small/hybrid model (MiMo-7B or Falcon-H1). Fill the six-field fingerprint for each.
+2. **Predict the cost shape.** For each, state: prefill- or decode-dominated? memory-, compute-, or comm-bound? Then estimate the dominant resource — e.g. for the MoE, the aggregate VRAM to hold all experts and the all-to-all volume per layer; for the dense reasoning model, the FLOPs/token and the extra tokens "thinking" mode emits.
+3. **To dollars.** Using Lecture 1's cost model and a reasonable tokens/s for each (from a public benchmark — date it), put a rough `$/Mtok` band on each, and note which lever (MoE compute, MLA memory, MTP decode, FP8 bytes) is doing the most work.
 
-The benchmark profile says:
-
-```text
-strong:
-  math
-  code
-  long-form reasoning
-  science-style problem solving
-
-weaker:
-  tool calling
-  multi-step agent execution
-  strict complex instruction following
-  general chat style
-```
-
-That suggests a routing role:
-
-```text
-planner/general assistant:
-  use a stronger tool-calling model
-
-specialized math/coding sub-agent:
-  consider ZAYA1-8B
-
-expensive reasoning pass:
-  consider Markovian RSA if latency and cost allow
-```
-
-For OpenClaw-style systems, a realistic use is:
-
-```text
-Gateway routes:
-  math proof task -> ZAYA1-8B specialist
-  code puzzle -> ZAYA1-8B specialist
-  tool workflow -> tool-calling model
-  app SDK operation -> structured-tool model
-```
-
-This matches the principle from Lecture 09:
-
-```text
-use the right interface and model for the job
-```
+Deliverable: three filled fingerprints, three predicted cost shapes, and three `$/Mtok` bands with the dominant lever named. If your prediction disagrees with a published benchmark, explain the gap — that gap is usually a serving-stack detail (batching, expert parallelism) you didn't model, and finding it is the point.
 
 ---
 
-## 8. Deployment caveat
+## 8. Mini-lab
 
-ZAYA1-8B is **not currently a generic drop-in** for standard vLLM.
+Build a one-page **"systems fingerprint" cheat sheet** you'll reuse for the rest of your career: the six-field checklist from §6, with a worked example for each archetype — a dense model (Llama/Nemotron Ultra), an MoE (Qwen3/DeepSeek), a hybrid (Nemotron-H/Falcon-H1), and a small on-device model (MiMo). For each archetype, write the one sentence that predicts its cost shape. Test it on the *next* model release you see: fill the fingerprint from the card alone, predict the cost shape, then check against the first published benchmark.
 
-The Hugging Face model card recommends Zyphra's fork:
-
-```bash
-pip install "vllm @ git+https://github.com/Zyphra/vllm.git@zaya1"
-```
-
-For Transformers usage, it also recommends Zyphra's fork:
-
-```bash
-pip install "transformers @ git+https://github.com/Zyphra/transformers.git@zaya1"
-```
-
-Example vLLM serve command from the model card:
-
-```bash
-vllm serve Zyphra/ZAYA1-8B --port 8010 \
-  --mamba-cache-dtype float32 --dtype bfloat16 \
-  --reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser zaya_xml
-```
-
-This matters operationally.
-
-A model that requires a **forked runtime** has extra deployment risk:
-
-- upgrade lag
-- plugin compatibility issues
-- serving bugs
-- security patch delay
-- harder reproducibility
-- limited support in existing inference clusters
-
-That does not mean "do not use it."
-
-It means **benchmark the model and the runtime together**.
-
----
-
-## 9. Hardware engineer view
-
-ZAYA1-8B is useful for thinking about **model efficiency**.
-
-Key hardware questions:
-
-```text
-MoE routing:
-  Are experts balanced or do hot experts bottleneck?
-
-Active parameter count:
-  Does low active compute translate into lower latency on your hardware?
-
-Memory:
-  Are all experts resident in memory even if only a subset is active?
-
-Attention:
-  Does CCA require custom kernels or forked runtime support?
-
-Batching:
-  Does Markovian RSA parallel trace generation batch efficiently?
-
-Interconnect:
-  How does expert parallelism behave across GPUs?
-
-AMD stack:
-  Which parts rely on custom Zyphra infrastructure versus upstream ROCm?
-```
-
-The model is **small in active compute**.
-
-It is **not necessarily trivial to serve optimally**.
-
-MoE models often trade dense compute for **routing, memory residency, batching, and expert-placement complexity**.
-
----
-
-## 10. How to evaluate it for OpenClaw
-
-Do **not evaluate ZAYA1-8B with a generic chat benchmark** first.
-
-Evaluate the **role you would actually use it for**.
-
-Suggested task buckets:
-
-```text
-math:
-  contest-style reasoning
-  symbolic manipulation
-  proof sketching
-
-coding:
-  algorithmic coding
-  bug localization
-  test repair
-  code explanation
-
-agentic:
-  function calling
-  structured JSON calls
-  multi-step tool workflows
-  instruction following under constraints
-
-systems:
-  latency
-  throughput
-  memory footprint
-  runtime stability
-  forked vLLM maintenance burden
-```
-
-Run against at least one baseline:
-
-```text
-Qwen small reasoning model
-Gemma small model
-current OpenClaw default model
-larger hosted model for quality ceiling
-```
-
-Then decide:
-
-```text
-Use as specialist:
-Use as default:
-Avoid for:
-Need RSA for:
-Need stronger tool model for:
-```
-
----
-
-## 11. Evaluation checklist
-
-For any benchmark result, record:
-
-```text
-Model:
-Runtime:
-Commit or model revision:
-Base or RSA:
-RSA token budget:
-Hardware:
-Prompt set:
-Tool availability:
-Temperature:
-Latency:
-Cost:
-Pass rate:
-Failure examples:
-```
-
-For agent workflows, include:
-
-```text
-tool-call validity
-schema adherence
-idempotency behavior
-refusal/safety behavior
-recovery from tool errors
-final answer correctness
-```
-
-Use Lecture 22's skill eval approach if the model is meant to execute a skill.
-
-Use Lecture 03's trace approach if you are making performance claims.
-
----
-
-## Mini-lab: ZAYA1-8B routing decision
-
-Design a routing evaluation for an OpenClaw-like gateway.
-
-Compare:
-
-```text
-ZAYA1-8B
-current default agent model
-one stronger hosted reasoning model
-one stronger tool-calling model
-```
-
-Use four task groups:
-
-```text
-math reasoning
-coding/debugging
-structured tool use
-general assistant/chat
-```
-
-For each task group, report:
-
-```text
-quality
-latency
-cost
-tool-call validity
-failure modes
-whether RSA/test-time compute was used
-```
-
-Final decision:
-
-```text
-ZAYA1-8B should be routed to:
-ZAYA1-8B should not be routed to:
-RSA is justified when:
-RSA is too expensive when:
-Runtime blockers:
-```
+Deliverable: the cheat sheet + one "prediction vs reality" check on a fresh model card. Getting good at this — pricing a model from its card before anyone benchmarks it — is a senior MLSys signature skill.
 
 ---
 
 ## Key takeaways
 
-- ZAYA1-8B is best understood as a small active-parameter MoE reasoning specialist.
-- The headline strength is math and coding, not general agent execution.
-- Active parameter count and total parameter count are different deployment concepts.
-- AMD end-to-end training is strategically important for hardware ecosystem diversity.
-- Markovian RSA is a test-time compute harness that keeps reasoning context bounded.
-- Base scores and RSA-boosted scores represent different compute budgets.
-- Zyphra reports weak relative scores on agentic benchmarks such as BFCL-v4 and tau2 compared with stronger tool-use models.
-- The model currently requires Zyphra runtime forks for proper local deployment.
-- Use it as a routed specialist only after measuring quality, latency, runtime stability, and tool-call behavior on your real workload.
+- **MoE** decouples capacity (total params, in VRAM) from compute (active params, FLOPs/token) — the dominant >30B pattern. It **shifts cost from FLOPs to memory + all-to-all interconnect**: MoE is memory/comm-bound where dense is compute-bound.
+- **Qwen3** — dense + MoE (235B/22B, 128/8 experts), with a **unified thinking switch** that's a runtime knob on token count and cost.
+- **Nemotron Ultra 253B** — **NAS-compressed** from Llama-405B (skip-attention, FFN fusion) to **fit 8×H100**: architecture search as a deployment-to-budget tool.
+- **MiMo-7B** — small, reasoning, and **MTP-pretrained** so it ships built-in speculative-decode draft heads; the architecture behind a 1000-tok/s milestone (Lec 6).
+- **DeepSeek V3/R1** — the **canonical efficiency stack**: MoE (compute) + **MLA** (KV memory) + **MTP** (decode) + **FP8** (bytes) → frontier quality at ~$0.14/Mtok.
+- The reusable skill is the **six-field systems fingerprint** (total/active, attention/KV, routing, precision, draft, context) → predicted **cost shape**. Price a model from its card; that's the senior move.
 
 ---
 
 ## References
 
-- Zyphra, "ZAYA1-8B: Frontier intelligence density, trained on AMD": [https://www.zyphra.com/post/zaya1-8b](https://www.zyphra.com/post/zaya1-8b)
-- ZAYA1-8B Hugging Face model card: [https://huggingface.co/Zyphra/ZAYA1-8B](https://huggingface.co/Zyphra/ZAYA1-8B)
-- Firethering summary: [https://firethering.com/zaya1-8b-open-source-math-coding-model/](https://firethering.com/zaya1-8b-open-source-math-coding-model/)
-- Zyphra vLLM fork: [https://github.com/Zyphra/vllm](https://github.com/Zyphra/vllm)
-- Structured Tools Beat Computer Use — *AI Agent Development 2026 course*
-- Lecture 03 - TraceLens: [Lecture 03](Lecture-03.md)
-- Agent Skills Eval — *AI Agent Development 2026 course*
+- Qwen3 (Alibaba): [https://qwenlm.github.io/blog/qwen3/](https://qwenlm.github.io/blog/qwen3/)
+- Llama-3.1-Nemotron-Ultra-253B (NVIDIA): [https://huggingface.co/nvidia/Llama-3_1-Nemotron-Ultra-253B-v1](https://huggingface.co/nvidia/Llama-3_1-Nemotron-Ultra-253B-v1)
+- Xiaomi MiMo, arXiv 2505.07608: [https://arxiv.org/abs/2505.07608](https://arxiv.org/abs/2505.07608) · repo [https://github.com/XiaomiMiMo/MiMo](https://github.com/XiaomiMiMo/MiMo)
+- DeepSeek-V3, arXiv 2412.19437: [https://arxiv.org/abs/2412.19437](https://arxiv.org/abs/2412.19437)
+- Mixture-of-Experts infrastructure & expert parallelism overview: [https://www.digitalocean.com/community/tutorials/expert-parallelism-in-deep-learning](https://www.digitalocean.com/community/tutorials/expert-parallelism-in-deep-learning)
+- *MLSys Deep Dives* — [Lecture 04](Lecture-04.md) (MLA, hybrids) and [Lecture 06](Lecture-06.md) (MTP → speculative decoding).
+
 ---
 
-*Next: [Lecture 06](Lecture-06.md)*
+## Current as of
+
+2026-06. Pins: Qwen3 (Apr 2025, 235B-A22B / 30B-A3B, 128 experts/8), Nemotron-Ultra-253B (Apr 2025, NAS from Llama-3.1-405B, 8×H100), MiMo-7B (2025, MTP), DeepSeek-V3 (Dec 2024, 671B/37B, MLA+MTP+FP8). MoE-adoption stats (">60% of 2025 releases") are from an industry blog, illustrative not peer-reviewed. Later Qwen / Nemotron / MiMo releases may supersede these — re-pull the cards.
+
+---
+
+*Next: [Lecture 06 — Making decode fast](Lecture-06.md)*
