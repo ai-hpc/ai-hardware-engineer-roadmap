@@ -559,6 +559,13 @@ nav:
         - "04: AutoSP — Sequence Parallelism": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-04.md
         - "05: ZAYA1-8B — Small MoE Reasoning": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-05.md
         - "06: MLSys 2026 Kernel Contest": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-06.md
+      - "TVM Deep Dives":
+        - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/README.md
+        - "01: The TVM Stack & Compilation Flow": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/Lecture-01.md
+        - "02: TensorIR & the Schedule Space": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/Lecture-02.md
+        - "03: Auto-Tuning — AutoTVM → Ansor → MetaSchedule": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/Lecture-03.md
+        - "04: Relax — Dynamic Shapes, Fusion, BYOC": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/Lecture-04.md
+        - "05: Shipping It — Runtime, microTVM, MLC-LLM": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/Lecture-05.md
       - "AI Inference Engineer 2026":
         - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/README.md
         - "Refresh Log": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/REFRESH-LOG.md

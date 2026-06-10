@@ -767,6 +767,8 @@ Anchored on the most recent open-weights models and current runtime versions, wi
 
 - [**MLSys Deep Dives**](MLSys%20Deep%20Dives/README.md) — standalone inference- and kernel-leaning topics that pair with the course above: GPU kernel translation (cuTile), FP8 KV-cache in vLLM, trace-driven performance analysis (TraceLens), compiler-generated sequence parallelism (AutoSP), and small-MoE reasoning (ZAYA1-8B).
 
+- [**TVM Deep Dives**](TVM%20Deep%20Dives/README.md) — a 5-lecture senior-engineer course on the Apache TVM compiler stack: the compilation flow (Relax, TensorIR, the unified `IRModule`), hand-scheduling kernels, auto-tuning (AutoTVM → Ansor → MetaSchedule), Relax graph optimization (dynamic shapes, fusion, BYOC for custom accelerators), and shipping (runtime, microTVM, MLC-LLM). Compile a model to the metal, tune it, and beat the framework baseline — with the numbers to prove it.
+
 ---
 
 ## Edge MLSys Specialization
