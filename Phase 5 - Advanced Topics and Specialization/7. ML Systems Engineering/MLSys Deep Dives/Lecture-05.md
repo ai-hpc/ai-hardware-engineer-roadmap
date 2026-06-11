@@ -51,6 +51,21 @@ But nothing is free — MoE **shifts the cost from FLOPs to memory and interconn
 
 So an MoE model is **memory- and comm-bound where a dense model is compute-bound**. Dense scaling pays in FLOPs; MoE scaling pays in VRAM and all-to-all bandwidth (NVLink/InfiniBand). Past ~30B, that trade wins — which is why the 2026 frontier is sparse, and why **expert parallelism** and fast all-to-all are core serving skills.
 
+One subtlety decides *how* you serve MoE, and it is worth holding precisely — **expert memory traffic depends on batch size**:
+
+```text
+   batch 1:    each token touches only K experts → ~ACTIVE-param bytes stream per step
+               (DeepSeek-V3: ~37B of 671B) → the batch-1 bandwidth ceiling (Lec 1, §6)
+               looks like a 37B model's, not a 671B model's
+   big batch:  different tokens route to DIFFERENT experts → collectively most of the
+               N experts are touched every layer → traffic per step approaches TOTAL
+               params — but it is now shared across the whole batch → per-token cost collapses
+   the middle: enough tokens to touch most experts, too few to amortize them —
+               you stream most of 671B for a handful of tokens. the worst regime.
+```
+
+So MoE wants to be served at the extremes: **tiny batch** (cheap single stream — the latency-critical case) or **deep batch** (experts amortized — the throughput case), and the awkward middle is where naive deployments bleed money. This is why MoE serving pushes so hard on batch depth and expert parallelism, and why MoE rarely makes sense for small-batch edge deployment (Lecture 7's small dense/hybrid models own that regime). When you run Lecture 1's bandwidth-ceiling check on an MoE, use **active bytes at batch 1** and **total bytes near saturation** — quoting either one alone is how vendor decks mislead you.
+
 ---
 
 ## 2. Qwen3 — dense and MoE, with a thinking switch

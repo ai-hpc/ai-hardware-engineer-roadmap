@@ -47,7 +47,17 @@ Here is the key observation that unlocks everything: **verifying K candidate tok
    ⇒ OUTPUT IS PROVABLY IDENTICAL to normal target decoding (lossless)
 ```
 
-That last line is what makes speculative decoding special: it is a **free lunch in quality** — same distribution, more speed. The entire research race is about making the draft *cheaper and more accurate* (higher acceptance), so more of the K tokens survive verification.
+That last line is what makes speculative decoding special: it is a **free lunch in quality** — same distribution, more speed. "Provably identical" is a strong claim, so here is the proof's engine — the **acceptance rule** (modified rejection sampling), which every method in this lecture inherits:
+
+```text
+   for each drafted token x, with draft probability q(x) and target probability p(x):
+       accept x with probability  min(1, p(x) / q(x))
+       on the first rejection:    resample from  norm( max(0, p − q) )   and stop there
+   ⇒ the token that comes out — accepted or resampled — is distributed EXACTLY as p,
+     for ANY draft q. (greedy is the easy case: accept while draft matches target argmax.)
+```
+
+Walk the intuition: where the draft *over*-proposes a token (`q > p`), acceptance is thinned by `p/q`; where it *under*-proposes (`q < p`), the token is always accepted *and* the leftover probability mass (`p − q`) is exactly what the rejection-resample distribution restores. The two effects cancel to `p` precisely. The consequence an engineer cares about: **a bad draft costs you speed (low acceptance), never correctness** — which is why the entire research race is about making the draft *cheaper and more accurate* (higher acceptance), so more of the K tokens survive verification.
 
 ---
 
@@ -56,15 +66,17 @@ That last line is what makes speculative decoding special: it is a **free lunch 
 Before the lineage, fix the metric, because every method is measured by it. The verify step proposes a sequence (or tree) of candidate tokens; the target accepts the **longest valid prefix**. The average number accepted per step is the **acceptance length** τ.
 
 ```text
-   speedup  ≈  acceptance_length τ
-              ──────────────────────────────────   (roughly; bounded by draft + verify overhead)
-              1 + (draft cost relative to one step)
+   one verify cycle:  draft K tokens, verify once, keep τ on average
 
-   higher τ  →  more tokens per verify  →  more speedup
-   cheaper draft → less overhead per step
+                         τ                  c  =  draft cost per token
+   speedup   ≈      ─────────                     ─────────────────────
+                     1 + K·c                      target cost per step
+
+   τ = 4, K = 5, c = 0.05 (EAGLE-style head)  →  4 / 1.25  =  3.2×
+   τ = 4, K = 5, c = 0.5  (a chunky draft LM) →  4 / 3.5   =  1.14×   ← same τ, draft ate the win
 ```
 
-So a method wins by **raising τ** (better drafts → more accepted) or **lowering draft cost** (cheaper to produce the guesses). EAGLE-3 reports τ improvements that translate to ~3–6.5×; DFlash pushes τ higher still with block drafting. When you benchmark spec decode, **τ is the number you report** — it's the mechanism-level truth behind the wall-clock speedup.
+The two rows are the whole design space: **the same acceptance length is worth 3× or worth nothing depending on what the draft costs.** So a method wins by **raising τ** (better drafts → more accepted) or **lowering c** (cheaper to produce the guesses) — and the lineage in §3 is exactly the history of pushing both at once. EAGLE-3 reports τ improvements that translate to ~3–6.5×; DFlash pushes τ higher still with block drafting. When you benchmark spec decode, **τ is the number you report** — it's the mechanism-level truth behind the wall-clock speedup.
 
 ---
 

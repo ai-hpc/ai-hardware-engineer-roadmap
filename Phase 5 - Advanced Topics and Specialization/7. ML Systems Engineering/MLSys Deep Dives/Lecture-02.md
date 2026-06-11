@@ -43,7 +43,7 @@ Against that hardware, the scalar thread is the *wrong abstraction*. The natural
                       the compiler handles thread partitioning, shared memory,
                       data movement (TMA), and (often) the pipeline.
 
-   lineage:  CUDA C++ (2012) → Triton (2019) → CuTe (2023)
+   lineage:  CUDA C++ (2007) → Triton (2019 paper) → CuTe (2023)
                 → ThunderKittens (2024) → TileLang (Jan 2025) → cuTile (2025)
 ```
 
@@ -74,7 +74,7 @@ The trade is always the same: the more the compiler decides, the faster you ship
 
 ## 3. Triton — the mindshare leader
 
-**Triton** (OpenAI, public since 2021, MLIR-based since 2.0) is the tile language most people mean when they say "I wrote a kernel." You write a Python function decorated with `@triton.jit` that operates on **block-level tiles**; the compiler handles coalescing, shared memory, and intra-block scheduling.
+**Triton** (born as Philippe Tillet's 2019 MAPL paper; OpenAI-stewarded and public since 2021; MLIR-based since 2.0) is the tile language most people mean when they say "I wrote a kernel." You write a Python function decorated with `@triton.jit` that operates on **block-level tiles**; the compiler handles coalescing, shared memory, and intra-block scheduling.
 
 ```python
 import triton
@@ -91,7 +91,29 @@ def fused_add_relu(x_ptr, y_ptr, out_ptr, n, BLOCK: tl.constexpr):
     tl.store(out_ptr + offs, out, mask=mask)
 ```
 
-Note what you did *not* write: no thread indices, no `__shared__`, no `__syncthreads()`. You described a tile; Triton mapped it to threads. For matmul you'd use `tl.dot(a_tile, b_tile)`, which lowers to Tensor Cores. `@triton.autotune` sweeps block sizes, `num_warps`, and `num_stages` to pick a config.
+Note what you did *not* write: no thread indices, no `__shared__`, no `__syncthreads()`. You described a tile; Triton mapped it to threads.
+
+That elementwise kernel shows the model; the op that pays the bills is matmul, and it shows the tile thesis directly — the loop structure *is* the tiling diagram from §1:
+
+```python
+@triton.jit
+def matmul(a_ptr, b_ptr, c_ptr, M, N, K,
+           s_am, s_ak, s_bk, s_bn, s_cm, s_cn,
+           BM: tl.constexpr, BN: tl.constexpr, BK: tl.constexpr):
+    pid_m, pid_n = tl.program_id(0), tl.program_id(1)   # this instance owns tile (pid_m, pid_n) of C
+    rm = pid_m * BM + tl.arange(0, BM)                  # the BM rows of C this tile covers
+    rn = pid_n * BN + tl.arange(0, BN)                  # the BN cols
+    acc = tl.zeros((BM, BN), dtype=tl.float32)
+    for k in range(0, K, BK):                            # march down K, one BK-wide tile at a time
+        rk = k + tl.arange(0, BK)
+        a = tl.load(a_ptr + rm[:, None] * s_am + rk[None, :] * s_ak)   # (BM, BK) tile of A
+        b = tl.load(b_ptr + rk[:, None] * s_bk + rn[None, :] * s_bn)   # (BK, BN) tile of B
+        acc += tl.dot(a, b)                              # → Tensor Cores. the tile IS the instruction.
+    tl.store(c_ptr + rm[:, None] * s_cm + rn[None, :] * s_cn, acc)
+    # (boundary masks omitted for clarity — production kernels mask the edge tiles)
+```
+
+Read the division of labor: **you** chose the tile shape (`BM × BN × BK`) and the dataflow (accumulate over K); **Triton** chose the thread layout, staged the tiles through shared memory, and software-pipelined the loop (`num_stages` deep) so tile *k+1* loads while tile *k* multiplies. That pipeline is exactly the TMA/warp-specialization pattern from §1 — you just never had to write it. `@triton.autotune` then sweeps `BM/BN/BK`, `num_warps`, and `num_stages` per shape to pick the config.
 
 Why Triton leads mindshare, concretely:
 

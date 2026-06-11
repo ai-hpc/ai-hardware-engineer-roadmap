@@ -61,6 +61,18 @@ Note where the headline number lands and where the *real* constraint is:
 * The binding constraint for LLM decode is **not** the TOPS — it's the **273 GB/s memory bandwidth**. Compare that to a datacenter GPU's **multiple TB/s of HBM**: the edge has ~10–30× less bandwidth. Since decode is memory-bound (Lecture 1, 6), **the edge is even more bandwidth-starved than the datacenter** — which makes quantization, hybrid architectures, and speculative decoding *more* important here, not less.
 * **128 GB of unified memory** is generous (it's a robot's whole brain), but **75–130 W** is the hard wall. You are power-capped, full stop.
 
+Run Lecture 1's **bandwidth-ceiling check** on this box and the whole edge story falls out of three lines of arithmetic:
+
+```text
+   batch-1 decode ceiling on Thor (273 GB/s):
+       7B  @ FP16  ≈ ~14  GB weights   →   273 / 14    ≈  ~19 tok/s
+       7B  @ INT4  ≈ ~3.5 GB weights   →   273 / 3.5   ≈  ~78 tok/s
+       70B @ INT4  ≈ ~35  GB weights   →   273 / 35    ≈   ~8 tok/s
+   add speculative decoding at τ ≈ 3 (Lec 6) → the 7B-INT4 box clears ~200 tok/s in theory
+```
+
+Notice what *didn't* appear in that math: the 2070-TOPS headline. Bandwidth and bytes decided everything — which is the concrete proof of the bullet above, and of why on the edge **quantization is not a nice-to-have, it is the difference between a usable robot and a 19-tok/s one.**
+
 The competitive set (DRIVE Thor, Qualcomm Snapdragon Ride Flex) lives in the same **1000–2000 TOPS, sub-130 W** band, targeting centralized automotive/robotics compute. This is the hardware where a reasoning model has to run *inside a power budget*, in real time, next to sensors.
 
 ---

@@ -157,13 +157,37 @@ The hardware cost (`$20/hr`) never changed. Every drop came from the **denominat
 
 > **One caveat to keep you honest:** aggregate tokens/s depends on batch size, and batching trades against TPOT. The cost model above is only valid *at a fixed interactivity SLO*. Always quote `$/Mtok` together with the TPOT it was measured at — a cheap token nobody will wait for is not cheap, it is unsold.
 
+### Predicting the denominator: the bandwidth ceiling
+
+The cost model *measures* tokens/s; you should also be able to **predict** it before touching a GPU. Because decode is memory-bound (§3), every generated token must stream the model's weights (plus its KV slice) from HBM once — so bandwidth divided by bytes is a hard ceiling:
+
+```text
+   batch-1 decode ceiling:   tokens/s  ≤  HBM bandwidth  /  bytes streamed per token
+                                          (weights touched + KV read for that token)
+```
+
+Worked example — a 70B-class dense model in FP16 (~140 GB of weights) on one H100 SXM (3.35 TB/s):
+
+```text
+   3350 GB/s ÷ 140 GB  ≈  24 tokens/s    ← the ceiling, batch 1, before any cleverness
+```
+
+Now read the whole course against that one formula. Every major technique is an attack on one of its two terms:
+
+* **Quantize FP16 → INT4** → ~140 GB becomes ~35 GB → ceiling ~96 tok/s. *Fewer bytes per token.* (Lecture 7)
+* **Batch 32 requests** → the same weight stream is shared by 32 tokens → aggregate ceiling ~32× higher (each request still pays its own KV reads). *More tokens per byte.* This is why batching is the biggest TOK/$ lever — and why the KV cache, which caps batch depth, matters so much. (Lecture 4)
+* **Speculative decoding at acceptance τ ≈ 3** → ~3 tokens emitted per pass over the weights → ~3×. (Lecture 6)
+* **MoE 671B-total / 37B-active** → only ~37B of weights stream per token at small batch → a 671B model with a 37B-sized ceiling. (Lecture 5)
+
+The formula is also your first line of defense in a design review: if a quoted tokens/s claim sits *above* the bandwidth ceiling for the stated model, precision, and batch size, something unstated is doing the work — batching, speculation, sparsity — and now you know exactly which questions to ask.
+
 ---
 
 ## 7. Mini-lab: place the field on the equation
 
 A two-part exercise that sets up the whole course.
 
-1. **The cost model.** Take a real model + runtime you can run (or a published benchmark). Measure or read its aggregate tokens/s at a fixed TPOT, and compute `$/Mtok` with §6. Record TTFT, TPOT, tokens/s, TOK/$, and `$/Mtok` as your baseline row — you will add rungs to this table in every later lecture.
+1. **The cost model.** Take a real model + runtime you can run (or a published benchmark). Measure or read its aggregate tokens/s at a fixed TPOT, and compute `$/Mtok` with §6. Also compute the **bandwidth ceiling** for your model + precision + GPU and report measured tokens/s as a **% of ceiling** — that one ratio tells you how much headroom the rest of this course can still claim. Record TTFT, TPOT, tokens/s, TOK/$, `$/Mtok`, and %-of-ceiling as your baseline row — you will add rungs to this table in every later lecture.
 2. **The map.** Write the §2 equation at the top of a page. Under the denominator, list the seven lecture topics of this course and, for each, one sentence on *how* it grows tokens/s. If you cannot write the sentence yet, that lecture is where you'll learn it — but the slot on the equation should be obvious even now.
 
 Deliverable: one baseline cost-model row, and the annotated equation. Keep both; the course is, in a sense, the exercise of filling in that page.
@@ -176,6 +200,7 @@ Deliverable: one baseline cost-model row, and the annotated equation. Keep both;
 - The governing equation: **price/token = (energy + capital) / tokens-per-second**. Hardware sets the numerator; **MLSys grows the denominator**, and that is the whole job.
 - Metrics split into **user-facing** (TTFT, TPOT, tokens/s, p99) and **operator-facing** (TOK/$, TCO/Mtok, perf/watt). The target is the **SLO frontier**: max throughput subject to latency bounds — never a single number.
 - **Prefill is compute-bound; decode is memory-bound.** Most acceleration targets decode, because that is where long-generation time and cost live.
+- The **bandwidth ceiling** — `tokens/s ≤ HBM bandwidth ÷ bytes streamed per token` — predicts batch-1 decode speed from a datasheet. Quantization shrinks the bytes; batching shares them; speculation emits more tokens per stream; MoE streams only active experts. The whole course is an attack on that one ratio.
 - Read perf/$ benchmarks (SemiAnalysis InferenceMAX/InferenceX) by **TCO/Mtok**, and treat any printed throughput as a dated teaching anchor, not deployment truth.
 - Once capability commoditizes, **cost-to-serve is the differentiator** — so every systems win is immediate, compounding economic value. That is why MLSys is the product.
 

@@ -62,7 +62,16 @@ for x_t in sequence:
 # memory is O(d_state), INDEPENDENT of sequence length
 ```
 
-The problem with classic SSMs was that `A, B, C` were **fixed** (input-invariant), so the model couldn't selectively remember or forget based on *content* — fatal for language. **Mamba** (Albert Gu & Tri Dao, Dec 2023) fixed this with the **selection mechanism**: make `Δ, B, C` **functions of the input** `x_t`, so the model decides, per token, what to keep and what to drop. That single change made SSMs competitive with transformers on language while keeping the systems win:
+The problem with classic SSMs was that `A, B, C` were **fixed** (input-invariant), so the model couldn't selectively remember or forget based on *content* — fatal for language. **Mamba** (Albert Gu & Tri Dao, Dec 2023) fixed this with the **selection mechanism**: make `Δ, B, C` **functions of the input** `x_t`, so the model decides, per token, what to keep and what to drop.
+
+`Δ` (the **step size**) is the parameter that makes this click, and it deserves a beat of explanation. The SSM is defined in continuous time; `Δ_t` is how big a "time step" this token represents when the recurrence is **discretized** (`Ā = exp(Δ_t·A)`, `B̄ ≈ Δ_t·B`). Making it input-dependent turns it into a learned, per-token **remember-vs-skip gate**:
+
+```text
+   Δ_t → 0      Ā → I       state coasts through unchanged  →  token is IGNORED
+   Δ_t large    Ā → 0       state resets toward this token   →  token OVERWRITES memory
+```
+
+That is the SSM's answer to attention's "attend or don't" — except the decision compresses into a fixed-size state instead of growing a cache. That single change made SSMs competitive with transformers on language while keeping the systems win:
 
 ```text
    attention:  O(L²) compute,  O(L) memory (growing KV cache)
@@ -175,9 +184,16 @@ for L in (4_000, 32_000, 128_000):
 for L in (4_000, 32_000, 128_000):
     gb = kv_cache_gb(layers=10, kv_heads=8, head_dim=128, seq_len=L, batch=1)  # ~10 attn layers
     print(f"hybrid ctx={L:>7}: {gb:6.1f} GB KV   (SSM layers add a flat, tiny state)")
+
+# and "flat, tiny" deserves a number — the SSM state, fixed regardless of context:
+def ssm_state_gb(layers, heads, head_dim, d_state, batch, dtype_bytes=2):
+    return layers * heads * head_dim * d_state * batch * dtype_bytes / 1e9
+
+gb = ssm_state_gb(layers=64, heads=64, head_dim=64, d_state=128, batch=1)  # Mamba-2-ish 7B
+print(f"SSM 'cache': {gb:.3f} GB  — at 1K context, at 128K, and at 1M. it does not move.")
 ```
 
-The dense column climbs into tens of GB; the hybrid column is a fraction of it, and the SSM layers add a constant that doesn't move with `L`. Then take the freed memory and compute how much **deeper you can batch**, and what that does to aggregate tokens/s and `$/Mtok` (Lecture 1, §6). That chain — KV bytes → batch depth → tokens/s → dollars — is the deliverable.
+The dense column climbs into tens of GB (the 70B-class row hits ~42 GB at 128K); the hybrid column is a fraction of it; and the SSM state prints **~0.07 GB** — the entire "cache" of a 7B-class Mamba-2 is smaller than one layer's worth of dense KV, and it is identical at 1K and at 1M tokens. For calibration, a dense 7B-class transformer (32 layers, 8 KV heads) carries ~17 GB of KV at 128K — roughly **250×** the Mamba state. That ratio, not the asymptotic O-notation, is what buys you batch depth. Then take the freed memory and compute how much **deeper you can batch**, and what that does to aggregate tokens/s and `$/Mtok` (Lecture 1, §6). That chain — KV bytes → batch depth → tokens/s → dollars — is the deliverable.
 
 **The serving caveat (the Bamba lesson):** these wins are only real if your inference stack *implements* SSM state management. Before promising an 8× batching win, confirm vLLM/SGLang (or your runtime) actually supports the architecture's state handling — or you've drawn a chart the hardware can't cash.
 

@@ -120,7 +120,18 @@ Compilers produce kernels; the **runtime** decides how they execute. This is whe
                                 pipeline stays GPU-resident across the whole forward pass
 ```
 
-The trend is rightward. At small batch and short decode steps — exactly the memory-bound regime where LLM decode lives — **kernel-launch overhead and inter-op HBM round-trips become a large fraction of the step time**. Capturing the graph (CUDA Graphs) helps; fusing the *entire* model into a **single persistent "megakernel"** helps more, because the data never leaves on-chip memory between ops and the launch gaps vanish.
+The trend is rightward. At small batch and short decode steps — exactly the memory-bound regime where LLM decode lives — **kernel-launch overhead and inter-op HBM round-trips become a large fraction of the step time**. Put numbers on it, because the claim sounds abstract until you do:
+
+```text
+   batch-1 decode step, 70B-class transformer (illustrative):
+   ~80 layers × ~8–10 unfused kernels/layer  ≈  600–800 launches per token
+   × ~2–5 µs launch + teardown each          ≈  1.5–4 ms of pure gap per step
+   vs a TPOT budget of ~10–20 ms             →  10–30% of the step is nobody-computing time
+   …and at every kernel boundary the activations spill to HBM and come back,
+   paying bandwidth the roofline never required.
+```
+
+Capturing the graph (CUDA Graphs) reclaims most of the *launch* cost; fusing the *entire* model into a **single persistent "megakernel"** reclaims the *round-trips* too, because the data never leaves on-chip memory between ops and the launch gaps vanish. Note the regime-dependence: at batch 128 prefill those same gaps are noise behind big GEMMs — which is why megakernels are a *decode/latency* story, not a universal one.
 
 **TileRT** (from the `tile-ai` group, same lineage as TileLang) is the 2026 exemplar: a **persistent-megakernel runtime** that decomposes LLM operators into **fine-grained tile-level tasks** and dynamically **overlaps compute, I/O, and communication** across GPUs, with **warp specialization** keeping the whole pipeline resident and overhead at microsecond scale. It is the runtime behind a headline throughput result you'll meet in Lecture 6 (a 1-trillion-parameter model pushed past **1000 tokens/s** on a single 8-GPU commodity node). For now, hold the principle: **once kernels are fast, the next bottleneck is the gaps between them, and megakernels close the gaps.**
 

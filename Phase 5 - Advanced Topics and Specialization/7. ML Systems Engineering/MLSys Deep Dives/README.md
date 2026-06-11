@@ -76,6 +76,7 @@ So the arc moves from the metric down through the stack and back up to the deplo
 By the end you should be able to:
 
 * Read any 2026 model card or serving config and predict its **cost shape** — tokens/s regime, KV-cache behavior, dense vs sparse compute, dominant precision, draft mechanism.
+* Predict any model's batch-1 decode speed from a datasheet with the **bandwidth ceiling** (`tokens/s ≤ HBM GB/s ÷ bytes per token`), and use it to sanity-check any vendor throughput claim.
 * Place any kernel tool (Triton, CUTLASS/cuTile, ThunderKittens, TileLang, TVM, Mojo, TensorRT) on the **ease↔control spectrum** and pick one for a workload with a defensible reason.
 * Explain why **SSM/hybrid architectures and MLA** kill KV-cache growth, why **MoE** decouples capacity from compute, and what each costs you in memory and interconnect.
 * Stand up **speculative decoding** (and explain EAGLE-3 vs DFlash vs Medusa), and read the acceptance-length / speedup tradeoff.
