@@ -99,7 +99,7 @@ Lower latency for small messages, higher latency for large messages (less bandwi
 
 ### 2.3 What NCCL picks
 
-NCCL auto-tunes per (message size, topology). On HGX H100/H200 with NVLink Switch (fully-connected 8-GPU domain), ring is typical for the all-reduces in TP because the messages are large (~16-32 MB per layer at FP16).
+NCCL auto-tunes per (message size, topology). On HGX H100/H200 with NVLink Switch (fully-connected 8-GPU domain), ring is typical for the all-reduces in TP because the messages are large during prefill (~16-32 MB per layer at FP16); decode messages are far smaller and latency-bound (§2.4).
 
 ### 2.4 The bandwidth cost
 
@@ -273,7 +273,7 @@ Quick diagnostic:
 
 ### 6.1 The reduce-scatter + all-gather pattern
 
-For very large all-reduces, NCCL implements it as reduce-scatter (gather partial sums to one GPU each) + all-gather (broadcast back). This is what produces the 2× efficiency gap vs single-GPU on TP=8.
+For very large all-reduces, NCCL implements it as reduce-scatter (after which each GPU holds one fully-reduced *chunk* of the vector) + all-gather (each GPU then collects the remaining chunks). This decomposition *is* the bandwidth-optimal ring all-reduce: each GPU moves `2(N-1)/N ≈ 2×` the tensor's bytes — an all-reduce inherently transfers about twice the data volume of the tensor it reduces, which is why the communication bill is what it is.
 
 ---
 
@@ -312,7 +312,7 @@ Pass criterion: you can defend the choice of TP for a chat product at 32K contex
 1. For Llama 3.3 70B FP16 on 4× H100 SXM, predict the all-reduce time per token decode at batch=32. Use 900 GB/s NVLink bandwidth and 160 all-reduces per token.
 2. A teammate proposes TP=8 for a chat product to "double throughput." The TP=4 → TP=8 measurement shows 1.5× throughput at 65% per-GPU efficiency. Defend or reject in two sentences using $/MTok reasoning.
 3. Your Nsight trace shows NCCL kernels running serially with compute kernels (no overlap). What runtime upgrade would you try first?
-4. Sequence parallelism is "free" memory savings — why is it always-on then? What is the cost?
+4. Sequence parallelism is "free" memory savings — why isn't it on by default? What is the cost?
 5. For Qwen 2.5 72B at TP=4 vs Llama 3.3 70B at TP=4 on the same hardware, which has worse scaling efficiency and why?
 
 ---

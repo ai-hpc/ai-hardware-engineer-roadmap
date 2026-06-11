@@ -143,7 +143,7 @@ The hardest engineering problem in disaggregation.
 For DeepSeek V3.1 (MLA) at 8K context:
 
 ```text
-KV per request = 8192 tokens × 61 KB / token ≈ 500 MB
+KV per request = 8192 tokens × 69 KB / token ≈ 560 MB
 ```
 
 For Llama 3.3 70B (GQA) at 8K context:
@@ -286,7 +286,7 @@ Pass criterion: you can defend whether to ship disaggregation for a specific pro
 
 ## Self-check
 
-1. For Llama 3.3 70B GQA at 8K context, KV transfer is ~2.6 GB. For DeepSeek V3.1 MLA at 8K, it's ~500 MB. Why does MLA help disaggregation specifically?
+1. For Llama 3.3 70B GQA at 8K context, KV transfer is ~2.6 GB. For DeepSeek V3.1 MLA at 8K, it's ~560 MB. Why does MLA help disaggregation specifically?
 2. A teammate proposes disaggregating a pure batch workload (no SLO). Defend or reject in two sentences.
 3. NVLink 5 makes KV transfer within NVL72 trivial. Why does cross-rack disaggregation still struggle?
 4. Mooncake reports 75% throughput improvement. What workload assumptions make this plausible, and where might it fail?
@@ -300,7 +300,7 @@ Pass criterion: you can defend whether to ship disaggregation for a specific pro
 * Splitwise — [arXiv:2311.18677](https://arxiv.org/abs/2311.18677)
 * DistServe — [arXiv:2401.09670](https://arxiv.org/abs/2401.09670)
 * SGLang disaggregation guide — [sgl-project.github.io](https://sgl-project.github.io/)
-* "TetriInfer" (recent disaggregation work) — [arXiv:2402.13533](https://arxiv.org/abs/2402.13533)
+* "TetriInfer" (recent disaggregation work) — [arXiv:2401.11181](https://arxiv.org/abs/2401.11181)
 
 Cross-references:
 

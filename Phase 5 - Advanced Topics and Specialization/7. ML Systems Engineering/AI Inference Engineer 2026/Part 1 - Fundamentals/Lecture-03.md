@@ -136,7 +136,7 @@ A prefill of a 4K-token prompt with batch=1 has intensity in the hundreds of FLO
 
 Ridge points:
 
-* FP16: 989 / 4.80 = **~206 FLOPs/byte** (43% lower than H100)
+* FP16: 989 / 4.80 = **~206 FLOPs/byte** (~30% lower than H100)
 * FP8: 1,979 / 4.80 = **~412 FLOPs/byte**
 
 H200 lowers the ridge point because bandwidth grew without FLOPs growing. **Bandwidth-bound kernels are 43% faster on H200 than H100** at the same precision. Compute-bound kernels are unchanged — H200's win is **decode, not prefill**. This is why H200 is the right pick for **chat workloads** and H100 is the right pick for **embedding / batch**.
@@ -158,22 +158,22 @@ Blackwell's FP4 path moves the ridge point dramatically higher — meaning at FP
 
 ### 3.4 Jetson Orin Nano Super 8 GB (edge cross-reference)
 
-* Peak BF16/FP16 TFLOPs: ~67 (Ampere SM 8.7 tensor cores)
-* Peak INT8 TFLOPs: ~134
+* Peak BF16/FP16 TFLOPs: ~17 dense (Ampere SM 8.7 tensor cores)
+* Peak INT8 TOPs: ~33 dense (NVIDIA's headline "67 TOPS" is sparse INT8)
 * LPDDR5 bandwidth: ~102 GB/s (0.1 TB/s)
 
 Ridge points:
 
-* FP16: 67 × 10¹² / 102 × 10⁹ = **~657 FLOPs/byte**
-* INT8: 134 × 10¹² / 102 × 10⁹ = **~1,314 FLOPs/byte**
+* FP16: 17 × 10¹² / 102 × 10⁹ = **~167 FLOPs/byte**
+* INT8: 33 × 10¹² / 102 × 10⁹ = **~324 OPs/byte**
 
-Notice the ridge point on Orin Nano is *much higher* than on Hopper — **bandwidth is the relatively scarce resource**. A 4B-class model decoding at batch=1 on Orin Nano hits the **bandwidth wall** extremely hard (this is the entire premise of the [Qwen Inference Optimization](../../../3.%20Edge%20AI/Qwen%20Inference%20Optimization/README.md) special course). **Batching almost never helps on edge** because each user is alone.
+Notice the FP16 ridge point on Orin Nano is actually *below* Hopper's ~295 — but that is no comfort, because the binding constraint is the ~102 GB/s LPDDR5 bandwidth, roughly 1/33 of an H100's. A 4B-class model decoding at batch=1 on Orin Nano hits the **bandwidth wall** extremely hard (this is the entire premise of the [Qwen Inference Optimization](../../../3.%20Edge%20AI/Qwen%20Inference%20Optimization/README.md) special course). **Batching almost never helps on edge** because each user is alone.
 
 ### 3.5 Cross-GPU summary
 
 | GPU | Peak FP16 | HBM BW | FP16 Ridge | FP8 Ridge | FP4 Ridge |
 |-----|-----------|--------|------------|-----------|-----------|
-| Jetson Orin Nano Super 8G | 67 TFLOPs | 102 GB/s | 657 | (INT8: 1314) | — |
+| Jetson Orin Nano Super 8G | ~17 TFLOPs | 102 GB/s | ~167 | (INT8: ~324) | — |
 | H100 SXM | 989 TFLOPs | 3.35 TB/s | 295 | 591 | — |
 | H200 SXM | 989 TFLOPs | 4.80 TB/s | 206 | 412 | — |
 | B200 SXM | 2,250 TFLOPs | 8.0 TB/s | 281 | 562 | 1,125 |
@@ -266,7 +266,7 @@ Pass criterion: the chart goes in your benchmark report. Anyone reading it under
 2. You run a decode kernel and measure 480 GB/s of HBM read on an H200 (4.8 TB/s peak). What is your bandwidth efficiency? What are two likely reasons the kernel is at this level instead of 80%+?
 3. A teammate proposes doubling batch size from 64 to 128 for a 70B-class decode. The roofline says the kernel is at the compute ceiling at batch=64. Predict the throughput change. Defend in one sentence.
 4. Why does the FP4 ridge point on B200 (~1125 FLOPs/byte) feel "too high to ever hit"? What workload shape would actually reach it?
-5. On Jetson Orin Nano Super 8 GB at INT8 the ridge point is ~1314 FLOPs/byte. A Qwen3-4B decoded at batch=1 has intensity ~2. What is the upper bound on tokens/sec from the roofline alone? What single change (without changing hardware) gets closest to it?
+5. On Jetson Orin Nano Super 8 GB at INT8 the ridge point is ~324 OPs/byte. A Qwen3-4B decoded at batch=1 has intensity ~2. What is the upper bound on tokens/sec from the roofline alone? What single change (without changing hardware) gets closest to it?
 
 ---
 

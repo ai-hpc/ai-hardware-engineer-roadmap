@@ -77,7 +77,7 @@ The two SKUs ship at different points in 2025–2026:
 | HBM capacity | 192 GB | 288 GB |
 | HBM bandwidth | 8.0 TB/s | ~8.0 TB/s |
 | Peak FP16 TFLOPs | 2,250 | ~2,500 (slightly higher) |
-| Peak FP4 TFLOPs | 9,000 | ~10,000 |
+| Peak FP4 TFLOPs | 9,000 | ~15,000 (dense) |
 | TDP | 1000 W | 1200 W |
 | NVLink | NVLink 5 | NVLink 5 |
 
@@ -104,7 +104,7 @@ The GB200 superchip pairs **one Grace CPU** with **two Blackwell GPUs** (B200 di
 
 * The Grace CPU has up to 480 GB of LPDDR5x.
 * The two Blackwell GPUs have 192 GB HBM3e each (384 GB total per GB200).
-* NV-C2C links the CPU memory to the GPU memory at 900 GB/s in each direction.
+* NV-C2C links the CPU memory to the GPU memory at 900 GB/s total bidirectional (~450 GB/s per direction).
 * **The GPU can read CPU memory directly** — pinned, large pages, no explicit copy.
 
 For MoE inference, this enables **CPU-resident expert offload**: experts that are rarely activated can live in CPU memory, fetched on demand. This is an **active research topic**; production runtimes are starting to use it but it's not the default.
@@ -129,7 +129,7 @@ NVL72 Rack:
   - NVLink Switch v4: full all-to-all 1.8 TB/s per GPU
   - Aggregate NVLink bandwidth: ~130 TB/s
   - Liquid cooled
-  - ~100 kW power
+  - ~120 kW power
 ```
 
 For DeepSeek V3.1 671B at FP4 (350 GB):
@@ -157,7 +157,7 @@ The leap is large:
 | Total HBM | 640 GB | 13.5 TB |
 | Total NVLink BW | 7.2 TB/s | 130 TB/s |
 
-**The 9× larger NVLink domain is what makes MoE EP practical at full scale.** On 8× H100, EP=8 means each GPU holds 1/8 of experts; on NVL72, EP=64 means each GPU holds 1/64. Token routing is cheaper because fewer tokens per expert per step; load balancing is easier.
+**The 9× larger NVLink domain is what makes MoE EP practical at full scale.** On 8× H100, EP=8 means each GPU holds 1/8 of experts; on NVL72, EP=64 means each GPU holds 1/64. Token routing is cheaper because fewer tokens land on each rank per step — but load balancing gets **harder**, not easier: fewer experts per rank means higher per-rank load variance, and one hot expert can dominate its rank's step time (hot-expert replication across ranks is the standard mitigation — Lecture 03).
 
 ---
 
@@ -223,11 +223,11 @@ This is **2× the per-GPU NVLink bandwidth of Hopper**. For **all-to-all communi
 
 ### 6.2 All-to-all primitives
 
-NCCL provides:
+NCCL has **no dedicated all-to-all collective**. The MoE dispatch/combine is composed from point-to-point primitives:
 
-* `nccl_alltoall` — every rank sends one buffer per other rank, one receive per other rank. The canonical MoE primitive.
-* `nccl_alltoallv` — variable-size sends, used when tokens-per-expert is uneven.
-* `nccl_send` / `nccl_recv` — point-to-point.
+* `ncclSend` / `ncclRecv` — point-to-point transfers.
+* Grouped inside `ncclGroupStart()` / `ncclGroupEnd()` — every rank posts one send and one receive per peer, which NCCL executes as a single fused all-to-all step. The canonical MoE primitive.
+* The variable-size "alltoallv" pattern — same grouped send/recv with per-peer sizes, used when tokens-per-expert is uneven.
 
 On NVL72, an `alltoall` with 64 GPUs and 1 MB per pair is ~1 ms. For MoE EP, this is the per-layer cost; with 61–94 layers, total all-to-all per token can be substantial. We'll diagnose this in Lecture 03.
 
@@ -262,7 +262,7 @@ Goal: same as Lecture 02 from Part 2, but for Blackwell.
    * BF16 reference.
    * FP8 via TE2 (`te.Linear` with `fp8_recipe="hybrid"`).
    * FP4 via TE2 (`te.Linear` with `fp8_recipe="fp4"`).
-4. **Profile with Nsight Compute** — confirm Blackwell-native instructions (WGMMA + new FP4 ops).
+4. **Profile with Nsight Compute** — confirm Blackwell-native instructions (`tcgen05` UMMA + new FP4 ops — not Hopper's WGMMA).
 5. **Compare measured TFLOPs** to peak (2,250 BF16 / 4,500 FP8 / 9,000 FP4). Compute efficiency.
 
 Pass criterion: you see ~1.8× FP4 over FP8 and ~3-4× FP4 over BF16 on the FFN shape.

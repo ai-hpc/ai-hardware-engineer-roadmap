@@ -43,7 +43,7 @@ The key idea: **the engine is chosen per call, not once at startup.** A prefill 
 
 These are the bottom layer — thin bindings, no policy.
 
-* **`pynccl` — NCCL bindings.** Direct access to `ncclAllReduce`, `ncclAllGather`, `ncclReduceScatter`, `ncclAllToAll`. NCCL is the stable, works-everywhere baseline (Lecture 04 §2). vLLM wraps it directly rather than going through `torch.distributed` for the hot path, so it controls streams and avoids framework overhead.
+* **`pynccl` — NCCL bindings.** Direct access to `ncclAllReduce`, `ncclAllGather`, `ncclReduceScatter`, plus grouped `ncclSend`/`ncclRecv` (NCCL has no native all-to-all collective; it is composed from send/recv pairs). NCCL is the stable, works-everywhere baseline (Lecture 04 §2). vLLM wraps it directly rather than going through `torch.distributed` for the hot path, so it controls streams and avoids framework overhead.
 * **`cuda_wrapper` — the CUDA glue.** Stream creation, `cudaMemcpyAsync`, event/handle management, device context. This is "Python safely driving CUDA streams"; the collectives launch onto these streams so communication can overlap compute.
 * **`shm_*` — host shared memory.** CPU↔CPU transfer between *worker processes* (the engine/driver and its TP workers, or Ray actors). This is **not** the GPU hot path — it carries control messages, small metadata, and CPU-offload tensors between processes on one node. Important for startup and scheduling, irrelevant to per-token latency.
 

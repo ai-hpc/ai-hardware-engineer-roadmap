@@ -287,7 +287,7 @@ Pass criterion: at least one candidate passes the parity budget on your defined 
 
 ## Self-check
 
-1. You are deploying a 7B model on a single L40S (no FP8 tensor cores fast enough to matter). What is the safest precision recipe to start with? What does it not buy you that FP8 would on H100?
+1. You are deploying a 7B model on a single A100 (no FP8 tensor cores). What is the safest precision recipe to start with? What does it not buy you that FP8 would on H100?
 2. A teammate shows you a benchmark where W8A8 quantized Llama 3 70B is 1.6× faster than FP16 but loses 3 pp on MMLU. You insist on QuaRot W4A8 instead. Defend the choice in two sentences.
 3. You quantize a model to FP4 on Blackwell and tool-call accuracy (BFCL) drops 5 pp while MMLU is stable. Which of the three quantization axes is the likely culprit, and what is the first experiment to confirm?
 4. You measure parity twice on the FP16 reference and get MMLU = 78.2 and 78.6. A candidate scores 76.8. Is this within or outside a reasonable parity budget? Show the math.

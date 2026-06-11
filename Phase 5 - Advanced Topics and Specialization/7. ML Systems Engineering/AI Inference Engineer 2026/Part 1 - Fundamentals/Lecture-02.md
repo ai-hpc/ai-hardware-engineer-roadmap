@@ -32,7 +32,7 @@ output: hidden states for all P positions
 
 Concretely, for each of the L transformer layers:
 
-> **RMSNorm** rescales each token vector to a stable magnitude before every sub-layer (pre-norm). It is elementwise, bandwidth-bound, and costs ~0.5 FLOP/B — cheap individually but called 160 times across 80 layers per token. For the full intuition (what RMS measures, why it replaces LayerNorm, and what ε does) see [Part 2 → Lecture 01 §1.1](../Part%202%20-%20Dense%20at%20Hopper/Lecture-01.md#11-rmsnorm--what-it-actually-does).
+> **RMSNorm** rescales each token vector to a stable magnitude before every sub-layer (pre-norm). It is elementwise, bandwidth-bound, and costs ~0.5 FLOP/B — cheap individually but called 160 times across 80 layers per token. For the full intuition (what RMS measures, why it replaces LayerNorm, and what ε does) see [Part 2 → Lecture 01 §1.1](../Part%202%20-%20Dense%20at%20Hopper/Lecture-01.md#11-rmsnorm-what-it-actually-does).
 
 ```text
 x ── RMSNorm ─► QKV projection ──► (Q, K, V each of shape [P, h_q × head_dim] / [P, h_kv × head_dim])
@@ -154,7 +154,7 @@ At long context the KV cache becomes the dominant HBM consumer:
 | 65,536 | 21 GB | 10.5 GB | 5.3 GB |
 | 131,072 | 42 GB | 21 GB | 10.5 GB |
 
-**Per request.** At batch=16 with 32K context, the KV cache alone is 84 GB at FP16 — already over H100 80 GB capacity, forcing FP8 KV or smaller batch. This is why **long-context serving forces precision drops on KV** before it forces them on weights.
+**Per request.** At batch=16 with 32K context, the KV cache alone is ~168 GB at FP16 — more than double H100 80 GB capacity; even batch=8 (~84 GB) already blows past it, forcing FP8 KV or smaller batch. This is why **long-context serving forces precision drops on KV** before it forces them on weights.
 
 ### 2.4 The bandwidth half of the KV cache
 
@@ -282,7 +282,7 @@ Pass criterion: you can show a chart of decode throughput (tokens/sec) vs batch 
 ## References
 
 * "Reducing Activation Recomputation in Large Transformer Models" — [arXiv:2205.05198](https://arxiv.org/abs/2205.05198) — activation memory math
-* "FlashAttention-4: Fast and Accurate Attention with Asynchrony and Low-precision" — [arXiv:2407.08608](https://arxiv.org/abs/2407.08608)
+* "FlashAttention-3: Fast and Accurate Attention with Asynchrony and Low-precision" — [arXiv:2407.08608](https://arxiv.org/abs/2407.08608)
 * "Efficient Memory Management for Large Language Model Serving with PagedAttention" — [arXiv:2309.06180](https://arxiv.org/abs/2309.06180) — the KV cache as the bottleneck
 * NVIDIA Nsight Systems documentation — [docs.nvidia.com/nsight-systems/](https://docs.nvidia.com/nsight-systems/)
 * NVIDIA Nsight Compute documentation — [docs.nvidia.com/nsight-compute/](https://docs.nvidia.com/nsight-compute/)

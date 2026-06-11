@@ -30,7 +30,7 @@ By the end you should have a runtime decision matrix for any workload × hardwar
 ## 1. vLLM — the open-source workhorse
 
 **Project:** [github.com/vllm-project/vllm](https://github.com/vllm-project/vllm)
-**Pinned version (this lecture):** 0.7.x with the **V1 engine** as the default path.
+**Pinned version (this lecture):** 0.22.x with the **V1 engine** as the default path.
 
 ### 1.1 What it does
 
@@ -74,7 +74,7 @@ vLLM's V0 engine (2023 → early 2025) accumulated complexity. The **V1 engine**
 ## 2. SGLang — RadixAttention + EP
 
 **Project:** [github.com/sgl-project/sglang](https://github.com/sgl-project/sglang)
-**Pinned version:** 0.4.x.
+**Pinned version:** 0.5.x.
 
 ### 2.1 What it does
 
@@ -105,16 +105,16 @@ vLLM's V0 engine (2023 → early 2025) accumulated complexity. The **V1 engine**
 ## 3. TensorRT-LLM — NVIDIA's max-throughput path
 
 **Project:** [github.com/NVIDIA/TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM)
-**Pinned version:** 0.18.x.
+**Pinned version:** 1.3.x.
 
 ### 3.1 What it does
 
 * **TensorRT engine compilation** — model graph compiled into a hardware-specific engine plan; usually 1.5–2× faster than vLLM at peak single-replica throughput on the same Hopper GPU.
 * **FP8 native** — first-class FP8 support (E4M3 weights, E5M2 KV), the most mature FP8 path among the runtimes.
-* **FP4 / Blackwell** — TE2 FP4 path landing in 0.18+; the canonical Blackwell inference path will probably be TRT-LLM.
+* **FP4 / Blackwell** — TE2 FP4 path landed in the 1.x releases; the canonical Blackwell inference path will probably be TRT-LLM.
 * **In-flight batching** — NVIDIA's continuous-batching equivalent.
 * **Triton Inference Server integration** — production serving orchestration.
-* **All NVIDIA kernels** — FlashAttention 4, Hopper TMA, Blackwell WGMMA, all hand-tuned.
+* **All NVIDIA kernels** — FlashAttention 4, Hopper TMA + WGMMA, Blackwell tcgen05 (UMMA), all hand-tuned.
 
 ### 3.2 What it does badly
 
@@ -168,7 +168,7 @@ vLLM's V0 engine (2023 → early 2025) accumulated complexity. The **V1 engine**
 ## 5. MLX — Apple Silicon native
 
 **Project:** [github.com/ml-explore/mlx](https://github.com/ml-explore/mlx)
-**Pinned version:** 0.21.x.
+**Pinned version:** 0.31.x.
 
 ### 5.1 What it does
 

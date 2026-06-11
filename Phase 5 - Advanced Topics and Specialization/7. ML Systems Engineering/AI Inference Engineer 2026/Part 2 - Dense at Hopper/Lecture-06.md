@@ -57,15 +57,15 @@ On H200 (4.8 TB/s HBM3e), the KV read alone takes:
 kv_read_time = 42 GB / 4.8 TB/s ≈ 8.7 ms
 ```
 
-Plus the weight read (~30 ms at FP16 for 140 GB / 4.8 TB/s, ~15 ms at INT4). So decode at 128K context on a single H200, FP16 KV, INT4 weights:
+Plus the weight read (~30 ms at FP16 for 140 GB / 4.8 TB/s, ~7.3 ms at INT4 for 35 GB). So decode at 128K context on a single H200, FP16 KV, INT4 weights:
 
 ```text
 TPOT ≈ kv_read_time + weight_read_time + compute + overhead
-     ≈ 8.7 + 15 + small + small
-     ≈ 25 ms per token
+     ≈ 8.7 + 7.3 + small + small
+     ≈ 16 ms per token
 ```
 
-versus ~12 ms at 4K context. **TPOT roughly doubles at 128K** because the **KV bandwidth becomes a co-dominant cost**.
+versus ~8 ms at 4K context (same weight read, negligible KV term). **TPOT roughly doubles at 128K** because the **KV bandwidth becomes a co-dominant cost**.
 
 ### 1.2 Prefill cost at 128K
 
@@ -82,7 +82,7 @@ On 4× H100 at FP16 (4 × 989 TFLOPs / GPU = 3.96 PFLOPs aggregate, assuming 80%
 prefill_time ≈ 18.3 / 3.17 ≈ 5.8 seconds
 ```
 
-Almost six seconds of prefill before the first token decodes. **For an interactive product this is unshippable** without chunked prefill or prefix cache.
+Almost six seconds of prefill before the first token decodes. **For an interactive product this is unshippable** without chunked prefill or prefix cache. (This counts only the weight-matmul FLOPs — at 128K the prefill attention term is of comparable size, see §1.3, so budget ~10 s wall-clock.)
 
 ### 1.3 Attention cost at 128K
 
@@ -102,7 +102,7 @@ For prefill (batch=1, prompt=128K), attention is O(prompt² × head_dim × heads
 
 ## 2. YaRN context extension
 
-Both Llama 3.3 70B and Qwen 2.5 72B were *trained* at shorter context (4K-32K base) and **extended to 128K via YaRN** ([arXiv:2309.00071](https://arxiv.org/abs/2309.00071)).
+The two models reach 128K by **different mechanisms**. Llama 3.1/3.3 70B use Meta's own `"rope_type": "llama3"` RoPE frequency scaling plus long-context continued pretraining — the 128K window is baked in at training time. Qwen 2.5 72B is the YaRN case: trained at 32K native context and **extended to 128K via YaRN** ([arXiv:2309.00071](https://arxiv.org/abs/2309.00071)) applied at inference.
 
 ### 2.1 What YaRN does
 
@@ -112,7 +112,7 @@ The runtime impact is minimal:
 
 * The RoPE matrix is rebuilt with extended frequencies. No code change beyond `rope_scaling` in config.
 * No additional kernel overhead.
-* The published 128K context is YaRN-extended; for `max_position_embeddings > base_context`, ensure the runtime applies the right scaling.
+* Qwen's published 128K context is YaRN-extended; for `max_position_embeddings > base_context`, ensure the runtime applies the right scaling.
 
 ### 2.2 Where YaRN can go wrong at inference
 
@@ -371,7 +371,7 @@ Pass criterion: you can hand the report to another engineer and they can pick a 
 * Needle in a haystack (LangChain implementation) — [github.com/gkamradt/LLMTest_NeedleInAHaystack](https://github.com/gkamradt/LLMTest_NeedleInAHaystack)
 * StreamingLLM (long-context window attention) — [arXiv:2309.17453](https://arxiv.org/abs/2309.17453)
 * H2O (KV cache eviction) — [arXiv:2306.14048](https://arxiv.org/abs/2306.14048)
-* FastV (sparse attention) — [arXiv:2403.06764](https://arxiv.org/abs/2403.06764)
+* MInference (dynamic sparse attention for long-context prefill) — [arXiv:2407.02490](https://arxiv.org/abs/2407.02490)
 * vLLM long-context tuning — [docs.vllm.ai/en/latest/serving/openai_compatible_server.html](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html)
 * SGLang RadixAttention paper — [arXiv:2312.07104](https://arxiv.org/abs/2312.07104)
 
@@ -384,7 +384,7 @@ Cross-references:
 
 ## Current as of 2026-06
 
-YaRN extension as published by both model teams. FP8 KV per-head as the production recipe. Chunked prefill as the default in vLLM 0.22+. Refresh when a fundamentally new long-context attention pattern (e.g., recurrent state, hybrid SSM) ships in either model family.
+Context extension as published by both model teams (`llama3` RoPE scaling for Llama 3.3, YaRN for Qwen 2.5). FP8 KV per-head as the production recipe. Chunked prefill as the default in vLLM 0.22+. Refresh when a fundamentally new long-context attention pattern (e.g., recurrent state, hybrid SSM) ships in either model family.
 
 ---
 

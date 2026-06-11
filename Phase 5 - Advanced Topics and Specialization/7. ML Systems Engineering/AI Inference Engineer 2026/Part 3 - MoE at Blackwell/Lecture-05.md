@@ -206,7 +206,7 @@ Features:           continuous batching, paged KV, RadixAttention prefix cache,
 Disaggregation:     enabled if cluster has > 16 GPUs available; SGLang P/D mode
 
 Expected throughput: ~13,000 tok/s/replica (with MTP)
-Expected $/MTok:    ~$0.20-0.30 at NVL72 cost
+Expected $/MTok:    ~$1.9-2.0 raw replica cost (16× B200 @ ~$5.50/GPU-hr — derived in §5.2)
 ```
 
 ### 4.2 Qwen3-MoE 235B-A22B production recipe
@@ -223,7 +223,7 @@ Features:           continuous batching, paged KV, prefix cache, chunked prefill
 Disaggregation:     usually not worth it at this scale; ship colocated
 
 Expected throughput: ~10,500 tok/s/replica
-Expected $/MTok:    ~$0.25-0.40
+Expected $/MTok:    ~$1.1-1.2 raw replica cost (8× B200 @ ~$5.50/GPU-hr)
 ```
 
 ---
@@ -235,7 +235,7 @@ Deriving `$/MTok` is the **final exit-criterion deliverable**.
 ### 5.1 The formula
 
 ```text
-$/MTok = (replica_cost_per_hour × 3600) / (output_tokens_per_sec × 10^6)
+$/MTok = (replica_cost_per_hour × 10^6) / (3600 × output_tokens_per_sec)
 ```
 
 Inputs:
@@ -264,13 +264,12 @@ A 16-GPU replica of DeepSeek V3.1:
 If throughput is 13,000 tok/s/replica (with MTP):
 
 ```text
-$/MTok = ($90 × 3600) / (13000 × 10^6) × 1e6
-       = $324,000 / 13e9
-       = $0.025 per 1K tokens
-       = $25 per million tokens
+$/MTok = ($90 × 10^6) / (3600 × 13,000)
+       = $90,000,000 / 46,800,000
+       ≈ $1.92 per million tokens
 ```
 
-Hmm, that's the gross rate. The published rate for DeepSeek V3.1 API ($/MTok) is ~$0.30 input and ~$1.10 output (varies by provider). The gap is overhead (idle replicas, redundancy, profit margin).
+Now compare: the published rate for DeepSeek V3.1 API ($/MTok) is ~$0.30 input and ~$1.10 output (varies by provider) — **below** this raw single-replica estimate. That gap tells you real deployments run at much higher utilization and batching than this example assumes, on top of provider-scale economics (prefix caching, traffic mixing across replicas, committed-hardware pricing). The $1.92 is a teaching anchor, not the truth of an optimized fleet.
 
 **For the inference engineer's defense:** show the raw $/MTok at full utilization. The product team multiplies by overhead.
 
@@ -285,7 +284,7 @@ Hmm, that's the gross rate. The published rate for DeepSeek V3.1 API ($/MTok) is
 | Concurrency 64 → 256 | -10 to -20% | diminishing returns |
 | EP=8 → EP=16 | -10 to -20% | less per-GPU pressure |
 
-A naive deployment at FP8 + greedy decoding + concurrency 16 + EP=2 might cost $40/MTok. The same model at FP4 + MTP + EP=8 + concurrency 64 hits $25 or less. **The optimization stack moves the cost model by 30-50%.**
+A naive deployment at FP8 + greedy decoding + concurrency 16 + EP=2 might cost $4-6/MTok (greedy alone drops the replica to ~6,500 tok/s, or ~$3.85/MTok; FP8 and the low concurrency push it further). The same model at FP4 + MTP + EP=8 + concurrency 64 hits $2 or less. **The optimization stack moves the cost model by 2-3×.**
 
 ---
 

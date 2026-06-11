@@ -29,7 +29,7 @@ Added the production footgun where **block-scaled FP8 weights require each tenso
 
 ## 2026-06 — Correctness fix: Qwen 2.5 72B dimensions
 
-Corrected the Qwen 2.5 72B architecture numbers in **Part 2 Lecture 01** and the **Part 2 README**, plus a stray reference in **Part 3 Lecture 01**. Earlier drafts quoted Qwen 2.5 72B as **12288 hidden / 49152 FFN** — a common secondary-source misquote (12288 is GPT-3's width). The official `config.json` is **8192 hidden / 29568 FFN**, which makes Qwen 2.5 72B *dimensionally near-identical* to Llama 3.3 70B (same 8192 hidden, same GQA 64/8, ~3% wider FFN); the 72B-vs-70B gap is mostly the larger 152K vocab. Lecture 01 §2.1/§4.2 now lead with the correct figures and keep the "derive from the published config, sanity-check against the parameter count" lesson as a cautionary note instead of presenting the wrong numbers as fact. Also fixed DeepSeek V3's dense-FFN width in Part 3 Lecture 01 (18432, not 12288). Surfaced while building the [LLM Inference Visualizer](https://github.com/ai-hpc/llm-inference-viz), which renders the correct shapes.
+Corrected the Qwen 2.5 72B architecture numbers in **Part 2 Lecture 01** and the **Part 2 README**, plus a stray reference in **Part 3 Lecture 01**. Earlier drafts quoted Qwen 2.5 72B as **12288 hidden / 49152 FFN** — a common secondary-source misquote (12288 is GPT-3's width). The official `config.json` is **8192 hidden / 29568 FFN**, which makes Qwen 2.5 72B *dimensionally near-identical* to Llama 3.3 70B (same 8192 hidden, same GQA 64/8, ~3% wider FFN); the 72B-vs-70B gap is mostly that ~3% wider FFN (≈1.8B params), with the larger 152K vocab adding ≈0.4B. Lecture 01 §2.1/§4.2 now lead with the correct figures and keep the "derive from the published config, sanity-check against the parameter count" lesson as a cautionary note instead of presenting the wrong numbers as fact. Also fixed DeepSeek V3's dense-FFN width in Part 3 Lecture 01 (18432, not 12288). Surfaced while building the [LLM Inference Visualizer](https://github.com/ai-hpc/llm-inference-viz), which renders the correct shapes.
 
 ---
 
@@ -70,7 +70,7 @@ Note: DeepSeek V4 (2026-04) is now the actual production frontier, but V3.1's ar
 
 | Runtime | Version | Notes |
 |---------|---------|-------|
-| vLLM | **0.22.0** (2026-05-29) | V1 engine is default since v0.6; current release cadence is roughly every 2 weeks |
+| vLLM | **0.22.0** (2026-05-29) | V1 engine shipped alpha in v0.7.0, default since v0.8.x; current release cadence is roughly every 2 weeks |
 | SGLang | **0.5.12.post1** (2026-05-26) | RadixAttention, full DeepSeek + Qwen3-MoE EP support, production disaggregation |
 | TensorRT-LLM | **1.3.0rc16** (2026-05-26) | Now at the v1.x major; FP4 path mature on Blackwell |
 | llama.cpp | build **b9444** (2026-05-31) | Rolling release; GGUF + IQ-quants reference for edge |

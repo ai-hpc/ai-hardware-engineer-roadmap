@@ -139,7 +139,7 @@ The English-only calibration **loses 2.4 pp on Chinese eval** — well outside a
 In order of increasing complexity:
 
 1. **Stay at W4A16** — AWQ-INT4 weights with FP16 activations. Dodges the activation-quantization problem entirely. **This is what most production deployments do.**
-2. **Use FP8 instead of INT8** — the FP8 dynamic range (E5M2: ±57,000) is large enough to represent the outliers without clipping. TensorRT-LLM's FP8 path on Llama 3.3 70B has no measurable parity issue.
+2. **Use FP8 instead of INT8** — TRT-LLM's FP8 activations are E4M3 (±448), so raw range is not the savior: floating point's exponentially-spaced grid keeps fine resolution for the small-magnitude bulk while still reaching the outliers, where INT8's uniform grid must sacrifice one for the other. TensorRT-LLM's FP8 path on Llama 3.3 70B has no measurable parity issue.
 3. **QuaRot W4A8** — Hadamard rotation invariantly spreads the outliers across channels. Parity recovers.
 4. **SpinQuant W4A8** — learnable rotation, slightly better parity than QuaRot at higher pipeline complexity.
 
@@ -290,7 +290,7 @@ For Llama 3.3 70B and Qwen 2.5 72B in a production chat product, a defensible bu
 | HumanEval | 73.8 / 87.2 | -1.5 pp |
 | BFCL (simple) | 88.2 / ~88 | -2.0 pp |
 | BFCL (irrelevance) | ~80 / ~80 | -2.0 pp |
-| RULER 64K | ~94 / ~92 | -1.5 pp |
+| RULER 64K | ~89.5 / ~91 | -1.5 pp |
 | Per-language eval (Qwen Chinese) | 83.9 | -1.5 pp |
 
 Budgets are *workload-defended*, not generic. A code-product cannot afford -1.5 pp HumanEval; for them tighten to -0.5. A non-multilingual product can ignore CEval.

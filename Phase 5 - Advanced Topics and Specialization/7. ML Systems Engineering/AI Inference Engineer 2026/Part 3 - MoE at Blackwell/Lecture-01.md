@@ -71,7 +71,7 @@ What "active" means in the param count: **only the experts the token actually to
 
 ## 2. MLA — Multi-head Latent Attention (DeepSeek)
 
-The most distinctive 2024–2025 architectural choice. **MLA compresses the KV cache by 10–20× compared to GQA**, which is the single biggest inference win at long context.
+The most distinctive 2024–2025 architectural choice. **MLA compresses the KV cache by ~15× compared to full MHA, and ~4× compared to the GQA configs typical of 70B-class models (§2.2)**, which is the single biggest inference win at long context.
 
 ### 2.1 The idea
 
@@ -86,6 +86,8 @@ V_t = W_uV · c_t
 
 The latent `c_t` is the stored cache. K and V are recomputed on-the-fly each decode step. This is a **memory/compute tradeoff**: more compute (a small matmul per layer per step) for **dramatically less KV memory**.
 
+One subtlety: **the rotary embedding cannot ride inside the latent**. RoPE applies a position-dependent rotation to each key, and that rotation does not commute with the low-rank up-projection `W_uK` — folding position into the compressed latent would mean re-rotating the cached value for every new query position. DeepSeek's fix is a **decoupled rotary key**: a small 64-dim key per token (`qk_rope_head_dim = 64`), rotated once and cached alongside the latent. The latent stays position-free; the rotary key carries the position.
+
 ### 2.2 KV bytes per token — MLA vs GQA
 
 For DeepSeek V3 / V3.1:
@@ -93,14 +95,15 @@ For DeepSeek V3 / V3.1:
 | Spec | Value |
 |------|-------|
 | `kv_lora_rank` (d_c) | 512 |
+| `qk_rope_head_dim` (decoupled rotary key) | 64 |
 | `num_hidden_layers` | 61 |
 | `bytes_per_element` | 2 (FP16/BF16) |
 
 ```text
-mla_kv_bytes_per_token = num_layers × d_c × bytes
-                       = 61 × 512 × 2
-                       = 62,464 bytes
-                       ≈ 61 KB / token
+mla_kv_bytes_per_token = num_layers × (d_c + qk_rope_head_dim) × bytes
+                       = 61 × (512 + 64) × 2
+                       = 70,272 bytes
+                       ≈ 69 KB / token
 ```
 
 For a hypothetical 64-head, 8-KV-head, head-dim-128 GQA model with 61 layers:
@@ -111,9 +114,9 @@ gqa_kv_bytes_per_token = 2 (K + V) × 61 × 8 × 128 × 2
                        ≈ 244 KB / token
 ```
 
-MLA is **~4× smaller** than equivalent GQA — and DeepSeek V3 has **more layers (61) than its dense competitors** so the absolute savings are larger.
+MLA is **~3.5× smaller** than equivalent GQA — and DeepSeek V3 has **more layers (61) than its dense competitors** so the absolute savings are larger.
 
-At 128K context, DeepSeek V3.1 needs **~8 GB of KV cache per request**, versus ~30 GB+ for a GQA equivalent. This is what makes **long-context serving practical without aggressive KV quantization**.
+At 128K context, DeepSeek V3.1 needs **~9 GB of KV cache per request**, versus ~30 GB+ for a GQA equivalent. This is what makes **long-context serving practical without aggressive KV quantization**.
 
 ### 2.3 What MLA costs
 
@@ -154,7 +157,7 @@ MTP makes DeepSeek's decode throughput on Blackwell roughly equivalent to a dens
 
 ### 3.3 Qwen3-MoE has no native MTP
 
-Qwen3-MoE 235B-A22B was **not trained with the MTP objective**. It uses standard EAGLE-3 (or Medusa) speculation via a **separate draft model**. Acceptance rates are similar (70-80% at k=4 with a 7B draft) but the engineering layer is different: a separate model, separate runtime path, separate fine-tuning.
+Qwen3-MoE 235B-A22B was **not trained with the MTP objective**. It uses **a lightweight EAGLE-3 head (or Medusa heads)** that reuses the target model's hidden states. Acceptance rates are similar (70-80% at k=4) but the engineering layer is different: a separately trained head, separate runtime path, separate fine-tuning.
 
 This is one of the cleanest "architectural choice → inference recipe" contrasts in the course.
 
@@ -202,10 +205,10 @@ Per-token active params:
 ```text
 Per token, per MoE layer:
   Attention: ~110M (MLA-shaped attention)
-  8 routed experts × 44M + 1 shared × 44M + gating = ~396M + ~44M = ~440M
-  Per-layer active: ~550M
+  8 routed experts × 44M + 1 shared × 44M + gating = ~352M + ~44M + ~2M ≈ ~398M
+  Per-layer active: ~510M
 
-58 MoE layers × 550M + 3 dense layers × dense-FFN-size + attention + embed
+58 MoE layers × 510M + 3 dense layers × dense-FFN-size + attention + embed
 ≈ 37B active params per token
 ```
 
@@ -255,9 +258,9 @@ A dense model has a simple "1 GPU, all the weights" mental model. An MoE has "al
 | Layers | 61 (3 dense + 58 MoE) |
 | Hidden size | 7168 |
 | Attention | MLA, 128 heads (Q), `q_lora_rank=1536`, `kv_lora_rank=512` |
-| Vocab | 128,256 |
+| Vocab | 129,280 |
 | Context | 128K (extended via YaRN) |
-| KV bytes/token (FP16) | ~61 KB |
+| KV bytes/token (FP16) | ~69 KB |
 | Native speculation | MTP |
 | Total HBM (BF16) | ~1.4 TB |
 | Total HBM (FP8) | ~700 GB |
@@ -273,7 +276,7 @@ A dense model has a simple "1 GPU, all the weights" mental model. An MoE has "al
 | Hidden size | 4096 |
 | Attention | GQA, 64 Q heads, 4 KV heads (per Qwen3 release) |
 | Vocab | 151,936 |
-| Context | 128K (YaRN) |
+| Context | 256K (Instruct-2507) |
 | KV bytes/token (FP16) | 2 × 94 × 4 × 128 × 2 ≈ 192 KB |
 | Native speculation | None (use EAGLE-3 / Medusa) |
 | Total HBM (BF16) | ~470 GB |
@@ -287,7 +290,7 @@ A dense model has a simple "1 GPU, all the weights" mental model. An MoE has "al
 | Total / active params | 671B / 37B | 235B / 22B |
 | Active param ratio | 5.5% | 9.4% |
 | Attention | MLA (compressed KV) | GQA (4 KV heads) |
-| KV bytes/token | ~61 KB | ~192 KB |
+| KV bytes/token | ~69 KB | ~192 KB |
 | Layers | 61 | 94 |
 | Native speculation | MTP (yes) | none (EAGLE-3 external) |
 | Experts | 256 + 1 shared | 128 |
@@ -359,11 +362,11 @@ Decode at batch=1 for DeepSeek V3.1 at FP4 on one B200 (just hypothetically, ign
 ```text
 bytes read per decode step:
   Active weights: 37B × 0.5 bytes (FP4) = 18.5 GB
-  KV cache (128K, FP16 MLA): 8 GB
-  Total: ~26.5 GB
+  KV cache (128K, FP16 MLA): 9 GB
+  Total: ~27.5 GB
 
 Decode time on B200 (8 TB/s HBM):
-  ≈ 26.5 GB / 8 TB/s ≈ 3.3 ms / token
+  ≈ 27.5 GB / 8 TB/s ≈ 3.4 ms / token
   ≈ ~300 tokens/sec at batch=1 (theoretical ceiling)
 ```
 
@@ -379,10 +382,10 @@ The headline numbers (mid-2026 ballpark; replicate in your lab):
 
 | Model | Hardware | Active | Throughput (tok/s/GPU) | $/MTok |
 |-------|----------|--------|------------------------|--------|
-| Llama 3.3 70B FP8 | 4× H100 | 70B | ~580 | ~$0.40 |
-| Qwen 2.5 72B FP8 | 4× H100 | 72B | ~550 | ~$0.42 |
-| Qwen3-MoE 235B-A22B FP4 | 8× B200 | 22B | ~1200 | ~$0.30 |
-| DeepSeek V3.1 FP4 + MTP | 16× B200 (NVL72) | 37B | ~1500 (effective with MTP) | ~$0.25 |
+| Llama 3.3 70B FP8 | 4× H100 | 70B | ~580 | ~$1.20 |
+| Qwen 2.5 72B FP8 | 4× H100 | 72B | ~550 | ~$1.26 |
+| Qwen3-MoE 235B-A22B FP4 | 8× B200 | 22B | ~1200 | ~$1.27 |
+| DeepSeek V3.1 FP4 + MTP | 16× B200 (NVL72) | 37B | ~1500 (effective with MTP) | ~$1.02 |
 
 **MoE on Blackwell is the cost-economics winner** once the cluster scale is available — but it **requires the cluster scale**. For a single-replica deployment, **dense Hopper still wins**.
 
@@ -408,7 +411,7 @@ Pass criterion: the report can be reproduced by another engineer from public con
 
 ## Self-check
 
-1. MLA reduces DeepSeek V3.1's per-token KV from ~244 KB (hypothetical GQA equivalent) to ~61 KB. At 128K context, how many concurrent requests fit in the KV cache budget of one B200 (192 GB) versus the GQA hypothetical?
+1. MLA reduces DeepSeek V3.1's per-token KV from ~244 KB (hypothetical GQA equivalent) to ~69 KB. At 128K context, how many concurrent requests fit in the KV cache budget of one B200 (192 GB) versus the GQA hypothetical?
 2. MTP gives DeepSeek native speculation at ~2× effective decode throughput. Why is it specifically not transferable to Qwen3-MoE without retraining?
 3. A teammate proposes serving DeepSeek V3.1 on 8× H200 instead of 8× B200 to save cost. Without running it, predict the throughput drop. What's the bottleneck?
 4. Why does Qwen3-MoE 235B-A22B have 94 layers and DeepSeek V3.1 only 61, but DeepSeek's active params (37B) is *higher* than Qwen3's (22B)?
@@ -438,7 +441,7 @@ Cross-references:
 
 ## Current as of 2026-06
 
-Configs pinned from the official model cards: DeepSeek V3.1 (2025-08) and Qwen3-MoE 235B-A22B (2025-04). Refresh when DeepSeek V4 or Qwen4-MoE ships, or when a competing MoE family with different architectural choices becomes the production standard.
+Configs pinned from the official model cards: DeepSeek V3.1 (2025-08) and Qwen3-235B-A22B-Instruct-2507 (2025-07). Refresh when DeepSeek V4 or Qwen4-MoE ships, or when a competing MoE family with different architectural choices becomes the production standard.
 
 ---
 

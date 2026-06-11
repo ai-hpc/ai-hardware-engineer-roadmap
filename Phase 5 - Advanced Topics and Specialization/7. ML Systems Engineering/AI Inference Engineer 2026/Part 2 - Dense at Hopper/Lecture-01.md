@@ -9,11 +9,11 @@ Both Llama 3.3 70B (Meta, 2024-12) and Qwen 2.5 72B (Alibaba, 2024-09) are **den
 * 80 transformer layers
 * GQA with 64 query heads and 8 KV heads (head_dim 128)
 * RoPE positional encoding, RMSNorm, SwiGLU FFN
-* 128K context window (with YaRN)
+* 128K context window (reached by different routes: Meta's `llama3` RoPE frequency scaling for Llama 3.3, YaRN for Qwen 2.5)
 
 They are, in fact, **dimensionally almost identical** — same hidden size (8192), same 80 layers, same GQA geometry. They differ in three smaller places that matter for inference engineering:
 
-1. **Vocabulary / tokenizer** — Llama 3.3 uses a tiktoken-derived BPE at ~128K vocab; Qwen 2.5 uses its own 152K BPE optimized for multilingual (especially Chinese) content. This is the largest single source of the 70B-vs-72B parameter gap (bigger embed + LM-head matrices), and tokenization efficiency differs by ~20–30% on Chinese.
+1. **Vocabulary / tokenizer** — Llama 3.3 uses a tiktoken-derived BPE at ~128K vocab; Qwen 2.5 uses its own 152K BPE optimized for multilingual (especially Chinese) content. The bigger embed + LM-head matrices add ≈0.4B params to the 70B-vs-72B gap (most of the gap is the ~3% wider FFN, ≈1.8B — see §5), and tokenization efficiency differs by ~20–30% on Chinese.
 2. **QKV bias** — Qwen keeps the bias terms on Q, K, V projections; Llama is bias-free. Tiny memory footprint, modest impact on long-context extrapolation behavior.
 3. **FFN width** — Qwen's intermediate size is *slightly* larger (29568 vs Llama's 28672, ~3%). Real, but minor — not the "Qwen is 50% wider" you'll see in secondary sources (which misquote Qwen as 12288 hidden / 49152 FFN; §2.1 shows why that fails a back-of-envelope check).
 
@@ -71,7 +71,7 @@ input tokens (vocab → embeddings)
 Both:
 
 * Use **GQA** (8 KV heads shared across 64 query heads → group size 8).
-* Use **RoPE** for position encoding with extension to 128K via YaRN.
+* Use **RoPE** for position encoding, extended to 128K by different routes — Llama 3.3 via Meta's `"rope_type": "llama3"` frequency scaling plus long-context continued pretraining; Qwen 2.5 via YaRN applied at inference over a 32K native window.
 * Use **RMSNorm** with epsilon ≈ 1e-6 / 1e-5.
 * Use **SwiGLU** in the FFN (gate, up, down projections).
 * Are bidirectional-positional via RoPE, **causally masked** for decoding.
@@ -197,7 +197,7 @@ For a long-context workload, the two models have the **same KV memory pressure**
 | Llama 3.3 70B | absent | absent | absent |
 | Qwen 2.5 72B | present | present | present |
 
-Memory cost: 4096 + 1024 + 1024 = 6144 floats × 80 layers ≈ 2 MB total. Negligible.
+Memory cost: 8192 + 1024 + 1024 = 10,240 floats × 80 layers ≈ 819K floats ≈ 1.6 MB at FP16. Negligible.
 
 Inference cost: one extra add per matmul. Negligible on modern hardware.
 
@@ -212,7 +212,7 @@ Inference cost: one extra add per matmul. Negligible on modern hardware.
 
 Differences with inference impact:
 
-* **Embedding matrix size:** Llama 128256 × 8192 ≈ 1.05B params; Qwen 152064 × 8192 ≈ 1.25B params (≈ 2.5 GB FP16 each for embed and LM head, untied). Qwen's larger vocab is the single biggest driver of the 72B-vs-70B parameter gap.
+* **Embedding matrix size:** Llama 128256 × 8192 ≈ 1.05B params; Qwen 152064 × 8192 ≈ 1.25B params (≈ 2.5 GB FP16 each for embed and LM head, untied). Qwen's larger vocab adds ≈0.4B params to the 72B-vs-70B parameter gap — real, but the ~3% wider FFN contributes the bulk (≈1.8B; see §5).
 * **LM head matrix:** same sizes as embeddings (untied).
 * **Tokenization efficiency** — for a given text:
   * English: Llama's tokenizer is ~5% more efficient than Qwen's.
@@ -343,7 +343,7 @@ Total: ~72.7B
 
 Matches "72B" within rounding.
 
-The 2B parameter difference between the two labels comes ~50/50 from larger vocab and slightly larger FFN. Architecturally, treat them as nearly identical for inference engineering purposes.
+The ~2B parameter difference between the two labels comes mostly from the ~3% wider FFN (≈22M more per layer × 80 ≈ 1.8B); the larger vocab adds ≈0.4B in embed + LM head. Architecturally, treat them as nearly identical for inference engineering purposes.
 
 ---
 
@@ -367,7 +367,7 @@ The 2B parameter difference between the two labels comes ~50/50 from larger voca
 |----------|----------------|----------------|-------|
 | 1× H100 80G | INT4 only, tight | INT4 only, very tight | KV cache pressure limits batch |
 | 1× H200 141G | FP8 with small batch, INT4 with batch | Same | H200 is the sweet spot for single-GPU 70B-class |
-| 2× H100 NVL (TP=2) | FP8 with batch | Same | 8B/GPU at FP8 fits comfortably with KV |
+| 2× H100 NVL (TP=2) | FP8 with batch | Same | ~35 GB/GPU at FP8 fits comfortably with KV |
 | 4× H100 80G (TP=4) | FP16/BF16 native | FP16/BF16 native | 35–36B/GPU, comfortable |
 | 8× H100/H200 (TP=8) | FP16, large batch, long context | Same | production sweet spot for max throughput |
 
@@ -415,7 +415,7 @@ Pass criterion: your report can be reproduced by another engineer from the same 
 * "The Uniqueness of LLaMA3-70B Series with Per-Channel Quantization" — [arXiv:2408.15301](https://arxiv.org/abs/2408.15301)
 * GQA paper — [arXiv:2305.13245](https://arxiv.org/abs/2305.13245)
 * RoPE paper — [arXiv:2104.09864](https://arxiv.org/abs/2104.09864)
-* YaRN — [arXiv:2309.00071](https://arxiv.org/abs/2309.00071) — context extension method used by both
+* YaRN — [arXiv:2309.00071](https://arxiv.org/abs/2309.00071) — context extension method used by Qwen 2.5 (32K native → 128K at inference); Llama 3.1/3.3 instead use Meta's `"rope_type": "llama3"` frequency scaling + long-context continued pretraining
 
 Cross-references:
 

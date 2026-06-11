@@ -84,7 +84,7 @@ For DeepSeek V3.1 at EP=8 on 8× B200, batch=64, decode (1 token per request):
 ```text
 Per layer per step:
   - 64 tokens × 8 experts each = 512 token-expert pairs
-  - Average tokens per expert: 512 / (256/8) = 16
+  - Average tokens per expert: 512 / 256 = 2
   - Per token data: hidden_size × bytes = 7168 × 1 (FP8) = 7 KB
 
 Send per source rank: 64 tokens × ~50% local = 32 tokens elsewhere
@@ -95,19 +95,19 @@ NCCL alltoallv: ~28 KB to 7 destinations, asymmetric
   Approx 100-200 μs per all-to-all
 
 Per layer: 2 all-to-alls (dispatch + combine) ≈ 200-400 μs
-Per token (61 MoE layers): ~12-24 ms in all-to-all alone
+Per token (58 MoE layers): ~12-23 ms in all-to-all alone
 ```
 
 Compare to the bandwidth-bound weight read on B200:
 
 ```text
 Active weights: 37B × 0.5 bytes (FP4) = 18.5 GB
-Per GPU at EP=8: 18.5 / 8 ≈ 2.3 GB (only the experts hit per token)
-HBM read time: 2.3 / 8 ≈ 0.3 ms per layer
-Per token (61 layers): ~18 ms in weight reads
+Per GPU at EP=8: 18.5 / 8 ≈ 2.3 GB (only the experts hit per token, summed over all layers)
+HBM read time: 2.3 GB / 8 TB/s ≈ 0.29 ms per token total
+Per MoE layer (58 of the 61 layers): ~5 μs in weight reads
 ```
 
-So in a TP=8 EP=8 deployment, weight read and all-to-all are **roughly equal contributors** to decode time. This is why MoE inference is fundamentally a **communication-bound** problem — even more than dense TP — and why NVLink 5's bandwidth doubling pays off.
+So in an EP=8 deployment, **all-to-all dominates weight reads by an order of magnitude or more** — ~12-23 ms against ~0.3 ms per token. This is why MoE inference is fundamentally a **communication-bound** problem — even more than dense TP — and why NVLink 5's bandwidth doubling pays off.
 
 ### 2.1 At larger batch sizes
 
@@ -115,14 +115,14 @@ At batch=512:
 
 ```text
 Per layer: 512 tokens × 8 experts = 4096 token-expert pairs
-Average tokens per expert: 4096 / 32 = 128
+Average tokens per expert: 4096 / 256 = 16
 Per all-to-all message: ~30 tokens × 7 KB = ~200 KB per destination
 
 Now bandwidth-dominated: 200 KB × 7 destinations ÷ 1.8 TB/s ≈ 1 μs (much less than latency floor)
 But NCCL setup + small-message handling ≈ 50-100 μs
 
 Per layer: ~100-200 μs all-to-all
-Per token (61 layers): ~6-12 ms
+Per token (58 MoE layers): ~6-12 ms
 ```
 
 Larger batch **amortizes the per-step all-to-all cost**. **MoE strongly prefers higher batch sizes than dense.** Continuous batching is essential.
@@ -253,7 +253,7 @@ Per gating call: 1.83M × 64 × 128 ≈ 15 GFLOPs
 On B200 FP16 (2,250 TFLOPs peak): ~7 μs
 
 Per layer: gating + topk + scatter overhead ≈ 20-50 μs
-Per token (61 layers): ~1.2-3 ms in gating-related ops
+Per token (58 MoE layers): ~1.2-2.9 ms in gating-related ops
 ```
 
 Small. **Usually not the bottleneck** unless the runtime's gating implementation is unoptimized.
