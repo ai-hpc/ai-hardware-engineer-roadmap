@@ -1,0 +1,27 @@
+name: Notify blog to rebuild
+
+# When inference course content changes on this branch, ping the blog repo
+# (ai-hpc/ai-hpc.github.io) so it rebuilds and re-syncs the
+# "AI Inference Engineer 2026" folder. Inert until BLOG_DISPATCH_TOKEN is set.
+on:
+  push:
+    branches: [ai-inference]
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger blog rebuild
+        env:
+          TOKEN: ${{ secrets.BLOG_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "BLOG_DISPATCH_TOKEN not set — skipping. Add the secret to enable instant sync."
+            exit 0
+          fi
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/ai-hpc/ai-hpc.github.io/dispatches \
+            -d '{"event_type":"roadmap-updated"}'
+          echo "Dispatched roadmap-updated -> ai-hpc/ai-hpc.github.io"
