@@ -508,6 +508,13 @@ nav:
         - "04: Qwen2.5-72B Multi-GPU FP16": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-04.md
         - "05: Cross-Model and Production Serving": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-05.md
         - "06: Batched GEMM vs Normal GEMM": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-06.md
+      - "Gemma 4 Edge Deployment":
+        - Overview: Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/README.md
+        - "01: Why Gemma 4 at the Edge": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-01.md
+        - "02: Quantization and Format Conversion": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-02.md
+        - "03: The PDL Runtime Stack": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-03.md
+        - "04: Speculative Decoding with Gemma 4": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-04.md
+        - "05: Physical AI and Multimodal Gemma 4": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-05.md
     - "D: Robotics":
       - Guide: Phase 5 - Advanced Topics and Specialization/4. Robotics/Guide.md
       - CMU Robotics Courses: Phase 5 - Advanced Topics and Specialization/4. Robotics/CMU-Robotics-Courses.md
