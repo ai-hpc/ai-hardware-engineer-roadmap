@@ -49,7 +49,7 @@ The **interleaved attention** is the architectural moat at the edge. At 128 K co
 
 ---
 
-## Course Map (5 lectures)
+## Course Map (6 lectures)
 
 <div class="lecture-map" markdown>
 
@@ -60,6 +60,7 @@ The **interleaved attention** is the architectural moat at the edge. At 128 K co
 | [03](Lecture-03.md) | **The PDL Runtime Stack** — LiteRT (Google AI Edge), llama.cpp, MLC-LLM (TVM Unity), TensorRT-LLM: selection matrix, latency/throughput profiles on Orin and Thor | runtime choice |
 | [04](Lecture-04.md) | **Speculative Decoding with Gemma 4** — 1B draft + 4B/12B target, EAGLE-3-style self-draft heads, lookahead decoding, acceptance-length analysis on edge hardware | the algorithm layer |
 | [05](Lecture-05.md) | **Physical AI and Multimodal Gemma 4** — SigLIP-400M vision encoder, VLM pipeline on Jetson, robot perception use cases, latency budget, capstone | closing the loop |
+| [06](Lecture-06.md) | **MTP with Gemma 4 E2B** — 4-layer E2B MTP drafter architecture, target-state-aware proposals, deployment on vLLM / LiteRT-LM / llama.cpp, E2B vs 1B vs EAGLE-3 decision matrix | the official drafter |
 
 </div>
 

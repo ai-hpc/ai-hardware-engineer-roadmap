@@ -515,6 +515,7 @@ nav:
         - "03: The PDL Runtime Stack": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-03.md
         - "04: Speculative Decoding with Gemma 4": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-04.md
         - "05: Physical AI and Multimodal Gemma 4": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-05.md
+        - "06: MTP with Gemma 4 E2B": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-06.md
     - "D: Robotics":
       - Guide: Phase 5 - Advanced Topics and Specialization/4. Robotics/Guide.md
       - CMU Robotics Courses: Phase 5 - Advanced Topics and Specialization/4. Robotics/CMU-Robotics-Courses.md
