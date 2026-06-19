@@ -1,0 +1,49 @@
+{#- Resolve the first page URL of a nav item, drilling up to 4 levels deep -#}
+{% macro get_url(item) -%}
+  {%- if item.url -%}
+    {{ item.url | url }}
+  {%- elif item.children -%}
+    {%- set a = item.children | first -%}
+    {%- if a.url -%}
+      {{ a.url | url }}
+    {%- elif a.children -%}
+      {%- set b = a.children | first -%}
+      {%- if b.url -%}
+        {{ b.url | url }}
+      {%- elif b.children -%}
+        {%- set c = b.children | first -%}
+        {%- if c.url -%}{{ c.url | url }}{%- endif -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro render(nav_item, ref) %}
+  {%- set ref = ref or nav_item -%}
+  {%- set is_active = ref.active -%}
+  {%- set has_dropdown = nav_item.children and (nav_item.children | length) > 1 -%}
+  <li class="md-tabs__item{{ ' md-tabs__item--active' if is_active else '' }}{{ ' md-tabs__item--has-dropdown' if has_dropdown else '' }}">
+    {%- if nav_item.children -%}
+      <a href="{{ get_url(nav_item) }}" class="md-tabs__link">
+        {{- nav_item.title -}}
+        {%- if has_dropdown -%}
+          <svg class="md-tabs__caret" viewBox="0 0 10 6" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M0 0l5 6 5-6z" fill="currentColor"/></svg>
+        {%- endif -%}
+      </a>
+      {%- if has_dropdown -%}
+        <ul class="md-tabs__dropdown" role="menu">
+          {%- for child in nav_item.children -%}
+            {%- set child_url = get_url(child) -%}
+            {%- if child_url -%}
+              <li role="menuitem">
+                <a href="{{ child_url }}" class="md-tabs__dropdown-link">{{ child.title }}</a>
+              </li>
+            {%- endif -%}
+          {%- endfor -%}
+        </ul>
+      {%- endif -%}
+    {%- else -%}
+      <a href="{{ nav_item.url | url }}" class="md-tabs__link">{{ nav_item.title }}</a>
+    {%- endif -%}
+  </li>
+{% endmacro %}
