@@ -600,3 +600,8 @@ nav:
           - "03: Expert Parallelism (EP)": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-03.md
           - "04: Disaggregated Prefill/Decode": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-04.md
           - "05: Production MoE Serving": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-05.md
+  - Phase 6 — Interview Preparation:
+    - Overview: Phase 6 - Interview Preparation/README.md
+    - "MLSys Engineer":
+      - Guide: Phase 6 - Interview Preparation/1. MLSys Engineer/README.md
+      - "01: Inference Systems Q&A": Phase 6 - Interview Preparation/1. MLSys Engineer/01-Inference-Systems-QA.md
