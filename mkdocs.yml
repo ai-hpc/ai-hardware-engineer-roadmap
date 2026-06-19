@@ -109,320 +109,322 @@ nav:
       - Track B — NVIDIA Jetson: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Guide.md
       - Track C — ML Compiler: Phase 4 - Track C - ML Compiler and Graph Optimization/Guide.md
     - Phase 5 — Specialization: Phase 5 - Advanced Topics and Specialization/Guide.md
+    - Phase 6 — Interview Prep: Phase 6 - Interview Preparation/README.md
     - 💬 Join the Discord community: https://discord.gg/r8DKtDzrsm
-  - Roles & Market: Roles and Market Analysis.md
 
-  # ── Phase 1 ─────────────────────────────────────────────────
-  - Phase 1 — Digital Foundations:
-    - Overview: Phase 1 - Foundational Knowledge/Guide.md
-    - Digital Design:
-      - Guide: Phase 1 - Foundational Knowledge/1. Digital Design and Hardware Description Languages/Guide.md
-      - Fundamentals: Phase 1 - Foundational Knowledge/1. Digital Design and Hardware Description Languages/Digital Design Fundamentals/Guide.md
-      - HDLs: Phase 1 - Foundational Knowledge/1. Digital Design and Hardware Description Languages/Hardware Description Languages (HDLs)/Guide.md
-    - Computer Architecture: Phase 1 - Foundational Knowledge/2. Computer Architecture and Hardware/Guide.md
-    - Operating Systems:
-      - Guide: Phase 1 - Foundational Knowledge/3. Operating Systems/Guide.md
-      - Lectures:
-        - "01: Introduction": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-01.md
-        - "02": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-02.md
-        - "03": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-03.md
-        - "04": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-04.md
-        - "05": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-05.md
-        - "06": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-06.md
-        - "07": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-07.md
-        - "08": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-08.md
-        - "09": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-09.md
-        - "10": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-10.md
-        - "11": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-11.md
-        - "12": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-12.md
-        - "13": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-13.md
-        - "14": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-14.md
-        - "15": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-15.md
-        - "16": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-16.md
-        - "17": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-17.md
-        - "18": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-18.md
-        - "19": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-19.md
-        - "20": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-20.md
-        - "21": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-21.md
-        - "22": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-22.md
-        - "23": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-23.md
-        - "24": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-24.md
-        - "25": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-25.md
-        - "26": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-26.md
-      - Lecture Notes:
-        - "Note 01": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-Note-01.md
-        - "Note 02": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-Note-02.md
-        - "Note 03": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-Note-03.md
-        - "Note 04": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-Note-04.md
-        - "Note 05": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-Note-05.md
-        - "Note 06": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-Note-06.md
-        - "Note 07": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-Note-07.md
-        - "Note 08": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-Note-08.md
-    - C++ & Parallel Computing:
-      - Guide: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/Guide.md
-      - C++ and SIMD: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/C++ and SIMD/Guide.md
-      - OpenMP and oneTBB: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/OpenMP and OneTBB/Guide.md
-      - CUDA and SIMT: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/CUDA and SIMT/Guide.md
-      - ROCm and HIP: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/ROCm and HIP/Guide.md
-      - OpenCL and SYCL: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/OpenCL and SYCL/Guide.md
+  # ── P1–P2 · Foundations ───────────────────────────────────────────────
+  - "P1–2 · Foundations":
+    - Phase 1 — Digital Foundations:
+      - Overview: Phase 1 - Foundational Knowledge/Guide.md
+      - Digital Design:
+        - Guide: Phase 1 - Foundational Knowledge/1. Digital Design and Hardware Description Languages/Guide.md
+        - Fundamentals: Phase 1 - Foundational Knowledge/1. Digital Design and Hardware Description Languages/Digital Design Fundamentals/Guide.md
+        - HDLs: Phase 1 - Foundational Knowledge/1. Digital Design and Hardware Description Languages/Hardware Description Languages (HDLs)/Guide.md
+      - Computer Architecture: Phase 1 - Foundational Knowledge/2. Computer Architecture and Hardware/Guide.md
+      - Operating Systems:
+        - Guide: Phase 1 - Foundational Knowledge/3. Operating Systems/Guide.md
+        - Lectures:
+          - "01: Introduction": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-01.md
+          - "02": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-02.md
+          - "03": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-03.md
+          - "04": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-04.md
+          - "05": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-05.md
+          - "06": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-06.md
+          - "07": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-07.md
+          - "08": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-08.md
+          - "09": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-09.md
+          - "10": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-10.md
+          - "11": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-11.md
+          - "12": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-12.md
+          - "13": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-13.md
+          - "14": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-14.md
+          - "15": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-15.md
+          - "16": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-16.md
+          - "17": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-17.md
+          - "18": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-18.md
+          - "19": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-19.md
+          - "20": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-20.md
+          - "21": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-21.md
+          - "22": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-22.md
+          - "23": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-23.md
+          - "24": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-24.md
+          - "25": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-25.md
+          - "26": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-26.md
+        - Lecture Notes:
+          - "Note 01": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-Note-01.md
+          - "Note 02": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-Note-02.md
+          - "Note 03": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-Note-03.md
+          - "Note 04": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-Note-04.md
+          - "Note 05": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-Note-05.md
+          - "Note 06": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-Note-06.md
+          - "Note 07": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-Note-07.md
+          - "Note 08": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-Note-08.md
+      - C++ & Parallel Computing:
+        - Guide: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/Guide.md
+        - C++ and SIMD: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/C++ and SIMD/Guide.md
+        - OpenMP and oneTBB: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/OpenMP and OneTBB/Guide.md
+        - CUDA and SIMT: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/CUDA and SIMT/Guide.md
+        - ROCm and HIP: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/ROCm and HIP/Guide.md
+        - OpenCL and SYCL: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/OpenCL and SYCL/Guide.md
 
-  # ── Phase 2 ─────────────────────────────────────────────────
-  - Phase 2 — Embedded Systems:
-    - Overview: Phase 2 - Embedded Systems/Guide.md
-    - Schematic & PCB: Phase 2 - Embedded Systems/1. Schematic Capture and PCB Design/Guide.md
-    - Embedded Software:
-      - Guide: Phase 2 - Embedded Systems/2. Embedded Software/Guide.md
-      - Espressif:
-        - Guide: Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Guide.md
-        - Arduino-ESP32 Lectures:
-          - Overview: Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Lecture/README.md
-          - "01": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Lecture/Lecture-01.md
-          - "02": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Lecture/Lecture-02.md
-          - "03": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Lecture/Lecture-03.md
-          - "04": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Lecture/Lecture-04.md
-          - "05": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Lecture/Lecture-05.md
-        - Official Education Path:
-          - Guide: Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Education/Guide.md
+    # ── Phase 2 ─────────────────────────────────────────────────
+    - Phase 2 — Embedded Systems:
+      - Overview: Phase 2 - Embedded Systems/Guide.md
+      - Schematic & PCB: Phase 2 - Embedded Systems/1. Schematic Capture and PCB Design/Guide.md
+      - Embedded Software:
+        - Guide: Phase 2 - Embedded Systems/2. Embedded Software/Guide.md
+        - Espressif:
+          - Guide: Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Guide.md
+          - Arduino-ESP32 Lectures:
+            - Overview: Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Lecture/README.md
+            - "01": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Lecture/Lecture-01.md
+            - "02": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Lecture/Lecture-02.md
+            - "03": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Lecture/Lecture-03.md
+            - "04": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Lecture/Lecture-04.md
+            - "05": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Lecture/Lecture-05.md
+          - Official Education Path:
+            - Guide: Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Education/Guide.md
+            - Lectures:
+              - Overview: Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Education/Lecture/README.md
+              - "01": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Education/Lecture/Lecture-01.md
+              - "02": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Education/Lecture/Lecture-02.md
+              - "03": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Education/Lecture/Lecture-03.md
+              - "04": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Education/Lecture/Lecture-04.md
+              - "05": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Education/Lecture/Lecture-05.md
+        - IoT:
+          - Guide: Phase 2 - Embedded Systems/2. Embedded Software/IoT/Guide.md
+          - OpenThread: Phase 2 - Embedded Systems/2. Embedded Software/IoT/OpenThread/Guide.md
+          - Zigbee:
+            - Guide: Phase 2 - Embedded Systems/2. Embedded Software/IoT/Zigbee/Guide.md
+            - Lectures:
+              - Overview: Phase 2 - Embedded Systems/2. Embedded Software/IoT/Zigbee/Lecture/README.md
+              - "01": Phase 2 - Embedded Systems/2. Embedded Software/IoT/Zigbee/Lecture/Lecture-01.md
+              - "02": Phase 2 - Embedded Systems/2. Embedded Software/IoT/Zigbee/Lecture/Lecture-02.md
+              - "03": Phase 2 - Embedded Systems/2. Embedded Software/IoT/Zigbee/Lecture/Lecture-03.md
+              - "04": Phase 2 - Embedded Systems/2. Embedded Software/IoT/Zigbee/Lecture/Lecture-04.md
+              - "05": Phase 2 - Embedded Systems/2. Embedded Software/IoT/Zigbee/Lecture/Lecture-05.md
+      - Embedded Linux:
+        - Guide: Phase 2 - Embedded Systems/3. Embedded Linux/Guide.md
+        - Jetson ESP-Hosted Host Code:
+          - Guide: Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Guide.md
           - Lectures:
-            - Overview: Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Education/Lecture/README.md
-            - "01": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Education/Lecture/Lecture-01.md
-            - "02": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Education/Lecture/Lecture-02.md
-            - "03": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Education/Lecture/Lecture-03.md
-            - "04": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Education/Lecture/Lecture-04.md
-            - "05": Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Education/Lecture/Lecture-05.md
-      - IoT:
-        - Guide: Phase 2 - Embedded Systems/2. Embedded Software/IoT/Guide.md
-        - OpenThread: Phase 2 - Embedded Systems/2. Embedded Software/IoT/OpenThread/Guide.md
-        - Zigbee:
-          - Guide: Phase 2 - Embedded Systems/2. Embedded Software/IoT/Zigbee/Guide.md
+            - Overview: Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Lecture/README.md
+            - "01": Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Lecture/Lecture-01.md
+            - "02": Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Lecture/Lecture-02.md
+            - "03": Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Lecture/Lecture-03.md
+            - "04": Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Lecture/Lecture-04.md
+            - "05": Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Lecture/Lecture-05.md
+        - Yocto:
+          - Guide: Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Guide.md
           - Lectures:
-            - Overview: Phase 2 - Embedded Systems/2. Embedded Software/IoT/Zigbee/Lecture/README.md
-            - "01": Phase 2 - Embedded Systems/2. Embedded Software/IoT/Zigbee/Lecture/Lecture-01.md
-            - "02": Phase 2 - Embedded Systems/2. Embedded Software/IoT/Zigbee/Lecture/Lecture-02.md
-            - "03": Phase 2 - Embedded Systems/2. Embedded Software/IoT/Zigbee/Lecture/Lecture-03.md
-            - "04": Phase 2 - Embedded Systems/2. Embedded Software/IoT/Zigbee/Lecture/Lecture-04.md
-            - "05": Phase 2 - Embedded Systems/2. Embedded Software/IoT/Zigbee/Lecture/Lecture-05.md
-    - Embedded Linux:
-      - Guide: Phase 2 - Embedded Systems/3. Embedded Linux/Guide.md
-      - Jetson ESP-Hosted Host Code:
-        - Guide: Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Guide.md
+            - Overview: Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/README.md
+            - "01": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-01.md
+            - "02": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-02.md
+            - "03": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-03.md
+            - "04": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-04.md
+            - "05": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-05.md
+            - "06": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-06.md
+            - "07": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-07.md
+            - "08": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-08.md
+            - "09": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-09.md
+            - "10": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-10.md
+            - "11": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-11.md
+            - "12": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-12.md
+            - "13": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-13.md
+            - "14": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-14.md
+            - "15": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-15.md
+            - "16": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-16.md
+            - "Lab: Edge AI Camera": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lab-01-Worked-Example-Edge-AI-Camera.md
+      - Product Design:
+        - Guide: Phase 2 - Embedded Systems/4. Product Design/Guide.md
         - Lectures:
-          - Overview: Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Lecture/README.md
-          - "01": Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Lecture/Lecture-01.md
-          - "02": Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Lecture/Lecture-02.md
-          - "03": Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Lecture/Lecture-03.md
-          - "04": Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Lecture/Lecture-04.md
-          - "05": Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Lecture/Lecture-05.md
-      - Yocto:
-        - Guide: Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Guide.md
-        - Lectures:
-          - Overview: Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/README.md
-          - "01": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-01.md
-          - "02": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-02.md
-          - "03": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-03.md
-          - "04": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-04.md
-          - "05": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-05.md
-          - "06": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-06.md
-          - "07": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-07.md
-          - "08": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-08.md
-          - "09": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-09.md
-          - "10": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-10.md
-          - "11": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-11.md
-          - "12": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-12.md
-          - "13": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-13.md
-          - "14": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-14.md
-          - "15": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-15.md
-          - "16": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-16.md
-          - "Lab: Edge AI Camera": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lab-01-Worked-Example-Edge-AI-Camera.md
-    - Product Design:
-      - Guide: Phase 2 - Embedded Systems/4. Product Design/Guide.md
-      - Lectures:
-        - Overview: Phase 2 - Embedded Systems/4. Product Design/Lecture/README.md
-        - "01": Phase 2 - Embedded Systems/4. Product Design/Lecture/Lecture-01.md
-        - "02": Phase 2 - Embedded Systems/4. Product Design/Lecture/Lecture-02.md
-        - "03": Phase 2 - Embedded Systems/4. Product Design/Lecture/Lecture-03.md
-        - "04": Phase 2 - Embedded Systems/4. Product Design/Lecture/Lecture-04.md
+          - Overview: Phase 2 - Embedded Systems/4. Product Design/Lecture/README.md
+          - "01": Phase 2 - Embedded Systems/4. Product Design/Lecture/Lecture-01.md
+          - "02": Phase 2 - Embedded Systems/4. Product Design/Lecture/Lecture-02.md
+          - "03": Phase 2 - Embedded Systems/4. Product Design/Lecture/Lecture-03.md
+          - "04": Phase 2 - Embedded Systems/4. Product Design/Lecture/Lecture-04.md
 
-  # ── Phase 3 ─────────────────────────────────────────────────
-  - Phase 3 — AI:
-    - Overview: Phase 3 - Artificial Intelligence/Guide.md
-    - 1. Neural Networks:
-      - Guide: Phase 3 - Artificial Intelligence/1. Neural Networks/Guide.md
-      - "Transformer Fundamentals": Phase 3 - Artificial Intelligence/1. Neural Networks/Transformer Fundamentals/Lecture-01.md
-    - 2. Frameworks:
-      - Guide: Phase 3 - Artificial Intelligence/2. Deep Learning Frameworks/Guide.md
-      - micrograd: Phase 3 - Artificial Intelligence/2. Deep Learning Frameworks/micrograd/Guide.md
-      - PyTorch: Phase 3 - Artificial Intelligence/2. Deep Learning Frameworks/PyTorch/Guide.md
-      - tinygrad: Phase 3 - Artificial Intelligence/2. Deep Learning Frameworks/tinygrad/Guide.md
-    - "Track A: Hardware & Edge AI":
-      - 3. Computer Vision: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/3. Computer Vision/Guide.md
-      - 4. Sensor Fusion:
-        - Guide: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/Guide.md
-        - Kalibr: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/Kalibr/Guide.md
-        - BEVFusion: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/BEVFusion/Guide.md
-        - MOT: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/multi-object-tracking/Guide.md
-        - Kalman Filter:
-          - Index: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/00-index.md
-          - "01: What is Estimation": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/01-what-is-estimation.md
-          - "02: Noisy Measurements": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/02-noisy-measurements.md
-          - "03: Combining Information": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/03-combining-information.md
-          - "04: Averages & Uncertainty": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/04-averages-and-uncertainty.md
-          - "05: Weighted Averages": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/05-weighted-averages.md
-          - "06: Prediction": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/06-prediction.md
-          - "07: Kalman Filter Idea": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/07-kalman-filter-idea.md
-          - "08: 1D Kalman Filter": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/08-1d-kalman-filter.md
-          - "09: Tracking Moving Object": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/09-tracking-moving-object.md
-          - "10: Matrix Form": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/10-matrix-form.md
-          - "11: Multidimensional KF": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/11-multidimensional-kf.md
-          - 6D Kalman Explained: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/6d-kalman-explained.md
-          - Cheat Sheet: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/cheat-sheet.md
-      - 5. Voice AI: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/5. Voice AI/Guide.md
-      - 6. Edge AI & Optimization: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/6. Edge AI and Model Optimization/Guide.md
-    - "Track B: Agentic AI & ML":
-      - 3. AI Agent Development 2026:
-        - Guide: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Guide.md
-        - Lectures:
-          - Index: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/README.md
-          - "01: The Modern AI Agent in 2026: What Changed": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-01.md
-          - "02: What Is an AI Agent Harness? The Runtime Around the Model": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-02.md
-          - "03: Building Agents I: Foundations (Model, Tools, Instructions)": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-03.md
-          - "04: Building Agents II: Orchestration & Guardrails": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-04.md
-          - "05: LLM Fundamentals for Agents": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-05.md
-          - "06: LLM From Scratch: Model Mechanics for Agent and GPU Engineers": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-06.md
-          - "07: Prompt Engineering & Structured Output": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-07.md
-          - "08: Tool Use & Function Calling": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-08.md
-          - "09: Structured Tools Beat Computer Use: Interface Hierarchy for Agents": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-09.md
-          - "10: Memory Systems": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-10.md
-          - "11: RAG: Ingestion & Embeddings": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-11.md
-          - "12: RAG: Retrieval & Reranking": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-12.md
-          - "13: Qdrant, pgvector, and Embedding Model Selection": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-13.md
-          - "14: Efficient Local RAG Stack: Qwen3.5-4B INT4 and Granite Embeddings": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-14.md
-          - "15: Agent Architecture Patterns": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-15.md
-          - "16: LangGraph: Stateful Workflows": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-16.md
-          - "17: Agent SDKs and Runtime APIs": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-17.md
-          - "18: OpenAI Agents SDK: Native Sandbox and Durable Agent Harness": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-18.md
-          - "19: Multi-Agent Systems": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-19.md
-          - "20: Nemotron 3 Nano Omni: Multimodal Perception Sub-Agents for Agent Systems": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-20.md
-          - "21: Agent Skills: Workflow Discipline for Reliable Coding Agents": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-21.md
-          - "22: Agent Skills Eval: Benchmarking SKILL.md Files": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-22.md
-          - "23: Evaluation & Observability": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-23.md
-          - "24: Runtime Discipline and AI Runtime Security": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-24.md
-          - "25: AI Agent Security Engineer: A Practitioner's Roadmap": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-25.md
-          - "26: Session as Source of Truth: Event-Sourced Agent State": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-26.md
-          - "27: Deterministic Startup for AI Agent Systems": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-27.md
-          - "28: Runtime Strategy for Agent Systems: Node, Bun, Rust, and Edge Packaging": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-28.md
-          - "29: Agentic SDLC: Explore Fast, Ship Safely": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-29.md
-          - "30: Production Deployment": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-30.md
-          - "31: OpenClaw Case Study: Why Real Agents Need a Gateway": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-31.md
-          - "32: OpenClaw Case Study: Channels, Routing, and Session Design": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-32.md
-          - "33: OpenClaw Case Study: Multi-Agent Isolation, Workspaces, and Memory": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-33.md
-          - "34: OpenClaw Case Study: Operating and Securing a Persistent Agent System": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-34.md
-          - "35: OpenClaw Case Study: The Agent Loop": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-35.md
-          - "36: OpenClaw Case Study: Cron, Scheduled Agent Runs, and Automation Reliability": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-36.md
-          - "37: OpenClaw Case Study: System Prompt Architecture": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-37.md
-          - "38: OpenClaw Case Study: App SDK Dogfooding and Typed Gateway RPCs": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-38.md
-          - "39: OpenClaw Case Study: Gateway RPC Protocol": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-39.md
-          - "40: OpenClaw Threat Model: MITRE ATLAS for Agent Security": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-40.md
-          - "41: Pi (pi-mono): A Detail Reading of a Minimal Coding Agent": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-41.md
-        - Labs:
-          - "Lab 01: Research Agent": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-01-Research-Agent.md
-          - "Lab 02: Multi-Agent Pipeline": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-02-Multi-Agent-Pipeline.md
-          - "Lab 03: Production RAG": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-03-Production-RAG.md
-          - "Lab 04: TokenJuice Output Compaction": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-04-TokenJuice-Output-Compaction.md
-          - "Lab 05: OpenMeow App SDK Dogfood": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-05-OpenMeow-App-SDK-Dogfood.md
-          - "Lab 06: Capstone — Build genie-claw": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-06-Genie-Claw-Capstone.md
-      - 4. ML Engineering & MLOps: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/4. ML Engineering and MLOps/Guide.md
-      - 5. LLM App Development:
-        - Guide: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/5. LLM Application Development/Guide.md
-        - Qwen3.5-4B Unsloth Fine-Tuning: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/5. LLM Application Development/Qwen3.5-4B Unsloth Fine-Tuning/Guide.md
-    - CMU AI Courses: Phase 3 - Artificial Intelligence/CMU-AI-Courses.md
+  # ── P3–P4 · AI Systems ────────────────────────────────────────────────
+  - "P3–4 · AI Systems":
+    - Phase 3 — AI:
+      - Overview: Phase 3 - Artificial Intelligence/Guide.md
+      - 1. Neural Networks:
+        - Guide: Phase 3 - Artificial Intelligence/1. Neural Networks/Guide.md
+        - "Transformer Fundamentals": Phase 3 - Artificial Intelligence/1. Neural Networks/Transformer Fundamentals/Lecture-01.md
+      - 2. Frameworks:
+        - Guide: Phase 3 - Artificial Intelligence/2. Deep Learning Frameworks/Guide.md
+        - micrograd: Phase 3 - Artificial Intelligence/2. Deep Learning Frameworks/micrograd/Guide.md
+        - PyTorch: Phase 3 - Artificial Intelligence/2. Deep Learning Frameworks/PyTorch/Guide.md
+        - tinygrad: Phase 3 - Artificial Intelligence/2. Deep Learning Frameworks/tinygrad/Guide.md
+      - "Track A: Hardware & Edge AI":
+        - 3. Computer Vision: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/3. Computer Vision/Guide.md
+        - 4. Sensor Fusion:
+          - Guide: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/Guide.md
+          - Kalibr: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/Kalibr/Guide.md
+          - BEVFusion: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/BEVFusion/Guide.md
+          - MOT: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/multi-object-tracking/Guide.md
+          - Kalman Filter:
+            - Index: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/00-index.md
+            - "01: What is Estimation": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/01-what-is-estimation.md
+            - "02: Noisy Measurements": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/02-noisy-measurements.md
+            - "03: Combining Information": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/03-combining-information.md
+            - "04: Averages & Uncertainty": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/04-averages-and-uncertainty.md
+            - "05: Weighted Averages": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/05-weighted-averages.md
+            - "06: Prediction": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/06-prediction.md
+            - "07: Kalman Filter Idea": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/07-kalman-filter-idea.md
+            - "08: 1D Kalman Filter": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/08-1d-kalman-filter.md
+            - "09: Tracking Moving Object": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/09-tracking-moving-object.md
+            - "10: Matrix Form": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/10-matrix-form.md
+            - "11: Multidimensional KF": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/11-multidimensional-kf.md
+            - 6D Kalman Explained: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/6d-kalman-explained.md
+            - Cheat Sheet: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/cheat-sheet.md
+        - 5. Voice AI: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/5. Voice AI/Guide.md
+        - 6. Edge AI & Optimization: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/6. Edge AI and Model Optimization/Guide.md
+      - "Track B: Agentic AI & ML":
+        - 3. AI Agent Development 2026:
+          - Guide: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Guide.md
+          - Lectures:
+            - Index: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/README.md
+            - "01: The Modern AI Agent in 2026: What Changed": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-01.md
+            - "02: What Is an AI Agent Harness? The Runtime Around the Model": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-02.md
+            - "03: Building Agents I: Foundations (Model, Tools, Instructions)": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-03.md
+            - "04: Building Agents II: Orchestration & Guardrails": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-04.md
+            - "05: LLM Fundamentals for Agents": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-05.md
+            - "06: LLM From Scratch: Model Mechanics for Agent and GPU Engineers": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-06.md
+            - "07: Prompt Engineering & Structured Output": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-07.md
+            - "08: Tool Use & Function Calling": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-08.md
+            - "09: Structured Tools Beat Computer Use: Interface Hierarchy for Agents": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-09.md
+            - "10: Memory Systems": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-10.md
+            - "11: RAG: Ingestion & Embeddings": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-11.md
+            - "12: RAG: Retrieval & Reranking": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-12.md
+            - "13: Qdrant, pgvector, and Embedding Model Selection": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-13.md
+            - "14: Efficient Local RAG Stack: Qwen3.5-4B INT4 and Granite Embeddings": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-14.md
+            - "15: Agent Architecture Patterns": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-15.md
+            - "16: LangGraph: Stateful Workflows": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-16.md
+            - "17: Agent SDKs and Runtime APIs": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-17.md
+            - "18: OpenAI Agents SDK: Native Sandbox and Durable Agent Harness": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-18.md
+            - "19: Multi-Agent Systems": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-19.md
+            - "20: Nemotron 3 Nano Omni: Multimodal Perception Sub-Agents for Agent Systems": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-20.md
+            - "21: Agent Skills: Workflow Discipline for Reliable Coding Agents": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-21.md
+            - "22: Agent Skills Eval: Benchmarking SKILL.md Files": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-22.md
+            - "23: Evaluation & Observability": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-23.md
+            - "24: Runtime Discipline and AI Runtime Security": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-24.md
+            - "25: AI Agent Security Engineer: A Practitioner's Roadmap": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-25.md
+            - "26: Session as Source of Truth: Event-Sourced Agent State": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-26.md
+            - "27: Deterministic Startup for AI Agent Systems": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-27.md
+            - "28: Runtime Strategy for Agent Systems: Node, Bun, Rust, and Edge Packaging": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-28.md
+            - "29: Agentic SDLC: Explore Fast, Ship Safely": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-29.md
+            - "30: Production Deployment": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-30.md
+            - "31: OpenClaw Case Study: Why Real Agents Need a Gateway": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-31.md
+            - "32: OpenClaw Case Study: Channels, Routing, and Session Design": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-32.md
+            - "33: OpenClaw Case Study: Multi-Agent Isolation, Workspaces, and Memory": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-33.md
+            - "34: OpenClaw Case Study: Operating and Securing a Persistent Agent System": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-34.md
+            - "35: OpenClaw Case Study: The Agent Loop": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-35.md
+            - "36: OpenClaw Case Study: Cron, Scheduled Agent Runs, and Automation Reliability": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-36.md
+            - "37: OpenClaw Case Study: System Prompt Architecture": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-37.md
+            - "38: OpenClaw Case Study: App SDK Dogfooding and Typed Gateway RPCs": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-38.md
+            - "39: OpenClaw Case Study: Gateway RPC Protocol": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-39.md
+            - "40: OpenClaw Threat Model: MITRE ATLAS for Agent Security": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-40.md
+            - "41: Pi (pi-mono): A Detail Reading of a Minimal Coding Agent": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-41.md
+          - Labs:
+            - "Lab 01: Research Agent": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-01-Research-Agent.md
+            - "Lab 02: Multi-Agent Pipeline": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-02-Multi-Agent-Pipeline.md
+            - "Lab 03: Production RAG": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-03-Production-RAG.md
+            - "Lab 04: TokenJuice Output Compaction": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-04-TokenJuice-Output-Compaction.md
+            - "Lab 05: OpenMeow App SDK Dogfood": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-05-OpenMeow-App-SDK-Dogfood.md
+            - "Lab 06: Capstone — Build genie-claw": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-06-Genie-Claw-Capstone.md
+        - 4. ML Engineering & MLOps: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/4. ML Engineering and MLOps/Guide.md
+        - 5. LLM App Development:
+          - Guide: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/5. LLM Application Development/Guide.md
+          - Qwen3.5-4B Unsloth Fine-Tuning: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/5. LLM Application Development/Qwen3.5-4B Unsloth Fine-Tuning/Guide.md
+      - CMU AI Courses: Phase 3 - Artificial Intelligence/CMU-AI-Courses.md
 
-  # ── Phase 4 ─────────────────────────────────────────────────
-  - Phase 4 — Deployment:
-    - "Track A: Xilinx FPGA":
-      - 1. FPGA Development: Phase 4 - Track A - Xilinx FPGA/1. Xilinx FPGA Development/Guide.md
-      - 2. Zynq UltraScale+: Phase 4 - Track A - Xilinx FPGA/2. Zynq UltraScale+ MPSoC/Guide.md
-      - 3. Advanced FPGA: Phase 4 - Track A - Xilinx FPGA/3. Advanced FPGA Design/Guide.md
-      - 4. HLS: Phase 4 - Track A - Xilinx FPGA/4. High-Level Synthesis (HLS)/Guide.md
-      - 5. Runtime & Drivers: Phase 4 - Track A - Xilinx FPGA/5. Runtime and Driver Development/Guide.md
-      - 6. Projects: Phase 4 - Track A - Xilinx FPGA/6. Projects/Wireless-Video-FPGA.md
-    - "Track B: NVIDIA Jetson":
-      - 1. Jetson Platform:
-        - Guide: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Guide.md
-        - CUDA Programming: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-CUDA-Programming/Guide.md
-        - Camera ISP & Sensor Bring-Up: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Camera-ISP-Sensor-Bringup/Guide.md
-        - Container Fleet: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Container-Fleet/Guide.md
-        - DLA Deep Dive: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-DLA-Deep-Dive/Guide.md
-        - GPIO / SPI / I2C / CAN: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-GPIO-SPI-I2C-CAN/Guide.md
-        - Kernel Internals: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Kernel-Internals/Guide.md
-        - Memory Architecture: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Memory-Architecture/Guide.md
-        - OTA Deep Dive: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-OTA-Deep-Dive/Guide.md
-        - Power & Thermal: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Power-Thermal/Guide.md
-        - RT Linux Deep Dive: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-RT-Linux-Deep-Dive/Guide.md
-        - Real-Time Inference: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Real-Time-Inference/Guide.md
-        - Rootfs & A/B Redundancy: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Rootfs-and-AB-Redundancy/Guide.md
-        - Security: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Security/Guide.md
-        - TensorRT: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Tensor/Guide.md
-        - Video Codec & DeepStream: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Video-Codec-DeepStream/Guide.md
-        - Yocto BSP Production: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Yocto-BSP-Production/Guide.md
-      - 2. Carrier Board: Phase 4 - Track B - Nvidia Jetson/2. Custom Carrier Board Design and Bring-Up/Guide.md
-      - 3. L4T Customization:
-        - Guide: Phase 4 - Track B - Nvidia Jetson/3. L4T Customization/Guide.md
-        - Custom Board Engineering Flow: Phase 4 - Track B - Nvidia Jetson/3. L4T Customization/Orin-Nano-8GB-Custom-Board-L4T-Engineering-Flow.md
-        - Module Adaptation & Bring-Up: Phase 4 - Track B - Nvidia Jetson/3. L4T Customization/Jetson-Module-Adaptation-Bring-Up-Orin-NX-Nano.md
-        - ODMDATA & GPIO: Phase 4 - Track B - Nvidia Jetson/3. L4T Customization/ODMDATA-and-GPIO-Jetson-Linux.md
-        - T23x Deployment: Phase 4 - Track B - Nvidia Jetson/3. L4T Customization/T23x-Deployment.md
-        - Deployment: Phase 4 - Track B - Nvidia Jetson/3. L4T Customization/Deployment.md
-      - 4. FSP Firmware: Phase 4 - Track B - Nvidia Jetson/4. FSP (Firmware Support Package) Customization/Guide.md
-      - 5. App Development:
-        - Guide: Phase 4 - Track B - Nvidia Jetson/5. Application Development/Guide.md
-        - Peripheral Access: Phase 4 - Track B - Nvidia Jetson/5. Application Development/1. Peripheral Access/Guide.md
-        - Network & Connectivity:
-          - Guide: Phase 4 - Track B - Nvidia Jetson/5. Application Development/2. Network and Connectivity/Guide.md
-          - ESP32-C6 ESP-Hosted over SPI: Phase 4 - Track B - Nvidia Jetson/5. Application Development/2. Network and Connectivity/ESP32-C6-ESP-Hosted-SPI-Jetson-Orin-Nano.md
-          - ESP32-C6 OpenThread RCP: Phase 4 - Track B - Nvidia Jetson/5. Application Development/2. Network and Connectivity/ESP32-C6-OpenThread-RCP-Jetson-Orin-Nano.md
-          - ESP32-C6 Zigbee NCP: Phase 4 - Track B - Nvidia Jetson/5. Application Development/2. Network and Connectivity/ESP32-C6-Zigbee-NCP-Jetson-Orin-Nano.md
-        - GUI: Phase 4 - Track B - Nvidia Jetson/5. Application Development/3. GUI/Guide.md
-        - Multimedia:
-          - Guide: Phase 4 - Track B - Nvidia Jetson/5. Application Development/4. Multimedia/Guide.md
-          - Audio Setup & Development: Phase 4 - Track B - Nvidia Jetson/5. Application Development/4. Multimedia/Jetson-Audio-Setup-and-Development/Guide.md
-          - ESP32-LyraT I2S Mic Capture: Phase 4 - Track B - Nvidia Jetson/5. Application Development/4. Multimedia/ESP32-LyraT-I2S-Mic-Jetson-Orin-Nano/Guide.md
-        - ML & AI:
-          - Guide: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/Guide.md
-          - Small Object Detection: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/small-object-detection-jetson/Guide.md
-          - TAO Toolkit: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/tao-toolkit/Guide.md
-          - Non-Contact Monitoring: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/non-contact-monitoring-edge/Guide.md
-          - VLA Deployment on Edge GPUs: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/vla-deploy-jetson/Guide.md
-        - ROS 2: Phase 4 - Track B - Nvidia Jetson/5. Application Development/6. ROS2/Guide.md
-      - 6. Security & OTA: Phase 4 - Track B - Nvidia Jetson/6. Security and OTA/Guide.md
-      - 7. Manufacturing: Phase 4 - Track B - Nvidia Jetson/7. Compliance and Manufacturing/Guide.md
-      - 8. Runtime & Drivers: Phase 4 - Track B - Nvidia Jetson/8. Runtime and Driver Development/Guide.md
-    - "Track C: ML Compiler":
-      - Guide: Phase 4 - Track C - ML Compiler and Graph Optimization/Guide.md
-      - DL Inference Optimization:
-        - Overview: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/Guide.md
-        - 01 Graph & Ops: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/01 - Graph and Operator Optimization/Guide.md
-        - 02 Kernel Engineering:
-          - Overview: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/Guide.md
-          - "FlashAttention Course":
-            - "Overview": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Guide.md
-            - "01 Attention Bottleneck & Roofline": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 01 - Attention Bottleneck and Roofline.md
-            - "02 Online Softmax & Correctness": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 02 - Online Softmax and Numerical Correctness.md
-            - "03 FlashAttention-1 Algorithm": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 03 - FlashAttention-1 Algorithm.md
-            - "04 GPU Kernel Performance Basics": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 04 - GPU Kernel Performance Basics.md
-            - "05 Repo Anatomy & Python/CUDA API": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 05 - Repo Anatomy and Python CUDA API.md
-            - "06 FlashAttention-2": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 06 - FlashAttention-2.md
-            - "07 Backward Pass & Validation": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 07 - Backward Pass and Validation.md
-            - "08 Inference Path: KV Cache & Decode": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 08 - Inference Path KV Cache and Decode.md
-            - "09 Hopper / FA3 / FA4": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 09 - Hopper FA3 FA4.md
-            - "10 Capstone": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 10 - Capstone.md
-        - 03 Compiler Stack: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/03 - Compiler Stack/Guide.md
-        - 04 Quantization: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/04 - Quantization/Guide.md
-        - 05 Runtimes: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/05 - Inference Runtimes and Deployment/Guide.md
-        - 06 tinygrad: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/06 - tinygrad Deep Dive/Guide.md
+    # ── Phase 4 ─────────────────────────────────────────────────
+    - Phase 4 — Deployment:
+      - "Track A: Xilinx FPGA":
+        - 1. FPGA Development: Phase 4 - Track A - Xilinx FPGA/1. Xilinx FPGA Development/Guide.md
+        - 2. Zynq UltraScale+: Phase 4 - Track A - Xilinx FPGA/2. Zynq UltraScale+ MPSoC/Guide.md
+        - 3. Advanced FPGA: Phase 4 - Track A - Xilinx FPGA/3. Advanced FPGA Design/Guide.md
+        - 4. HLS: Phase 4 - Track A - Xilinx FPGA/4. High-Level Synthesis (HLS)/Guide.md
+        - 5. Runtime & Drivers: Phase 4 - Track A - Xilinx FPGA/5. Runtime and Driver Development/Guide.md
+        - 6. Projects: Phase 4 - Track A - Xilinx FPGA/6. Projects/Wireless-Video-FPGA.md
+      - "Track B: NVIDIA Jetson":
+        - 1. Jetson Platform:
+          - Guide: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Guide.md
+          - CUDA Programming: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-CUDA-Programming/Guide.md
+          - Camera ISP & Sensor Bring-Up: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Camera-ISP-Sensor-Bringup/Guide.md
+          - Container Fleet: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Container-Fleet/Guide.md
+          - DLA Deep Dive: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-DLA-Deep-Dive/Guide.md
+          - GPIO / SPI / I2C / CAN: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-GPIO-SPI-I2C-CAN/Guide.md
+          - Kernel Internals: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Kernel-Internals/Guide.md
+          - Memory Architecture: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Memory-Architecture/Guide.md
+          - OTA Deep Dive: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-OTA-Deep-Dive/Guide.md
+          - Power & Thermal: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Power-Thermal/Guide.md
+          - RT Linux Deep Dive: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-RT-Linux-Deep-Dive/Guide.md
+          - Real-Time Inference: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Real-Time-Inference/Guide.md
+          - Rootfs & A/B Redundancy: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Rootfs-and-AB-Redundancy/Guide.md
+          - Security: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Security/Guide.md
+          - TensorRT: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Tensor/Guide.md
+          - Video Codec & DeepStream: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Video-Codec-DeepStream/Guide.md
+          - Yocto BSP Production: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Yocto-BSP-Production/Guide.md
+        - 2. Carrier Board: Phase 4 - Track B - Nvidia Jetson/2. Custom Carrier Board Design and Bring-Up/Guide.md
+        - 3. L4T Customization:
+          - Guide: Phase 4 - Track B - Nvidia Jetson/3. L4T Customization/Guide.md
+          - Custom Board Engineering Flow: Phase 4 - Track B - Nvidia Jetson/3. L4T Customization/Orin-Nano-8GB-Custom-Board-L4T-Engineering-Flow.md
+          - Module Adaptation & Bring-Up: Phase 4 - Track B - Nvidia Jetson/3. L4T Customization/Jetson-Module-Adaptation-Bring-Up-Orin-NX-Nano.md
+          - ODMDATA & GPIO: Phase 4 - Track B - Nvidia Jetson/3. L4T Customization/ODMDATA-and-GPIO-Jetson-Linux.md
+          - T23x Deployment: Phase 4 - Track B - Nvidia Jetson/3. L4T Customization/T23x-Deployment.md
+          - Deployment: Phase 4 - Track B - Nvidia Jetson/3. L4T Customization/Deployment.md
+        - 4. FSP Firmware: Phase 4 - Track B - Nvidia Jetson/4. FSP (Firmware Support Package) Customization/Guide.md
+        - 5. App Development:
+          - Guide: Phase 4 - Track B - Nvidia Jetson/5. Application Development/Guide.md
+          - Peripheral Access: Phase 4 - Track B - Nvidia Jetson/5. Application Development/1. Peripheral Access/Guide.md
+          - Network & Connectivity:
+            - Guide: Phase 4 - Track B - Nvidia Jetson/5. Application Development/2. Network and Connectivity/Guide.md
+            - ESP32-C6 ESP-Hosted over SPI: Phase 4 - Track B - Nvidia Jetson/5. Application Development/2. Network and Connectivity/ESP32-C6-ESP-Hosted-SPI-Jetson-Orin-Nano.md
+            - ESP32-C6 OpenThread RCP: Phase 4 - Track B - Nvidia Jetson/5. Application Development/2. Network and Connectivity/ESP32-C6-OpenThread-RCP-Jetson-Orin-Nano.md
+            - ESP32-C6 Zigbee NCP: Phase 4 - Track B - Nvidia Jetson/5. Application Development/2. Network and Connectivity/ESP32-C6-Zigbee-NCP-Jetson-Orin-Nano.md
+          - GUI: Phase 4 - Track B - Nvidia Jetson/5. Application Development/3. GUI/Guide.md
+          - Multimedia:
+            - Guide: Phase 4 - Track B - Nvidia Jetson/5. Application Development/4. Multimedia/Guide.md
+            - Audio Setup & Development: Phase 4 - Track B - Nvidia Jetson/5. Application Development/4. Multimedia/Jetson-Audio-Setup-and-Development/Guide.md
+            - ESP32-LyraT I2S Mic Capture: Phase 4 - Track B - Nvidia Jetson/5. Application Development/4. Multimedia/ESP32-LyraT-I2S-Mic-Jetson-Orin-Nano/Guide.md
+          - ML & AI:
+            - Guide: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/Guide.md
+            - Small Object Detection: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/small-object-detection-jetson/Guide.md
+            - TAO Toolkit: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/tao-toolkit/Guide.md
+            - Non-Contact Monitoring: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/non-contact-monitoring-edge/Guide.md
+            - VLA Deployment on Edge GPUs: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/vla-deploy-jetson/Guide.md
+          - ROS 2: Phase 4 - Track B - Nvidia Jetson/5. Application Development/6. ROS2/Guide.md
+        - 6. Security & OTA: Phase 4 - Track B - Nvidia Jetson/6. Security and OTA/Guide.md
+        - 7. Manufacturing: Phase 4 - Track B - Nvidia Jetson/7. Compliance and Manufacturing/Guide.md
+        - 8. Runtime & Drivers: Phase 4 - Track B - Nvidia Jetson/8. Runtime and Driver Development/Guide.md
+      - "Track C: ML Compiler":
+        - Guide: Phase 4 - Track C - ML Compiler and Graph Optimization/Guide.md
+        - DL Inference Optimization:
+          - Overview: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/Guide.md
+          - 01 Graph & Ops: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/01 - Graph and Operator Optimization/Guide.md
+          - 02 Kernel Engineering:
+            - Overview: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/Guide.md
+            - "FlashAttention Course":
+              - "Overview": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Guide.md
+              - "01 Attention Bottleneck & Roofline": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 01 - Attention Bottleneck and Roofline.md
+              - "02 Online Softmax & Correctness": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 02 - Online Softmax and Numerical Correctness.md
+              - "03 FlashAttention-1 Algorithm": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 03 - FlashAttention-1 Algorithm.md
+              - "04 GPU Kernel Performance Basics": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 04 - GPU Kernel Performance Basics.md
+              - "05 Repo Anatomy & Python/CUDA API": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 05 - Repo Anatomy and Python CUDA API.md
+              - "06 FlashAttention-2": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 06 - FlashAttention-2.md
+              - "07 Backward Pass & Validation": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 07 - Backward Pass and Validation.md
+              - "08 Inference Path: KV Cache & Decode": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 08 - Inference Path KV Cache and Decode.md
+              - "09 Hopper / FA3 / FA4": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 09 - Hopper FA3 FA4.md
+              - "10 Capstone": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 10 - Capstone.md
+          - 03 Compiler Stack: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/03 - Compiler Stack/Guide.md
+          - 04 Quantization: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/04 - Quantization/Guide.md
+          - 05 Runtimes: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/05 - Inference Runtimes and Deployment/Guide.md
+          - 06 tinygrad: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/06 - tinygrad Deep Dive/Guide.md
 
-  # ── Phase 5 ─────────────────────────────────────────────────
-  - Phase 5 — Specialization:
+  # ── P5 · Specialization ──────────────────────────────────────────────
+  - "P5 · Specialization":
     - Overview: Phase 5 - Advanced Topics and Specialization/Guide.md
     - "A: GPU Infrastructure":
       - Guide: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Guide.md
@@ -600,7 +602,7 @@ nav:
           - "03: Expert Parallelism (EP)": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-03.md
           - "04: Disaggregated Prefill/Decode": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-04.md
           - "05: Production MoE Serving": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-05.md
-  - Phase 6 — Interview Preparation:
+  - "P6 · Careers":
     - Overview: Phase 6 - Interview Preparation/README.md
     - "MLSys Engineer":
       - Guide: Phase 6 - Interview Preparation/1. MLSys Engineer/README.md
