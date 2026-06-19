@@ -100,7 +100,6 @@ extra_css:
 nav:
   - Home:
     - Overview: README.md
-    - Roles & Market: Roles and Market Analysis.md
     - Phase 1 — Digital Foundations: Phase 1 - Foundational Knowledge/Guide.md
     - Phase 2 — Embedded Systems: Phase 2 - Embedded Systems/Guide.md
     - Phase 3 — AI: Phase 3 - Artificial Intelligence/Guide.md
@@ -604,6 +603,7 @@ nav:
           - "05: Production MoE Serving": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-05.md
   - "P6 · Careers":
     - Overview: Phase 6 - Interview Preparation/README.md
+    - Roles & Market: Roles and Market Analysis.md
     - "MLSys Engineer":
       - Guide: Phase 6 - Interview Preparation/1. MLSys Engineer/README.md
       - "01: Inference Systems Q&A": Phase 6 - Interview Preparation/1. MLSys Engineer/01-Inference-Systems-QA.md
