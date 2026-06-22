@@ -302,8 +302,10 @@
 
 /* ── Navigation tabs ──────────────────────────── */
 .md-tabs {
-  backdrop-filter: blur(10px);
-  background: linear-gradient(180deg, rgba(48, 63, 161, 0.96), rgba(63, 81, 181, 0.94));
+  /* NOTE: no backdrop-filter here — a backdrop-filtered element clips its overflowing
+     children to its own box (Chrome/Safari), which hid the hover dropdown hanging below
+     the bar. The gradient below is ~95% opaque, so the blur was imperceptible anyway. */
+  background: linear-gradient(180deg, rgba(48, 63, 161, 0.98), rgba(63, 81, 181, 0.97));
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
   overflow: visible;   /* override Material's overflow:auto so hover dropdowns can hang below the bar */
   position: relative;  /* + z-index makes the bar (and its dropdown) paint above page content */
