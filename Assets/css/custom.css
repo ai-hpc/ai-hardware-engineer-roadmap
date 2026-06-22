@@ -307,21 +307,23 @@
      the bar. The gradient below is ~95% opaque, so the blur was imperceptible anyway. */
   background: linear-gradient(180deg, rgba(48, 63, 161, 0.98), rgba(63, 81, 181, 0.97));
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
-  overflow: visible;   /* override Material's overflow:auto so hover dropdowns can hang below the bar */
+  overflow: visible !important;   /* override Material's overflow:auto so hover dropdowns can hang below the bar */
   position: relative;  /* + z-index makes the bar (and its dropdown) paint above page content */
   z-index: 3;
 }
 
 /* the grid wrapper inside the bar must not clip the dropdown either */
 .md-tabs .md-grid {
-  overflow: visible;
+  contain: none !important;
+  overflow: visible !important;
 }
 
 .md-tabs__list {
+  contain: none !important;        /* Material sets contain:content — paint containment that CLIPS the dropdown regardless of overflow. THIS was the real blocker. */
   display: flex;
   flex-wrap: nowrap;
   gap: 1rem;
-  overflow: visible;   /* let hover dropdowns escape the bar (5 tabs fit; tabs are hidden on mobile) */
+  overflow: visible !important;    /* Material also sets overflow:auto — override both so the panel can escape the bar */
   padding: 0.18rem 0 0.08rem;
   scrollbar-width: none;
   -ms-overflow-style: none;
