@@ -332,7 +332,21 @@ nav:
             - "Lab 04: TokenJuice Output Compaction": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-04-TokenJuice-Output-Compaction.md
             - "Lab 05: OpenMeow App SDK Dogfood": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-05-OpenMeow-App-SDK-Dogfood.md
             - "Lab 06: Capstone — Build genie-claw": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-06-Genie-Claw-Capstone.md
-        - 4. ML Engineering & MLOps: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/4. ML Engineering and MLOps/Guide.md
+        - 4. ML Engineering & MLOps:
+          - Guide: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/4. ML Engineering and MLOps/Guide.md
+          - "Practical ML (CS329P)":
+            - Overview: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/4. ML Engineering and MLOps/Practical Machine Learning (CS329P)/README.md
+            - "01: Data I — Acquisition, Scraping & Labeling": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/4. ML Engineering and MLOps/Practical Machine Learning (CS329P)/Lecture-01.md
+            - "02: Data II — Cleaning, Transformation & Features": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/4. ML Engineering and MLOps/Practical Machine Learning (CS329P)/Lecture-02.md
+            - "03: ML Models Recap — Trees, Linear, Neural Nets": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/4. ML Engineering and MLOps/Practical Machine Learning (CS329P)/Lecture-03.md
+            - "04: Model Validation & Evaluation": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/4. ML Engineering and MLOps/Practical Machine Learning (CS329P)/Lecture-04.md
+            - "05: Model Combination — Bagging, Boosting, Stacking": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/4. ML Engineering and MLOps/Practical Machine Learning (CS329P)/Lecture-05.md
+            - "06: Distribution Shift — Covariate & Label": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/4. ML Engineering and MLOps/Practical Machine Learning (CS329P)/Lecture-06.md
+            - "07: Data Beyond IID — Sequences & Graphs": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/4. ML Engineering and MLOps/Practical Machine Learning (CS329P)/Lecture-07.md
+            - "08: Model & Hyperparameter Tuning — HPO, NAS": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/4. ML Engineering and MLOps/Practical Machine Learning (CS329P)/Lecture-08.md
+            - "09: Transfer Learning — CV, NLP, Prompting": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/4. ML Engineering and MLOps/Practical Machine Learning (CS329P)/Lecture-09.md
+            - "10: Model Compression — Pruning, Quantization, Distillation": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/4. ML Engineering and MLOps/Practical Machine Learning (CS329P)/Lecture-10.md
+            - "11: Multimodal, Fairness & Explainability": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/4. ML Engineering and MLOps/Practical Machine Learning (CS329P)/Lecture-11.md
         - 5. LLM App Development:
           - Guide: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/5. LLM Application Development/Guide.md
           - Qwen3.5-4B Unsloth Fine-Tuning: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/5. LLM Application Development/Qwen3.5-4B Unsloth Fine-Tuning/Guide.md

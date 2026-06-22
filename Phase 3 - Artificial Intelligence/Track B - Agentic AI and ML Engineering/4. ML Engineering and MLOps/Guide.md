@@ -20,6 +20,10 @@
 
 ---
 
+> **★ Featured deep-dive course:** [**Practical Machine Learning (CS329P)**](Practical%20Machine%20Learning%20%28CS329P%29/README.md) — the full ML lifecycle a practitioner actually meets, adapted from Stanford CS329P (Mu Li & Alex Smola) and refreshed for 2026: data acquisition/labeling, validation that doesn't lie, distribution-shift detection, tuning, and a hardware-facing [model-compression lecture](Practical%20Machine%20Learning%20%28CS329P%29/Lecture-10.md). 11 lectures. Start with the [Overview](Practical%20Machine%20Learning%20%28CS329P%29/README.md).
+
+---
+
 ## Why This Matters for AI Hardware
 
 ML engineers define the **training and serving workloads** that hardware must support:
