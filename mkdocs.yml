@@ -574,6 +574,13 @@ nav:
         - "05": Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Lectures/Lecture-05.md
     - "G: ML Systems Engineering":
       - Guide: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Guide.md
+      - "Logprobs, Perplexity & KL Divergence":
+        - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Logprobs, Perplexity and KL Divergence/README.md
+        - "01: Logprobs — What a Model Emits": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-01.md
+        - "02: Entropy, Cross-Entropy & NLL": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-02.md
+        - "03: Perplexity — The Exponential of Confusion": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-03.md
+        - "04: KL Divergence — The Gap Between Distributions": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-04.md
+        - "05: Quantization, Distillation, RLHF & Spec Decode": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-05.md
       - "MLSys Deep Dives":
         - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/README.md
         - "01: MLSys as the Economic-Value Layer": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-01.md

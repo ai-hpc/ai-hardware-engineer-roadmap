@@ -153,7 +153,9 @@ Recommended order:
 
 ### Why It Matters
 
-MLSys work without measurement turns into tool tourism. Before changing runtimes or kernels, build the habit of collecting comparable numbers.
+MLSys work without measurement turns into tool tourism. Before changing runtimes or kernels, build the habit of collecting comparable numbers. Performance numbers (latency, throughput) tell you how *fast* the system runs; **quality** numbers — logprobs, perplexity, KL divergence — tell you whether your optimization *preserved the model*. A 2× speedup that quietly raises perplexity 15% is a regression, not a win.
+
+> **★ Companion course — quality measurement:** [**Logprobs, Perplexity & KL Divergence**](Logprobs,%20Perplexity%20and%20KL%20Divergence/README.md) is the foundations course for this stage. It derives `cross-entropy = entropy + KL`, `perplexity = exp(cross-entropy)`, and shows how llama.cpp grades a quantization with [mean KLD and top-token agreement](Logprobs,%20Perplexity%20and%20KL%20Divergence/Lecture-05.md) — exactly the "did the optimization break the model?" gate Stage 0 is about. 5 lectures.
 
 ### Learn
 
@@ -161,6 +163,7 @@ MLSys work without measurement turns into tool tourism. Before changing runtimes
 - throughput: requests/sec, tokens/sec, samples/sec, tokens/sec/GPU
 - GPU counters: occupancy, memory bandwidth, tensor-core utilization, SM activity
 - memory metrics: peak allocated, fragmentation, KV-cache blocks, activation memory
+- **quality metrics: perplexity / bits-per-byte, KL divergence vs. the FP16 reference, top-1 token agreement** (see companion course above)
 - distributed metrics: collective time, bandwidth, GPU idle time, rank skew
 - reliability metrics: error rate, retry rate, checkpoint restore time, failed-node recovery
 
