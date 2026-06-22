@@ -305,14 +305,21 @@
   backdrop-filter: blur(10px);
   background: linear-gradient(180deg, rgba(48, 63, 161, 0.96), rgba(63, 81, 181, 0.94));
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  overflow: visible;   /* override Material's overflow:auto so hover dropdowns can hang below the bar */
+  position: relative;  /* + z-index makes the bar (and its dropdown) paint above page content */
+  z-index: 3;
+}
+
+/* the grid wrapper inside the bar must not clip the dropdown either */
+.md-tabs .md-grid {
+  overflow: visible;
 }
 
 .md-tabs__list {
   display: flex;
   flex-wrap: nowrap;
   gap: 1rem;
-  overflow-x: clip;   /* clip without creating scroll context — lets dropdowns overflow vertically */
-  overflow-y: visible;
+  overflow: visible;   /* let hover dropdowns escape the bar (5 tabs fit; tabs are hidden on mobile) */
   padding: 0.18rem 0 0.08rem;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -345,7 +352,7 @@
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 12px;
   box-shadow: 0 10px 36px rgba(0, 0, 0, 0.13), 0 3px 10px rgba(0, 0, 0, 0.08);
-  left: 50%;
+  left: 0;
   list-style: none;
   margin: 0;
   min-width: 220px;
@@ -354,9 +361,19 @@
   pointer-events: none;
   position: absolute;
   top: calc(100% + 0.5rem);
-  transform: translateX(-50%) translateY(-8px);
+  transform: translateY(-8px);
   transition: opacity 0.2s ease, transform 0.2s ease;
   z-index: 500;
+}
+
+/* transparent bridge over the 0.5rem gap so moving the cursor to the panel doesn't drop hover */
+.md-tabs__dropdown::after {
+  content: "";
+  height: 0.7rem;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: -0.7rem;
 }
 
 .md-tabs__dropdown::before {
@@ -365,17 +382,17 @@
   border-top: 1px solid rgba(0, 0, 0, 0.08);
   content: "";
   height: 10px;
-  left: 50%;
+  left: 1.7rem;
   position: absolute;
   top: -6px;
-  transform: translateX(-50%) rotate(45deg);
+  transform: rotate(45deg);
   width: 10px;
 }
 
 .md-tabs__item--has-dropdown:hover .md-tabs__dropdown {
   opacity: 1;
   pointer-events: auto;
-  transform: translateX(-50%) translateY(0);
+  transform: translateY(0);
 }
 
 .md-tabs__dropdown li {
