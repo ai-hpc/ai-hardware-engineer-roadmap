@@ -687,6 +687,21 @@
   }
 }
 
+/* ── Sidebar height: keep each sidebar inside the viewport ─────────────
+   At the desktop (sticky) breakpoint, cap the left nav and right TOC scroll
+   area to the viewport so a long nav / TOC scrolls internally and can never
+   spill down over the footer. */
+@media screen and (min-width: 76.25em) {
+  .md-sidebar {
+    height: auto;                 /* contribute real height; never collapse to 0 */
+  }
+
+  .md-sidebar__scrollwrap {
+    max-height: calc(100vh - var(--aihpc-sticky-offset) - 2rem);
+    overflow-y: auto;
+  }
+}
+
 /* ── Header ───────────────────────────────────── */
 .md-header {
   background: linear-gradient(180deg, #4051b5, #3a4aa5);
