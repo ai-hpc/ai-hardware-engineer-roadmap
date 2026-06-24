@@ -14,6 +14,7 @@ By the end of this lecture you will be able to:
 4. Build a cost-tracking decorator that accumulates token spend per session.
 5. Log every LLM call with full input/output/token/latency details.
 6. Construct an evaluation dataset from production traffic and run A/B prompt tests.
+7. Place a coding or agent model on the public **benchmark ladder** (HumanEval → SWE-bench → Terminal-Bench → MCPMark), read a score critically (contamination, harness, pass@1), and choose the cheapest model that clears your task's rung.
 
 ---
 
@@ -587,6 +588,80 @@ class PromptABTest:
 
 ---
 
+## 8. Standardized Capability Benchmarks — The Coding & Agent Ladder
+
+Sections 1–7 answer *"is **my** agent good?"* — operational evaluation of a system you already built. This section answers the question that comes *before* you build: *"is the model underneath even capable enough — and how does the field measure that?"* When you choose the model that powers a coding agent, or decide whether the frontier moved enough to re-test, you read **public capability benchmarks**. They form a ladder, from *write one function* up to *operate a repository like an engineer through tools*.
+
+> **Harness reminder (Lecture 02):** a benchmark scores a **model + harness**, not a model alone. The same model scores very differently under a bare prompt versus a strong agent scaffold (planning, retries, test execution, file tools). Always read the harness next to the number — a leaderboard jump is often a better loop, not a better model.
+
+### 8.1 The ladder
+
+This is the spine — the climb from isolated code to protocol-level tool use. Difficulty and the "what the number means" column are calibrated to **mid-2026**; treat the scores as moving anchors, not constants.
+
+| Benchmark | Tests | Difficulty | Scale | What the score really means (2026) |
+|---|---|---|---|---|
+| **[HumanEval](https://github.com/openai/human-eval)** | Write a function | Easy | 164 | **Saturated (~99%)** — a floor, not a differentiator. Use **HumanEval+** (EvalPlus); its extra tests expose solutions that overfit the original cases. |
+| **[MBPP](https://github.com/google-research/google-research/tree/master/mbpp)** | Small coding tasks | Easy–Medium | ~970 | Also near-saturated. **MBPP+** is the honest variant. Good only for screening weak/local models. |
+| **[LiveCodeBench](https://livecodebench.github.io/)** | Competitive programming | Medium–Hard | rolling | **Contamination-free**: problems are time-stamped, so a model is scored only on problems published *after* its training cutoff. The first rung you can trust on a fresh model. |
+| **[SWE-bench](https://www.swebench.com/)** | Fix real GitHub bugs | Hard | 2,294 | The real-world battleground. Cite **SWE-bench Verified** (500 human-validated tasks); frontier harnesses reach ~**85–90%+** in 2026. The agent must localize a bug across a repo, edit, and pass hidden tests. |
+| **[Terminal-Bench](https://www.tbench.ai/)** | Use the terminal like an engineer | Very Hard | — | End-to-end shell tasks (build, debug, configure) in a real container. v2 frontier ~**80%+**. Tests planning + tool loops + recovery, not just code synthesis. |
+| **[NL2Repo-Bench](https://arxiv.org/abs/2512.12730)** | Understand / generate an entire repository | Very Hard | 104 | Build a full installable library from an ~18.8k-token spec. **Largely unsolved** — best agents stay **< 40%** test-pass. Measures long-horizon, multi-module coherence. |
+| **[MCPMark](https://arxiv.org/abs/2509.24002)** | Tool use through MCP | Agent-focused | 127 | Stress-tests realistic **MCP** tool use (CRUD across Notion / GitHub / Postgres / Filesystem / Playwright). Averages **16.2 turns / 17.4 tool calls** per task; rewards failure recovery and long multi-tool execution. |
+
+Read the ladder as a capability gradient:
+
+```text
+  isolated code  →  contamination-safe code  →  repo bug-fix  →  repo synthesis  →  terminal agency  →  protocol tool use
+   HumanEval/MBPP     LiveCodeBench               SWE-bench         NL2Repo-Bench      Terminal-Bench       MCPMark
+   (saturated)        (trustworthy)              (the fight)       (unsolved)         (very hard)          (agent-native)
+```
+
+A 2026 frontier model **saturates the bottom rungs** (function-level code) and is **still under ~50% on repo synthesis and long-horizon agency**. That gap — between "writes a correct function" and "operates a repo through tools over dozens of turns" — is exactly where agent engineering (this whole course) earns its keep.
+
+### 8.2 Other benchmarks worth knowing
+
+The seven above are the spine; these are the important neighbors you will see cited, grouped by the same rungs:
+
+```text
+function-level   HumanEval+, MBPP+, BigCodeBench        realistic library/API calls; mostly saturated
+competitive      LiveCodeBench Pro, CodeContests,       harder, expert-curated, contamination-aware
+                 Aider Polyglot                          multi-language whole-file edits
+repo bug-fix     SWE-bench Verified / Pro / Multimodal, human-validated, harder, multilingual,
+                 Multi-SWE-bench, SWE-Lancer             and $-denominated (freelance value)
+repo synthesis   NL2Repo-Bench, Commit0                  build whole libraries from a spec (long-horizon)
+computer / OS    OSWorld, WebArena                       desktop and browser agency
+tool & protocol  MCP-Bench, MCP-Atlas, τ-bench           multi-tool / MCP / domain workflows
+                 (tau-bench)
+ML engineering   MLE-bench, RE-Bench                     Kaggle-style and research-engineering agents
+general agent    GAIA                                    multi-step assistant tasks with tools
+```
+
+### 8.3 How to read a benchmark number without fooling yourself
+
+- **Contamination & saturation.** HumanEval and MBPP leaked into training corpora years ago; 99% there means nothing. Prefer **time-stamped** sets (LiveCodeBench) or **human-curated, held-out** ones (SWE-bench Verified).
+- **Harness can outweigh the model.** SWE-bench and Terminal-Bench numbers are a *scaffold* result. Hold the harness fixed when you compare models, or you are benchmarking loops, not intelligence.
+- **pass@1, not pass@k.** pass@1 (one attempt) is the honest deployment number; pass@k flatters by hiding variance behind retries.
+- **Test-time compute is not free.** Top scores often spend many turns, thousands of tokens, and sometimes parallel rollouts. The capability is real, but it has a price tag (§4).
+- **One number ≠ your task.** A model that tops SWE-bench (Python bug-fixing) can be mediocre on your Rust, terminal, or MCP workload. Match the rung to the job you actually have.
+
+### 8.4 Which benchmark for which decision
+
+| Your decision | Read this rung |
+|---|---|
+| "Is this small/local model good enough to autocomplete functions?" | HumanEval+ / MBPP+ / BigCodeBench |
+| "Will it hold up on fresh problems it can't have memorized?" | LiveCodeBench |
+| "Can it fix bugs in my actual repo, as an agent?" | SWE-bench Verified (+ Pro for the hard tail) |
+| "Can it scaffold a new service or drive the shell?" | NL2Repo-Bench, Terminal-Bench |
+| "Can it drive my MCP tools reliably over many turns?" | MCPMark, τ-bench |
+
+> **Hardware / inference lens.** Leaderboards are won by frontier models running **many turns and thousands of tokens per task** — the opposite of cheap. For a *deployed* coding agent you are trading capability against **tokens/$ and latency** (Phase 5 — [MLSys Deep Dives](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/7.%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/README.md)). The move that pays: deploy the **cheapest model that clears the rung your task lives on** — a strong open model passing BigCodeBench + LiveCodeBench can beat a frontier model on TOK/$ for autocomplete — and reserve frontier capability for the SWE-bench-class work that genuinely needs it. The ladder locates that line; the cost tracker in §4 prices it.
+
+> **Intrinsic vs. extrinsic.** This section is the **extrinsic** half of model measurement — task scores. The **intrinsic** half — perplexity, KL divergence, and logprob-level grading used when you quantize or distill a model — lives in Phase 5 → [Logprobs, Perplexity & KL Divergence](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/7.%20ML%20Systems%20Engineering/Logprobs,%20Perplexity%20and%20KL%20Divergence/README.md). Intrinsic metrics are cheap and continuous (run on any text, catch regressions in seconds); benchmark scores are expensive and task-real. Mature teams use both — intrinsic to fail fast, the ladder to confirm capability.
+
+**Sources:** [SWE-bench](https://www.swebench.com/) · [LiveCodeBench](https://livecodebench.github.io/) · [Terminal-Bench](https://www.tbench.ai/) · [NL2Repo-Bench (arXiv 2512.12730)](https://arxiv.org/abs/2512.12730) · [MCPMark (arXiv 2509.24002, ICLR 2026)](https://arxiv.org/abs/2509.24002) · [EvalPlus / HumanEval+ & MBPP+](https://github.com/evalplus/evalplus). Scores are mid-2026 anchors and move monthly — re-check the leaderboards before quoting.
+
+---
+
 ## Key Takeaways
 
 - **LLM-as-judge** scales evaluation to thousands of examples quickly. Use a rubric with clear integer scores (0-5) and require JSON output for reliable parsing.
@@ -595,6 +670,7 @@ class PromptABTest:
 - **Cost tracking** should accumulate per-session and log per-call. Early visibility on costs prevents budget surprises.
 - **Structured call logging** (JSONL) is your flight recorder — essential for debugging failures and building eval datasets.
 - **A/B testing** with sticky user assignment ensures reproducible experiments. Always run for a statistically meaningful number of samples before declaring a winner.
+- **Public capability benchmarks** (the coding/agent ladder — HumanEval → SWE-bench → Terminal-Bench → MCPMark) tell you whether the *model underneath* is good enough, but read them critically: HumanEval/MBPP are saturated, SWE-bench/Terminal-Bench scores depend on the harness, pass@1 is the honest number, and the headline usually comes from expensive many-turn runs. Deploy the cheapest model that clears your task's rung.
 
 ---
 
@@ -611,6 +687,10 @@ Create a small corpus of 5–10 documents on any technical topic you choose. Wri
 ### Exercise 3 — Cost Dashboard
 
 Build a `CostDashboard` class that reads from the JSONL log file produced by `LLMLogger` and renders a summary report. The report should include: total spend, spend by model, average cost per call, top 5 most expensive calls (with their inputs), and a call count time series grouped by hour. The report should be printable as a formatted text table.
+
+### Exercise 4 — Locate Your Model on the Ladder
+
+Pick one model you can call (open or hosted). Find its most recent **LiveCodeBench** and **SWE-bench Verified** scores from the public leaderboards, noting the *harness* each result used. Then write one paragraph: which rung of the ladder (§8.1) does this model comfortably clear, which rung does it fail, and for a code-autocomplete product would you deploy it or a cheaper model? Justify with the score **and** a tokens/$ argument.
 
 ---
 
