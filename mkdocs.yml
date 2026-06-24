@@ -332,6 +332,16 @@ nav:
             - "Lab 04: TokenJuice Output Compaction": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-04-TokenJuice-Output-Compaction.md
             - "Lab 05: OpenMeow App SDK Dogfood": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-05-OpenMeow-App-SDK-Dogfood.md
             - "Lab 06: Capstone — Build genie-claw": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-06-Genie-Claw-Capstone.md
+          - "MCP for AI Agents":
+            - Overview: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/MCP for AI Agents/README.md
+            - "01: Why MCP Exists — The M×N Problem": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/MCP for AI Agents/Lecture-01.md
+            - "02: Architecture & Lifecycle — Host, Client, Server": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/MCP for AI Agents/Lecture-02.md
+            - "03: Core Primitives — Tools, Resources, Prompts": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/MCP for AI Agents/Lecture-03.md
+            - "04: Reverse Primitives — Sampling, Roots, Elicitation": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/MCP for AI Agents/Lecture-04.md
+            - "05: Building an MCP Server (FastMCP)": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/MCP for AI Agents/Lecture-05.md
+            - "06: Transports, Remote Servers & OAuth 2.1": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/MCP for AI Agents/Lecture-06.md
+            - "07: MCP Security — The Agent Attack Surface": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/MCP for AI Agents/Lecture-07.md
+            - "08: Production MCP — Gateways, Registry, Eval": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/MCP for AI Agents/Lecture-08.md
         - 4. ML Engineering & MLOps:
           - Guide: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/4. ML Engineering and MLOps/Guide.md
           - "Practical ML (CS329P)":

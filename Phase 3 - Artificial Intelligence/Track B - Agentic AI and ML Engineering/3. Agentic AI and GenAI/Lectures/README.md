@@ -4,6 +4,8 @@ A hands-on lecture series building from the modern agent harness, through fundam
 
 > This is the **flat, numbered index** of all lectures. For the recommended **theory-first reading order** grouped into modules, see the **[course Guide](../Guide.md)**.
 
+> **★ Companion deep-dive:** [**MCP for AI Agents**](../MCP%20for%20AI%20Agents/README.md) — an 8-lecture course on the **Model Context Protocol**, the open standard agents use to reach tools and data. It builds directly on [Tool Use & Function Calling](Lecture-08.md): architecture and the six primitives, building and securing real servers, OAuth 2.1 for remote deployment, and the production stack — current to the 2025-11-25 spec and the 2026 release candidate.
+
 ## How to Read This Course in 2026
 
 Model names, context windows, SDK features, and token prices change quickly. Treat vendor-specific examples as implementation snapshots, not permanent recommendations.
