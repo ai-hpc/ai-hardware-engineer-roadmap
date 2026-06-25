@@ -19,7 +19,7 @@ The durable concepts in this course are:
 - **Product control plane:** gateways, channels, sessions, routing, identities, and audit logs.
 - **Runtime security:** least privilege, policy gates, telemetry, incident response, and evidence.
 
-The lectures are numbered 01–41 in the recommended reading order. They group into six modules — *start here* (the modern agent, the harness, and how to build one), *fundamentals*, *core building blocks*, *production & runtime*, the *OpenClaw* example, and the *genie-claw* practice capstone. See the **[course Guide](../Guide.md)** for the full module breakdown.
+The lectures are numbered 01–42 in the recommended reading order (Lecture 42 is an advanced security capstone on confidential & verifiable agents). They group into six modules — *start here* (the modern agent, the harness, and how to build one), *fundamentals*, *core building blocks*, *production & runtime*, the *OpenClaw* example, and the *genie-claw* practice capstone. See the **[course Guide](../Guide.md)** for the full module breakdown.
 
 ## Lecture Index
 
@@ -68,6 +68,7 @@ The lectures are numbered 01–41 in the recommended reading order. They group i
 | [Lecture 39](Lecture-39.md) | OpenClaw Case Study - Gateway RPC Protocol | WebSocket frames, handshake, roles, scopes, pairing, features, node transport |
 | [Lecture 40](Lecture-40.md) | OpenClaw Threat Model - MITRE ATLAS for Agent Security | threat matrix, attack chains, trust boundaries, prompt injection, skill supply chain, tool execution controls |
 | [Lecture 41](Lecture-41.md) | Pi - A Minimal Coding Agent and the Substrate Beneath OpenClaw | Tiny core (4 tools), no-MCP rationale, custom messages in session log, hot reload, tree-structured sessions, TUI vs LLM-tool surfaces |
+| [Lecture 42](Lecture-42.md) | Confidential & Verifiable AI Agents (NVIDIA CC, zk-STARK, PearlChain) | TEE / confidential GPUs (H100/Blackwell), NRAS attestation, zk-STARK / ZKML, hybrid TEE+ZK, blockchain audit, enterprise threat model |
 
 </div>
 

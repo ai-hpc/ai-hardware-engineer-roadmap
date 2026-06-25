@@ -1,6 +1,6 @@
 # Lecture 41 - Pi (pi-mono): A Detail Reading of a Minimal Coding Agent
 
-**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 40](Lecture-40.md) | **Next: [Lab 01 - Research Agent](Lab-01-Research-Agent.md)* [Lab 01](Lab-01-Research-Agent.md)
+**Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 40](Lecture-40.md) | **Next:** [Lecture 42](Lecture-42.md)
 
 ---
 
@@ -547,4 +547,4 @@ Two concrete artifacts, in increasing difficulty.
 
 ---
 
-*Next: [Lab 01](Lab-01-Research-Agent.md)*
+*Next: [Lecture 42](Lecture-42.md)*
