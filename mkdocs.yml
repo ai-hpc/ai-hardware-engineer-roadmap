@@ -487,6 +487,11 @@ nav:
             - 04 libcufile API: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/04-libcufile-API.md
             - 05 Performance Tuning: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/05-Performance-Tuning.md
             - 06 Disaggregated Storage: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/06-Disaggregated-Storage.md
+          - Confidential Computing & Hardware Attestation:
+            - Overview: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/README.md
+            - 01 Intel TDX Attestation Chain: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/01-Intel-TDX-Attestation-Chain.md
+            - 02 NVIDIA CC Attestation Chain: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/02-NVIDIA-CC-Attestation-Chain.md
+            - 03 Dual-Vendor Claim Binding & Verification: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/03-Dual-Vendor-Claim-Binding-and-Verification.md
           - "Long-Context MoE Foundation Training":
             - "Overview": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/README.md
             - "01 Long-Context Bottlenecks": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/01-Long-Context-Bottlenecks.md

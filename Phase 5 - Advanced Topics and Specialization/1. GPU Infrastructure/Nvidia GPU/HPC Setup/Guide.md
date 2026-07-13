@@ -28,6 +28,7 @@ Detailed guides for specific GPU cluster configurations and subsystems:
 | **CUDA Advanced Optimization** | CUDA Graphs, Cooperative Groups, Persistent Kernels, Fusion, Warp Specialization | [CUDA-Advanced-Optimization/](./CUDA-Advanced-Optimization/README.md) |
 | **GPUDirect Storage (GDS)** | Direct NVMe→GPU DMA, NVMe-oF, WD OpenFlex + RapidFlex, libcufile API | [GPUDirect-Storage/](./GPUDirect-Storage/README.md) |
 | **Long-Context MoE Foundation Training** | End-to-end course: long-context attention, MoE routing, mesh design, adaptive data, honest eval | [Long-Context-MoE-Foundation-Training/](./Long-Context-MoE-Foundation-Training/README.md) |
+| **Confidential Computing & Hardware Attestation** | Intel TDX + NVIDIA CC remote attestation for untrusted/rented/decentralized cluster nodes: DCAP quote verification, NRAS/JWKS, dual-vendor claim binding | [Confidential-Computing-Attestation/](./Confidential-Computing-Attestation/README.md) |
 
 ### 8x H200 — Topics
 - [01 Hardware Architecture](./8x-H200-Training-Inference/01-Hardware-Architecture.md) — GH100 die, HBM3e, NVLink 4.0, NVSwitch topology
@@ -67,6 +68,11 @@ Detailed guides for specific GPU cluster configurations and subsystems:
 - [04 libcufile API](./GPUDirect-Storage/04-libcufile-API.md) — cuFileRead/Write, buffer registration, batch I/O, PyTorch DataLoader integration
 - [05 Performance Tuning](./GPUDirect-Storage/05-Performance-Tuning.md) — 512-byte alignment, optimal transfer size, queue depth, buffer pool, benchmarks
 - [06 Disaggregated Storage](./GPUDirect-Storage/06-Disaggregated-Storage.md) — NVMe-oF over RoCEv2, WD OpenFlex + RapidFlex, 75 GB/s scale-out, lossless config
+
+### Confidential Computing & Hardware Attestation — Topics
+- [01 Intel TDX Attestation Chain](./Confidential-Computing-Attestation/01-Intel-TDX-Attestation-Chain.md) — TDX Module RTM, MRTD/RTMR/REPORTDATA, TD Report → Quoting Enclave → TD Quote, DCAP verification chain
+- [02 NVIDIA CC Attestation Chain](./Confidential-Computing-Attestation/02-NVIDIA-CC-Attestation-Chain.md) — GPU EAT tokens, eat_nonce binding, NRAS/JWKS signature verification, the symmetric-key self-attestation trap
+- [03 Dual-Vendor Claim Binding & Verification Review](./Confidential-Computing-Attestation/03-Dual-Vendor-Claim-Binding-and-Verification.md) — composing both chains, binding-vs-authenticity review discipline, threat model, verification checklist
 
 ---
 
