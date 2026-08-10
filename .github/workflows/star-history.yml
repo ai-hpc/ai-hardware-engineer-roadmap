@@ -1,0 +1,53 @@
+name: Update Star History
+
+# GitHub restricted the stargazers API to a repo's own admins and collaborators
+# on 2026-06-30, which broke the api.star-history.com embed. We regenerate the
+# chart here with the repo's own token and commit the SVGs, so the README points
+# at assets we control.
+
+on:
+  schedule:
+    - cron: '17 3 * * *'  # daily, 03:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: star-history
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Generate charts
+        env:
+          # Falls back to the job token, which can read this repo's stargazers.
+          # Set the STAR_HISTORY_TOKEN secret only if that ever stops working.
+          STAR_HISTORY_TOKEN: ${{ secrets.STAR_HISTORY_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/generate_star_history.py \
+            --repo "${{ github.repository }}" \
+            --out-dir Assets/star-history
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- Assets/star-history; then
+            echo "No star history change."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Assets/star-history
+          git commit -m "chore: update star history chart"
+          git push

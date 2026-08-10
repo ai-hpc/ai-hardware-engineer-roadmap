@@ -355,11 +355,11 @@ Most people learn one pillar. Some learn two. This roadmap is for the people who
 
 ## Star History
 
-<a href="https://www.star-history.com/#ai-hpc/ai-hardware-engineer-roadmap&Date">
+<a href="https://github.com/ai-hpc/ai-hardware-engineer-roadmap/stargazers">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ai-hpc/ai-hardware-engineer-roadmap&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=ai-hpc/ai-hardware-engineer-roadmap&type=Date" />
-    <img alt="Star History Chart for ai-hpc/ai-hardware-engineer-roadmap" src="https://api.star-history.com/svg?repos=ai-hpc/ai-hardware-engineer-roadmap&type=Date" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ai-hpc/ai-hardware-engineer-roadmap/main/Assets/star-history/star-history-dark.svg" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/ai-hpc/ai-hardware-engineer-roadmap/main/Assets/star-history/star-history-light.svg" />
+    <img alt="Star History Chart for ai-hpc/ai-hardware-engineer-roadmap" src="https://raw.githubusercontent.com/ai-hpc/ai-hardware-engineer-roadmap/main/Assets/star-history/star-history-light.svg" width="800" />
   </picture>
 </a>
 
