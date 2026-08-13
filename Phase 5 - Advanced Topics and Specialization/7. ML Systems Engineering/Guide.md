@@ -761,10 +761,11 @@ Do not stop at "it runs." The milestone is complete when you can explain why it 
 
 ## Featured Special Course
 
-- [**AI Inference Engineer 2026**](AI%20Inference%20Engineer%202026/README.md) — three-part deep dive on the modern production inference stack:
+- [**AI Inference Engineer 2026**](AI%20Inference%20Engineer%202026/README.md) — four-part deep dive on the modern production inference stack:
   - **Part 1 — Fundamentals** (5 lectures): the mental model, transformer execution, roofline, the FP16→FP8→FP4→INT4 precision stack, the runtime landscape
   - **Part 2 — Dense at Hopper** (7 lectures): Llama 3.3 70B ↔ Qwen 2.5 72B side-by-side on H100/H200, quantization recipes including the LLaMA-3-70B W8A8 anomaly, tensor parallelism, the modern serving stack, 128K context, and the distributed communication layer
   - **Part 3 — MoE at Blackwell** (5 lectures): DeepSeek V3.1 + Qwen3-MoE 235B-A22B on B200/GB200 NVL72, MLA + MTP, EP all-to-all, disaggregated prefill/decode, full `$/MTok` cost model
+  - **Part 4 — Optimizing a Real Engine** (10 lectures): a **measured case study**. [SparkInfer-K3](https://github.com/gittensor-ai-lab/sparkinfer-k3) running Kimi K3 (2.8T, 896 experts, hybrid MLA + KDA) on one 8× H200 node, **1.01 → 60.17 tok/s** decode at 128k across ~96 PRs, against llama.cpp at 18.44 on the same box. Building a scoreboard that cannot be gamed; diagnosing which of the four ceilings binds; launch geometry, fusion + activation quantization, split-context/split-head attention, expert sharding and the Amdahl trap, CUDA-graph residency; the forgotten phase (prefill, one forward per token for six weeks); and the failure mode where a bug makes the benchmark *better*.
 
 Anchored on the most recent open-weights models and current runtime versions, with a [refresh log](AI%20Inference%20Engineer%202026/REFRESH-LOG.md) that tracks every version pin.
 

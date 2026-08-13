@@ -6,6 +6,22 @@ When a lecture is refreshed, update its `## Current as of YYYY-MM` line *and* ad
 
 ---
 
+## 2026-08 — New part: Part 4 — Optimizing a Real Engine (10 lectures)
+
+Added **Part 4**, a measured case study anchored on [SparkInfer-K3](https://github.com/gittensor-ai-lab/sparkinfer-k3) (MIT) — a from-scratch CUDA engine for **Kimi K3** (2.8T total, 93 layers = 24 MLA + 69 KDA, 896 routed experts top-16, latent MoE at 3584, `situ` activation, 1M context) on a single **8× H200** node at `UD-IQ1_S` (553 GiB). Course total 17 → 27 lectures.
+
+**Why this part is different from Parts 1–3.** Those pin *teaching anchors* — representative numbers, refreshed on a cadence. Part 4 pins *one measured history*, sourced from pull requests, `reference.lock` commit history, sealed eval receipts, and a changelog that records retracted numbers alongside real ones. Nothing here is refreshed; it is 2026-08 history for one model on one box, and the transferable content is the reasoning.
+
+**The spine.** Decode at the real 128k scored context went **1.01 → 60.17 tok/s** across ~96 PRs, against llama.cpp at **18.44** on the same box and the same weights — 18× behind to 3.26× ahead. Seventeen recorded frontier advances, of which the largest single step is 4.5× and the median is ~7%: the 60× is a *product*, not a discovery. Prefill went **40.35 → 99.68** at 32k against llama.cpp's 143.88 (still 1.44× behind).
+
+**Lectures.** 01 the workload/baseline/ladder (why the baseline had to be a pinned third-party fork — upstream llama.cpp asserts `n_expert ≤ 512`); 02 the scoreboard (correctness gate ordered *before* speed, top-1 ≥ 0.95 / mean KL ≤ 0.05 worst-of-seven-depths, tier = `min(Δ/llama_ref, Δ/frontier)`, raise-only frontier, and ~40 merged PRs that each closed one measurement-trust hole); 03 diagnosis across four ceilings (bandwidth / occupancy / launch / comm) with the finding that the collective was ~2% of the token while ~30 unfused kernels per layer × 93 were the cost; 04 launch geometry; 05 fusion + activation quantization; 06 attention at 128k; 07 expert sharding and the Amdahl trap; 08 CUDA-graph residency; 09 batched prefill; 10 silent wrongness.
+
+**Three findings that carry beyond the case study.** (1) The harness measured context **64** while the slot was named `_128` and the docs said 128k — at 64 the engine was 1.8× behind the reference, at 128k it was **18×** behind, so weeks of work were aimed at a context nobody runs. (2) A **3× MoE speedup made TP scaling worse**, 2.44× → ~1.1×, because the replicated attention it left behind became the whole serial term (serial fraction 0.33 → 0.90). (3) A PR measured **169.72 tok/s** prefill with two live defects — a transposed stride pair masked below 13 layers, and an env gate documented default-off that read opt-out — and *"the corrupted walk was faster because it was reading the wrong rows."* The honest number was 98.80. On a memory-bound engine, incorrectness and speed are positively correlated.
+
+Also registered Part 2 Lecture 07 in the site nav, where it was present on disk but missing from `mkdocs.yml`.
+
+---
+
 ## 2026-06 — New lecture: Part 2 Lecture 07 (the communication layer)
 
 Added **Part 2 Lecture 07 — "Inside the Communication Layer: NCCL, Custom All-Reduce, and the vLLM Communicator Stack."** How a serving runtime actually moves bytes between GPUs, using vLLM's `distributed/device_communicators/` as the worked example: the three-layer architecture (router → engines → primitives), the small-message latency problem that motivates a custom one-shot/two-shot all-reduce over the NCCL ring, the fused all-reduce+RMSNorm path (FlashInfer), the runtime routing/fallback ladder, and all2all as a forward pointer to Part 3 MoE. Mechanistically explains Lecture 04's "TP=8 decode is comm-bound." Part 2 is now 7 lectures (course total 16 → 17); updated the Part 2 README, course README counts/maps, Lecture 06 footer, and the root roadmap README. Module names pinned to the vLLM 0.22-era lineage and hedged as version-dependent.

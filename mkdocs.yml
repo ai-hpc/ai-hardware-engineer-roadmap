@@ -632,6 +632,7 @@ nav:
           - "04: Tensor Parallelism on 8× Hopper": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-04.md
           - "05: Modern Serving Stack": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-05.md
           - "06: Long Context at 128K on Hopper": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-06.md
+          - "07: Inside the Communication Layer": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-07.md
         - "Part 3 — MoE at Blackwell":
           - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/README.md
           - "01: Anatomy of a Modern MoE": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-01.md
@@ -639,6 +640,18 @@ nav:
           - "03: Expert Parallelism (EP)": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-03.md
           - "04: Disaggregated Prefill/Decode": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-04.md
           - "05: Production MoE Serving": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-05.md
+        - "Part 4 — Optimizing a Real Engine":
+          - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/README.md
+          - "01: The Workload, the Baseline, the Ladder": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-01.md
+          - "02: The Scoreboard — A Benchmark That Cannot Be Gamed": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-02.md
+          - "03: Diagnosis — Launch, Bandwidth, or Comm?": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-03.md
+          - "04: Launch Geometry — Grids and Occupancy": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-04.md
+          - "05: Fusion and Activation Quantization": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-05.md
+          - "06: Attention at 128k — Split Context, Split Heads": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-06.md
+          - "07: Sharding 896 Experts — and Amdahl": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-07.md
+          - "08: Graph-Resident Decode": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-08.md
+          - "09: The Phase You Forgot — Batched Prefill": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-09.md
+          - "10: Silently Wrong": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-10.md
   - "P6 · Careers":
     - Overview: Phase 6 - Interview Preparation/README.md
     - Roles & Market: Roles and Market Analysis.md

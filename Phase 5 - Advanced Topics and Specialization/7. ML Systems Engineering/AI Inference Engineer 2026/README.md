@@ -13,7 +13,7 @@
 
 The inference layer has moved more in the last twelve months than the previous three years combined. FP4 went from research to native silicon. Disaggregated prefill/decode went from paper to production. MoE went from "interesting" to "the default architecture above 30B." Any course that does not lead with what shipped in 2025–2026 is already mis-training engineers.
 
-This course is structured as **three parts** that can be read independently or as a sequence. Each part stands on its own; together they walk the precision floor down (FP16 → FP8 → FP4), the architecture from dense to sparse (Llama / Qwen → DeepSeek / Qwen3-MoE), and the hardware up (single-GPU → 8× Hopper → GB200 NVL72 Blackwell).
+This course is structured as **four parts** that can be read independently or as a sequence. Parts 1–3 stand on their own; together they walk the precision floor down (FP16 → FP8 → FP4), the architecture from dense to sparse (Llama / Qwen → DeepSeek / Qwen3-MoE), and the hardware up (single-GPU → 8× Hopper → GB200 NVL72 Blackwell). **Part 4 is a different kind of chapter**: one engine, one node, ~96 pull requests, and a measured 60× — the discipline of optimization as it actually happens, with every number traceable to the diff that produced it.
 
 **Layer mapping:** L3–L8. Runtime / scheduler / kernels / collectives / fabric / observability — the full ML Systems stack as it applies to inference.
 
@@ -44,7 +44,7 @@ Run it locally: `git clone https://github.com/ai-hpc/llm-inference-viz && cd llm
 
 ---
 
-## Course Map (3 parts, 17 lectures)
+## Course Map (4 parts, 27 lectures)
 
 ### 🧭 Part 1 — Fundamentals of AI Inference / MLSys (5 lectures)
 
@@ -96,6 +96,29 @@ The Blackwell stack for modern MoE — DeepSeek V3.1 (with MLA + MTP) and Qwen3-
 
 </div>
 
+### 🔬 Part 4 — Optimizing a Real Engine (10 lectures)
+
+A measured case study. Parts 1–3 pin *teaching anchors*; this part pins **one engine's history**: [SparkInfer-K3](https://github.com/gittensor-ai-lab/sparkinfer-k3) running **Kimi K3** (2.8T params, 896 experts, hybrid MLA + KDA) on a single **8× H200** node, from **1.01 → 60.17 tok/s** decode at 128k across ~96 pull requests — measured against llama.cpp at 18.44 on the same box and the same weights.
+
+The subject is not the numbers, which belong to one model on one box in 2026-08. It is the **discipline**: build the scoreboard before the optimization, find the binding ceiling before writing kernels, and recognize the failure mode where a bug makes the benchmark *better*.
+
+<div class="lecture-map" markdown>
+
+| # | Title |
+|---|-------|
+| 01 | [The workload, the baseline, and the ladder](Part%204%20-%20Optimizing%20a%20Real%20Engine/Lecture-01.md) |
+| 02 | [The scoreboard — a benchmark that cannot be gamed](Part%204%20-%20Optimizing%20a%20Real%20Engine/Lecture-02.md) |
+| 03 | [Diagnosis — launch-bound, bandwidth-bound, or comm-bound?](Part%204%20-%20Optimizing%20a%20Real%20Engine/Lecture-03.md) |
+| 04 | [Launch geometry — grids, occupancy, and 327 norms per token](Part%204%20-%20Optimizing%20a%20Real%20Engine/Lecture-04.md) |
+| 05 | [Fusion and the activation-quantization discipline](Part%204%20-%20Optimizing%20a%20Real%20Engine/Lecture-05.md) |
+| 06 | [Attention at 128k — split over context, split over heads](Part%204%20-%20Optimizing%20a%20Real%20Engine/Lecture-06.md) |
+| 07 | [Sharding 896 experts — and the Amdahl trap that followed](Part%204%20-%20Optimizing%20a%20Real%20Engine/Lecture-07.md) |
+| 08 | [Graph-resident decode — killing the launch bill for good](Part%204%20-%20Optimizing%20a%20Real%20Engine/Lecture-08.md) |
+| 09 | [The phase you forgot — batched prefill](Part%204%20-%20Optimizing%20a%20Real%20Engine/Lecture-09.md) |
+| 10 | [Silently wrong — the failure mode unique to inference engines](Part%204%20-%20Optimizing%20a%20Real%20Engine/Lecture-10.md) |
+
+</div>
+
 ---
 
 ## Course Outcomes
@@ -108,6 +131,7 @@ By the end of all three parts you should be able to:
 * Stand up 8× Hopper TP serving with continuous batching, paged KV, prefix cache, and speculation — and explain which knobs moved which metric.
 * Stand up Blackwell EP serving for MoE with token-level routing, MTP, and (where applicable) disaggregated P/D.
 * Ship a reproducible benchmark with TTFT, TPOT, throughput, p99, and a defended $/MTok cost line.
+* **Take any optimization claim apart** — name three ways the measurement could be flattering itself before arguing about the technique — and build a gate for your own workload that survives an honest engineer, a hostile contributor, and non-deterministic hardware (Part 4).
 
 ---
 
@@ -137,6 +161,8 @@ A single repo that, by the end of Part 2, contains:
 
 By the end of Part 3, the same harness extends to MoE on Blackwell with EP, MTP speculation, and (where the cluster allows) disaggregated P/D measurements.
 
+Part 4 turns that harness into something auditable: a pinned reference with a drift assertion, a correctness gate ordered *before* the speed gate, a raise-only frontier whose every value traces to a committed measurement, a diagnosis naming the binding ceiling with a number per candidate, an optimization ladder of at least five changes **including the ones that measured nothing**, and a deliberate-corruption suite proving the gate catches a bug that makes the engine *faster*.
+
 ---
 
 ## Exit Criteria
@@ -147,5 +173,6 @@ You are done with this course when you can:
 * Defend a precision floor (FP16 vs FP8 vs INT4 vs FP4) to a roboticist who does not trust quantization.
 * Tell, from a profile trace alone, whether a workload is compute-bound, memory-bound, comm-bound, or scheduler-bound — and what to change to verify.
 * Walk through your benchmark repo with another engineer and they reproduce your numbers on the same hardware class within ±5%.
+* Hand your harness to someone hostile and have them find only holes you already documented.
 
-If you cannot do all four, you have a notebook of recipes, not a body of inference-engineering work. Re-run the benchmarks.
+If you cannot do all five, you have a notebook of recipes, not a body of inference-engineering work. Re-run the benchmarks.
