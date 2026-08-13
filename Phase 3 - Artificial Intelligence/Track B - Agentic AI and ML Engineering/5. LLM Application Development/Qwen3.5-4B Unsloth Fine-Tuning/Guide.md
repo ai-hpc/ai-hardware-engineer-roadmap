@@ -404,10 +404,10 @@ Deliver:
 | [Unsloth Qwen3.5 fine-tuning guide](https://unsloth.ai/docs/models/qwen3.5/fine-tune) | Current Unsloth support, recommended precision, and training examples |
 | [TRL SFTTrainer documentation](https://huggingface.co/docs/trl/sft_trainer) | Trainer API used for supervised fine-tuning |
 | [PEFT LoRA documentation](https://huggingface.co/docs/peft/main/en/conceptual_guides/lora) | Adapter mechanics and tunable parameters |
-| [Phase 5 - Qwen Inference Optimization](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/README.md) | Companion inference course for profiling the exported model |
+| [Phase 5 - Qwen Inference Optimization](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20C%20-%20Edge%20AI/Qwen%20Inference%20Optimization/README.md) | Companion inference course for profiling the exported model |
 
 ---
 
 ## Next
 
--> [Phase 5 - Qwen Inference Optimization](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/README.md) once the fine-tuned artifact is ready to benchmark.
+-> [Phase 5 - Qwen Inference Optimization](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20C%20-%20Edge%20AI/Qwen%20Inference%20Optimization/README.md) once the fine-tuned artifact is ready to benchmark.

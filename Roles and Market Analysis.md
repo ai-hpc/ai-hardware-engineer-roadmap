@@ -48,9 +48,9 @@ Start by choosing one **primary sub-layer** and one **adjacent sub-layer**:
 
 Then map those targets back to the roadmap:
 
-- **L1 / L2 roles:** prioritize [Phase 3](Phase%203%20-%20Artificial%20Intelligence/Guide.md) and the relevant Phase 4 track: [Xilinx FPGA](Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md), [NVIDIA Jetson](Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md), or [ML Compiler](Phase%204%20-%20Track%20C%20-%20ML%20Compiler%20and%20Graph%20Optimization/Guide.md)
+- **L1 / L2 roles:** prioritize [Phase 3](Phase%203%20-%20Artificial%20Intelligence/Guide.md) and the relevant Phase 4 track: [Xilinx FPGA](Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md), [NVIDIA Jetson](Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md), or [ML Compiler](Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md)
 - **L3 / L4 roles:** prioritize [Phase 1](Phase%201%20-%20Foundational%20Knowledge/Guide.md), [Phase 2](Phase%202%20-%20Embedded%20Systems/Guide.md), and selected Phase 4 tracks
-- **L5 / L6 roles:** prioritize [Phase 1](Phase%201%20-%20Foundational%20Knowledge/Guide.md), [Phase 4 Track A](Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md), and [Phase 5F](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/6.%20AI%20Chip%20Design/Guide.md)
+- **L5 / L6 roles:** prioritize [Phase 1](Phase%201%20-%20Foundational%20Knowledge/Guide.md), [Phase 4 Track A](Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md), and [Phase 5F](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Guide.md)
 
 This makes the data actionable instead of just interesting.
 

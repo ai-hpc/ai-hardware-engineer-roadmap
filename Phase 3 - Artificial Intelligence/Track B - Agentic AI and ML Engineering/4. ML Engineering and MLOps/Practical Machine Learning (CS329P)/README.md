@@ -15,7 +15,7 @@ This course is an adaptation of **Stanford CS329P — Practical Machine Learning
 
 This is the course that makes you dangerous in a real ML role. Most engineers can call `model.fit()`. Far fewer can tell you *why their validation score lied*, detect that production traffic has drifted, or shrink a model 4× without losing the accuracy that justified it. That gap is this syllabus.
 
-**Layer mapping:** the ML-engineering layer — the practice that sits between a research model and a served product. It feeds directly into [Module 4B — ML Engineering & MLOps](../Guide.md) and the serving/compression work in [Phase 5 — ML Systems Engineering](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/7.%20ML%20Systems%20Engineering/Guide.md).
+**Layer mapping:** the ML-engineering layer — the practice that sits between a research model and a served product. It feeds directly into [Module 4B — ML Engineering & MLOps](../Guide.md) and the serving/compression work in [Phase 5 — ML Systems Engineering](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/Guide.md).
 
 **Role targets:** Machine Learning Engineer · Applied Scientist · MLOps Engineer · Data Scientist (modeling track) · ML Platform Engineer.
 
@@ -25,7 +25,7 @@ This is the course that makes you dangerous in a real ML role. Most engineers ca
 * [Module 2 — Deep Learning Frameworks](../../../2.%20Deep%20Learning%20Frameworks/Guide.md) for the PyTorch used in the model and compression lectures.
 * No prior MLOps knowledge needed — this course *is* the on-ramp to it.
 
-**Pairs with:** [Module 4B — ML Engineering & MLOps](../Guide.md) (the infrastructure side of shipping) and, for the hardware payoff of Lecture 10, [Phase 5 — Model Compression and the inference stack](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/7.%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/README.md).
+**Pairs with:** [Module 4B — ML Engineering & MLOps](../Guide.md) (the infrastructure side of shipping) and, for the hardware payoff of Lecture 10, [Phase 5 — Model Compression and the inference stack](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/README.md).
 
 ---
 
@@ -106,4 +106,4 @@ If you can fit a model but can't do the ten things around the fit, you have a no
 
 ---
 
-*Related: [Module 4B — ML Engineering & MLOps](../Guide.md) · [Phase 5 — ML Systems Engineering](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/7.%20ML%20Systems%20Engineering/Guide.md) · original [Stanford CS329P](https://c.d2l.ai/stanford-cs329p)*
+*Related: [Module 4B — ML Engineering & MLOps](../Guide.md) · [Phase 5 — ML Systems Engineering](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/Guide.md) · original [Stanford CS329P](https://c.d2l.ai/stanford-cs329p)*

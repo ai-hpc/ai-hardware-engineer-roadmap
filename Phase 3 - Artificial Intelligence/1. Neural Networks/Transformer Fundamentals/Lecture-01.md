@@ -263,7 +263,7 @@ Concretely for Qwen3-4B at 4 k context, the KV cache for one sequence holds:
   ≈ 576 MB
 ```
 
-That cache is read on every decoded token. It's the second-biggest bandwidth load (after the weights themselves) on the entire decode path. The Phase 5 inference lectures spend a lot of time on it — see [Edge LLM Inference Internals](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Edge%20LLM%20Inference%20Internals/Lecture-01.md) §5.
+That cache is read on every decoded token. It's the second-biggest bandwidth load (after the weights themselves) on the entire decode path. The Phase 5 inference lectures spend a lot of time on it — see [Edge LLM Inference Internals](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20C%20-%20Edge%20AI/Edge%20LLM%20Inference%20Internals/Lecture-01.md) §5.
 
 !!! tip "Why the three-vector design exists at all"
     Q/K/V is not just an architectural quirk — it is what makes long-context LLM inference economically viable. The asymmetry between **"Q recomputed per step"** and **"K, V cacheable across steps"** is the entire reason GPT-class models can hold a conversation without recomputing the past from scratch on every token.
@@ -795,5 +795,5 @@ This lecture is the prerequisite for the Phase 5 inference lectures. The bridge:
 * **[Hugging Face Transformers — `modeling_qwen2.py`](https://github.com/huggingface/transformers/blob/main/src/transformers/models/qwen2/modeling_qwen2.py):** A real production-grade transformer implementation you can read top-to-bottom.
 * **[PyTorch — `scaled_dot_product_attention` docs](https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html):** The modern fused-attention primitive.
 * **[FlashAttention paper (Dao et al., 2022)](https://arxiv.org/abs/2205.14135):** How to compute the same attention 5× faster by tiling. Not required for fundamentals, but the bridge to inference engineering.
-* **[Phase 5 — Edge LLM Inference Internals](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Edge%20LLM%20Inference%20Internals/Lecture-01.md):** The first downstream lecture that applies this material to real hardware.
-* **[Phase 5 — Qwen Inference Optimization](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/3.%20Edge%20AI/Qwen%20Inference%20Optimization/README.md):** The 6-lecture series that specializes this architecture to Qwen3-4B and Qwen2.5-72B.
+* **[Phase 5 — Edge LLM Inference Internals](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20C%20-%20Edge%20AI/Edge%20LLM%20Inference%20Internals/Lecture-01.md):** The first downstream lecture that applies this material to real hardware.
+* **[Phase 5 — Qwen Inference Optimization](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20C%20-%20Edge%20AI/Qwen%20Inference%20Optimization/README.md):** The 6-lecture series that specializes this architecture to Qwen3-4B and Qwen2.5-72B.

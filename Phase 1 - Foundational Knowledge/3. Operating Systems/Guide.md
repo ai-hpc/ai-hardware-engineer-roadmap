@@ -105,7 +105,7 @@ Follow this order rather than skipping around; later lectures assume earlier voc
 - **Slides:** [CS124 lectures (PDF)](https://users.cms.caltech.edu/~donnie/cs124/lectures/)
 - **Textbook:** *Operating System Concepts* (Silberschatz, Galvin, Gagne)
 - **Kernel narrative:** [Linux Insides](https://0xax.gitbooks.io/linux-insides/)
-- **Real fork (openpilot / comma):** [agnos-kernel-sdm845](https://github.com/commaai/agnos-kernel-sdm845), [agnos-builder](https://github.com/commaai/agnos-builder) — [**AGNOS Guide**](../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/5.%20Autonomous%20Vehicles/2.%20openpilot%20Reference%20Stack/agnos/Guide.md) maps **all 26** lecture topics to kernel paths and fork-specific changes.
+- **Real fork (openpilot / comma):** [agnos-kernel-sdm845](https://github.com/commaai/agnos-kernel-sdm845), [agnos-builder](https://github.com/commaai/agnos-builder) — [**AGNOS Guide**](../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20E%20-%20Autonomous%20Vehicles/2.%20openpilot%20Reference%20Stack/agnos/Guide.md) maps **all 26** lecture topics to kernel paths and fork-specific changes.
 
 ---
 

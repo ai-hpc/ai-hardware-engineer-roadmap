@@ -18,7 +18,7 @@
 
 **Prerequisites:** comfort with basic command-line tooling and a working development environment
 
-**What comes after:** [Phase 2 — Embedded Systems](../Phase%202%20-%20Embedded%20Systems/Guide.md), [Phase 3 — Artificial Intelligence](../Phase%203%20-%20Artificial%20Intelligence/Guide.md), then one of the Phase 4 tracks: [Xilinx FPGA](../Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md), [NVIDIA Jetson](../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md), or [ML Compiler](../Phase%204%20-%20Track%20C%20-%20ML%20Compiler%20and%20Graph%20Optimization/Guide.md)
+**What comes after:** [Phase 2 — Embedded Systems](../Phase%202%20-%20Embedded%20Systems/Guide.md), [Phase 3 — Artificial Intelligence](../Phase%203%20-%20Artificial%20Intelligence/Guide.md), then one of the Phase 4 tracks: [Xilinx FPGA](../Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md), [NVIDIA Jetson](../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md), or [ML Compiler](../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md)
 
 ---
 

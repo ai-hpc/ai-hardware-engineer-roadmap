@@ -139,7 +139,7 @@ print(y.grad)  # dz/dy = x + 2y = 2 + 6 = 8.0
 3. Run with `BEAM=3` and compare kernel count and latency vs `BEAM=0`.
 4. (Advanced) Add a minimal logging backend that prints each kernel launch — verify which ops fuse.
 
-**Deep dive:** The full tinygrad learning path (11 parts, 7 projects) is in [Phase 5E — Autonomous Vehicles / tinygrad](../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/5.%20Autonomous%20Vehicles/3.%20tinygrad%20for%20Inference/Guide.md).
+**Deep dive:** The full tinygrad learning path (11 parts, 7 projects) is in [Phase 5E — Autonomous Vehicles / tinygrad](../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20E%20-%20Autonomous%20Vehicles/3.%20tinygrad%20for%20Inference/Guide.md).
 
 ---
 

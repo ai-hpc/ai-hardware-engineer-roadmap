@@ -526,4 +526,4 @@ These are unsettled as of mid-2026; expect the answers to move in the next 12 mo
 - [ML and AI on Jetson — overview](../Guide.md)
 - [Jetson LLM Runtime](../jetson-llm-runtime/Guide.md)
 - [LLM Optimization on Jetson](../llm-optimization-jetson/Guide.md)
-- [Robotics — Advanced Perception and AI](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/4.%20Robotics/Advanced%20Perception%20and%20AI%20for%20Robotics/Lecture-01.md)
+- [Robotics — Advanced Perception and AI](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Advanced%20Perception%20and%20AI%20for%20Robotics/Lecture-01.md)

@@ -18,7 +18,7 @@
 
 **Prerequisites:** [Xilinx FPGA Development](../1.%20Xilinx%20FPGA%20Development/Guide.md), [Advanced FPGA Design](../3.%20Advanced%20FPGA%20Design/Guide.md), C/C++, and basic performance profiling.
 
-**What comes after:** [Runtime and Driver Development](../5.%20Runtime%20and%20Driver%20Development/Guide.md), [ML Compiler and Graph Optimization](../../Phase%204%20-%20Track%20C%20-%20ML%20Compiler%20and%20Graph%20Optimization/Guide.md), and [AI Chip Design](../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/6.%20AI%20Chip%20Design/Guide.md).
+**What comes after:** [Runtime and Driver Development](../5.%20Runtime%20and%20Driver%20Development/Guide.md), [ML Compiler and Graph Optimization](../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md), and [AI Chip Design](../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Guide.md).
 
 ---
 

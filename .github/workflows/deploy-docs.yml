@@ -34,6 +34,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install mkdocs-material==9.7.* \
+                      mkdocs-redirects \
                       pymdown-extensions \
                       pillow \
                       cairosvg

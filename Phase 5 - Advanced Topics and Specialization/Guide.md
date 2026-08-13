@@ -16,7 +16,7 @@
 
 **Role targets:** GPU Infrastructure Engineer · HPC Engineer · ML Systems Engineer · Robotics Engineer · Autonomous Vehicles Engineer · AI Accelerator Architect · Advanced Edge AI Engineer
 
-**Prerequisites:** one primary Phase 4 track completed to a project-capable level: [Xilinx FPGA](../Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md), [NVIDIA Jetson](../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md), or [ML Compiler](../Phase%204%20-%20Track%20C%20-%20ML%20Compiler%20and%20Graph%20Optimization/Guide.md), plus whichever earlier phases your track depends on most heavily.
+**Prerequisites:** one primary Phase 4 track completed to a project-capable level: [Xilinx FPGA](../Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md), [NVIDIA Jetson](../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md), or [ML Compiler](../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md), plus whichever earlier phases your track depends on most heavily.
 
 **What comes after:** Specialization is the endpoint of the curriculum. At this stage, the next step is usually a major portfolio project, open-source contribution, or role-specific job targeting.
 
@@ -42,13 +42,13 @@ That is the difference between a learner and a differentiated candidate.
 
 | Track | Focus | Best for | Guide |
 |------|-------|----------|-------|
-| **1. GPU Infrastructure** | multi-GPU systems, interconnects, distributed runtime, vendor ecosystems | cluster and infrastructure work | [Guide](1.%20GPU%20Infrastructure/Guide.md) |
-| **2. High Performance Computing** | CUDA-X libraries, performance engineering, large-scale acceleration | systems and performance roles | [Guide](2.%20High%20Performance%20Computing/Guide.md) |
-| **3. Edge AI** | efficient deployment, real-time constraints, edge optimization | edge deployment specialists | [Guide](3.%20Edge%20AI/Guide.md) |
-| **4. Robotics** | ROS 2, autonomy software, robot systems integration | robotics and embodied AI | [Guide](4.%20Robotics/Guide.md) |
-| **5. Autonomous Vehicles** | perception, safety, deployment, debugging real vehicle stacks | AV systems and applied autonomy | [Guide](5.%20Autonomous%20Vehicles/Guide.md) |
-| **6. AI Chip Design** | accelerator architecture, dataflow, custom compute design | architecture and chip-design paths | [Guide](6.%20AI%20Chip%20Design/Guide.md) |
-| **7. ML Systems Engineering** | training systems, inference runtimes, GPU scheduling, distributed serving, compiler/runtime work | AI infrastructure and MLSys roles | [Guide](7.%20ML%20Systems%20Engineering/Guide.md) |
+| **Track A — GPU Infrastructure** | multi-GPU systems, interconnects, distributed runtime, vendor ecosystems | cluster and infrastructure work | [Guide](Track%20A%20-%20GPU%20Infrastructure/Guide.md) |
+| **Track B — High Performance Computing** | CUDA-X libraries, performance engineering, large-scale acceleration | systems and performance roles | [Guide](Track%20B%20-%20High%20Performance%20Computing/Guide.md) |
+| **Track C — Edge AI** | efficient deployment, real-time constraints, edge optimization | edge deployment specialists | [Guide](Track%20C%20-%20Edge%20AI/Guide.md) |
+| **Track D — Robotics** | ROS 2, autonomy software, robot systems integration | robotics and embodied AI | [Guide](Track%20D%20-%20Robotics/Guide.md) |
+| **Track E — Autonomous Vehicles** | perception, safety, deployment, debugging real vehicle stacks | AV systems and applied autonomy | [Guide](Track%20E%20-%20Autonomous%20Vehicles/Guide.md) |
+| **Track F — AI Chip Design** | accelerator architecture, dataflow, custom compute design | architecture and chip-design paths | [Guide](Track%20F%20-%20AI%20Chip%20Design/Guide.md) |
+| **Track G — ML Systems Engineering** | training systems, inference runtimes, GPU scheduling, distributed serving, compiler/runtime work | AI infrastructure and MLSys roles | [Guide](Track%20G%20-%20ML%20Systems%20Engineering/Guide.md) |
 
 **Recommended rule:** pick one primary track first. Add a second track only when it strengthens your main specialization instead of diluting it.
 

@@ -849,8 +849,8 @@ First metric to monitor:
 - llama.cpp: [https://github.com/ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp)
 - vLLM documentation: [https://docs.vllm.ai](https://docs.vllm.ai)
 - TensorRT-LLM: [https://github.com/NVIDIA/TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM)
-- FP8 KV-Cache in vLLM → [MLSys Deep Dives · Lecture 02](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/7.%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/Lecture-02.md)
-- MLSys 2026 Kernel Contest → [MLSys Deep Dives · Lecture 06](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/7.%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/Lecture-06.md)
+- FP8 KV-Cache in vLLM → [MLSys Deep Dives · Lecture 02](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/Lecture-02.md)
+- MLSys 2026 Kernel Contest → [MLSys Deep Dives · Lecture 06](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/Lecture-06.md)
 
 ---
 

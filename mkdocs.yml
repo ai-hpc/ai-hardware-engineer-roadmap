@@ -93,6 +93,200 @@ markdown_extensions:
 plugins:
   - search
   - tags
+  - redirects:
+      redirect_maps:
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/01 - Graph and Operator Optimization/Guide.md': 'Phase 4 - Track C - DL Inference Optimization/01 - Graph and Operator Optimization/Guide.md'
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Guide.md': 'Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Guide.md'
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 01 - Attention Bottleneck and Roofline.md': 'Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 01 - Attention Bottleneck and Roofline.md'
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 02 - Online Softmax and Numerical Correctness.md': 'Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 02 - Online Softmax and Numerical Correctness.md'
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 03 - FlashAttention-1 Algorithm.md': 'Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 03 - FlashAttention-1 Algorithm.md'
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 04 - GPU Kernel Performance Basics.md': 'Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 04 - GPU Kernel Performance Basics.md'
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 05 - Repo Anatomy and Python CUDA API.md': 'Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 05 - Repo Anatomy and Python CUDA API.md'
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 06 - FlashAttention-2.md': 'Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 06 - FlashAttention-2.md'
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 07 - Backward Pass and Validation.md': 'Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 07 - Backward Pass and Validation.md'
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 08 - Inference Path KV Cache and Decode.md': 'Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 08 - Inference Path KV Cache and Decode.md'
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 09 - Hopper FA3 FA4.md': 'Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 09 - Hopper FA3 FA4.md'
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 10 - Capstone.md': 'Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 10 - Capstone.md'
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/Guide.md': 'Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/Guide.md'
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/03 - Compiler Stack/Guide.md': 'Phase 4 - Track C - DL Inference Optimization/03 - Compiler Stack/Guide.md'
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/04 - Quantization/Guide.md': 'Phase 4 - Track C - DL Inference Optimization/04 - Quantization/Guide.md'
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/05 - Inference Runtimes and Deployment/Guide.md': 'Phase 4 - Track C - DL Inference Optimization/05 - Inference Runtimes and Deployment/Guide.md'
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/06 - tinygrad Deep Dive/Guide.md': 'Phase 4 - Track C - DL Inference Optimization/06 - tinygrad Deep Dive/Guide.md'
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/Guide.md': 'Phase 4 - Track C - DL Inference Optimization/Guide.md'
+        'Phase 4 - Track C - ML Compiler and Graph Optimization/Guide.md': 'Phase 4 - Track C - DL Inference Optimization/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/AMD GPU/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/AMD GPU/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Accelerator Platform Evaluation/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Accelerator Platform Evaluation/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Distributed AI Interconnects/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Distributed AI Interconnects/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/01-Hardware-Architecture.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/01-Hardware-Architecture.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/02-Training-Setup.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/02-Training-Setup.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/03-Inference-Setup.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/03-Inference-Setup.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/04-Memory-Management.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/04-Memory-Management.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/05-Performance-Optimization.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/05-Performance-Optimization.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/06-Benchmarks-and-Validation.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/06-Benchmarks-and-Validation.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/README.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/README.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/01-Blackwell-Architecture.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/01-Blackwell-Architecture.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/02-FP4-Numerics-Transformer-Engine.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/02-FP4-Numerics-Transformer-Engine.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/03-Single-B200-Qwen-Inference.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/03-Single-B200-Qwen-Inference.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/04-Multi-B200-NVL72.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/04-Multi-B200-NVL72.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/05-Blackwell-Kernel-Engineering.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/05-Blackwell-Kernel-Engineering.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/06-Production-Serving-on-Blackwell.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/06-Production-Serving-on-Blackwell.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/README.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/README.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/01-CUDA-Graphs.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/01-CUDA-Graphs.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/02-Cooperative-Groups.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/02-Cooperative-Groups.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/03-Persistent-Kernels.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/03-Persistent-Kernels.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/04-Kernel-Fusion.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/04-Kernel-Fusion.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/05-Warp-Specialization.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/05-Warp-Specialization.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/README.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/README.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/01-Intel-TDX-Attestation-Chain.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/01-Intel-TDX-Attestation-Chain.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/02-NVIDIA-CC-Attestation-Chain.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/02-NVIDIA-CC-Attestation-Chain.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/03-Dual-Vendor-Claim-Binding-and-Verification.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/03-Dual-Vendor-Claim-Binding-and-Verification.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/04-Confidential-Inference-Protocol.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/04-Confidential-Inference-Protocol.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/README.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/README.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/01-Architecture-and-Data-Path.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/01-Architecture-and-Data-Path.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/02-Hardware-Setup.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/02-Hardware-Setup.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/03-Software-Stack.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/03-Software-Stack.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/04-libcufile-API.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/04-libcufile-API.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/05-Performance-Tuning.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/05-Performance-Tuning.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/06-Disaggregated-Storage.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/06-Disaggregated-Storage.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/README.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/README.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/01-Hardware-Architecture.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/01-Hardware-Architecture.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/02-Inference-Optimization.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/02-Inference-Optimization.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/03-Multi-GPU-Strategy.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/03-Multi-GPU-Strategy.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/04-Deployment-Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/04-Deployment-Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/05-Benchmarks.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/05-Benchmarks.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/README.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/README.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/01-Long-Context-Bottlenecks.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/01-Long-Context-Bottlenecks.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/02-Long-Context-Attention.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/02-Long-Context-Attention.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/03-Position-Encoding.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/03-Position-Encoding.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/04-MoE-Fundamentals.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/04-MoE-Fundamentals.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/05-MoE-Systems-Infrastructure.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/05-MoE-Systems-Infrastructure.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/06-Adaptive-Data-Pipelines.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/06-Adaptive-Data-Pipelines.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/07-Long-Context-Evaluation.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/07-Long-Context-Evaluation.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/08-Combining-LongContext-and-MoE.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/08-Combining-LongContext-and-MoE.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/09-Distributed-Training-Infrastructure.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/09-Distributed-Training-Infrastructure.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/10-General-Purpose-Model.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/10-General-Purpose-Model.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/README.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/README.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/01-Fundamentals.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/01-Fundamentals.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/02-Algorithms-and-Bandwidth.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/02-Algorithms-and-Bandwidth.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/03-Framework-Integration.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/03-Framework-Integration.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/04-Configuration-and-Tuning.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/04-Configuration-and-Tuning.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/05-Multi-Node-Clusters.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/05-Multi-Node-Clusters.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/06-Debugging.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/06-Debugging.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/07-Trillion-Parameter-Scale.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/07-Trillion-Parameter-Scale.md'
+        'Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/README.md': 'Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/README.md'
+        'Phase 5 - Advanced Topics and Specialization/2. High Performance Computing/CUDA-X Libraries/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track B - High Performance Computing/CUDA-X Libraries/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/2. High Performance Computing/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track B - High Performance Computing/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/3. Edge AI/AI-Driven Wireless Communication/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/AI-Driven Wireless Communication/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/3. Edge AI/Agent Tool-Dispatch Evaluation with BFCL/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Agent Tool-Dispatch Evaluation with BFCL/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/3. Edge AI/Edge LLM Inference Internals/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Edge LLM Inference Internals/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Gemma 4 Edge Deployment/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-02.md': 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Gemma 4 Edge Deployment/Lecture-02.md'
+        'Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-03.md': 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Gemma 4 Edge Deployment/Lecture-03.md'
+        'Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-04.md': 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Gemma 4 Edge Deployment/Lecture-04.md'
+        'Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-05.md': 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Gemma 4 Edge Deployment/Lecture-05.md'
+        'Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-06.md': 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Gemma 4 Edge Deployment/Lecture-06.md'
+        'Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/README.md': 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Gemma 4 Edge Deployment/README.md'
+        'Phase 5 - Advanced Topics and Specialization/3. Edge AI/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-02.md': 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/Lecture-02.md'
+        'Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-03.md': 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/Lecture-03.md'
+        'Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-04.md': 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/Lecture-04.md'
+        'Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-05.md': 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/Lecture-05.md'
+        'Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-06.md': 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/Lecture-06.md'
+        'Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/README.md': 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/README.md'
+        'Phase 5 - Advanced Topics and Specialization/4. Robotics/Advanced Perception and AI for Robotics/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Advanced Perception and AI for Robotics/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/4. Robotics/Advanced Robot Operating System/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Advanced Robot Operating System/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/4. Robotics/CMU-Robotics-Courses.md': 'Phase 5 - Advanced Topics and Specialization/Track D - Robotics/CMU-Robotics-Courses.md'
+        'Phase 5 - Advanced Topics and Specialization/4. Robotics/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/4. Robotics/Industrial and Embedded Robotics/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Industrial and Embedded Robotics/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/4. Robotics/Multi-Robot Systems and Swarm Robotics/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Multi-Robot Systems and Swarm Robotics/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/4. Robotics/VLA Optimization and Action-Parity Harness/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/4. Robotics/VLA Optimization and Action-Parity Harness/Lecture-02.md': 'Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/Lecture-02.md'
+        'Phase 5 - Advanced Topics and Specialization/4. Robotics/VLA Optimization and Action-Parity Harness/README.md': 'Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/README.md'
+        'Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/1. Fundamentals/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/1. Fundamentals/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/2. openpilot Reference Stack/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/2. openpilot Reference Stack/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/2. openpilot Reference Stack/agnos/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/2. openpilot Reference Stack/agnos/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/2. openpilot Reference Stack/camerad/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/2. openpilot Reference Stack/camerad/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/2. openpilot Reference Stack/flow-diagram.md': 'Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/2. openpilot Reference Stack/flow-diagram.md'
+        'Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/3. tinygrad for Inference/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/3. tinygrad for Inference/README.md': 'Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/README.md'
+        'Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/3. tinygrad for Inference/notes/internals.md': 'Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/notes/internals.md'
+        'Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/3. tinygrad for Inference/notes/overview.md': 'Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/notes/overview.md'
+        'Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/3. tinygrad for Inference/ops/README.md': 'Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/ops/README.md'
+        'Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/3. tinygrad for Inference/ops/elementwise.md': 'Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/ops/elementwise.md'
+        'Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/3. tinygrad for Inference/ops/movement.md': 'Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/ops/movement.md'
+        'Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/3. tinygrad for Inference/ops/reduce.md': 'Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/ops/reduce.md'
+        'Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/3. tinygrad for Inference/projects/README.md': 'Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/projects/README.md'
+        'Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/4. Advanced Perception and Prediction/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/4. Advanced Perception and Prediction/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/5. Safety Standards and Deployment/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/5. Safety Standards and Deployment/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/6. Lauterbach TRACE32 Debug/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/6. Lauterbach TRACE32 Debug/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Agentic Chip Design 2026/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Agentic Chip Design 2026/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Agentic Chip Design 2026/Lectures/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Agentic Chip Design 2026/Lectures/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Lectures/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Lectures/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Lectures/Lecture-02.md': 'Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Lectures/Lecture-02.md'
+        'Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Lectures/Lecture-03.md': 'Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Lectures/Lecture-03.md'
+        'Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Lectures/Lecture-04.md': 'Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Lectures/Lecture-04.md'
+        'Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Lectures/Lecture-05.md': 'Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Lectures/Lecture-05.md'
+        'Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/RISC-V-AI-Chip-Design-and-Market/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/RISC-V-AI-Chip-Design-and-Market/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-02.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-02.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-03.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-03.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-04.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-04.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-05.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-05.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/README.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/README.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-02.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-02.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-03.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-03.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-04.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-04.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-05.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-05.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-06.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-06.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-07.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-07.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/README.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/README.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-02.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-02.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-03.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-03.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-04.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-04.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-05.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-05.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/README.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/README.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-02.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-02.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-03.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-03.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-04.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-04.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-05.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-05.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-06.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-06.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-07.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-07.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-08.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-08.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-09.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-09.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-10.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-10.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/README.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/README.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/README.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/README.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/REFRESH-LOG.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/REFRESH-LOG.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Guide.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Guide.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-02.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-02.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-03.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-03.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-04.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-04.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-05.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-05.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Logprobs, Perplexity and KL Divergence/README.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Logprobs, Perplexity and KL Divergence/README.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-02.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-02.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-03.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-03.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-04.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-04.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-05.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-05.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-06.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-06.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-07.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-07.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/README.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/README.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/Lecture-01.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/Lecture-01.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/Lecture-02.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/Lecture-02.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/Lecture-03.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/Lecture-03.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/Lecture-04.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/Lecture-04.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/Lecture-05.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/Lecture-05.md'
+        'Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/README.md': 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/README.md'
 
 extra_css:
   - Assets/css/custom.css
@@ -106,7 +300,7 @@ nav:
     - Phase 4 — Deployment:
       - Track A — Xilinx FPGA: Phase 4 - Track A - Xilinx FPGA/1. Xilinx FPGA Development/Guide.md
       - Track B — NVIDIA Jetson: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Guide.md
-      - Track C — ML Compiler: Phase 4 - Track C - ML Compiler and Graph Optimization/Guide.md
+      - Track C — DL Inference Optimization: Phase 4 - Track C - DL Inference Optimization/Guide.md
     - Phase 5 — Specialization: Phase 5 - Advanced Topics and Specialization/Guide.md
     - Phase 6 — Interview Prep: Phase 6 - Interview Preparation/README.md
     - 💬 Join the Discord community: https://discord.gg/r8DKtDzrsm
@@ -423,235 +617,233 @@ nav:
         - 6. Security & OTA: Phase 4 - Track B - Nvidia Jetson/6. Security and OTA/Guide.md
         - 7. Manufacturing: Phase 4 - Track B - Nvidia Jetson/7. Compliance and Manufacturing/Guide.md
         - 8. Runtime & Drivers: Phase 4 - Track B - Nvidia Jetson/8. Runtime and Driver Development/Guide.md
-      - "Track C: ML Compiler":
-        - Guide: Phase 4 - Track C - ML Compiler and Graph Optimization/Guide.md
-        - DL Inference Optimization:
-          - Overview: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/Guide.md
-          - 01 Graph & Ops: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/01 - Graph and Operator Optimization/Guide.md
-          - 02 Kernel Engineering:
-            - Overview: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/Guide.md
-            - "FlashAttention Course":
-              - "Overview": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Guide.md
-              - "01 Attention Bottleneck & Roofline": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 01 - Attention Bottleneck and Roofline.md
-              - "02 Online Softmax & Correctness": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 02 - Online Softmax and Numerical Correctness.md
-              - "03 FlashAttention-1 Algorithm": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 03 - FlashAttention-1 Algorithm.md
-              - "04 GPU Kernel Performance Basics": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 04 - GPU Kernel Performance Basics.md
-              - "05 Repo Anatomy & Python/CUDA API": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 05 - Repo Anatomy and Python CUDA API.md
-              - "06 FlashAttention-2": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 06 - FlashAttention-2.md
-              - "07 Backward Pass & Validation": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 07 - Backward Pass and Validation.md
-              - "08 Inference Path: KV Cache & Decode": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 08 - Inference Path KV Cache and Decode.md
-              - "09 Hopper / FA3 / FA4": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 09 - Hopper FA3 FA4.md
-              - "10 Capstone": Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 10 - Capstone.md
-          - 03 Compiler Stack: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/03 - Compiler Stack/Guide.md
-          - 04 Quantization: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/04 - Quantization/Guide.md
-          - 05 Runtimes: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/05 - Inference Runtimes and Deployment/Guide.md
-          - 06 tinygrad: Phase 4 - Track C - ML Compiler and Graph Optimization/DL Inference Optimization/06 - tinygrad Deep Dive/Guide.md
+      - "Track C: DL Inference Optimization":
+        - Guide: Phase 4 - Track C - DL Inference Optimization/Guide.md
+        - 01 Graph & Ops: Phase 4 - Track C - DL Inference Optimization/01 - Graph and Operator Optimization/Guide.md
+        - 02 Kernel Engineering:
+          - Overview: Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/Guide.md
+          - "FlashAttention Course":
+            - "Overview": Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Guide.md
+            - "01 Attention Bottleneck & Roofline": Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 01 - Attention Bottleneck and Roofline.md
+            - "02 Online Softmax & Correctness": Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 02 - Online Softmax and Numerical Correctness.md
+            - "03 FlashAttention-1 Algorithm": Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 03 - FlashAttention-1 Algorithm.md
+            - "04 GPU Kernel Performance Basics": Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 04 - GPU Kernel Performance Basics.md
+            - "05 Repo Anatomy & Python/CUDA API": Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 05 - Repo Anatomy and Python CUDA API.md
+            - "06 FlashAttention-2": Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 06 - FlashAttention-2.md
+            - "07 Backward Pass & Validation": Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 07 - Backward Pass and Validation.md
+            - "08 Inference Path: KV Cache & Decode": Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 08 - Inference Path KV Cache and Decode.md
+            - "09 Hopper / FA3 / FA4": Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 09 - Hopper FA3 FA4.md
+            - "10 Capstone": Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 10 - Capstone.md
+        - 03 Compiler Stack: Phase 4 - Track C - DL Inference Optimization/03 - Compiler Stack/Guide.md
+        - 04 Quantization: Phase 4 - Track C - DL Inference Optimization/04 - Quantization/Guide.md
+        - 05 Runtimes: Phase 4 - Track C - DL Inference Optimization/05 - Inference Runtimes and Deployment/Guide.md
+        - 06 tinygrad: Phase 4 - Track C - DL Inference Optimization/06 - tinygrad Deep Dive/Guide.md
 
   # ── P5 · Specialization ──────────────────────────────────────────────
   - "P5 · Specialization":
     - Overview: Phase 5 - Advanced Topics and Specialization/Guide.md
-    - "A: GPU Infrastructure":
-      - Guide: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Guide.md
+    - "Track A: GPU Infrastructure":
+      - Guide: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Guide.md
       - Nvidia GPU:
-        - Guide: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/Guide.md
+        - Guide: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/Guide.md
         - HPC Setup:
-          - Guide: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Guide.md
+          - Guide: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Guide.md
           - Blackwell B200 Qwen Inference:
-            - Overview: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/README.md
-            - "01 Blackwell Architecture": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/01-Blackwell-Architecture.md
-            - "02 FP4 Numerics & Transformer Engine 2": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/02-FP4-Numerics-Transformer-Engine.md
-            - "03 Single-B200 Qwen Inference": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/03-Single-B200-Qwen-Inference.md
-            - "04 Multi-B200 and NVL72": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/04-Multi-B200-NVL72.md
-            - "05 Blackwell Kernel Engineering": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/05-Blackwell-Kernel-Engineering.md
-            - "06 Production Serving on Blackwell": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/06-Production-Serving-on-Blackwell.md
+            - Overview: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/README.md
+            - "01 Blackwell Architecture": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/01-Blackwell-Architecture.md
+            - "02 FP4 Numerics & Transformer Engine 2": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/02-FP4-Numerics-Transformer-Engine.md
+            - "03 Single-B200 Qwen Inference": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/03-Single-B200-Qwen-Inference.md
+            - "04 Multi-B200 and NVL72": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/04-Multi-B200-NVL72.md
+            - "05 Blackwell Kernel Engineering": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/05-Blackwell-Kernel-Engineering.md
+            - "06 Production Serving on Blackwell": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Blackwell-B200-Qwen-Inference/06-Production-Serving-on-Blackwell.md
           - 8x H200 Training & Inference:
-            - Overview: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/README.md
-            - 01 Hardware Architecture: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/01-Hardware-Architecture.md
-            - 02 Training Setup: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/02-Training-Setup.md
-            - 03 Inference Setup: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/03-Inference-Setup.md
-            - 04 Memory Management: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/04-Memory-Management.md
-            - 05 Performance Optimization: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/05-Performance-Optimization.md
-            - 06 Benchmarks & Validation: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/06-Benchmarks-and-Validation.md
+            - Overview: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/README.md
+            - 01 Hardware Architecture: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/01-Hardware-Architecture.md
+            - 02 Training Setup: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/02-Training-Setup.md
+            - 03 Inference Setup: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/03-Inference-Setup.md
+            - 04 Memory Management: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/04-Memory-Management.md
+            - 05 Performance Optimization: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/05-Performance-Optimization.md
+            - 06 Benchmarks & Validation: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/06-Benchmarks-and-Validation.md
           - CUDA Advanced Optimization:
-            - Overview: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/README.md
-            - 01 CUDA Graphs: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/01-CUDA-Graphs.md
-            - 02 Cooperative Groups: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/02-Cooperative-Groups.md
-            - 03 Persistent Kernels: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/03-Persistent-Kernels.md
-            - 04 Kernel Fusion: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/04-Kernel-Fusion.md
-            - 05 Warp Specialization: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/05-Warp-Specialization.md
+            - Overview: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/README.md
+            - 01 CUDA Graphs: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/01-CUDA-Graphs.md
+            - 02 Cooperative Groups: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/02-Cooperative-Groups.md
+            - 03 Persistent Kernels: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/03-Persistent-Kernels.md
+            - 04 Kernel Fusion: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/04-Kernel-Fusion.md
+            - 05 Warp Specialization: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/05-Warp-Specialization.md
           - GPUDirect Storage:
-            - Overview: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/README.md
-            - 01 Architecture & Data Path: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/01-Architecture-and-Data-Path.md
-            - 02 Hardware Setup: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/02-Hardware-Setup.md
-            - 03 Software Stack: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/03-Software-Stack.md
-            - 04 libcufile API: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/04-libcufile-API.md
-            - 05 Performance Tuning: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/05-Performance-Tuning.md
-            - 06 Disaggregated Storage: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/06-Disaggregated-Storage.md
+            - Overview: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/README.md
+            - 01 Architecture & Data Path: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/01-Architecture-and-Data-Path.md
+            - 02 Hardware Setup: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/02-Hardware-Setup.md
+            - 03 Software Stack: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/03-Software-Stack.md
+            - 04 libcufile API: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/04-libcufile-API.md
+            - 05 Performance Tuning: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/05-Performance-Tuning.md
+            - 06 Disaggregated Storage: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/06-Disaggregated-Storage.md
           - Confidential Computing & Hardware Attestation:
-            - Overview: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/README.md
-            - 01 Intel TDX Attestation Chain: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/01-Intel-TDX-Attestation-Chain.md
-            - 02 NVIDIA CC Attestation Chain: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/02-NVIDIA-CC-Attestation-Chain.md
-            - 03 Dual-Vendor Claim Binding & Verification: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/03-Dual-Vendor-Claim-Binding-and-Verification.md
-            - 04 Confidential Inference Protocol: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/04-Confidential-Inference-Protocol.md
+            - Overview: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/README.md
+            - 01 Intel TDX Attestation Chain: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/01-Intel-TDX-Attestation-Chain.md
+            - 02 NVIDIA CC Attestation Chain: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/02-NVIDIA-CC-Attestation-Chain.md
+            - 03 Dual-Vendor Claim Binding & Verification: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/03-Dual-Vendor-Claim-Binding-and-Verification.md
+            - 04 Confidential Inference Protocol: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/04-Confidential-Inference-Protocol.md
           - "Long-Context MoE Foundation Training":
-            - "Overview": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/README.md
-            - "01 Long-Context Bottlenecks": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/01-Long-Context-Bottlenecks.md
-            - "02 Long-Context Attention": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/02-Long-Context-Attention.md
-            - "03 Position Encoding": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/03-Position-Encoding.md
-            - "04 MoE Fundamentals": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/04-MoE-Fundamentals.md
-            - "05 MoE Systems & Infrastructure": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/05-MoE-Systems-Infrastructure.md
-            - "06 Adaptive Data Pipelines": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/06-Adaptive-Data-Pipelines.md
-            - "07 Long-Context Evaluation": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/07-Long-Context-Evaluation.md
-            - "08 Combining Long-Context & MoE": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/08-Combining-LongContext-and-MoE.md
-            - "09 Distributed Training Infrastructure": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/09-Distributed-Training-Infrastructure.md
-            - "10 General-Purpose Model": Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/10-General-Purpose-Model.md
+            - "Overview": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/README.md
+            - "01 Long-Context Bottlenecks": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/01-Long-Context-Bottlenecks.md
+            - "02 Long-Context Attention": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/02-Long-Context-Attention.md
+            - "03 Position Encoding": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/03-Position-Encoding.md
+            - "04 MoE Fundamentals": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/04-MoE-Fundamentals.md
+            - "05 MoE Systems & Infrastructure": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/05-MoE-Systems-Infrastructure.md
+            - "06 Adaptive Data Pipelines": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/06-Adaptive-Data-Pipelines.md
+            - "07 Long-Context Evaluation": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/07-Long-Context-Evaluation.md
+            - "08 Combining Long-Context & MoE": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/08-Combining-LongContext-and-MoE.md
+            - "09 Distributed Training Infrastructure": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/09-Distributed-Training-Infrastructure.md
+            - "10 General-Purpose Model": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/10-General-Purpose-Model.md
           - L40S x12 Inference:
-            - Overview: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/README.md
-            - 01 Hardware Architecture: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/01-Hardware-Architecture.md
-            - 02 Inference Optimization: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/02-Inference-Optimization.md
-            - 03 Multi-GPU Strategy: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/03-Multi-GPU-Strategy.md
-            - 04 Deployment Guide: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/04-Deployment-Guide.md
-            - 05 Benchmarks: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/05-Benchmarks.md
+            - Overview: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/README.md
+            - 01 Hardware Architecture: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/01-Hardware-Architecture.md
+            - 02 Inference Optimization: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/02-Inference-Optimization.md
+            - 03 Multi-GPU Strategy: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/03-Multi-GPU-Strategy.md
+            - 04 Deployment Guide: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/04-Deployment-Guide.md
+            - 05 Benchmarks: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/05-Benchmarks.md
           - NCCL Deep Dive:
-            - Overview: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/README.md
-            - 01 Fundamentals: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/01-Fundamentals.md
-            - 02 Algorithms & Bandwidth: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/02-Algorithms-and-Bandwidth.md
-            - 03 Framework Integration: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/03-Framework-Integration.md
-            - 04 Configuration & Tuning: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/04-Configuration-and-Tuning.md
-            - 05 Multi-Node Clusters: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/05-Multi-Node-Clusters.md
-            - 06 Debugging: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/06-Debugging.md
-            - 07 Trillion-Parameter Scale: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/07-Trillion-Parameter-Scale.md
-      - AMD GPU: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/AMD GPU/Guide.md
-      - Distributed AI Interconnects: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Distributed AI Interconnects/Guide.md
-      - Accelerator Platform Evaluation: Phase 5 - Advanced Topics and Specialization/1. GPU Infrastructure/Accelerator Platform Evaluation/Guide.md
-    - "B: HPC (CUDA-X)":
-      - Guide: Phase 5 - Advanced Topics and Specialization/2. High Performance Computing/Guide.md
-      - CUDA-X Libraries: Phase 5 - Advanced Topics and Specialization/2. High Performance Computing/CUDA-X Libraries/Guide.md
-    - "C: Edge AI":
-      - Guide: Phase 5 - Advanced Topics and Specialization/3. Edge AI/Guide.md
-      - "Lecture: Edge LLM Inference Internals": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Edge LLM Inference Internals/Lecture-01.md
-      - "Lecture: Agent Tool-Dispatch Evaluation (BFCL)": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Agent Tool-Dispatch Evaluation with BFCL/Lecture-01.md
-      - "Lecture: AI-Driven Wireless Communication": Phase 5 - Advanced Topics and Specialization/3. Edge AI/AI-Driven Wireless Communication/Lecture-01.md
+            - Overview: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/README.md
+            - 01 Fundamentals: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/01-Fundamentals.md
+            - 02 Algorithms & Bandwidth: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/02-Algorithms-and-Bandwidth.md
+            - 03 Framework Integration: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/03-Framework-Integration.md
+            - 04 Configuration & Tuning: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/04-Configuration-and-Tuning.md
+            - 05 Multi-Node Clusters: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/05-Multi-Node-Clusters.md
+            - 06 Debugging: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/06-Debugging.md
+            - 07 Trillion-Parameter Scale: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/07-Trillion-Parameter-Scale.md
+      - AMD GPU: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/AMD GPU/Guide.md
+      - Distributed AI Interconnects: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Distributed AI Interconnects/Guide.md
+      - Accelerator Platform Evaluation: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Accelerator Platform Evaluation/Guide.md
+    - "Track B: HPC (CUDA-X)":
+      - Guide: Phase 5 - Advanced Topics and Specialization/Track B - High Performance Computing/Guide.md
+      - CUDA-X Libraries: Phase 5 - Advanced Topics and Specialization/Track B - High Performance Computing/CUDA-X Libraries/Guide.md
+    - "Track C: Edge AI":
+      - Guide: Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Guide.md
+      - "Lecture: Edge LLM Inference Internals": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Edge LLM Inference Internals/Lecture-01.md
+      - "Lecture: Agent Tool-Dispatch Evaluation (BFCL)": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Agent Tool-Dispatch Evaluation with BFCL/Lecture-01.md
+      - "Lecture: AI-Driven Wireless Communication": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/AI-Driven Wireless Communication/Lecture-01.md
       - "Qwen Inference Optimization":
-        - Overview: Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/README.md
-        - "01: Qwen Architecture Deep Dive": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-01.md
-        - "02: Quantizing Qwen3-4B to Q4": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-02.md
-        - "03: Decode Optimization on Jetson": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-03.md
-        - "04: Qwen2.5-72B Multi-GPU FP16": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-04.md
-        - "05: Cross-Model and Production Serving": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-05.md
-        - "06: Batched GEMM vs Normal GEMM": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Qwen Inference Optimization/Lecture-06.md
+        - Overview: Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/README.md
+        - "01: Qwen Architecture Deep Dive": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/Lecture-01.md
+        - "02: Quantizing Qwen3-4B to Q4": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/Lecture-02.md
+        - "03: Decode Optimization on Jetson": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/Lecture-03.md
+        - "04: Qwen2.5-72B Multi-GPU FP16": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/Lecture-04.md
+        - "05: Cross-Model and Production Serving": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/Lecture-05.md
+        - "06: Batched GEMM vs Normal GEMM": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/Lecture-06.md
       - "Gemma 4 Edge Deployment":
-        - Overview: Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/README.md
-        - "01: Why Gemma 4 at the Edge": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-01.md
-        - "02: Quantization and Format Conversion": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-02.md
-        - "03: The PDL Runtime Stack": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-03.md
-        - "04: Speculative Decoding with Gemma 4": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-04.md
-        - "05: Physical AI and Multimodal Gemma 4": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-05.md
-        - "06: MTP with Gemma 4 E2B": Phase 5 - Advanced Topics and Specialization/3. Edge AI/Gemma 4 Edge Deployment/Lecture-06.md
-    - "D: Robotics":
-      - Guide: Phase 5 - Advanced Topics and Specialization/4. Robotics/Guide.md
-      - CMU Robotics Courses: Phase 5 - Advanced Topics and Specialization/4. Robotics/CMU-Robotics-Courses.md
-      - "Lecture: Perception & AI": Phase 5 - Advanced Topics and Specialization/4. Robotics/Advanced Perception and AI for Robotics/Lecture-01.md
-      - "Lecture: Advanced ROS": Phase 5 - Advanced Topics and Specialization/4. Robotics/Advanced Robot Operating System/Lecture-01.md
-      - "Lecture: Industrial & Embedded": Phase 5 - Advanced Topics and Specialization/4. Robotics/Industrial and Embedded Robotics/Lecture-01.md
-      - "Lecture: Multi-Robot & Swarm": Phase 5 - Advanced Topics and Specialization/4. Robotics/Multi-Robot Systems and Swarm Robotics/Lecture-01.md
+        - Overview: Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Gemma 4 Edge Deployment/README.md
+        - "01: Why Gemma 4 at the Edge": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Gemma 4 Edge Deployment/Lecture-01.md
+        - "02: Quantization and Format Conversion": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Gemma 4 Edge Deployment/Lecture-02.md
+        - "03: The PDL Runtime Stack": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Gemma 4 Edge Deployment/Lecture-03.md
+        - "04: Speculative Decoding with Gemma 4": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Gemma 4 Edge Deployment/Lecture-04.md
+        - "05: Physical AI and Multimodal Gemma 4": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Gemma 4 Edge Deployment/Lecture-05.md
+        - "06: MTP with Gemma 4 E2B": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Gemma 4 Edge Deployment/Lecture-06.md
+    - "Track D: Robotics":
+      - Guide: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Guide.md
+      - CMU Robotics Courses: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/CMU-Robotics-Courses.md
+      - "Lecture: Perception & AI": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Advanced Perception and AI for Robotics/Lecture-01.md
+      - "Lecture: Advanced ROS": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Advanced Robot Operating System/Lecture-01.md
+      - "Lecture: Industrial & Embedded": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Industrial and Embedded Robotics/Lecture-01.md
+      - "Lecture: Multi-Robot & Swarm": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Multi-Robot Systems and Swarm Robotics/Lecture-01.md
       - "Special Course: VLA Optimization & Action-Parity Harness":
-        - Overview: Phase 5 - Advanced Topics and Specialization/4. Robotics/VLA Optimization and Action-Parity Harness/README.md
-        - "01: VLA Optimization for Real-Time Control": Phase 5 - Advanced Topics and Specialization/4. Robotics/VLA Optimization and Action-Parity Harness/Lecture-01.md
-        - "02: The Action-Parity Harness": Phase 5 - Advanced Topics and Specialization/4. Robotics/VLA Optimization and Action-Parity Harness/Lecture-02.md
-    - "E: Autonomous Vehicles":
-      - Guide: Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/Guide.md
-      - 1. Fundamentals: Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/1. Fundamentals/Guide.md
+        - Overview: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/README.md
+        - "01: VLA Optimization for Real-Time Control": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/Lecture-01.md
+        - "02: The Action-Parity Harness": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/Lecture-02.md
+    - "Track E: Autonomous Vehicles":
+      - Guide: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/Guide.md
+      - 1. Fundamentals: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/1. Fundamentals/Guide.md
       - 2. openpilot:
-        - Guide: Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/2. openpilot Reference Stack/Guide.md
-        - Flow Diagram: Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/2. openpilot Reference Stack/flow-diagram.md
-        - AGNOS: Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/2. openpilot Reference Stack/agnos/Guide.md
-        - camerad: Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/2. openpilot Reference Stack/camerad/Guide.md
+        - Guide: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/2. openpilot Reference Stack/Guide.md
+        - Flow Diagram: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/2. openpilot Reference Stack/flow-diagram.md
+        - AGNOS: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/2. openpilot Reference Stack/agnos/Guide.md
+        - camerad: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/2. openpilot Reference Stack/camerad/Guide.md
       - 3. tinygrad:
-        - Guide: Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/3. tinygrad for Inference/Guide.md
-        - Notes — Overview: Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/3. tinygrad for Inference/notes/overview.md
-        - Notes — Internals: Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/3. tinygrad for Inference/notes/internals.md
-        - Ops — Elementwise: Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/3. tinygrad for Inference/ops/elementwise.md
-        - Ops — Movement: Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/3. tinygrad for Inference/ops/movement.md
-        - Ops — Reduce: Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/3. tinygrad for Inference/ops/reduce.md
-      - 4. Perception: Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/4. Advanced Perception and Prediction/Guide.md
-      - 5. Safety: Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/5. Safety Standards and Deployment/Guide.md
-      - 6. Lauterbach: Phase 5 - Advanced Topics and Specialization/5. Autonomous Vehicles/6. Lauterbach TRACE32 Debug/Guide.md
-    - "F: AI Chip Design":
-      - Guide: Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Guide.md
-      - RISC-V AI Chip Design and Market: Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/RISC-V-AI-Chip-Design-and-Market/Guide.md
+        - Guide: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/Guide.md
+        - Notes — Overview: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/notes/overview.md
+        - Notes — Internals: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/notes/internals.md
+        - Ops — Elementwise: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/ops/elementwise.md
+        - Ops — Movement: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/ops/movement.md
+        - Ops — Reduce: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/ops/reduce.md
+      - 4. Perception: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/4. Advanced Perception and Prediction/Guide.md
+      - 5. Safety: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/5. Safety Standards and Deployment/Guide.md
+      - 6. Lauterbach: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/6. Lauterbach TRACE32 Debug/Guide.md
+    - "Track F: AI Chip Design":
+      - Guide: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Guide.md
+      - RISC-V AI Chip Design and Market: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/RISC-V-AI-Chip-Design-and-Market/Guide.md
       - "Agentic Chip Design 2026":
-        - Guide: Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Agentic Chip Design 2026/Guide.md
-        - "01: Why Agents for Chip Design": Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Agentic Chip Design 2026/Lectures/Lecture-01.md
+        - Guide: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Agentic Chip Design 2026/Guide.md
+        - "01: Why Agents for Chip Design": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Agentic Chip Design 2026/Lectures/Lecture-01.md
       - Lectures:
-        - "01": Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Lectures/Lecture-01.md
-        - "02": Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Lectures/Lecture-02.md
-        - "03": Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Lectures/Lecture-03.md
-        - "04": Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Lectures/Lecture-04.md
-        - "05": Phase 5 - Advanced Topics and Specialization/6. AI Chip Design/Lectures/Lecture-05.md
-    - "G: ML Systems Engineering":
-      - Guide: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Guide.md
+        - "01": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Lectures/Lecture-01.md
+        - "02": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Lectures/Lecture-02.md
+        - "03": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Lectures/Lecture-03.md
+        - "04": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Lectures/Lecture-04.md
+        - "05": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Lectures/Lecture-05.md
+    - "Track G: ML Systems Engineering":
+      - Guide: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Guide.md
       - "Logprobs, Perplexity & KL Divergence":
-        - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Logprobs, Perplexity and KL Divergence/README.md
-        - "01: Logprobs — What a Model Emits": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-01.md
-        - "02: Entropy, Cross-Entropy & NLL": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-02.md
-        - "03: Perplexity — The Exponential of Confusion": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-03.md
-        - "04: KL Divergence — The Gap Between Distributions": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-04.md
-        - "05: Quantization, Distillation, RLHF & Spec Decode": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-05.md
+        - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Logprobs, Perplexity and KL Divergence/README.md
+        - "01: Logprobs — What a Model Emits": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-01.md
+        - "02: Entropy, Cross-Entropy & NLL": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-02.md
+        - "03: Perplexity — The Exponential of Confusion": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-03.md
+        - "04: KL Divergence — The Gap Between Distributions": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-04.md
+        - "05: Quantization, Distillation, RLHF & Spec Decode": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-05.md
       - "MLSys Deep Dives":
-        - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/README.md
-        - "01: MLSys as the Economic-Value Layer": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-01.md
-        - "02: The Kernel-Language Explosion (Triton, cuTile, TileLang)": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-02.md
-        - "03: Compilers & Runtimes (TVM, Mojo, TensorRT, TileRT)": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-03.md
-        - "04: Beyond the Dense Transformer (Mamba, SSMs, Hybrids)": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-04.md
-        - "05: The 2026 Frontier (Qwen3, Nemotron Ultra, MiMo, DeepSeek)": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-05.md
-        - "06: Making Decode Fast (EAGLE-3, DFlash, Flash kernels)": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-06.md
-        - "07: Edge & Physical-AI Frontier + Capstone": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/MLSys Deep Dives/Lecture-07.md
+        - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/README.md
+        - "01: MLSys as the Economic-Value Layer": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-01.md
+        - "02: The Kernel-Language Explosion (Triton, cuTile, TileLang)": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-02.md
+        - "03: Compilers & Runtimes (TVM, Mojo, TensorRT, TileRT)": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-03.md
+        - "04: Beyond the Dense Transformer (Mamba, SSMs, Hybrids)": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-04.md
+        - "05: The 2026 Frontier (Qwen3, Nemotron Ultra, MiMo, DeepSeek)": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-05.md
+        - "06: Making Decode Fast (EAGLE-3, DFlash, Flash kernels)": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-06.md
+        - "07: Edge & Physical-AI Frontier + Capstone": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-07.md
       - "TVM Deep Dives":
-        - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/README.md
-        - "01: The TVM Stack & Compilation Flow": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/Lecture-01.md
-        - "02: TensorIR & the Schedule Space": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/Lecture-02.md
-        - "03: Auto-Tuning — AutoTVM → Ansor → MetaSchedule": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/Lecture-03.md
-        - "04: Relax — Dynamic Shapes, Fusion, BYOC": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/Lecture-04.md
-        - "05: Shipping It — Runtime, microTVM, MLC-LLM": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/TVM Deep Dives/Lecture-05.md
+        - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/README.md
+        - "01: The TVM Stack & Compilation Flow": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/Lecture-01.md
+        - "02: TensorIR & the Schedule Space": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/Lecture-02.md
+        - "03: Auto-Tuning — AutoTVM → Ansor → MetaSchedule": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/Lecture-03.md
+        - "04: Relax — Dynamic Shapes, Fusion, BYOC": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/Lecture-04.md
+        - "05: Shipping It — Runtime, microTVM, MLC-LLM": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/Lecture-05.md
       - "AI Inference Engineer 2026":
-        - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/README.md
-        - "Refresh Log": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/REFRESH-LOG.md
+        - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/README.md
+        - "Refresh Log": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/REFRESH-LOG.md
         - "Part 1 — Fundamentals":
-          - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/README.md
-          - "01: The 2026 Inference Engineer's Mental Model": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-01.md
-          - "02: Transformer Execution — Tokens to Bits": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-02.md
-          - "03: Roofline, Bandwidth, Memory Hierarchy": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-03.md
-          - "04: The Precision Stack FP16→FP4": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-04.md
-          - "05: The Runtime Landscape": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-05.md
+          - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/README.md
+          - "01: The 2026 Inference Engineer's Mental Model": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-01.md
+          - "02: Transformer Execution — Tokens to Bits": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-02.md
+          - "03: Roofline, Bandwidth, Memory Hierarchy": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-03.md
+          - "04: The Precision Stack FP16→FP4": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-04.md
+          - "05: The Runtime Landscape": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-05.md
         - "Part 2 — Dense at Hopper":
-          - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/README.md
-          - "01: Anatomy of a 70B Dense Model": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-01.md
-          - "02: Hopper Hardware Story": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-02.md
-          - "03: Quantizing Llama 3.3 70B and Qwen 2.5 72B": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-03.md
-          - "04: Tensor Parallelism on 8× Hopper": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-04.md
-          - "05: Modern Serving Stack": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-05.md
-          - "06: Long Context at 128K on Hopper": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-06.md
-          - "07: Inside the Communication Layer": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-07.md
+          - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/README.md
+          - "01: Anatomy of a 70B Dense Model": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-01.md
+          - "02: Hopper Hardware Story": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-02.md
+          - "03: Quantizing Llama 3.3 70B and Qwen 2.5 72B": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-03.md
+          - "04: Tensor Parallelism on 8× Hopper": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-04.md
+          - "05: Modern Serving Stack": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-05.md
+          - "06: Long Context at 128K on Hopper": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-06.md
+          - "07: Inside the Communication Layer": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 2 - Dense at Hopper/Lecture-07.md
         - "Part 3 — MoE at Blackwell":
-          - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/README.md
-          - "01: Anatomy of a Modern MoE": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-01.md
-          - "02: Blackwell Hardware Story": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-02.md
-          - "03: Expert Parallelism (EP)": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-03.md
-          - "04: Disaggregated Prefill/Decode": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-04.md
-          - "05: Production MoE Serving": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-05.md
+          - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/README.md
+          - "01: Anatomy of a Modern MoE": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-01.md
+          - "02: Blackwell Hardware Story": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-02.md
+          - "03: Expert Parallelism (EP)": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-03.md
+          - "04: Disaggregated Prefill/Decode": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-04.md
+          - "05: Production MoE Serving": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-05.md
         - "Part 4 — Optimizing a Real Engine":
-          - Overview: Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/README.md
-          - "01: The Workload, the Baseline, the Ladder": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-01.md
-          - "02: The Scoreboard — A Benchmark That Cannot Be Gamed": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-02.md
-          - "03: Diagnosis — Launch, Bandwidth, or Comm?": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-03.md
-          - "04: Launch Geometry — Grids and Occupancy": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-04.md
-          - "05: Fusion and Activation Quantization": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-05.md
-          - "06: Attention at 128k — Split Context, Split Heads": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-06.md
-          - "07: Sharding 896 Experts — and Amdahl": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-07.md
-          - "08: Graph-Resident Decode": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-08.md
-          - "09: The Phase You Forgot — Batched Prefill": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-09.md
-          - "10: Silently Wrong": Phase 5 - Advanced Topics and Specialization/7. ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-10.md
+          - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/README.md
+          - "01: The Workload, the Baseline, the Ladder": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-01.md
+          - "02: The Scoreboard — A Benchmark That Cannot Be Gamed": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-02.md
+          - "03: Diagnosis — Launch, Bandwidth, or Comm?": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-03.md
+          - "04: Launch Geometry — Grids and Occupancy": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-04.md
+          - "05: Fusion and Activation Quantization": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-05.md
+          - "06: Attention at 128k — Split Context, Split Heads": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-06.md
+          - "07: Sharding 896 Experts — and Amdahl": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-07.md
+          - "08: Graph-Resident Decode": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-08.md
+          - "09: The Phase You Forgot — Batched Prefill": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-09.md
+          - "10: Silently Wrong": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-10.md
   - "P6 · Careers":
     - Overview: Phase 6 - Interview Preparation/README.md
     - Roles & Market: Roles and Market Analysis.md

@@ -82,7 +82,7 @@ NVIDIA closed that gap. Starting with the **Hopper H100**, the GPU runs in a **C
 
 The **Blackwell** generation extends this from one GPU to a pod: **multi-GPU confidential computing across NVLink/NVSwitch** (so a model sharded over many GPUs stays inside one trust domain) and **Trusted I/O**, with end-to-end CPU+GPU attestation built on Intel TDX and Intel Trust Authority. NVIDIA ships the open **nvTrust** toolkit and SDKs to drive all of this.
 
-> **Hardware lens.** This is where the roadmap's GPU thread meets security: the same H100/Blackwell you tune for throughput (Phase 5 — [MLSys Deep Dives](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/7.%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/README.md)) is also the root of a confidentiality guarantee. A confidential **TensorRT-LLM** server is a normal high-performance server that additionally refuses to reveal what it processed.
+> **Hardware lens.** This is where the roadmap's GPU thread meets security: the same H100/Blackwell you tune for throughput (Phase 5 — [MLSys Deep Dives](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/README.md)) is also the root of a confidentiality guarantee. A confidential **TensorRT-LLM** server is a normal high-performance server that additionally refuses to reveal what it processed.
 
 ---
 

@@ -141,7 +141,7 @@ The capstone: apply Modules 1–5 by building **genie-claw** — your own minima
 
 ### Related — MLSys deep dives (relocated)
 
-The inference- and kernel-leaning deep dives (GPU kernels, FP8 KV-cache, performance tracing, sequence parallelism, small-MoE reasoning) used to live here as an appendix. They belong with **ML Systems Engineering**, so they now live in the **[MLSys Deep Dives](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/7.%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/README.md)** collection (Phase 5), alongside the [AI Inference Engineer 2026](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/7.%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/README.md) course.
+The inference- and kernel-leaning deep dives (GPU kernels, FP8 KV-cache, performance tracing, sequence parallelism, small-MoE reasoning) used to live here as an appendix. They belong with **ML Systems Engineering**, so they now live in the **[MLSys Deep Dives](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/README.md)** collection (Phase 5), alongside the [AI Inference Engineer 2026](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/README.md) course.
 
 ---
 

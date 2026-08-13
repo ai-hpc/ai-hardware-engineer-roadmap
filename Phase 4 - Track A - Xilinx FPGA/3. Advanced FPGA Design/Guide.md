@@ -18,7 +18,7 @@
 
 **Prerequisites:** [Xilinx FPGA Development](../1.%20Xilinx%20FPGA%20Development/Guide.md), comfort reading timing reports, and at least one board-validated FPGA project.
 
-**What comes after:** [High-Level Synthesis](../4.%20High-Level%20Synthesis%20%28HLS%29/Guide.md), [Runtime and Driver Development](../5.%20Runtime%20and%20Driver%20Development/Guide.md), and [AI Chip Design](../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/6.%20AI%20Chip%20Design/Guide.md).
+**What comes after:** [High-Level Synthesis](../4.%20High-Level%20Synthesis%20%28HLS%29/Guide.md), [Runtime and Driver Development](../5.%20Runtime%20and%20Driver%20Development/Guide.md), and [AI Chip Design](../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Guide.md).
 
 ---
 
