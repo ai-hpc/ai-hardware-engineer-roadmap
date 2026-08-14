@@ -1,11 +1,27 @@
-<div align="center" markdown="1">
+<div class="home-hero" markdown="1">
+<div class="home-hero__copy" markdown="1">
+<p class="home-hero__eyebrow">The AI Hardware Engineer Roadmap</p>
+<h1 class="home-hero__title">Design a custom<br>AI inference chip.</h1>
+<p class="home-hero__lede">An 8-layer stack, a 6-phase curriculum, and 12 tracks — from digital logic to silicon. Background all the layers. Master one.</p>
+<div class="home-hero__actions">
+  <a class="md-button md-button--primary" href="https://github.com/ai-hpc/ai-hardware-engineer-roadmap">Star on GitHub</a>
+  <a class="md-button" href="#the-path">Browse the curriculum</a>
+</div>
+</div>
+<div class="home-hero__art">
+  <img src="Assets/images/physical-ai-chip.png" alt="A custom AI inference chip" />
+</div>
+</div>
 
-![AI Hardware Engineer Roadmap](Assets/images/physical-ai-chip.png)
-
-[Star this repo](https://github.com/ai-hpc/ai-hardware-engineer-roadmap) · [Read the full roadmap online](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/) · [<img src="https://cdn.simpleicons.org/discord/5865F2" alt="" width="14" height="14" align="absmiddle" /> Join the Discord community](https://discord.gg/r8DKtDzrsm)
-
-*Building the path from AI Hardware → Inference → Agents → Physical AI → AI Chips.*
-
+<div class="home-rail" markdown="1">
+<div class="home-rail__row">
+  <a class="home-rail__step" href="Phase%201%20-%20Foundational%20Knowledge/Guide.md"><span class="home-rail__n">01</span><span class="home-rail__t">Digital Foundations</span></a>
+  <a class="home-rail__step" href="Phase%202%20-%20Embedded%20Systems/Guide.md"><span class="home-rail__n">02</span><span class="home-rail__t">Embedded Systems</span></a>
+  <a class="home-rail__step" href="Phase%203%20-%20Artificial%20Intelligence/Guide.md"><span class="home-rail__n">03</span><span class="home-rail__t">Artificial Intelligence</span></a>
+  <a class="home-rail__step" href="Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md"><span class="home-rail__n">04</span><span class="home-rail__t">Deployment &amp; Compilation</span></a>
+  <a class="home-rail__step" href="Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Guide.md"><span class="home-rail__n">05</span><span class="home-rail__t">Specialization</span></a>
+  <a class="home-rail__step" href="Phase%206%20-%20Interview%20Preparation/README.md"><span class="home-rail__n">06</span><span class="home-rail__t">Interview Preparation</span></a>
+</div>
 </div>
 
 ---
