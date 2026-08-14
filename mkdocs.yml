@@ -32,11 +32,19 @@ theme:
     text: Inter
     code: JetBrains Mono
   features:
+    # navigation.instant is deliberately NOT enabled. It suppresses Material's
+    # scroll-the-sidebar-to-the-active-page behaviour on load, and with a 92-item
+    # sidebar that costs the reader their place — verified by build comparison.
+    # Losing that cue is worse than the perceived-speed gain.
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.sections
+    # breadcrumbs: essential once pages sit 5–6 levels deep
+    # (Phase 5 › Track G › course › part › lecture)
+    - navigation.path
     - navigation.prune
     - navigation.top
+    - navigation.tracking
     - navigation.indexes
     - navigation.footer
     - search.suggest
@@ -45,6 +53,7 @@ theme:
     - content.code.copy
     - content.code.annotate
     - content.tabs.link
+    - content.tooltips
     - toc.follow
   icon:
     repo: fontawesome/brands/github

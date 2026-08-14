@@ -1,9 +1,14 @@
 /* AI Hardware Engineer Roadmap — MkDocs Material Custom Theme */
 
 :root {
-  --md-text-font-family: Helvetica, Arial, sans-serif;
+  /* text family is set once, further down, in the reading-typography block —
+     declaring it here too only created a dead override */
   --md-code-font-family: "JetBrains Mono", "Cascadia Code", "Fira Code", monospace;
   --aihpc-sticky-offset: 4.8rem;
+
+  /* hairline used for section rules and card edges, so every divider in the
+     theme derives from one value instead of a scatter of greys */
+  --aihpc-hairline: color-mix(in srgb, var(--md-default-fg-color) 12%, transparent);
 }
 
 /* ── Layout ───────────────────────────────────── */
@@ -15,16 +20,20 @@
   padding-top: 1.2rem;
 }
 
-/* ── Hero H1 ──────────────────────────────────── */
+/* ── Page title ────────────────────────────────
+   Left-aligned, so the title shares an edge with the prose underneath it.
+   Centring it read as a mistake next to left-aligned body copy, and cost a
+   whole extra line of height on the many two-line lecture titles. */
 .md-content__inner > h1:first-of-type,
 .md-typeset h1 {
-  font-size: 1.7rem !important;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  text-align: center;
-  margin-top: 0.25rem;
-  margin-bottom: 0.5rem;
-  line-height: 1.15;
+  font-size: 1.85rem !important;
+  font-weight: 750;
+  letter-spacing: -0.032em;
+  text-align: left;
+  text-wrap: balance;
+  margin-top: 0.1rem;
+  margin-bottom: 1.1rem;
+  line-height: 1.14;
 }
 
 /* Content paragraphs — always left-aligned */
@@ -41,14 +50,23 @@
   word-break: normal;
 }
 
-/* Standalone bold label lines (e.g. "You will learn to:") */
+/* Standalone bold label lines (e.g. "You will learn to:").
+   Previously these were shrunk, greyed, and UPPERCASED — which made a label
+   quieter than the text it introduces, and turned any fully-bold pull-quote
+   into a wall of capitals. Now it reads as emphasis at full contrast, and
+   blockquotes/admonitions opt out because a bold line there is a statement,
+   not a label. */
 .md-typeset p > strong:only-child {
   display: inline-block;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--md-default-fg-color--light);
+  font-weight: 680;
+  letter-spacing: -0.005em;
+  color: var(--md-default-fg-color);
+}
+
+.md-typeset blockquote p > strong:only-child,
+.md-typeset .admonition p > strong:only-child {
+  display: inline;
+  font-weight: 650;
 }
 
 /* Banner image */
@@ -78,27 +96,34 @@
 }
 
 /* ── Headings ─────────────────────────────────── */
+/* A hairline rather than a 2px brand-coloured bar: the old rule fired on every
+   H2 and, next to the `---` separators these documents use heavily, produced
+   two competing dividers per section. */
 .md-typeset h2 {
   font-weight: 700;
-  letter-spacing: -0.01em;
-  border-bottom: 2px solid var(--md-primary-fg-color);
-  padding-bottom: 0.4rem;
+  letter-spacing: -0.018em;
+  border-bottom: 1px solid var(--aihpc-hairline);
+  padding-bottom: 0.45rem;
   margin-top: 2rem;
   margin-bottom: 1rem;
 }
 
 .md-typeset h3 {
-  font-weight: 600;
+  font-weight: 640;
+  letter-spacing: -0.014em;
   margin-top: 1.6rem;
 }
 
+/* H4 was uppercase, brand-coloured, and 0.78rem — smaller than the 0.83rem
+   body text it introduced, so a heading read as a caption. Now it sits above
+   body size and stays in the text colour. */
 .md-typeset h4 {
-  font-weight: 600;
-  color: var(--md-primary-fg-color);
-  text-transform: uppercase;
-  font-size: 0.78rem;
-  letter-spacing: 0.07em;
-  margin-top: 1.4rem;
+  font-weight: 660;
+  font-size: 0.9rem;
+  letter-spacing: -0.008em;
+  color: var(--md-default-fg-color);
+  margin-top: 1.5rem;
+  margin-bottom: 0.4rem;
 }
 
 .md-typeset h1,
@@ -174,15 +199,20 @@
   line-height: 1.55;
 }
 
-/* ── Blockquotes as callouts ──────────────────── */
+/* ── Blockquotes as callouts ────────────────────
+   These carry the "steal this" / key-insight lines, so they were the one thing
+   on the page that must not be quieter than body copy. They were set at
+   0.75rem in a lightened grey — smaller and fainter than the 0.83rem prose
+   around them. Now they match body size at full contrast and lean on the
+   surface tint plus a soft accent rail to stand apart. */
 .md-typeset blockquote {
-  border-left: 4px solid var(--md-primary-fg-color);
+  border-left: 3px solid var(--md-primary-fg-color);
   background: var(--md-admonition-bg-color);
-  padding: 0.75rem 1.2rem 0.75rem 1.4rem;
-  border-radius: 0 8px 8px 0;
-  margin: 1.2rem 0;
-  font-size: 0.75rem;
-  color: var(--md-default-fg-color--light);
+  padding: 0.85rem 1.25rem 0.85rem 1.35rem;
+  border-radius: 0 10px 10px 0;
+  margin: 1.4rem 0;
+  font-size: 0.83rem;
+  color: var(--md-default-fg-color);
 }
 
 .md-typeset blockquote p {
@@ -304,9 +334,19 @@
 .md-tabs {
   /* NOTE: no backdrop-filter here — a backdrop-filtered element clips its overflowing
      children to its own box (Chrome/Safari), which hid the hover dropdown hanging below
-     the bar. The gradient below is ~95% opaque, so the blur was imperceptible anyway. */
-  background: linear-gradient(180deg, rgba(48, 63, 161, 0.98), rgba(63, 81, 181, 0.97));
-  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+     the bar. Keep it off regardless of the background used.
+
+     The bar used to be a second saturated blue band under the header, stacking
+     ~90px of heavy chrome above every page. It is now a light surface rail: the
+     header stays branded, the tab row reads as part of the page, and the active
+     tab is marked by an accent underline instead of by colour weight. */
+  background: var(--md-default-bg-color);
+  border-bottom: 1px solid var(--aihpc-hairline);
+  box-shadow: none;
+  /* Material sets the bar's colour to the primary *background* (white) because it
+     expects a branded bar. Reset it here so every descendant inherits page text
+     instead of white-on-white — otherwise the active tab vanishes. */
+  color: var(--md-default-fg-color--light);
   overflow: visible !important;   /* override Material's overflow:auto so hover dropdowns can hang below the bar */
   position: relative;  /* + z-index makes the bar (and its dropdown) paint above page content */
   z-index: 3;
@@ -452,33 +492,35 @@
   background: transparent;
   border-bottom: 2px solid transparent;
   border-radius: 0;
+  color: var(--md-default-fg-color--light);
   font-size: 0.74rem;
-  font-weight: 700;
+  font-weight: 620;
   letter-spacing: -0.01em;
   line-height: 1.2;
   margin-top: 0;
   max-width: none;
-  opacity: 0.92;
+  opacity: 1;
   overflow: visible;
-  padding: 0.5rem 0.12rem 0.42rem;
+  padding: 0.55rem 0.12rem 0.45rem;
   text-overflow: clip;
-  transition: border-color 0.18s ease, color 0.18s ease, opacity 0.18s ease;
+  transition: border-color 0.18s ease, color 0.18s ease;
   white-space: nowrap;
 }
 
 .md-tabs__link:hover {
   background: transparent;
-  border-bottom-color: rgba(255, 255, 255, 0.45);
+  border-bottom-color: var(--aihpc-hairline);
+  color: var(--md-default-fg-color);
   opacity: 1;
   transform: none;
 }
 
 .md-tabs__link--active {
   background: transparent;
-  border-bottom-color: rgba(255, 255, 255, 0.98);
+  border-bottom-color: var(--md-primary-fg-color);
   box-shadow: none;
-  color: var(--md-primary-bg-color);
-  font-weight: 800;
+  color: var(--md-default-fg-color);
+  font-weight: 720;
   opacity: 1;
 }
 
@@ -994,9 +1036,11 @@
   box-shadow: 0 4px 24px rgba(0,0,0,0.4);
 }
 
+/* the tab rail follows the page surface in both schemes, so these only need to
+   restate the dark hairline and a brighter accent for the active underline */
 [data-md-color-scheme="slate"] .md-tabs {
-  background: linear-gradient(180deg, rgba(17, 24, 39, 0.98), rgba(31, 41, 55, 0.96));
-  border-bottom-color: rgba(148, 163, 184, 0.18);
+  background: var(--md-default-bg-color);
+  border-bottom-color: rgba(148, 163, 184, 0.16);
 }
 
 [data-md-color-scheme="slate"] .md-header {
@@ -1005,12 +1049,12 @@
 
 [data-md-color-scheme="slate"] .md-tabs__link:hover {
   background: transparent;
-  border-bottom-color: rgba(191, 219, 254, 0.52);
+  border-bottom-color: rgba(148, 163, 184, 0.3);
 }
 
 [data-md-color-scheme="slate"] .md-tabs__link--active {
   background: transparent;
-  border-bottom-color: rgba(191, 219, 254, 0.98);
+  border-bottom-color: var(--md-accent-fg-color);
   box-shadow: none;
 }
 
@@ -1244,4 +1288,132 @@
 
 .md-typeset .highlight.language-text > pre > code {
   color: var(--md-default-fg-color);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   UI/UX pass — breadcrumbs, chrome weight, and table headers
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Breadcrumbs (theme feature: navigation.path) ──
+   Pages here sit up to six levels deep (Phase 5 › Track G › course › part ›
+   lecture). Without a path trail the only cue to where you are is the sidebar,
+   which is scrolled and truncated. This renders the trail as quiet metadata
+   above the title rather than as another navigation bar. */
+.md-path {
+  font-size: 0.68rem;
+  margin: 0 0 0.55rem;
+  padding: 0;
+}
+
+.md-path__list {
+  gap: 0.1rem;
+  row-gap: 0.15rem;
+}
+
+.md-path__item {
+  color: var(--md-default-fg-color--light);
+}
+
+.md-path__link {
+  color: var(--md-default-fg-color--light);
+  letter-spacing: 0.005em;
+}
+
+.md-path__link:hover,
+.md-path__link:focus {
+  color: var(--md-accent-fg-color);
+}
+
+/* the separator Material injects between crumbs */
+.md-path__item:not(:first-child)::before {
+  color: var(--md-default-fg-color--lighter);
+}
+
+/* On a phone a five-level trail either overflows the viewport or eats four
+   lines before the title. Keep the two crumbs that actually orient the
+   reader — the course and the part — and let them wrap. */
+@media screen and (max-width: 700px) {
+  .md-path {
+    font-size: 0.64rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .md-path__list {
+    flex-wrap: wrap;
+    overflow: hidden;
+  }
+
+  .md-path__item:not(:nth-last-child(-n + 2)) {
+    display: none;
+  }
+
+  /* the retained leading crumb should not re-draw a dangling separator */
+  .md-path__item:nth-last-child(2)::before {
+    content: none;
+  }
+}
+
+/* ── Header weight ──
+   The title no longer competes with the (now quiet) tab rail beneath it, so it
+   can lose a little size and gain tracking. */
+.md-header {
+  box-shadow: 0 1px 3px rgb(2 8 23 / 0.10);
+}
+
+.md-header__title {
+  font-size: 0.92rem;
+  font-weight: 660;
+  letter-spacing: -0.014em;
+}
+
+/* ── Empty table headers ──
+   Several spec tables in the lectures are two-column key/value grids written
+   with an empty header row (`| | |`). Material still paints the <thead>, so the
+   table opened with a tinted, wordless bar. Collapse the row when it holds no
+   text. :has() is supported everywhere this theme targets; browsers without it
+   simply keep the old bar. */
+.md-typeset table:not([class]) thead:not(:has(th:not(:empty))) {
+  display: none;
+}
+
+/* ── Emoji in navigation ──
+   Nav labels contain literal emoji (e.g. the Discord entry). Name a colour-emoji
+   family explicitly so they don't fall back to a tofu box where the primary UI
+   font has no glyph. */
+.md-nav__link,
+.md-tabs__link,
+.md-path__link {
+  font-family: var(--md-text-font-family), "Apple Color Emoji",
+               "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+}
+
+/* ── Sidebar nav legibility ──
+   Lecture titles are long ("02: The Scoreboard — A Benchmark That Cannot Be
+   Gamed") and wrapped to four cramped lines. Tightening the leading and
+   softening inactive entries makes the column scannable, and the active entry
+   now carries a rail so position survives a wrapped label. */
+@media screen and (min-width: 960px) {
+  .md-nav__link {
+    line-height: 1.42;
+    padding-block: 0.12rem;
+  }
+
+  .md-sidebar--primary .md-nav__item--active > .md-nav__link--active,
+  .md-sidebar--primary .md-nav__link--active {
+    border-left: 2px solid var(--md-primary-fg-color);
+    font-weight: 680;
+    margin-left: -0.6rem;
+    padding-left: 0.5rem;
+  }
+}
+
+/* ── Focus visibility ──
+   Material's default focus ring is easy to lose against tinted surfaces. */
+.md-content a:focus-visible,
+.md-nav__link:focus-visible,
+.md-tabs__link:focus-visible,
+.md-path__link:focus-visible {
+  outline: 2px solid var(--md-accent-fg-color);
+  outline-offset: 2px;
+  border-radius: 3px;
 }
