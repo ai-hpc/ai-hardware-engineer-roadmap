@@ -1,7 +1,7 @@
-<div class="home-hero" markdown="1">
-<div class="home-hero__copy" markdown="1">
+<div class="home-hero">
+<div class="home-hero__copy">
 <p class="home-hero__eyebrow">The AI Hardware Engineer Roadmap</p>
-<h1 class="home-hero__title">Design a custom<br>AI inference chip.</h1>
+<h1 class="home-hero__title"><span>Design a custom</span> <span>AI inference chip.</span></h1>
 <p class="home-hero__lede">An 8-layer stack, a 6-phase curriculum, and 12 tracks — from digital logic to silicon. Background all the layers. Master one.</p>
 <div class="home-hero__actions">
   <a class="md-button md-button--primary" href="https://github.com/ai-hpc/ai-hardware-engineer-roadmap">Star on GitHub</a>
@@ -20,7 +20,7 @@
   <a class="home-rail__step" href="Phase%203%20-%20Artificial%20Intelligence/Guide.md"><span class="home-rail__n">03</span><span class="home-rail__t">Artificial Intelligence</span></a>
   <a class="home-rail__step" href="Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md"><span class="home-rail__n">04</span><span class="home-rail__t">Deployment &amp; Compilation</span></a>
   <a class="home-rail__step" href="Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Guide.md"><span class="home-rail__n">05</span><span class="home-rail__t">Specialization</span></a>
-  <a class="home-rail__step" href="Phase%206%20-%20Interview%20Preparation/README.md"><span class="home-rail__n">06</span><span class="home-rail__t">Interview Preparation</span></a>
+  <a class="home-rail__step" href="Phase%206%20-%20Interview%20Preparation/README.md"><span class="home-rail__n">06</span><span class="home-rail__t">Interview Prep</span></a>
 </div>
 </div>
 

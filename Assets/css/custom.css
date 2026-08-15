@@ -41,12 +41,14 @@
   text-align: left;
 }
 
-/* Prevent long inline content in prose from overflowing on narrow screens */
+/* Prevent long inline content in prose from overflowing on narrow screens.
+   `anywhere` was breaking ordinary words mid-letter ("Foundation s") whenever
+   a column got tight; `break-word` only splits a token that cannot fit. */
 .md-typeset p,
 .md-typeset li,
 .md-typeset td,
 .md-typeset blockquote {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: normal;
 }
 
@@ -1443,51 +1445,70 @@
 }
 
 /* ── Homepage hero ──
-   A two-column split: the thesis on the left, the chip on the right. The image
-   sits on a soft tinted surface rather than floating, so it reads as part of
-   the composition instead of a pasted screenshot. */
+   True 50/50 split: thesis on the left, chip on the right. Each title line is
+   a locked phrase so the headline cannot collapse into one-word rows. */
 .home-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  gap: clamp(1.6rem, 4vw, 3.2rem);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(1.4rem, 3vw, 2.4rem);
   align-items: center;
   padding: clamp(0.6rem, 2vw, 1.4rem) 0 clamp(1.2rem, 2.4vw, 2rem);
 }
 
-.home-hero__eyebrow {
+/* min-width:auto on grid items would let the title steal the image
+   column; both halves must be allowed to shrink to 50%. */
+.home-hero__copy,
+.home-hero__art {
+  min-width: 0;
+}
+
+.home-hero p,
+.home-hero li {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.md-typeset .home-hero__eyebrow {
   font-family: var(--md-code-font-family);
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--aihpc-accent);
-  margin: 0 0 0.9rem;
+  margin: 0 0 0.85rem;
 }
 
-/* The hero title must beat the global page-title rule, so it is scoped to the
-   hero and left-aligned to share an edge with the lede under it. */
+/* Beat the global page-title rule. Two short locked lines, not a 4-line wrap. */
 .md-typeset h1.home-hero__title,
 .md-content__inner > h1.home-hero__title:first-of-type {
-  font-size: clamp(2.1rem, 5vw, 3.3rem) !important;
+  font-size: clamp(1.55rem, 1.05rem + 1.25vw, 2.25rem) !important;
   font-weight: 780;
   letter-spacing: -0.038em;
-  line-height: 1.02;
+  line-height: 1.08;
   text-align: left;
-  text-wrap: balance;
+  text-wrap: unset;
   margin: 0;
 }
 
-.home-hero__lede {
-  margin-top: 1.1rem;
-  max-width: 30rem;
-  font-size: 1.02rem;
-  line-height: 1.6;
+.md-typeset h1.home-hero__title .headerlink {
+  display: none;
+}
+
+.md-typeset h1.home-hero__title span {
+  display: block;
+}
+
+.md-typeset .home-hero__lede {
+  margin: 1rem 0 0;
+  max-width: none;
+  font-size: 0.98rem;
+  line-height: 1.55;
   color: var(--md-default-fg-color--light);
   text-wrap: pretty;
 }
 
 .home-hero__actions {
-  margin-top: 1.5rem;
+  margin-top: 1.35rem;
   display: flex;
   gap: 0.6rem;
   flex-wrap: wrap;
@@ -1523,6 +1544,12 @@
   margin: 0;
 }
 
+/* Homepage has its own hero + phase rail, so the TOC is redundant and
+   stealing the half-width the chip image needs. */
+.md-main__inner:has(.home-hero) > .md-sidebar--secondary {
+  display: none;
+}
+
 /* ── Phase rail ──
    The six phases as a connected strip of steps — the curriculum as a path,
    not a list. A rule runs behind the numbered steps; each step is a link. */
@@ -1532,10 +1559,12 @@
 
 .home-rail__row {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(6, minmax(10.25rem, 1fr));
   gap: 0;
   border-top: 1px solid var(--aihpc-hairline);
   position: relative;
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 .home-rail__step {
@@ -1579,6 +1608,9 @@
   letter-spacing: -0.012em;
   color: var(--md-default-fg-color);
   line-height: 1.3;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  hyphens: none;
 }
 
 /* ── Cards and callouts share the hero's surface ──
@@ -1611,15 +1643,13 @@
 
   .home-hero__art {
     order: -1;
-    max-width: 30rem;
+    max-width: 36rem;
   }
 
   .home-rail__row {
     grid-template-columns: none;
     grid-auto-flow: column;
-    grid-auto-columns: minmax(150px, 1fr);
-    overflow-x: auto;
-    scrollbar-width: thin;
+    grid-auto-columns: 11.5rem;
     padding-bottom: 0.4rem;
   }
 }
