@@ -808,6 +808,21 @@ nav:
         - "05: The 2026 Frontier (Qwen3, Nemotron Ultra, MiMo, DeepSeek)": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-05.md
         - "06: Making Decode Fast (EAGLE-3, DFlash, Flash kernels)": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-06.md
         - "07: Edge & Physical-AI Frontier + Capstone": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-07.md
+      - "Hardware-Aware LLM Quantization":
+        - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/README.md
+        - "01: Inference Physics": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Lecture-01.md
+        - "02: Quantization Mathematics (NVFP4)": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Lecture-02.md
+        - "03: Blackwell Hardware — What sm_120 Accelerates": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Lecture-03.md
+        - "04: Model Anatomy — The Per-Token Byte Ledger": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Lecture-04.md
+        - "05: Calibration — Choosing the Scales": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Lecture-05.md
+        - "06: Activation Outliers": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Lecture-06.md
+        - "07: Layer Sensitivity — Why Q/K Break": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Lecture-07.md
+        - "08: Behavior Preservation": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Lecture-08.md
+        - "09: KV Cache & Long Context": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Lecture-09.md
+        - "10: Speculative Decoding & the Acceptance Tax": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Lecture-10.md
+        - "11: Hardware-Aware AutoQuant": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Lecture-11.md
+        - "12: Research Methodology": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Lecture-12.md
+        - "Capstone: TurboQuant": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Lecture-13.md
       - "TVM Deep Dives":
         - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/README.md
         - "01: The TVM Stack & Compilation Flow": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/Lecture-01.md
