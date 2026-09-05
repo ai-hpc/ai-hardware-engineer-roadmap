@@ -9,7 +9,7 @@
 </div>
 </div>
 <div class="home-hero__art">
-  <img src="Assets/images/physical-ai-chip.png" alt="A custom AI inference chip" />
+  <img src="Assets/images/physical-ai-chip.png" alt="AI Hardware Engineering — from models to machines" />
 </div>
 </div>
 
