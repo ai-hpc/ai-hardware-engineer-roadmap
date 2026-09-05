@@ -808,6 +808,20 @@ nav:
         - "05: The 2026 Frontier (Qwen3, Nemotron Ultra, MiMo, DeepSeek)": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-05.md
         - "06: Making Decode Fast (EAGLE-3, DFlash, Flash kernels)": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-06.md
         - "07: Edge & Physical-AI Frontier + Capstone": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-07.md
+      - "GLM-5.3-Flash Architecture Mastery":
+        - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/README.md
+        - "01: The Exact Model": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/Lecture-01.md
+        - "02: MoE — Capacity, Work, and Traffic": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/Lecture-02.md
+        - "03: KDA I — The Delta-Rule Recurrence": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/Lecture-03.md
+        - "04: KDA II — Chunked Parallelism & the Full Sublayer": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/Lecture-04.md
+        - "05: MLA — Compressing Per-Token History": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/Lecture-05.md
+        - "06: DSA & KPool — Selective Retrieval": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/Lecture-06.md
+        - "07: mHC — Manifold-Constrained Residual Streams": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/Lecture-07.md
+        - "08: Vision, MTP, and Hybrid Serving State": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/Lecture-08.md
+        - "09: The 8-GPU Memory Model": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/Lecture-09.md
+        - "10: Kernel Roofline & Serving Decisions": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/Lecture-10.md
+        - "11: Correctness as Architecture Mastery": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/Lecture-11.md
+        - "Capstone: The KDA-First Mastery Ladder": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/Lecture-12.md
       - "Hardware-Aware LLM Quantization":
         - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/README.md
         - "01: Inference Physics": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Lecture-01.md
