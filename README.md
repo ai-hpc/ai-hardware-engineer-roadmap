@@ -1,12 +1,8 @@
 <div class="home-hero">
 <div class="home-hero__copy">
 <p class="home-hero__eyebrow">The AI Hardware Engineer Roadmap</p>
-<h1 class="home-hero__title"><span>Design a custom</span> <span>AI inference chip.</span></h1>
-<p class="home-hero__lede">An 8-layer stack, a 6-phase curriculum, and 12 tracks — from digital logic to silicon. Background all the layers. Master one.</p>
-<div class="home-hero__actions">
-  <a class="md-button md-button--primary" href="https://github.com/ai-hpc/ai-hardware-engineer-roadmap">Star on GitHub</a>
-  <a class="md-button" href="#the-path">Browse the curriculum</a>
-</div>
+<h1 class="home-hero__title"><span>AI Hardware Engineering.</span> <span>From models to machines.</span></h1>
+<p class="home-hero__lede">A hands-on curriculum for understanding, optimizing, and deploying AI on real hardware — GPU kernels, agent runtimes, embedded systems, and Jetson — with a path toward designing the accelerator underneath. Start with one working experiment; finish with results someone else can reproduce.</p>
 </div>
 <div class="home-hero__art">
   <img src="Assets/images/physical-ai-chip.png" alt="AI Hardware Engineering — from models to machines" />
@@ -34,7 +30,39 @@ The endpoint is a single die that runs production AI workloads, hosts a real age
 
 ---
 
+## Who This Is For
+
+- **AI/ML engineers** who want to stop treating inference as a black box and design the chip that runs it.
+- **Inference engineers** who want to extend up into agent-runtime co-design and down into kernel + silicon.
+- **Embedded/firmware engineers** who want to climb the stack — from boards to runtimes to chip architecture.
+- **Hardware/RTL/FPGA engineers** who need workload and runtime intuition before specing accelerators.
+- **CS students** who want a structured path that ends at "I designed a chip" rather than "I read about chips."
+
+**Baseline:** comfortable with Python or C++, and basic Linux command-line use. No prior hardware background required.
+
+**Already past the basics?** [Phase 1](Phase%201%20-%20Foundational%20Knowledge/Guide.md) and [Phase 2](Phase%202%20-%20Embedded%20Systems/Guide.md) exist to fill specific gaps — digital logic, embedded Linux — not to gate you. If you already know CUDA/C++, go straight to [Phase 3](Phase%203%20-%20Artificial%20Intelligence/Guide.md) and pick up Phase 1–2 material only where a later module says you need it.
+
+If you only want to call an LLM API, this isn't for you. If you want to design the silicon that calls it, keep reading.
+
+---
+
+## Three Ways In
+
+Pick the finish line that matches what you want to be able to do, not a track number.
+
+| Path | You'll build | Finish-line artifact | Start here |
+|---|---|---|---|
+| **AI Inference Engineering** | Transformer execution, GEMV/GEMM kernels, quantization, serving | A benchmark report: predicted vs. measured tok/s on a real model, with the gap explained | [Phase 3 — AI Workloads](Phase%203%20-%20Artificial%20Intelligence/Guide.md) |
+| **AI Agent Harness Systems** | Sessions, tool calling, multi-agent loops, evals, observability | A production-shaped agent harness running end to end | [Agentic AI & GenAI — 42 lectures](Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Lectures/README.md) |
+| **Physical Hardware Engineering** | Boards, embedded Linux, RTL, FPGA, ASIC flow | A board you brought up yourself, or an accelerator spec with real numbers | [Phase 1 — Digital Foundations](Phase%201%20-%20Foundational%20Knowledge/Guide.md) |
+
+Each path stands on its own — you don't need the other two to get something real out of it. [The Path](#the-path) below is where all three converge into the physical-AI-chip endpoint.
+
+---
+
 ## The Three Pillars
+
+*(Already picked a path above? This section is the deep-dive on why the three connect — skip to [The Path](#the-path) if you just want the phase-by-phase breakdown.)*
 
 This roadmap is not three unrelated study tracks. It is a co-design loop. The
 inference workload tells you what the silicon must accelerate, the agent
@@ -155,18 +183,6 @@ The reason for this roadmap, written as a checklist:
 - [ ] You can write the architecture spec for a **physical AI agent chip** — one die containing an NPU tile (Qwen-class decode at edge power), a wireless subsystem (Wi-Fi 6/BLE 5/Thread/Zigbee), MIPI CSI-2 camera input, ISP, audio I/O, and a Linux-capable CPU — with realistic numbers for tile size, SRAM budget, MAC array, DMA, RF integration, and compiler/runtime interface.
 
 That last bullet is the goal. The first six exist to make it real.
-
----
-
-## Who This Is For
-
-- **AI/ML engineers** who want to stop treating inference as a black box and design the chip that runs it.
-- **Inference engineers** who want to extend up into agent-runtime co-design and down into kernel + silicon.
-- **Embedded/firmware engineers** who want to climb the stack — from boards to runtimes to chip architecture.
-- **Hardware/RTL/FPGA engineers** who need workload and runtime intuition before specing accelerators.
-- **CS students** who want a structured path that ends at "I designed a chip" rather than "I read about chips."
-
-If you only want to call an LLM API, this isn't for you. If you want to design the silicon that calls it, keep reading.
 
 ---
 
