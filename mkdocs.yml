@@ -95,6 +95,11 @@ markdown_extensions:
   - md_in_html
   - def_list
   - footnotes
+  - pymdownx.arithmatex:
+      generic: true
+      # Inline math is \( ... \) only: a bare $ appears in prices all over the roadmap.
+      inline_syntax: [round]
+      block_syntax: [dollar, square, begin]
   - toc:
       permalink: true
       toc_depth: 3
@@ -756,6 +761,22 @@ nav:
       - "Lecture: Advanced ROS": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Advanced Robot Operating System/Lecture-01.md
       - "Lecture: Industrial & Embedded": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Industrial and Embedded Robotics/Lecture-01.md
       - "Lecture: Multi-Robot & Swarm": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Multi-Robot Systems and Swarm Robotics/Lecture-01.md
+      - "Special Course: Deep RL for Robot Learning":
+        - Overview: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/README.md
+        - "01: The RL Problem and the Rollout Engine": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-01.md
+        - "02: Imitation Learning: BC and DAgger": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-02.md
+        - "03: Modern Imitation: Chunks and Flow Matching": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-03.md
+        - "04: Policy Gradients": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-04.md
+        - "05: Actor-Critic, GAE, Privileged Critics": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-05.md
+        - "06: PPO, Trust Regions, KL Leash": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-06.md
+        - "07: Off-Policy RL: Q-Learning to SAC": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-07.md
+        - "08: ELBO, VAEs, Control as Inference, IRL": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-08.md
+        - "09: Model-Based RL and World Models": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-09.md
+        - "10: Offline RL and Offline-to-Online": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-10.md
+        - "11: RL for LLMs and VLAs": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-11.md
+        - "12: Exploration, Curricula, Multi-Task": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-12.md
+        - "13: Theory, Eval Rigor, Sim-to-Real": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-13.md
+        - "14: Capstone: RL Post-Training π0.5": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-14.md
       - "Special Course: VLA Optimization & Action-Parity Harness":
         - Overview: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/README.md
         - "01: VLA Optimization for Real-Time Control": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/Lecture-01.md

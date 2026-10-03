@@ -18,7 +18,7 @@ This special course pairs two halves that almost always have to ship together:
 
 The two halves are inseparable: an optimization that you cannot measure against the reference policy is not an engineering result, it is a vibe.
 
-**Scope:** inference and deployment of pretrained VLAs (OpenVLA, RT-2-X / OpenX-style policies, π₀ / π0.5, NVIDIA GR00T N-series, RDT, Octo). Training and finetuning are explicit non-goals — when you need adaptation, use the [Robot Learning section of Lecture 3](../Advanced%20Perception%20and%20AI%20for%20Robotics/Lecture-01.md#c1-reinforcement-learning) of the Perception lecture.
+**Scope:** inference and deployment of pretrained VLAs (OpenVLA, RT-2-X / OpenX-style policies, π₀ / π0.5, NVIDIA GR00T N-series, RDT, Octo). Training and finetuning are explicit non-goals — when you need adaptation, take the [Deep RL for Robot Learning](../Deep%20RL%20for%20Robot%20Learning/README.md) special course (imitation learning through RL post-training of π0.5), or the shorter [Robot Learning section of Lecture 3](../Advanced%20Perception%20and%20AI%20for%20Robotics/Lecture-01.md#c1-reinforcement-learning) of the Perception lecture.
 
 **Layer mapping:** L3-L8. Touches model architecture, runtime / kernels, edge accelerators, ROS 2 integration, and the closed-loop sim / real evaluation harness.
 

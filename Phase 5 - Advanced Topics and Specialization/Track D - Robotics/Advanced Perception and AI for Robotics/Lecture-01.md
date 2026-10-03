@@ -153,6 +153,8 @@ Nav2 already uses **BehaviorTree.CPP**. For **semantic** goals (“only drive on
 
 ## Part C — Robot learning and autonomous behaviors
 
+> **Go deeper:** this part is a survey. The full treatment — behavioral cloning and DAgger, flow-matching policies, policy gradients, PPO, SAC, model-based and offline RL, and RL post-training of a VLA — is the [Deep RL for Robot Learning](../Deep%20RL%20for%20Robot%20Learning/README.md) special course.
+
 ### C.1 Reinforcement learning
 
 **Sim-to-real:** Randomize **dynamics**, **friction**, **sensor noise**, **latency**; **domain randomization** reduces **overfitting** to one simulator build.
