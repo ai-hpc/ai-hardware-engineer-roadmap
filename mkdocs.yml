@@ -761,6 +761,22 @@ nav:
       - "Lecture: Advanced ROS": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Advanced Robot Operating System/Lecture-01.md
       - "Lecture: Industrial & Embedded": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Industrial and Embedded Robotics/Lecture-01.md
       - "Lecture: Multi-Robot & Swarm": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Multi-Robot Systems and Swarm Robotics/Lecture-01.md
+      - "Special Course: Isaac Sim and Isaac Lab":
+        - Overview: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/README.md
+        - "01: The Isaac Stack and Your First Simulation": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-01.md
+        - "02: USD for Roboticists": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-02.md
+        - "03: The Core Experimental API": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-03.md
+        - "04: PhysX for Robots": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-04.md
+        - "05: Newton and Multi-Physics": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-05.md
+        - "06: Robots: Import, Tune, and Move": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-06.md
+        - "07: Sensors, Rendering, Synthetic Data": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-07.md
+        - "08: ROS 2 and OmniGraph": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-08.md
+        - "09: Isaac Lab 3.0 Architecture": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-09.md
+        - "10: Training Policies in Isaac Lab": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-10.md
+        - "10b: Worked Example: Spot Waypoint Navigation": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-10b.md
+        - "11: Imitation, Teleop, Policy Evaluation": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-11.md
+        - "12: Performance, Sim-to-Real, Scale-Out": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-12.md
+        - "13: Capstone: Task, Policy, Bridge": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-13.md
       - "Special Course: Deep RL for Robot Learning":
         - Overview: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/README.md
         - "01: The RL Problem and the Rollout Engine": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-01.md
@@ -769,6 +785,7 @@ nav:
         - "04: Policy Gradients": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-04.md
         - "05: Actor-Critic, GAE, Privileged Critics": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-05.md
         - "06: PPO, Trust Regions, KL Leash": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-06.md
+        - "06b: Actor-Critic PPO in RSL-RL": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-06b.md
         - "07: Off-Policy RL: Q-Learning to SAC": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-07.md
         - "08: ELBO, VAEs, Control as Inference, IRL": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-08.md
         - "09: Model-Based RL and World Models": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-09.md

@@ -177,7 +177,7 @@ Nav2 already uses **BehaviorTree.CPP**. For **semantic** goals (“only drive on
 
 ### Resources (Part C)
 
-* [Isaac Lab](https://docs.omniverse.nvidia.com/isaacsim/latest/isaac_lab_tutorials/index.html)
+* [Isaac Lab](https://docs.omniverse.nvidia.com/isaacsim/latest/isaac_lab_tutorials/index.html) — full treatment in the [Isaac Sim and Isaac Lab](../Isaac%20Sim%20and%20Isaac%20Lab/README.md) special course
 * Sutton & Barto, *Reinforcement Learning: An Introduction*
 * [Lerobot](https://github.com/huggingface/lerobot) (Hugging Face)
 

@@ -446,6 +446,6 @@ You can move on when you can:
 
 ## Next in this special course
 
-* Next: [Lecture 07 — Value-Based and Off-Policy RL: From Q-Learning to SAC](Lecture-07.md)
+* Next: [Lecture 06b — Actor-Critic PPO in Practice: Inside RSL-RL](Lecture-06b.md)
 * Previous: [Lecture 05 — Actor-Critic, GAE, and Privileged Critics](Lecture-05.md)
 * Back: [Deep RL for Robot Learning — Overview](README.md)

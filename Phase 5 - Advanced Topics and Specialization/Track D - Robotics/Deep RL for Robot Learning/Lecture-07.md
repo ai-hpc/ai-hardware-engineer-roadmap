@@ -533,5 +533,5 @@ You can move on when you can:
 ## Next in this special course
 
 * Next: [Lecture 08 — The Probabilistic Toolkit: ELBO, VAEs, Control as Inference, Inverse RL](Lecture-08.md)
-* Previous: [Lecture 06 — PPO, Trust Regions, and the KL Leash](Lecture-06.md)
+* Previous: [Lecture 06b — Actor-Critic PPO in Practice: Inside RSL-RL](Lecture-06b.md)
 * Back: [Deep RL for Robot Learning — Overview](README.md)
