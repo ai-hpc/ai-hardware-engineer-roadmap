@@ -105,3 +105,17 @@ If you can quote the definitions but can't grade a quant with them, you have not
 ---
 
 *Related: [MLSys Deep Dives](../MLSys%20Deep%20Dives/README.md) · [Gemma 4 Edge Deployment](../../Track%20C%20-%20Edge%20AI/Gemma%204%20Edge%20Deployment/README.md) · [Practical Machine Learning (CS329P) — Model Compression](../../../Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/4.%20ML%20Engineering%20and%20MLOps/Practical%20Machine%20Learning%20%28CS329P%29/Lecture-10.md) · [Phase 5 — ML Systems Engineering Guide](../Guide.md)*
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Compute log-softmax and a token negative log likelihood on a tiny example. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Compare a reference and candidate distribution on identical token positions.
+2. **Guided variation:** Use padding, masked tokens, and truncated top-k data to expose invalid comparisons.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Token counts, normalization/mask rules, NLL/perplexity, and KL only where full support is available. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

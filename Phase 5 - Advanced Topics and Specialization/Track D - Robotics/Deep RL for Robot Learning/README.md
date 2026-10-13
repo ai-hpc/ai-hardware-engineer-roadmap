@@ -15,6 +15,8 @@ This course is the **training half** of Track D's robot-learning story. The [VLA
 
 The lecture sequence follows the topic order of **UC Berkeley CS 185/285, Deep Reinforcement Learning (Spring 2026, Sergey Levine)**, compressed from 25 lectures into 13 plus a capstone, with one production deep dive (06b, RSL-RL). Every lecture is rewritten for this roadmap's standard: build it, measure it, ship an artifact — and always ask where the compute goes.
 
+**Comprehensive VLA companion:** [VLA Foundations to Frontier 2026](../VLA%20Foundations%20to%20Frontier%202026/README.md) provides 32 lectures spanning history, architectures, data, imitation/flow/RL training, evaluation, deployment, and the research frontier verified through October 13, 2026. Use its [CPU labs](../VLA%20Foundations%20to%20Frontier%202026/Lab-Guide.md) and capstones alongside this specialization.
+
 **Scope:** algorithms, training systems, and evaluation for robot policies in simulation, with sim-to-real as the frontier. The runtime optimization of a *trained* policy for deployment belongs to the VLA course; general LLM post-training infra belongs to [Track G](../../Track%20G%20-%20ML%20Systems%20Engineering/Guide.md).
 
 **Layer mapping:** L2-L8. Model architecture (flow-matching action experts, critics, world models), training systems (rollout/learner split, GPU-parallel simulation, replay buffers), and the closed-loop evaluation harness.
@@ -129,3 +131,5 @@ You are done with this special course when you can:
 
 * Start: [Lecture 01 — The RL Problem and the Rollout Engine](Lecture-01.md)
 * Back: [Track D — Robotics Guide](../Guide.md)
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

@@ -100,3 +100,17 @@ Step 1 is grounded in **[Neural Networks](../../1.%20Neural%20Networks/Guide.md)
 | Multi-sensor calibration, tracking, BEV fusion | [Sensor Fusion](../4.%20Sensor%20Fusion/Guide.md) | Phase 4 Jetson + [ROS2](../../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/5.%20Application%20Development/6.%20ROS2/Guide.md) for integration |
 
 **Hub:** [Phase 3 — Artificial Intelligence](../../Guide.md)
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Estimate model, activation, and runtime memory for a constrained device. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Compare a reference and one optimized deployment on the same held-out inputs.
+2. **Guided variation:** Run a sustained workload and vary batch/input size within the device budget.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Quality, p95 latency, peak memory, sustained power/temperature if available, and fallback behavior. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

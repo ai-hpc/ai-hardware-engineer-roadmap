@@ -42,3 +42,17 @@
 - [PyTorch Tutorials](https://pytorch.org/tutorials/)
 - *Deep Learning with PyTorch* (Stevens, Antiga, Viehmann)
 - [PyTorch Profiler](https://pytorch.org/tutorials/recipes/recipes/profiler_recipe.html)
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain tensor shapes, autograd, device placement, and evaluation mode. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Implement the same small forward/backward computation in two frameworks or against a numerical reference.
+2. **Guided variation:** Test shape boundaries and compare eager versus compiled or scheduled execution where supported.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Output/gradient error, warmup versus steady-state timing, memory, and environment versions. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

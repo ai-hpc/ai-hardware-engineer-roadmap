@@ -359,3 +359,5 @@ You're learning the workload first. Then you'll build the machine that runs it.
 ## Next
 
 → [**Phase 3 — Neural Networks**](../../Phase%203%20-%20Artificial%20Intelligence/1.%20Neural%20Networks/Guide.md) — the workloads that make all this parallelism necessary.
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

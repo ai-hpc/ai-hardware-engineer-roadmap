@@ -107,3 +107,17 @@ If you can fit a model but can't do the ten things around the fit, you have a no
 ---
 
 *Related: [Module 4B — ML Engineering & MLOps](../Guide.md) · [Phase 5 — ML Systems Engineering](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/Guide.md) · original [Stanford CS329P](https://c.d2l.ai/stanford-cs329p)*
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain dataset/model versioning and leakage-free evaluation. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Package a small training/evaluation pipeline and reproduce it from its manifest.
+2. **Guided variation:** Change one data or model version and detect the difference before deployment.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Held-out score, data hashes, run configuration, resource usage, and reproducibility. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

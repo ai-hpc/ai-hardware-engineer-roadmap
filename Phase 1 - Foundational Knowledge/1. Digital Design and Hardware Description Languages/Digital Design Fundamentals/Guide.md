@@ -1618,3 +1618,17 @@ Ideal speedup from N-stage pipeline = N (limited by hazard stalls)
 | **Pipelined MIPS in Verilog** | Pipeline registers, forwarding, hazard detection | Understand CPI, stalls, bypassing |
 | **Cache simulator (Python/C++)** | Direct-map vs set-assoc, LRU, miss rates | Memory hierarchy intuition |
 | **RTL-to-GDS with OpenLane** | Synthesis, PnR, DRC/LVS, SkyWater PDK | Experience the full tapeout flow (open-source) |
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Trace a truth table and one clocked state transition without a simulator. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Build a small counter or ready/valid block and a self-checking testbench; predict its waveform before simulation.
+2. **Guided variation:** Vary reset timing and apply backpressure; demonstrate that the checker catches one deliberately incorrect transition.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Waveforms, assertion results, cycle latency, and a stated clock/reset contract. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

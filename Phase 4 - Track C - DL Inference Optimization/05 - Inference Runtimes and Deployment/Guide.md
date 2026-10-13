@@ -163,3 +163,17 @@ python run.py \
 ## Next
 
 → **[06 — tinygrad Deep Dive](../06%20-%20tinygrad%20Deep%20Dive/Guide.md)** (optional) — Hands-on compiler/kernel interface: IR, scheduler, backends, and adding a simple optimization.
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Separate queueing, prefill, decode, cache state, and response transport. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Serve a supported small model with fixed request logging and a quality baseline.
+2. **Guided variation:** Sweep one batching or admission setting and include timeout/error requests.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** TTFT, per-request TPOT, useful throughput, failure rate, memory, and exact runtime/checkpoint revisions. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

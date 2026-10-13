@@ -5460,3 +5460,5 @@ Community:
 deploying 15,000-25,000+ Jetson Orin Nano devices in industrial edge computing
 applications. All code examples are representative of real-world implementations
 and should be adapted to your specific project requirements.*
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

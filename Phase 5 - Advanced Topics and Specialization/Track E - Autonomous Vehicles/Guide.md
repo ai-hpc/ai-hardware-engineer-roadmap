@@ -77,3 +77,17 @@ Modules 2 and 3 reinforce each other: openpilot is the system context, tinygrad 
 | comma.ai Blog | https://blog.comma.ai/ |
 | nuScenes Dataset | https://www.nuscenes.org/ |
 | Waymo Open Dataset | https://waymo.com/open/ |
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Trace perception, prediction, planning, and control with frames and timestamps. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Evaluate a small recorded or simulated driving scenario against a simple baseline.
+2. **Guided variation:** Perturb timing or sensor availability and inspect failure handling in replay/simulation.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Task/trajectory error, latency, collision/constraint outcomes in simulation, and scenario coverage. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

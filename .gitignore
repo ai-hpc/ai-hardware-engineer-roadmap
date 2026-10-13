@@ -8,3 +8,7 @@ Phase 5 - Advanced Topics and Specialization/4. Autonomous Driving/agnos-kernel-
 docs/
 _site/
 site/
+
+# Python lab and tooling caches
+__pycache__/
+*.py[cod]

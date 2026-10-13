@@ -2135,3 +2135,17 @@ These are the issues that consume weeks of debugging in real HPC and ML systems.
 ## Next
 
 → [**Sub-Track 2 — OpenMP and oneTBB**](../OpenMP%20and%20OneTBB/Guide.md) — scale from SIMD to multi-core CPU parallelism.
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain alignment, aliasing, vector width, and a scalar tail. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Implement scalar and vectorized dot products and inspect generated instructions.
+2. **Guided variation:** Use misaligned and non-multiple-of-vector-width inputs; verify the fallback and tail.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Numerical error, cycles or time per element, input size, and compiler flags. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

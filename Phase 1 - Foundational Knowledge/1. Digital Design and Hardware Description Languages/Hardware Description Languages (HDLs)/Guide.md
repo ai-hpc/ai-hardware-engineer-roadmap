@@ -1339,3 +1339,17 @@ set_property -dict {PACKAGE_PIN V16 IOSTANDARD LVCMOS33} [get_ports {sw[1]}]
 | 8 | **Single-cycle MIPS processor** | All of the above: datapath, control, memory | Advanced |
 | 9 | **Pipelined MIPS + forwarding** | Pipeline registers, hazard detection, MUX | Advanced |
 | 10 | **Matrix multiply accelerator** | BRAM tiling, FSM control, DSP inference | Advanced |
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain blocking versus nonblocking assignment using a two-register example. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Implement a parameterized FIFO with a reference queue and randomized reads/writes.
+2. **Guided variation:** Exercise full, empty, simultaneous read/write, and reset; introduce and detect an off-by-one occupancy bug.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Reference mismatches, boundary coverage, latency, and inferred storage. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

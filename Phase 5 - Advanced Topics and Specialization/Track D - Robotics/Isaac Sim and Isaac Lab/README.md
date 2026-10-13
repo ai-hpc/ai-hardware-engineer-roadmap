@@ -15,7 +15,9 @@ Isaac Sim is NVIDIA's robotics simulator: an Omniverse Kit application that comp
 
 This course teaches both from the bottom up — USD prims to trained policies — and treats the simulator as what it is on your desk: **a GPU program competing for a fixed VRAM and compute budget.** Every lab measures step time, render time, and memory, and every lecture says which knob moves which number.
 
-**Version pin (checked October 2026):**
+**Comprehensive VLA companion:** [VLA Foundations to Frontier 2026](../VLA%20Foundations%20to%20Frontier%202026/README.md) provides 32 lectures spanning history, architectures, data, imitation/flow/RL training, evaluation, deployment, and the research frontier verified through October 13, 2026. Use its [CPU labs](../VLA%20Foundations%20to%20Frontier%202026/Lab-Guide.md) and capstones alongside this specialization.
+
+**Teaching release family (checked October 2026):** Resolve an exact commit and lockfile using the [lab manifest](Lab-Guide.md#version-and-hardware-contract); a moving release branch is not an immutable pin.
 
 | Component | Version | Notes |
 |---|---|---|
@@ -26,7 +28,7 @@ This course teaches both from the bottom up — USD prims to trained policies �
 
 The Core API changed under everyone's feet: Isaac Sim 5.0 introduced the **Core Experimental API**, and 6.0 **deprecated** the classic `isaacsim.core.api` (including `World` and `SimulationContext`). This course teaches the new API first and shows the old one only so you can read existing code.
 
-**Reference hardware: an 8 GB RTX 4060.** That is **below** NVIDIA's official minimum for Isaac Sim 6.1 (RTX 4080, 16 GB). It runs, but not everything fits, so the course treats the limit as a design constraint. Labs run headless where they can, use state observations by default, and size camera counts and resolutions to a VRAM budget. Each lecture has an **8 GB budget** note. Where a lab genuinely needs more (many RTX cameras, VLA policies in the loop), it says so and points to a cloud L40S / RTX PRO 6000 as the fallback. Data-center GPUs without RT cores (A100, H100) are **not** supported for Isaac Sim rendering.
+**Reference hardware: an 8 GB RTX 4060.** That is **below** NVIDIA's official minimum for Isaac Sim 6.1 (RTX 4080, 16 GB). Operation on it is not guaranteed; use it only for reduced experiments after a compatibility check. The supported full-simulator route uses hardware meeting the documented requirements. Labs run headless where they can, use state observations by default, and size camera counts and resolutions to a VRAM budget. Each lecture has an **8 GB budget** note. Where a lab genuinely needs more (many RTX cameras, VLA policies in the loop), it says so and points to a cloud L40S / RTX PRO 6000 as the fallback. Data-center GPUs without RT cores (A100, H100) are **not** supported for Isaac Sim rendering.
 
 **Layer mapping:** L3-L8. Scene description and physics (simulation runtime), GPU rendering and sensor pipelines, ROS 2 integration, and the RL training loop.
 
@@ -61,13 +63,25 @@ The Core API changed under everyone's feet: Isaac Sim 5.0 introduced the **Core 
 | 10b | [Worked Example: Spot Waypoint Navigation](Lecture-10b.md) | Hierarchical control: waypoint follower → 50 Hz learned locomotion policy → 500 Hz PD actuators → physics · the policy contract (48-dim observation, command ranges) · `RobotPolicyRunner` on PhysX and Newton · train your own Spot policy and deploy it · ROS 2 `/cmd_vel` bridge |
 | 11 | [Imitation, Teleop, and Policy Evaluation](Lecture-11.md) | Teleop with Isaac Capture (formerly Isaac Teleop) · Mimic data generation · robomimic · Isaac Lab-Arena for VLA evaluation · RLinf · client-server policies |
 | 12 | [Performance, Sim-to-Real, and Scale-Out](Lecture-12.md) | Profiling physics vs render vs Python · headless and streaming · containers and cloud · multi-GPU · determinism · actuator models and domain randomization |
-| 13 | [Capstone: A Task, a Policy, and a Bridge](Lecture-13.md) | Build a custom manipulation task, train it within 8 GB, evaluate with seeds and CIs, and drive it over ROS 2, with a full performance report |
+| 13 | [Capstone: A Task, a Policy, and a Bridge](Lecture-13.md) | Build a custom manipulation task, size training to measured capacity, evaluate with seeds and CIs, and drive it over ROS 2, with a full performance report |
+| 14 | [Reproducible Simulation Setup](Lecture-14.md) | Version/asset manifest, compatibility, zero/random-action smoke tests |
+| 15 | [Frames, Units, and Asset Validation](Lecture-15.md) | Known-answer transforms, quaternion conventions, joint/asset contracts |
+| 16 | [Task Correctness and Partial Resets](Lecture-16.md) | Reward probes, done/timeout semantics, reset isolation, action history |
+| 17 | [Training and Held-Out Evaluation](Lecture-17.md) | Baselines, seed splits, sample/time efficiency, uncertainty |
+| 18 | [Physics, Sensors, and Performance](Lecture-18.md) | Stage profiles, rate definitions, sensor/rollout memory, scaling |
+| 19 | [ROS 2 Timing and Policy Export](Lecture-19.md) | Normalizers, observation age, clocks, deadlines, stale commands |
+| 20 | [System Identification and Transfer](Lecture-20.md) | Actuator response, delay, randomization ranges, held-out shifts |
+| 21 | [Language-Guided Robotics Capstone](Lecture-21.md) | Asynchronous planner, bounded skills, inference contention, closed-loop evaluation |
 
 </div>
 
-Each lecture follows the *Why it matters → Mental model → Build it → Use it in the real stack → Measure it → Ship it → Exit criteria* shape from the [Curriculum Authoring Guide](../../../Curriculum-Authoring-Guide.md), with a self-check and a runnable lab.
+The lectures use the [Curriculum Authoring Guide](../../../Curriculum-Authoring-Guide.md): explain the concept, work a small example, run an experiment, and assess the evidence. Lectures 14–21 add self-check guidance and staged engineering exercises; the lab guide identifies which checks run on a CPU and which require Isaac.
 
 ---
+
+## Applied engineering labs
+
+Follow the [engineering lab sequence](Lab-Guide.md) for Lectures 14–21 and runnable CPU contract exercises. Together with Lecture 10b, the course now has **22 lectures**. The sequence separates simulator, policy, and deployment milestones so learners can show exactly what they have validated.
 
 ## Learning path: from "what is Isaac Sim" to physical AI
 
@@ -155,3 +169,5 @@ You are done with this special course when you can:
 
 * Start: [Lecture 01 — The Isaac Stack and Your First Simulation](Lecture-01.md)
 * Back: [Track D — Robotics Guide](../Guide.md)
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

@@ -4,16 +4,16 @@
 <div class="course-identity__icon">INF</div>
 <div markdown="1">
 <p class="course-identity__eyebrow">Phase 5 · ML Systems Engineering · Special Course</p>
-<p class="course-identity__title">From transformer-execution fundamentals to dense-70B on Hopper to MoE-672B on Blackwell — the modern inference stack, end to end.</p>
+<p class="course-identity__title">Transformer execution, dense and MoE serving, and DeepSeek V4.1 Flash NVFP4 checkpoint engineering across the inference stack.</p>
 <p class="course-identity__meta">Artifact: reproducible inference benchmark · Measure: TTFT, TPOT, throughput, $/MTok, parity vs reference</p>
 </div>
 </div>
 
 > *Up-to-date is not a side requirement. It is the discipline.*
 
-The inference layer has moved more in the last twelve months than the previous three years combined. FP4 went from research to native silicon. Disaggregated prefill/decode went from paper to production. MoE went from "interesting" to "the default architecture above 30B." Any course that does not lead with what shipped in 2025–2026 is already mis-training engineers.
+Inference engineering connects model execution, numerical quality, GPU behavior, and service latency. This course uses dated case studies to teach methods that transfer across model and hardware generations. Recheck runtime support and compare actual workloads before adopting a configuration.
 
-This course is structured as **four parts** that can be read independently or as a sequence. Parts 1–3 stand on their own; together they walk the precision floor down (FP16 → FP8 → FP4), the architecture from dense to sparse (Llama / Qwen → DeepSeek / Qwen3-MoE), and the hardware up (single-GPU → 8× Hopper → GB200 NVL72 Blackwell). **Part 4 is a different kind of chapter**: one engine, one node, ~96 pull requests, and a measured 60× — the discipline of optimization as it actually happens, with every number traceable to the diff that produced it.
+The course has **five parts and 37 lectures**. Parts 1–3 develop execution, precision, dense serving, and MoE fundamentals. Part 4 studies an optimization history and its correctness gates. Part 5 applies the same discipline to **DeepSeek V4.1 Flash NVFP4**, starting with checkpoint identity and loader compatibility, then memory, kernels, parallelism, scheduling, and quality. Historical case-study numbers remain specific to their original setups.
 
 **Layer mapping:** L3–L8. Runtime / scheduler / kernels / collectives / fabric / observability — the full ML Systems stack as it applies to inference.
 
@@ -44,7 +44,7 @@ Run it locally: `git clone https://github.com/ai-hpc/llm-inference-viz && cd llm
 
 ---
 
-## Course Map (4 parts, 27 lectures)
+## Course Map (5 parts, 37 lectures)
 
 ### 🧭 Part 1 — Fundamentals of AI Inference / MLSys (5 lectures)
 
@@ -121,9 +121,17 @@ The subject is not the numbers, which belong to one model on one box in 2026-08.
 
 ---
 
+### Part 5 — DeepSeek V4.1 Flash NVFP4 (10 lectures)
+
+[Part overview and lab tools](Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/README.md) — inspect official and community checkpoint formats, derive capacity and traffic budgets, verify loader/kernel compatibility, profile prefill and decode, and optimize useful throughput only after a quality gate passes. CPU exercises are included; full-model results require the named hardware and runtime.
+
+The default NVFP4 teaching artifact is a community conversion. Its format and evaluation status are stated in the part overview; this course does not claim a validated launch merely from an architecture support listing.
+
+---
+
 ## Course Outcomes
 
-By the end of all three parts you should be able to:
+By the end of the applicable parts you should be able to:
 
 * Read any 2026-era model card and predict its inference cost shape (KV growth, prefill vs decode dominance, dense vs MoE routing, expected dominant precision).
 * Pick a runtime (vLLM / SGLang / TRT-LLM / llama.cpp / MLX) for a workload + hardware + SLO and defend the choice.
@@ -139,11 +147,11 @@ By the end of all three parts you should be able to:
 
 Up-to-date is the differentiator of this course. The discipline is baked in:
 
-* Every lecture closes with `## Current as of YYYY-MM` stating the date the content was written and the specific model / runtime / hardware versions it pinned.
+* Record a checked date and exact model/runtime/hardware identifiers for version-sensitive work. Part 5 keeps its source status in the part overview and immutable experiment revisions in the learner manifest.
 * [`REFRESH-LOG.md`](REFRESH-LOG.md) tracks every dated update to lectures and benchmark data.
 * Versioned benchmark data: when a model or runtime ships a new version, prior benchmark numbers are kept in dated subfiles for archaeology; the latest pinned at the top of each lecture.
 * **Primary sources only** — model cards, technical reports, GitHub releases, official benchmark pages. Blog posts (which silently rot) are last-resort and dated.
-* **Live benchmark reference:** for current cross-stack numbers (tokens/s, perf/$, tokens/MW, interactivity) across hardware (H100 → B200 → GB200/GB300 NVL72, MI355X) and runtimes (vLLM / SGLang / TRT-LLM), use a continuously-updated public benchmark such as **[SemiAnalysis InferenceX](https://github.com/SemiAnalysisAI/InferenceX)** ([live dashboard](https://inferencex.com/), Apache-2.0) rather than any fixed number printed in a lecture — software-stack gains move these weekly. Treat the lecture numbers as *teaching anchors*; treat the live dashboard as *truth at time of deployment*.
+* **Live benchmark reference:** for current cross-stack numbers (tokens/s, perf/$, tokens/MW, interactivity) across hardware (H100 → B200 → GB200/GB300 NVL72, MI355X) and runtimes (vLLM / SGLang / TRT-LLM), use a continuously-updated public benchmark such as **[SemiAnalysis InferenceX](https://github.com/SemiAnalysisAI/InferenceX)** ([live dashboard](https://inferencex.com/), Apache-2.0) rather than any fixed number printed in a lecture — software-stack gains move these weekly. Treat the lecture numbers as *teaching anchors*; check the live dashboard's workload, versions, and methodology before using it as a comparison.
 * **Refresh cadence:** six months default; three months if a major model class drops (e.g. DeepSeek V4, Llama 5, Qwen 4) or a hardware generation lands (B300 → Vera Rubin etc.).
 
 ---
@@ -169,10 +177,12 @@ Part 4 turns that harness into something auditable: a pinned reference with a dr
 
 You are done with this course when you can:
 
-* Explain, on a whiteboard, why decode is bandwidth-bound and what makes a workload escape that regime.
+* Explain when decode is bandwidth-bound, and use a trace and workload model to identify exceptions.
 * Defend a precision floor (FP16 vs FP8 vs INT4 vs FP4) to a roboticist who does not trust quantization.
 * Tell, from a profile trace alone, whether a workload is compute-bound, memory-bound, comm-bound, or scheduler-bound — and what to change to verify.
-* Walk through your benchmark repo with another engineer and they reproduce your numbers on the same hardware class within ±5%.
-* Hand your harness to someone hostile and have them find only holes you already documented.
+* Walk through your benchmark repo with another engineer and reproduce results within a tolerance justified by observed run-to-run variation.
+* Ask another engineer to challenge your assumptions and document the limits of the evidence.
 
-If you cannot do all five, you have a notebook of recipes, not a body of inference-engineering work. Re-run the benchmarks.
+If an exit criterion is missing, use the corresponding lab to close that gap; mark unavailable hardware experiments as not run.
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

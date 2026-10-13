@@ -42,11 +42,19 @@ The endpoint is a single die that runs production AI workloads, hosts a real age
 
 **Already past the basics?** [Phase 1](Phase%201%20-%20Foundational%20Knowledge/Guide.md) and [Phase 2](Phase%202%20-%20Embedded%20Systems/Guide.md) exist to fill specific gaps — digital logic, embedded Linux — not to gate you. If you already know CUDA/C++, go straight to [Phase 3](Phase%203%20-%20Artificial%20Intelligence/Guide.md) and pick up Phase 1–2 material only where a later module says you need it.
 
-If you only want to call an LLM API, this isn't for you. If you want to design the silicon that calls it, keep reading.
+You can enter through software, robotics, or hardware. Choose one working artifact first and add lower-level material as your project needs it.
 
 ---
 
-## Three Ways In
+## Learn by building and testing
+
+Start with [How to learn this roadmap](Learning-Guide.md): entry diagnostics, a repeatable lesson cycle, hardware access options, and a shared completion rubric. Each course's practice section asks you to predict a result, build a baseline, test a variation, and explain the evidence.
+
+New applied sequences: [DeepSeek V4.1 Flash NVFP4 inference engineering](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/README.md) and [Isaac Sim / Isaac Lab engineering labs](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Isaac%20Sim%20and%20Isaac%20Lab/Lab-Guide.md). Both have CPU exercises and separate milestones for work requiring compatible GPU hardware.
+
+New professional course: [**VLA Foundations to Frontier 2026 — 32 lectures**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/VLA%20Foundations%20to%20Frontier%202026/README.md), covering history, architectures, training, evaluation, Isaac integration, and verified research through October 13, 2026. Includes runnable CPU labs, source dossiers, and two capstones.
+
+## Four Ways In
 
 Pick the finish line that matches what you want to be able to do, not a track number.
 
@@ -55,8 +63,9 @@ Pick the finish line that matches what you want to be able to do, not a track nu
 | **AI Inference Engineering** | Transformer execution, GEMV/GEMM kernels, quantization, serving | A benchmark report: predicted vs. measured tok/s on a real model, with the gap explained | [Phase 3 — AI Workloads](Phase%203%20-%20Artificial%20Intelligence/Guide.md) |
 | **AI Agent Harness Systems** | Sessions, tool calling, multi-agent loops, evals, observability | A production-shaped agent harness running end to end | [Agentic AI & GenAI — 42 lectures](Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Lectures/README.md) |
 | **Physical Hardware Engineering** | Boards, embedded Linux, RTL, FPGA, ASIC flow | A board you brought up yourself, or an accelerator spec with real numbers | [Phase 1 — Digital Foundations](Phase%201%20-%20Foundational%20Knowledge/Guide.md) |
+| **Robotics and Robot Learning** | Isaac Sim scenes, Isaac Lab tasks, policies, ROS 2 integration | A validated task, held-out policy evaluation, and measured sensor-to-action timing | [Robotics](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Guide.md) |
 
-Each path stands on its own — you don't need the other two to get something real out of it. [The Path](#the-path) below is where all three converge into the physical-AI-chip endpoint.
+Each path has its own useful completion milestone. [The Path](#the-path) connects them for learners pursuing the larger physical-AI-chip project; designing a chip is optional for an inference or robotics specialization.
 
 ---
 
@@ -251,7 +260,7 @@ You don't have to do all three. But to land at chip design, you want enough of *
 | [**A — GPU Infrastructure**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20A%20-%20GPU%20Infrastructure/Guide.md) | Multi-GPU, NVLink, NCCL, AMD ROCm/HIP, MI300X | Inference |
 | [**B — HPC (CUDA-X)**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20B%20-%20High%20Performance%20Computing/Guide.md) | cuBLAS, cuDNN, NVSHMEM, 40+ libraries | Inference |
 | [**C — Edge AI**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20C%20-%20Edge%20AI/Guide.md) | Holoscan, [Edge LLM Inference Internals](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20C%20-%20Edge%20AI/Edge%20LLM%20Inference%20Internals/Lecture-01.md), [**Qwen Inference Optimization (6-lecture series)**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20C%20-%20Edge%20AI/Qwen%20Inference%20Optimization/README.md), AI-driven wireless | Inference |
-| [**D — Robotics**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Guide.md) | ROS 2, Nav2, motion planning, swarm, [**Isaac Sim and Isaac Lab (14-lecture course)**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Isaac%20Sim%20and%20Isaac%20Lab/README.md), [**Deep RL for Robot Learning (15-lecture course)**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Deep%20RL%20for%20Robot%20Learning/README.md), VLA optimization | Hardware + Inference |
+| [**D — Robotics**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Guide.md) | ROS 2, Nav2, motion planning, swarm, [**Isaac Sim and Isaac Lab (22 lectures + engineering labs)**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Isaac%20Sim%20and%20Isaac%20Lab/README.md), [**Deep RL for Robot Learning (15-lecture course)**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Deep%20RL%20for%20Robot%20Learning/README.md), [**VLA Foundations to Frontier 2026 (32 lectures)**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/VLA%20Foundations%20to%20Frontier%202026/README.md), VLA optimization | Hardware + Inference |
 | [**E — Autonomous Vehicles**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20E%20-%20Autonomous%20Vehicles/Guide.md) | openpilot, BEV perception, ISO 26262, TRACE32 debug | Hardware + Inference |
 | [**F — AI Chip Design**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Guide.md) | **The endpoint.** Systolic arrays, dataflow architectures, tinygrad↔hardware, RISC-V AI accelerator design, ASIC flow — and the integration question: how do you put an NPU, an ESP32-class radio, an ISP, and a Linux CPU on one die? | **All three** |
 | [**G — ML Systems Engineering**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/Guide.md) | Training systems, inference runtimes, GPU scheduling, distributed serving, compiler/runtime work, observability | Inference + Infrastructure |

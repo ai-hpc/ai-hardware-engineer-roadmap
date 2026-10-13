@@ -213,6 +213,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--n", type=int, default=64)          # number of cubes
 parser.add_argument("--headless", action="store_true")
 parser.add_argument("--steps", type=int, default=600)
+parser.add_argument("--device", default="cuda:0")              # physics device: "cuda:0" or "cpu"
 args = parser.parse_args()
 
 from isaacsim import SimulationApp                          # must come before omni/isaacsim imports
@@ -242,23 +243,30 @@ GeomPrim(paths=shape.paths, apply_collision_apis=True)
 cubes = RigidPrim(paths="/World/Cube_.*")                         # regex: the same n prims
 t_build = time.perf_counter() - t0
 
+# Set the physics device explicitly: the default depends on Kit settings, and GPU vs CPU changes everything.
+# On "cuda:0" this enables GPU dynamics, the GPU broadphase and Fabric (USD writeback off).
+SimulationManager.setup_simulation(device=args.device)
+
 omni.timeline.get_timeline_interface().play()
 simulation_app.update()                                           # first update starts physics
 
 def timed(fn, steps):
-    t = time.perf_counter()
+    n0, t = SimulationManager.get_num_physics_steps(), time.perf_counter()
     for _ in range(steps):
         fn()
-    return (time.perf_counter() - t) / steps * 1e3                # ms per call
+    cubes.get_world_poses()[0].numpy()                            # readback: wait for async GPU work
+    ms = (time.perf_counter() - t) / steps * 1e3                  # ms per call
+    return ms, (SimulationManager.get_num_physics_steps() - n0) / steps   # physics steps per call
 
-ms_physics = timed(SimulationManager.step, args.steps)            # physics only, no render
-ms_update = timed(simulation_app.update, args.steps)              # physics + render (+ UI if not headless)
+ms_physics, sp_physics = timed(SimulationManager.step, args.steps)    # physics only, no render
+ms_update, sp_update = timed(simulation_app.update, args.steps)       # physics + render (+ UI if not headless)
 
 positions, _ = cubes.get_world_poses()                            # Warp array, shape (n, 3)
 z = positions.numpy()[:, 2]
-print(f"n={args.n} headless={args.headless} build={t_build:.2f}s "
-      f"physics={ms_physics:.3f} ms/step update={ms_update:.3f} ms/frame "
-      f"z: min={z.min():.3f} max={z.max():.3f}")
+print(f"n={args.n} device={SimulationManager.get_device()} headless={args.headless} build={t_build:.2f}s "
+      f"physics={ms_physics:.3f} ms/step ({sp_physics:.2f} steps/call) "
+      f"update={ms_update:.3f} ms/frame ({sp_update:.2f} steps/call) "
+      f"throughput={args.n * 1e3 / ms_physics:,.0f} body-steps/s z: min={z.min():.3f} max={z.max():.3f}")
 
 simulation_app.close()
 ```
@@ -266,9 +274,10 @@ simulation_app.close()
 ```bash
 python isaac_bench/falling_cubes.py --n 64              # with the GUI viewport
 python isaac_bench/falling_cubes.py --n 64 --headless
+python isaac_bench/falling_cubes.py --n 64 --headless --device cpu   # same scene, CPU pipeline
 ```
 
-Check the physics before trusting the timings: after 1,200 steps every cube should be resting near the ground (`z` close to half the cube size, 0.05 m). If cubes are still at 1 m, the simulation is not playing. If any `z` is far below 0, something fell through the floor.
+Check two things before trusting the timings. First, the **steps/call** columns. If either is not 1.00, the two loops are not doing the same physics work, and their times cannot be compared directly. If `SimulationManager.get_num_physics_steps()` does not count manual `step()` calls on your build, the physics column will read 0.00; then rely on the device and the readback. Second, the physics itself: after 1,200 steps every cube should be resting near the ground (`z` close to half the cube size, 0.05 m). If cubes are still at 1 m, the simulation is not playing. If any `z` is far below 0, something fell through the floor.
 
 If your build of the wrapper rejects a list of paths, create the cubes in a loop and keep the single regex `RigidPrim`. Building is a one-time cost; the regex wrapper is what matters for stepping.
 
@@ -281,6 +290,25 @@ Run Lab 1b for `n ∈ {1, 16, 64, 256, 1024, 4096}`, headless and windowed, whil
 * peak VRAM minus your Lab 1a fixed cost, vs `n`
 
 What to expect, qualitatively. At small `n`, physics time is almost flat, because fixed per-step overhead dominates. At large `n` it grows with the number of bodies and contacts. Here every cube rests on the ground rather than on another cube, so contacts grow roughly linearly with `n`; dense stacks (Lecture 04) grow them faster. Update time includes rendering, so the gap between the two curves is the price of drawing a frame. Note where your 4060 stops being comfortable. That number feeds the environment-count estimates in Lecture 10.
+
+**Reference results: RTX 4060 Laptop GPU.** One learner's run of the earlier version of Lab 1b (headless, 300 steps per timed loop, Isaac Sim 6.1, physics device **not set explicitly**, and no steps/call diagnostics). The throughput column is computed from the physics column:
+
+| n cubes | Build | Physics ms/step | Update ms/frame | Physics steps/s | Throughput (body-steps/s) |
+|--:|--:|--:|--:|--:|--:|
+| 16 | 0.14 s | 3.66 | 70.6 (first-launch warm-up) | ~273 | ~4,400 |
+| 64 | 0.59 s | 5.03 | 13.8 | ~199 | ~12,700 |
+| 256 | 2.20 s | 9.51 | 14.4 | ~105 | ~26,900 |
+| 1024 | 8.84 s | 23.72 | 14.1 | ~42 | ~43,200 |
+| 4096 | 35.7 s | 81.76 | 108.0 | ~12 | ~50,100 |
+
+How to read it, including two traps:
+
+* **Build is linear,** about 9 ms per cube. It is a one-time authoring cost, but it is why reset-by-rebuilding is a bad idea at scale.
+* **Physics is affine, not sublinear:** a fixed floor of about 3.5 ms, then about 19 µs per cube. The marginal cost is roughly constant from 256 to 4,096 cubes (18.5 µs, then 18.9 µs per cube per step). Going from 64 to 4,096 cubes (64×) costs only 16× because of the floor, not because the solver gets more efficient per body.
+* **Fewer steps per second is not slower training.** Physics steps/s falls from ~199 to ~12, but body-steps/s rises from ~12,700 to ~50,100, about 4×. For RL, the number that matters is Lecture 01's env-steps/s, which is *steps/s × number of parallel copies*. These are single rigid cubes, not environments: a robot environment costs much more per step, so do not read these columns as environment counts.
+* **Trap 1: update is faster than physics at 256 and 1,024 cubes.** Each `update()` should include a physics step plus a render, so it cannot honestly beat a bare physics step (14.1 ms against 23.7 ms at n = 1,024). That is a measurement red flag, not "physics hidden under the frame budget". Either the two loops did different physics work per call, or `SimulationManager.step()` paid extra costs per call that the app's update path does not, such as writing results back to USD when Fabric is off. The current script prints steps/call and the device for exactly this reason.
+* **Trap 2: the device was never set.** The default physics device depends on Kit settings. A constant ~19 µs per body is in line with CPU stepping plus per-step USD writeback, which `setup_simulation(device="cuda:0")` turns off. Rerun the sweep with `--device cuda:0` and `--device cpu` and compare the slopes before drawing conclusions about the GPU.
+* **No cube-cube contacts.** At 25 cm spacing, the cubes never touch each other. Each one rests on the ground with a handful of contact points, so contacts grow linearly with `n` and the 4,096 case has no self-collision overhead.
 
 ---
 

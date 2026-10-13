@@ -740,3 +740,5 @@ The core team is strict about code quality. When contributing:
 ---
 
 *See the `projects/` folder for runnable Python scripts for each project above.*
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../../Learning-Guide.md) with this course's existing practice. Predict the schedule before inspecting it, test a changed shape, and revisit the self-check after two days and one week.

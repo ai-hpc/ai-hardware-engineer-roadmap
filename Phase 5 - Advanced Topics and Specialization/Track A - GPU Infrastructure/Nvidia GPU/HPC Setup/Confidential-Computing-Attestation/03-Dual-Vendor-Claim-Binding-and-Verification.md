@@ -76,7 +76,7 @@ If the answer to (2) or (3) is "nothing verifies that," the binding in (1) is de
 |---|---|---|
 | Fabricated claim JSON with no real hardware involved | binding checks alone | **none — this is the gap, not a defense; needs the authenticity checks in files 01 §4 / 02 §4 too** |
 | Forged TD Quote with correct REPORTDATA bytes | DCAP signature + PCK chain ([file 01, §4](./01-Intel-TDX-Attestation-Chain.md#4-dcap-verification-chaining-the-quote-back-to-intels-root-ca)) | Intel's root CA and PCK infrastructure are uncompromised |
-| Forged GPU EAT with correct eat_nonce | NRAS JWKS signature check ([file 02, §4](./02-NVIDIA-CC-Attestation-Chain.md#4-authenticity-nras-signature--jwks-key-resolution)) | NVIDIA's NRAS signing key and JWKS endpoint are uncompromised |
+| Forged GPU EAT with correct eat_nonce | NRAS JWKS signature check ([file 02, §4](./02-NVIDIA-CC-Attestation-Chain.md#4-authenticity-nras-signature-jwks-key-resolution)) | NVIDIA's NRAS signing key and JWKS endpoint are uncompromised |
 | Genuine hardware, wrong/tampered software stack | MRTD / RTMR measurement | the verifier's *golden* reference measurement is itself correct and current — a stale or wrong golden value defeats this silently |
 | Genuine attestation, semantically wrong result (bad inputs, wrong parameters, quietly-broken logic) | **nothing here** | out of scope for hardware attestation entirely — this needs re-execution (the slow path) or a proof-of-computation approach (e.g. zk-STARK execution-trace proofs) |
 | Node with a disclosed CPU vulnerability | TCB status field | this is a *reported signal*, not an automatic reject — the validator's policy has to actually consume it |

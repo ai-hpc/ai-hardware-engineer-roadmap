@@ -50,3 +50,17 @@ Custom carrier board (Module 2) + L4T BSP (Module 3) + FSP (Module 4)
 ```
 
 Work through sub-modules 1–4 in any order based on your product's needs. **ML/AI** (sub-module 5) and **ROS 2** (sub-module 6) typically build on the peripheral and multimedia foundations.
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Draw one complete sensor-to-user-output path and identify its queues. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Integrate one peripheral, one processing stage, and one observable application output.
+2. **Guided variation:** Disconnect the input or slow the consumer and verify a bounded error state.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Stage/end-to-end latency, queue depth, drop/error counts, and recovery time. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

@@ -172,3 +172,17 @@
 | **Nav2 theory** | *Behavior Trees in Robotics and AI* — Colledanchise and Ögren |
 | **SLAM theory** | *Probabilistic Robotics* — Thrun, Burgard, and Fox |
 | **Testing** | `ros_testing` — official ROS 2 testing framework for node unit and integration tests |
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain nodes, topics, QoS, TF, and simulation versus wall time. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Build a timestamped publisher/controller pipeline with an explicit frame and message contract.
+2. **Guided variation:** Delay, duplicate, or drop a message in simulation and test stale-command handling.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Observation age, end-to-end latency, drop rate, frame consistency, and recovery. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

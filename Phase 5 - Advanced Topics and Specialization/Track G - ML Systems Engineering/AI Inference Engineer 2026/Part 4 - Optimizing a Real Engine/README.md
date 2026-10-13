@@ -93,3 +93,5 @@ You are done with Part 4 when you can:
 * State, for your own artifact, which of your measured wins you would still believe if someone hostile audited it.
 
 If you can do all six, the transferable content of this part has landed. If you can only recite the SparkInfer-K3 numbers, it has not — those numbers are 2026-08 history for one model on one box, and their only job is to make the reasoning concrete.
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

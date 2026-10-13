@@ -9,12 +9,13 @@
 
 ## Core Entry Points
 
+- [Learning Guide](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/Learning-Guide/)
 - [Roles and Market Analysis](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/Roles%20and%20Market%20Analysis/)
 - [Phase 1 - Digital Foundations](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/Phase%201%20-%20Foundational%20Knowledge/)
 - [Phase 2 - Embedded Systems](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/Phase%202%20-%20Embedded%20Systems/)
 - [Phase 3 - Artificial Intelligence](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/Phase%203%20-%20Artificial%20Intelligence/)
 - [Phase 4 - NVIDIA Jetson](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/)
-- [Phase 4 - ML Compiler and Graph Optimization](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/Phase%204%20-%20Track%20C%20-%20ML%20Compiler%20and%20Graph%20Optimization/)
+- [Phase 4 - DL Inference Optimization](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide/)
 - [Phase 5 - Advanced Topics and Specialization](https://ai-hpc.github.io/ai-hardware-engineer-roadmap/Phase%205%20-%20Advanced%20Topics%20and%20Specialization/)
 
 ## Topic Summary
@@ -30,3 +31,6 @@ This roadmap teaches AI hardware engineering across the full stack:
 - ML compiler and graph optimization flows
 - RISC-V and AI accelerator architecture
 - AI agents, runtime systems, and production AI applications
+- DeepSeek V4.1 Flash NVFP4 checkpoint inspection, numerical quality, and inference optimization
+- NVIDIA Isaac Sim / Isaac Lab task validation, policy evaluation, ROS 2 timing, and robotics labs
+- Vision-language-action professional course: 32 lectures from historical foundations through October 13, 2026, with training, Isaac/ROS deployment, CPU labs, and capstones

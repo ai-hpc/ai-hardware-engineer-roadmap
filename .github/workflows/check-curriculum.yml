@@ -1,0 +1,29 @@
+name: Check curriculum links and CPU labs
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check source Markdown links
+        run: python3 scripts/check_links.py
+      - name: Test link checker
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - name: Test inference lab arithmetic and validation
+        run: python3 -m unittest discover -s 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/labs' -p 'test_*.py'
+      - name: Test robotics contracts
+        run: python3 -m unittest discover -s 'Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/labs' -p 'test_*.py'
+      - name: Test VLA grounding, data contracts, timing, and evaluation
+        run: python3 -m unittest discover -s 'Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/labs' -p 'test_*.py'

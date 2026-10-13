@@ -1020,3 +1020,17 @@ TAO models:
 
 *Previous: [5.5 ML and AI](../Guide.md)*
 *See also: [ML and AI main guide](../Guide.md) for quantization theory, TensorRT manual pipeline, and DLA usage*
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain dataset annotations, task metric, and the model export contract. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Train or adapt a small task and compare exported inference with its framework reference.
+2. **Guided variation:** Inspect a difficult held-out subset and test a quantized/exported variant.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Task score by subset, export parity, latency, memory, and pinned training/export inputs. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

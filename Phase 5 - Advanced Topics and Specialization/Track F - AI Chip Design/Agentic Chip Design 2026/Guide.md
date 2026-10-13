@@ -102,3 +102,17 @@ Anchored on the Chip-Design-LLM-Zoo leaderboard (VerilogEval / RTLLM / RealBench
 * **VerilogEval** — [arXiv:2309.07544](https://arxiv.org/abs/2309.07544) · **RTLLM** — [arXiv:2308.05345](https://arxiv.org/abs/2308.05345)
 * NVIDIA Computex / GTC Taipei 2026 (Vera Rubin production, Cosmos 3) — [ServeTheHome live coverage](https://www.servethehome.com/nvidia-computex-2026-keynote-live-coverage/) · [NVIDIA GTC Taipei](https://www.nvidia.com/en-tw/gtc/taipei/computex/)
 * Bridge courses: [AI Agent Development 2026](../../../Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Guide.md) · [AI Inference Engineer 2026](../../Track%20G%20-%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/README.md)
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain which design decisions can be proposed automatically and which need objective verification. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Use a small RTL task with an independent testbench and bounded design constraints.
+2. **Guided variation:** Propose a change and test counterexamples before considering PPA improvement.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Functional verification, constraint satisfaction, synthesis evidence where available, and reproducible design history. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

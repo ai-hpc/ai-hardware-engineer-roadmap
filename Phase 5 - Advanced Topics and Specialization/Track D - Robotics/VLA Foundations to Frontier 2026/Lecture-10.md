@@ -1,0 +1,74 @@
+# Lecture 10 — Action Chunking, ACT, and Temporal Ensembling
+
+Design the interface between a policy that predicts a sequence and a controller that must choose one action now.
+
+**Prerequisites:** Lecture 09; sequence models and basic variational inference. **Effort:** setup 30 minutes, lab 3 hours, analysis 90 minutes. **Hardware:** CPU for scheduling experiments; optional GPU for an ACT implementation. **Stack/roles:** model architecture, inference scheduling, and control; robot learning and inference optimization engineers. **Artifact:** a chunk scheduler with timing traces, validity masks, and controlled comparisons.
+
+## Three horizons, three different decisions
+
+A chunk policy predicts \(A_t=(a_t,\ldots,a_{t+H-1})\) from observations at time \(t\). The prediction horizon \(H\), execution horizon \(K\), and observation-history length \(O\) are separate variables. Predicting 32 actions does not require executing all 32 before observing again. A receding-horizon controller might execute four, acquire fresh observations, and replace the remaining plan.
+
+Chunking amortizes expensive visual and language processing across several actions. It also represents correlations across a short movement. The cost is increasing commitment to a plan based on older information. Whether this is useful depends on camera rate, inference latency, contact sensitivity, actuator control rate, and how much uncertainty evolves while the chunk executes.
+
+ACT combines a transformer action-chunk predictor with a conditional variational autoencoder and a temporal ensembling mechanism. The original ALOHA work supplies the experimental context and exact architectural choices; use it as an instance of this design space rather than assuming every chunk policy is ACT. [ACT / ALOHA paper, RSS 2023](https://roboticsproceedings.org/rss19/p016.html).
+
+## What the latent variable learns
+
+During training, an encoder observes the demonstrated action sequence and robot state and forms \(q_\phi(z\mid A,q)\). A decoder predicts the chunk from observation and latent \(z\). A simplified teaching objective is
+
+$$
+\mathcal L=\mathbb E_{z\sim q_\phi}[\|A-f_\theta(o,z)\|_1]
++\beta D_{KL}(q_\phi(z\mid A,q)\|\mathcal N(0,I)).
+$$
+
+For a diagonal Gaussian, the KL term is \(\frac12\sum_i(\mu_i^2+\sigma_i^2-\log\sigma_i^2-1)\). The reconstruction term rewards demonstrated motion; the KL term discourages an arbitrary latent code that works only when an entire target sequence is already known. At deployment the future demonstration is unavailable. The chosen prior or fixed-latent inference rule must match the implementation being reproduced.
+
+This distinction is operationally useful. If reconstruction is excellent only when using the training encoder, your deployment path has not been validated. If the decoder ignores the observation because the latent encodes everything, the policy can replay familiar trajectories without responding to a moved object. Test both failures deliberately.
+
+## Temporal ensembling without indexing ambiguity
+
+Several chunks can contain a prediction for the same absolute control timestep \(t\). Let \(\hat a_t^{(s)}\) mean the action for timestep \(t\) predicted from a chunk generated at timestep \(s\). An ensemble computes
+
+$$
+\bar a_t=\frac{\sum_{s\in V_t}w_{t,s}\hat a_t^{(s)}}{\sum_{s\in V_t}w_{t,s}},
+$$
+
+where \(V_t\) contains only valid, already available predictions. Define weight indexing explicitly. With age \(t-s\), \(w_{t,s}=e^{-\lambda(t-s)}\) favors recent predictions. This is a teaching variant; reproducing ACT requires checking the original implementation's ordering and decay convention. A formula such as \(e^{-\lambda i}\) is incomplete until the meaning of \(i\) is stated.
+
+Never use nonzero action values as the validity mask: zero is a valid motor command. Preserve generation time, observation timestamp, target control time, and chunk identity. Discard chunks from an old episode after reset. Averages are meaningful only when all predictions share the same coordinate frame, units, and action semantics. Averaging discrete gripper modes or rotations requires a separate rule.
+
+## Worked example: smoothness can create delay
+
+Suppose three available predictions for one joint target are 0.20, 0.24, and 0.32 radians, ordered oldest to newest. A uniform average is approximately 0.253 radians. Recent-favoring weights \((1,2,4)\) produce approximately 0.280 radians. Both reduce the jump to the newest prediction. If the newest prediction reflects a newly visible obstacle, smoothing also delays the response.
+
+For an illustrative 50 Hz actuator stream and \(K=5\), replanning occurs nominally every 100 ms. A measured inference latency of 70 ms could fit that interval, but a 140 ms tail event cannot. A scheduler needs a declared fallback when a replacement chunk misses its deadline. The policy invocation rate, action streaming rate, and physical servo rate should appear as separate columns in your report.
+
+## Build a chunk scheduler before training a transformer
+
+**Exercise / pseudocode.** Implement a synthetic chunk producer that predicts a bounded trajectory, adds seeded noise, and has configurable completion latency. The scheduler is real code written by the learner; the synthetic producer is not an ACT quality benchmark.
+
+1. Represent each chunk as generation ID, episode ID, source timestamp, target timestep range, predictions, and a Boolean validity mask.
+2. Implement execute-\(K\), latest-available prediction, uniform ensemble, and recent-weighted ensemble. Keep action clipping and rate limits identical.
+3. Run a smooth target and a target that changes suddenly. Sweep \(H\in\{8,32\}\), \(K\in\{1,4,8\}\), and fixed versus jittered completion latency.
+4. Measure target tracking error, action total variation, deadline misses, maximum observation age at execution, and scheduler CPU cost. State that total variation is a numerical smoothness proxy, not a mechanical wear measurement.
+5. Inject a zero-valued chunk, a delayed old-episode chunk after reset, and a chunk with the wrong joint order. Require explicit handling for each.
+6. Optionally train a small ACT-style model on the state trajectories from Lecture 09. Compare deployment inference with the training encoder disabled. Record the code revision if using upstream software.
+
+Stop the scheduler sweep after a fixed 24 configurations and three seeds; select further settings using a written hypothesis. **Acceptance criteria:** target timesteps align correctly; stale episode data never executes; zeros remain valid; reported smoothness gains include their response-delay cost; no configuration is declared superior from offline loss alone.
+
+## Failure clinic
+
+- **Smooth open-loop motion, repeated contact failure:** shorten execution horizon and inspect whether new sensory information arrives before replanning.
+- **First action jumps at every refresh:** inspect overlap alignment and delta-action reference state.
+- **GPU gets slower as chunks grow:** measure the action decoder separately; fewer invocations do not imply smaller individual forward passes.
+- **Reset moves the robot toward the previous task:** clear queued chunks and pending asynchronous results using an episode token.
+- **Ensembling creates a physically invalid pose:** reconsider the representation and the space in which averaging occurs.
+
+## Self-check and answer guidance
+
+1. **Does chunking make inference cheaper per invocation?** Usually that is not its guarantee; it can reduce cost per executed action through amortization.
+2. **Why include a latent regularizer?** The action encoder sees privileged future targets during training; regularization supports a usable deployment latent distribution.
+3. **Can temporal ensembling average arbitrary action representations?** No. Joint targets, relative poses, and categorical gripper decisions need representation-aware handling.
+4. **What is the essential optimization constraint?** Improve end-to-end task behavior while satisfying observation-age and action-deadline limits.
+
+[Previous: behavioral cloning](Lecture-09.md) · [Course index](README.md) · [Next: diffusion policies](Lecture-11.md)

@@ -58,3 +58,17 @@
 ## Next in Phase 2
 
 **[Embedded Software — ARM MCU, FreeRTOS, protocols](../2.%20Embedded%20Software/Guide.md)**
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Follow a supply rail from connector through regulation and decoupling to the load. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Design a small sensor interface schematic and PCB with explicit power and signal budgets.
+2. **Guided variation:** Review swapped pins, missing pull-ups, and connector orientation using ERC/DRC and a peer-style checklist.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** ERC/DRC findings, voltage/current budget, net/pin mapping, and fabrication/bring-up artifacts. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

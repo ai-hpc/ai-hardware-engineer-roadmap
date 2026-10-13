@@ -30,3 +30,17 @@ The short version: a single B200 holds 192 GB of HBM3e at 8 TB/s and supports FP
 ## A note on dates and software versions
 
 This series assumes Blackwell-aware software stacks from mid-2026: CUDA 13, cuBLAS 13, TensorRT-LLM 0.20+, vLLM Blackwell backend (PR series merged Q1 2026), Transformer Engine 2.x, FlashAttention 3.x. If you're reading on an earlier toolchain, expect missing kernels and slower-than-quoted numbers.
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Distinguish FP4 hardware capability from checkpoint-format and kernel support. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Audit a supported model format and establish a correct Blackwell serving baseline.
+2. **Guided variation:** Compare precision or placement only after a fixed quality gate passes.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Checkpoint/runtime revisions, quality, TTFT/TPOT, useful throughput, memory, and dispatched kernels. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

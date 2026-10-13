@@ -303,3 +303,17 @@ Start here:
 | OBD-II CAN reader | J1979 protocol, CAN frame parsing |
 | MCUboot secure bootloader | Secure boot, A/B slots, signature verification |
 | Ultra-low-power IoT node | Deep sleep, event-driven, power profiling |
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain interrupt context, task context, and ownership of a DMA buffer. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Build a timestamped sensor producer and bounded consumer queue on a development board or simulator.
+2. **Guided variation:** Inject queue saturation or a disconnected sensor; verify recovery without stale data.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Sampling jitter, queue high-water mark, drop count, memory use, and recovery time. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

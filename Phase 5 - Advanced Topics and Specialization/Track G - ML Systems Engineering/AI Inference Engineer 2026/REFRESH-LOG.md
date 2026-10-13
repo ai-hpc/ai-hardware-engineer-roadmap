@@ -1,5 +1,14 @@
 # Refresh Log — AI Inference Engineer 2026
 
+## 2026-10-13 — DeepSeek V4.1 Flash NVFP4 and learning workflow
+
+- Added Part 5: ten lectures, metadata/FP4/metric CPU exercises, and correctness tests.
+- Distinguished upstream mixed precision, community NVFP4 serialization, runtime architecture support, and verified deployment support.
+- Added an analysis-only milestone for learners without a compatible full-model node.
+- Replaced universal performance/recency claims with workload-specific evidence and linked the shared assessment method.
+- Source review and local CPU/documentation validation are recorded in the repository curriculum review; GPU serving results are not claimed.
+
+
 Every meaningful update to this course is dated and listed here so readers know exactly what version of reality the lectures are pinned to. Refresh cadence: 6 months default; 3 months if a major model class or hardware generation drops.
 
 When a lecture is refreshed, update its `## Current as of YYYY-MM` line *and* add an entry here.

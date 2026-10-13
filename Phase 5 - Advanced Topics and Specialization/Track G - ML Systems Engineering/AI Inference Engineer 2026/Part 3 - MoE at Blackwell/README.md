@@ -47,3 +47,17 @@ You can do all of:
 * State your `$/MTok` for one (model, runtime, precision, EP) cell on GB200 NVL72 and walk the formula.
 
 You have completed the course when these are all defended by numbers in your benchmark repo.
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain why active experts reduce compute without removing resident model storage. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Profile a supported MoE baseline with documented expert placement and routing statistics.
+2. **Guided variation:** Change parallelism or request mix and inspect rank imbalance.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Quality, per-rank memory/time, dispatch/combine cost, routing load, and useful throughput. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

@@ -70,3 +70,5 @@ Target: 3 on your two strongest topics, 2 on the rest, 1 on at most one. Intervi
 ---
 
 *Up: [Interview Preparation](../README.md)*
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

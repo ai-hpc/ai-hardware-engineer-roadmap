@@ -306,3 +306,5 @@ You are ready to move on when you can:
 - boot Linux with a device tree entry for PL hardware
 - expose a PL block to software through a defensible interface
 - measure end-to-end acceleration rather than only kernel speed
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

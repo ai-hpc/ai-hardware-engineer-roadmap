@@ -416,3 +416,17 @@ Use the **local openpilot clone** at `../openpilot/system/camerad/` (relative to
 - **Trace the pipeline:** Start at `camerad_thread()` in `camera_qcom2.cc`, follow `handle_camera_event` → `processFrame` → `sendFrameToVipc`
 - **modeld consumption:** `selfdrive/modeld/modeld.py` — `VisionIpcClient` for `VISION_STREAM_ROAD` (and wide if used)
 - **Calibration:** `common/transformations/camera.py`, `get_warp_matrix` for model input warp
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain capture timestamp, buffer lifetime, pixel format, and consumer synchronization. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Trace one recorded camera buffer through conversion and model input.
+2. **Guided variation:** Test a format/stride mismatch and a dropped-frame sequence in replay.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Image correctness, frame continuity, copy count, latency, and buffer ownership. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

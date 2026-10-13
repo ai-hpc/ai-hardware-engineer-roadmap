@@ -595,3 +595,17 @@ kern(((data.size + 255) // 256,), (256,), (data, data.size))
 * [TensorRT Developer Guide](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/)
 * [CUDA WMMA API](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#wmma)
 * [Jetson Linux Multimedia API](https://docs.nvidia.com/jetson/l4t-multimedia/)
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain stream synchronization and unified physical memory on the target. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Profile a correct CUDA operator and separate transfer, launch, and kernel costs.
+2. **Guided variation:** Sweep shapes and concurrency while monitoring memory and sustained clocks.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Numerical error, latency, bandwidth, memory, and power-mode/clock metadata. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

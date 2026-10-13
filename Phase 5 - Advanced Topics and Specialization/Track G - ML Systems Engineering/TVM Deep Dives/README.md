@@ -89,3 +89,5 @@ If you can only make TVM *run* a model, you have a transpiler. The point of this
 ---
 
 *Related: [MLSys Deep Dives](../MLSys%20Deep%20Dives/README.md) · [AI Inference Engineer 2026](../AI%20Inference%20Engineer%202026/README.md) · [Phase 4 — Track C — ML Compiler and Graph Optimization](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md)*
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

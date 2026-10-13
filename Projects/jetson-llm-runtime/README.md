@@ -100,7 +100,7 @@ The production repo extends this with:
 | Read the HTTP server reference | [`docs/server.md` (production repo)](https://github.com/GeniePod/genie-ai-runtime/blob/main/docs/server.md) |
 | Read the original first-tokens roadmap (this folder's planning doc) | [`ROADMAP.md`](./ROADMAP.md) |
 | Read the original test plan | [`TESTING.md`](./TESTING.md) |
-| See the original scaffolded modules | [`src/`](./src/), [`include/`](./include/), [`tests/`](./tests/), [`scripts/`](./scripts/) |
+| See the original scaffolded modules | [`src/`](https://github.com/ai-hpc/ai-hardware-engineer-roadmap/tree/main/Projects/jetson-llm-runtime/src), [`include/`](https://github.com/ai-hpc/ai-hardware-engineer-roadmap/tree/main/Projects/jetson-llm-runtime/include), [`tests/`](https://github.com/ai-hpc/ai-hardware-engineer-roadmap/tree/main/Projects/jetson-llm-runtime/tests), [`scripts/`](https://github.com/ai-hpc/ai-hardware-engineer-roadmap/tree/main/Projects/jetson-llm-runtime/scripts) |
 
 ## Original scaffold (preserved as the starting framework)
 

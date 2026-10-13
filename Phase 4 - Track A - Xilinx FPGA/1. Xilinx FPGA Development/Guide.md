@@ -343,3 +343,5 @@ You are ready for the next FPGA modules when you can:
 - constrain a design without hiding real timing problems
 - package a small reusable IP block
 - explain the engineering evidence behind a working bitstream
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

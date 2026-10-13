@@ -2710,3 +2710,17 @@ Fix:
 * A/B deep dive: [Orin Nano Rootfs & A/B Redundancy](../Orin-Nano-Rootfs-and-AB-Redundancy/Guide.md)
 * Security deep dive: [Orin Nano Security](../Orin-Nano-Security/Guide.md)
 * Yocto BSP: [Orin Nano Yocto BSP Production](../Orin-Nano-Yocto-BSP-Production/Guide.md)
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Trace update verification, staging, activation, health check, and rollback. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Exercise an update lifecycle in a disposable test deployment with recorded image versions.
+2. **Guided variation:** Inject an invalid image or failed application health check and verify rollback.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Artifact hashes, slot/state transitions, downtime, rollback evidence, and retained application data. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

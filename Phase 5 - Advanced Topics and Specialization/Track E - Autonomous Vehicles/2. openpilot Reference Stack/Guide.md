@@ -139,3 +139,17 @@
 ## Next
 
 → **[Module 3 — tinygrad for Inference](../3.%20tinygrad%20for%20Inference/Guide.md)** — Deep dive into the inference engine that powers openpilot's perception.
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Trace camera capture through model, plan, and control processes. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Inspect a pinned openpilot path and reproduce a recorded-data or simulator experiment.
+2. **Guided variation:** Inject a replay timing or missing-message fault and identify the responsible process boundary.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Message age, model/plan outputs, latency, process logs, and scenario outcome; use replay/simulation. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

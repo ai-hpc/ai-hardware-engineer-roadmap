@@ -82,6 +82,31 @@ If a page cannot name the artifact, the page is probably still only a topic list
 
 Use this standard when reviewing old modules or adding new ones.
 
+The learner-facing companion is [How to learn this roadmap](Learning-Guide.md).
+Use its diagnostic, practice levels, experiment record, and rubric across courses.
+Teach a small worked example before asking for an independent optimization.
+Name the misconception a lesson corrects, and include answer guidance for its
+self-check so an independent learner can recover from a wrong answer.
+
+### Evidence and reproducibility
+
+- Label a command as **tested here**, **upstream documented**, or **exercise / pseudocode**. A plausible command is not a tested installation recipe.
+- Record exact model, asset, runtime, and source revisions. A date or a moving branch alone is not a reproducible pin.
+- Link primary sources next to version-sensitive claims. Distinguish an official release from a community checkpoint and a model architecture from a supported serialized format.
+- Separate reported upstream results, local measurements, analytical estimates, and synthetic fixtures. Never invent benchmark data to fill a table.
+- State required hardware and a reduced exercise. Reduced exercises must identify which original outcomes they cannot validate.
+- Define correctness before performance. Include a negative case, such as a stale timestamp, swapped scale, invalid reset, or dropped request.
+- Estimate effort separately for setup, lab execution, and analysis. Give a stopping condition for long training or benchmarking jobs.
+
+### Assessment without repetition
+
+Course overviews should explain the entry diagnostic and final assessment.
+Lectures should teach a concept and exercise it, rather than repeat the entire
+course contract. Use a worked example, a guided variation, and an independent
+transfer task. Link prerequisite and next lessons; do not require learners to
+complete unrelated specializations. The shared rubric measures correctness,
+reasoning, measurement, reproduction, and transfer, not pages read.
+
 | Standard | Weak page | Strong page |
 |----------|-----------|-------------|
 | Purpose | Lists topics | States the engineering problem and why it matters |

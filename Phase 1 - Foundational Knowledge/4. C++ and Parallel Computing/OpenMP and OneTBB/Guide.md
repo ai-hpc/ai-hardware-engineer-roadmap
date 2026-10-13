@@ -2702,3 +2702,17 @@ Learning oneTBB's task decomposition makes CUDA's thread/block/grid hierarchy in
 ## Next
 
 → [**CUDA and SIMT**](../CUDA%20and%20SIMT/Guide.md) — GPU parallelism: threads, warps, blocks, and memory hierarchy.
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Identify a data race in a shared reduction and explain ownership. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Compare static/dynamic work scheduling or task decomposition against a serial result.
+2. **Guided variation:** Use an imbalanced input and vary workers; detect a deliberately shared accumulator race with an appropriate checker.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Speedup, workload distribution, scheduling overhead, and reproducible correctness. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

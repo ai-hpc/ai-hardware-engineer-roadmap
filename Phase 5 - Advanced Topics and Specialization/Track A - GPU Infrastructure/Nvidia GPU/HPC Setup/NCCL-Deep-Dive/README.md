@@ -42,3 +42,17 @@ NCCL approach:
 - **Understanding Ring AllReduce math?** → [02-Algorithms-and-Bandwidth](./02-Algorithms-and-Bandwidth.md)
 - **Building multi-node cluster?** → [05-Multi-Node-Clusters](./05-Multi-Node-Clusters.md)
 - **Training 70B+ models?** → [07-Trillion-Parameter-Scale](./07-Trillion-Parameter-Scale.md)
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain rank, communicator, collective semantics, and the physical link path. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Run a correctness-checked collective baseline over several message sizes.
+2. **Guided variation:** Change rank placement and inspect a controlled communication failure in a test job.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Latency, algorithm/bus bandwidth definitions, topology, scaling, and diagnostic logs. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

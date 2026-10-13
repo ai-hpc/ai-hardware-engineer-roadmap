@@ -99,3 +99,17 @@ Gemma 4 launched April 2025. The deployment ecosystem is moving fast:
 ---
 
 *Related: [Qwen Inference Optimization](../Qwen%20Inference%20Optimization/README.md) · [Edge LLM Inference Internals](../Edge%20LLM%20Inference%20Internals/Lecture-01.md) · [MLSys Deep Dives](../../Track%20G%20-%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/README.md)*
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Identify the exact checkpoint, modality, memory requirement, and target runtime. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Audit the model/runtime combination and run a small held-out edge deployment if supported.
+2. **Guided variation:** Compare an optimized variant under the same prompt/input and quality contract.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Quality, payload/runtime memory, latency, energy assumptions, and explicit compatibility evidence. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

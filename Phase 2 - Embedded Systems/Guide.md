@@ -88,3 +88,5 @@ You are ready to continue when you can:
 ## Next
 
 → [**Phase 3 — Artificial Intelligence**](../Phase%203%20-%20Artificial%20Intelligence/Guide.md) · [**Phase 4 Track A — Xilinx FPGA**](../Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md) · [**Phase 4 Track B — NVIDIA Jetson**](../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md) · [**Phase 4 Track C — ML Compiler**](../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md)
+
+**Study method:** use the [shared lesson cycle and completion rubric](../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

@@ -107,3 +107,5 @@ ML engineers define the **training and serving workloads** that hardware must su
 ## Next
 
 → [**Module 5B — LLM Application Development**](../5.%20LLM%20Application%20Development/Guide.md)
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

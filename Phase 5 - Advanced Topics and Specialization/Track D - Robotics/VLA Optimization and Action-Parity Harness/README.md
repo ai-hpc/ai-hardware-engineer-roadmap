@@ -18,7 +18,9 @@ This special course pairs two halves that almost always have to ship together:
 
 The two halves are inseparable: an optimization that you cannot measure against the reference policy is not an engineering result, it is a vibe.
 
-**Scope:** inference and deployment of pretrained VLAs (OpenVLA, RT-2-X / OpenX-style policies, π₀ / π0.5, NVIDIA GR00T N-series, RDT, Octo). Training and finetuning are explicit non-goals — when you need adaptation, take the [Deep RL for Robot Learning](../Deep%20RL%20for%20Robot%20Learning/README.md) special course (imitation learning through RL post-training of π0.5), or the shorter [Robot Learning section of Lecture 3](../Advanced%20Perception%20and%20AI%20for%20Robotics/Lecture-01.md#c1-reinforcement-learning) of the Perception lecture.
+**Comprehensive VLA companion:** [VLA Foundations to Frontier 2026](../VLA%20Foundations%20to%20Frontier%202026/README.md) provides 32 lectures spanning history, architectures, data, imitation/flow/RL training, evaluation, deployment, and the research frontier verified through October 13, 2026. Use its [CPU labs](../VLA%20Foundations%20to%20Frontier%202026/Lab-Guide.md) and capstones alongside this specialization.
+
+**Scope:** inference and deployment of pretrained VLAs (OpenVLA, RT-2-X / OpenX-style policies, π₀ / π0.5, NVIDIA GR00T N-series, RDT, Octo). This specialization focuses on inference; for VLA pretraining and fine-tuning use the comprehensive companion above. For deeper reinforcement learning, take the [Deep RL for Robot Learning](../Deep%20RL%20for%20Robot%20Learning/README.md) special course (imitation learning through RL post-training of π0.5), or the shorter [Robot Learning section of Lecture 3](../Advanced%20Perception%20and%20AI%20for%20Robotics/Lecture-01.md#c1-reinforcement-learning) of the Perception lecture.
 
 **Layer mapping:** L3-L8. Touches model architecture, runtime / kernels, edge accelerators, ROS 2 integration, and the closed-loop sim / real evaluation harness.
 
@@ -29,7 +31,7 @@ The two halves are inseparable: an optimization that you cannot measure against 
 * Phase 5 — Robotics — [Advanced Perception and AI for Robotics, Part C (Robot Learning)](../Advanced%20Perception%20and%20AI%20for%20Robotics/Lecture-01.md) — you need to already understand what a VLA *is* and how it sits above ROS 2 skills.
 * Phase 5 — Edge AI — [Qwen Inference Optimization](../../Track%20C%20-%20Edge%20AI/Qwen%20Inference%20Optimization/README.md) — the LLM half of a VLA is a transformer; the optimization toolkit transfers.
 * Phase 4 Track B — [Jetson Real-Time Inference](../../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Real-Time-Inference/Guide.md) — Jetson Orin is the default reference edge target.
-* Phase 4 Track C — [Quantization](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/04%20-%20Quantization/Guide.md) — INT8 / FP8 / AWQ-style weight-only quant is reused verbatim on the LLM backbone of the VLA.
+* Phase 4 Track C — [Quantization](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/04%20-%20Quantization/Guide.md) — quantization methods can transfer to supported VLA components, but calibration, runtime support, and closed-loop action quality require separate validation.
 
 **What comes after:** a reproducible repo containing an optimized policy checkpoint, a runtime config, a harness CLI, a CSV of parity metrics across optimization levels, and an on-robot or closed-loop sim recording of the optimized policy hitting the parity bar.
 
@@ -63,7 +65,7 @@ images (N cameras, ~224x224 or 384x384)
                           └─► 7-DoF (or 14-DoF bimanual) action @ 10-50 Hz
 ```
 
-The hardware reality every embodied-AI engineer hits:
+Illustrative planning assumptions to replace with measurements for your selected policy, device, and controller:
 
 * the **control loop deadline** is 20-100 ms; a vanilla 7B VLA at fp16 takes 200-600 ms per action on consumer / edge hardware
 * **the vision tower is not free** — at 4 cameras × 384×384 it can rival the LLM backbone in FLOPs
@@ -100,3 +102,5 @@ You are done with this special course when you can:
 * point to one body of work (the repo above) that another team could fork
 
 If you cannot do these things, you have built an optimization demo, not a deployment artifact. Re-run the harness.
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

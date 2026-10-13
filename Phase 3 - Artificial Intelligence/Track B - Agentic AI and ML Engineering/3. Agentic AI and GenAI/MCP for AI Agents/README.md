@@ -102,3 +102,5 @@ If you can call one tool but can't defend the server or deploy it for someone el
 ---
 
 *Related: [Tool Use & Function Calling](../Lectures/Lecture-08.md) · [Evaluation & the MCP benchmark ladder (L23 §8)](../Lectures/Lecture-23.md) · [OpenClaw Threat Model — MITRE ATLAS](../Lectures/Lecture-40.md) · official spec: [modelcontextprotocol.io](https://modelcontextprotocol.io)*
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

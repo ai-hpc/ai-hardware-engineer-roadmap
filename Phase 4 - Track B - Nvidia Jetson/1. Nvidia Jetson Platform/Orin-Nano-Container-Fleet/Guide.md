@@ -3285,3 +3285,17 @@ Orin Nano 8GB. The key takeaways:
 9. **Security is amplified at the edge.** Physical access, untrusted networks, and
    long deployment lifetimes mean you must enforce read-only filesystems, drop
    capabilities, sign images, and manage secrets properly from day one.
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain host-driver versus container userspace responsibilities. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Package one inference service with pinned image and model versions and a health check.
+2. **Guided variation:** Restart the container and simulate dependency failure; verify bounded recovery.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Startup time, service health, resource limits, latency, and image/configuration identity. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

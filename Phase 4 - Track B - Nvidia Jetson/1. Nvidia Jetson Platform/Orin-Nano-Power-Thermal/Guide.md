@@ -2684,3 +2684,17 @@ step but a continuous engineering discipline. The key principles:
 - T234 SoC Technical Reference Manual (TRM)
 - Linux Kernel Documentation: cpu-freq, devfreq, thermal
 - INA3221 Triple-Channel Power Monitor Datasheet (Texas Instruments)
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain power mode, clock policy, thermal throttling, and sustained versus burst performance. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Measure a fixed inference workload from cold start through thermal steady state.
+2. **Guided variation:** Change one supported power/cooling setting and repeat the workload.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Throughput over time, latency tails, power, temperature, clocks, and throttling evidence. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

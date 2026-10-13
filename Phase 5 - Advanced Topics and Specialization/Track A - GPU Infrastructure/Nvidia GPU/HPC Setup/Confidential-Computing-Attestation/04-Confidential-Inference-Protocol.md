@@ -83,7 +83,7 @@ Suppose the server operator — not an external attacker, the operator itself �
 Qwen3-32B (official)  ──modify──▶  Qwen3-32B + prompt exfiltration
 ```
 
-If the operator computes this modified stack's measurement and registers *that* hash as the expected value, attestation succeeds every time: the quote correctly reports "the measured bytes match the registry," because the registry itself was poisoned at the source. This is precisely the caveat from [file 03 §4](./03-Dual-Vendor-Claim-Binding-and-Verification.md#4-threat-model--whats-proven-what-remains-trusted) — *"a stale or wrong golden value defeats this silently"* — except here the golden value was never right to begin with, because the party setting it and the party being verified are the same entity.
+If the operator computes this modified stack's measurement and registers *that* hash as the expected value, attestation succeeds every time: the quote correctly reports "the measured bytes match the registry," because the registry itself was poisoned at the source. This is precisely the caveat from [file 03 §4](./03-Dual-Vendor-Claim-Binding-and-Verification.md#4-threat-model-whats-proven-what-remains-trusted) — *"a stale or wrong golden value defeats this silently"* — except here the golden value was never right to begin with, because the party setting it and the party being verified are the same entity.
 
 Closing this gap needs a trust root that is independent of the server operator:
 
@@ -125,7 +125,7 @@ Each column defends a different forgery:
 | Model identity (exact official weights) | Publisher-signed manifest (§4) | Operator swaps in a modified model and registers its own hash as "expected" |
 | Session bound to all of the above | Protocol design (§8), not any single vendor | A valid attestation from *a* request gets replayed to authorize a *different*, unattested one |
 
-No single row is sufficient alone — this table is the model-serving-specific instance of the "binding vs. authenticity" discipline from [file 03 §3](./03-Dual-Vendor-Claim-Binding-and-Verification.md#3-binding-vs-authenticity--the-core-review-discipline): each property needs both something bound in and an independent signature chain validating it.
+No single row is sufficient alone — this table is the model-serving-specific instance of the "binding vs. authenticity" discipline from [file 03 §3](./03-Dual-Vendor-Claim-Binding-and-Verification.md#3-binding-vs-authenticity-the-core-review-discipline): each property needs both something bound in and an independent signature chain validating it.
 
 ## 6. The Confidential Inference Protocol
 
@@ -170,4 +170,4 @@ What this buys over "the API uses HTTPS and the box happens to be a TDX host":
 
 ## 7. What This Adds Beyond Files 01–03
 
-Files 01–03 answer "did a genuine node, with a genuine GPU, run a genuine measured stack" — sufficient for proof-of-training or proof-of-execution claims where the verifier checks a claim *after the fact*. This file's protocol is stronger and narrower: it's for the case where a client needs to verify *before sending any data*, and where the thing being protected (a user's prompt) is exactly the payload flowing through the channel being attested. The publisher-signature chain in §4 is the one genuinely new trust root — it doesn't come from Intel or NVIDIA at all, and a design that skips it inherits every risk of "attested, but not audited" from [file 03 §4](./03-Dual-Vendor-Claim-Binding-and-Verification.md#4-threat-model--whats-proven-what-remains-trusted), just aimed at the model weights instead of the training claim.
+Files 01–03 answer "did a genuine node, with a genuine GPU, run a genuine measured stack" — sufficient for proof-of-training or proof-of-execution claims where the verifier checks a claim *after the fact*. This file's protocol is stronger and narrower: it's for the case where a client needs to verify *before sending any data*, and where the thing being protected (a user's prompt) is exactly the payload flowing through the channel being attested. The publisher-signature chain in §4 is the one genuinely new trust root — it doesn't come from Intel or NVIDIA at all, and a design that skips it inherits every risk of "attested, but not audited" from [file 03 §4](./03-Dual-Vendor-Claim-Binding-and-Verification.md#4-threat-model-whats-proven-what-remains-trusted), just aimed at the model weights instead of the training claim.

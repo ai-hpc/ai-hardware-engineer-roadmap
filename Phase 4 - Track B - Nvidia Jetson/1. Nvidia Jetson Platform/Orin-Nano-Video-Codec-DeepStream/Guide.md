@@ -3322,3 +3322,17 @@ ls /proc/$(pgrep deepstream-app)/fd | wc -l
 - NVIDIA Nsight Systems -- https://docs.nvidia.com/nsight-systems/
 - Jetson Power and Performance -- https://docs.nvidia.com/jetson/archives/r36.3/DeveloperGuide/SD/PlatformPowerAndPerformance.html
 - V4L2 API Specification -- https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/v4l2.html
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Trace timestamps and buffers through capture, decode, inference, and display/encode. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Build a fixed video pipeline and compare stage timing with end-to-end timing.
+2. **Guided variation:** Change queue depth or input rate and examine dropping versus latency growth.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Frame rate, dropped frames, age of output frames, memory, and hardware block utilization. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

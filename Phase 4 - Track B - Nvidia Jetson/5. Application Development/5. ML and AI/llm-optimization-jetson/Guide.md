@@ -1202,3 +1202,5 @@ Expected performance on Orin Nano Super 8 GB (25W mode, Q4_K_M, llama.cpp):
 ## Next
 
 → Back to [ML and AI hub](../Guide.md)
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

@@ -527,3 +527,17 @@ These are unsettled as of mid-2026; expect the answers to move in the next 12 mo
 - [Jetson LLM Runtime](../jetson-llm-runtime/Guide.md)
 - [LLM Optimization on Jetson](../llm-optimization-jetson/Guide.md)
 - [Robotics — Advanced Perception and AI](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Advanced%20Perception%20and%20AI%20for%20Robotics/Lecture-01.md)
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** State observation/action order, normalization, coordinate convention, and policy period. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Compare exported policy actions on identical observations before a simulated closed-loop run.
+2. **Guided variation:** Inject stale observations or a joint-order mismatch and prove detection.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Action error, closed-loop success, observation age, deadline misses, and memory. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

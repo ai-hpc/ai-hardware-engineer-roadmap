@@ -85,3 +85,5 @@
 - Not a research course on novel long-context architectures. We use proven, in-production designs (rotary scaling, top-k MoE, ring/context parallel) and focus on how to ship them.
 - Not a generic "train an LLM" tutorial. Every module assumes you already understand transformer training basics and are scaling beyond what a single node can do.
 - Not exhaustive on MoE variants. We focus on token-choice top-k routing; we mention expert-choice, hash routing, and soft MoE only to point at where to read next.
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

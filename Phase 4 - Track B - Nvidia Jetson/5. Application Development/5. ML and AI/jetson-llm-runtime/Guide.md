@@ -75,7 +75,7 @@ The gap: **no existing runtime is designed around the 8 GB unified memory constr
 | **Scripts** | setup_jetson.sh, bench.sh, profile.sh | ✅ Ready |
 | **Tests** | test_memory (3), test_kernels (5), test_model_load (8) | ✅ Ready |
 
-### All Bugs Fixed (✅)
+### Previously addressed issues — verify on the target
 
 All 8 known bugs have been fixed in the codebase:
 
@@ -90,7 +90,7 @@ All 8 known bugs have been fixed in the codebase:
 | 7 | No FP32 logits | Added `fp16_to_fp32()` GPU conversion kernel |
 | 8 | Slow tokenizer O(V×L) | Hash map `token_to_id_` + longest-match-first |
 
-**Code is ready to build and test on Jetson hardware.**
+**Target validation required:** use the linked testing guide to establish build, correctness, and performance results on the actual Jetson/BSP. Implementation presence and this issue list do not certify a working deployment.
 
 ---
 
@@ -208,3 +208,17 @@ Full testing guide: [`TESTING.md`](../../../../Projects/jetson-llm-runtime/TESTI
 | [LLM Optimization on Jetson](../llm-optimization-jetson/Guide.md) | Quantization, model selection, FlashAttention |
 | [llama.cpp](https://github.com/ggerganov/llama.cpp) | Reference GGUF runtime |
 | [GGML CUDA kernels](https://github.com/ggerganov/llama.cpp/tree/master/ggml/src/ggml-cuda) | Reference kernel implementations |
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Trace preprocessing, model input/output, postprocessing, and deployment format. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Deploy a small reference-checked model and measure the full application pipeline.
+2. **Guided variation:** Test one shifted input condition and a bounded overload condition.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Task score, end-to-end latency, memory, dropped work, and hardware/runtime versions. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

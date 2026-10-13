@@ -87,3 +87,5 @@ That is the minimum base for the rest of the roadmap.
 ## Next
 
 → [**Phase 2 — Embedded Systems**](../Phase%202%20-%20Embedded%20Systems/Guide.md) · [**Phase 3 — Artificial Intelligence**](../Phase%203%20-%20Artificial%20Intelligence/Guide.md)
+
+**Study method:** use the [shared lesson cycle and completion rubric](../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

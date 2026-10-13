@@ -651,3 +651,17 @@ Use OTBR to bridge the Thread mesh to Ethernet, Wi-Fi, or a USB-backed Linux bri
 * [ARM MCU, FreeRTOS, and Communication Protocols](../../Guide.md)
 * [Jetson ESP-Hosted Host Code](../../../3.%20Embedded%20Linux/Jetson%20ESP-Hosted%20Host%20Code/Guide.md)
 * [ESP32-C6 OpenThread RCP on Jetson Orin Nano](../../../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/5.%20Application%20Development/2.%20Network%20and%20Connectivity/ESP32-C6-OpenThread-RCP-Jetson-Orin-Nano.md)
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain border router, router, end device, and IPv6 addressing. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Connect a sensor node to a Thread network and trace one application request end to end.
+2. **Guided variation:** Remove a link in a controlled test or replay a partition; observe role and route recovery.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Packet loss, recovery duration, routing/role logs, and radio duty-cycle assumptions. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

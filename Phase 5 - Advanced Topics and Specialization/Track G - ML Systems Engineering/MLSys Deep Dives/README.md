@@ -107,3 +107,17 @@ If you can name the techniques but can't connect any of them to a cost number, y
 ---
 
 *Related: [TVM Deep Dives](../TVM%20Deep%20Dives/README.md) · [AI Inference Engineer 2026](../AI%20Inference%20Engineer%202026/README.md) · [Phase 5 — ML Systems Engineering Guide](../Guide.md)*
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Separate numerical correctness, runtime behavior, and service-level performance. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Build a fixed workload with a reference gate, profiler trace, and raw request records.
+2. **Guided variation:** Change one execution/scheduling choice and include a failed or neutral hypothesis when observed.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Quality, TTFT/TPOT, throughput/goodput, failure rate, memory, and versioned configuration. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

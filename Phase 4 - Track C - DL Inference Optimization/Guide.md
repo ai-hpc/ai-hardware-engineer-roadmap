@@ -35,7 +35,7 @@ This track has two parts. **Part 1** covers compiler fundamentals (IR, graph opt
 | Part | Focus | Sections |
 |------|-------|----------|
 | **Part 1 — Compiler Fundamentals** | How compilers work, from IR to hardware code | §1–§7 below |
-| **Part 2 — DL Inference Optimization** | Applying compiler + kernel skills to real inference | [Part 2 below](#part-2--dl-inference-optimization) (6 units) |
+| **Part 2 — DL Inference Optimization** | Applying compiler + kernel skills to real inference | [Part 2 below](#part-2-dl-inference-optimization) (6 units) |
 
 **Recommended order:** Work through Part 1 first (or at least §1–§2 and §5), then Part 2 in order. Part 2 units 01–03 reinforce and deepen Part 1 concepts with GPU-specific practice; units 04–06 add quantization, deployment, and hands-on tinygrad.
 
@@ -397,3 +397,20 @@ Companies that ask for "Blackwell experience" mean: *can you get the most out of
 | 04 Quantization | INT8 with TensorRT, PTQ vs QAT comparison, kernel path trace |
 | 05 Runtimes | Runtime comparison, Triton server setup, benchmark report |
 | 06 tinygrad (optional) | Pipeline trace, add optimization, backend hook |
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain a tensor graph, an operator roofline, and a correctness tolerance. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Carry one small model through graph inspection, kernel profiling, quantization, and serving.
+2. **Guided variation:** Change one optimization at a time and reject any that fail the reference-quality gate.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Quality, compile/startup cost, latency distribution, useful throughput, memory, and traces. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+
+
+**Next applied specialization:** [DeepSeek V4.1 Flash NVFP4 inference engineering](../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/README.md), after the model-execution and MoE prerequisites in that part.

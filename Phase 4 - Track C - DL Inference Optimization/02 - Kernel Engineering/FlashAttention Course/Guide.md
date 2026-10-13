@@ -95,3 +95,17 @@ If you do not have a GPU locally, a single L4 / A10 / 3090 in a cloud instance i
 - Not a CUDA-from-scratch course. Lecture 4 reviews the strict minimum; everything deeper is referenced to Track B and to NVIDIA's own docs.
 - Not a transformer-architecture course. We assume you know what Q, K, V, and softmax(QKᵀ/√d)·V are; we focus on how to make that line of math run fast on real hardware.
 - Not exhaustive. We intentionally skip FlashAttention forks for non-NVIDIA hardware and quantized-only variants. After this course you should be able to read those repos on your own.
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Derive stable online-softmax updates on two small score blocks. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Compare tiled attention with a reference on causal and noncausal small cases.
+2. **Guided variation:** Exercise tails, masks, large logits, and differing sequence lengths.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Output/gradient error as applicable, HBM traffic estimate, latency, memory, and supported shapes. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

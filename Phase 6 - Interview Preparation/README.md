@@ -51,3 +51,17 @@ More roles coming: Edge AI Engineer, CUDA Kernel Engineer, AI Chip Architect, Ro
 ---
 
 *Start here: [MLSys Engineer Interview Prep](1.%20MLSys%20Engineer/README.md)*
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain one project with a diagram, a measured constraint, and a failure you fixed. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Give a timed design explanation and reproduce one calculation from your own artifact.
+2. **Guided variation:** Change a key constraint mid-review and revise the design without hiding assumptions.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Correct calculations, tradeoff reasoning, evidence links, and a short list of gaps to revisit. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

@@ -3,7 +3,7 @@
 
 Usage: check_links.py [ROOT]
 
-Walks every tracked (or, outside a git checkout, every discovered) ``*.md`` file
+Walks tracked and untracked, nonignored (or, outside a git checkout, discovered) ``*.md`` files
 under ROOT and resolves each relative link target against the filesystem.
 Anchors and external schemes are ignored. Exits non-zero if anything is broken,
 so it can be used as a CI gate.
@@ -21,15 +21,33 @@ SKIP_PREFIXES = ("_site/", "docs/")
 # not to match the link-shaped math and code that appears in lecture prose.
 LINK = re.compile(r'\]\(([^)\s]+?)(?:\s+"[^"]*")?\)')
 LINK_WITH_SPACES = re.compile(r'\]\(([^)]+?\.md)(?:#[^)]*)?\)')
+LINK_ANGLE = re.compile(r'\]\(<([^>]+)>(?:\s+"[^"]*")?\)')
+
+
+def prose_only(text):
+    """Skip fenced and inline code, where array indexing resembles Markdown links."""
+    lines, fence_char, fence_length = [], None, 0
+    for line in text.splitlines():
+        match = re.match(r'^\s*(`{3,}|~{3,})', line)
+        if match:
+            marker = match.group(1)
+            if fence_char is None:
+                fence_char, fence_length = marker[0], len(marker)
+            elif marker[0] == fence_char and len(marker) >= fence_length and not line[match.end():].strip():
+                fence_char = None
+            continue
+        if fence_char is None:
+            lines.append(line)
+    return re.sub(r'(`+)(?!`)(.*?)\1(?!`)', '', '\n'.join(lines), flags=re.DOTALL)
 
 
 def markdown_files(root):
     try:
         out = subprocess.run(
-            ["git", "-C", root, "ls-files", "*.md"],
+            ["git", "-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "*.md"],
             capture_output=True, text=True, check=True,
         ).stdout
-        files = [f for f in out.split("\n") if f]
+        files = sorted(set(f for f in out.split("\0") if f))
     except (subprocess.CalledProcessError, FileNotFoundError):
         files = []
     if not files:
@@ -47,14 +65,15 @@ def broken_links(root):
     for rel in markdown_files(root):
         path = os.path.join(root, rel)
         try:
-            text = open(path, encoding="utf-8").read()
+            with open(path, encoding="utf-8") as source:
+                text = prose_only(source.read())
         except OSError:
             continue
         base = os.path.dirname(path)
-        for pattern in (LINK, LINK_WITH_SPACES):
+        for pattern in (LINK, LINK_WITH_SPACES, LINK_ANGLE):
             for match in pattern.finditer(text):
-                href = match.group(1)
-                if href.startswith(("http://", "https://", "mailto:", "#")):
+                href = match.group(1).strip('<>')
+                if urllib.parse.urlsplit(href).scheme or href.startswith(("#", "//")):
                     continue
                 target = urllib.parse.unquote(href.split("#")[0])
                 if not target:

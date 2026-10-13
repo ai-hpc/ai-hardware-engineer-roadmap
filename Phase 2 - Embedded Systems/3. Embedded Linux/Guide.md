@@ -159,3 +159,17 @@ You're right, let's dive even deeper into the world of Embedded Linux Developmen
     * **Performance Profiling and Tracing:**  Use advanced profiling tools (e.g., perf, ftrace) to analyze system performance, identify bottlenecks, and optimize critical code paths. This involves understanding performance metrics, collecting performance data, and analyzing it to identify areas for improvement.
     * **Real-Time Optimization:**  Explore techniques for optimizing embedded Linux systems for real-time performance, including using real-time kernels (e.g., PREEMPT_RT) and configuring process priorities. This involves understanding real-time concepts, configuring the kernel for real-time scheduling, and prioritizing real-time tasks.
     * **Power Management:**  Learn about power management techniques in embedded Linux, such as CPU frequency scaling, device power management, and suspend/resume functionality. This involves understanding power management states, configuring power management policies, and optimizing for low power consumption.
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Trace bootloader, kernel, device tree, root filesystem, and userspace startup. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Build or customize a minimal image with one service and a versioned configuration.
+2. **Guided variation:** Break one service dependency or device-tree assumption in a recoverable test image and diagnose the boot log.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Build inputs, boot/service timings, image size, and a recovery/reproduction log. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

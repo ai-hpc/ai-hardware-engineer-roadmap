@@ -90,3 +90,5 @@ You are using this phase correctly when you can:
 ## Next
 
 Choose one specialization guide above and turn it into a flagship project.
+
+**Study method:** use the [shared lesson cycle and completion rubric](../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

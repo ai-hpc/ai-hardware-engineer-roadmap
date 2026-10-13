@@ -18,8 +18,9 @@ This phase is organized into **four lecture tracks** (each has its own folder an
 | 2 | **Industrial and Embedded Robotics** (ROS-I, embedded, Docker, Gazebo / Isaac Sim) | [Industrial and Embedded Robotics/Lecture-01.md](Industrial%20and%20Embedded%20Robotics/Lecture-01.md) |
 | 3 | **Advanced Perception and AI for Robotics** (applied ROS 2 perception loop, deep learning perception, robot learning) | [Advanced Perception and AI for Robotics/Lecture-01.md](Advanced%20Perception%20and%20AI%20for%20Robotics/Lecture-01.md) |
 | 4 | **Multi-Robot Systems and Swarm Robotics** | [Multi-Robot Systems and Swarm Robotics/Lecture-01.md](Multi-Robot%20Systems%20and%20Swarm%20Robotics/Lecture-01.md) |
-| ★ | **Special course — Isaac Sim and Isaac Lab** (USD, PhysX/Newton, RTX sensors, ROS 2 bridge, Isaac Lab 3.0 training; pinned to Isaac Sim 6.1, sized for an 8 GB RTX GPU) | [Isaac Sim and Isaac Lab/README.md](Isaac%20Sim%20and%20Isaac%20Lab/README.md) |
+| ★ | **Special course — Isaac Sim and Isaac Lab** (USD, PhysX/Newton, RTX sensors, ROS 2 bridge, Isaac Lab 3.0 training; Isaac Sim 6.1 teaching baseline, supported RTX route plus reduced exercises) | [Isaac Sim and Isaac Lab/README.md](Isaac%20Sim%20and%20Isaac%20Lab/README.md) |
 | ★ | **Special course — Deep RL for Robot Learning** (imitation, policy gradients, PPO, SAC, model-based and offline RL, RL post-training of a flow-matching VLA; follows UC Berkeley CS 185/285) | [Deep RL for Robot Learning/README.md](Deep%20RL%20for%20Robot%20Learning/README.md) |
+| ★ | **Professional course — VLA Foundations to Frontier 2026** (32 detailed lectures: history, architectures, data, training, RL, evaluation, Isaac/ROS deployment, October 13 frontier, CPU labs, two capstones) | [VLA Foundations to Frontier 2026/README.md](VLA%20Foundations%20to%20Frontier%202026/README.md) |
 | ★ | **Special course — VLA Optimization and Action-Parity Harness** (deploy and validate Vision-Language-Action policies on real robots) | [VLA Optimization and Action-Parity Harness/README.md](VLA%20Optimization%20and%20Action-Parity%20Harness/README.md) |
 
 Each `Lecture-01.md` is a **full lecture**: learning objectives, worked conceptual sections, tables/diagrams where helpful, **self-check** questions, and links to the next/previous track.
@@ -45,7 +46,7 @@ Use these **structured courses** alongside each lecture’s **Recommended course
     * [Docker for Robotics](https://app.theconstruct.ai/courses/docker-basics-for-robotics-114/) — containerized dev and deploy.
     * [Linux for Robotics](https://app.theconstruct.ai/courses/linux-for-robotics-noetic-185/) — shell, permissions, workflows (ROS 1 in the title; skills transfer directly).
     * [C++ for Robotics](https://app.theconstruct.ai/courses/c-for-robotics-59/) / [Python 3 for Robotics](https://app.theconstruct.ai/courses/python-3-for-robotics-58/) — language prep before ROS 2 nodes.
-    * Nvidia [Isaac Sim documentation](https://docs.omniverse.nvidia.com/isaacsim/latest/index.html) — tutorials; see [ROS 2 tutorials](https://docs.omniverse.nvidia.com/isaacsim/latest/ros2_tutorials/index.html) when bridging to ROS 2 work.
+    * Nvidia [Isaac Sim documentation](https://docs.isaacsim.omniverse.nvidia.com/6.1.0/index.html) — tutorials; see [ROS 2 tutorials](https://docs.isaacsim.omniverse.nvidia.com/6.1.0/ros2_tutorials/index.html) when bridging to ROS 2 work.
 
 * **§3 — Applied perception, tracking, control, drones (maps to [Lecture 3](Advanced%20Perception%20and%20AI%20for%20Robotics/Lecture-01.md), Part A)**
     * [Kalman Filters](https://app.theconstruct.ai/courses/kalman-filters-52/) — estimation intuition tied to mobile robots.
@@ -56,3 +57,21 @@ Use these **structured courses** alongside each lecture’s **Recommended course
     * [State Estimation and Localization for Self-Driving Cars](https://www.coursera.org/learn/state-estimation-localization-self-driving-cars) (Coursera) — Kalman, EKF, UKF, particle filters (transferable to tracking and fusion).
     * ETH Zürich [Autonomous Mobile Robots](https://www.edx.org/learn/autonomous-robotics/eth-zurich-autonomous-mobile-robots) (edX) — kinematics, localization, mapping, planning (theory; pair with ROS 2 projects).
     * ETH RSL [Programming for Robotics (ROS)](https://rsl.ethz.ch/education-students/lectures/ros.html) — official ROS 2 lecture materials (free outline/readings; on-campus course; use as a syllabus alongside your own labs).
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Draw world/base/sensor frames and distinguish policy period from physics timestep. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Build a simulated sensor-to-controller loop with a documented task and action contract.
+2. **Guided variation:** Inject a reset, stale observation, or frame mismatch and prove the check catches it.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Task success, latency/deadlines, reset correctness, simulation rate, and seed/configuration. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+
+## Recommended project progression
+
+Start with a frame- and timestamp-correct ROS 2 loop, then a validated Isaac scene, then a tested Isaac Lab task. Train only after action/reset/reward checks pass. Evaluate held-out episodes before exporting a policy. Finish with the [Isaac engineering labs](Isaac%20Sim%20and%20Isaac%20Lab/Lab-Guide.md) and the language-guided robotics capstone; the language service and local controller have separate timing contracts.

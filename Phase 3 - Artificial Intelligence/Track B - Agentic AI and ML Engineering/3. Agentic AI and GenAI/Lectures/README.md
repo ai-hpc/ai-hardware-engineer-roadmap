@@ -131,3 +131,5 @@ Code snippets use placeholder model IDs such as `your-agent-model-id`, `your-fas
 | [Build a Large Language Model (From Scratch) — Raschka](https://github.com/rasbt/LLMs-from-scratch) | LLM internals |
 
 </div>
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

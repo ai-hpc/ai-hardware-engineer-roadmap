@@ -480,3 +480,17 @@ The kernel in AGNOS is **forked from Linux and custom modified**. The table belo
 - **agnos-builder:** [GitHub — commaai/agnos-builder](https://github.com/commaai/agnos-builder) — “Build AGNOS, the operating system for the comma three, 3X, and four.”  
 - **OS course:** [Phase 1 — Operating Systems — Guide](../../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Guide.md) and [Lecture index](../../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Guide.md#lecture-index).  
 - **openpilot:** Runs on AGNOS; see [Autonomous Driving Guide](../Guide.md) and [flow diagram](../flow-diagram.md).
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain boot partitions, device services, and the camera/accelerator driver boundary. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Inspect a pinned AGNOS build/configuration and map it to boot/runtime artifacts.
+2. **Guided variation:** Analyze a seeded service or configuration failure in logs or a disposable image.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Build identity, boot/service timing, dependency evidence, and recovery plan. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

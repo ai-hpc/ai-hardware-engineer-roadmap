@@ -2996,3 +2996,16 @@ interfaces may differ on other Jetson platforms or JetPack versions. Always
 cross-reference with the official NVIDIA L4T documentation and the sensor
 manufacturer's datasheet for your specific hardware configuration.*
 
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Trace sensor clock/reset, CSI transport, driver, buffers, and image consumer. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Capture a fixed scene with known resolution/format and validate timestamps and frame content.
+2. **Guided variation:** Change one supported mode or simulate dropped frames; diagnose the failing pipeline boundary.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Frame rate, drop count, capture-to-consumer latency, format/stride, and driver logs. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

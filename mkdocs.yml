@@ -308,6 +308,9 @@ extra_css:
 nav:
   - Home:
     - Overview: README.md
+    - How to Learn: Learning-Guide.md
+    - Curriculum Review: Curriculum-Review.md
+    - Authoring Guide: Curriculum-Authoring-Guide.md
     - Phase 1 — Digital Foundations: Phase 1 - Foundational Knowledge/Guide.md
     - Phase 2 — Embedded Systems: Phase 2 - Embedded Systems/Guide.md
     - Phase 3 — AI: Phase 3 - Artificial Intelligence/Guide.md
@@ -777,6 +780,15 @@ nav:
         - "11: Imitation, Teleop, Policy Evaluation": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-11.md
         - "12: Performance, Sim-to-Real, Scale-Out": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-12.md
         - "13: Capstone: Task, Policy, Bridge": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-13.md
+        - Engineering Lab Sequence: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lab-Guide.md
+        - "14: Reproducible Simulation Setup": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-14.md
+        - "15: Frames, Units, and Assets": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-15.md
+        - "16: Task Correctness and Partial Resets": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-16.md
+        - "17: Training and Held-Out Evaluation": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-17.md
+        - "18: Physics, Sensors, and Performance": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-18.md
+        - "19: ROS 2 Timing and Policy Export": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-19.md
+        - "20: System Identification and Transfer": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-20.md
+        - "21: Language-Guided Robotics Capstone": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-21.md
       - "Special Course: Deep RL for Robot Learning":
         - Overview: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/README.md
         - "01: The RL Problem and the Rollout Engine": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-01.md
@@ -794,6 +806,53 @@ nav:
         - "12: Exploration, Curricula, Multi-Task": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-12.md
         - "13: Theory, Eval Rigor, Sim-to-Real": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-13.md
         - "14: Capstone: RL Post-Training π0.5": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-14.md
+      - "Professional Course: VLA Foundations to Frontier 2026":
+        - Overview: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/README.md
+        - Laboratory Guide: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lab-Guide.md
+        - Notation and Glossary: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Reference.md
+        - "History and Representations":
+          - "01: What a VLA policy is": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-01.md
+          - "02: Historical foundations: control, imitation, and deep visuomotor learning": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-02.md
+          - "03: Language grounding: CLIP, CLIPort, and SayCan": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-03.md
+          - "04: RT-1, RT-2, and PaLM-E: three distinct architectural steps": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-04.md
+          - "05: Open X-Embodiment, RT-X, Octo, and OpenVLA": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-05.md
+          - "06: Geometry, robot state, and control contracts": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-06.md
+          - "07: Visual and language encoders, fusion, and attention masks": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-07.md
+          - "08: Action representations, quantization, and FAST": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-08.md
+        - "Training and Data":
+          - "09: Behavioral Cloning, Sequence Losses, and Covariate Shift": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-09.md
+          - "10: Action Chunking, ACT, and Temporal Ensembling": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-10.md
+          - "11: Diffusion Action Policies from Noise to Control": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-11.md
+          - "12: Flow Matching and the π₀ Architecture": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-12.md
+          - "13: Robot Data Collection, Teleoperation, and Annotation": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-13.md
+          - "14: Dataset Schemas, Transformations, Splits, and Mixtures": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-14.md
+          - "15: Pretraining and Cross-Embodiment Generalization": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-15.md
+          - "16: Fine-Tuning, Adapters, Normalization, and Calibration": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-16.md
+          - "17: Offline and Online RL Post-Training for VLAs": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-17.md
+          - "18: Training Infrastructure, Distributed Execution, and Reproducibility": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-18.md
+        - "Evaluation and Deployment":
+          - "19: Closed-Loop Evaluation, Benchmarks, and Statistical Evidence": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-19.md
+          - "20: Integrating a VLA with Isaac Sim and Isaac Lab": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-20.md
+          - "21: VLA Inference Optimization and Edge Deployment": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-21.md
+          - "22: Asynchronous Control, ROS 2, and Real-Time Action Chunking": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-22.md
+          - "23: Robustness, System Identification, and Sim-to-Real Transfer": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-23.md
+          - "24: Deployment Boundaries, Recovery, and Human Intervention": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-24.md
+        - "The October 2026 Frontier":
+          - "25: Physical Intelligence: from π0 to steerable generalists": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-25.md
+          - "26: NVIDIA GR00T and the Isaac engineering boundary": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-26.md
+          - "27: Gemini Robotics: reasoning, action, and access boundaries": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-27.md
+          - "28: Open VLA systems: choose an artifact, not a headline": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-28.md
+          - "29: Reasoning, memory, hierarchy, and world-action models": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-29.md
+          - "30: The October 2026 frontier: comparison and critical reading": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-30.md
+        - "Capstones":
+          - "31: Capstone I: Train, Diagnose, and Integrate a Grounded Policy": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-31.md
+          - "32: Capstone II: A Professional VLA Research and Deployment Review": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-32.md
+        - Dated Frontier Register: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Frontier-Register.md
+        - Primary Source Dossiers:
+          - Foundations and History: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Sources-Foundations.md
+          - Training and Data: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Sources-Training.md
+          - Systems and Evaluation: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Sources-Systems.md
+          - Frontier Research: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Sources-Frontier.md
       - "Special Course: VLA Optimization & Action-Parity Harness":
         - Overview: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/README.md
         - "01: VLA Optimization for Real-Time Control": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/Lecture-01.md
@@ -920,6 +979,19 @@ nav:
           - "08: Graph-Resident Decode": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-08.md
           - "09: The Phase You Forgot — Batched Prefill": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-09.md
           - "10: Silently Wrong": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-10.md
+        - Part 5 — DeepSeek V4.1 Flash NVFP4:
+          - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/README.md
+          - Lab Tools: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/labs/README.md
+          - "01: Checkpoint Identity and Compatibility": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/Lecture-01.md
+          - "02: Execution and Memory Budgets": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/Lecture-02.md
+          - "03: NVFP4 and Numerical Checks": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/Lecture-03.md
+          - "04: Establishing a Serving Baseline": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/Lecture-04.md
+          - "05: Prefill, Decode, and Profiling": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/Lecture-05.md
+          - "06: MoE Placement and Communication": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/Lecture-06.md
+          - "07: Long Context and Cache Behavior": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/Lecture-07.md
+          - "08: Scheduling, Load, and Goodput": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/Lecture-08.md
+          - "09: Quality and Speculative Decoding": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/Lecture-09.md
+          - "10: Capstone Deployment Decision": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/Lecture-10.md
   - "P6 · Careers":
     - Overview: Phase 6 - Interview Preparation/README.md
     - Roles & Market: Roles and Market Analysis.md

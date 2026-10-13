@@ -143,3 +143,7 @@ If you can recite quantization algorithms but cannot say which bytes a token act
 ---
 
 *Related: [Logprobs, Perplexity & KL Divergence](../Logprobs,%20Perplexity%20and%20KL%20Divergence/README.md) · [AI Inference Engineer 2026](../AI%20Inference%20Engineer%202026/README.md) · [MLSys Deep Dives](../MLSys%20Deep%20Dives/README.md) · [Phase 5 — ML Systems Engineering Guide](../Guide.md)*
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+**Applied checkpoint case study:** [DeepSeek V4.1 Flash NVFP4](../AI%20Inference%20Engineer%202026/Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/Lecture-03.md) connects packed values and scales to actual loader compatibility, per-rank memory, quality gates, and useful serving throughput.

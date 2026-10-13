@@ -337,3 +337,5 @@ You are ready to move on when you can:
 - estimate and reduce power without breaking throughput requirements
 - add assertions to risky control logic
 - produce a validation package that looks credible to another FPGA engineer
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

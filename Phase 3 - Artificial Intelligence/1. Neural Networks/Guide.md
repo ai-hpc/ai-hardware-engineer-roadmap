@@ -1199,3 +1199,5 @@ tinygrad   →  you see what frameworks hide, control the scheduler
 ---
 
 *Next (Phase 4 Track B): [ML and AI](../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/5.%20Application%20Development/5.%20ML%20and%20AI/Guide.md) — quantization, pruning, TensorRT, TFLite*
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

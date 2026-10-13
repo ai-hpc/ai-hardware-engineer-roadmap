@@ -119,3 +119,17 @@ Follow this order rather than skipping around; later lectures assume earlier voc
 | **Process / thread model** | Separate daemons for capture, inference, control |
 | **User vs kernel** | Drivers vs userspace ML runtimes |
 | **eBPF** | Profiling, scheduler analysis, XDP filtering |
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain the difference between process address space, scheduling delay, and device execution time. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Run a producer/consumer or periodic-worker experiment with explicit timestamps and bounded load.
+2. **Guided variation:** Introduce lock contention or queue pressure; identify whether the delay is execution, blocking, or scheduling.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Latency distribution, CPU utilization, dropped/deadline-missed work, and a trace explaining one outlier. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

@@ -346,3 +346,5 @@ You are ready to move on when you can:
 - verify generated RTL against a reference model
 - compare speedup after including data movement and control overhead
 - explain when hand-written RTL or a GPU kernel would be better
+
+**Study method:** use the [shared lesson cycle and completion rubric](../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.

@@ -3161,3 +3161,17 @@ class PointNet(nn.Module):
 ---
 
 *Previous: [Phase 3 — Artificial Intelligence](../../Guide.md)*
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Explain train/validation/test separation and the metric for one vision task. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Build a small detection or segmentation baseline and profile preprocessing, model, and postprocessing separately.
+2. **Guided variation:** Evaluate a held-out change in lighting, scale, or occlusion; inspect false positives and false negatives.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Task score by condition, end-to-end latency, memory, and sample counts. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.

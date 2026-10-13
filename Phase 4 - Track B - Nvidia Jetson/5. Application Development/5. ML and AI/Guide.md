@@ -1828,3 +1828,17 @@ Use TAO for standard detection/classification on Jetson. Use the manual pipeline
 
 *Prerequisite map: [Phase 3 — Neural Networks](../../../Phase%203%20-%20Artificial%20Intelligence/1.%20Neural%20Networks/Guide.md)*
 *Next (sub-module): [5.6 ROS2](../6.%20ROS2/Guide.md) · **Sensor fusion** (Phase 3): [Sensor Fusion](../../../Phase%203%20-%20Artificial%20Intelligence/Track%20A%20-%20Hardware%20and%20Edge%20AI/4.%20Sensor%20Fusion/Guide.md)*
+
+## Practice and assessment
+
+**Entry diagnostic (prerequisite check):** Trace preprocessing, model input/output, postprocessing, and deployment format. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+
+1. **Baseline lab:** Deploy a small reference-checked model and measure the full application pipeline.
+2. **Guided variation:** Test one shifted input condition and a bounded overload condition.
+3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+
+**Evidence to submit:** Task score, end-to-end latency, memory, dropped work, and hardware/runtime versions. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+
+**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+
+**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
