@@ -1,42 +1,59 @@
 <div class="home-hero">
 <div class="home-hero__copy">
 <p class="home-hero__eyebrow">The AI Hardware Engineer Roadmap</p>
-<h1 class="home-hero__title"><span>AI Hardware Engineering.</span> <span>From models to machines.</span></h1>
-<p class="home-hero__lede">A hands-on curriculum for understanding, optimizing, and deploying AI on real hardware — GPU kernels, agent runtimes, embedded systems, and Jetson — with a path toward designing the accelerator underneath. Start with one working experiment; finish with results someone else can reproduce.</p>
+<h1 class="home-hero__title"><span>Master AI on hardware.</span> <span>Build the physical AI chip.</span></h1>
+<p class="home-hero__lede">Design a custom system-on-chip for advanced vision-language-action models: dedicated AI acceleration, your own AI compiler, embedded Linux, and integrated wireless. Learn the full stack from models to silicon to power the next generation of robots, drones, and autonomous machines.</p>
 </div>
 <div class="home-hero__art">
-  <img src="Assets/images/physical-ai-chip.png" alt="AI Hardware Engineering — from models to machines" />
+  <img src="Assets/images/physical-ai-chip.png" alt="AI hardware engineering: from model workloads to a custom physical-AI system-on-chip" />
 </div>
 </div>
 
 <div class="home-rail" markdown="1">
-<div class="home-rail__row">
-  <a class="home-rail__step" href="Phase%201%20-%20Foundational%20Knowledge/Guide.md"><span class="home-rail__n">01</span><span class="home-rail__t">Digital Foundations</span></a>
-  <a class="home-rail__step" href="Phase%202%20-%20Embedded%20Systems/Guide.md"><span class="home-rail__n">02</span><span class="home-rail__t">Embedded Systems</span></a>
-  <a class="home-rail__step" href="Phase%203%20-%20Artificial%20Intelligence/Guide.md"><span class="home-rail__n">03</span><span class="home-rail__t">Artificial Intelligence</span></a>
-  <a class="home-rail__step" href="Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md"><span class="home-rail__n">04</span><span class="home-rail__t">Deployment &amp; Compilation</span></a>
-  <a class="home-rail__step" href="Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Guide.md"><span class="home-rail__n">05</span><span class="home-rail__t">Specialization</span></a>
-  <a class="home-rail__step" href="Phase%206%20-%20Interview%20Preparation/README.md"><span class="home-rail__n">06</span><span class="home-rail__t">Interview Prep</span></a>
-</div>
+
+## Explore the curriculum
+
+Six phases toward one goal: a complete physical-AI chip and its software stack.
+
+- [<span class="home-rail__n">01</span> <span class="home-rail__copy"><strong class="home-rail__t">Digital Foundations</strong><br /><span class="home-rail__description">Logic, computer architecture, and accelerator foundations.</span></span>](Phase%201%20-%20Foundational%20Knowledge/Guide.md)
+- [<span class="home-rail__n">02</span> <span class="home-rail__copy"><strong class="home-rail__t">Embedded Systems</strong><br /><span class="home-rail__description">Boards, firmware, embedded Linux, and wireless.</span></span>](Phase%202%20-%20Embedded%20Systems/Guide.md)
+- [<span class="home-rail__n">03</span> <span class="home-rail__copy"><strong class="home-rail__t">Artificial Intelligence</strong><br /><span class="home-rail__description">Neural networks, vision-language models, and AI agents.</span></span>](Phase%203%20-%20Artificial%20Intelligence/Guide.md)
+- [<span class="home-rail__n">04</span> <span class="home-rail__copy"><strong class="home-rail__t">Deployment &amp; Compilation</strong><br /><span class="home-rail__description">AI compilers, GPU kernels, and inference runtimes.</span></span>](Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md)
+- [<span class="home-rail__n">05</span> <span class="home-rail__copy"><strong class="home-rail__t">Specialization</strong><br /><span class="home-rail__description">VLA robotics, drones, ML systems, and custom SoCs.</span></span>](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Guide.md)
+- [<span class="home-rail__n">06</span> <span class="home-rail__copy"><strong class="home-rail__t">Interview Prep</strong><br /><span class="home-rail__description">Practice technical questions and explain your work.</span></span>](Phase%206%20-%20Interview%20Preparation/README.md)
+
 </div>
 
 ---
 
 ## The Goal
 
-> **Master AI inference, AI agent harness systems, and hardware engineering — then design a physical AI chip.**
+> **Master AI on hardware, then design a custom physical-AI inference system-on-chip built around advanced VLA models—with a dedicated accelerator, an AI compiler, embedded Linux, and integrated wireless.**
 
-The endpoint is a single die that runs production AI workloads, hosts a real agent runtime, and talks to the physical world over Wi-Fi/BLE/Thread — a Jetson-class AI brain fused with an ESP32-class wireless stack on one chip. Designing it takes three working skill sets at once: **inference engineering** (Qwen-class decode, kernels, quantization, rooflines, multi-GPU serving), **agent harness systems** (sessions, tools, multi-agent loops, RAG, evals, production observability), and **hardware engineering** (RTL, embedded Linux, Jetson, ESP32, RF, ASIC flow). This roadmap teaches all three side by side — the chip is the artifact, but the three pillars are the actual work.
+The destination is a complete computing platform for robots, drones, and other autonomous machines. Start by understanding how a model sees, reasons, remembers, and produces actions. Use that workload to design the compute, memory, compiler, runtime, operating system, sensor interfaces, and wireless subsystem together. The chip and its software should serve the machine's behavior: useful autonomy within measured latency, energy, memory, and reliability budgets.
+
+**Native VLA support** means the model's actual execution path shapes the architecture: visual encoding, attention, temporal state, action generation, numerical formats, data movement, and control timing. The compiler must map that workload to the accelerator, and the runtime must carry observations through to usable actions. Design for a defined set of frontier workloads and evaluate new model revisions as they emerge, with programmable components and explicit operator coverage.
+
+| Part of the target system | What you will design and demonstrate |
+|---|---|
+| **AI accelerator** | Compute units, supported precision, on-chip memory, dataflow, and DMA chosen from measured VLA bottlenecks |
+| **AI compiler and runtime** | Model import, intermediate representations, graph lowering, tiling, scheduling, memory planning, code generation, and device execution |
+| **Linux-capable SoC** | CPU, interconnect, memory interfaces, boot flow, firmware, drivers, device tree, and a reproducible embedded Linux image |
+| **Wireless subsystem** | Integrated connectivity, host/firmware interfaces, telemetry, updates, and defined behavior under communication loss |
+| **Physical interfaces** | Camera and sensor inputs, time synchronization, actuator interfaces, and a clear boundary between policy inference and low-level control |
+| **Robotics and drone applications** | Validated tasks, closed-loop outcomes, sensor-to-action latency, sustained power, and recovery under disturbances |
+
+GPU and Jetson experiments establish workload evidence; FPGA and board prototypes validate architecture and interfaces. These feed the [custom SoC capstone](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Guide.md#physical-ai-soc-capstone), then implementation and silicon bring-up. Each stage produces evidence for the next.
 
 ---
 
 ## Who This Is For
 
 - **AI/ML engineers** who want to stop treating inference as a black box and design the chip that runs it.
-- **Inference engineers** who want to extend up into agent-runtime co-design and down into kernel + silicon.
-- **Embedded/firmware engineers** who want to climb the stack — from boards to runtimes to chip architecture.
-- **Hardware/RTL/FPGA engineers** who need workload and runtime intuition before specing accelerators.
-- **CS students** who want a structured path that ends at "I designed a chip" rather than "I read about chips."
+- **Inference engineers** who want to co-design VLA execution, AI compilers, and custom accelerators.
+- **Embedded/firmware engineers** who want to connect Linux, wireless, sensors, and AI acceleration on a custom SoC.
+- **Hardware/RTL/FPGA engineers** who want real model and compiler requirements to guide accelerator design.
+- **Robotics engineers and students** who want to build the computing platform behind intelligent robots, drones, and autonomous devices.
 
 **Baseline:** comfortable with Python or C++, and basic Linux command-line use. No prior hardware background required.
 
@@ -56,142 +73,91 @@ New professional course: [**VLA Foundations to Frontier 2026 — 32 lectures**](
 
 ## Four Ways In
 
-Pick the finish line that matches what you want to be able to do, not a track number.
+Choose your first subsystem. The full path connects these entry points into the same custom physical-AI SoC.
 
-| Path | You'll build | Finish-line artifact | Start here |
+| Entry point | You'll build | First milestone | Start here |
 |---|---|---|---|
-| **AI Inference Engineering** | Transformer execution, GEMV/GEMM kernels, quantization, serving | A benchmark report: predicted vs. measured tok/s on a real model, with the gap explained | [Phase 3 — AI Workloads](Phase%203%20-%20Artificial%20Intelligence/Guide.md) |
-| **AI Agent Harness Systems** | Sessions, tool calling, multi-agent loops, evals, observability | A production-shaped agent harness running end to end | [Agentic AI & GenAI — 42 lectures](Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Lectures/README.md) |
+| **AI and VLA Inference** | Visual encoders, transformers, action heads, kernels, and quantization | A workload report linking model quality, memory, latency, and energy to hardware requirements | [Phase 3 — AI Workloads](Phase%203%20-%20Artificial%20Intelligence/Guide.md) |
+| **AI Compiler and Runtime Systems** | Graph lowering, kernel scheduling, memory planning, and device execution | A compiler/runtime path that runs a verified model subgraph on a target backend | [Compiler and inference stack](Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md) |
 | **Physical Hardware Engineering** | Boards, embedded Linux, RTL, FPGA, ASIC flow | A board you brought up yourself, or an accelerator spec with real numbers | [Phase 1 — Digital Foundations](Phase%201%20-%20Foundational%20Knowledge/Guide.md) |
 | **Robotics and Robot Learning** | Isaac Sim scenes, Isaac Lab tasks, policies, ROS 2 integration | A validated task, held-out policy evaluation, and measured sensor-to-action timing | [Robotics](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Guide.md) |
 
-Each path has its own useful completion milestone. [The Path](#the-path) connects them for learners pursuing the larger physical-AI-chip project; designing a chip is optional for an inference or robotics specialization.
+Each entry point produces a useful subsystem. [The Path](#the-path) brings them together: VLA workload → compiler and runtime → accelerator and SoC → embedded Linux and wireless → validated physical behavior. The roadmap's unifying goal is the complete chip and software platform.
 
 ---
 
 ## The Three Pillars
 
-*(Already picked a path above? This section is the deep-dive on why the three connect — skip to [The Path](#the-path) if you just want the phase-by-phase breakdown.)*
+The model defines the work. The compiler and runtime map that work onto the machine. The SoC supplies the compute, memory, operating system, connectivity, and physical interfaces. Learn all three together so a decision in one layer can be tested against its consequences in the others.
 
-This roadmap is not three unrelated study tracks. It is a co-design loop. The
-inference workload tells you what the silicon must accelerate, the agent
-harness tells you what product behavior the runtime must support, and the
-hardware platform tells you what power, memory, I/O, security, and manufacturing
-constraints are real.
-
-```
-                               TARGET ARTIFACT
-┌────────────────────────────────────────────────────────────────────────────┐
-│                         Physical AI Agent Chip                             │
-│ Linux-capable CPU + NPU/GPU/DLA + SRAM/DRAM fabric + ISP/audio/sensors     │
-│ + Wi-Fi/BLE/Thread/Zigbee + secure boot/OTA + local agent runtime support  │
-└────────────────────────────────────┬───────────────────────────────────────┘
-                                     │
-        ┌────────────────────────────┼────────────────────────────┐
-        ▼                            ▼                            ▼
-┌───────────────────────┐  ┌───────────────────────┐  ┌───────────────────────┐
-│  AI Inference Systems │  │ Agent Harness Systems │  │ Physical HW Platform  │
-├───────────────────────┤  ├───────────────────────┤  ├───────────────────────┤
-│ Transformer execution │  │ Sessions and memory   │  │ Digital logic + RTL   │
-│ GEMV/GEMM kernels     │  │ Tool/skill execution  │  │ CPU/NPU/GPU/DLA arch  │
-│ Attention + KV cache  │  │ Gateway/RPC protocols │  │ SRAM/DRAM/DMA fabric  │
-│ Quantization formats  │  │ Planner/executor loop │  │ MIPI CSI-2 + ISP      │
-│ Tensor/pipeline para. │  │ Multi-agent control   │  │ Audio/GPIO/CAN/I2C    │
-│ Serving schedulers    │  │ Evals and guardrails  │  │ Embedded Linux/L4T    │
-│ CUDA/Triton kernels   │  │ Telemetry and tracing │  │ ESP32-class wireless  │
-│ Roofline profiling    │  │ Product update path   │  │ FPGA -> ASIC flow     │
-│ Real models: Qwen etc │  │ OpenClaw/SDKs/APIs    │  │ Board -> SoC thinking │
-└───────────┬───────────┘  └───────────┬───────────┘  └───────────┬───────────┘
-            │                          │                          │
-            └──────────────┬───────────┴───────────┬──────────────┘
-                           ▼                       ▼
-        ┌────────────────────────────────────────────────────────────────┐
-        │ Cross-layer contracts you learn to write                       │
-        ├────────────────────────────────────────────────────────────────┤
-        │ Workload contract: tokens/s, TTFT, context length, KV memory,  │
-        │ batch shape, precision, latency tail, power budget.            │
-        │ Runtime contract: APIs, cancellation, scheduling, security,    │
-        │ observability, OTA, failure recovery, agent state persistence. │
-        │ Hardware contract: MAC array, SRAM size, DMA plan, interconnect│
-        │ bandwidth, radio wake events, camera/audio I/O, boot chain.    │
-        └────────────────────────────────────────────────────────────────┘
-
-                              CONVERGENCE PATH
-┌────────────────────────────────────────────────────────────────────────────┐
-│ Jetson-class AI subsystem        -> NPU/GPU/DLA/CPU compute tile           │
-│ ESP32-class connectivity         -> Wi-Fi/BLE/Thread/Zigbee radio block    │
-│ Camera, audio, and sensors       -> MIPI CSI-2, ISP, codecs, low-power I/O │
-│ Agent runtime and serving stack  -> scheduler, memory manager, telemetry   │
-│ FPGA/RTL/HLS/MLIR experiments    -> accelerator spec and tape-out target   │
-└────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    VLA["Advanced VLA workloads<br/>Vision · language · temporal state · actions"]
+    Compiler["Custom AI compiler and runtime<br/>Lowering · scheduling · memory planning"]
+    VLA --> Compiler
+    subgraph SoC["Target: custom physical-AI inference SoC"]
+        CPU["Linux-capable CPU"]
+        NPU["Dedicated AI accelerator"]
+        Memory["On-chip memory and interconnect"]
+        IO["Sensor and control interfaces"]
+        Radio["Integrated wireless subsystem"]
+        CPU <--> Memory
+        NPU <--> Memory
+        IO <--> Memory
+        Radio <--> Memory
+    end
+    Compiler --> NPU
+    Compiler --> CPU
+    IO <--> Machines["Robots · drones · autonomous machines"]
+    Machines -->|"Observations and task outcomes"| VLA
 ```
 
-### 1. AI Inference Engineering
-The workload your chip will run. This pillar teaches transformer execution from
-the bottom up: tokenization, embeddings, QKV projection, RoPE, attention, MLP,
-sampling, KV cache growth, quantization, batching, and serving. You learn why
-decode is often memory-bandwidth bound, why prefill and decode behave
-differently, and how GEMV/GEMM kernels, CUDA Graphs, FlashAttention, paged
-attention, tensor parallelism, and roofline analysis change the system.
+### 1. AI Models and VLA Inference
 
-**Output of this pillar:** benchmark reports, kernel experiments, model-memory
-budgets, quantization choices, and workload contracts precise enough to drive an
-accelerator architecture.
+Understand the workload before choosing the accelerator. Learn visual and language representations, attention, action tokens, diffusion and flow action heads, memory, adaptation, and evaluation. Trace tensor shapes, precision, operator cost, and memory traffic. Use GPU kernels and existing runtimes to measure a reference implementation, then connect those measurements to sensor-to-action timing and task success.
 
-### 2. AI Agent Harness Systems
-The software stack that lives *above* your chip. This pillar covers agentic
-runtimes, session models, gateway RPCs, tool calling, skills, multi-agent loops,
-RAG, evals, observability, policy controls, and product update flows. A physical
-AI chip does not just run matmuls. It runs user-facing loops with state,
-timeouts, cancellations, tool failures, network events, sensor interrupts, and
-safety constraints.
+**Output:** a pinned VLA workload, operator and memory profiles, a numerical reference, closed-loop evaluation, and compute/energy budgets for the proposed chip. The [professional VLA course](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/VLA%20Foundations%20to%20Frontier%202026/README.md) supplies the model-to-action foundation.
 
-**Output of this pillar:** a production-style agent harness with clear runtime
-interfaces, telemetry, evals, tool boundaries, scheduling requirements, and the
-operational behavior your chip must support.
+### 2. AI Compilers and Physical-AI Runtimes
 
-### 3. Physical Hardware Engineering
-The substrate itself. This pillar starts with digital design, computer
-architecture, C/C++ systems work, embedded Linux, Jetson Orin, custom carrier
-boards, L4T, TensorRT/DLA, ESP32, OpenThread, Zigbee, ESP-Hosted, sensors,
-camera bring-up, audio, power, thermal, compliance, and manufacturing. Then it
-moves toward FPGA, HLS, MLIR/compiler work, RTL, SoC architecture, and AI chip
-design.
+Build the software that makes custom silicon usable. Learn graph capture and import, operator semantics, intermediate representations, quantization, fusion, tiling, buffer allocation, instruction selection, and code generation. Implement a compiler backend and the runtime/driver interface that submits work, moves data, synchronizes execution, and exposes timing and errors.
 
-**Output of this pillar:** working boards, bring-up logs, Linux images, wireless
-integration, sensor pipelines, FPGA/RTL prototypes, and a credible chip spec
-with compute, memory, I/O, security, and manufacturing constraints.
+Connect model execution to robot state, sensor timestamps, action chunks, controllers, and updates. Agent harnesses contribute planning, tool use, memory, and observability to this stack; their requests must respect the device and control interfaces. Validate the compiled model against its reference and measure the complete application path.
 
-| Design question | Inference pillar answers | Agent pillar answers | Hardware pillar answers |
+**Output:** a working compiler/backend, runtime and driver contracts, correctness checks, and execution traces from model input to controller-ready output. Start with the [compiler and inference track](Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md) and connect it to the [agent systems course](Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Lectures/README.md).
+
+### 3. Custom Accelerators, SoCs, and Embedded Platforms
+
+Design the hardware around those measured requirements: compute arrays, vector operations, SRAM, DMA, interconnect, CPU integration, sensor interfaces, and wireless. Learn RTL and verification, FPGA prototyping, timing and power analysis, physical implementation, board bring-up, firmware, bootloaders, device trees, Linux drivers, and reproducible system images.
+
+Prototype Linux and wireless behavior on available boards, then carry the verified interfaces into the custom SoC architecture. Define what runs on the application CPU, accelerator, and controller domains, and where external memory, RF components, antennas, and sensors connect. The integration objective is a chip that supports an entire physical-AI application.
+
+**Output:** tested RTL, a prototype platform, compiler-visible hardware interfaces, a bootable Linux BSP, wireless integration evidence, and an implementation-ready SoC specification. Continue into the [AI chip design track](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Guide.md).
+
+| Design question | Model and inference evidence | Compiler and runtime decision | SoC and platform decision |
 |---|---|---|---|
-| How fast must the chip be? | TTFT, tok/s, batch shape, context length | User-visible latency, tool-loop timing | MACs, SRAM, DRAM bandwidth, clocks |
-| How much memory is enough? | Weights, KV cache, activations, quantization | Session state, tool buffers, logs | SRAM, LPDDR, DMA, cache hierarchy |
-| How does it talk to the world? | Streaming inference, multimodal inputs | Events, RPC, tools, wake-on-demand | Wi-Fi/BLE/Thread/Zigbee, MIPI, audio |
-| How does it ship safely? | Reproducible benchmarks, model updates | Evals, policy, observability, rollback | Secure boot, OTA, compliance, test |
-
-**Why the combination?** A chip without a runtime is a brick. A runtime without
-an agent stack is a benchmark. An agent stack without inference cost discipline
-is a demo. An inference accelerator that cannot talk to the physical world over
-wireless, camera, audio, and sensor interfaces is a coprocessor someone else has
-to integrate. The three pillars are how you build a chip that **ships in a real
-physical product**: workload, runtime, radio, sensors, board, compiler, and
-silicon aligned from the start.
+| How quickly must the machine react? | Observation age, action cadence, task outcomes | Scheduling, chunk execution, synchronization | Compute budget, sensor I/O, controller interfaces |
+| What must fit in memory? | Weights, activations, history, caches, action state | Buffer reuse, layouts, transfer overlap | SRAM, external-memory bandwidth, DMA, interconnect |
+| Which operations deserve dedicated hardware? | Operator profiles and numerical sensitivity | Lowering, fusion, precision, fallback coverage | Compute units, supported formats, programmability |
+| How does it operate as a connected product? | Sensor modalities and task behavior | Linux services, telemetry, updates, recovery | Boot flow, wireless, power management, physical interfaces |
+| How will it support newer models? | A versioned workload suite and regression criteria | Extensible IR/backend and compatibility checks | Programmable execution and measured capacity margins |
 
 ---
 
 ## What You'll Have at the End
 
-The reason for this roadmap, written as a checklist:
+These milestones connect the courses to the chip you are designing:
 
-- [ ] You can take a transformer model, predict its decode tok/s on a given chip from first principles, and explain where it falls short of the roofline.
-- [ ] You can hand-tune a CUDA/kernel path for a Qwen-class model — fused QKV, fused gate+up, CUDA Graphs, INT8 KV, speculative decoding — and quote a before/after benchmark.
-- [ ] You can run a production agent harness end-to-end: gateway, sessions, skills, tool calls, multi-agent supervision, observability dashboards, the lot.
-- [ ] You can take a Jetson module, design a carrier board for it, bring up custom L4T, flash it in volume, and ship a product against FCC/CE.
-- [ ] You can bring up an ESP32 wireless coprocessor over SPI, expose it to a Linux host as a Wi-Fi/BLE/Thread/Zigbee radio, and integrate it into the same product.
-- [ ] You can write RTL, drive timing closure on a real FPGA, and lower a small transformer block through HLS or a custom MLIR dialect.
-- [ ] You can write the architecture spec for a **physical AI agent chip** — one die containing an NPU tile (Qwen-class decode at edge power), a wireless subsystem (Wi-Fi 6/BLE 5/Thread/Zigbee), MIPI CSI-2 camera input, ISP, audio I/O, and a Linux-capable CPU — with realistic numbers for tile size, SRAM budget, MAC array, DMA, RF integration, and compiler/runtime interface.
+- [ ] **A VLA workload contract:** selected model revisions, input/action schemas, operator coverage, memory traffic, control cadence, and task-quality targets.
+- [ ] **A measured inference baseline:** reference kernels/runtime, numerical checks, full sensor-to-action latency, sustained power, and closed-loop results.
+- [ ] **Your own AI compiler path:** model import, IR transformations, memory planning, scheduling, and code generation for a simulated or FPGA accelerator backend.
+- [ ] **A dedicated accelerator prototype:** verified RTL or HLS, a software-visible interface, timing constraints, resource usage, and model-subgraph parity.
+- [ ] **An embedded Linux platform:** boot flow, BSP, drivers, device tree, reproducible image, model runtime, and updates on the chosen prototype.
+- [ ] **Wireless and physical I/O:** connectivity, sensor acquisition, synchronized timestamps, controller interfaces, and tested communication-loss behavior.
+- [ ] **A robotics or drone integration:** a bounded application with logged outcomes, deadline misses, energy use, and recovery; simulation, hardware-in-the-loop, and physical results labeled separately.
+- [ ] **A complete physical-AI SoC design:** CPU, custom accelerator, memory/interconnect, wireless subsystem, I/O, firmware, compiler, and Linux architecture, with traceable verification and power/performance/area assumptions.
 
-That last bullet is the goal. The first six exist to make it real.
+The full hardware path continues through physical implementation, tape-out preparation, fabrication, and silicon bring-up. Keep milestones explicit: a simulator result, an FPGA prototype, a signed-off design, and a measured fabricated chip are different deliverables. The [SoC capstone](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Guide.md#physical-ai-soc-capstone) ties the evidence together.
 
 ---
 
@@ -207,7 +173,7 @@ When you're designing a chip, **every** layer is a constraint and a degree of fr
 
 ## The Path
 
-Five phases. The first four are foundation; the fifth is where the three pillars converge.
+Six phases. The first four build the model, software, and hardware foundations; Phase 5 combines them into the physical-AI SoC; Phase 6 prepares you to explain and defend your engineering work.
 
 ### [Phase 1 — Digital Foundations](Phase%201%20-%20Foundational%20Knowledge/Guide.md) *(Hardware pillar)*
 *The language of hardware. Logic gates → GPU code.*
@@ -229,7 +195,7 @@ Five phases. The first four are foundation; the fifth is where the three pillars
 | [Embedded Linux](Phase%202%20-%20Embedded%20Systems/3.%20Embedded%20Linux/Guide.md) | Yocto, PetaLinux, driver bring-up |
 | [Product Design](Phase%202%20-%20Embedded%20Systems/4.%20Product%20Design/Guide.md) | Going from prototype to shippable product |
 
-### [Phase 3 — AI Workloads](Phase%203%20-%20Artificial%20Intelligence/Guide.md) *(Inference & Agent pillars start here)*
+### [Phase 3 — AI Workloads](Phase%203%20-%20Artificial%20Intelligence/Guide.md) *(AI models and runtime foundations)*
 *Understand the workloads your chip must serve. Core + two tracks.*
 
 **Core (everyone):**
@@ -239,7 +205,7 @@ Five phases. The first four are foundation; the fifth is where the three pillars
 
 **Track A — Hardware & Edge AI:** Computer vision, sensor fusion, Voice AI, Edge AI & optimization. Feeds Phase 4B and Phase 5C.
 
-**Track B — Agentic AI & ML Engineering:** [42 lectures](Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Lectures/README.md) on agent harnesses, LangGraph, multi-agent systems, RAG, evaluation, production runtime discipline, OpenClaw, OpenAI Agents SDK, security, plus a [Qwen3.5-4B-Base Unsloth fine-tuning course](Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/5.%20LLM%20Application%20Development/Qwen3.5-4B%20Unsloth%20Fine-Tuning/Guide.md). This is the **agent harness pillar in its primary form** — read in order if your destination is the chip + runtime + harness story.
+**Track B — Agentic AI & ML Engineering:** [42 lectures](Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Lectures/README.md) on agent harnesses, LangGraph, multi-agent systems, RAG, evaluation, production runtime discipline, OpenClaw, OpenAI Agents SDK, security, plus a [Qwen3.5-4B-Base Unsloth fine-tuning course](Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/5.%20LLM%20Application%20Development/Qwen3.5-4B%20Unsloth%20Fine-Tuning/Guide.md). This supplies the **planning and agent-runtime layer** of the physical-AI platform; connect its interfaces to model execution, Linux services, and robot control.
 
 ### Phase 4 — Deployment & Compilation *(All three pillars co-exist here)*
 *Take AI to real silicon. Three specialized tracks.*
@@ -250,7 +216,7 @@ Five phases. The first four are foundation; the fifth is where the three pillars
 | [**B — NVIDIA Jetson**](Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md) | Orin platform, custom carrier, L4T, OTA, TensorRT/DLA | Hardware + Inference |
 | [**C — DL Inference Optimization**](Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md) | MLIR, TVM, Triton, kernel engineering, quantization, runtimes | Inference |
 
-You don't have to do all three. But to land at chip design, you want enough of **A** to write RTL, enough of **B** to know what an inference platform looks like, and enough of **C** to know how a compiler will target your chip.
+For the complete chip path, combine **A** for RTL and FPGA validation, **B** for embedded Linux and device integration, and **C** for the compiler and runtime that target your accelerator.
 
 ### [Phase 5 — Specialization & Convergence](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Guide.md)
 *The three pillars converge here. Specialization tracks plus the chip-design endpoint.*
@@ -262,10 +228,10 @@ You don't have to do all three. But to land at chip design, you want enough of *
 | [**C — Edge AI**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20C%20-%20Edge%20AI/Guide.md) | Holoscan, [Edge LLM Inference Internals](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20C%20-%20Edge%20AI/Edge%20LLM%20Inference%20Internals/Lecture-01.md), [**Qwen Inference Optimization (6-lecture series)**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20C%20-%20Edge%20AI/Qwen%20Inference%20Optimization/README.md), AI-driven wireless | Inference |
 | [**D — Robotics**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Guide.md) | ROS 2, Nav2, motion planning, swarm, [**Isaac Sim and Isaac Lab (22 lectures + engineering labs)**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Isaac%20Sim%20and%20Isaac%20Lab/README.md), [**Deep RL for Robot Learning (15-lecture course)**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Deep%20RL%20for%20Robot%20Learning/README.md), [**VLA Foundations to Frontier 2026 (32 lectures)**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/VLA%20Foundations%20to%20Frontier%202026/README.md), VLA optimization | Hardware + Inference |
 | [**E — Autonomous Vehicles**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20E%20-%20Autonomous%20Vehicles/Guide.md) | openpilot, BEV perception, ISO 26262, TRACE32 debug | Hardware + Inference |
-| [**F — AI Chip Design**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Guide.md) | **The endpoint.** Systolic arrays, dataflow architectures, tinygrad↔hardware, RISC-V AI accelerator design, ASIC flow — and the integration question: how do you put an NPU, an ESP32-class radio, an ISP, and a Linux CPU on one die? | **All three** |
+| [**F — AI Chip Design**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Guide.md) | **The endpoint.** VLA-driven accelerator design, compiler/backend co-design, a Linux-capable CPU, integrated wireless, sensor I/O, SoC verification, and ASIC implementation. | **All three** |
 | [**G — ML Systems Engineering**](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/Guide.md) | Training systems, inference runtimes, GPU scheduling, distributed serving, compiler/runtime work, observability | Inference + Infrastructure |
 
-**The signature path:** Phase 1 → Phase 2 → Phase 3 (Core + Track B) → Phase 4 (selected) → Phase 5C + Phase 5F.
+**The signature physical-AI chip path:** Phase 1 → Phase 2 (Linux + wireless) → Phase 3 (models + perception + agents) → Phase 4A/B/C (FPGA + Jetson + compilers) → Phase 5D (VLA + Isaac robotics) and Phase 5C/G (edge inference + systems) → Phase 5F (custom accelerator + SoC).
 
 **The MLSys path:** Phase 1 §3/§4 → Phase 3 Core → Phase 4B/4C → Phase 5A/B/C → Phase 5G.
 
@@ -369,7 +335,7 @@ The roadmap is full-stack on purpose, but it produces several well-paid speciali
 |------|-----------|
 | **AI Inference Engineer** | 3 + 4C + 5A/B/C |
 | **ML Systems Engineer** | 1 + 3 + 4B/4C + 5A/B/C/G |
-| **AI Compiler Engineer** | 1 + 4C + 5B |
+| **AI Compiler Engineer** | 1 + 4C + 5F/G |
 | **Edge AI Engineer** | 3A + 4B + 5C |
 | **GPU Runtime / Kernel Engineer** | 1 + 4B + 5A |
 | **Agentic AI / Agent Harness Engineer** | 3B (full lecture series) + 5C |
@@ -377,7 +343,7 @@ The roadmap is full-stack on purpose, but it produces several well-paid speciali
 | **Autonomous Vehicles Engineer** | 3A + 4B + 5E |
 | **RTL / FPGA Design Engineer** | 1 + 4A |
 | **AI Accelerator Architect** | 1 + 4A + 5F |
-| **Physical AI Chip Architect** | Full path — Jetson + ESP32 fused into one SoC; the chip-design endpoint |
+| **Physical AI SoC Architect** | Full path — VLA workload, custom accelerator/compiler, embedded Linux, integrated wireless, and robot/drone interfaces |
 
 → See [**Roles & Market Analysis**](Roles%20and%20Market%20Analysis.md) for salary data, 23 sub-roles, remote percentages, and hiring signals.
 
@@ -385,13 +351,11 @@ The roadmap is full-stack on purpose, but it produces several well-paid speciali
 
 ## Why This Roadmap Exists
 
-A **physical AI chip** — Jetson-class brain + ESP32-class radio + sensors + Linux on one die — is one of the most demanding engineering projects a small team can attempt. It needs:
+The aim is to give engineers the skills to build the computing foundation for future robotics, drones, and autonomous machines. That requires understanding AI deeply enough to decide what hardware it needs, and understanding hardware deeply enough to build the compiler, runtime, Linux platform, and connectivity that make the models useful.
 
-- **Workload truth.** You can't design an NPU tile or a memory hierarchy without knowing what bytes-per-token a Qwen-class decode will throw at you. That's the inference pillar.
-- **System truth.** Your chip is going to host runtimes that host agent harnesses in a battery-powered product. Wrong access pattern (batch=1 chat vs always-on wake word vs long-context retrieval), wrong wake-on-radio policy, wrong boot ROM, you've shipped the wrong chip. That's the agent harness pillar.
-- **Engineering truth — both halves.** Silicon doesn't care about your intentions. RTL, timing, power, embedded software, board, antenna, FCC, manufacturing — there's no shortcut. You need the AI-compute side (Jetson stack) *and* the wireless side (ESP32 stack) on the same die *and* on the same Linux. That's the hardware pillar.
+Each experiment should answer a design question for the eventual SoC: which computation to accelerate, which data to keep on chip, how to schedule inference around fresh observations, how to preserve action quality at lower precision, or how to keep the machine operating when workloads or network conditions change.
 
-Most people learn one pillar. Some learn two. This roadmap is for the people who want to learn all three, and then build the thing that puts an AI agent in a real product — talking to sensors, talking to networks, talking to humans, off a single SoC.
+The result is a coherent design effort from model behavior to physical implementation: **advanced VLA models → custom AI compiler and runtime → dedicated accelerator → Linux and wireless SoC → robots, drones, and autonomous machines.**
 
 ---
 
@@ -409,7 +373,7 @@ Most people learn one pillar. Some learn two. This roadmap is for the people who
 
 <div align="center" markdown="1">
 
-**Build the workload. Build the runtime. Build the radio. Build the silicon. Ship the physical AI chip.**
+**Master the models. Build the compiler. Design the accelerator. Bring up Linux and wireless. Build the physical-AI SoC.**
 
 [⭐ Star this repo](https://github.com/ai-hpc/ai-hardware-engineer-roadmap) if you're on this path — it helps the next engineer find it.
 

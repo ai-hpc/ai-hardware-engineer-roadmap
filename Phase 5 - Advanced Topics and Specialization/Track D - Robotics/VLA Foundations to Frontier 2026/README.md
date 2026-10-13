@@ -15,6 +15,12 @@ A VLA maps visual observations, language, and often robot state/history to actio
 
 **Role targets:** Robot Learning Engineer · Robotics Foundation-Model Engineer · Embodied AI Research Engineer · VLA Training Engineer · Robotics Inference and Evaluation Engineer. **Roadmap layers:** L3–L8, from model/training choices through GPU execution, runtime integration, and robot behavior.
 
+## The chip this course helps you design
+
+This is the model and control foundation for the roadmap's larger goal: **a custom physical-AI inference SoC built for advanced VLA workloads, with a dedicated accelerator, an AI compiler, embedded Linux, and integrated wireless for robots, drones, and autonomous machines**. Learn how models work so their actual computation, state, numerical sensitivity, and timing requirements can guide the hardware.
+
+Carry a design brief through the course: selected checkpoint and tasks; vision/language/action operator coverage; supported shapes and precision; memory and bandwidth; sensor-to-action deadlines; compiler/runtime interfaces; and closed-loop quality gates. Use [Capstone II's hardware co-design route](Lecture-32.md#hardware-co-design-route) to turn this into an experiment, then continue into the [physical-AI SoC capstone](../../Track%20F%20-%20AI%20Chip%20Design/Guide.md#physical-ai-soc-capstone). Completing the VLA course supplies workload evidence; the chip-design, compiler, Linux, and wireless tracks provide the other implementation milestones.
+
 ## Outcomes and prerequisites
 
 By the end, you should be able to derive the central imitation/diffusion/flow objectives, read a VLA paper critically, build a causal robot dataset pipeline, adapt an accessible policy, define its physical action contract, evaluate it in closed loop, and defend one measured training or deployment result. The CPU route establishes foundations and tooling; the GPU/simulator route adds model adaptation and robot-learning integration. Physical deployment requires additional device-specific experience and supervised validation.

@@ -1447,6 +1447,16 @@
 /* ── Homepage hero ──
    True 50/50 split: thesis on the left, chip on the right. Each title line is
    a locked phrase so the headline cannot collapse into one-word rows. */
+.home-hero,
+.home-rail {
+  --home-accent: var(--md-typeset-a-color);
+}
+
+[data-md-color-scheme="slate"] .home-hero,
+[data-md-color-scheme="slate"] .home-rail {
+  --home-accent: #a5b4fc;
+}
+
 .home-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -1474,7 +1484,7 @@
   font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--aihpc-accent);
+  color: var(--home-accent);
   margin: 0 0 0.85rem;
 }
 
@@ -1483,6 +1493,7 @@
 .md-content__inner > h1.home-hero__title:first-of-type {
   font-size: clamp(1.55rem, 1.05rem + 1.25vw, 2.25rem) !important;
   font-weight: 780;
+  color: var(--md-default-fg-color);
   letter-spacing: -0.038em;
   line-height: 1.08;
   text-align: left;
@@ -1498,12 +1509,16 @@
   display: block;
 }
 
+.md-typeset h1.home-hero__title span + span {
+  color: var(--home-accent);
+}
+
 .md-typeset .home-hero__lede {
   margin: 1rem 0 0;
   max-width: none;
   font-size: 0.98rem;
   line-height: 1.55;
-  color: var(--md-default-fg-color--light);
+  color: color-mix(in srgb, var(--md-default-fg-color) 90%, var(--md-default-bg-color));
   text-wrap: pretty;
 }
 
@@ -1550,67 +1565,105 @@
   display: none;
 }
 
-/* ── Phase rail ──
-   The six phases as a connected strip of steps — the curriculum as a path,
-   not a list. A rule runs behind the numbered steps; each step is a link. */
+/* ── Homepage phase navigation ──
+   Real Markdown list links stay readable without this stylesheet and let
+   MkDocs resolve source links to built-page URLs. All six phases wrap. */
 .home-rail {
   margin: 0.4rem 0 1.6rem;
 }
 
-.home-rail__row {
+.md-typeset .home-rail h2 {
+  margin: 0 0 0.35rem;
+  padding: 0;
+  border: 0;
+  font-size: 1.2rem;
+}
+
+.md-typeset .home-rail > p {
+  margin: 0 0 1rem;
+  color: color-mix(in srgb, var(--md-default-fg-color) 90%, var(--md-default-bg-color));
+}
+
+.md-typeset .home-rail > ul {
   display: grid;
-  grid-template-columns: repeat(6, minmax(10.25rem, 1fr));
-  gap: 0;
-  border-top: 1px solid var(--aihpc-hairline);
-  position: relative;
-  overflow-x: auto;
-  scrollbar-width: thin;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.home-rail__step {
+.md-typeset .home-rail > ul > li {
   display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  padding: 1rem 0.9rem 0.9rem;
-  border-radius: 0 0 var(--aihpc-radius) var(--aihpc-radius);
-  position: relative;
-  transition: background 0.18s ease;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
 }
 
-/* the connecting node on the top rule */
-.home-rail__step::before {
-  content: "";
-  position: absolute;
-  top: -5px;
-  left: 0.9rem;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--md-default-bg-color);
-  border: 2px solid var(--aihpc-accent);
+.md-typeset .home-rail > ul > li > a {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--md-default-fg-color) 20%, transparent);
+  border-radius: var(--aihpc-radius);
+  background: color-mix(in srgb, var(--md-default-fg-color) 3%, var(--md-default-bg-color));
+  box-shadow: var(--aihpc-elev-1);
+  color: var(--md-default-fg-color);
+  text-decoration: none;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
 
-.home-rail__step:hover {
+.md-typeset .home-rail > ul > li > a:hover,
+.md-typeset .home-rail > ul > li > a:focus-visible {
+  border-color: var(--home-accent);
   background: var(--aihpc-accent-soft);
+  box-shadow: var(--aihpc-elev-2);
+  text-decoration: none;
+}
+
+.md-typeset .home-rail > ul > li > a:focus-visible {
+  outline: 3px solid var(--home-accent);
+  outline-offset: 3px;
 }
 
 .home-rail__n {
+  display: grid;
+  place-items: center;
+  flex: 0 0 2rem;
+  height: 2rem;
+  border-radius: 0.55rem;
+  background: var(--aihpc-accent-soft);
+  color: var(--home-accent);
   font-family: var(--md-code-font-family);
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  color: var(--aihpc-accent);
-  letter-spacing: 0.02em;
+  line-height: 1;
 }
 
-.home-rail__t {
-  font-size: 0.86rem;
-  font-weight: 600;
+.home-rail__copy {
+  min-width: 0;
+}
+
+.home-rail__copy > br {
+  display: none;
+}
+
+.md-typeset .home-rail__t {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 700;
   letter-spacing: -0.012em;
-  color: var(--md-default-fg-color);
-  line-height: 1.3;
-  overflow-wrap: normal;
-  word-break: keep-all;
-  hyphens: none;
+  line-height: 1.35;
+}
+
+.home-rail__description {
+  display: block;
+  margin-top: 0.4rem;
+  color: color-mix(in srgb, var(--md-default-fg-color) 90%, var(--md-default-bg-color));
+  font-size: 0.76rem;
+  line-height: 1.5;
 }
 
 /* ── Cards and callouts share the hero's surface ──
@@ -1634,7 +1687,7 @@
   box-shadow: var(--aihpc-elev-1);
 }
 
-/* ── Responsive: the hero collapses to a single column, rail scrolls ── */
+/* ── Responsive: the hero stacks and the phase cards wrap ── */
 @media screen and (max-width: 900px) {
   .home-hero {
     grid-template-columns: 1fr;
@@ -1646,15 +1699,16 @@
     max-width: 36rem;
   }
 
-  .home-rail__row {
-    grid-template-columns: none;
-    grid-auto-flow: column;
-    grid-auto-columns: 11.5rem;
-    padding-bottom: 0.4rem;
+  .md-typeset .home-rail > ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media screen and (max-width: 560px) {
+  .md-typeset .home-rail > ul {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .home-hero__actions .md-button {
     flex: 1 1 auto;
     justify-content: center;
@@ -1665,7 +1719,7 @@
    stop animating. ── */
 @media (prefers-reduced-motion: reduce) {
   .home-hero__actions .md-button,
-  .home-rail__step {
+  .md-typeset .home-rail > ul > li > a {
     transition: none;
   }
 }

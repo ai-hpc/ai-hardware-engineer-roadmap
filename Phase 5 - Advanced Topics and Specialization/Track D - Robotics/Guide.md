@@ -10,6 +10,8 @@
 </div>
 
 
+**Contribution to the physical-AI SoC:** robots and drones define the workloads and timing constraints the chip must serve. Use the VLA and Isaac courses to measure model quality, observation-to-action latency, memory, energy, and controller requirements. Carry that evidence into the [custom accelerator, compiler, Linux, and wireless capstone](../Track%20F%20-%20AI%20Chip%20Design/Guide.md#physical-ai-soc-capstone).
+
 This phase is organized into **four lecture tracks** (each has its own folder and `Lecture-01.md`). Start with **Advanced Robot Operating System**, then proceed in order or jump by topic.
 
 | # | Track | Folder / lecture |

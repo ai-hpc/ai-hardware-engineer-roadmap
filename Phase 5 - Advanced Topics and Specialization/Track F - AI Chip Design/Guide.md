@@ -4,10 +4,32 @@
 <div class="course-identity__icon">ASIC</div>
 <div markdown="1">
 <p class="course-identity__eyebrow">Track 5F · AI Chip Design</p>
-<p class="course-identity__title">Design accelerator dataflows, memory hierarchies, interfaces, and silicon-facing architecture specs.</p>
-<p class="course-identity__meta">Artifact: accelerator architecture spec · Measure: area, SRAM, bandwidth, energy, throughput</p>
+<p class="course-identity__title">Design a physical-AI inference SoC: VLA accelerator, compiler, embedded Linux, and wireless integration.</p>
+<p class="course-identity__meta">Artifact: reproducible model-to-machine prototype · Measure: task success, latency, energy, memory, area</p>
 </div>
 </div>
+
+## Mission: build the computer inside an autonomous machine
+
+The destination is a custom system on chip for physical AI: a processor running embedded Linux, a dedicated AI accelerator, memory and sensor interfaces, wireless connectivity, and the compiler and runtime that turn an advanced vision-language-action (VLA) model into useful robot behavior. Robots, drones, and other autonomous machines supply the requirements. The design must explain how observations become actions within a measured latency, energy, and memory budget.
+
+Begin with the [professional VLA course](../Track%20D%20-%20Robotics/VLA%20Foundations%20to%20Frontier%202026/README.md) and profile an executable reference model. Treat the latest model as a versioned workload, with explicit operator, precision, shape, and action contracts. A programmable design and documented fallback path should accommodate evolving architectures. A chip optimized for one checkpoint alone does not establish support for future models.
+
+## Physical-AI SoC capstone
+
+Progress through these review gates. Each produces evidence that another learner can inspect or reproduce; choose the final implementation level according to available tools and hardware.
+
+1. **Freeze the workload contract.** Select one robot or drone task, checkpoint revision, observation stream, and action interface. Record sensor timestamps, coordinate frames, control rate, action horizon, numerical tolerance, and task-success definition. Profile the complete pipeline, including preprocessing, transfers, vision encoding, language conditioning, and action generation. Deliver a reference runner and measurements that justify the proposed accelerator.
+
+2. **Co-design accelerator and SoC.** Specify supported operations, numeric formats and scale metadata, local SRAM, external-memory traffic, DMA, interconnect, interrupts, and CPU responsibilities. Allocate budgets to sensing, inference, communication, and control. Build a functional simulator and a resource/performance model before selecting an RTL subset or FPGA prototype. Compare predictions with measurements and retain error bars. Report unsupported operations and their execution cost.
+
+3. **Make the compiler produce executable work.** Follow the [compiler stack](../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/03%20-%20Compiler%20Stack/Guide.md) and this track's [LLVM/MLIR lectures](Lectures/Lecture-01.md). Define lowering, tiling, buffer lifetimes, instruction or command encoding, and runtime synchronization. Validate compiled outputs against the reference across representative shapes and precisions. Deliver a documented compiler/runtime ABI, driver-facing command path, correctness suite, and end-to-end benchmark, including fallback execution.
+
+4. **Boot Linux and connect the system.** Use [embedded Linux](../../Phase%202%20-%20Embedded%20Systems/3.%20Embedded%20Linux/Guide.md) to build the boot chain, board support, device tree, accelerator driver, and reproducible filesystem image. Specify a Linux-capable CPU subsystem, memory management, and interrupt behavior. Bring up sensor I/O and wireless using the [ESP-Hosted integration course](../../Phase%202%20-%20Embedded%20Systems/3.%20Embedded%20Linux/Jetson%20ESP-Hosted%20Host%20Code/Guide.md) as a reference pattern. State whether the radio is an external module, companion die, or integrated RF block; monolithic RF requires its own mixed-signal design and verification work. Measure link loss, interference, reconnect behavior, and inference contention.
+
+5. **Close the loop on a machine.** Start with [Isaac Sim and Isaac Lab](../Track%20D%20-%20Robotics/Isaac%20Sim%20and%20Isaac%20Lab/README.md), then transfer to the selected platform when available. Evaluate task success, observation-to-action latency, deadline misses, sustained power, thermal behavior, and recovery from stale sensors or dropped links. Define the boundary between VLA decisions and deterministic motor or flight control. Compare against the original CPU/GPU baseline under the same scenarios.
+
+6. **Declare the implementation maturity.** Deliver source revisions, build instructions, traces, test results, and unresolved limitations. A simulator demonstrates modeled behavior; an FPGA demonstrates a hardware prototype. A synthesis or place-and-route report supports an implementation estimate. Tapeout readiness additionally requires a specific process/IP flow, timing and physical verification, power integrity, test strategy, packaging, and signoff evidence. Fabrication and measured silicon are separate milestones. Name the level achieved rather than presenting projected silicon performance as a measurement.
 
 
 **Prerequisite: Master AI/Software Stack First**

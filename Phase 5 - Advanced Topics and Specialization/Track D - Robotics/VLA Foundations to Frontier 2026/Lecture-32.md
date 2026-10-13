@@ -51,6 +51,18 @@ Third measure the system: full observation-to-command timing, memory peak, susta
 
 For quantization projects, record which tensors changed precision and whether measured kernels implement that precision. For RL projects, record the actual objective, data source, critic inputs, intervention policy, and whether the method uses exact or surrogate likelihoods. For world-model projects, evaluate behavior as well as video quality. These distinctions connect the earlier lectures to daily engineering decisions.
 
+## Hardware co-design route
+
+**Prerequisites and scope:** use the compiler and RTL foundations from Phases 1 and 4. The implementation estimate at the top of this lecture applies to a bounded experiment using existing tools. Building a new compiler backend, driver, or FPGA platform needs a separately scoped schedule; the full SoC is a subsequent integration project.
+
+For the roadmap's custom physical-AI SoC goal, frame the project around a VLA workload and its compiler/hardware mapping. Choose a released checkpoint with an executable reference, then select a meaningful subgraph: a visual-encoder block, attention path, or action-head step. Keep its tensor shapes, precision, normalization, and place in the complete policy explicit.
+
+Implement a lowering path through a compiler IR or a small backend to a functional accelerator simulator or FPGA prototype. Define command encoding, layouts, DMA transfers, buffer lifetimes, and synchronization. Compare compiled outputs with the reference across representative inputs and a deliberately unsupported case. Measure the implemented path, then estimate its impact on the complete policy while accounting for transfers, preprocessing, and fallback operations.
+
+Deliver a model-to-SoC brief containing the supported workload, operator coverage, numeric error, memory/bandwidth requirements, measured versus estimated latency/energy, and an interface proposal for a Linux driver. Define how timestamped sensor data enters, how controller-ready actions leave, and how wireless telemetry or updates share resources. Preserve the boundary between VLA inference and low-level motor or flight control.
+
+The claim should match the artifact: accelerating one block demonstrates that block's mapping; full-policy support additionally needs the remaining operators, runtime, and closed-loop validation. Continue with the [SoC capstone](../../Track%20F%20-%20AI%20Chip%20Design/Guide.md#physical-ai-soc-capstone) for CPU/accelerator integration, embedded Linux, wireless, physical implementation, and silicon bring-up.
+
 ## Analyze negative and inconclusive results
 
 Suppose a candidate improves success by three points but its interval spans -4 to +10. The estimate is encouraging but does not establish improvement. Inspect variance sources and collect additional evidence only under a justified follow-up plan. Do not erase the original result from the record.

@@ -2,6 +2,8 @@
 
 Choose one engineering outcome, diagnose the missing prerequisites, and build a small experiment before expanding it. The phase numbers describe dependencies; they are not a requirement to finish every course. Time estimates are planning aids, not mastery tests.
 
+The shared destination is a [custom physical-AI SoC](README.md#the-goal) built around advanced VLA workloads: a dedicated accelerator and AI compiler, embedded Linux, wireless, and interfaces for robots and drones. Treat each course artifact as evidence for a subsystem of that platform. The [SoC capstone](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Guide.md#physical-ai-soc-capstone) joins the model, compiler, hardware, and application work.
+
 ## Choose a route and a first deliverable
 
 | Route | Start | First deliverable | Then |
@@ -10,6 +12,7 @@ Choose one engineering outcome, diagnose the missing prerequisites, and build a 
 | Robotics and robot learning | [Robotics](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Guide.md) | A simulated robot with validated frames, units, reset behavior, and timing | [Isaac Sim / Isaac Lab](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Isaac%20Sim%20and%20Isaac%20Lab/README.md), then held-out policy evaluation |
 | Embedded and edge systems | [Phase 2](Phase%202%20-%20Embedded%20Systems/Guide.md) | A timestamped sensor-to-application pipeline with recovery from a fault | [Jetson](Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md), then a thermal and latency budget |
 | FPGA and accelerator design | [Phase 1](Phase%201%20-%20Foundational%20Knowledge/Guide.md) | Tested RTL with a timing constraint and a waveform explaining a failure | [FPGA](Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md), then [chip design](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Guide.md) |
+| AI compiler and runtime | [Phase 4C](Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md) | A reference-checked compiled subgraph with memory and execution traces | Custom accelerator backend, Linux driver, and SoC integration |
 | ML and agent systems | [Phase 3](Phase%203%20-%20Artificial%20Intelligence/Guide.md) | A reproducible model or agent evaluation, including failed cases | ML engineering, runtime profiling, and one deployment target |
 
 ## Diagnose before reading

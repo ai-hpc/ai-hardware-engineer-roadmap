@@ -1,6 +1,6 @@
 # AI Hardware Engineer Roadmap
 
-> A hardware-first AI engineering roadmap for CUDA, embedded systems, Jetson, FPGA, ML compilers, RISC-V, accelerator architecture, and edge AI deployment.
+> Master AI on hardware and design a custom physical-AI inference SoC for advanced VLA models, with a dedicated accelerator, an AI compiler, embedded Linux, and integrated wireless for robots, drones, and autonomous machines.
 
 ## Canonical Site
 
@@ -20,7 +20,7 @@
 
 ## Topic Summary
 
-This roadmap teaches AI hardware engineering across the full stack:
+The curriculum connects models to a complete physical-AI SoC and software platform:
 
 - digital design and computer architecture
 - operating systems and parallel programming
@@ -34,3 +34,4 @@ This roadmap teaches AI hardware engineering across the full stack:
 - DeepSeek V4.1 Flash NVFP4 checkpoint inspection, numerical quality, and inference optimization
 - NVIDIA Isaac Sim / Isaac Lab task validation, policy evaluation, ROS 2 timing, and robotics labs
 - Vision-language-action professional course: 32 lectures from historical foundations through October 13, 2026, with training, Isaac/ROS deployment, CPU labs, and capstones
+- End-to-end physical-AI SoC capstone: VLA workload contracts, accelerator/compiler co-design, Linux bring-up, wireless integration, robot/drone evaluation, and implementation evidence
