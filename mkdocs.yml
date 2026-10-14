@@ -888,6 +888,21 @@ nav:
       - 6. Lauterbach: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/6. Lauterbach TRACE32 Debug/Guide.md
     - "Track F: AI Chip Design":
       - Guide: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Guide.md
+      - "Professional Course: Programmable VLA Inference Accelerator":
+        - Overview: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/README.md
+        - Laboratory Guide: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Lab-Guide.md
+        - "01: Design Brief and Baselines": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Lecture-01.md
+        - "02: Workload Atlas and Trace Contract": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Lecture-02.md
+        - "03: Programmable Tensor and Vector Tiles": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Lecture-03.md
+        - "04: Memory Residency and Traffic": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Lecture-04.md
+        - "05: Precision and Valid Reuse": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Lecture-05.md
+        - "06: Compiler, Runtime ABI, and SoC": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Lecture-06.md
+        - "07: Scheduling for Fresh Actions": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Lecture-07.md
+        - "08: Energy, Quality, and Comparisons": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Lecture-08.md
+        - "09: Prototype to Silicon Feasibility": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Lecture-09.md
+        - "10: Capstone Design Defense": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Lecture-10.md
+        - Hardware Evidence: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Sources-Hardware.md
+        - Model and Research Evidence: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Sources-Models.md
       - RISC-V AI Chip Design and Market: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/RISC-V-AI-Chip-Design-and-Market/Guide.md
       - "Agentic Chip Design 2026":
         - Guide: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Agentic Chip Design 2026/Guide.md

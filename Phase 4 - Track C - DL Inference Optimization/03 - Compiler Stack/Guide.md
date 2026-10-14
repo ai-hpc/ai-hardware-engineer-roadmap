@@ -77,3 +77,5 @@ Trace one matrix operator from graph IR through buffer planning, loop/kernel sch
 **Acceptance evidence:** Save before/after IR and correctness results. Separate graph fusion from BEAM kernel search, and pass the lowered operator plus memory-layout contract to quantization/runtime work.
 
 **Continue:** take this artifact to [04 - Quantization](../04%20-%20Quantization/Guide.md). Explain which assumption from this course the next engineer must preserve.
+
+**Custom-accelerator handoff:** take the lowered operator, buffer-lifetime plan, and reference vectors to [Compiler, Runtime ABI, and SoC Integration](../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Programmable%20VLA%20Inference%20Accelerator/Lecture-06.md). Specify command fields, alignment, DMA ownership, completion/error reporting, and fallback so the same contract can drive a functional simulator, RTL implementation, and Linux driver.

@@ -61,7 +61,9 @@ Implement a lowering path through a compiler IR or a small backend to a function
 
 Deliver a model-to-SoC brief containing the supported workload, operator coverage, numeric error, memory/bandwidth requirements, measured versus estimated latency/energy, and an interface proposal for a Linux driver. Define how timestamped sensor data enters, how controller-ready actions leave, and how wireless telemetry or updates share resources. Preserve the boundary between VLA inference and low-level motor or flight control.
 
-The claim should match the artifact: accelerating one block demonstrates that block's mapping; full-policy support additionally needs the remaining operators, runtime, and closed-loop validation. Continue with the [SoC capstone](../../Track%20F%20-%20AI%20Chip%20Design/Guide.md#physical-ai-soc-capstone) for CPU/accelerator integration, embedded Linux, wireless, physical implementation, and silicon bring-up.
+The claim should match the artifact: accelerating one block demonstrates that block's mapping; full-policy support additionally needs the remaining operators, runtime, and closed-loop validation.
+
+**Next-course handoff:** bring your pinned policy, shape/traffic traces, action contract, and evaluation baseline to [Programmable VLA Inference Accelerator](../../Track%20F%20-%20AI%20Chip%20Design/Programmable%20VLA%20Inference%20Accelerator/README.md). Its ten lectures develop the memory-residency study, tensor/vector architecture, compiler/runtime ABI, scheduling analysis, and prototype design defense. Pass that reviewed evidence into the [SoC capstone](../../Track%20F%20-%20AI%20Chip%20Design/Guide.md#physical-ai-soc-capstone) for CPU/accelerator integration, embedded Linux, wireless, physical implementation, and silicon bring-up.
 
 ## Analyze negative and inconclusive results
 

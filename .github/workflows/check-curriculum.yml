@@ -27,3 +27,5 @@ jobs:
         run: python3 -m unittest discover -s 'Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/labs' -p 'test_*.py'
       - name: Test VLA grounding, data contracts, timing, and evaluation
         run: python3 -m unittest discover -s 'Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/labs' -p 'test_*.py'
+      - name: Test VLA accelerator traffic, scheduling, and evaluation
+        run: python3 -m unittest discover -s 'Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/labs' -p 'test_*.py'

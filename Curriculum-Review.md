@@ -78,3 +78,19 @@ Added [VLA Foundations to Frontier 2026](Phase%205%20-%20Advanced%20Topics%20and
 The course adds a 16-week study path, notation/glossary reference, worked examples, negative controls, answered self-checks, and two capstones. Its CPU labs train an inspectable nine-parameter grounding model and check action normalization, episode masks, split groups, scheduling, and paired task statistics. These fixtures do not establish pretrained-model, simulator, or physical-robot performance. New VLA tests are included in curriculum CI; the 23-test result above records the earlier roadmap review, before this expansion.
 
 **VLA expansion validation:** 35 portable tests pass across the link checker, inference, Isaac, and VLA suites. All four VLA lab-guide shell blocks execute successfully, local Markdown links resolve, and the strict documentation build renders all 32 lectures and their downloadable Python helpers. No GPU, simulator, API, or physical-robot execution was performed.
+
+## Programmable VLA accelerator expansion — October 14, 2026
+
+Developed the supplied chip proposal into [Programmable VLA Inference Accelerator](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Programmable%20VLA%20Inference%20Accelerator/README.md): ten lectures connecting executable workloads, tensor/vector architecture, memory residency, mixed precision, valid reuse, compiler/runtime interfaces, action scheduling, task-level energy, hardware prototyping, and a reviewed SoC proposal.
+
+Two primary-source ledgers record current hardware specifications, model access, GR00T timing boundaries, and 2026 accelerator/quantization research. They preserve unresolved source discrepancies and distinguish publications, available implementations, analytical assumptions, and measurements. The research snapshot ends on October 14; later October developments are outside its scope.
+
+Five CPU labs reproduce the proposal's arithmetic and test assumptions before hardware commitments. Two original, reproducible SVG/PNG figures explain partial residency and scheduling boundaries. The course is linked from the roadmap, VLA capstone, compiler track, physical-AI studio, and chip-design track, with all ten lectures in site navigation.
+
+**Portable validation:** 51 tests pass across the existing suites and 16 new accelerator tests. The new tests include decimal release/deadline boundaries, partial packed blocks, cold/warm fills, SRAM reserves, tile padding, dispatch cost, failed-attempt energy, and observation age. All local Markdown file targets resolve. These results validate teaching fixtures; no GPU, simulator, FPGA, or silicon measurements were performed for this expansion.
+
+Run the new suite from the repository root:
+
+```bash
+python3 -m unittest discover -s 'Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/labs' -p 'test_*.py'
+```

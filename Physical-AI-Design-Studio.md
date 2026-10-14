@@ -80,6 +80,8 @@ The [DeepSeek V4.1 Flash NVFP4 course](Phase%205%20-%20Advanced%20Topics%20and%2
 
 **Exit:** one accepted optimization, or a well-supported explanation of why a candidate failed. Export the actual hot operator shapes, traffic, precision/error budgets, and timing requirements to Gate 5.
 
+**Accelerator handoff:** use the [memory-residency study](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Programmable%20VLA%20Inference%20Accelerator/Lecture-04.md) to separate capacity from repeated traffic, and the [fresh-action scheduling lab](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Programmable%20VLA%20Inference%20Accelerator/Lecture-07.md) to test whether a faster policy also reacts sooner.
+
 ## Gate 5 — design the compiler contract
 
 **Study:** [compiler stack](Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/03%20-%20Compiler%20Stack/Guide.md), [tinygrad](Phase%203%20-%20Artificial%20Intelligence/2.%20Deep%20Learning%20Frameworks/tinygrad/Guide.md), and [TVM](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/TVM%20Deep%20Dives/README.md).
@@ -94,6 +96,8 @@ Start with one measured subgraph, such as a projection plus activation. Define s
 
 **Exit:** reference vectors pass before and after lowering, and the ABI is precise enough for an RTL engineer to implement. Export it unchanged to Gate 6.
 
+**Worked contract:** [compiler, runtime ABI, and SoC integration](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Programmable%20VLA%20Inference%20Accelerator/Lecture-06.md) connects lowering to buffer ownership, DMA, completion, errors, and the Linux driver boundary. Use it to review the command interface with its future implementer.
+
 ## Gate 6 — prototype the accelerator and memory system
 
 **Study:** [digital foundations](Phase%201%20-%20Foundational%20Knowledge/Guide.md), [FPGA deployment](Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md), and [AI chip design](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Guide.md).
@@ -103,6 +107,8 @@ Choose compute width and local memory from Gate 4's shape distribution, not a he
 **Challenge:** odd dimensions, maximum values, reset during work, a stalled consumer, and a failed command. Check that buffer ownership remains correct and completion cannot refer to an overwritten input.
 
 **Exit:** simulation checks and, when hardware is available, FPGA resource/timing and host-to-host latency results. A kernel taking 1 ms plus 4 ms of transfers is a 5 ms path before other overhead; report both. Keep ASIC area/power/timing estimates separate from FPGA measurements.
+
+**Implementation evidence:** follow [prototype to silicon feasibility](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Programmable%20VLA%20Inference%20Accelerator/Lecture-09.md) to turn the selected subgraph into a verified vertical slice, then identify the technology, memory-interface, and physical-design evidence still needed for an ASIC decision.
 
 ## Gate 7 — integrate embedded Linux and physical I/O
 

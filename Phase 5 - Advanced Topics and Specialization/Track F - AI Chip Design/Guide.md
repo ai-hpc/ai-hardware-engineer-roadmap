@@ -15,6 +15,12 @@ The destination is a custom system on chip for physical AI: a processor running 
 
 Begin with the [professional VLA course](../Track%20D%20-%20Robotics/VLA%20Foundations%20to%20Frontier%202026/README.md) and profile an executable reference model. Treat the latest model as a versioned workload, with explicit operator, precision, shape, and action contracts. A programmable design and documented fallback path should accommodate evolving architectures. A chip optimized for one checkpoint alone does not establish support for future models.
 
+## Recommended course: programmable VLA inference accelerator
+
+Take the [10-lecture accelerator design course](Programmable%20VLA%20Inference%20Accelerator/README.md) after establishing a reproducible VLA reference. It turns the project goal into a workload dossier, tensor/vector architecture, memory-traffic model, precision/reuse contract, compiler/runtime ABI, and prototype evidence. CPU labs make the first architecture decisions testable before hardware is available.
+
+Carry its outputs into the SoC capstone below. Use [memory residency](Programmable%20VLA%20Inference%20Accelerator/Lecture-04.md) to justify SRAM and bandwidth, [compiler integration](Programmable%20VLA%20Inference%20Accelerator/Lecture-06.md) to define executable commands, [scheduling](Programmable%20VLA%20Inference%20Accelerator/Lecture-07.md) to bound action age, and [prototype-to-silicon feasibility](Programmable%20VLA%20Inference%20Accelerator/Lecture-09.md) to distinguish measured results from implementation estimates.
+
 ## Physical-AI SoC capstone
 
 Progress through these review gates. Each produces evidence that another learner can inspect or reproduce; choose the final implementation level according to available tools and hardware.
