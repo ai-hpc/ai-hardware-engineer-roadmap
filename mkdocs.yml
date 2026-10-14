@@ -304,6 +304,10 @@ plugins:
 
 extra_css:
   - Assets/css/custom.css
+  - Assets/css/reading-layout.css
+
+extra_javascript:
+  - Assets/js/reading-layout.js
 
 nav:
   - Home:

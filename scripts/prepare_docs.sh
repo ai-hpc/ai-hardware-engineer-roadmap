@@ -25,6 +25,7 @@ done < <(
     '*.gif' \
     '*.py' \
     '*.css' \
+    'Assets/js/*.js' \
     'Assets/js/vendor/mermaid/*'
 )
 
@@ -46,6 +47,7 @@ done < <(
     '*.gif' \
     '*.py' \
     '*.css' \
+    'Assets/js/*.js' \
     'Assets/js/vendor/mermaid/*'
 )
 

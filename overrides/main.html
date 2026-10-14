@@ -50,6 +50,18 @@
   {% endif %}
 {% endblock %}
 
+{% block container %}
+  <div class="md-content" data-md-component="content">
+    {% include "partials/reading-controls.html" %}
+    {% if "navigation.path" in features %}
+      {% include "partials/path.html" %}
+    {% endif %}
+    <article class="md-content__inner md-typeset">
+      {{ self.content() }}
+    </article>
+  </div>
+{% endblock %}
+
 {% block scripts %}
   {# Keep Material's renderer and palette support, but provide its runtime locally.
      Load before the theme bundle so Material does not request its default CDN.
