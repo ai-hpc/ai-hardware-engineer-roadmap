@@ -49,3 +49,13 @@
   <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   {% endif %}
 {% endblock %}
+
+{% block scripts %}
+  {# Keep Material's renderer and palette support, but provide its runtime locally.
+     Load before the theme bundle so Material does not request its default CDN.
+     navigation.instant is disabled; each diagram page loads this script itself. #}
+  {% if page and page.content and 'class="mermaid"' in page.content %}
+  <script src="{{ 'Assets/js/vendor/mermaid/mermaid-11.17.2.min.js' | url }}"></script>
+  {% endif %}
+  {{ super() }}
+{% endblock %}

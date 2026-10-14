@@ -787,6 +787,12 @@
 }
 
 /* ── Search ───────────────────────────────────── */
+.md-search {
+  /* Keep the overlay, input and results above the tabs' stacking context (3),
+     including dropdowns. Raising only the results leaves the overlay behind. */
+  z-index: 4;
+}
+
 .md-search__form {
   border-radius: 6px;
   background: var(--md-default-bg-color);
@@ -853,14 +859,23 @@
   transform: none;
 }
 
-.md-search-result__title {
-  font-size: 0.5rem;
+.md-search-result .md-search-result__title,
+.md-search-result .md-search-result__article h1,
+.md-search-result .md-search-result__article h2 {
+  /* Search uses h1/h2 inside .md-typeset; reset the article heading styles,
+     including the responsive !important page-title sizes. */
+  border: 0;
+  font-size: 0.85rem !important;
   font-weight: 700;
   line-height: 1.35;
   letter-spacing: normal;
+  margin: 0 0 0.35rem;
+  padding: 0;
+  text-wrap: wrap;
 }
 
-.md-search-result__teaser {
+.md-search-result__teaser,
+.md-search-result .md-search-result__article p {
   color: var(--md-default-fg-color--light);
   font-size: 0.74rem;
   line-height: 1.5;

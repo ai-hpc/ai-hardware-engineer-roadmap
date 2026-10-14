@@ -24,7 +24,8 @@ done < <(
     '*.svg' \
     '*.gif' \
     '*.py' \
-    '*.css'
+    '*.css' \
+    'Assets/js/vendor/mermaid/*'
 )
 
 for static_file in robots.txt llms.txt; do
@@ -44,7 +45,8 @@ done < <(
     '*.svg' \
     '*.gif' \
     '*.py' \
-    '*.css'
+    '*.css' \
+    'Assets/js/vendor/mermaid/*'
 )
 
 echo "Prepared docs tree at $DOCS_DIR"
