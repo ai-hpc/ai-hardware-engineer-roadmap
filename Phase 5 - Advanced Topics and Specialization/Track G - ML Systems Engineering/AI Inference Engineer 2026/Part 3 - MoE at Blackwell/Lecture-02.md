@@ -26,12 +26,12 @@ By the end you should be able to map DeepSeek V3.1 and Qwen3-MoE 235B-A22B onto 
 
 ### 1.1 The package
 
-Blackwell ships as a **dual-die** package. Each die is comparable to a full Hopper chip; they are connected via a chip-to-chip interconnect (NV-C2C) at **10 TB/s**. To software, the dual-die package **looks like one GPU** with twice the SMs and twice the HBM stacks.
+Blackwell ships as a **dual-die** package. Each die is comparable to a full Hopper chip, and the two are connected by a **10 TB/s** die-to-die interconnect (distinct from NVLink-C2C, the Grace↔GPU link in GB200). To software, the dual-die package **is one GPU**: one CUDA device, with no API to place work or memory on a particular die.
 
-* **Total SMs (B200):** 208 (104 per die × 2)
-* **Total tensor cores:** 832 (4 per SM)
+* **Total SMs (B200):** 148 enabled (74 per die; each die has 80 physically). The "208" often quoted is the transistor count in billions (104 B per die).
+* **Total tensor cores:** 592 (4 per SM)
 * **HBM stacks:** 8 (4 per die)
-* **L2 cache:** ~60 MB on-chip (per package)
+* **L2 cache:** 126 MB per package (NVIDIA Blackwell Tuning Guide), split into partitions on the two dies; hits in the far die's partition cost extra latency
 * **NVLink:** 18 links at 100 GB/s each → 1.8 TB/s per GPU (NVLink 5)
 
 ### 1.2 Tensor cores

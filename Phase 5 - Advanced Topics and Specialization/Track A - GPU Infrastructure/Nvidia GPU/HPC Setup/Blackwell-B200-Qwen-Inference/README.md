@@ -8,11 +8,11 @@ The short version: a single B200 holds 192 GB of HBM3e at 8 TB/s and supports FP
 
 | Chapter | Title | Focus |
 |---|---|---|
-| 01 | [Blackwell Architecture](01-Blackwell-Architecture.md) | Dual-die package, NVLink-C2C, HBM3e, 5th-gen tensor cores, NVL72 |
+| 01 | [Blackwell Architecture](01-Blackwell-Architecture.md) | Dual-die package (one CUDA device), HBM3e, 5th-gen tensor cores and Tensor Memory, NVL72 |
 | 02 | [FP4 Numerics & Transformer Engine 2](02-FP4-Numerics-Transformer-Engine.md) | MX-FP4/FP6/FP8 microscaling, dynamic per-block quant, quality vs bandwidth |
-| 03 | [Qwen on a Single B200](03-Single-B200-Qwen-Inference.md) | Qwen2.5-72B fitting in one die, layout, per-die TP via NVLink-C2C |
+| 03 | [Qwen on a Single B200](03-Single-B200-Qwen-Inference.md) | Qwen2.5-72B fitting in one GPU, layout, single vs dual instance, speculative decoding |
 | 04 | [Multi-B200 and NVL72](04-Multi-B200-NVL72.md) | GB200 superchip, NVL72 architecture, TP=16/72, NCCL on NVLink-5 |
-| 05 | [Blackwell Kernel Engineering](05-Blackwell-Kernel-Engineering.md) | 5th-gen WGMMA, TMA-2, async warp specialization, FlashAttention-3, CUTLASS 4 |
+| 05 | [Blackwell Kernel Engineering](05-Blackwell-Kernel-Engineering.md) | `tcgen05` + Tensor Memory, Blackwell TMA modes, warp specialization, attention kernels for SM100, CUTLASS |
 | 06 | [Production Serving on Blackwell](06-Production-Serving-on-Blackwell.md) | TRT-LLM 0.20+, vLLM Blackwell backend, FP4 in prod, benchmarks, cost |
 
 ## Prerequisites

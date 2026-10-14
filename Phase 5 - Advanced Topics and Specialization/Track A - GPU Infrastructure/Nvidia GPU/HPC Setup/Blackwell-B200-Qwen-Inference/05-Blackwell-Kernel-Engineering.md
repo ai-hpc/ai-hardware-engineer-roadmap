@@ -2,81 +2,86 @@
 
 ## Overview
 
-The kernels that make Qwen-class inference fast on Blackwell are not the same kernels that ran on Hopper. The new instruction set (`tcgen05.mma`), the redesigned async copy engine (TMA-2), the broader 5th-gen WGMMA tile shapes, and the warp specialization patterns that exploit FP4/FP6 — all of these are Blackwell-specific. A vLLM or TRT-LLM build compiled for Hopper will run on Blackwell, but will leave a large factor of throughput on the table.
+The kernels that make Qwen-class inference fast on Blackwell are not the same kernels that ran on Hopper. Blackwell's 5th-generation tensor cores are driven by a new instruction family (`tcgen05.*`) that accumulates into a new per-SM **Tensor Memory (TMEM)** instead of registers. TMA, Hopper's async copy engine, gains a few Blackwell-only modes. And the warp-specialized kernel structure is reorganized around both. Hopper's `wgmma.mma_async` is an `sm_90a`-only feature, so it does not run on Blackwell at all. A build without Blackwell (`sm_100a` / `sm_100f`) kernels either falls back to slower generic code paths or fails to load, and in either case leaves a large factor of throughput on the table.
 
-This chapter is for engineers who need to read, write, or tune the kernels that production runtimes use. You don't have to write WGMMA assembly to deploy Qwen on B200, but you do have to understand what the kernels are doing if you want to debug a 30% performance gap.
+This chapter is for engineers who need to read, write, or tune the kernels that production runtimes use. You don't have to write `tcgen05` PTX to deploy Qwen on B200, but you do have to understand what the kernels are doing if you want to debug a 30% performance gap.
 
 By the end you should be able to:
 
-* Distinguish 5th-gen WGMMA from Hopper's WGMMA and identify which one a kernel uses.
-* Read TMA-2 descriptors and explain what async copy patterns they enable.
+* Distinguish Blackwell's `tcgen05.mma` (accumulator in Tensor Memory) from Hopper's `wgmma.mma_async` (accumulator in registers) and identify which one a kernel uses.
+* Explain which TMA features Hopper already had (5-D tensor copies, cluster multicast, bulk reductions) and which ones Blackwell adds.
 * Understand persistent-kernel architecture and why it dominates Blackwell-era LLM serving.
-* Recognize FlashAttention-3's Blackwell adaptations vs FA-2.
+* Tell which attention kernels actually target Blackwell (FlashAttention-3 is Hopper-only).
 * Use CUTLASS 4 for custom kernels that target FP4 mixed precision.
 
 ---
 
 ## 1. 5th-Generation Tensor Cores at the Instruction Level
 
-Tensor cores on Hopper exposed `wgmma.mma_async` — an async warp-group MMA that operated on warp groups of 4 warps (128 threads). Blackwell adds `tcgen05.mma`, which:
+Tensor cores on Hopper exposed `wgmma.mma_async`: an async MMA issued by a warp group of 4 warps (128 threads), with the accumulator held in that warp group's registers. Blackwell replaces it with the `tcgen05` family:
 
-* Supports MX-FP4/FP6 as native operand types (Hopper's WGMMA didn't have these).
-* Has new tile shapes optimized for the new formats (`m64n16k64` for FP4 vs `m64n16k16` for FP16).
-* Reduces register pressure for the MX paths — important because FP4 GEMMs use small accumulator tiles and the compiler often spills on Hopper.
-* Adds support for **shared scale factors** as a third operand, enabling true MX block-format consumption without per-block dequant.
+* **The accumulator lives in Tensor Memory (TMEM),** a dedicated per-SM memory allocated with `tcgen05.alloc`. The MMA's D operand is a TMEM address. Results reach registers only through `tcgen05.ld`, usually in the epilogue. The registers Hopper spent on accumulators are free.
+* **One thread issues the MMA,** not a warp group, and it completes asynchronously. Completion is tracked by `tcgen05.commit` arriving on an mbarrier. With `.cta_group::2`, one thread drives the tensor cores of a pair of SMs.
+* **Low-precision and block-scaled formats are native:** `.kind::f8f6f4` for FP8/FP6/FP4, and with `.block_scale`, `.kind::mxf8f6f4`, `.kind::mxf4` and `.kind::mxf4nvf4` (NVFP4). The scale factors are read from TMEM too.
+* **The shape and operand types are not spelled out in the mnemonic.** They are encoded in a 32-bit instruction descriptor (`idesc`).
 
-A simplified PTX snippet for an MX-FP4 GEMM tile on Blackwell:
+The PTX for one block-scaled MX-FP4 MMA, following the PTX ISA's `tcgen05.mma` syntax:
 
 ```
-.reg .b32 a_desc, b_desc;            // matrix descriptors
-.reg .b64 scale_desc;                // shared scale factor descriptor
-.reg .b32 accum<8>;                  // FP32 accumulator tile
+// D (FP32, in TMEM) += A (MX-FP4) x B (MX-FP4), with E8M0 block scales held in TMEM
+tcgen05.mma.cta_group::1.kind::mxf4.block_scale
+    [d_tmem],                       // TMEM address of the accumulator tile
+    a_desc, b_desc,                 // 64-bit shared-memory matrix descriptors
+    idesc,                          // 32-bit instruction descriptor: M, N, A/B formats, scale format
+    [scale_a_tmem], [scale_b_tmem], // TMEM addresses of the block scales
+    enable_input_d;                 // predicate: accumulate (D += A*B) or overwrite (D = A*B)
 
-// New Blackwell instruction:
-tcgen05.mma.async.aligned.m64n16k64.row.col.f32.e2m1.e2m1.ue8m0
-    {accum0, accum1, ..., accum7},
-    a_desc, b_desc, scale_desc;
+// Epilogue: move the finished tile from TMEM to registers
+tcgen05.ld.sync.aligned.32x32b.x8.b32 {r0, r1, r2, r3, r4, r5, r6, r7}, [d_tmem];
+tcgen05.wait::ld.sync.aligned;
 ```
 
-The `e2m1.e2m1.ue8m0` triplet says: operand A is MX-FP4 (E2M1), operand B is MX-FP4, scale factors are UE8M0. The accumulator is FP32 (the standard MMA accumulator type).
+You won't write this by hand. cuBLAS/cuBLASLt, CUTLASS (CuTe's SM100 MMA atoms) and Triton emit it. To confirm the Blackwell path is active, dump the PTX (`cuobjdump --dump-ptx`) and look for `tcgen05.mma`. In SASS, Hopper's `wgmma` appears as `HGMMA`, and Blackwell kernels should not contain it.
 
-You won't write this by hand. CUTLASS 4 templates and Triton 3.x emit it. But seeing `tcgen05.mma` in your `cuobjdump` output is how you confirm the Blackwell path is active.
+### 1.1 If your Blackwell profile shows no `tcgen05` kernels
 
-### 1.1 If you see `wgmma.mma_async` on Blackwell
+`wgmma.mma_async` requires `sm_90a`, and architecture-specific (`a`) features do not carry forward to later architectures. So a Hopper-tuned kernel never runs on a B200. Either the binary also carries generic code (Ampere-style `mma.sync`, or PTX the driver JIT-compiles) and runs that slower path, or the kernel fails to load. Common causes:
 
-It runs — Hopper instructions are forward-compatible — but you're leaving ~30–40% of peak throughput on the table for MX-FP4 workloads. The compiler chose the safer/older instruction. Common causes:
+* CUDA toolkit older than 12.8, the first release with Blackwell (`sm_100`) targets.
+* A CUTLASS release without SM100 kernels (before 3.8), or a runtime build compiled without Blackwell kernels.
+* A custom kernel built with `-arch=sm_90a` (or `sm_90`) and no `sm_100a` / `sm_100f` target.
 
-* CUDA toolkit < 13.
-* CUTLASS < 4.0.
-* TRT-LLM < 0.20.
-* Custom kernel built with `-arch=sm_90` instead of `sm_100`.
-
-Rebuild with Blackwell-targeted toolchain and re-disassemble.
+Rebuild with a Blackwell-targeted toolchain and re-disassemble.
 
 ---
 
-## 2. TMA-2: The Async Copy Engine
+## 2. TMA on Blackwell: What Is Actually New
 
-Hopper introduced the **Tensor Memory Accelerator (TMA)** — a copy engine that moves multi-dimensional tile chunks from HBM to shared memory asynchronously, freeing warps to do compute while the load happens. Blackwell extends it to **TMA-2** with:
+Hopper introduced the **Tensor Memory Accelerator (TMA)**, a copy engine that moves multi-dimensional tiles between global and shared memory asynchronously, so warps can compute while loads are in flight. There is no "TMA-2" in NVIDIA's documentation, and most features attributed to it were already in Hopper (`sm_90`):
 
-* **Multicast** — one TMA load can deliver the same tile to multiple SMs' shared memory simultaneously. Crucial for attention kernels where K and V tiles are read by many SMs.
-* **Reduction-on-store** — TMA can accumulate stores into HBM with atomic-like behavior, useful for cross-SM partial reductions.
-* **Larger descriptors** — supports up to 5D tile descriptors (vs Hopper's 4D), making it easier to express complex paged-attention KV layouts.
-* **Lower-latency completion signals** — the SM gets the completion barrier in ~half the cycles.
+* **1-D to 5-D tensor copies** (`cp.async.bulk.tensor.1d` … `.5d`).
+* **Multicast** to the CTAs of a thread-block cluster (`.multicast::cluster`).
+* **Bulk tensor reductions** into global memory (`cp.reduce.async.bulk.tensor`).
 
-For Qwen inference specifically, TMA-2 multicast changes attention kernels significantly:
+What Blackwell adds (PTX targets `sm_100a` / `sm_100f`):
+
+* **`.tile::gather4` and `.tile::scatter4`** — load or store four rows selected by index in one operation. Useful for gathering scattered rows, such as MoE tokens or paged KV blocks.
+* **`.im2col::w` and `.im2col::w::128` modes** for convolution-style access.
+* **`.cta_group`** — a TMA load can signal the mbarrier of either CTA in a pair, matching `tcgen05.mma.cta_group::2`.
+
+What multicast buys, on Hopper and Blackwell alike:
 
 ```
-FlashAttention on Hopper:
-  Each SM loads its own K and V tiles independently.
-  Aggregate HBM read traffic = N_SMs × (K + V tile size).
+Without multicast:
+  Each CTA in a cluster loads its own copy of a shared tile.
+  L2 -> SMEM traffic for that tile = cluster_size x tile_size.
 
-FlashAttention-3 on Blackwell with TMA-2 multicast:
-  One TMA load broadcasts K (or V) to all SMs that need it.
-  Aggregate HBM read traffic = 1 × (K + V tile size).
+With multicast:
+  One TMA load delivers the tile to every CTA in the cluster that needs it.
+  L2 -> SMEM traffic for that tile = 1 x tile_size (per cluster).
 ```
 
-For Qwen2.5-72B at long context, this can roughly **halve** the KV cache bandwidth pressure during attention — the second-biggest bandwidth load in decode (after weights).
+The saving is bounded by the cluster size (8 CTAs portable, up to 16 non-portable), not by the number of SMs, and it only applies to tiles that several CTAs in a cluster actually share. In decode attention each KV tile is usually read once per (sequence, KV-head) pair, so how much multicast saves depends on the kernel's work split. Measure L2 and DRAM traffic in Nsight Compute rather than assuming a fixed reduction.
 
 ---
 
@@ -130,33 +135,21 @@ In practice TRT-LLM, CUTLASS 4 PerformanceKernel, and vLLM's Blackwell backend a
 
 ---
 
-## 4. FlashAttention-3 on Blackwell
+## 4. Attention Kernels on Blackwell
 
-FlashAttention-2 (Hopper) was the canonical attention kernel for Llama/Qwen/etc. inference. FlashAttention-3 is its Blackwell evolution, with several substantive changes:
+The FlashAttention generations target different hardware, and only the newest targets Blackwell:
 
-| Aspect | FA-2 (Hopper) | FA-3 (Blackwell) |
+| Kernel | Target | Tensor-core path |
 |---|---|---|
-| Tensor core instruction | `wgmma.mma_async` | `tcgen05.mma.async` |
-| TMA features used | TMA (load/store) | TMA-2 (multicast, reduce-on-store) |
-| Warp specialization | Producer/consumer split | Producer/consumer + reduction warp |
-| Accumulator precision | FP32 | FP32 (unchanged) |
-| Max tile size | 128 × 64 | 256 × 64 (more registers per SM) |
-| Q precision | FP16/BF16 | FP16/BF16/FP8 |
-| K, V precision | FP16/BF16 | FP16/BF16/FP8/FP4 |
-| Async pipeline depth | 2-3 | 4-6 stages |
-| Speedup vs FA-2 same arch | baseline | 1.6–2.2× on MX-FP4/FP8 paths |
+| FlashAttention-2 | Ampere, Ada, Hopper (generic) | `mma.sync`; runs on Blackwell, but far from its peak |
+| FlashAttention-3 | **Hopper only** ("optimized for Hopper GPUs", per the FlashAttention repository) | `wgmma` + TMA + warp specialization; cannot run on Blackwell |
+| FlashAttention-4 | Hopper and Blackwell (H100, B200); written in CuTe DSL | On Blackwell: `tcgen05.mma` with TMEM accumulators |
 
-FA-3 is what TRT-LLM uses by default on Blackwell. If your kernel trace shows `flash_attention_v2_decode_kernel` rather than `fa3_decode_*_sm100`, you're on the older path — rebuild with FA-3 enabled.
+Production runtimes on B200 (TensorRT-LLM, FlashInfer, cuDNN's SDPA, CUTLASS's Blackwell FMHA examples) ship their own SM100 attention kernels, and kernel names vary by runtime and version. To check which one ran, read the kernel names in an Nsight Systems trace and confirm `tcgen05` in their PTX, as in §8.
 
 ### 4.1 Decode-specific variants
 
-For autoregressive decode (seq_len=1 per query), there's a specialized kernel: **FlashDecoding-3**. It:
-
-* Parallelizes across the KV cache dimension (not the Q dimension, which is 1).
-* Uses TMA-2 multicast to broadcast the single Q to all SMs.
-* Reduces partial results across SMs via atomic-accumulating TMA stores.
-
-The result: a Qwen2.5-72B decode step's attention kernel runs in ~0.5 ms on a single B200 at ctx=4k, ~3 ms at ctx=32k. That's the kernel-level cost behind the per-token latencies in Chapter 3 §3.
+Autoregressive decode has one query token per sequence, so there is little work along Q. **Flash-Decoding** (split-KV) parallelizes along the KV sequence instead. Each CTA processes a slice of the KV cache and writes partial outputs plus softmax statistics, and a second step combines the partials. Most production decode kernels on Blackwell use this split-KV structure. Measure the attention kernel's share of a decode step on your own B200; Chapter 3 §3 gives the per-token budget it has to fit in.
 
 ---
 
@@ -200,7 +193,7 @@ using GemmOperator = cutlass::gemm::device::GemmUniversalAdapter<GemmKernel>;
 
 What this gives you:
 
-* A Blackwell-targeted, TMA-2-using, MX-FP4 ping-pong-scheduled GEMM kernel.
+* A Blackwell-targeted, TMA-fed, MX-FP4 GEMM kernel. The template above is illustrative: take the exact SM100 kernel-schedule and builder type names from CUTLASS's Blackwell examples for your CUTLASS version, because they changed across 3.8-4.x.
 * Tile size 128×128×128, warp-specialized producer/consumer.
 * Persistent-kernel architecture via the `Pingpong` schedule.
 
@@ -210,28 +203,25 @@ This is the level you operate at when production runtimes don't have the exact d
 
 ## 6. Warp Specialization on Blackwell
 
-Hopper introduced warp specialization — different warps within a CTA execute different programs (producer warps do TMA loads, consumer warps do MMA). Blackwell extends this with:
+Hopper introduced warp specialization: different warps within a CTA run different programs. Producer warps issue TMA loads, and consumer warp groups run `wgmma` while holding the accumulators in their registers. Blackwell keeps the idea but changes who does what, because the accumulator moved into Tensor Memory:
 
-* **Reduction warps** — dedicated warps that accumulate partial sums across the SM, useful for attention's softmax stage.
-* **Tighter producer/consumer balance** — TMA-2's lower-latency completion means producer warps spend less time waiting, more time prefetching.
-* **More warp-group MMA pipeline stages** — 4-6 stages of in-flight MMA per warp group (vs 2-3 on Hopper), reducing register pressure per stage.
+* **A dedicated MMA warp** — one elected thread issues `tcgen05.mma`. It needs no accumulator registers.
+* **Separate epilogue warps** — they `tcgen05.ld` a finished tile out of TMEM, apply scaling and activation, and store it. Meanwhile the MMA warp is already accumulating the next tile into a second TMEM buffer.
+* **Deeper pipelines are cheaper** — shared-memory stages hold operands, and TMEM holds accumulators, so adding stages no longer costs register pressure the way it did on Hopper.
 
-A simplified persistent decode-kernel layout for Qwen2.5-72B on Blackwell:
+A simplified warp-specialized GEMM/decode-kernel layout on Blackwell:
 
 ```
-Per SM (Blackwell has ~160 SMs per B200):
-  Warp group 0 (warps 0-3):  TMA-2 producer
-    - Issues async loads of weight tiles and KV tiles
-    - Waits on completion barriers
-  Warp group 1 (warps 4-7):  MMA consumer
-    - Runs tcgen05.mma on incoming tiles
-    - Accumulates into FP32 register tile
-  Warp group 2 (warps 8-11): Reduction warp group
-    - Accumulates across SM via shared memory
-    - Issues TMA-2 reduce-on-store to global memory
+Per SM (B200 has 148 SMs):
+  Producer warp:   issues TMA loads of weight and KV tiles into shared memory
+                   (multicast within the cluster where tiles are shared), waits on mbarriers
+  MMA warp:        one elected thread issues tcgen05.mma; the accumulator lives in Tensor Memory;
+                   tcgen05.commit signals the epilogue through an mbarrier
+  Epilogue warps:  tcgen05.ld the finished tile from TMEM into registers, apply scale/activation,
+                   store via TMA (or reduce split-K partials with cp.reduce.async.bulk)
 ```
 
-This three-warp-group pattern is now standard for LLM kernels on Blackwell. Older two-warp-group designs (Hopper-era) leave the reduction work to one of the consumer groups and underutilize the SM.
+This producer / MMA / epilogue split is the structure of CUTLASS's SM100 warp-specialized kernels. On Hopper the consumer warp groups owned the accumulators, so the epilogue ran in those same warps. On Blackwell, a separate set of warps can drain TMEM while the tensor cores keep working.
 
 ---
 
@@ -246,13 +236,14 @@ import triton.language as tl
 @triton.jit
 def qwen_ffn_mx_fp4_kernel(
     X_ptr, W_gate_ptr, W_up_ptr, W_down_ptr,
-    Out_ptr, scale_ptr,
+    Out_ptr,
+    Sg_ptr, Su_ptr,          # E8M0 block scales for the FP4 weights, one per 32 values
     M, N, K,
     BLOCK_M: tl.constexpr,
     BLOCK_N: tl.constexpr,
     BLOCK_K: tl.constexpr,
 ):
-    # Triton 3.x exposes MX-FP4 via tl.dot with format hints
+    # Triton exposes OCP-MX matmuls through tl.dot_scaled (formats "e2m1", "e4m3", "e5m2", "bf16", "fp16")
     pid_m = tl.program_id(0)
     pid_n = tl.program_id(1)
 
@@ -264,33 +255,36 @@ def qwen_ffn_mx_fp4_kernel(
     up   = tl.zeros((BLOCK_M, BLOCK_N), dtype=tl.float32)
 
     for k in range(0, K, BLOCK_K):
-        offs_k = k + tl.arange(0, BLOCK_K)
-        x  = tl.load(X_ptr + offs_m[:, None]*K + offs_k[None, :])
-        wg = tl.load(W_gate_ptr + offs_n[:, None]*K + offs_k[None, :],
-                     dtype=tl.float_e2m1)         # MX-FP4 hint
-        wu = tl.load(W_up_ptr   + offs_n[:, None]*K + offs_k[None, :],
-                     dtype=tl.float_e2m1)
-        gate += tl.dot(x, wg.T)                   # uses tcgen05.mma
-        up   += tl.dot(x, wu.T)
+        offs_k  = k + tl.arange(0, BLOCK_K)
+        offs_kp = k // 2 + tl.arange(0, BLOCK_K // 2)      # FP4: two values packed per uint8 along K
+        offs_ks = k // 32 + tl.arange(0, BLOCK_K // 32)    # one E8M0 scale per 32 values
+        x   = tl.load(X_ptr + offs_m[:, None]*K + offs_k[None, :])                 # bf16 [BM, BK]
+        wg  = tl.load(W_gate_ptr + offs_kp[:, None]*N + offs_n[None, :])          # uint8 [BK/2, BN]
+        wu  = tl.load(W_up_ptr   + offs_kp[:, None]*N + offs_n[None, :])
+        sg  = tl.load(Sg_ptr + offs_n[:, None]*(K // 32) + offs_ks[None, :])       # uint8 [BN, BK/32]
+        su  = tl.load(Su_ptr + offs_n[:, None]*(K // 32) + offs_ks[None, :])
+        # Native block-scaled MMA on Blackwell; emulated (upcast to bf16) on GPUs without MX support
+        gate = tl.dot_scaled(x, None, "bf16", wg, sg, "e2m1", acc=gate)
+        up   = tl.dot_scaled(x, None, "bf16", wu, su, "e2m1", acc=up)
 
     swiglu = tl.sigmoid(gate) * gate * up         # SwiGLU
     # Then a second matmul into W_down...
 ```
 
-Triton emits Blackwell SASS via the MLIR backend. It's how a lot of "small custom kernel work" gets done in 2026 — full WGMMA-level control without writing PTX. The compile times can be slow (auto-tuning sweeps blow up at FP4 because the tile space is larger), but the runtime is competitive with hand-tuned CUTLASS for many shapes.
+Triton emits Blackwell SASS via the MLIR backend. It's how a lot of "small custom kernel work" gets done in 2026 — tensor-core-level control without writing PTX. The compile times can be slow (auto-tuning sweeps blow up at FP4 because the tile space is larger), but the runtime is competitive with hand-tuned CUTLASS for many shapes.
 
 ---
 
 ## 8. Performance Diagnostics — Is Your Kernel on the Blackwell Path?
 
 ```bash
-# 1. Disassemble the kernel and look for tcgen05.mma
-cuobjdump --dump-sass your_kernel.cubin | grep -E "tcgen05|wgmma" | head
-# Expect tcgen05.mma; if only wgmma, you're on the Hopper path.
+# 1. Look for tcgen05.mma in the embedded PTX
+cuobjdump --dump-ptx your_binary | grep -E "tcgen05\.mma|wgmma" | head
+# Expect tcgen05.mma. wgmma (sm_90a) cannot run on Blackwell; mma.sync means a generic path.
 
-# 2. Confirm TMA-2 multicast in attention kernels
-cuobjdump --dump-sass fa3_kernel.cubin | grep "TMA.LDGSTS.MULTICAST"
-# Expect at least one MULTICAST instruction per K/V load.
+# 2. Identify the attention kernel that actually ran
+nsys profile -o decode_trace your_app && nsys stats --report cuda_gpu_kern_sum decode_trace.nsys-rep
+# Check the attention kernel's name and that its PTX contains tcgen05 (step 1).
 
 # 3. Profile with Nsight Compute
 ncu --set full --kernel-name "gemm_mx_fp4_sm100" your_app
@@ -306,7 +300,7 @@ ncu --metrics launch__waves_per_multiprocessor your_app
 # Non-persistent: many waves (kernel launches per op)
 ```
 
-If `tcgen05.mma` is absent, fix the build. If TMA-2 MULTICAST is absent, you're on FA-2 not FA-3. If occupancy is low, your tile size or register pressure is suboptimal — tune via Triton's autotune or CUTLASS template parameters.
+If `tcgen05.mma` is absent, fix the build. If the attention kernel is FlashAttention-2 or another generic path, switch to a Blackwell attention backend (§4). If occupancy is low, your tile size or register pressure is suboptimal — tune via Triton's autotune or CUTLASS template parameters.
 
 ---
 
@@ -319,7 +313,7 @@ Where each layer lives in mid-2026:
 | User-facing API | OpenAI-compatible REST | `/v1/chat/completions` |
 | Serving frontend | TRT-LLM Triton frontend / vLLM | Request batching, scheduling |
 | Engine | TensorRT engine (compiled) | The compiled-once graph |
-| Kernel library | TRT-LLM kernels, FA-3, custom CUTLASS | The per-op implementations |
+| Kernel library | TRT-LLM kernels, FlashInfer / cuDNN / FlashAttention-4 attention, custom CUTLASS | The per-op implementations |
 | Tile-level GEMM | CUTLASS 4 (templated) | Reusable tile kernels |
 | Custom GPU code | Triton 3.x | Quick fused kernels, exploration |
 | PTX assembly | Manual / cuobjdump output | Performance debugging only |
@@ -333,10 +327,10 @@ You rarely touch the bottom three layers in normal LLM deployment. You touch CUT
 
 | Takeaway | Why it matters |
 |---|---|
-| `tcgen05.mma` is the new instruction; `wgmma` is the fallback | Look for it in disassembly to confirm Blackwell path |
-| TMA-2 multicast halves KV bandwidth in attention | Crucial for long-context decode |
+| `tcgen05.mma` (accumulator in TMEM) is the Blackwell MMA; `wgmma` is `sm_90a`-only | Look for `tcgen05` in the PTX to confirm the Blackwell path |
+| TMA multicast (a Hopper feature) cuts L2 traffic for tiles shared within a cluster | Savings are bounded by cluster size; measure them |
 | Persistent kernels dominate Blackwell LLM serving | Zero launch overhead, warm caches, work-queue dispatch |
-| FlashAttention-3 is the canonical attention; FA-2 is legacy | 1.6–2.2× speedup on the MX-FP4 path |
+| FlashAttention-3 is Hopper-only; Blackwell needs SM100 attention kernels | FA-4, FlashInfer, cuDNN or runtime-specific kernels |
 | CUTLASS 4 is the layer for custom Blackwell kernels | Templated tile-level composition with FP4 first-class |
 | Triton 3.x handles MX-FP4 with `tl.dot` and dtype hints | Quick exploration without PTX |
 | Diagnostics: disasm shows `tcgen05`, ncu shows >60% occupancy | Validate every deployment, not just first one |
@@ -345,9 +339,11 @@ You rarely touch the bottom three layers in normal LLM deployment. You touch CUT
 
 ## Resources
 
-* **[NVIDIA CUDA 13 Programming Guide](https://docs.nvidia.com/cuda/cuda-c-programming-guide/):** `tcgen05.mma`, TMA-2 reference.
+* **[PTX ISA](https://docs.nvidia.com/cuda/parallel-thread-execution/):** `tcgen05.*` instructions, Tensor Memory, and `cp.async.bulk.tensor` (TMA), with per-target requirements.
+* **[Blackwell Tuning Guide](https://docs.nvidia.com/cuda/blackwell-tuning-guide/):** compute capability 10.0 specifics, L2 capacity.
 * **[CUTLASS 4 GitHub](https://github.com/NVIDIA/cutlass):** Blackwell-aware tile kernel templates.
-* **[FlashAttention-3 paper](https://arxiv.org/abs/2407.08608):** The attention kernel design.
+* **[FlashAttention-3 paper](https://arxiv.org/abs/2407.08608):** The Hopper attention design (wgmma, TMA, warp specialization).
+* **[FlashAttention repository](https://github.com/Dao-AILab/flash-attention):** FlashAttention-4 (CuTe DSL) for Hopper and Blackwell.
 * **[Triton 3.x documentation](https://triton-lang.org/):** Higher-level kernel DSL.
 * **[Nsight Compute on Blackwell](https://docs.nvidia.com/nsight-compute/):** Profiling.
 * **[Phase 5 — CUDA Advanced Optimization](../CUDA-Advanced-Optimization/README.md):** Persistent kernels, warp specialization (Hopper foundation).

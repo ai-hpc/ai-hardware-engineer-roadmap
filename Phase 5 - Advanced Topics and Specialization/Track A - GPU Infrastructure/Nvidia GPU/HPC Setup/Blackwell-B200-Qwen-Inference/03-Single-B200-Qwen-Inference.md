@@ -4,12 +4,12 @@
 
 The biggest single-platform change between Hopper-class and Blackwell-class deployment is this: **Qwen2.5-72B-Instruct fits in one Blackwell B200 GPU.** Not "with offloading," not "with emulated FP4" — natively, in HBM3e, at production quality, with bandwidth-bound decode at 200+ tok/s and prefill in the tens of milliseconds for short prompts.
 
-This chapter is the deployment playbook for that single-GPU regime. It covers the memory layout, the per-die placement choices, how to use the second die for either throughput or speculative decoding or a second model, and what to expect from the latency/throughput numbers.
+This chapter is the deployment playbook for that single-GPU regime. It covers the memory layout, how to use the HBM one model doesn't need (a larger batch, a second instance, or a draft model), why there is no per-die placement or intra-GPU tensor parallelism, and what to expect from the latency/throughput numbers.
 
 By the end you should be able to:
 
 * Compute exactly how Qwen2.5-72B-MX-FP4-mixed lays out in 192 GB of HBM3e.
-* Choose between single-instance, dual-instance, intra-package TP=2, and draft+target for a workload.
+* Choose between a single instance, two instances on one GPU, and draft+target for a workload, and explain why "TP=2 inside one B200" is not an option.
 * Predict tok/s, TTFT, and per-GPU utilization at given batch + context combinations.
 * Recognize when you should keep Hopper deployments running anyway.
 
@@ -133,66 +133,57 @@ From mid-2026 internal benchmarks (validated on HGX B200 silicon):
 
 ---
 
-## 4. The Dual-Die Question — What to Do with the Second Die
+## 4. Using a Single B200's Spare Capacity
 
-This is the new architectural decision Blackwell introduces. A single Qwen2.5-72B engine touches **all of die 0 and die 1** in a default TP=1 deployment — but it doesn't necessarily *need* to. The model's effective working set per layer (one tile of weights + activations + KV slice) fits comfortably on one die's 96 GB.
+A B200 is two dies, but CUDA presents it as **one GPU**. There is no API to place a kernel or an allocation on a particular die, so "use the second die for something else" is not an option you have (Chapter 1 §4). The real decision is how to use one GPU with 192 GB of HBM, when one Qwen2.5-72B instance needs well under half of it.
 
-Three deployment patterns:
+### 4.1 Pattern A — One instance, the default
 
-### 4.1 Pattern A — Single TP=1 instance spans both dies
+One engine owns the GPU. Its kernels run across all 148 SMs, and its weights and KV cache are spread across both dies' HBM by the hardware, with nothing to configure. The spare memory goes to a larger KV cache and batch.
 
-Default for TRT-LLM 0.20. Weights striped across both dies' HBM stacks; tensor cores from both dies participate per layer. NVLink-C2C handles the implicit collective at hot-path speed.
+**Pros:** simplest, best single-stream latency, highest aggregate throughput.
+**Cons:** no isolation between tenants.
 
-**Pros:** simplest, highest single-stream throughput, uses both dies' bandwidth.
-**Cons:** doesn't expose dual-die as a software degree of freedom.
+### 4.2 Pattern B — Two instances on one GPU
 
-### 4.2 Pattern B — Two parallel instances, one per die
+Run two engines on the same B200: either two processes sharing the device, or MIG partitions where your driver and configuration support them. MIG gives each instance dedicated SMs and memory, while shared processes contend for both. Neither lets you choose which die an instance runs on.
 
-Pin instance 0 to die 0, instance 1 to die 1. Each is a separate Qwen2.5-72B serving 30% of users.
+**Pros:** isolation (with MIG, one instance's OOM or noisy load doesn't affect the other); two model versions side by side.
+**Cons:** each instance gets a share of the bandwidth, so single-stream speed drops.
 
-**Pros:** doubles aggregate batch throughput, isolates instances (one OOM doesn't kill the other).
-**Cons:** halves single-stream throughput; per-die bandwidth is "only" 4 TB/s.
+Best for: multiple smaller customer cohorts, or A/B testing two model versions.
 
-Best for: serving multiple smaller customer cohorts, or A/B testing two model versions side by side.
+### 4.3 There is no "TP=2 inside one B200"
 
-### 4.3 Pattern C — TP=2 inside one B200 (intra-package)
+Tensor parallelism splits a model across separate GPUs and runs collectives between them. A B200's two dies are not separate CUDA devices, so a single B200 cannot be configured for tensor parallelism. If one B200's single-stream decode is not fast enough, the options are faster kernels and formats on the same GPU (FP4/FP8 paths, CUDA Graphs, speculative decoding), or tensor parallelism across several B200s over NVLink 5 (Chapter 4).
 
-Explicitly partition the model across die 0 and die 1, using NVLink-C2C for the AllReduce after attention and FFN. From Chapter 1 §4: per-token NVLink-C2C time is ~0.0003 ms — effectively free.
+### 4.4 Pattern C — Draft + target speculative decoding
 
-**Pros:** doubles bandwidth available to one model (each die contributes 4 TB/s, weights split). Single-stream tok/s ~280 instead of ~210.
-**Cons:** more complex deployment; TRT-LLM exposes this as `--tp_size 2 --intra_package=True`.
-
-Best for: latency-sensitive single-user workloads where you want the absolute fastest single-stream decode possible.
-
-### 4.4 Pattern D — Draft + target speculative decoding
-
-Run a smaller Qwen-family draft model (Qwen2.5-7B at FP4) on die 0, with the Qwen2.5-72B target spanning die 1 (and spilling slightly to die 0 if needed). Use speculative decoding to verify K drafted tokens in one target forward pass.
+Run a smaller Qwen-family draft model (Qwen2.5-7B at FP4) next to the Qwen2.5-72B target in the same GPU. Speculative decoding verifies K drafted tokens in one target forward pass.
 
 ```
-Single B200:
-  Die 0: Qwen2.5-7B-MX-FP4 draft (~4 GB) + KV
-  Die 1: Qwen2.5-72B-MX-FP4-mixed target (~45 GB) + KV
+Single B200 (one device, both models resident):
+  Qwen2.5-7B-MX-FP4 draft   (~4 GB)  + KV
+  Qwen2.5-72B-MX-FP4-mixed target (~45 GB) + KV
   Per spec-dec step:
-    - 5 draft tokens at ~700 tok/s (die 0)
+    - 5 draft tokens at ~700 tok/s
     - 1 target forward verification with seq_len=5
     - α (accept rate) ~ 0.7 (same family)
     - Effective: ~3.5 tokens per target step at ~35 ms wall
     - tok/s ≈ 100 (single-stream)
 ```
 
-Wait — that's slower than just running the 72B at TP=2. Spec dec is actually a **batch throughput** win, not a single-stream win, on B200 specifically. The 72B target step is already very fast; you can't beat 280 tok/s single-stream with a 7B draft.
-
-On B200, **speculative decoding becomes a throughput multiplier under load** (~1.4× at batch=8), but it stops being the dominant single-stream optimization it was on Hopper.
+That is slower than Pattern A's single-stream rate (§5). On B200, speculative decoding is mainly a **batch-throughput** lever (~1.4× at batch=8) rather than the dominant single-stream optimization it was on Hopper. These figures are estimates for this configuration; measure acceptance rate and step time on your own traffic.
 
 ### 4.5 The recommendation matrix
 
 | Workload | Pattern |
 |---|---|
-| Single-user chat assistant, lowest latency | C (intra-package TP=2) |
-| Multi-tenant serving, high throughput | A (default TP=1) |
-| Side-by-side A/B test, two models | B (two instances) |
+| Single-user chat assistant, lowest latency | A (one instance), or multi-GPU TP if one B200 is not fast enough |
+| Multi-tenant serving, high throughput | A (one instance, large batch) |
+| Side-by-side A/B test, two models | B (two instances, ideally MIG-isolated) |
 | High-load API with code/long-form output | A + EAGLE-2 (continuous batching + inline spec dec) |
-| Latency-tier-1 with 7B draft | D, only if you're willing to take the complexity |
+| Throughput under load with a same-family draft | C, only if you're willing to take the complexity |
 
 ---
 
@@ -206,12 +197,10 @@ The deployment trade-off on a single B200, plotted in a table:
 | A: TP=1, batch=8 | 8 | 175 | 1,400 | 50 ms | 850 ms |
 | A: TP=1, batch=32 | 32 | 120 | 3,800 | 90 ms | 1.4 s |
 | B: 2 instances, batch=16 each | 32 | 95 | 3,000 | 110 ms | 1.5 s |
-| C: intra-TP=2, batch=1 | 1 | 280 | 280 | 22 ms | 440 ms |
-| C: intra-TP=2, batch=16 | 16 | 200 | 3,200 | 35 ms | 700 ms |
 
-Pattern C dominates on per-user-latency metrics. Pattern A dominates on aggregate throughput at high concurrency. Pattern B is a niche choice.
+These are planning estimates for this configuration, not measurements; rerun them on your hardware and runtime version. Pattern A leads on both per-user latency and aggregate throughput. Pattern B trades throughput for isolation.
 
-For most production deployments, **start with Pattern A, switch to Pattern C only if your p95 TTFT requirement is below ~80 ms.** Pattern B is for special multi-model A/B test cases.
+For most production deployments, **start with Pattern A.** If its p95 TTFT or single-stream decode misses your target, move to tensor parallelism across several B200s (Chapter 4). Use Pattern B for isolation or multi-model A/B tests.
 
 ---
 
@@ -280,8 +269,8 @@ If any of these fail, look at: (a) driver version, (b) TRT-LLM version, (c) buil
 | Takeaway | Why it matters |
 |---|---|
 | Qwen2.5-72B-MX-FP4-mixed fits in one B200 with 40 GB to spare | The single-GPU 70B regime didn't exist before Blackwell |
-| Default Pattern A (TP=1 spans both dies) is the right starting point | Simplest, highest aggregate throughput, fewest moving parts |
-| Pattern C (intra-package TP=2) is the latency play | Cuts TTFT and per-token decode time substantially |
+| Default Pattern A (one instance per GPU) is the right starting point | Simplest, lowest latency, highest aggregate throughput |
+| A B200 is one CUDA device: no die pinning, no TP inside one GPU | For lower latency than one B200 gives, use multi-GPU TP (Chapter 4) |
 | Speculative decoding shifts from single-stream win to throughput multiplier | On B200, target forward is fast enough that draft + verify doesn't help latency much |
 | KV cache budget is the real constraint | 192 GB HBM looks like infinity until you put a long context on it |
 | MX-FP4 kernel paths require CUDA 13 / TRT-LLM 0.20+ | Older stacks silently fall back to FP8 — measure to confirm the right path |

@@ -120,7 +120,7 @@ The dashboards from the Edge AI / Qwen / Lecture 05 still apply. What's added fo
 * **Transformer Engine 2 promotion events** — TE2 logs when a block's quant gets promoted at runtime (overflow detection). Counter: `te2_block_promotion_count`. Healthy: < 100/hour under steady load.
 * **NVLink-5 link health** — `nvidia-smi nvlink --errors -l 0` for each GPU should show zero CRC errors. Errors here silently degrade throughput by 20–50% for the affected GPU.
 * **Grace coherent memory access ratio** (GB200/NVL72) — fraction of memory reads that crossed the NVLink-C2C from B200 to Grace. Above ~10% suggests KV spill is dominant and worth re-tuning.
-* **TMA-2 multicast utilization** — Nsight metric `tma_multicast_loads_per_sec`. Should be high in attention kernels; absence means FA-3 isn't actually active.
+* **Attention backend actually in use** — read the attention kernel names in an Nsight Systems trace, and confirm `tcgen05` in their PTX. FlashAttention-3 is Hopper-only, so on B200 expect an SM100 backend (FlashInfer, cuDNN, FlashAttention-4, or the runtime's own kernels).
 
 ### 3.2 The Prometheus scrape
 
@@ -193,7 +193,7 @@ Peak tok/s (5× peak factor):  ~2,300 tok/s
 
 For a 2,300 tok/s peak you actually have several viable options:
 
-* **Single B200** with intra-package TP=2 fits the peak with ~25% headroom. Cheapest by a wide margin if you don't need redundancy.
+* **Single B200** running one instance is the cheapest option if it meets the peak with headroom and you don't need redundancy. Confirm with a load test; there is no intra-GPU tensor parallelism to fall back on.
 * **HGX H100/H200** also works but with less headroom and a near-future capacity ceiling.
 * **HGX B200** is overkill for this load but gives you 6× growth headroom — pick this if you expect to 5× users in 12 months.
 

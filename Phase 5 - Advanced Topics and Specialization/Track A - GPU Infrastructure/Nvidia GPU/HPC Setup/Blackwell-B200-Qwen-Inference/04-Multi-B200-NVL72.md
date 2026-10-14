@@ -56,7 +56,7 @@ By the end you should be able to:
 
 | Workload | Right tier |
 |---|---|
-| Single-user low-latency Qwen2.5-72B | Tier 1 (single B200, intra-package TP=2) |
+| Single-user low-latency Qwen2.5-72B | Tier 1 (single B200), or a few B200s at TP=2-4 if one GPU is not fast enough |
 | Multi-tenant chat, 100s of concurrent users | Tier 2 (HGX B200 8-GPU) |
 | Long-context KV spill / prefix cache / MoE expert pool | Tier 3 (GB200, uses Grace coherent memory) |
 | Frontier model serving (Qwen3-300B+ / Qwen-MoE) | Tier 4 (NVL72) |
@@ -262,7 +262,7 @@ Healthy. Above ~TP=72 you'd start being collective-latency-bound, but within one
 
 | Qwen Workload | Recommended Platform | Why |
 |---|---|---|
-| Qwen2.5-72B, single-user low-latency chat | Single B200, intra-package TP=2 | 280 tok/s in one chip |
+| Qwen2.5-72B, single-user low-latency chat | Single B200 (one instance) | Fits in one GPU; add multi-GPU TP only if latency targets need it |
 | Qwen2.5-72B, multi-tenant chat (100s users) | HGX B200 (1 box, TP=8) | 32k tok/s aggregate, simplest |
 | Qwen2.5-72B, multi-tenant with 128k+ context | GB200 superchip | Grace LPDDR for KV spill |
 | Qwen-MoE serving | GB200 (small) or NVL72 (large) | Grace holds expert pool |

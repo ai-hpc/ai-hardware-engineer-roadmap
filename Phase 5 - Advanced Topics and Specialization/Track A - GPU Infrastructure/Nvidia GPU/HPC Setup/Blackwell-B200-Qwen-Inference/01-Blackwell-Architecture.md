@@ -8,7 +8,7 @@ For Qwen-class transformer inference the headline number is bandwidth: **8 TB/s 
 
 By the end you should be able to:
 
-* Sketch the B200 package and explain how dual-die affects software (TP=2 inside one card).
+* Sketch the B200 package and explain what the dual-die design does and does not change for software (it is one CUDA device).
 * Quote per-GPU and aggregate bandwidth, capacity, and compute numbers for Qwen-class workloads.
 * Compare B200 against H100, H200, and the still-shipping L40S on relevant inference metrics.
 * Place GB200 superchip and NVL72 rack in the same mental model.
@@ -20,7 +20,7 @@ By the end you should be able to:
 ```
        ┌────────────────────────────────────────┐
        │                  B200                  │
-       │   ┌────────────┐ NVLink-C2C ┌────────────┐│
+       │   ┌────────────┐ die-to-die ┌────────────┐│
        │   │   Die 0    │◄══════════►│   Die 1    ││
        │   │ (104 B txn)│  10 TB/s   │ (104 B txn)││
        │   │  4×HBM3e   │            │  4×HBM3e   ││
@@ -37,17 +37,17 @@ By the end you should be able to:
 
 Two reticle-limit dies (~800 mm² each) are co-packaged on a CoWoS-L substrate. Each die has its own SM array, its own L2 cache, and four HBM3e stacks (24 GB each, 1 TB/s each → 4 TB/s per die).
 
-The two dies are connected by **NVLink-C2C** — a wide, low-latency, on-package link that delivers **10 TB/s bidirectional**. For comparison: H100 SXM's NVLink 4 between two cards is 900 GB/s. So inside one B200, the die-to-die bandwidth is more than 10× a single H100-to-H100 NVLink. The two dies present themselves to CUDA as **one GPU**, but software that's aware of the partitioning can do something the H100 generation could not — run **tensor-parallel inference across two dies inside a single GPU**.
+The two dies are connected by a **10 TB/s die-to-die interconnect** on the package. This is not NVLink-C2C, which is the separate 900 GB/s Grace↔GPU link in Grace Hopper and GB200. For comparison, H100 SXM's NVLink 4 is 900 GB/s per GPU. The two dies present themselves to CUDA as **one GPU**: one device, one address space, one pool of 148 SMs. CUDA gives you no control over which die a kernel's blocks run on or which die's HBM an allocation lands in. The hardware spreads both across the dies, and cross-die traffic travels over the 10 TB/s link transparently. What software can observe is non-uniformity. L2 is partitioned between the dies, and an access served by the far die's partition has higher latency than one served locally (Chips and Cheese measured this on B200).
 
 ### 1.1 Why this matters for Qwen inference
 
-For Qwen2.5-72B-Instruct at FP4 (~36 GB weights), the model fits comfortably on **one** die. The KV cache, activations, and CUDA context take another 10–20 GB. You can run the whole model on one die and keep the second die free for either:
+For Qwen2.5-72B-Instruct at FP4 (~36 GB weights), the model fits comfortably in **one B200**. The KV cache, activations and CUDA context take another 10–20 GB, which leaves most of the 192 GB free. The spare capacity is a GPU-level resource, not a spare die. Typical uses:
 
-* A second concurrent model instance (doubles serving throughput at the cost of higher per-request latency under load).
-* TP=2 of the same model across the two dies, doubling decode bandwidth and shrinking per-stream latency.
-* A draft model for speculative decoding (Qwen3-8B drafting Qwen2.5-72B target).
+* A much larger KV cache and batch, which raises serving throughput.
+* A second model instance in the same GPU: two processes sharing the device, or MIG partitions where your driver and configuration support them.
+* A draft model for speculative decoding (for example, Qwen3-8B drafting for Qwen2.5-72B).
 
-This is a regime that simply doesn't exist on H100/H200 — there, a 70B-class model in FP4/FP8 fits on one card, but you can't subdivide the card further. On B200 the dual-die architecture is a software-visible degree of freedom.
+None of these places work on a particular die, and you cannot run "tensor parallelism across the two dies" of one B200. Tensor parallelism splits a model across separate GPUs (Chapter 4). The dual-die design matters for capacity and bandwidth (192 GB at ~8 TB/s in one device), not as a software-visible partition.
 
 ---
 
@@ -57,8 +57,8 @@ This is a regime that simply doesn't exist on H100/H200 — there, a 70B-class m
 |---|---|---|---|
 | HBM capacity | 192 GB | 141 GB | 80 GB |
 | HBM bandwidth | ~8 TB/s | ~4.8 TB/s | ~3.35 TB/s |
-| L2 cache total | ~120 MB | ~50 MB | ~50 MB |
-| SM count | ~160 (across both dies) | ~132 | 132 |
+| L2 cache total | 126 MB (partitioned across the two dies) | ~50 MB | ~50 MB |
+| SM count | 148 (74 enabled per die) | 132 | 132 |
 
 For decode-bound LLM inference, the relevant comparison is **bandwidth × dtype efficiency**:
 
@@ -83,7 +83,7 @@ Tensor cores have been the dominant matmul accelerator on NVIDIA GPUs since Volt
 * **Native FP4** (E2M1 with shared block scale) — 4 bits per element.
 * **Native FP6** (E2M3 / E3M2) — 6 bits.
 * **MX (microscaling) formats** — sub-block scales (per-32-element block), shared exponent — the OCP-MX standard.
-* **Refined async warp-group MMA (WGMMA)** — Hopper-era WGMMA is extended with better tile sizes, lower register pressure on the FP4/FP6 paths.
+* **A new MMA instruction family, `tcgen05`** — replaces Hopper's `wgmma` (which is `sm_90a`-only and does not run on Blackwell). Accumulators live in a dedicated per-SM **Tensor Memory (TMEM)** instead of registers, one thread issues each MMA, and a pair of SMs can cooperate on a single MMA (Chapter 5 §1).
 
 For Qwen inference, the most important number is **throughput at FP4**: a B200 die delivers ~2.25 PFLOPS dense FP4, ~4.5 PFLOPS with structured sparsity. That's roughly 8× H100 FP16 dense throughput, on the same physical area budget.
 
@@ -91,36 +91,25 @@ The compute is rarely the bottleneck for decode (still bandwidth-bound), but it 
 
 ### 3.1 What "5th-gen" actually means at the kernel level
 
-* WGMMA instructions still take warp groups of 4 warps (128 threads) but with new tile shapes that match FP4 better: `64×16×64` for FP4 vs `64×16×16` for FP16.
+* There is no Blackwell WGMMA. `wgmma.mma_async` exists only on `sm_90a`. Blackwell kernels issue `tcgen05.mma`, and the tile shape and operand formats are encoded in a 32-bit instruction descriptor rather than in the mnemonic.
 * The Transformer Engine 2 manages scale factors per block automatically, transparently to the CUDA kernel.
-* The `tcgen05.mma` instruction (Blackwell-only) brings a faster path with reduced register pressure for FP4/FP6 — but requires CUTLASS 4 / cuBLAS 13 to be exposed.
+* `tcgen05.mma` is the path to Blackwell's tensor-core throughput. It needs Blackwell targets (`sm_100a` / `sm_100f`, CUDA 12.8 or newer) and libraries built for them (cuBLAS, CUTLASS 3.8+).
 * Sparsity support is now 2:4 *and* 4:8 structured.
 
-You as an LLM inference engineer rarely write WGMMA by hand. Production runtimes (TRT-LLM, vLLM, SGLang) compile down to these instructions via Triton-MLIR, CUTLASS templates, or hand-tuned kernels — but you should know they exist when reading kernel traces.
+You as an LLM inference engineer rarely write `tcgen05` PTX by hand. Production runtimes (TRT-LLM, vLLM, SGLang) compile down to these instructions via Triton-MLIR, CUTLASS templates, or hand-tuned kernels — but you should know they exist when reading kernel traces.
 
 ---
 
-## 4. NVLink-C2C and the "GPU as Two GPUs" Pattern
+## 4. One GPU, Two Dies: What Software Can and Cannot Do
 
-Inside a B200, the two dies are NVLink-C2C-connected. CUDA exposes them as one device for compatibility, but Blackwell-aware code paths can:
+It is tempting to treat a B200 as two GPUs in one package, but CUDA does not expose it that way:
 
-* Pin tensors to a specific die (Die-0 HBM or Die-1 HBM) via NUMA-style placement.
-* Do tensor-parallel collectives **across the two dies** using NVLink-C2C as the fabric — 10 TB/s of "free" intra-package bandwidth that doesn't touch the external NVLink.
+* **One device.** `nvidia-smi` and `cudaGetDeviceCount` show one GPU per B200. Kernels are scheduled across all 148 SMs, and allocations come from the combined 192 GB.
+* **No die affinity.** There is no CUDA API to pin a kernel, a stream or an allocation to die 0 or die 1. So you cannot place half a model on each die, and you cannot run tensor-parallel collectives "across the two dies". Tensor parallelism splits a model across GPUs, connected by NVLink 5 (§5 and Chapter 4).
+* **Isolation, not placement.** If you need two isolated slices of one B200, use MIG where your driver and configuration support it, or two processes sharing the GPU. Neither gives you control over which die runs what.
+* **What you can see.** Some memory accesses are slower than others. L2 is split into partitions on the two dies, and hits in the far partition cost more latency. For most inference kernels this is second-order next to HBM bandwidth. It shows up as variance in latency microbenchmarks, not as something you schedule around.
 
-For Qwen2.5-72B TP=2 inside one B200:
-
-```
-Per layer collectives:
-  AllReduce post-attention:  d_model floats × 2 bytes
-  AllReduce post-FFN:        d_model floats × 2 bytes
-  = ~32 KB per layer × 80 layers = 2.56 MB / token
-
-NVLink-C2C bandwidth: 10 TB/s
-Roundtrip latency: ~150 ns
-Per-token NVLink time: ~0.0003 ms (negligible)
-```
-
-In other words: **intra-package TP is essentially free**. The collective time is so small that you get the bandwidth doubling effect of TP=2 without the usual NCCL/NVLink penalty. This is unique to Blackwell.
+The practical rule: size and parallelize B200 deployments as single GPUs with 192 GB and ~8 TB/s each. The die-to-die link is the reason a single kernel can treat both dies' SMs and HBM as one pool. It is not a free intra-package fabric you can program.
 
 ---
 
@@ -234,7 +223,7 @@ NVIDIA B200, 196608 MiB, 38912 MiB, 87 %, 925.43 W
 
 * **196 608 MiB ≈ 192 GB** — confirms one B200.
 * Topology output (`nvidia-smi topo -m`) shows NVLink-5 connectivity between cards; on an HGX B200 you should see `NV18` (18-link NVLink 5) between every GPU pair.
-* The two dies inside one B200 are not separately addressable by default in `nvidia-smi`; tools like `nvbandwidth` and CUDA Multi-Instance GPU APIs can probe the C2C link directly.
+* The two dies inside one B200 are not separately addressable: `nvidia-smi` and CUDA show one GPU. MIG instances, where supported, are isolation slices, not a handle on the physical dies.
 
 ---
 
@@ -242,10 +231,10 @@ NVIDIA B200, 196608 MiB, 38912 MiB, 87 %, 925.43 W
 
 | Takeaway | Why it matters |
 |---|---|
-| B200 is two dies on one package, linked by 10 TB/s NVLink-C2C | Enables intra-package TP=2 — a regime that doesn't exist on H100/H200 |
+| B200 is two dies on one package, linked by a 10 TB/s die-to-die interconnect | CUDA still sees one GPU with 148 SMs and 192 GB; there is no die-level placement or intra-package TP |
 | 192 GB HBM3e at 8 TB/s | 2.4× H100 bandwidth; decode tok/s roughly tracks this |
 | Native FP4 tensor cores | A 70B-class Qwen fits in one GPU at ~36 GB weights |
-| NVLink-C2C collective time is negligible (~0.0003 ms/token) | Intra-package TP is effectively free |
+| L2 is 126 MB, partitioned across the dies | Far-partition hits cost extra latency; you cannot control placement |
 | NVL72 rack = 13.8 TB HBM + 30 TB coherent memory | Enables Qwen-300B+ class TP=72 deployments |
 | GB200 superchip exposes Grace LPDDR as coherent warm tier | Long-context KV, MoE expert pools, prefix caches can spill cleanly |
 | Production runtimes need Blackwell support (CUDA 13, cuBLAS 13, TRT-LLM 0.20+) | Older stacks emulate FP4 or fall back to FP8 paths |
@@ -258,5 +247,5 @@ NVIDIA B200, 196608 MiB, 38912 MiB, 87 %, 925.43 W
 * **[GB200 NVL72 Product Page](https://www.nvidia.com/en-us/data-center/gb200-nvl72/):** Rack-scale platform specs.
 * **[HGX B200 Platform Brief](https://www.nvidia.com/en-us/data-center/hgx/):** 8-GPU board spec for non-rack deployments.
 * **[OCP Microscaling Formats Specification (MX-FP4/FP6/FP8)](https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf):** The standard behind the new numeric formats.
-* **[NVLink-C2C Programming Guide](https://docs.nvidia.com/cuda/cuda-c-programming-guide/):** Updated for Blackwell die-aware programming.
+* **[Blackwell Tuning Guide](https://docs.nvidia.com/cuda/blackwell-tuning-guide/):** Compute capability 10.0 specifics, including the 126 MB L2.
 * **[Chapter 2 — FP4 Numerics & Transformer Engine 2](02-FP4-Numerics-Transformer-Engine.md):** The next chapter in this series.
