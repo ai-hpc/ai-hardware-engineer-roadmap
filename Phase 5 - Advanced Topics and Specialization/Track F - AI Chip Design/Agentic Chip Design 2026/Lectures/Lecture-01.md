@@ -13,7 +13,7 @@ This lecture covers:
 3. The precedent: ChipNeMo.
 4. The 2026 task landscape (and the live leaderboard).
 5. How to measure — because in hardware, evaluation is everything.
-6. The 2026 hardware backdrop and why the bottleneck moved upstream.
+6. Transfer from benchmark tasks to a real accelerator module.
 7. The harness connection.
 
 ---
@@ -74,7 +74,7 @@ The field now spans generation, verification, and full agentic flows. The most-m
 
 </div>
 
-We treat the Zoo as **truth-at-time-of-reading** (the way the inference course treats live benchmark dashboards). Specific "best model" claims rot in months — check the leaderboard, not your memory.
+Use the Zoo to find primary papers, then check task definitions, benchmark revisions, sample counts, and repair budgets. A leaderboard is an index of reported results, not an independent verification of your design.
 
 ---
 
@@ -89,13 +89,15 @@ In hardware you cannot judge an agent by a nice transcript. The benchmarks that 
 Two hard truths these encode:
 
 1. **Syntax ≠ function.** Code that compiles and lints can still be functionally wrong — and only a testbench or formal check catches it. A high syntax-pass rate with a low functional-pass rate is the field's recurring failure mode.
-2. **pass@1 is the honest metric for autonomy.** pass@5 (best of 5 samples) flatters a model; for an agent meant to act, the first answer's correctness is what counts.
+2. **Match the metric to the protocol.** pass@1 measures a single sampled candidate; pass@k estimates whether at least one of k candidates passes the reference checker. A bounded repair agent additionally needs final success rate, tool calls, latency, and cost under a fixed budget. Report first-attempt and repaired success separately. The checker and selection procedure are part of the result. [VerilogEval harness](https://github.com/NVlabs/verilog-eval).
 
 ---
 
-## 6. The 2026 hardware backdrop
+## 6. Transfer from a benchmark to the accelerator
 
-Computex / GTC Taipei 2026 (June 1–5) underlined *why* the design loop is now the bottleneck: NVIDIA announced **Vera Rubin in full production**, with a Grace-Blackwell rack assembled in ~5 minutes, plus **Cosmos 3**, a fully-open omnimodel mapping text/image/video/audio → action. The manufacturing and model cadence keeps accelerating; the scarce resource is **verified design throughput**. Faster silicon makes a faster *design* loop more valuable, not less — which is the economic case for this entire course.
+A benchmark test passing means the candidate satisfied that checker on that task. It does not prove freedom from every RTL defect, nor timing closure after physical implementation. Transfer the method to one accelerator interface first: a command FIFO, DMA length counter, or interrupt-status register.
+
+For a command FIFO, enumerate reset, simultaneous push/pop, backpressure, overflow, and counter wrap. Keep a reference queue and held-out stimulus independent of the generator. If you use formal verification, document clock/reset assumptions and the properties proved; an overconstrained environment can exclude the bug you intended to find. Run the bounded experiment in the [course workshop](../Guide.md#ready-to-run-study-design-a-bounded-rtl-repair-experiment) before proposing a larger agentic flow.
 
 ---
 
@@ -117,7 +119,7 @@ The course capstone is exactly this: a **genie-claw**-style harness that generat
 * The chip-design bottleneck is **verification throughput**, and that judgment-heavy, unstructured work is a strong agent fit — under a brutal silicon-cost asymmetry that mandates **human-in-the-loop + deterministic checkers**.
 * **ChipNeMo** proved domain-adapted LLMs + tools + scope work inside a real design org.
 * Judge everything by **pass@1 and functional correctness** (syntax is not function); use the live **Chip-Design-LLM-Zoo** rather than stale rankings.
-* The 2026 hardware cadence (Vera Rubin in production) makes a faster design loop more valuable — the economic case for agentic chip design.
+* Small verified interfaces provide a useful first target; system integration and physical signoff require additional evidence.
 
 ---
 
@@ -126,7 +128,7 @@ The course capstone is exactly this: a **genie-claw**-style harness that generat
 1. Why is verification — not RTL generation — the part of the flow where agents add the most value?
 2. Explain the silicon-cost asymmetry and what it implies for autonomy in this domain.
 3. A model scores 90% syntax-pass but 45% functional-pass on RTLLM. What does that tell you, and what catches the gap?
-4. Why is pass@1 the honest metric for an *agent*, versus pass@5?
+4. What is the difference between pass@1, pass@5, and success after three repair rounds? What budget and checker details make the comparison fair?
 5. Name the three ChipNeMo applications and the general lesson they teach about deploying LLMs in a specialized domain.
 
 ---
@@ -136,7 +138,6 @@ The course capstone is exactly this: a **genie-claw**-style harness that generat
 * **Chip-Design-LLM-Zoo** (live leaderboard) — [iprc-dip.github.io/Chip-Design-LLM-Zoo](https://iprc-dip.github.io/Chip-Design-LLM-Zoo/)
 * **ChipNeMo** — [arXiv:2311.00176](https://arxiv.org/abs/2311.00176)
 * **VerilogEval** — [arXiv:2309.07544](https://arxiv.org/abs/2309.07544) · **RTLLM** — [arXiv:2308.05345](https://arxiv.org/abs/2308.05345)
-* NVIDIA Computex / GTC Taipei 2026 — [ServeTheHome coverage](https://www.servethehome.com/nvidia-computex-2026-keynote-live-coverage/)
 * Bridge: [AI Agent Development 2026 — when to build an agent](../../../../Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Lectures/Lecture-03.md)
 
 ---

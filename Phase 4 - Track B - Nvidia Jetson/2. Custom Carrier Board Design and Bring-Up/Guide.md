@@ -524,16 +524,11 @@ After a successful first boot with your custom pinmux, systematically validate e
 | [Jetson Module Adaptation and Bring-Up](../3.%20L4T%20Customization/Jetson-Module-Adaptation-Bring-Up-Orin-NX-Nano.md) | NVIDIA's guide for moving from dev kit to custom carrier |
 | [Orin Nano Custom Board L4T Engineering Flow](../3.%20L4T%20Customization/Orin-Nano-8GB-Custom-Board-L4T-Engineering-Flow.md) | End-to-end engineering flowchart for custom carrier + L4T |
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Follow module power/reset/boot straps and one high-speed interface. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Which carrier decision constrains the inference architecture?
 
-1. **Baseline lab:** Review a carrier design against its exact module pinout and a written bring-up plan.
-2. **Guided variation:** Find a seeded pin-mapping or sequencing error in a copy of the design.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Make an interface budget for cameras, radio, storage, and debug. Link each high-speed lane, power rail, reset, and clock to the module/carrier documentation; perform staged bring-up before running the model.
 
-**Evidence to submit:** Interface/power budgets, review findings, test points, and staged bring-up evidence. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Submit rail sequencing and link-validation evidence with a schematic-to-device-tree map. The accepted artifact identifies bottlenecks and recovery access before BSP customization begins.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [3. L4T Customization](../3.%20L4T%20Customization/Guide.md). Explain which assumption from this course the next engineer must preserve.

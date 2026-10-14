@@ -1,34 +1,21 @@
 # NCCL Deep Dive — NVIDIA Collective Communications Library
 
-NCCL (pronounced "Nickel") is the **core communication engine** that makes multi-GPU AI training possible. Every time PyTorch runs `dist.all_reduce()`, every time DeepSpeed syncs gradients, every time Megatron-LM does tensor parallelism — NCCL is executing the actual GPU-to-GPU data movement.
+NCCL (pronounced "Nickel") is the **core communication engine** that makes multi-GPU AI training possible. On NVIDIA deployments configured with the NCCL process-group backend, these libraries use NCCL for many collectives. PyTorch also supports other backends; verify the selected backend and execution path.
 
 Understanding NCCL at depth means understanding **why your training runs fast or slow**, and how to fix it when it isn't.
 
 ## What NCCL Solves
 
-```
-Naive multi-GPU synchronization (without NCCL):
-  GPU0 copies gradient → CPU RAM
-  CPU reduces all gradients
-  CPU copies result back to each GPU
+For an AllReduce over `n` ranks, nccl-tests reports `algbw = S / t` and `busbw = algbw × 2(n−1)/n`, where `S` is the payload per rank. For a hypothetical 1 GB payload completed in 10 ms on 8 ranks, these are 100 GB/s and 175 GB/s respectively. Those numbers are definitions, not measurements from this repository. Neither can be equated blindly with a bidirectional NVLink datasheet number. [nccl-tests bandwidth definitions](https://github.com/NVIDIA/nccl-tests/blob/master/doc/PERFORMANCE.md).
 
-  Bottleneck: PCIe bandwidth (32 GB/s) × 2 transfers × 8 GPUs
-  Time for 1 GB gradient sync: ~500 ms
-
-NCCL approach:
-  GPU-to-GPU direct via NVLink (900 GB/s bidirectional)
-  No CPU involvement, no PCIe crossing
-  Time for 1 GB gradient sync: ~2 ms
-
-  → 250× faster
-```
+Start with correctness and a message-size sweep, then inspect topology and algorithm selection. NCCL may use NVLink, PCIe, NICs, or staging depending on the system; CPU launch/control work still exists. A universal “250× faster” example hides the very bottleneck this course teaches you to measure.
 
 ## Topic Index
 
 | # | Topic | Key Questions Answered |
 |---|---|---|
 | 01 | [Fundamentals](./01-Fundamentals.md) | What are collectives? What does each operation do? |
-| 02 | [Algorithms & Bandwidth](./02-Algorithms-and-Bandwidth.md) | How does Ring AllReduce work? How does NCCL hit 900 GB/s? |
+| 02 | [Algorithms & Bandwidth](./02-Algorithms-and-Bandwidth.md) | How does Ring AllReduce work? How do payload bandwidth, normalized bus bandwidth, and link limits differ? |
 | 03 | [Framework Integration](./03-Framework-Integration.md) | How do PyTorch/DeepSpeed/Megatron use NCCL internally? |
 | 04 | [Configuration & Tuning](./04-Configuration-and-Tuning.md) | Which env vars matter? How to tune for H200 vs PCIe? |
 | 05 | [Multi-Node Clusters](./05-Multi-Node-Clusters.md) | InfiniBand, SHARP offload, hierarchical AllReduce |

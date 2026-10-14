@@ -41,10 +41,10 @@
 | Term | Meaning |
 |------|--------|
 | **Matrix multiply** | Compute A·B for matrices A, B (often plus bias or activation). The core operation in linear layers and most heavy compute. "GEMM" is the standard name in libraries. |
-| **GEMM** | **G**eneral **E**lement-wise **M**atrix **M**ultiply: C = α(A·B) + βC. The BLAS/cuBLAS/CUTLASS interface for matrix multiply. GPU GEMM kernels (tiling, tensor cores) dominate training and inference time. |
+| **GEMM** | **GE**neral **M**atrix **M**ultiplication: C = α(A·B) + βC. The BLAS/cuBLAS/CUTLASS interface for matrix multiply. GPU GEMM kernels (tiling, tensor cores) dominate training and inference time. |
 | **Epilogue fusion** | In a GEMM kernel, the **epilogue** is what you do with the result (add bias, ReLU/GELU, write to memory). **Fusion** = doing that in the *same* kernel as the multiply. Saves memory bandwidth and launch overhead; CUTLASS and similar libraries support it. |
 | **Attention** | In transformers: each token has **Q, K, V** (from linear layers); *attention* = softmax(Q·K^T/√d)·V. Lets the model focus on relevant tokens. The matmuls are heavy for long sequences; optimized attention kernels and KV-cache are critical. |
-| **FlashAttention** | A family of **attention kernels** that reduce memory traffic by tiling and keeping Q,K,V in SRAM, and avoid materializing the full Q·K^T matrix. Faster and more memory-efficient than naive attention; standard in LLM training and inference (e.g. FlashAttention-2, -3). |
+| **FlashAttention** | A family of **attention kernels** that reduce memory traffic by tiling and keeping Q,K,V in SRAM, and avoid materializing the full attention-score matrix in HBM; only tiles need fit on chip. Faster and more memory-efficient than naive attention; standard in LLM training and inference (e.g. FlashAttention-2, -3). |
 | **KV-cache** | In transformer attention: keys and values for previous tokens are cached so you don't recompute them. **KV-cache** = that cache. Long context → huge cache → memory and bandwidth become the bottleneck; paging/sharding and efficient kernels matter. |
 | **Data / model / pipeline parallelism** | **Data:** same model on every GPU, different data; sync gradients. **Model:** split the model across GPUs. **Pipeline:** different layers on different GPUs, pass activations in a pipeline. |
 | **Collectives** | Multi-GPU operations: **AllReduce** (everyone gets the same sum), **AllGather** (everyone gets all pieces), **ReduceScatter**. Used to sync gradients (data parallel) or exchange activations (model/pipeline parallel). |
@@ -70,6 +70,12 @@ This track now focuses on **HPC infrastructure and multi-GPU operations**. The *
 2. **Then [HPC Setup](./HPC%20Setup/Guide.md)** — Covers Nvidia GPU HPC fundamentals, virtualization (vGPU, KVM), interconnects and storage (InfiniBand, GDS, Slurm, Kubernetes), and Phase 2 advanced topics (advanced CUDA, distributed training, performance modeling). Use the deep dives (8x H200, L40S, NCCL, CUDA Advanced, GDS) for your target hardware and stack.
 
 **Prerequisite:** Phase 4 Track B (Jetson, TensorRT, CUDA) and Phase 4 Track C (compiler + inference optimization).
+
+## A two-measurement diagnostic
+
+Measure the same inference step once with device timing and once from input-ready to output-ready on the host. A large gap suggests dispatch, transfer, synchronization, or preprocessing work; it is not evidence that the GEMM kernel is slow. Then sweep batch size while keeping precision and shapes documented.
+
+Carry both traces into [HPC Setup](HPC%20Setup/Guide.md). This decides whether the next study should be kernel efficiency, host scheduling, memory capacity, or multi-GPU communication. Hardware peaks describe ceilings; the pipeline determines which ceiling matters.
 
 ## Practice and assessment
 

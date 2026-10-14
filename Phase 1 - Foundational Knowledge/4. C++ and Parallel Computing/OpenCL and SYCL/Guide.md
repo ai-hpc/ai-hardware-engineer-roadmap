@@ -4,7 +4,7 @@
 <div class="course-identity__icon">OASP</div>
 <div markdown="1">
 <p class="course-identity__eyebrow">Deep Dive · Digital Foundations</p>
-<p class="course-identity__title">Specialized course identity for OpenCL and SYCL (Phase 1 §4 — Sub-Track 5).</p>
+<p class="course-identity__title">Make dependencies visible before measuring portability.</p>
 <p class="course-identity__meta">Artifact: working low-level demo · Measure: timing, memory, correctness</p>
 </div>
 </div>
@@ -422,8 +422,10 @@ int main() {
 | Type | Host access | Device access | Data movement |
 |------|-----------|--------------|---------------|
 | `malloc_device` | No | Yes | Explicit `memcpy` |
-| `malloc_host` | Yes | Yes (over PCIe) | Implicit (slow) |
-| `malloc_shared` | Yes | Yes | Automatic migration |
+| `malloc_host` | Yes | If the device supports host USM | Access path depends on shared/discrete memory architecture |
+| `malloc_shared` | Yes | If the device supports shared USM | Runtime/platform managed; do not assume free concurrent access |
+
+Check `sycl::aspect::usm_device_allocations`, `usm_host_allocations`, or `usm_shared_allocations` before selecting a memory model. Check allocation failure and surface asynchronous errors with `wait_and_throw()` in a complete application. USM pointers do not make an out-of-order queue infer dependencies: retain events or explicitly order dependent operations. See [Khronos USM concepts](https://github.khronos.org/SYCL_Reference/iface/usm_basic_concept.html).
 
 ### 2.4 Local Memory and Work-Group Tiling
 
@@ -581,16 +583,10 @@ icpx -fsycl -fintelfpga -Xshardware -o hw hw.cpp
 
 → [Phase 3 — Neural Networks](../../../Phase%203%20-%20Artificial%20Intelligence/1.%20Neural%20Networks/Guide.md)
 
-## Practice and assessment
+## Make dependencies visible before measuring portability
 
-**Entry diagnostic (prerequisite check):** Explain work items, work groups, buffers, and synchronization scope. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+Implement a two-stage pipeline with explicit USM events, then a buffer/accessor version. Draw the copy → kernel → copy dependency graph. Test an out-of-order queue where supported; omitting a dependency should be identified as a correctness bug, not treated as a performance improvement. Query required aspects and reject unsupported configurations clearly.
 
-1. **Baseline lab:** Build a vector operation and reduction with explicit host/device transfer boundaries.
-2. **Guided variation:** Change local size and test a nondivisible global extent; verify synchronization assumptions.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Compare identical shapes and tolerance on available devices. Distinguish source portability, functionality, and performance portability in the report. For a future custom NPU, specify the compiler/runtime work needed to implement its backend instead of assuming a standards-based source language creates hardware support automatically.
 
-**Evidence to submit:** Correctness, transfer versus execution time, backend/device identity, and portability limitations. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** Dependency graph, capability checks, and a portable operator contract. Continue with [the next course](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/03%20-%20Compiler%20Stack/Guide.md) and reuse that evidence.

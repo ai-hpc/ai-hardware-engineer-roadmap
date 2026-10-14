@@ -339,3 +339,12 @@ You are ready to move on when you can:
 - produce a validation package that looks credible to another FPGA engineer
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Integration lab: Does a faster datapath still work across clock boundaries?
+
+Take the previous streaming block across two clocks using an asynchronous FIFO. Randomize the phase, downstream stalls, and reset order in simulation; inspect the CDC report and timing constraints.
+
+**Acceptance evidence:** Explain each remaining CDC finding and show no loss, duplication, or reordering for the checked traces. A two-flop synchronizer on a multi-bit payload is not an acceptable bus-transfer design.
+
+**Continue:** take this artifact to [4. High-Level Synthesis (HLS)](../4.%20High-Level%20Synthesis%20%28HLS%29/Guide.md). Explain which assumption from this course the next engineer must preserve.

@@ -13,9 +13,9 @@
 
 > *Apply the agent harness you built in AI Agent Development to the hardest verification problem there is: designing the chip itself.*
 
-This course sits at the intersection of two tracks. From **AI Agent Development** it takes the harness — run loops, tools, guardrails, evaluation. From **AI Chip Design** it takes the target — RTL, verification, synthesis, PPA, and the unforgiving economics of silicon. The thesis: as the hardware cadence accelerates (NVIDIA put **Vera Rubin into full production** at Computex / GTC Taipei 2026, with a Grace-Blackwell rack now assembled in ~5 minutes), the bottleneck moves upstream to **design and verification throughput** — exactly where LLM agents are starting to help.
+This course applies an agent harness to design tasks with machine-checkable outcomes: RTL behavior, synthesis constraints, and traceable tool results. The purpose is to accelerate a bounded design experiment while preserving an independent specification and checker. It does not depend on a product launch or a claim that a language model can sign off silicon.
 
-**Prerequisites:** comfort with Verilog/RTL and the basic ASIC flow ([AI Chip Design](../Guide.md) lectures 01–05), and the agent fundamentals ([AI Agent Development 2026](../../../Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Guide.md) Modules 1–3: harness, tools, guardrails, evaluation).
+**Prerequisites:** comfort with Verilog/RTL, simulation, and basic ASIC flow ([AI Chip Design](../Guide.md)); its lectures 01–05 cover LLVM/MLIR, so use the Phase 1 HDL material for RTL prerequisites, and the agent fundamentals ([AI Agent Development 2026](../../../Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Guide.md) Modules 1–3: harness, tools, guardrails, evaluation).
 
 **Role targets:** Design-automation / AI-for-EDA Engineer · RTL Engineer (agent-augmented) · ML-for-hardware researcher.
 
@@ -25,8 +25,7 @@ This course sits at the intersection of two tracks. From **AI Agent Development*
 
 * **A design-productivity gap.** Transistor budgets and product cadence are outrunning human RTL+verification throughput. **Verification** — not generation — is the dominant cost of a tapeout, and it is exactly the kind of judgment-heavy, unstructured-data work that agents are suited to (see [AI Agent Development · "when to build an agent"](../../../Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Lectures/Lecture-03.md)).
 * **Precedent exists.** NVIDIA's **ChipNeMo** (2023) showed domain-adapted LLMs doing real chip-design work — engineering Q&A, EDA-script generation, and bug-report summarization — inside a production design org. The field has since exploded into RTL generation, testbench synthesis, and multi-agent EDA flows.
-* **A living leaderboard.** The **[Chip-Design-LLM-Zoo](https://iprc-dip.github.io/Chip-Design-LLM-Zoo/)** tracks RTL-generation models against shared benchmarks (VerilogEval, RTLLM, RealBench) by **pass@1 / correct-rate**, distinguishing fine-tuned vs base and open vs closed weights. We use it as the *truth-at-time-of-reading* benchmark, the way the inference course uses live benchmark dashboards.
-* **The 2026 hardware backdrop.** Computex / GTC Taipei 2026 (June 1–5) underscored the cadence: **Vera Rubin in full production**, **Cosmos 3** (a fully-open omnimodel mapping text/image/video/audio → action), and a broad push of AI into every layer of the stack. Faster silicon ⇒ more pressure on the *design* loop.
+* **A living leaderboard.** The **[Chip-Design-LLM-Zoo](https://iprc-dip.github.io/Chip-Design-LLM-Zoo/)** tracks RTL-generation models against shared benchmarks (VerilogEval, RTLLM, RealBench) by **pass@1 / correct-rate**, distinguishing fine-tuned vs base and open vs closed weights. Use it for discovery, then inspect each paper and the exact benchmark revision. Scores from different task sets, sampling budgets, or checking protocols are not directly comparable.
 
 > **Honesty / currency note.** Model rankings, benchmark scores, and "best RTL LLM" change every few months — always check the live [Zoo leaderboard](https://iprc-dip.github.io/Chip-Design-LLM-Zoo/) and primary papers before quoting a number. This course teaches the *stable* layer: the flow, where agents fit, how to evaluate them, and the silicon-cost discipline that makes verification and human-in-the-loop non-negotiable.
 
@@ -74,7 +73,7 @@ This course sits at the intersection of two tracks. From **AI Agent Development*
 
 | # | Lecture |
 |---|---------|
-| 08 | Serving design agents — inference cost, Blackwell/Vera Rubin context (bridge to AI Inference Engineer 2026) |
+| 08 | Serving design agents — latency, token/tool budgets, and cost per successful task |
 | 09 | **Capstone** — build an RTL-generation + self-verification agent loop, evaluated on VerilogEval-style tasks |
 
 </div>
@@ -89,9 +88,19 @@ A small **agentic RTL pipeline**: an agent that, given a module spec, generates 
 
 ---
 
-## Current as of 2026-06
+## Ready-to-run study design: a bounded RTL repair experiment
 
-Anchored on the Chip-Design-LLM-Zoo leaderboard (VerilogEval / RTLLM / RealBench) and the Computex / GTC Taipei 2026 hardware backdrop (Vera Rubin in production, Cosmos 3). RTL-LLM rankings move fast — refresh against the live Zoo and primary papers. Refresh when a new RTL-generation SOTA or agentic-EDA system materially shifts the leaderboard.
+Lecture 01 is available; lectures 02–09 remain planned, so the table above is not a claim of nine completed lectures. Use this workshop to turn the opener into a concrete investigation:
+
+1. Specify a one-entry ready/valid buffer: transfer occurs only on `valid && ready`, accepted input is neither lost nor duplicated, output stays stable while stalled, and reset clears validity. Keep the specification and reference scoreboard outside the agent's editable files.
+2. Prepare directed tests for empty/full transitions, consecutive transfers, random backpressure, and reset while full. Add a deliberately incorrect candidate that drops an item under stall; confirm the checker rejects it before evaluating generated RTL.
+3. Compare a single proposal with an agent allowed at most three repair rounds. Freeze model revision, prompts, tool versions, timeout, and token budget. Give both arms the same visible tests; use separate held-out tests for scoring.
+4. Report first-proposal success separately from final success after repair. Include tool calls, wall time, cost, and failures. An agent editing its own tests until they pass has changed the target rather than verified a design.
+5. Synthesize only functionally accepted candidates under identical constraints. Compare area and timing with a hand-written baseline; power needs a stated activity source and is still an estimate unless measured on hardware.
+
+**Handoff to the SoC project:** apply the same protocol to a DMA command FIFO or completion counter. A passing small-module testbench does not establish SoC correctness, clock-domain crossing correctness, or tapeout readiness.
+
+**Review date: 2026-10-14.** This course uses primary papers and reproducible protocols rather than an unverified “latest best model” ranking. [VerilogEval's maintained harness](https://github.com/NVlabs/verilog-eval) distinguishes its original code-completion task from specification-to-RTL evaluation; save the exact task and harness commit with each result.
 
 ---
 
@@ -100,7 +109,6 @@ Anchored on the Chip-Design-LLM-Zoo leaderboard (VerilogEval / RTLLM / RealBench
 * **Chip-Design-LLM-Zoo** (live RTL-generation leaderboard) — [iprc-dip.github.io/Chip-Design-LLM-Zoo](https://iprc-dip.github.io/Chip-Design-LLM-Zoo/)
 * **ChipNeMo: Domain-Adapted LLMs for Chip Design** (NVIDIA) — [arXiv:2311.00176](https://arxiv.org/abs/2311.00176)
 * **VerilogEval** — [arXiv:2309.07544](https://arxiv.org/abs/2309.07544) · **RTLLM** — [arXiv:2308.05345](https://arxiv.org/abs/2308.05345)
-* NVIDIA Computex / GTC Taipei 2026 (Vera Rubin production, Cosmos 3) — [ServeTheHome live coverage](https://www.servethehome.com/nvidia-computex-2026-keynote-live-coverage/) · [NVIDIA GTC Taipei](https://www.nvidia.com/en-tw/gtc/taipei/computex/)
 * Bridge courses: [AI Agent Development 2026](../../../Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Guide.md) · [AI Inference Engineer 2026](../../Track%20G%20-%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/README.md)
 
 ## Practice and assessment

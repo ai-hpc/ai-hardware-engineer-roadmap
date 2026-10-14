@@ -12,16 +12,10 @@ Work through these in order. Each file is one session: read it, do the lab at th
 | [Lecture-04](Lecture-04.md) | Solution tracks: AI, connectivity, peripherals, low power, and gateways |
 | [Lecture-05](Lecture-05.md) | Practical courses and building your own Espressif study plan |
 
-## Practice and assessment
+## Use the official learning map to build one sensor node
 
-**Entry diagnostic (prerequisite check):** Build and flash a minimal example and identify board/SDK versions. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+L1 selects one supported board/framework pair; L2 closes the C, bus, and RTOS gaps needed by that choice; L3 captures an actual build/flash/boot record; L4 chooses one solution track with an explicit memory/power budget; L5 combines those into a project plan with a failure experiment.
 
-1. **Baseline lab:** Extend a sensor or GPIO example with bounded task communication and connection-state logging.
-2. **Guided variation:** Force reconnects and queue pressure while the sampling task continues.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+At the final review, explain why you excluded the other solution tracks and show the working baseline. Your plan should name the next interface consumer—such as a Linux process—and the packet fields it requires. Keep planning artifacts distinct from firmware you have actually run.
 
-**Evidence to submit:** Build manifest, heap use, sample jitter, connection recovery time, and error counters. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** Board baseline and a single solution-track plan feeding an external consumer. Continue with [the next course](../../../IoT/Guide.md) and reuse that evidence.

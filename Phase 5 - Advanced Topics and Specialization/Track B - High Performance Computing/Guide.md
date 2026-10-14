@@ -12,7 +12,7 @@
 
 **Timeline:** Ongoing — study each category as your projects demand it.
 
-**Prerequisites:** Phase 1 §4 (C++/CUDA), Phase 4 Track B (Jetson, CUDA runtime), Phase 4 Track C (ML compiler + DL inference optimization), Phase 5A (GPU Infrastructure).
+**Prerequisites:** Phase 1 §4 (C++/CUDA), Phase 4 Track B (Jetson, CUDA runtime), Phase 4 Track C (ML compiler + DL inference optimization). Phase 5A is needed for distributed-library projects, not for the first single-GPU lab.
 
 ---
 
@@ -28,7 +28,7 @@ High Performance Computing goes beyond single-GPU programming and cluster setup 
 
 ## How to use this track
 
-1. **Complete [Phase 5A — GPU Infrastructure](../Track%20A%20-%20GPU%20Infrastructure/Guide.md)** first — covers Nvidia/AMD GPU clusters, multi-GPU networking, Slurm/K8s, distributed training.
+1. **Start with one correct single-GPU library benchmark.** Add [Phase 5A — GPU Infrastructure](../Track%20A%20-%20GPU%20Infrastructure/Guide.md) when the chosen workload actually needs multiple GPUs or nodes.
 2. **Then [CUDA-X Libraries](CUDA-X%20Libraries/Guide.md)** — the comprehensive reference for every GPU-accelerated library. Organized by category (math, DL, data, vision, communication) with role-based learning paths and hands-on projects.
 
 ## Relationship to other tracks
@@ -40,6 +40,12 @@ High Performance Computing goes beyond single-GPU programming and cluster setup 
 | TensorRT, FlashInfer | Phase 4B §8 (Jetson runtime), Phase 4C Part 2 (inference optimization) |
 | RAPIDS (cuDF, cuML, cuGraph) | Data pipeline acceleration for any ML workflow |
 | CV-CUDA, DALI, Video Codec SDK | Phase 5E (Autonomous Vehicles — perception pipelines) |
+
+## Make a library call into a hardware requirement
+
+Select one VLA operation from a trace: a projection GEMM, normalization, resize, or reduction. Establish its shape/layout/dtype contract, then compare a library implementation with a correct reference. Include packing, transfer, plan creation, and synchronization when they are on the real inference path; report warm kernel time separately.
+
+Pass the best measured implementation and the remaining bottleneck to the compiler/accelerator project. A custom accelerator should improve a real constrained pipeline, so comparing only against an untuned Python loop is insufficient evidence.
 
 ## Practice and assessment
 

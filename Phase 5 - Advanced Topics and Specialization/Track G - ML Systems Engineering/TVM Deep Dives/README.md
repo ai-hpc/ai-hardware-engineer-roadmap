@@ -91,3 +91,12 @@ If you can only make TVM *run* a model, you have a transpiler. The point of this
 *Related: [MLSys Deep Dives](../MLSys%20Deep%20Dives/README.md) · [AI Inference Engineer 2026](../AI%20Inference%20Engineer%202026/README.md) · [Phase 4 — Track C — ML Compiler and Graph Optimization](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md)*
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Carry this course into the physical-AI system
+
+**Start from:** A minimal model subgraph with golden outputs and tensor contracts.
+
+**Build and challenge:** Lower to a pinned compiler/runtime target, preserve shape/layout semantics, and test odd sizes. Inspect generated code and buffer lifetimes before claiming fusion or reuse.
+
+**Pass forward:** A compiler/runtime ABI, generated kernel, and golden vectors for the chip-design capstone. Continue with [AI chip design](../../Track%20F%20-%20AI%20Chip%20Design/Guide.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

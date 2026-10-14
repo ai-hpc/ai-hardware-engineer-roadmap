@@ -22,16 +22,16 @@
 
 ## Why Voice AI Matters for Hardware Engineers
 
-Voice is one of the most latency-sensitive AI workloads. Users notice 200ms+ delay in conversation. This creates hard requirements for hardware:
+Voice systems need explicit budgets for audio buffering, endpoint detection, inference, and response playback. Choose these from the interaction design and measure the complete path:
 
-- **STT (Speech-to-Text):** Real-time transcription needs streaming inference with <100ms latency per chunk
-- **TTS (Text-to-Speech):** Natural voice synthesis requires autoregressive generation (like LLMs) or fast diffusion models
+- **STT (Speech-to-Text):** Measure first partial result, final transcript, and real-time factor separately
+- **TTS (Text-to-Speech):** Implementations include autoregressive, non-autoregressive, flow, and diffusion approaches
 - **On-device voice:** Privacy-critical applications (medical, military, automotive) need inference without cloud — your edge chip must handle it
 - **VAD (Voice Activity Detection):** Always-on, ultra-low-power — runs on MCU or dedicated DSP (L4/L5 hardware)
 
 | Voice task | Compute pattern | Hardware implication |
 |-----------|----------------|---------------------|
-| VAD | Tiny CNN, always-on | L4: MCU/DSP, < 1mW power budget |
+| VAD | Tiny CNN, always-on | L4: MCU/DSP, measured always-on power budget |
 | STT (streaming) | Encoder-decoder, chunked | L1/L3: streaming inference, low latency |
 | TTS (neural) | Autoregressive or diffusion | L1/L3: memory-bound generation, like LLM decode |
 | Keyword spotting | Small CNN/RNN, always-on | L4: TinyML, dedicated audio NPU |
@@ -55,10 +55,10 @@ Audio Input → Feature Extraction → Encoder → Decoder → Text Output
 |-------|-------------|-----------|----------|
 | **Whisper** (OpenAI) | Encoder-decoder transformer | Multi-language, robust, open-source | General-purpose STT |
 | **Wav2Vec 2.0** (Meta) | Self-supervised encoder + CTC | Pre-trained on unlabeled audio | Low-resource languages |
-| **Conformer** (Google) | Convolution + transformer | Best accuracy on benchmarks | Production ASR |
+| **Conformer** (Google) | Convolution + transformer | Convolution and attention for speech modeling | Production ASR |
 | **DeepSpeech** (Mozilla) | RNN + CTC | Simple, lightweight | Legacy / embedded |
 | **Whisper.cpp** | GGML quantized Whisper | Runs on CPU/edge without GPU | On-device STT |
-| **Faster-Whisper** | CTranslate2 backend | 4x faster than original Whisper | Production serving |
+| **Faster-Whisper** | CTranslate2 backend | Alternative runtime; compare matched model, beam, precision, and hardware | Production serving |
 
 ### Audio Feature Extraction
 
@@ -289,16 +289,11 @@ Real-time audio cleanup before STT.
 
 → [**Module 5A — Edge AI & Model Optimization**](../6.%20Edge%20AI%20and%20Model%20Optimization/Guide.md) — quantize and deploy these voice models on edge hardware.
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Trace capture, framing, model inference, and playback with explicit sample rates. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Carry this course into the physical-AI system
 
-1. **Baseline lab:** Build a recorded-audio pipeline and measure stage and end-to-end latency.
-2. **Guided variation:** Inject noise, silence, and truncated frames; inspect recognition and buffer behavior.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Start from:** Recorded audio, sample rate, and a small set of task intents.
 
-**Evidence to submit:** Task accuracy, response latency, dropped frames, buffering, and memory. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Build and challenge:** Measure buffering, endpointing, recognition, and dispatch separately. Test silence, noise, and an expired command; a transcript must pass an intent adapter before a robot task is requested.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** An optional language-command interface with latency, expiry, and rejection behavior. Continue with [the connected course](../../Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Guide.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

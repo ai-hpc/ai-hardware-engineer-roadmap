@@ -78,60 +78,33 @@ Without multicast:
 
 With multicast:
   One TMA load delivers the tile to every CTA in the cluster that needs it.
-  L2 -> SMEM traffic for that tile = 1 x tile_size (per cluster).
+  One source tile load can be distributed to several destination CTAs.
+  Destination shared memories still each receive their own tile.
 ```
 
 The saving is bounded by the cluster size (8 CTAs portable, up to 16 non-portable), not by the number of SMs, and it only applies to tiles that several CTAs in a cluster actually share. In decode attention each KV tile is usually read once per (sequence, KV-head) pair, so how much multicast saves depends on the kernel's work split. Measure L2 and DRAM traffic in Nsight Compute rather than assuming a fixed reduction.
 
 ---
 
-## 3. The Persistent-Kernel Pattern
+## 3. Persistent tile scheduling versus a device service loop
 
-The dominant inference-kernel architecture on Blackwell is the **persistent kernel**. Instead of launching one kernel per matmul (the per-launch overhead is real even with CUDA Graphs), a persistent kernel:
+In a persistent GEMM, a limited set of resident CTAs repeatedly takes tiles from the **current operation** until its work is finished. The kernel still has a launch and a finite lifetime. This can improve tile scheduling and load balance; it does not imply that a serving engine launches one immortal kernel at startup for the entire model.
 
-* Launches once at startup, with grid size matching SM count.
-* Each SM runs an infinite loop reading work items from a queue.
-* Work items describe "do this matmul on these inputs and write output here."
-* When the host wants to compute layer N's QKV, it pushes a work item to the queue; the persistent kernel picks it up.
+A separate design is a device-resident service loop that consumes host-submitted operations. That design requires a carefully specified queue, memory-ordering protocol, cancellation, completion, and shutdown. It can reserve resources that other kernels need, and watchdog or platform restrictions may matter. Do not attribute such a loop to a runtime without inspecting its implementation.
 
-Benefits on Blackwell:
+For a teaching persistent tile scheduler:
 
-* Zero per-op kernel launch overhead.
-* SMs stay warm; instruction caches don't get flushed between ops.
-* Better overlap of compute and memory across operations — the kernel can prefetch the next op's TMA load while computing the current.
-* Compatible with CUDA Graphs for the host-side dispatch.
-
-For the Qwen decode hot path, persistent kernels eliminate the ~150 µs of launch overhead per token (across ~470 unfused kernels, even tiny) that would otherwise cap tok/s on Blackwell where everything else is fast.
-
-### 3.1 Skeleton of a persistent-kernel design
-
-```c++
-// Pseudocode for a persistent GEMM kernel on Blackwell
-__launch_bounds__(256, 1)
-__global__ void persistent_gemm(WorkQueue* queue) {
-    while (true) {
-        WorkItem item = queue->try_pop();
-        if (item.type == WorkType::SHUTDOWN) break;
-        if (item.type == WorkType::IDLE) {
-            __nanosleep(100);
-            continue;
-        }
-
-        // Execute the matmul described by item
-        if (item.dtype == DType::MX_FP4) {
-            gemm_tile_mx_fp4(item.A, item.B, item.scale, item.C,
-                             item.M, item.N, item.K);
-        } else if (item.dtype == DType::MX_FP8) {
-            gemm_tile_mx_fp8(item.A, item.B, item.scale, item.C, ...);
-        }
-
-        // Signal completion
-        atomicAdd(&item.completion_counter, 1);
-    }
-}
+```text
+launch a bounded number of CTAs
+for each CTA:
+    obtain a valid tile index for this GEMM
+    while a tile remains:
+        wait for operands, compute tile, write output
+        obtain next tile
+finish; signal completion through the normal launch/runtime path
 ```
 
-In practice TRT-LLM, CUTLASS 4 PerformanceKernel, and vLLM's Blackwell backend all use variants of this pattern. The persistent-kernel architecture is also how TRT-LLM achieves CUDA-Graph-comparable steady-state efficiency with more flexibility (no captured-shape lock-in).
+This is algorithmic pseudocode, not a runnable CUDA synchronization implementation. Compare it with the actual scheduler in the selected [CUTLASS SM100 example](https://docs.nvidia.com/cutlass/latest/media/docs/cpp/blackwell_functionality.html). Measure launch cost, tiles per CTA, idle tails, and occupancy. A small or irregular GEMM may favor a different schedule.
 
 ---
 
@@ -149,7 +122,7 @@ Production runtimes on B200 (TensorRT-LLM, FlashInfer, cuDNN's SDPA, CUTLASS's B
 
 ### 4.1 Decode-specific variants
 
-Autoregressive decode has one query token per sequence, so there is little work along Q. **Flash-Decoding** (split-KV) parallelizes along the KV sequence instead. Each CTA processes a slice of the KV cache and writes partial outputs plus softmax statistics, and a second step combines the partials. Most production decode kernels on Blackwell use this split-KV structure. Measure the attention kernel's share of a decode step on your own B200; Chapter 3 §3 gives the per-token budget it has to fit in.
+Autoregressive decode has one query token per sequence, so there is little work along Q. **Flash-Decoding** (split-KV) parallelizes along the KV sequence instead. Each CTA processes a slice of the KV cache and writes partial outputs plus softmax statistics, and a second step combines the partials. Most production decode kernels on Blackwell use this split-KV structure. Measure the attention kernel's share of a decode step on your own B200; use the measured decode budget from Chapter 3 rather than assuming a fixed token rate.
 
 ---
 
@@ -165,7 +138,7 @@ The mental model: CUTLASS is a C++ template library that lets you compose tile-l
 * Epilogue (activation, scaling, store pattern).
 * Schedule (kernel architecture — persistent, cooperative, etc.).
 
-A minimal CUTLASS 4 GEMM template for MX-FP4 mixed Qwen FFN:
+The following is a structural CUTLASS sketch, not a complete buildable kernel or a verified Qwen checkpoint recipe. Start a runnable lab from a pinned upstream SM100 block-scaled example:
 
 ```cpp
 using ElementA = cutlass::float_e2m1_t;      // MX-FP4
@@ -227,7 +200,7 @@ This producer / MMA / epilogue split is the structure of CUTLASS's SM100 warp-sp
 
 ## 7. Triton 3.x on Blackwell
 
-For higher-level kernel work, Triton 3.x added Blackwell support:
+For higher-level kernel work, select a Triton release with support for the exact target. The following incomplete sketch illustrates gate/up projection structure; it omits output stores, tail masks, synchronization/layout details, and the down projection. Do not run it as a complete SwiGLU kernel:
 
 ```python
 import triton
@@ -280,7 +253,8 @@ Triton emits Blackwell SASS via the MLIR backend. It's how a lot of "small custo
 ```bash
 # 1. Look for tcgen05.mma in the embedded PTX
 cuobjdump --dump-ptx your_binary | grep -E "tcgen05\.mma|wgmma" | head
-# Expect tcgen05.mma. wgmma (sm_90a) cannot run on Blackwell; mma.sync means a generic path.
+# Embedded PTX may be absent in a cubin-only build; correlate with executed kernels and SASS.
+# mma.sync alone is not evidence of a bug: dtype/shape can justify a legacy path.
 
 # 2. Identify the attention kernel that actually ran
 nsys profile -o decode_trace your_app && nsys stats --report cuda_gpu_kern_sum decode_trace.nsys-rep

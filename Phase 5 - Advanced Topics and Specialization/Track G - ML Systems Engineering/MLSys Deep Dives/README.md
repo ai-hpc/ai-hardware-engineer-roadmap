@@ -11,7 +11,7 @@
 
 > *The model decides what's possible. The system decides what it costs. In 2026, the system is the product.*
 
-A frontier model is a research result. A frontier model **served at a price someone will pay** is a machine-learning-systems result — and the gap between those two is where this field lives. Between 2023 and 2026 the price of GPT-3.5-class intelligence fell roughly **280×**, and GPT-4-class input dropped **over 99%**. Almost none of that came from a bigger GPU. It came from MLSys: better kernels, smarter compilers, leaner architectures, and decode algorithms that didn't exist three years ago.
+A model's deployment cost depends on hardware, utilization, model architecture, software, energy, and operations. Compare a fixed task and quality bar over a stated accounting interval. API prices also reflect commercial decisions; a price decline alone does not identify a kernel or hardware speedup.
 
 This course is a connected tour of that stack as it stands in 2026. Not a survey of disconnected topics — a single argument, told in seven lectures, that the **kernel layer, the compiler layer, the architecture layer, and the inference-algorithm layer are one co-designed system**, and that every win in any of them is a direct, measurable move on tokens-per-second and cost-per-token.
 
@@ -34,11 +34,11 @@ This course is a connected tour of that stack as it stands in 2026. Not a survey
 Most MLSys content is a pile of acronyms. This course threads them onto one spine — **economic value** — because that is what actually decides which technique ships:
 
 ```text
-   price per token  =  ( energy  +  capital )  /  tokens-per-second
-                          └── hardware ──┘        └──── MLSys ────┘
+   cost per accepted output = total allocated cost over an interval
+                              / accepted outputs in that same interval
 
-   every kernel, compiler pass, architecture choice, and decode trick
-   in this course is a lever on the denominator. that is why it exists.
+   Include hardware amortization, energy, hosting, and operations consistently.
+   Reject outputs that fail the task-quality gate before computing this metric.
 ```
 
 So the arc moves from the metric down through the stack and back up to the deployment edge:
@@ -61,7 +61,7 @@ So the arc moves from the metric down through the stack and back up to the deplo
 |---|---------|-----------|
 | [01](Lecture-01.md) | **MLSys as the economic-value layer** — the inference-cost collapse, the metric stack (tokens/s, TOK/$, TCO/Mtok, perf/watt), why systems work *is* the product | the spine |
 | [02](Lecture-02.md) | **The kernel-language explosion** — tiles as the new ISA: Triton, CUTLASS/CuTe/cuTile, ThunderKittens, TileLang, and the ease↔control spectrum | how a kernel is written |
-| [03](Lecture-03.md) | **Compilers & runtimes** — TVM (autoscheduling), Mojo/MAX (a real language), TensorRT-LLM (closed vendor), IREE, and TileRT (the megakernel runtime) | how kernels run at scale |
+| [03](Lecture-03.md) | **Compilers & runtimes** — TVM (autoscheduling), Mojo/MAX (a real language), TensorRT-LLM (vendor runtime; inspect open-source and binary component boundaries), IREE, and TileRT (the megakernel runtime) | how kernels run at scale |
 | [04](Lecture-04.md) | **Beyond the dense transformer** — Mamba/SSMs, linear attention, and the hybrid wave: Nemotron-H, Jamba, Falcon-H1, MiniMax-01 | the model made cheap |
 | [05](Lecture-05.md) | **The 2026 frontier as systems artifacts** — Qwen3, Llama Nemotron Ultra 253B, Xiaomi MiMo, DeepSeek V3/R1, and the MoE + MLA + MTP stack | reading a model card |
 | [06](Lecture-06.md) | **Making decode fast** — speculative decoding (EAGLE-3, Medusa, Sequoia), DFlash, Flash kernels (FA-3, FlashInfer), and the Together AI research line | the algorithm layer |
@@ -76,9 +76,9 @@ So the arc moves from the metric down through the stack and back up to the deplo
 By the end you should be able to:
 
 * Read any 2026 model card or serving config and predict its **cost shape** — tokens/s regime, KV-cache behavior, dense vs sparse compute, dominant precision, draft mechanism.
-* Predict any model's batch-1 decode speed from a datasheet with the **bandwidth ceiling** (`tokens/s ≤ HBM GB/s ÷ bytes per token`), and use it to sanity-check any vendor throughput claim.
+* Derive an idealized batch-1 decode bandwidth bound under explicit traffic assumptions with the **bandwidth ceiling** (`tokens/s ≤ HBM GB/s ÷ bytes per token`), and use it to sanity-check any vendor throughput claim.
 * Place any kernel tool (Triton, CUTLASS/cuTile, ThunderKittens, TileLang, TVM, Mojo, TensorRT) on the **ease↔control spectrum** and pick one for a workload with a defensible reason.
-* Explain why **SSM/hybrid architectures and MLA** kill KV-cache growth, why **MoE** decouples capacity from compute, and what each costs you in memory and interconnect.
+* Explain why **SSM/hybrid architectures and MLA** change state/cache growth (recurrent state can be fixed-size; MLA retains token-indexed state), why **MoE** decouples capacity from compute, and what each costs you in memory and interconnect.
 * Stand up **speculative decoding** (and explain EAGLE-3 vs DFlash vs Medusa), and read the acceptance-length / speedup tradeoff.
 * Tie every optimization — kernel, compiler, architecture, decode algorithm — back to a **TOK/$ and tokens/s/watt** number, and defend it.
 
@@ -108,16 +108,11 @@ If you can name the techniques but can't connect any of them to a cost number, y
 
 *Related: [TVM Deep Dives](../TVM%20Deep%20Dives/README.md) · [AI Inference Engineer 2026](../AI%20Inference%20Engineer%202026/README.md) · [Phase 5 — ML Systems Engineering Guide](../Guide.md)*
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Separate numerical correctness, runtime behavior, and service-level performance. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Carry this course into the physical-AI system
 
-1. **Baseline lab:** Build a fixed workload with a reference gate, profiler trace, and raw request records.
-2. **Guided variation:** Change one execution/scheduling choice and include a failed or neutral hypothesis when observed.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Start from:** One model and a trace with a known limiting stage.
 
-**Evidence to submit:** Quality, TTFT/TPOT, throughput/goodput, failure rate, memory, and versioned configuration. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Build and challenge:** Choose one kernel, scheduling, architectural, or speculative change to test. Count cost over the same interval as accepted outputs; distinguish commercial prices from engineering cost.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** A measured optimization ladder with combined results and costs. Continue with [the connected course](../Guide.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

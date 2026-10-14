@@ -200,16 +200,11 @@ Other uses of a non-contact, multi-sensor (RGB/Depth + thermal) device that extr
 
 *Back to [Edge AI Optimization — Projects](../Guide.md#14-projects).*
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Define the observable signal, ground-truth timing, and limits of a proxy measurement. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Can a monitoring model distinguish missing evidence from a normal event?
 
-1. **Baseline lab:** Run the supplied recorded-data pipeline and compare estimated signals with a reference.
-2. **Guided variation:** Inject motion, missing frames, or illumination changes and identify invalid-result handling.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Define observable events and labels before selecting a model. Evaluate fixed replay clips with subject/session-separated splits, including occlusion, empty frames, and missing sensor input.
 
-**Evidence to submit:** Error versus reference, usable-window rate, latency, and failure categories; do not infer clinical validity. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Report false positives/negatives, detection delay, and invalid-input behavior. Do not turn a non-contact research signal into a clinical measurement without the necessary validation.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [phase1](phase1/README.md). Explain which assumption from this course the next engineer must preserve.

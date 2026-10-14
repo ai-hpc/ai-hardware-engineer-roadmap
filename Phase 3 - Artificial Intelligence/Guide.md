@@ -16,7 +16,7 @@
 
 **Role targets:** ML Inference Engineer · Edge AI Engineer · Agentic AI Engineer · ML Engineer · AI Compiler Engineer
 
-**Prerequisites:** Phase 1 (Digital Foundations), Phase 2 (Embedded Systems).
+**Prerequisites:** Python, vector/matrix operations, and basic programming. Use Phase 1 architecture and Phase 2 device material when a lab needs them; completing every hardware course is not required before learning a model.
 
 **What comes after:** Phase 4 Track A (FPGA), Track B (Jetson), Track C (ML Compiler).
 
@@ -83,7 +83,7 @@ This track teaches the **AI application, infrastructure, and safety workloads** 
 |---|--------|---------------|----------|
 | **3** | [Agentic AI & GenAI](Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Guide.md) | LLM agents, RAG pipelines, tool use, multi-step reasoning, prompt-injection basics, coding agents, and GenAI products | Phase 5A/B (GPU Infrastructure, HPC) |
 | **4** | [ML Engineering & MLOps](Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/4.%20ML%20Engineering%20and%20MLOps/Guide.md) | Training pipelines, experiment tracking, model serving, observability, CI/CD for models | Phase 5A/B (HPC, distributed training) |
-| **5** | [LLM Application Development](Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/5.%20LLM%20Application%20Development/Guide.md) | Prompt engineering, [Qwen3.5-4B Unsloth fine-tuning](Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/5.%20LLM%20Application%20Development/Qwen3.5-4B%20Unsloth%20Fine-Tuning/Guide.md), RAG architecture, evaluation, guardrails, moderation, PII controls, production deployment | L1d/L1e roles (highest job volume) |
+| **5** | [LLM Application Development](Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/5.%20LLM%20Application%20Development/Guide.md) | Prompt engineering, [Qwen3.5-4B Unsloth fine-tuning](Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/5.%20LLM%20Application%20Development/Qwen3.5-4B%20Unsloth%20Fine-Tuning/Guide.md), RAG architecture, evaluation, guardrails, moderation, PII controls, production deployment | L1d/L1e application roles |
 
 **Build:** RAG pipeline with vector search, agent with tool calling, coding agent in terminal or CI, fine-tune `Qwen/Qwen3.5-4B-Base` with Unsloth, deploy model behind Triton/vLLM, secure prompt gateway with moderation and redaction.
 
@@ -120,9 +120,8 @@ The exact policy depends on the product. Some systems block harmful or illegal r
 | **Goal** | Understand workloads that run on your chip | Understand workloads that create inference demand |
 | **Focus** | Perception, sensors, optimization, deployment | LLMs, agents, training pipelines, serving |
 | **Hardware connection** | Direct — you deploy on FPGA/Jetson/NPU | Indirect — you generate the traffic the chip serves |
-| **Job market** | L1a, L1b, L1c roles (~4,500/month) | L1d, L1e roles (~15,000/month) |
-| **Remote %** | 10–15% (hardware access needed) | 20–25% (cloud/API-based) |
-| **Phase 4 path** | Track A → B → C (all hardware) | Track C (compiler) or Phase 5 directly |
+| **Work setting** | Device access for deployment measurements | Local or hosted compute for application experiments |
+| **Phase 4 path** | Choose FPGA, Jetson, or compiler work to match the next artifact | Track C (compiler) or Phase 5 directly |
 
 **Do both?** If you have time, Track A → Track B gives you full L1 coverage. Most hardware-focused engineers do Track A first, then add Track B topics as needed.
 
@@ -178,3 +177,12 @@ You are ready for Phase 4 when you can:
 → [**Phase 4 Track A — Xilinx FPGA**](../Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md) · [**Phase 4 Track B — Jetson**](../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md) · [**Phase 4 Track C — ML Compiler**](../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md)
 
 **Study method:** use the [shared lesson cycle and completion rubric](../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Carry this course into the physical-AI system
+
+**Start from:** Python, matrix operations, and one robot task idea.
+
+**Build and challenge:** Complete the neural-network/framework core, then select the perception or application branch required by the task. Explain which courses can wait until a measured need appears.
+
+**Pass forward:** A workload brief connecting model inputs, outputs, state, and deployment limits. Continue with [the connected course](../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/VLA%20Foundations%20to%20Frontier%202026/README.md) and keep the artifact in the [Physical AI Design Studio](../Physical-AI-Design-Studio.md).

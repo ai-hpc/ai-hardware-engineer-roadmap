@@ -35,16 +35,11 @@ python kalman_1d.py   # or kalman_2d.py, kalman_6d.py
 - [Kalman Filter (Wikipedia)](https://en.wikipedia.org/wiki/Kalman_filter)
 - [Roger Labbe's Book](https://github.com/rlabbe/Kalman-and-Bayesian-Filters-in-Python)
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Write prediction and correction for a one-dimensional state. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Carry this course into the physical-AI system
 
-1. **Baseline lab:** Estimate a noisy synthetic trajectory and compare with unfiltered measurements.
-2. **Guided variation:** Change process/measurement noise and introduce a dropout; inspect covariance and innovation.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Start from:** A seeded trajectory and explicit process/measurement noise.
 
-**Evidence to submit:** State error, covariance consistency, residuals, and seed/model assumptions. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Build and challenge:** Compare prediction-only, measurement-only, and filtered estimates. Double the sample interval and introduce dropout; inspect innovation and covariance as well as state error.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** An estimator with documented time-step and uncertainty assumptions. Continue with [the connected course](../multi-object-tracking/Guide.md) and keep the artifact in the [Physical AI Design Studio](../../../../Physical-AI-Design-Studio.md).

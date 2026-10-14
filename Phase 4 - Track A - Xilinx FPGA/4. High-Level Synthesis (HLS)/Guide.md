@@ -348,3 +348,12 @@ You are ready to move on when you can:
 - explain when hand-written RTL or a GPU kernel would be better
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Integration lab: Which resource prevents the desired initiation interval?
+
+Synthesize a matrix-vector kernel at unroll factors 1, 2, and 4. For each variant count required reads per cycle and available bank ports. Distinguish loop II from whole-invocation throughput, including DMA startup.
+
+**Acceptance evidence:** Report C/RTL parity and achieved implementation timing. Explain one non-improving variant from the memory/dependency report, then pass the chosen interface and buffer alignment to the runtime course.
+
+**Continue:** take this artifact to [5. Runtime and Driver Development](../5.%20Runtime%20and%20Driver%20Development/Guide.md). Explain which assumption from this course the next engineer must preserve.

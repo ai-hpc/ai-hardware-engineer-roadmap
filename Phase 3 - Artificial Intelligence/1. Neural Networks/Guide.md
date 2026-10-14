@@ -1201,3 +1201,12 @@ tinygrad   →  you see what frameworks hide, control the scheduler
 *Next (Phase 4 Track B): [ML and AI](../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/5.%20Application%20Development/5.%20ML%20and%20AI/Guide.md) — quantization, pruning, TensorRT, TFLite*
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Carry this course into the physical-AI system
+
+**Start from:** A small labeled dataset and a two-layer network.
+
+**Build and challenge:** Derive one forward pass and one gradient by hand. Compare finite differences away from nondifferentiable points, then deliberately transpose one weight to explain the shape failure.
+
+**Pass forward:** A numerical reference, tensor-shape table, and measured training/inference distinction. Continue with [the connected course](../2.%20Deep%20Learning%20Frameworks/Guide.md) and keep the artifact in the [Physical AI Design Studio](../../Physical-AI-Design-Studio.md).

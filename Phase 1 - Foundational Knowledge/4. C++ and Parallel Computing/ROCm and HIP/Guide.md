@@ -4,7 +4,7 @@
 <div class="course-identity__icon">RAHP</div>
 <div markdown="1">
 <p class="course-identity__eyebrow">Deep Dive · Digital Foundations</p>
-<p class="course-identity__title">Specialized course identity for ROCm and HIP (Phase 1 §4 — Sub-Track 4).</p>
+<p class="course-identity__title">Port the assumptions as well as the API calls.</p>
 <p class="course-identity__meta">Artifact: working low-level demo · Measure: timing, memory, correctness</p>
 </div>
 </div>
@@ -83,7 +83,7 @@ CDNA powers AMD Instinct data-center GPUs. Optimized for matrix math and HPC —
 - CDNA's matrix cores are AMD's answer to NVIDIA tensor cores — the hardware you'd study (or compete with) in Phase 5F (AI Chip Design)
 - MI300X's chiplet design (8 XCDs on one package) is a reference for advanced packaging (L8)
 
-### MI300X Architecture (Current Flagship)
+### MI300X Architecture (CDNA 3 Case Study)
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -126,39 +126,55 @@ Each XCD contains 38 Compute Units (CUs), each CU has 64 stream processors + mat
 | `threadIdx.x` | `threadIdx.x` | Identical |
 | `cudaDeviceSynchronize()` | `hipDeviceSynchronize()` | Same |
 | `cudaLaunchKernel()` | `hipLaunchKernelGGL()` | Slightly different |
-| Warp size: 32 | **Wavefront size: 64** | **Key architectural difference** |
+| NVIDIA warp: 32 | **Query `warpSize`: commonly 32 or 64 by target** | Cross-lane algorithms must match the target |
 
 ### HIP Kernel Example
 
 ```cpp
 #include <hip/hip_runtime.h>
+#include <cstdlib>
+#include <iostream>
+#include <vector>
 
-__global__ void vector_add(float* a, float* b, float* c, int n) {
+__global__ void vector_add(const float* a, const float* b, float* c, int n) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) {
-        c[i] = a[i] + b[i];
-    }
+    if (i < n) c[i] = a[i] + b[i];
 }
 
 int main() {
+    auto check = [](hipError_t status) {
+        if (status != hipSuccess) {
+            std::cerr << hipGetErrorString(status) << '\n';
+            std::exit(EXIT_FAILURE);
+        }
+    };
+    constexpr int n = 1025; // Deliberately not divisible by the block size.
+    const size_t bytes = n * sizeof(float);
+    std::vector<float> a(n, 1.0f), b(n, 2.0f), c(n);
     float *d_a, *d_b, *d_c;
-    hipMalloc(&d_a, n * sizeof(float));
-    hipMalloc(&d_b, n * sizeof(float));
-    hipMalloc(&d_c, n * sizeof(float));
-
-    hipMemcpy(d_a, h_a, n * sizeof(float), hipMemcpyHostToDevice);
-    hipMemcpy(d_b, h_b, n * sizeof(float), hipMemcpyHostToDevice);
-
-    vector_add<<<(n+255)/256, 256>>>(d_a, d_b, d_c, n);
-
-    hipMemcpy(h_c, d_c, n * sizeof(float), hipMemcpyDeviceToHost);
-    hipFree(d_a); hipFree(d_b); hipFree(d_c);
+    check(hipMalloc(&d_a, bytes));
+    check(hipMalloc(&d_b, bytes));
+    check(hipMalloc(&d_c, bytes));
+    check(hipMemcpy(d_a, a.data(), bytes, hipMemcpyHostToDevice));
+    check(hipMemcpy(d_b, b.data(), bytes, hipMemcpyHostToDevice));
+    vector_add<<<(n + 255) / 256, 256>>>(d_a, d_b, d_c, n);
+    check(hipGetLastError());
+    check(hipDeviceSynchronize());
+    check(hipMemcpy(c.data(), d_c, bytes, hipMemcpyDeviceToHost));
+    check(hipFree(d_a));
+    check(hipFree(d_b));
+    check(hipFree(d_c));
+    for (float value : c) if (value != 3.0f) return EXIT_FAILURE;
+    std::cout << "Validated " << n << " elements\n";
 }
 ```
 
-If you know CUDA, you already know 95% of HIP. The critical differences:
+Build with the selected HIP toolchain and run on a supported device. This course review did not execute HIP hardware; preserve the compile/runtime log when reproducing it.
 
-**1. Wavefront = 64 threads (vs CUDA warp = 32):**
+
+CUDA experience transfers to HIP, but API coverage, execution width, and library support must be checked for the selected release. The critical differences:
+
+**1. Wavefront width depends on the target:**
 This affects any code that uses warp-level primitives:
 ```cpp
 // CUDA: assumes warp = 32
@@ -167,9 +183,9 @@ unsigned mask = __ballot_sync(0xFFFFFFFF, predicate);  // 32-bit mask
 // HIP on AMD: wavefront = 64
 unsigned long long mask = __ballot(predicate);          // 64-bit mask
 ```
-Reductions, shuffles, and vote operations all need adjustment for the wider wavefront.
+Reductions, shuffles, and vote masks must handle the actual wavefront width; a hard-coded 64 is no more portable than a hard-coded 32.
 
-**2. Shared memory (LDS) banks:** 64 banks on AMD (vs 32 on NVIDIA). Different bank conflict patterns — code that avoids conflicts on NVIDIA may still conflict on AMD, and vice versa.
+**2. Shared memory (LDS) banks:** AMD bank counts vary by architecture. Re-derive conflicts for the target rather than assuming 64 banks for every GPU. [AMD’s LDS guide](https://rocm.docs.amd.com/projects/composable_kernel/en/7.13.0-preview/conceptual/ck_tile/hardware/lds_bank_conflicts.html) explains the bank mapping.
 
 **3. Matrix Cores (not Tensor Cores):** AMD uses `rocWMMA` (Wavefront Matrix Multiply-Accumulate) or the Composable Kernel (CK) library instead of NVIDIA's `mma.sync` / CUTLASS.
 
@@ -179,12 +195,14 @@ Reductions, shuffles, and vote operations all need adjustment for the wider wave
 
 HIPIFY is AMD's tool suite for converting CUDA code to HIP. It's the fastest way to port existing CUDA projects to run on AMD GPUs.
 
+HIPIFY converts supported source constructs; it neither runs the program nor verifies correctness. Consult [AMD’s supported API tables](https://rocmdocs.amd.com/projects/HIPIFY/en/latest/reference/hip_roc_supported_apis.html) and [portability workflow](https://rocm.blogs.amd.com/software-tools-optimization/hipify/README.html).
+
 ### Two Conversion Tools
 
-| Tool | How it works | Accuracy | Speed |
+| Tool | How it works | Review requirement | Cost |
 |------|-------------|----------|-------|
-| **hipify-clang** | Uses Clang's AST parser to understand CUDA code semantically | ~95% accurate | Slower (full compilation) |
-| **hipify-perl** | Regex-based find-and-replace (`cuda` → `hip`) | ~85% accurate | Very fast |
+| **hipify-clang** | Parses CUDA with Clang | Inspect unsupported APIs and semantic assumptions | Requires source/build context |
+| **hipify-perl** | Textual substitutions | Review context-sensitive changes manually | Lightweight initial pass |
 
 ### hipify-clang (Recommended)
 
@@ -195,8 +213,8 @@ sudo apt install hipify-clang
 # Convert a single CUDA file
 hipify-clang my_kernel.cu -o my_kernel.hip.cpp
 
-# Convert an entire project (recursive)
-hipify-clang --project-dir ./cuda_project --output-dir ./hip_project
+# For a project, inspect hipify-clang --help and supply its compilation database.
+# Convert a reviewed list of translation units with the flags for that release.
 
 # Show what would change without writing (dry run)
 hipify-clang my_kernel.cu --print-stats
@@ -237,8 +255,8 @@ hipify-perl my_kernel.cu > my_kernel.hip.cpp
 ### Typical HIPIFY Workflow for a Real Project
 
 ```bash
-# Step 1: Run hipify-clang on the entire project
-hipify-clang --project-dir ./my_cuda_project --output-dir ./my_hip_project
+# Step 1: in a separate source checkout, convert each selected translation unit
+hipify-clang my_kernel.cu -o my_kernel.hip.cpp
 
 # Step 2: Try to build
 cd my_hip_project
@@ -246,7 +264,7 @@ mkdir build && cd build
 cmake .. -DCMAKE_CXX_COMPILER=hipcc
 make -j$(nproc)
 
-# Step 3: Fix compilation errors (usually 5-15% of files need manual fixes)
+# Step 3: Fix compilation errors and inspect unconverted features
 # Common issues:
 #   - warp size assumptions (32 → 64)
 #   - library API differences (cuBLAS → rocBLAS)
@@ -459,14 +477,14 @@ hipFree(managed);
 **When to use managed memory:**
 - Prototyping (avoids manual copy bookkeeping)
 - Irregular access patterns where you can't predict which data the GPU needs
-- **NOT** for performance-critical paths — explicit async copies with pinned memory are always faster
+- Performance-sensitive code: compare explicit async copies with pinned memory against managed memory on the actual platform
 
 ### 7.3 HIP Memory Comparison
 
 | Method | Performance | Ease of use | When to use |
 |--------|-----------|-------------|-------------|
-| `hipMalloc` + `hipMemcpy` | Best | Manual | Production kernels |
-| `hipMalloc` + `hipMemcpyAsync` + pinned | Best (overlapped) | Manual | Pipeline overlapping |
+| `hipMalloc` + `hipMemcpy` | Measure copy and execution costs | Manual | Explicit ownership and movement |
+| `hipMalloc` + `hipMemcpyAsync` + pinned | Overlap depends on resources/dependencies | Manual | Pipelined independent work |
 | `hipMallocManaged` | Good (page faults) | Automatic | Prototyping, irregular access |
 | `hipHostMalloc` (coherent) | Moderate | Direct access | Small data, host+device shared |
 
@@ -597,7 +615,7 @@ PyTorch uses HIP as the backend — the `torch.cuda.*` API works identically on 
 
 ## 11. Projects
 
-1. **HIPIFY your CUDA kernel** — Take your CUDA vector add and matmul from Sub-Track 3. Convert to HIP using `hipify-clang`. Build with `hipcc`. Run on AMD GPU (or ROCm Docker on NVIDIA). Verify identical output.
+1. **HIPIFY your CUDA kernel** — Take your CUDA vector add and matmul from Sub-Track 3. Convert to HIP using `hipify-clang`. Build with `hipcc`. Run on a supported AMD GPU, or use a separately supported HIP-on-CUDA toolchain for NVIDIA. A ROCm container does not emulate AMD hardware. Compare output with a stated numerical tolerance.
 2. **Wavefront vs warp** — Write a parallel reduction kernel. Run on both AMD (wavefront=64) and NVIDIA (warp=32). Measure how the wavefront width difference affects performance and code structure.
 3. **Profile with Omniperf** — Profile your HIP tiled matmul with `omniperf`. Generate a roofline plot. Compare with NVIDIA `ncu` roofline for the same kernel.
 4. **rocBLAS vs cuBLAS** — Call rocBLAS `rocblas_sgemm` for matrix multiply. Compare performance and API with cuBLAS `cublasSgemm` for the same matrix sizes.
@@ -612,16 +630,10 @@ PyTorch uses HIP as the backend — the `torch.cuda.*` API works identically on 
 
 → [**Sub-Track 5 — OpenCL and SYCL**](../OpenCL%20and%20SYCL/Guide.md) — portable compute across GPU, FPGA, and CPU.
 
-## Practice and assessment
+## Port the assumptions as well as the API calls
 
-**Entry diagnostic (prerequisite check):** Explain which assumptions in a CUDA kernel are tied to warp width or memory layout. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+Port the same ragged reduction and matrix product used in CUDA. List every NVIDIA-specific assumption: warp mask width, shuffle participation, inline assembly, shared-bank mapping, matrix instruction, and library call. Replace assumptions using documented target capabilities; compile success is only the first checkpoint.
 
-1. **Baseline lab:** Port a small reduction to HIP with a portable reference and explicit device information.
-2. **Guided variation:** Test irregular input sizes and compare two supported launch configurations.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Compare output tolerance first, then kernel and transfer time separately. Preserve an unsupported-feature list and a target manifest with GPU architecture, compiler/runtime, and chosen matrix library. This becomes a portability test for the future compiler: which decisions belong in a shared IR, and which belong in target lowering?
 
-**Evidence to submit:** Numerical tolerance, launch/kernel time, compiler/runtime versions, and hardware-specific assumptions. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** Portability matrix and matched CUDA/HIP correctness/performance results. Continue with [the next course](../OpenCL%20and%20SYCL/Guide.md) and reuse that evidence.

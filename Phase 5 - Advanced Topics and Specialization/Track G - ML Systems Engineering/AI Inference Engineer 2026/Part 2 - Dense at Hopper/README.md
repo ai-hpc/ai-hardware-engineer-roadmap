@@ -1,13 +1,19 @@
 # Part 2 — Dense Decoder-Only Inference at Hopper
 
-The end-to-end production inference stack for 70B-class dense models on Hopper-class hardware (H100 / H200). Seven lectures, anchored on a side-by-side comparison of two of the most-deployed dense models in 2025–2026:
+The end-to-end production inference stack for 70B-class dense models on Hopper-class hardware (H100 / H200). Seven lectures, anchored on a side-by-side comparison of two released dense-model architectures:
 
-* **Llama 3.3 70B Instruct** — the canonical Western dense workhorse, 8192 hidden, 28672 FFN, GQA (64 Q / 8 KV), bias-free attention.
-* **Qwen 2.5 72B Instruct** — the canonical Chinese dense counterpart, dimensionally near-identical (8192 hidden, *slightly* wider 29568 FFN, same GQA 64 Q / 8 KV), differing in QKV bias (present) and a larger multilingual tokenizer (152K vocab). *(Beware secondary sources that misquote Qwen as 12288 / 49152 — Lecture 01 §2.1 shows why that fails a parameter-count check.)*
+* **Llama 3.3 70B Instruct** — a dense-model case study, 8192 hidden, 28672 FFN, GQA (64 Q / 8 KV), bias-free attention.
+* **Qwen 2.5 72B Instruct** — a second dense-model case study, dimensionally near-identical (8192 hidden, *slightly* wider 29568 FFN, same GQA 64 Q / 8 KV), differing in QKV bias (present) and a larger multilingual tokenizer (152K vocab). *(Beware secondary sources that misquote Qwen as 12288 / 49152 — Lecture 01 §2.1 shows why that fails a parameter-count check.)*
 
-Both models share the same family-shape (80 layers, 128K context, GQA, RoPE, RMSNorm, SwiGLU) **and the same core dimensions**. They differ only in the tokenizer/vocab, a ~3% wider FFN, and one tiny architectural detail (QKV bias). The pair is the highest-information teaching anchor in the dense space because *every concept lands on two concrete deployable systems* — and the near-identical geometry isolates the differences that actually matter.
+Both models share the same family-shape (80 layers, 128K context, GQA, RoPE, RMSNorm, SwiGLU) **and the same core dimensions**. The highlighted differences are tokenizer/vocabulary, FFN width, and QKV bias; this is not an exhaustive comparison. Inspect RoPE configuration, normalization constants, training, and templates at each pinned revision. The pair is the highest-information teaching anchor in the dense space because *every concept lands on two concrete deployable systems* — and the near-identical geometry isolates the differences that actually matter.
 
 By the end of Part 2 you should be able to ship either model to production on 4–8× H200, defend the precision recipe, defend the runtime choice, and produce reproducible benchmarks for TTFT / TPOT / throughput / $/MTok / parity-vs-reference.
+
+## Access and compatibility route
+
+The full deployment experiment requires appropriate hardware. With a CPU or smaller GPU, complete the config audit, memory/traffic derivation, numerical subgraph checks, and benchmark design; label cluster throughput and cost results **not run**. This is an analysis milestone, not completion of the hardware deployment milestone.
+
+Build a model × runtime × format × parallelism compatibility table first. The parameter lists below describe the desired experiment space, not a promise that every combination is supported. Run only supported cells; explain excluded cells and keep them in the report.
 
 ## Lectures
 
@@ -40,23 +46,18 @@ A single benchmark repo, extending the harness from Part 1, that contains:
 You can do all of:
 
 * Sketch the inference graphs of Llama 3.3 70B and Qwen 2.5 72B, show they are dimensionally near-identical (same 8192 hidden, same KV cost per token), and name where the real differences live — vocab/tokenizer, a ~3% wider FFN, and QKV bias.
-* Defend AWQ-INT4 over GPTQ for these models in two sentences, citing the relevant arXiv anomaly.
+* Choose between supported AWQ/GPTQ or other precision candidates using matched quality and performance measurements; a result on another checkpoint is a hypothesis, not the answer.
 * Walk the all-reduce step in tensor parallelism on 8× H100 and explain why ring vs tree NCCL matters.
 * Predict the TTFT change from enabling chunked prefill at 32K context on H200, then verify.
 * State your $/MTok for one (model, precision, TP) cell on H200, with the formula it came from.
 
 If any of these is shaky, re-read the matching lecture before moving to Part 3.
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Derive weight and KV memory for a dense/GQA model. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Carry this course into the physical-AI system
 
-1. **Baseline lab:** Establish a correct dense-model baseline before sweeping precision or tensor parallelism.
-2. **Guided variation:** Compare small and large input/output workloads at fixed quality.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Start from:** Pinned dense-model configs and the fundamentals benchmark protocol.
 
-**Evidence to submit:** Per-rank memory, TTFT, TPOT, collective time, quality, and topology. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Build and challenge:** Compare supported quantization and parallelism candidates on matched requests. Do not force AWQ to win; use data to choose. Without large GPUs, complete config/math work and mark throughput unmeasured.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** A dense-model quality/capacity/latency comparison before studying sparse routing. Continue with [the connected course](../Part%203%20-%20MoE%20at%20Blackwell/README.md) and keep the artifact in the [Physical AI Design Studio](../../../../Physical-AI-Design-Studio.md).

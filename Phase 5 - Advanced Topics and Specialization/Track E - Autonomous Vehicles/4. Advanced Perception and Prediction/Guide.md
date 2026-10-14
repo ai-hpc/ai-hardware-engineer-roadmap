@@ -20,21 +20,21 @@
 
 ## Why this is advanced
 
-Modules 1–3 teach you to understand and work with a single-camera, production-deployed ADAS (openpilot). This module goes beyond: multi-sensor perception, BEV architectures, trajectory prediction, HD maps, and simulation — the research and engineering frontier for L3+ autonomy.
+Modules 1–3 teach you to understand and work with a camera-based, production-deployed ADAS (openpilot). This module goes beyond: multi-sensor perception, BEV architectures, trajectory prediction, HD maps, and simulation — the research and engineering frontier for L3+ autonomy.
 
 ---
 
 ## 1. Advanced Sensor Hardware
 
 * **LiDAR:**
-    * Working principles: mechanical spinning (Velodyne), solid-state (Livox, Innoviz), FMCW (Aeva, Luminar).
+    * Working principles: pulsed time-of-flight versus FMCW ranging, separately from mechanical, MEMS, or other scanning mechanisms. A vendor name alone does not identify the ranging method.
     * Trade-offs: range, resolution, FoV, latency, cost.
     * Point cloud representations: raw points, voxels, range images, pillars.
 
 * **Radar:**
     * Automotive radar: 77 GHz FMCW, range-Doppler processing, angular resolution.
     * 4D imaging radar: elevation + azimuth + range + velocity.
-    * Radar advantages: all-weather, direct velocity measurement, long range.
+    * Radar advantages: relative robustness in some adverse conditions and direct radial-velocity measurement; multipath, interference, occlusion, and weather still affect performance.
 
 * **Camera systems:**
     * Sensor types: CCD vs CMOS, global vs rolling shutter.
@@ -58,7 +58,7 @@ Modules 1–3 teach you to understand and work with a single-camera, production-
     * Impact of time misalignment on fusion accuracy.
 
 **Projects:**
-* Build a calibration target and calibrate a camera-LiDAR pair using Kalibr or ACSC. Verify by projecting LiDAR points onto camera image.
+* Use Kalibr for its documented camera/IMU calibration problems. For camera–LiDAR calibration, select a tool that explicitly supports those sensors and validate projection on held-out scenes; Kalibr is not a generic LiDAR calibrator. [Kalibr capabilities](https://github.com/ethz-asl/kalibr).
 * Implement a radar-camera fusion pipeline: associate radar detections with camera bounding boxes for velocity-augmented detection.
 
 ---
@@ -156,6 +156,12 @@ Modules 1–3 teach you to understand and work with a single-camera, production-
 ## Next
 
 → **[Module 5 — Safety Standards and Deployment](../5.%20Safety%20Standards%20and%20Deployment/Guide.md)** — ISO 26262, SOTIF, V2X, HIL testing, and production deployment.
+
+## Distinguish model failure from timestamp failure
+
+Hold a camera–LiDAR model fixed and inject a known timestamp offset in recorded or simulated data. Evaluate detection quality against offset, then repeat with a perturbed extrinsic transform. Keep those experiments separate: retraining a model is not the first remedy for a broken frame/time contract.
+
+For trajectory prediction, report horizon, sampling interval, number of predicted modes, miss rate, and probability calibration beside minADE/minFDE. Increasing the number of candidates can improve an oracle best-of-K metric without improving the trajectory a planner actually selects. Deliver the calibrated sensor contract, resource profile, and worst scenarios to [Module 5](../5.%20Safety%20Standards%20and%20Deployment/Guide.md). These become the SoC's sensor synchronization and deadline requirements.
 
 ## Practice and assessment
 

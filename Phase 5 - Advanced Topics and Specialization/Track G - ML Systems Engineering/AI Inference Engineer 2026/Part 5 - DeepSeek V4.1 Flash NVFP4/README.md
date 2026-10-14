@@ -57,3 +57,12 @@ These standard-library exercises use **synthetic fixtures**, not DeepSeek perfor
 **Deployment route:** additionally submit a working pinned launch, reference-quality comparisons, at least three repeated load runs, per-rank memory, and one successful or rejected optimization backed by traces. Apply the [shared rubric](../../../../Learning-Guide.md); an integrity check alone cannot satisfy model-quality assessment.
 
 [Back to the inference course](../README.md) · [Start Lecture 01](Lecture-01.md)
+
+
+## Carry this course into the physical-AI system
+
+**Start from:** Exact DeepSeek V4.1 Flash checkpoint identity and loader compatibility.
+
+**Build and challenge:** Audit payload/scales, total versus active parameters, hybrid state, and parallel placement. A text-output multimodal model is an inference case study or optional planner; it is not a native robot action policy.
+
+**Pass forward:** A checkpoint/memory/kernel dossier; transfer supported numerical and memory lessons to the selected VLA. Continue with [the connected course](../../Hardware-Aware%20LLM%20Quantization/README.md) and keep the artifact in the [Physical AI Design Studio](../../../../Physical-AI-Design-Studio.md).

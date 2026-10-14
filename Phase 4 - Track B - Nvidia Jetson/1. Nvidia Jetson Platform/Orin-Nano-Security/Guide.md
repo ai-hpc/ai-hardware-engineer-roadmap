@@ -1242,34 +1242,11 @@ ls -la /data/tee/
 #   - File identifier
 ```
 
-### 7.3 RPMB (Replay Protected Memory Block)
+### 7.3 RPMB is a storage capability, not a Nano assumption
 
-The eMMC on the Orin Nano includes an RPMB partition that provides
-hardware-enforced authenticated writes with replay protection:
+Do not assume the Orin Nano has eMMC with an RPMB partition. The developer kit uses microSD or external storage, as shown in NVIDIA's [hardware layout](https://docs.nvidia.com/jetson/orin-nano-devkit/user-guide/latest/hardware_layout.html). The secure-storage backend depends on the actual storage device and OP-TEE/BSP configuration.
 
-```bash
-# Check RPMB partition availability
-mmc rpmb read-counter /dev/mmcblk0rpmb
-
-# RPMB properties on typical Orin Nano eMMC:
-# - Size: 4 MB (configurable, max 16 MB)
-# - Authentication: HMAC-SHA256 with a 256-bit key
-# - Replay protection: Monotonic write counter (32-bit)
-# - Access: Only via authenticated commands
-
-# OP-TEE uses RPMB for:
-#   1. Secure storage root encryption key tree
-#   2. Anti-rollback counters for firmware
-#   3. Critical security state flags
-```
-
-OP-TEE RPMB configuration in the device tree:
-
-```bash
-# Verify RPMB is configured for OP-TEE
-dtc -I dtb -O dts /boot/dtb/kernel_tegra234-p3767-0003-p3768-0000-a0.dtb \
-    2>/dev/null | grep -A10 "rpmb"
-```
+For a platform with supported RPMB, study authenticated writes and replay counters using its storage and OP-TEE documentation. For Nano, record which backend is actually configured and its rollback threat model. A path such as `/dev/mmcblk0rpmb` must be discovered, not invented from the SoC name. Never provision a one-time key as a classroom probe.
 
 ### 7.4 Hardware-Bound Key Derivation
 
@@ -3932,16 +3909,11 @@ nvbootctrl dump-slots-info
 
 *End of Guide*
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Draw the assets, trust boundaries, and update/boot verification chain. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: What does each signature actually authenticate?
 
-1. **Baseline lab:** Verify a signed test artifact and map the result to an application-level acceptance decision.
-2. **Guided variation:** Corrupt the artifact or metadata in a disposable test and prove rejection without bypassing checks.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Map boot firmware, kernel, rootfs, container, model, and configuration to verification points and keys. Test rejection using an altered disposable artifact before considering irreversible device provisioning.
 
-**Evidence to submit:** Verification logs, threat assumptions, rejection cases, and a reproducible trust configuration. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Submit a trust-chain diagram and key-recovery/rotation plan. Secure boot alone does not encrypt weights or authenticate every downloaded model; specify those paths explicitly.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [6. Security and OTA](../../6.%20Security%20and%20OTA/Guide.md). Explain which assumption from this course the next engineer must preserve.

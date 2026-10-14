@@ -4,7 +4,7 @@
 <div class="course-identity__icon">YPEL</div>
 <div markdown="1">
 <p class="course-identity__eyebrow">Deep Dive · Embedded Systems</p>
-<p class="course-identity__title">Specialized course identity for Yocto Project — Embedded Linux Distribution Engineering.</p>
+<p class="course-identity__title">Package the runtime contract as a reproducible image.</p>
 <p class="course-identity__meta">Artifact: bring-up or firmware demo · Measure: boot, latency, power, reliability</p>
 </div>
 </div>
@@ -53,16 +53,10 @@ All step-by-step content, labs, glossary, and external links live in the **[Lect
 
 **Pro tip:** when documentation and the internet disagree, trust the **docs matching your exact Yocto release branch**—metadata syntax and variable names do evolve.
 
-## Practice and assessment
+## Package the runtime contract as a reproducible image
 
-**Entry diagnostic (prerequisite check):** Explain recipe, layer, machine, distribution, image, and task signatures. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+Carry the observation-service interface from embedded Linux into a product layer: recipe, runtime dependencies, configuration, startup unit, and smoke-test command. Record layer commits separately from recipe `SRCREV` values, plus host/toolchain details and source checksums. A branch name and a warm sstate cache are not a complete release record.
 
-1. **Baseline lab:** Add a small package to an image and rebuild from pinned layers and configuration.
-2. **Guided variation:** Change one recipe input and identify which tasks rebuild; verify package contents on the target or QEMU.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Build the image and SDK, boot the matching target/QEMU image, and submit a request to the CPU reference backend. Compare package manifest, service behavior, and artifact hashes across a second build. Explain any differences instead of calling all successful rebuilds bit-for-bit reproducible.
 
-**Evidence to submit:** Layer revisions, build/task logs, image manifest, size delta, and runtime smoke test. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** Pinned product layer, image/SDK manifest, and runtime smoke test. Continue with [the next course](Lecture/README.md) and reuse that evidence.

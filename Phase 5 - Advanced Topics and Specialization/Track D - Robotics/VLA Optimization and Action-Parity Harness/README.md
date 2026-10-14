@@ -20,7 +20,7 @@ The two halves are inseparable: an optimization that you cannot measure against 
 
 **Comprehensive VLA companion:** [VLA Foundations to Frontier 2026](../VLA%20Foundations%20to%20Frontier%202026/README.md) provides 32 lectures spanning history, architectures, data, imitation/flow/RL training, evaluation, deployment, and the research frontier verified through October 13, 2026. Use its [CPU labs](../VLA%20Foundations%20to%20Frontier%202026/Lab-Guide.md) and capstones alongside this specialization.
 
-**Scope:** inference and deployment of pretrained VLAs (OpenVLA, RT-2-X / OpenX-style policies, π₀ / π0.5, NVIDIA GR00T N-series, RDT, Octo). This specialization focuses on inference; for VLA pretraining and fine-tuning use the comprehensive companion above. For deeper reinforcement learning, take the [Deep RL for Robot Learning](../Deep%20RL%20for%20Robot%20Learning/README.md) special course (imitation learning through RL post-training of π0.5), or the shorter [Robot Learning section of Lecture 3](../Advanced%20Perception%20and%20AI%20for%20Robotics/Lecture-01.md#c1-reinforcement-learning) of the Perception lecture.
+**Scope:** inference and deployment of pretrained VLAs (released checkpoints such as OpenVLA, π₀ / π0.5, NVIDIA GR00T N-series, RDT, and Octo; RT-2/RT-2-X are research comparisons, not assumed downloadable deployment artifacts). This specialization focuses on inference; for VLA pretraining and fine-tuning use the comprehensive companion above. For deeper reinforcement learning, take the [Deep RL for Robot Learning](../Deep%20RL%20for%20Robot%20Learning/README.md) special course (imitation learning through RL post-training of π0.5), or the shorter [Robot Learning section of Lecture 3](../Advanced%20Perception%20and%20AI%20for%20Robotics/Lecture-01.md#c1-reinforcement-learning) of the Perception lecture.
 
 **Layer mapping:** L3-L8. Touches model architecture, runtime / kernels, edge accelerators, ROS 2 integration, and the closed-loop sim / real evaluation harness.
 
@@ -62,18 +62,22 @@ images (N cameras, ~224x224 or 384x384)
         └─► projector / Perceiver resampler
               └─► LLM backbone (Llama-7B / Gemma-2B / Qwen2-VL-class, 2-8B params)
                     └─► action head (discretized tokens, MLP regression, or diffusion head)
-                          └─► 7-DoF (or 14-DoF bimanual) action @ 10-50 Hz
+                          └─► embodiment-specific action vector or chunk (representation and rate must be stated)
 ```
 
-Illustrative planning assumptions to replace with measurements for your selected policy, device, and controller:
+### Measure the full robot path
 
-* the **control loop deadline** is 20-100 ms; a vanilla 7B VLA at fp16 takes 200-600 ms per action on consumer / edge hardware
-* **the vision tower is not free** — at 4 cameras × 384×384 it can rival the LLM backbone in FLOPs
-* **memory budget on Jetson AGX Orin (64 GB)** is shared between the robot stack, ROS 2 nodes, perception, and the VLA — you rarely have more than ~16-24 GB for the policy
-* **deterministic latency matters more than peak throughput** — a P99 spike that misses a control tick can crash a real robot
-* the **action head is a different runtime problem** from text generation: action-token VLAs do short autoregressive bursts (4-16 tokens per chunk), diffusion heads do 5-20 denoising steps
+[![Observation passes through inference, freshness and action checks, and a local controller; the optional network planner is outside the local control loop](../../../Assets/illustrations/learning-path/robot-loop.svg)](../../../Assets/illustrations/learning-path/robot-loop.svg)
 
-Every optimization in Lecture 01 is justified by one of those bullets. Every metric in Lecture 02 is the thing the optimization is allowed to trade away.
+*Trace the source timestamp through each box. Which component rejects a late action? [Download PNG](../../../Assets/illustrations/learning-path/robot-loop.png).*
+
+Separate **policy update rate**, **action-chunk horizon**, and **local controller frequency**. An action dimension is not automatically a robot degree of freedom: a 7-component command might encode position, rotation, and gripper intent for a controller with different joint dimensions.
+
+Measure the vision encoder, backbone, action head, preprocessing, queueing, and dispatch. Token counts and denoising steps depend on the selected architecture. Account for camera buffers, ROS nodes, live tensors, and workspace when budgeting shared memory. Use supported runtime/precision combinations; a text-LLM optimization does not automatically support a VLA's action head.
+
+For a stochastic policy, fixed-input action MSE is only a diagnostic. Record sampling settings, compare paired episode outcomes with uncertainty, and test closed-loop recovery. A successful frozen-observation comparison does not prove task success after the first changed action.
+
+**Starting references:** [OpenVLA](https://openvla.github.io/) and [openpi](https://github.com/Physical-Intelligence/openpi). Pin a checkpoint, embodiment adapter, normalization statistics, and runtime revision before the first benchmark.
 
 ---
 
@@ -104,3 +108,12 @@ You are done with this special course when you can:
 If you cannot do these things, you have built an optimization demo, not a deployment artifact. Re-run the harness.
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Carry this course into the physical-AI system
+
+**Start from:** A frozen VLA reference, paired episode list, and declared acceptance tolerances.
+
+**Build and challenge:** Optimize one component at a time. Compare same-observation numerics and paired closed-loop outcomes separately; test stale observations and recovery as well as average success.
+
+**Pass forward:** A passing candidate plus measured critical-path operator shapes for compiler and accelerator design. Continue with [the connected course](../../Track%20G%20-%20ML%20Systems%20Engineering/TVM%20Deep%20Dives/README.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

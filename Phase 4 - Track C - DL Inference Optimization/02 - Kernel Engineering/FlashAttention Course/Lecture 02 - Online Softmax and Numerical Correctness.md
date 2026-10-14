@@ -6,7 +6,7 @@
 
 **Prerequisites:** Lecture 1. Comfort with the `softmax(x) = exp(x − m) / Σ exp(x − m)` shifted form.
 
-**Artifact:** A NumPy script that proves blockwise-LSE equals one-shot softmax bit-for-bit in fp64, plus a small report of the actual fp16 / bf16 error you see for realistic shapes.
+**Artifact:** A NumPy script that proves blockwise-LSE equals one-shot softmax within a stated fp64 tolerance, plus a small report of the actual fp16 / bf16 error you see for realistic shapes.
 
 ---
 
@@ -71,7 +71,7 @@ Causal mask sets `S_{i,j} = -∞` for `j > i`. In the recurrence that means: whe
 
 ## Build it
 
-Read FA1 paper Section 3.1 (Algorithm 1 — fused matmul–softmax) and Tri Dao's [online-softmax note](https://github.com/Dao-AILab/flash-attention/blob/main/assets/flashattn_banner.jpg) (the algorithm boxes in the paper are clearer than the README). Then write this exact-equivalence test:
+Read FA1 paper Section 3.1 (Algorithm 1 — fused matmul–softmax) and the [FlashAttention algorithm and proof](https://arxiv.org/html/2205.14135v2) (the algorithm boxes in the paper are clearer than the README). Then write this exact-equivalence test:
 
 ```python
 # online_softmax_check.py
@@ -139,7 +139,7 @@ if __name__ == "__main__":
     print("max abs diff (fp64):", np.abs(O_ref - O_flash).max())
 ```
 
-In fp64 the diff should be at the level of `1e-13` — purely floating-point reduction-order noise. That proves the algorithm is **exact**.
+For these seeded inputs, expect a small float64 discrepancy; measure it and check a declared tolerance such as `atol=1e-12, rtol=1e-12`. This is a numerical regression check. The algebraic recurrence establishes exactness over real arithmetic; one floating-point experiment is not a proof.
 
 Now repeat the test in fp32 and bf16 (cast `Q, K, V` and run the same code). Record the max absolute error and the relative error at a few percentile cuts (`p50`, `p99`, `max`). You should see fp32 errors around `1e-5` and bf16 errors around `5e-3`. These numbers are the tolerance bands you will use later in your correctness harness (Lecture 7).
 
@@ -169,7 +169,7 @@ Do **not** compare bf16 against fp64 and complain about a 1e-2 error — that is
 
 Save the script as `online_softmax_check.py` in your course working directory. It must produce:
 
-1. fp64 max abs diff close to `1e-13` (proves exactness).
+1. float64 outputs within the declared tolerance, plus a written derivation of the running normalization invariant.
 2. fp32 and bf16 max abs diff in line with the expected numbers above.
 3. A short README note: "the running `(m, ℓ)` and rescale-by-`exp(m_old - m_new)` together implement an exact streaming softmax."
 

@@ -6,6 +6,8 @@ The shared destination is a [custom physical-AI SoC](README.md#the-goal) built a
 
 ## Choose a route and a first deliverable
 
+For a connected project across these routes, use the [Physical AI Design Studio](Physical-AI-Design-Studio.md). Its nine gates reuse the same task, reference vectors, numerical contracts, and evidence from model selection through SoC integration. Each course now identifies a specific artifact to pass to the next layer.
+
 | Route | Start | First deliverable | Then |
 |---|---|---|---|
 | Inference optimization | [Phase 4C](Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md) | Correctness-checked operator benchmark with a profiler trace | [Inference course](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/README.md), then its DeepSeek V4.1 Flash NVFP4 part |
@@ -29,7 +31,7 @@ Try the entry task for your next course without following its solution. If you c
 
 ## A repeatable lesson cycle
 
-Use this cycle with each course's **Practice and assessment** section. For courses that already contain detailed labs, those labs remain the main assignments.
+Use this cycle with the course's **lab, integration exercise, or handoff section**. For courses that already contain detailed labs, those labs remain the main assignments.
 
 1. **Retrieve (5 minutes):** close the notes and draw the data path or explain yesterday's failure. Mark what you cannot yet explain.
 2. **Predict (10 minutes):** estimate a result with units. Write the condition under which the estimate would fail.

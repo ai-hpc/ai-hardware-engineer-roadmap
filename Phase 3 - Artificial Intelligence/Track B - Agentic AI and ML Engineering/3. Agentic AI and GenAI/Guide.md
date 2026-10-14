@@ -386,16 +386,11 @@ For this roadmap, the important takeaway is that **Track B should teach the work
 
 → [**Module 4B — ML Engineering & MLOps**](../4.%20ML%20Engineering%20and%20MLOps/Guide.md)
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Trace an agent request through model, tool invocation, state, and final response. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Carry this course into the physical-AI system
 
-1. **Baseline lab:** Build a small task set with a fixed tool interface and log complete execution traces.
-2. **Guided variation:** Inject a tool timeout or malformed response; verify bounded retries and correct state recovery.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Start from:** A bounded task API and an inference endpoint.
 
-**Evidence to submit:** Task success, tool errors, latency, token/resource cost, and reproducible failure cases. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Build and challenge:** Build a planner that requests task intents with typed arguments and timeouts. Replay malformed or stale requests and retrieved text that attempts to alter permissions.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** An optional supervisory planner with an auditable trace; local controller execution remains separately scheduled. Continue with [the connected course](MCP%20for%20AI%20Agents/README.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

@@ -14,7 +14,7 @@ Your firmware image bundles **third-party copyrights**. Customers and acquirers 
 
 - Enable license manifest generation appropriate to your release (variable names evolve; follow current docs).
 - Treat **LICENSE** and **LIC_FILES_CHKSUM** in recipes as first-class review items.
-- **Pin branches** or use mirrors for anything that must be rebuildable in five years.
+- Record exact layer commit IDs and recipe source revisions; a branch name moves. Preserve source archives/checksums and a mirror policy for long-term rebuilds.
 
 ## 3. Lab 10 — Inspect the manifests
 

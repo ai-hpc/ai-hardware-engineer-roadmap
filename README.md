@@ -65,6 +65,8 @@ You can enter through software, robotics, or hardware. Choose one working artifa
 
 ## Learn by building and testing
 
+Follow the [**Physical AI Design Studio**](Physical-AI-Design-Studio.md) to connect the courses through one project: task contract → VLA reference → robot simulation → measured inference → compiler → accelerator → Linux → wireless → system evidence. Each gate names the courses to study, the artifact to build, and the check needed before proceeding. Includes original diagrams with downloadable PNGs.
+
 Start with [How to learn this roadmap](Learning-Guide.md): entry diagnostics, a repeatable lesson cycle, hardware access options, and a shared completion rubric. Each course's practice section asks you to predict a result, build a baseline, test a variation, and explain the evidence.
 
 New applied sequences: [DeepSeek V4.1 Flash NVFP4 inference engineering](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/README.md) and [Isaac Sim / Isaac Lab engineering labs](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Isaac%20Sim%20and%20Isaac%20Lab/Lab-Guide.md). Both have CPU exercises and separate milestones for work requiring compatible GPU hardware.

@@ -20,18 +20,18 @@
 
 ## Why openpilot
 
-[openpilot](https://github.com/commaai/openpilot) is comma.ai's open-source ADAS — production-deployed, well-documented, and using tinygrad for inference. It's the best publicly available end-to-end reference for studying how an autonomous driving system actually works: from raw camera pixels to CAN bus steering commands.
+[openpilot](https://github.com/commaai/openpilot) is comma.ai's open-source ADAS — production-deployed, well-documented, and using tinygrad for inference. It is a useful inspectable reference for a driver-assistance system: from raw camera pixels to CAN bus steering commands.
 
 ---
 
 ## 1. Architecture Overview
 
 * **End-to-end pipeline:**
-    * `camerad` → `modeld` → `plannerd` → `controlsd` → `pandad` → CAN bus → vehicle actuators.
-    * Each process communicates via **cereal** (msgpack-based IPC) and **VisionIpc** (shared-memory zero-copy frames).
+    * Conceptually: camera capture → model inference → planning/control → vehicle-specific CAN encoding → panda transport/safety → vehicle. Process ownership changes by revision; trace the actual publishers and subscribers.
+    * Each process communicates via **cereal** (Cap’n Proto message schemas, carried over the messaging transport) and **VisionIpc** (shared-memory zero-copy frames).
 
 * **Hardware:**
-    * comma 3X / comma four: Snapdragon 845/8 Gen 2, 3 cameras (wide road, road, driver), GPS, IMU.
+    * Use one named comma device revision and its published hardware specification. Do not infer that comma 3X and comma four share the same SoC, sensor, or kernel configuration.
     * **panda**: CAN-to-USB interface for vehicle communication.
 
 * **Software layers:**
@@ -43,7 +43,7 @@
 
 **Projects:**
 * Clone openpilot. Trace the data flow from `camerad` to `pandad` by reading `selfdrive/` source. Document the IPC messages between each process.
-* Run openpilot in simulation using comma's replay tools or CARLA integration.
+* Run a recorded log replay first. Replay consumes fixed observations; closed-loop simulation requires the selected simulator bridge and feeds commands back into the world.
 
 ---
 
@@ -59,7 +59,7 @@
 
 **Projects:**
 * Read `system/camerad/` source. Trace a single frame from sensor DQBUF to VisionIpc publish.
-* Modify the AE target grey fraction. Observe the effect on exposure in different lighting conditions.
+* On a bench camera or recorded test setup, vary the AE target and compare exposure convergence and saturation; do not modify a driving device for this exercise.
 
 ---
 
@@ -82,7 +82,7 @@
 * **Model architecture:** End-to-end neural network taking multi-camera input, outputting lanes, lead vehicles, pose, plan, and desired path.
 * **Warp matrix:** Calibration-based image warping applied before inference to normalize camera viewpoint.
 * **tinygrad inference:** Models run through tinygrad on Snapdragon GPU (Adreno) — see [Module 3](../3.%20tinygrad%20for%20Inference/Guide.md).
-* **Outputs:** `modelV2` cereal message — lanes, road edges, pose, plan trajectory, action (gas/brake/steer), forward collision warning (FCW).
+* **Outputs:** `modelV2` contains model predictions defined by the pinned schema; vehicle commands are produced through the downstream control/vehicle interface. Do not equate a predicted trajectory with final gas/brake/steer actuation.
 
 **Projects:**
 * Read `selfdrive/modeld/`. Trace model input preparation (frame + warp) through tinygrad inference to modelV2 output.
@@ -103,7 +103,7 @@
     * Outputs: `carControl` cereal message → `CarInterface` → CAN commands.
 
 * **pandad + CAN:**
-    * `pandad` translates carControl into raw CAN messages via the panda device.
+    * Vehicle-specific controller/interface code encodes CAN messages; `pandad` handles communication with the panda device. Trace the `sendcan` publisher at the selected revision.
     * Vehicle-specific `CarInterface` implementations handle DBC encoding per make/model.
 
 **Projects:**
@@ -120,7 +120,7 @@
 
 **Projects:**
 * Fork openpilot. Make a small change (e.g., adjust a UI element or tuning parameter). Build, test in simulation, and submit a PR.
-* (Advanced) Study the CAN DBC for your vehicle. Implement basic parsing and actuation.
+* (Advanced) Study the CAN DBC for your vehicle. Implement parsing and compare generated commands on an isolated simulated/bench bus, without connection to vehicle actuators.
 
 ---
 
@@ -139,6 +139,14 @@
 ## Next
 
 → **[Module 3 — tinygrad for Inference](../3.%20tinygrad%20for%20Inference/Guide.md)** — Deep dive into the inference engine that powers openpilot's perception.
+
+## Source-tracing lab: prove who owns each boundary
+
+Use a fixed repository tag/commit. The [v0.9.7 `card.py` snapshot](https://github.com/commaai/openpilot/blob/v0.9.7/selfdrive/car/card.py) and [message schemas](https://github.com/commaai/openpilot/blob/v0.9.7/cereal/log.capnp) are historical references for the distinction between model output, vehicle control, and CAN transport; they are not a claim that current paths are identical.
+
+For one replay frame, make a table of message name, publisher, subscriber, timestamp, frame ID, coordinate frame, and stale-data policy. Follow one desired lateral command through the vehicle interface to serialized CAN bytes, then locate the independent safety checks. Carry the input preprocessing and output contract into the tinygrad module so a compiler optimization cannot silently change units or frames.
+
+openpilot is driver assistance with an attentive driver requirement. Keep these coursework changes in replay/simulation/isolated benches; passing those exercises is not a road-deployment approval. [Official safety model](https://docs.comma.ai/concepts/safety/).
 
 ## Practice and assessment
 

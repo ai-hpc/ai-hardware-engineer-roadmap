@@ -87,3 +87,12 @@
 - Not exhaustive on MoE variants. We focus on token-choice top-k routing; we mention expert-choice, hash routing, and soft MoE only to point at where to read next.
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Two completion levels and a shared artifact
+
+The multi-node labs require suitable hardware; analytical or small-model work does not establish 64-GPU scaling. Without a cluster, complete memory/communication calculations, a tiny top-k router experiment, and the evaluation-design modules, labeling scaling results as modeled. With hardware, compare predictions with traces and checkpoint/resume behavior.
+
+Keep total parameters, active parameters per token, and resident expert memory separate. Sparsely activating experts reduces arithmetic but does not automatically remove their weights from memory. Long-context support also requires evaluation beyond retrieval of one needle.
+
+**Handoff to VLA hardware:** extract one operator/shape trace from the trained or reference model and explain which state grows with history, action horizon, or expert count. The chip-design course consumes that trace; training a frontier foundation model is not a prerequisite for prototyping its inference subgraph.

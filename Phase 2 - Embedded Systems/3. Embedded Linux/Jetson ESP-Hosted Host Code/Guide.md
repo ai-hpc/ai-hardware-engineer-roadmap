@@ -4,7 +4,7 @@
 <div class="course-identity__icon">JEHH</div>
 <div markdown="1">
 <p class="course-identity__eyebrow">Deep Dive · Embedded Systems</p>
-<p class="course-identity__title">Specialized course identity for Jetson ESP-Hosted Host Code — Embedded Linux Driver Reading Course.</p>
+<p class="course-identity__title">Transfer driver-reading skills to a custom accelerator.</p>
 <p class="course-identity__meta">Artifact: bring-up or firmware demo · Measure: boot, latency, power, reliability</p>
 </div>
 </div>
@@ -116,9 +116,9 @@ Do not try to memorize the whole repo. Learn to recognize the architecture and t
 
 ---
 
-## Validated real-hardware context
+## Reported board context and reproduction boundary
 
-This course reflects the validated Jetson flow already documented elsewhere in the roadmap:
+The existing roadmap records the following bring-up observations. This course review did not rerun them; reproduce them with the matching fork revision, peer firmware, carrier board, pinmux, and kernel before using the values:
 
 - Jetson Orin Nano over SPI
 - `spi0.0`
@@ -129,18 +129,12 @@ This course reflects the validated Jetson flow already documented elsewhere in t
 - `wlan0` appears after manual ESP reset
 - `hci0` appears and BLE scan works
 
-That matters because this is not a hypothetical driver-reading exercise. It is grounded in a path that was actually brought up on hardware.
+Global GPIO numbers and interface names can change across kernels and configurations. Translate schematic/header pins to the current GPIO controller and line, confirm voltage levels, and verify device ownership before adapting the example. A registered `wlan0` or `hci0` is one milestone; data exchange and restart recovery are separate checks.
 
-## Practice and assessment
+## Transfer driver-reading skills to a custom accelerator
 
-**Entry diagnostic (prerequisite check):** Trace a packet from a Linux network interface to SPI transport and the ESP peer. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+Trace one command through board policy, transport submission, deferred work, subsystem completion, and cleanup. Record which context may sleep and who owns each buffer. Then imagine replacing the radio peer with an accelerator: which objects change, and which ownership, timeout, interrupt, and reset questions remain?
 
-1. **Baseline lab:** Annotate one transmit/receive path in the driver and capture a baseline host/peer exchange.
-2. **Guided variation:** Test a controlled peer restart and inspect IRQ, queue, and interface recovery.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Pass the course with source links pinned to a commit, a successful exchange log if hardware is available, and a recovery analysis for peer reset during traffic. Interface registration alone is insufficient: verify data flow before claiming end-to-end success. Keep the reported board values above separate from your own tested configuration.
 
-**Evidence to submit:** Source revisions, transport errors, throughput/latency, queue behavior, and recovery duration. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** Pinned driver path, buffer ownership table, and reset/recovery evidence. Continue with [the next course](Lecture/README.md) and reuse that evidence.

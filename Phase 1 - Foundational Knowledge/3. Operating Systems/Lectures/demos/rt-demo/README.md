@@ -53,8 +53,11 @@ Linux or WSL with pthreads and `sched.h`. `--rt` / `--lock-memory` usually requi
 | `README.md` | This file |
 
 Back to the section hub: **[Operating Systems Guide](../../../Guide.md)**.
-</think>
 
+## Distinguish wakeup latency from real-time guarantees
 
-<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
-StrReplace
+Run the demo first with its default non-real-time policy on a CPU allowed by your environment. Record the affinity mask, kernel, requested policy, policy actually obtained, and whether memory locking succeeded. Compare an idle run with a bounded background load; a denied scheduling request is an experimental outcome, not a successful RT configuration.
+
+The supplied demo discards its `clock_gettime` result and has no periodic wakeup schedule; it is an API/synchronization demonstration, not a latency benchmark. As an extension, add timestamp logging outside the hot path and distinguish waiting from work. Changing priority does not remove IRQ, device, or memory contention. This userspace demo cannot validate a robot controller’s worst-case execution time; carry its trace methodology into the DMA and driver lectures.
+
+**Carry forward:** Baseline/load comparison including requested versus obtained policy. Continue with [the next course](../../Lecture-15.md) and reuse that evidence.

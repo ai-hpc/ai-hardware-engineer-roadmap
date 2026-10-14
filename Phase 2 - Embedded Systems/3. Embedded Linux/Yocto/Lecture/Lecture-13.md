@@ -12,11 +12,11 @@
 
 ## 2. CI design goals
 
-Use **deterministic branches** for release streams, not moving-main surprises. **Separate download and sstate directories** on shared storage with locking discipline. Pin layers with SRCREV or manifest tools appropriate to your process.
+Pin layer repositories in a manifest to exact commits, and pin recipe Git sources with `SRCREV`; these are different levels of version control. Record host/toolchain inputs and configuration. Separate download and sstate caches; a cache hit is not proof of reproducible output. See [Yocto build-history source records](https://docs.yoctoproject.org/current/dev-manual/build-quality.html).
 
 ## 3. Lab 11 — Measure a rebuild
 
-Time a **no-op rebuild** with warm cache vs after wiping tmp but keeping downloads. Record the delta.
+Use separate disposable build directories to compare a warm no-op build with a build that reuses downloads and sstate. Keep the layer revisions and configuration identical; record executed tasks as well as elapsed time.
 
 **Done when:** you can explain what you would never delete in CI vs what is safe to scrub.
 

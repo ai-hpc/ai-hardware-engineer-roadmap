@@ -1,4 +1,4 @@
-# Phase 5 — Track D: Robotics (12-18 months)
+# Phase 5 — Track D: Robotics
 
 <div class="course-identity robotics" markdown="1">
 <div class="course-identity__icon">ROS</div>
@@ -27,7 +27,7 @@ This phase is organized into **four lecture tracks** (each has its own folder an
 
 Each `Lecture-01.md` is a **full lecture**: learning objectives, worked conceptual sections, tables/diagrams where helpful, **self-check** questions, and links to the next/previous track.
 
-**Extended timeline (18-36 months):** Lectures 3–4 include the **expanded** topics that were previously labeled “Phase 2 (Significantly Expanded)” in older versions of this file (deep perception, robot learning, multi-robot / swarm). All of that material now lives in **Lecture-01.md** for tracks 3 and 4.
+**Optional depth after the working loop:** Lectures 3–4 include the **expanded** topics that were previously labeled “Phase 2 (Significantly Expanded)” in older versions of this file (deep perception, robot learning, multi-robot / swarm). All of that material now lives in **Lecture-01.md** for tracks 3 and 4.
 
 ---
 
@@ -60,20 +60,16 @@ Use these **structured courses** alongside each lecture’s **Recommended course
     * ETH Zürich [Autonomous Mobile Robots](https://www.edx.org/learn/autonomous-robotics/eth-zurich-autonomous-mobile-robots) (edX) — kinematics, localization, mapping, planning (theory; pair with ROS 2 projects).
     * ETH RSL [Programming for Robotics (ROS)](https://rsl.ethz.ch/education-students/lectures/ros.html) — official ROS 2 lecture materials (free outline/readings; on-campus course; use as a syllabus alongside your own labs).
 
-## Practice and assessment
-
-**Entry diagnostic (prerequisite check):** Draw world/base/sensor frames and distinguish policy period from physics timestep. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
-
-1. **Baseline lab:** Build a simulated sensor-to-controller loop with a documented task and action contract.
-2. **Guided variation:** Inject a reset, stale observation, or frame mismatch and prove the check catches it.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
-
-**Evidence to submit:** Task success, latency/deadlines, reset correctness, simulation rate, and seed/configuration. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
 
 ## Recommended project progression
 
 Start with a frame- and timestamp-correct ROS 2 loop, then a validated Isaac scene, then a tested Isaac Lab task. Train only after action/reset/reward checks pass. Evaluate held-out episodes before exporting a policy. Finish with the [Isaac engineering labs](Isaac%20Sim%20and%20Isaac%20Lab/Lab-Guide.md) and the language-guided robotics capstone; the language service and local controller have separate timing contracts.
+
+
+## Carry this course into the physical-AI system
+
+**Start from:** One manipulation task and the required observation/action interfaces.
+
+**Build and challenge:** Learn ROS 2 integration, establish an Isaac baseline, then study the matching VLA family. Add RL or multi-robot work only when it answers a demonstrated task limitation.
+
+**Pass forward:** One working robot loop with explicit model/controller timing boundaries. Continue with [the connected course](Isaac%20Sim%20and%20Isaac%20Lab/README.md) and keep the artifact in the [Physical AI Design Studio](../../Physical-AI-Design-Studio.md).

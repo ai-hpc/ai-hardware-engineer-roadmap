@@ -58,10 +58,12 @@ Solution B (Streaming DMA): driver explicitly invalidates cache before CPU reads
 
 `dma_alloc_coherent(dev, size, &dma_handle, GFP_KERNEL)`
 
-- Returns a physically contiguous CPU virtual address and a device-visible `dma_handle`
-- The memory allocated by `dma_alloc_coherent` is **non-cacheable** *only for that specific DMA buffer*, to ensure CPU and device always see the same data. When the CPU accesses this buffer, its data is not cached.
-- Importantly, the CPU *can still cache data for all other normal memory regions*—the non-cacheable setting applies only to the buffer returned by the coherent DMA allocation. All other (non-DMA) memory uses normal CPU caching and is unaffected.
-- Since CPU access to the coherent DMA buffer is uncached, reads and writes are slower; use this kind of memory for things like small control rings, descriptor tables, or status blocks where correctness is more important than speed.
+- Returns a CPU virtual pointer and a device-visible `dma_handle`; do not substitute a CPU physical address for the DMA address.
+- CPU and device accesses are coherent under the platform DMA API. Implementations may use hardware-coherent cached memory or uncached mappings; "coherent" does not universally mean "uncached".
+- Coherence does not order descriptor writes. Publish descriptor fields before a valid/ownership bit using the ordering required by the device and DMA API.
+- Check allocation failure and configure an appropriate DMA mask before allocation. The buffer cannot be freed while the device still references it.
+
+These are the portable guarantees in the [Linux DMA API HOWTO](https://docs.kernel.org/core-api/dma-api-howto.html); physical contiguity and cacheability must not be inferred from a virtual pointer.
 
 ### Streaming (Non-Coherent) DMA
 
@@ -79,20 +81,11 @@ dma_unmap_single(dev, dma, size, DMA_TO_DEVICE);
 /* After dma_unmap_single, ownership of cpu_ptr returns to CPU and it is safe for CPU to access or modify the memory */
 ```
 
-`dma_map_single()` performs the required cache maintenance for DMA in the specified direction: it flushes (writes back and invalidates) CPU cache lines covering the buffer for `DMA_TO_DEVICE` (so the device sees all CPU updates), or invalidates cache for `DMA_FROM_DEVICE` (so the CPU doesn't see stale data after device writes). `dma_unmap_single()` restores CPU ownership and, depending on direction, may invalidate the cache again so the CPU will read any data written by the device.
+`dma_map_single()` establishes a device mapping and performs platform-required synchronization in the given direction. Check `dma_mapping_error()` before submitting work; the returned address may differ from the CPU physical address.
 
-The mapping and unmapping calls perform the **cache synchronization**. Between `dma_map_single()` and `dma_unmap_single()`, the buffer "belongs" to the device — **the CPU must not touch it**.
+For a map → submit → complete → unmap transfer, the CPU leaves the buffer untouched while the device owns it. A persistent mapping can alternate ownership with `dma_sync_single_for_cpu()` and `dma_sync_single_for_device()`; wait for completion before returning ownership to the CPU. Cache maintenance operations are architecture-dependent, so application drivers should use the DMA API rather than hard-code flush/invalidate sequences.
 
-For fragmented memory, `dma_map_sg()` / `dma_unmap_sg()` operate on scatter-gather lists.
-
-DMA directions:
-- `DMA_TO_DEVICE`: CPU→device; flush cache before map
-- `DMA_FROM_DEVICE`: device→CPU; invalidate cache before device write, invalidate again after
-- `DMA_BIDIRECTIONAL`: both; most conservative (flush + invalidate)
-
-> **Key Insight:** The direction flag is not just documentation — it controls which cache operation is performed. `DMA_TO_DEVICE` flushes dirty cache lines so the device reads correct data. `DMA_FROM_DEVICE` invalidates cache lines so the CPU cannot read stale data after the device writes. Getting the direction wrong causes silent data corruption that is extremely hard to debug.
-
-> **Common Pitfall:** Accessing a buffer between `dma_map_single()` and `dma_unmap_single()` from the CPU is undefined behavior. The kernel documentation calls this "ownership": the device owns the buffer between map and unmap. Some architectures will silently return stale cached data; others will see both CPU and device writes collide. Always obey the ownership rule.
+Use `DMA_TO_DEVICE` when the device reads, `DMA_FROM_DEVICE` when it writes, and `DMA_BIDIRECTIONAL` only when both are required. With scatter-gather mappings, distinguish the original entry count from the mapped DMA segment count. Review the [DMA API guide](https://docs.kernel.org/core-api/dma-api-howto.html) alongside the target driver.
 
 ---
 

@@ -1,5 +1,7 @@
 # Lecture 4: Qwen2.5-72B-Instruct FP16 — Multi-GPU Inference
 
+> **Reproduction scope:** Pin the exact checkpoint and runtime revision. Numerical throughput, price, and latency examples without a linked measurement artifact are illustrative planning inputs, not results measured by this course. Record supported APIs from that runtime release before running commands.
+
 ## Overview
 
 Qwen2.5-72B-Instruct at FP16 is ~145 GB of weights. No single accelerator on the planet holds that in HBM. The model only runs by **splitting across multiple GPUs** — tensor parallel within a layer, optionally pipeline parallel across layers, all coordinated by NCCL collectives that sit in the decode hot path.

@@ -47,3 +47,12 @@ The finite-run window includes drain time and failures. Warmup must finish befor
 The demo's expected throughput is 2 output tokens/s; goodput is 1.333333…; failure rate is 0.333333…. **These are fixtures, not hardware benchmarks.**
 
 [Part overview](../README.md)
+
+
+## Carry this course into the physical-AI system
+
+**Start from:** The Part 5 lab fixtures and Python environment.
+
+**Build and challenge:** Run metadata, storage, placement, and benchmark-validation exercises on CPU. Use malformed scale or placement data as a negative control; distinguish fixture validation from loading the full checkpoint.
+
+**Pass forward:** Machine-readable audit results and explicit hardware experiments still to run. Continue with [the connected course](../README.md) and keep the artifact in the [Physical AI Design Studio](../../../../../Physical-AI-Design-Studio.md).

@@ -194,16 +194,11 @@ You can design the fastest accelerator in RTL or HLS — but without a runtime a
 | §4 User-space runtime | C++ runtime + Python bindings for HLS accelerator |
 | §5 Inference runtime | Vitis AI DPU deployment, FINN streaming, PYNQ prototype |
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain ownership and lifetime of a device buffer across submission and completion. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: What happens when an accelerator request never completes?
 
-1. **Baseline lab:** Trace or implement a bounded host/device queue with a software reference path.
-2. **Guided variation:** Inject timeout, cancellation, or invalid buffer length and verify cleanup/recovery.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Design a queue entry with buffer handles, byte lengths, sequence ID, and completion status. Validate lengths and access permissions before submission. Exercise completion, timeout, and reset using a simulator or disposable target.
 
-**Evidence to submit:** Correctness, submission/completion latency, transfer cost, queue depth, and leak/error checks. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** No timed-out request may later be reported as a different request. Submit queue-state traces and a userspace ABI test alongside the accelerator register map.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [03 - Compiler Stack](../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/03%20-%20Compiler%20Stack/Guide.md). Explain which assumption from this course the next engineer must preserve.

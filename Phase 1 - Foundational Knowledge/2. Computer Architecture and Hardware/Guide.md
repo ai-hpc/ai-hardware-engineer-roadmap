@@ -415,7 +415,7 @@ struct Counter {
 };
 ```
 
-**Why this matters for AI:** In multi-GPU systems, each GPU has its own HBM. Coherence is handled by NVLink/NVSwitch (NVIDIA) or Infinity Fabric (AMD). Understanding MESI is the mental model for understanding why all-reduce operations are expensive and why NCCL ring-allreduce is designed the way it is.
+**Why this matters for AI:** Cache coherence and distributed collectives are different mechanisms. GPU interconnects can enable peer memory access, but their presence does not imply transparent cache coherence across every device and allocation. An all-reduce explicitly combines values and communicates results; its cost depends on bytes, topology, synchronization, and algorithm. Verify the platform memory model rather than extending CPU MESI assumptions to GPU fabrics.
 
 ### 4.4 Virtual Memory and TLB
 
@@ -700,8 +700,10 @@ Examples:
   Vector addition  y = a + b:        1 FLOP / 12 bytes = 0.08 FLOP/byte  (memory-bound)
   Matrix multiply  C = A × B (N=1K): 2N³ FLOPs / 3N² × 4 bytes          (compute-bound)
     = 2×10⁹ / 12×10⁶ ≈ 167 FLOP/byte
-  Transformer attention (seq 2048):  ~10 FLOP/byte                        (memory-bound)
-  LLM weight loading (batch=1):      ~0.5 FLOP/byte                       (severely memory-bound)
+  FP32 matrix-vector multiply:       about 2 FLOP / 4 weight bytes = 0.5
+  FP16 matrix-vector multiply:       about 2 FLOP / 2 weight bytes = 1.0
+  (large matrix, no weight reuse, input/output traffic omitted)
+  Attention: derive from batch, heads, lengths, dtype, and actual tiling
 ```
 
 ### 8.2 The Roofline
@@ -719,11 +721,13 @@ TFLOPS (log)
          ↑
     Ridge point ≈ 989 TFLOPS / 3.35 TB/s ≈ 295 FLOP/byte (H100)
 
-Any kernel with AI < 295 FLOP/byte is memory-bandwidth-limited on H100.
-Transformer attention (~10 FLOP/byte) is 29× below the ridge point.
+Below this ridge, the bandwidth roof is lower than the selected compute roof.
+This predicts a ceiling; latency, dependencies, and low utilization may dominate first.
 ```
 
 ### 8.3 Where AI Workloads Live
+
+The ranges below illustrate possible implementations, not fixed properties of an operator. The low decode figure corresponds to FP32 weight streaming; batch, precision, cache reuse, and tiling can move the same workload substantially.
 
 ```
 AI (FLOP/byte)      Workload                    Bound
@@ -738,9 +742,9 @@ AI (FLOP/byte)      Workload                    Bound
 **Practical implication:** Improving LLM inference token rate requires:
 1. Larger batches (increase arithmetic intensity)
 2. More HBM bandwidth (H100 → H200: 3.35 → 4.8 TB/s)
-3. Weight quantisation (INT4 = 2× bandwidth; INT8 = same compute but half the bytes)
+3. Weight quantisation: relative to FP16, ideal payload size falls 2× for INT8 and 4× for INT4, before scales, padding, and metadata. This changes bytes per weight, not physical bandwidth. Dequantization and kernel support affect the result.
 
-Not a faster GPU clock.
+Use this reasoning only after confirming the actual bottleneck. Clock changes can still affect compute, latency hiding, and memory behavior.
 
 ---
 
@@ -1109,7 +1113,7 @@ Test on instruction traces: matrix multiply, Fibonacci, quicksort.
 | Custom AI chip design | RISC-V (control core) + custom dataflow |
 | Mobile inference | ARM64 (Neural Engine, Hexagon) |
 
-**Key takeaway:** The ISA you write code for is secondary. The memory hierarchy and arithmetic intensity of your workload determines performance. A 10 FLOP/byte kernel runs at the same ~33 TFLOPS on H100 regardless of whether you write it in CUDA PTX or high-level Python — it's hitting the HBM bandwidth ceiling.
+**Key takeaway:** Memory hierarchy and arithmetic intensity bound performance; the compiler and implementation determine how closely you approach the bound. With an assumed 3.35 TB/s roof, 10 FLOP/byte gives an upper bound of 33.5 TFLOP/s, not a guaranteed result. Python may invoke an efficient compiled kernel or introduce substantial overhead; the execution path matters.
 
 ---
 
@@ -1154,16 +1158,10 @@ This section
 | **NVIDIA Nsight Compute** | GPU roofline and memory hierarchy profiling |
 | **"Computer Systems: A Programmer's Perspective" — Bryant & O'Hallaron** | Linking, virtual memory, caching from the programmer's view |
 
-## Practice and assessment
+## Turn the operator trace into a memory budget
 
-**Entry diagnostic (prerequisite check):** Estimate operations and bytes moved for a matrix-vector product. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+For an FP16 `1024×1024` matrix-vector product, weights alone occupy 2 MiB and the operation performs about 2.10 million FLOPs. With no weight reuse, that is about 1 FLOP per weight byte; add input/output and metadata traffic before comparing with measurements. Reusing weights across a batch changes this model; increasing peak MAC count alone does not.
 
-1. **Baseline lab:** Compare sequential and strided array traversal over sizes below and above a cache boundary.
-2. **Guided variation:** Change stride while holding useful work fixed; explain when your bandwidth prediction fails.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Make a worksheet for weights, activations, scratchpad tiles, DMA bursts, and partial sums. Give separate estimates for cycles, external bytes, and on-chip capacity. Then measure the software reference and explain the gap. Hardware-product tables elsewhere in the guide are examples, not procurement advice or a substitute for a SKU-specific datasheet.
 
-**Evidence to submit:** Working-set bytes, elapsed time, useful bandwidth, and cache-miss evidence when counters are available. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** A shape-specific traffic/capacity worksheet and predicted limit. Continue with [the next course](../3.%20Operating%20Systems/Guide.md) and reuse that evidence.

@@ -125,16 +125,11 @@ If you can recite the five mechanism names but cannot derive any of their update
 
 *Related: [Hardware-Aware LLM Quantization](../Hardware-Aware%20LLM%20Quantization/README.md) · [AI Inference Engineer 2026](../AI%20Inference%20Engineer%202026/README.md) · [MLSys Deep Dives](../MLSys%20Deep%20Dives/README.md) · [Phase 5 — ML Systems Engineering Guide](../Guide.md)*
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Read a pinned config and map attention, routing, and weight formats to runtime components. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Carry this course into the physical-AI system
 
-1. **Baseline lab:** Trace one layer and build a memory/traffic estimate before a supported-model benchmark.
-2. **Guided variation:** Test an assumption from the architecture reading against config/source or an actual trace.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Start from:** A pinned GLM config and the course’s recurrent-state reference.
 
-**Evidence to submit:** Config/source evidence, numerical reference, memory estimate, latency, and unresolved runtime support. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Build and challenge:** Compare recurrent and chunked execution, including final state. Test speculative rejection/rollback for all state types; output agreement on one prefix is insufficient.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** A hybrid-state ABI and reference vectors informing programmable memory/state support. Continue with [the connected course](../TVM%20Deep%20Dives/README.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

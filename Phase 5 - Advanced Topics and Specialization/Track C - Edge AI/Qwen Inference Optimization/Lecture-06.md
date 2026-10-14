@@ -1,5 +1,7 @@
 # Lecture 6: Batched GEMM vs Normal GEMM — Kernels, Declarations, and Bit-Comparable Results
 
+> **Reproduction scope:** Pin the exact checkpoint and runtime revision. Numerical throughput, price, and latency examples without a linked measurement artifact are illustrative planning inputs, not results measured by this course. Record supported APIs from that runtime release before running commands.
+
 ## Overview
 
 Lecture 3 showed that **decode** is GEMV-bound on edge hardware. Lecture 4 mentioned, without spending time on it, that **prefill** and **batched decode** are GEMM-bound. This lecture sits between them: it dissects the GEMM and **batched** GEMM kernels at the cuBLAS API level, shows the three forms (single, array-of-pointers, strided), explains where each one fits in the Qwen inference path, and — most importantly — shows how to get the **same numerical result** across forms when you need cross-validation.
@@ -10,7 +12,7 @@ By the end you should be able to:
 
 * Read a cuBLAS GEMM declaration and identify the layout, leading dimensions, and batch stride.
 * Choose `Gemm`, `GemmBatched`, or `GemmStridedBatched` for a given workload (and explain why).
-* Reproduce a single-GEMM result from a batched GEMM (and vice versa) bit-for-bit.
+* Compare single and batched GEMM with explicit numerical and reproducibility criteria.
 * Recognize the eight or so failure modes that produce "wrong but plausible" outputs.
 
 This lecture is CUDA / cuBLAS-centric because that's where Qwen production inference lives. The same concepts apply to rocBLAS (`rocblas_sgemm_strided_batched`), MKL (`cblas_sgemm_batch`), and Apple's `Accelerate` framework with `BNNSBatch`. The API names differ; the math doesn't.
@@ -204,31 +206,17 @@ When you set `ld > rows` it means you have **padding** between columns — usefu
 
 You'll often write reference code with one cuBLAS form and production code with another. The question: when do they produce **identical** results?
 
-### 4.1 Bit-exact across forms — the strict version
+### 4.1 Reproducibility has a defined scope
 
-For two cuBLAS calls (e.g., `Gemm` looped vs `GemmStridedBatched`) to produce bit-identical results, **all of**:
+Identical input bytes and matching shapes, strides, alpha/beta, dtypes, and accumulation settings are prerequisites for a fair comparison. They do not guarantee bit identity across different cuBLAS APIs, algorithms, toolkit versions, or GPU architectures. Reduction order may change. `CUBLAS_PEDANTIC_MATH` constrains arithmetic behavior; it does not force every API to use one identical implementation.
 
-1. **Identical operand bytes.** The strides and offsets must lay out the same matrices.
-2. **Identical `alpha`, `beta`, `computeType`.**
-3. **Same algorithm selected.** cuBLAS will auto-tune; force consistency with `cublasGemmEx(..., CUBLAS_GEMM_ALGO0)` or whichever algo you pin.
-4. **Same architecture.** Tensor core paths produce different bit patterns than CUDA-core paths because of different accumulation orders.
-5. **No TF32 reduction.** Set `cublasSetMathMode(handle, CUBLAS_PEDANTIC_MATH)`. The default `CUBLAS_DEFAULT_MATH` on Ampere+ silently uses TF32 in some FP32 paths — different rounding.
+Use NVIDIA's [cuBLAS reproducibility contract](https://docs.nvidia.com/cuda/cublas/index.html#results-reproducibility) and report the actual maximum error. Pin toolkit, device, workspace, streams, and algorithm where supported. Validate tolerance against a higher-precision reference, especially near zero and for ill-conditioned inputs.
 
-When all five hold, the results match bit-for-bit on the same hardware.
+### 4.2 Tolerances depend on the input and accumulation path
 
-### 4.2 Numerically equivalent (FP32-equivalent epsilon)
+Use `abs(candidate-reference) <= atol + rtol * abs(reference)` with a higher-precision reference, explicit input ranges, and declared tolerances. Relative error alone is unstable near zero. Long reductions and cancellation can amplify error; a random-walk estimate proportional to `sqrt(K)` is not a universal correctness bound.
 
-For most practical purposes you don't need bit-exact, you need "the difference is at most floating-point noise." For FP32 matmul that means roughly:
-
-```
-|result_a - result_b| / |result_a| < ~1e-6 · sqrt(K)
-```
-
-(The `sqrt(K)` comes from the random-walk error model of accumulating K products.)
-
-So for a `K = 2560` GEMM, you should expect relative differences up to **~5e-5** in FP32 across different algorithms or accumulation orders. Anything bigger and you have a real bug.
-
-For FP16 matmul with FP32 accumulation (the common LLM case), bound is similar in absolute terms because accumulation is FP32 — but the FP16 inputs round to ~1e-3 each.
+Test ordinary random data, zeros, large dynamic range, cancellation, and irregular dimensions. Diagnose errors outside the declared budget; neither a small discrepancy nor a change under pedantic math proves an implementation correct by itself.
 
 ### 4.3 What goes wrong — the eight common bugs
 
@@ -277,7 +265,7 @@ int main() {
 
     cublasHandle_t handle;
     cublasCreate(&handle);
-    cublasSetMathMode(handle, CUBLAS_PEDANTIC_MATH);    // force deterministic path
+    cublasSetMathMode(handle, CUBLAS_PEDANTIC_MATH);    // constrain arithmetic; compare outputs explicitly
 
     const float alpha = 1.0f, beta = 0.0f;
 
@@ -327,7 +315,7 @@ nvcc -lcublas batched_gemm_compare.cu -o batched_gemm_compare
 # Max abs diff: 0.000e+00
 ```
 
-With `CUBLAS_PEDANTIC_MATH`, the diff is exactly zero. Without it (commenting that line out), you may see `~1e-7` differences on Ampere/Hopper because the default math mode allows tensor-core reduction with different accumulation orders.
+An observed zero difference is a result for this build, device, and input, not a guarantee across cuBLAS forms. Record the actual difference under each math mode and compare against a float64 reference.
 
 ---
 
@@ -462,7 +450,7 @@ Concrete mapping for **Qwen3-4B prefill at seq_len = 512** on Orin:
 | Attention value `S @ V` | Strided batched (or FlashAttention) | batch=32, `M=512, N=128, K=512` |
 | Output projection W_O | Single GEMM | `M=2560, N=512, K=4096` |
 | FFN gate, up (fused) | Single GEMM | `M=13824, N=512, K=2560` |
-| FFN down | Single GEMM | `M=2560, N=512, K=6912` |
+| FFN down | Single GEMM | `M=2560, N=512, K=9728` |
 | LM head (final layer only) | Single GEMM | `M=151936, N=512, K=2560` |
 
 For **Qwen2.5-72B prefill at seq_len = 4096, TP=4**: same structure, dimensions scaled. The QKV projection on each TP rank is `M=2560 (sharded), N=4096, K=8192`. Big GEMMs; the H100 spends most of its prefill time in cuBLAS calls.
@@ -479,9 +467,9 @@ When a batched-GEMM call gives an output that doesn't match the looped reference
 
 1. **Print shapes.** Are `m, n, k` what you think? Off-by-one is suspicious.
 2. **Print first 4×4 block of each operand.** Does it match your reference?
-3. **Force `CUBLAS_PEDANTIC_MATH`.** If the bug goes away, your problem was algorithm-selection non-determinism — not actually a bug.
+3. **Force `CUBLAS_PEDANTIC_MATH`.** If the difference changes, investigate arithmetic/reduction sensitivity; this does not prove the implementation correct.
 4. **Set `beta = 0` and pre-zero `C`.** Removes the "garbage input" case.
-5. **Try `batchCount = 1` of the strided form.** Should match the single `Sgemm` call exactly.
+5. **Try `batchCount = 1` of the strided form.** Compare with the single call using a justified tolerance.
 6. **Check transpose flags by computing M=N=K=2 by hand.** A 2×2 example pinpoints transpose bugs immediately.
 7. **Check strides.** `strideA = lda · k` for non-transposed `A` in column-major. **Off by `lda · k vs lda · m` is a frequent mistake.**
 8. **Check pointer offsets** in the array-of-pointers form. Print the device pointers; diff against manual `base + i * stride`.
@@ -502,9 +490,9 @@ If all of these check out and the numbers still differ — you have a real bug. 
 
 5. **Strided vs pointer-array benchmark.** For a workload of 64 batched 64×64 GEMMs, benchmark `GemmStridedBatched` vs `GemmBatched` (where you populate the pointer array yourself). Quantify the indirection overhead. Repeat for batch size 4 and batch size 1024.
 
-6. **PyTorch dispatch inspection.** Profile `torch.bmm` on shapes you'd actually see in Qwen attention (batch=32, M=512, K=128, N=512). Confirm via `nsys` that PyTorch dispatches to `cublasGemmStridedBatchedEx`. Then switch to `torch.nn.functional.scaled_dot_product_attention` and observe FlashAttention being called instead.
+6. **PyTorch dispatch inspection.** Profile `torch.bmm` on shapes you'd actually see in Qwen attention (batch=32, M=512, K=128, N=512). Inspect the actual backend chosen by the pinned PyTorch build. Then compare SDPA and record whether it selects a fused or math fallback path.
 
-7. **Tensor core alignment.** Run the QKV projection GEMM at `N = 256` (clean tile) and `N = 251` (awkward). Measure tok/s. Confirm the awkward N is significantly slower because cuBLAS can't use tensor cores for the trailing tile.
+7. **Tensor core alignment.** Run the QKV projection GEMM at `N = 256` (clean tile) and `N = 251` (awkward). Measure tok/s. Inspect the selected kernel and measure the effect; tail handling may still use tensor cores and need not be significantly slower.
 
 ---
 
@@ -512,14 +500,14 @@ If all of these check out and the numbers still differ — you have a real bug. 
 
 | Takeaway | Why it matters |
 |---|---|
-| `GemmStridedBatched` is the form 95% of inference uses | Same alpha/beta, same shapes, contiguous strides — fits LLM attention exactly |
+| Strided-batched GEMM suits uniform independent matrices | Same alpha/beta, same shapes, contiguous strides — fits LLM attention exactly |
 | `GemmBatched` (pointer array) is for scattered, same-size matrices | Pay indirection cost; only use when strided form isn't available |
 | cuBLAS is column-major; the swap-arguments idiom handles row-major input | The single most common source of layout bugs |
 | Set `beta = 0` whenever C is fresh output | The classic "I added random GPU memory" footgun |
-| `CUBLAS_PEDANTIC_MATH` is your bit-exact debug button | Disables tensor cores and algorithm selection — slow but deterministic |
+| Pedantic math constrains arithmetic | It does not guarantee bit identity between different algorithms or APIs |
 | Batched serving is one big GEMM, not many small ones | Don't reach for batched API when you have a contiguous concat batch |
 | For attention, FlashAttention has replaced explicit batched GEMM in production | Reference implementations still go through it; modern serving doesn't |
-| Eight debug-recipe steps catch >90% of "wrong output" bugs | Stride and transpose mistakes are everyone's favorite |
+| Eight debug-recipe steps isolate common output bugs | Stride and transpose mistakes are everyone's favorite |
 
 ---
 

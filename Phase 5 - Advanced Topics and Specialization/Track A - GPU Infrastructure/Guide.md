@@ -42,6 +42,14 @@ For the full CUDA-X library ecosystem (cuBLAS, cuDNN, CUTLASS, TensorRT, NCCL, R
 
 These tracks assume you've completed Phase 4 Track C (compiler + inference optimization). The HPC content here focuses on **infrastructure, multi-GPU scaling, and distributed systems** — the compiler and kernel optimization skills come from Track C.
 
+## Follow the workload, then choose the infrastructure
+
+Start with one versioned model and a single-device trace from Phase 4. Record which constraint forces expansion: model residency, training state, dataset input, request throughput, or a latency deadline. If none does, a cluster is an optional comparative study rather than a prerequisite for the SoC project.
+
+Follow this chain: [NVIDIA platform](Nvidia%20GPU/Guide.md) → topology and per-rank memory → [collective behavior](Nvidia%20GPU/HPC%20Setup/NCCL-Deep-Dive/README.md) → [placement experiment](Distributed%20AI%20Interconnects/Guide.md) → [platform decision](Accelerator%20Platform%20Evaluation/Guide.md). Port a representative kernel to AMD when portability helps test whether a claimed bottleneck is architectural or software-specific.
+
+**Handoff to chip design:** provide an operator/shape distribution, memory-traffic trace, communication budget, and bottleneck that remains after software tuning. Cluster throughput alone does not define the robot's observation-to-action deadline.
+
 ## Practice and assessment
 
 **Entry diagnostic (prerequisite check):** Draw GPU/CPU/NIC topology and explain bandwidth versus message latency. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.

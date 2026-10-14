@@ -133,3 +133,12 @@ Code snippets use placeholder model IDs such as `your-agent-model-id`, `your-fas
 </div>
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Carry this course into the physical-AI system
+
+**Start from:** The agent course’s recommended module order.
+
+**Build and challenge:** Use the flat index to locate a lecture, then return to the guide for prerequisites. Preserve one trace across model call, tool request, result, and retry rather than building unrelated demos.
+
+**Pass forward:** A linked set of agent lab artifacts that can be evaluated as one runtime. Continue with [the connected course](../Guide.md) and keep the artifact in the [Physical AI Design Studio](../../../../Physical-AI-Design-Studio.md).

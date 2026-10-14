@@ -75,36 +75,28 @@ MLSys is the discipline of finding those constraints, measuring them, and changi
 
 ## The Core Mental Model
 
-Most MLSys work reduces one of five costs:
+Compute, memory transfers, communication, and scheduling can overlap. Model the **critical path** through a dependency graph; add durations only when the regions are sequential and do not already include each other.
 
 ```text
-T_total = T_compute + T_memory + T_communication + T_synchronization + T_scheduling
+T_wall >= max(required work / sustained compute rate,
+              required bytes / sustained bandwidth,
+              longest sequential dependency path)
 ```
 
-For inference:
+These are lower bounds with stated assumptions, not a complete latency prediction. Prefill and decode timings often already include communication. Adding communication again double-counts it. Backward/all-reduce may overlap, and periodic checkpoint cost must be measured or amortized over its interval.
+
+[![Two tiles take 20 ms serially and 16 ms when independent copy and compute resources overlap](../../Assets/illustrations/learning-path/critical-path.svg)](../../Assets/illustrations/learning-path/critical-path.svg)
+
+*Analytical example: two copies of 6 ms and two dependent computes of 4 ms. The second copy overlaps the first compute. Explain why the critical path is 16 ms, not 12 ms or 20 ms. [Download PNG](../../Assets/illustrations/learning-path/critical-path.png).*
+
+For capacity, sum **simultaneously live** allocations on the device being measured:
 
 ```text
-T_latency = T_prefill + T_decode + T_queueing + T_communication + T_streaming
+M_inference = weights + live state/cache + activations + workspace + runtime overhead
+M_training  = weights + gradients + optimizer state + live activations + workspace + overhead
 ```
 
-For training:
-
-```text
-T_step = T_forward + T_backward + T_optimizer + T_allreduce + T_checkpoint + T_sync
-```
-
-For memory:
-
-```text
-M_training = M_weights + M_activations + M_gradients + M_optimizer + M_workspace
-M_inference = M_weights + M_kv_cache + M_workspace + M_batch_state
-```
-
-For distributed scaling:
-
-```text
-efficiency = useful_compute_time / wall_clock_time
-```
+Account for sharding, replication, allocator reservation, and transient loading peaks. For fixed total work, strong-scaling efficiency is `T_1 / (N * T_N)`; for a fixed per-device workload, state the weak-scaling experiment separately. GPU utilization is a different metric.
 
 Good MLSys engineering starts with a hypothesis and ends with measurement:
 
@@ -112,7 +104,7 @@ Good MLSys engineering starts with a hypothesis and ends with measurement:
 observe -> isolate -> change one thing -> benchmark -> profile -> explain -> repeat
 ```
 
-Avoid vague claims like "this is faster." Use concrete claims:
+Avoid vague claims like "this is faster." The following are **hypothetical reporting examples**, not measured repository results:
 
 - p95 TTFT dropped from 420 ms to 260 ms at 32 concurrent requests
 - decode throughput increased from 38 to 51 tok/s after KV-cache compaction
@@ -495,7 +487,8 @@ theta_next = theta - learning_rate * gradient(loss, theta)
 Step time:
 
 ```text
-T_step = T_forward + T_backward + T_optimizer + T_communication + T_sync
+T_step = critical-path duration of forward, backward, optimizer, communication, and sync
+# Sum only non-overlapping regions in the measured trace.
 ```
 
 Training memory:
@@ -974,3 +967,12 @@ The outcome is not a certificate. It is a body of systems work that proves you c
 **Study method:** use the [shared lesson cycle and completion rubric](../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
 
 **Applied checkpoint case study:** [DeepSeek V4.1 Flash NVFP4](AI%20Inference%20Engineer%202026/Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/README.md) connects packed values and scales to actual loader compatibility, per-rank memory, quality gates, and useful serving throughput.
+
+
+## Carry this course into the physical-AI system
+
+**Start from:** One measured workload and a timeline trace.
+
+**Build and challenge:** Build a dependency graph and identify its critical path. Change a tile schedule to expose overlap; keep scaling efficiency, device utilization, and application throughput distinct.
+
+**Pass forward:** A bottleneck explanation that selects the next kernel, compiler, or serving experiment. Continue with [the connected course](Logprobs%2C%20Perplexity%20and%20KL%20Divergence/README.md) and keep the artifact in the [Physical AI Design Studio](../../Physical-AI-Design-Studio.md).

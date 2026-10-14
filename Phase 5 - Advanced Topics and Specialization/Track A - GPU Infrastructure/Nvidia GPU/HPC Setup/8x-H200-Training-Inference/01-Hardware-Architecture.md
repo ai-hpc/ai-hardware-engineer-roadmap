@@ -71,7 +71,7 @@ No multi-hop penalty unlike ring or tree topologies.
 
 ### Why Full Mesh Matters
 
-- All-reduce across 8 GPUs stays at **full 900 GB/s** (no bottleneck GPUs)
+- The 900 GB/s figure is aggregate bidirectional link bandwidth per GPU, not a guaranteed AllReduce result. Measure message-size-dependent algorithm bandwidth and normalized bus bandwidth with nccl-tests.
 - Tensor parallel all-reduce for attention heads completes in ~1 µs for typical sizes
 - Point-to-point P2P transfers for pipeline parallelism are lossless
 

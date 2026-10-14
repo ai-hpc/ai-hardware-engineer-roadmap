@@ -2,7 +2,7 @@
 
 ## Overview
 
-If the roofline (Lecture 03) is the *static* ceiling of a GPU, **precision is the lever that moves where on the roofline a kernel sits.** Cutting weight precision in half cuts the bytes read from HBM in half, doubles arithmetic intensity, and — if the kernel was bandwidth-bound — roughly doubles throughput.
+If the roofline (Lecture 03) is the *static* ceiling of a GPU, **precision is the lever that moves where on the roofline a kernel sits.** Halving the weight payload can reduce weight traffic, but scales, unchanged tensors, cache reuse, and dequantization determine the actual traffic and speedup. First identify the limiting resource for the measured shape.
 
 The catch: every precision drop is a **potential parity drop**. **Quantization** is the engineering discipline of taking a precision floor down without taking accuracy with it. The engineer who quantizes without a **parity gate** is shipping incidents.
 
@@ -18,46 +18,33 @@ By the end you should be able to look at a model + workload + hardware target an
 
 ---
 
-## 1. The 2026 precision landscape
+## 1. Storage format, arithmetic, and kernel support
 
-The precision floor has dropped twice in three years. The current stack:
+Specify three things separately: checkpoint storage, operands accepted by the selected kernel, and accumulator/output types. A smaller checkpoint does not establish a faster implementation.
 
-| Format | Bits | Range / mantissa | Where it lives |
-|--------|------|------------------|----------------|
-| FP32 | 32 | full IEEE 754 | training reference, never deployed |
-| TF32 | 19 | 8-bit exp, 10-bit mantissa | Ampere+ training, rarely inference |
-| BF16 | 16 | 8-bit exp, 7-bit mantissa | default training precision, common inference |
-| FP16 | 16 | 5-bit exp, 10-bit mantissa | inference workhorse pre-FP8 |
-| **FP8 E4M3** | 8 | 4-bit exp, 3-bit mantissa | Hopper + Blackwell native, primary FP8 weight/activation |
-| **FP8 E5M2** | 8 | 5-bit exp, 2-bit mantissa | Hopper + Blackwell, often used for gradients / KV |
-| **FP6 (E3M2, E2M3)** | 6 | various | Blackwell support, less common in practice |
-| **FP4 (E2M1, MX-FP4)** | 4 | 2-bit exp, 1-bit mantissa | Blackwell native, microscaled |
-| INT8 | 8 | signed integer | universal, calibrated; legacy quantization |
-| INT4 | 4 | signed integer | weight-only mainstream (AWQ / GPTQ / GGUF) |
+| Format | Payload/storage | Meaning for an inference engineer |
+|---|---|---|
+| FP32 | 32 bits | Reference arithmetic and production operators that require its range or accuracy |
+| TF32 | FP32 storage | Tensor Core arithmetic with reduced significand precision; not a 19-bit checkpoint format |
+| BF16 / FP16 | 16 bits | Different exponent ranges and significand precision; choose with numerical tests |
+| FP8 E4M3 / E5M2 | 8 bits plus applicable scales | Distinct range/precision tradeoffs; confirm the runtime's exact variant and scaling |
+| FP4 E2M1 | 4-bit values plus scales | The payload alone does not specify NVFP4 or MXFP4 layout |
+| INT8 / INT4 | Integer payload plus quantization metadata | Specify signedness, scale, zero point, group size, and arithmetic path |
 
-The key 2025–2026 shifts:
-
-* **FP8 is the new default activation precision** on Hopper-and-newer hardware where the kernels are mature. Most flagship inference deployments (TensorRT-LLM, vLLM 0.22+) ship FP8 first.
-* **FP4 native arithmetic on Blackwell** (Transformer Engine 2) doubles FP8 throughput. Microscaling format (MX-FP4) attaches per-block scale factors so the dynamic range is preserved.
-* **INT4 weight-only remains the dominant quantization for cost-sensitive serving** — AWQ, GPTQ, and GGUF-IQ-quants all live here. INT4 weights at FP16 (or FP8) activations is the practical recipe for 70B-class on 1–4 GPUs.
-* **KV cache quantization** is increasingly common at FP8 (and sometimes INT4 with calibration) because the KV cache dominates HBM at long context.
+For the common one-dimensional **NVFP4** layout, a 16-value block contains 8 payload bytes and one E4M3 scale byte, with an additional FP32 tensor scale. **MXFP4** uses a different block/scale convention. A kernel accepting one layout cannot be assumed to accept the other. Padding, unquantized tensors, and runtime repacking affect the final allocation. See [NVIDIA's NVFP4 format description](https://docs.nvidia.com/deeplearning/transformer-engine/features/low_precision_training/nvfp4/nvfp4.html) and [TensorRT quantization schemes](https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/quantized-types-schemes.html).
 
 ### 1.1 The hardware support gate
 
-A precision format is only useful if the GPU has **native tensor cores** for it. The matrix:
+Native arithmetic is one possible implementation; weight compression can also help a kernel that dequantizes into a higher-precision compute type. **W4A16** commonly follows this second path. This does not mean integer INT4 matrix instructions do not exist: NVIDIA PTX includes signed/unsigned 4-bit integer MMA forms with documented architecture and shape requirements. `DP4A` is an integer dot-product instruction, not a synonym for a Tensor Core operation. Consult the [PTX instruction reference](https://docs.nvidia.com/cuda/parallel-thread-execution/) for the exact instruction and target.
 
-| Format | Ampere (A100, RTX 3000) | Hopper (H100/H200) | Ada (L40S, RTX 4000) | Blackwell (B200, RTX 5000) |
-|--------|--------------------------|--------------------|----------------------|----------------------------|
-| FP16/BF16 | ✓ | ✓ | ✓ | ✓ |
-| FP8 | ✗ (emulated) | ✓ TE | ✓ TE | ✓ TE2 |
-| FP6 | ✗ | ✗ | ✗ | ✓ |
-| FP4 | ✗ | ✗ | ✗ | ✓ TE2 |
-| INT8 (DP4A) | ✓ | ✓ | ✓ | ✓ |
-| INT4 weight-only | weights stored low-precision, computed at higher | same | same | same |
+Before choosing a recipe, record:
 
-**INT4 weight-only is a software pattern**, not a hardware operation: the weights are stored at 4 bits per element, dequantized to FP16 (or FP8) in shared memory, and computed at that higher precision. There is no native INT4 tensor core. This is why AWQ-INT4 + FP16 activations works on any modern GPU back to A100.
+1. GPU SKU and compute capability; storage and accumulator formats.
+2. Runtime version, model implementation, and supported kernel shapes.
+3. Checkpoint packing, scales, and any conversion/repacking step.
+4. Numerical acceptance criteria and a measured latency/memory baseline.
 
-**FP8 and FP4 *are* hardware operations** — Hopper / Blackwell tensor cores execute matmul natively at those precisions. The performance win is real silicon, not a software trick.
+An architecture's peak low-precision throughput is not the model's speedup. Use the [TensorRT-LLM support tables](https://nvidia.github.io/TensorRT-LLM/latest/features/quantization.html) or the selected runtime's equivalent, then confirm the dispatched kernels in a trace.
 
 ---
 
@@ -69,21 +56,18 @@ These are **three separate engineering decisions** with three separate parity co
 
 Quantizing weights cuts:
 
-* HBM capacity by the ratio (FP16 → INT4: 4× smaller).
-* HBM bandwidth on decode read (the dominant cost) by the same ratio.
+* Weight payload capacity (FP16 → INT4 is 4× smaller before metadata and unchanged tensors).
+* Weight-read traffic when those weights are actually fetched; total decode traffic also includes activations, state, and communication.
 
 Sensitivity is **per-layer and per-channel** — some attention heads or MLP rows tolerate quantization poorly. Method choice (AWQ / GPTQ / QuaRot) is mostly about handling the sensitive rows gracefully.
 
 ### 2.2 Activations
 
-Quantizing activations cuts:
-
-* Intermediate HBM traffic between layers (small win — activations are not the dominant traffic).
-* Tensor core throughput if the format has hardware support (FP8 doubles vs FP16 on Hopper).
+Quantizing activations can reduce intermediate traffic and enable a higher arithmetic rate on a supported kernel. The benefit depends on shape, fusion, scaling overhead, and the fraction of time spent in that kernel. Prefill and vision encoders can have substantial activation traffic.
 
 Sensitivity is **per-tensor or per-token** — outliers in the activations (a few large values) cause clipping that propagates. Methods (SmoothQuant, OmniQuant, QuaRot) work by *redistributing* activation outliers into the weights or by applying invariant rotations.
 
-**Weight-only INT4 + FP16 activations is the safe default.** FP8 weights + FP8 activations is the higher-performance recipe on Hopper / Blackwell once parity is validated.
+Compare W4A16 and supported W8A8/FP8 candidates against a higher-precision baseline. Neither numerical quality nor a speed advantage follows from the format name.
 
 ### 2.3 KV cache
 
@@ -92,7 +76,7 @@ Quantizing KV cuts:
 * HBM capacity of the KV cache (allows longer context or larger batches).
 * HBM bandwidth on every decode step (proportional to context length).
 
-Sensitivity is **per-head and per-position** — KV cache quantization at INT4 typically requires per-block calibration. FP8 KV is usually safe with per-tensor or per-head scaling.
+Sensitivity is **per-head and per-position** — KV cache quantization at INT4 typically requires per-block calibration. FP8 KV requires a supported variant, scale scheme, and quality evaluation at the intended context lengths; test attention-sensitive tasks explicitly.
 
 Note the bandwidth cost of KV **grows linearly with context**. **At 128K context the KV cache read is often a larger HBM cost than the weight read.** This is why FP8 KV is increasingly standard for long-context serving even when weights stay at INT4.
 
@@ -100,9 +84,9 @@ Note the bandwidth cost of KV **grows linearly with context**. **At 128K context
 
 | Workload | Weights | Activations | KV cache | Notes |
 |----------|---------|-------------|----------|-------|
-| Chat, 70B, 16K context, H200 | INT4 (AWQ) | FP16 | FP16 | safe default |
-| Chat, 70B, 128K context, H200 | INT4 (AWQ) | FP16 | FP8 | KV pressure forces precision |
-| Chat, 70B, 128K context, B200 | FP4 (MX-FP4) | FP4 | FP8 | full Blackwell stack |
+| Chat, 70B, 16K context, H200 | INT4 (AWQ) | FP16 | FP16 | candidate; validate quality and kernel support |
+| Chat, 70B, 128K context, H200 | INT4 (AWQ) | FP16 | FP8 | compare cache reduction with shorter context or lower concurrency |
+| Chat, 70B, 128K context, B200 | FP4 (specified layout) | supported low-precision type | FP8 | require compatible model, packing, and kernels |
 | Batch / offline, 70B, H100 | FP8 | FP8 | FP8 | throughput optimization |
 | Edge, 4B, Jetson Orin Nano | INT4 (AWQ or Q4_K_M) | FP16 | FP16 | memory tight, KV small |
 | Agent (BFCL-gated), 7B–70B | INT4 (AWQ) | FP16 | FP16 → FP8 once parity OK | tool-call accuracy is the parity bar |
@@ -133,7 +117,7 @@ Weaknesses:
 
 Strengths:
 
-* Generally better parity than GPTQ on agent/tool-use workloads (the BFCL discussion in [Phase 5 → Edge AI → BFCL Lecture](../../../Track%20C%20-%20Edge%20AI/Agent%20Tool-Dispatch%20Evaluation%20with%20BFCL/Lecture-01.md) shows this).
+* A candidate to compare with GPTQ on the same agent/tool-use workload (the BFCL discussion in [Phase 5 → Edge AI → BFCL Lecture](../../../Track%20C%20-%20Edge%20AI/Agent%20Tool-Dispatch%20Evaluation%20with%20BFCL/Lecture-01.md) shows this).
 * Fast inference: the trick is a software trick on top of standard INT4 matmul kernels.
 
 Weaknesses:
@@ -141,7 +125,7 @@ Weaknesses:
 * Requires calibration data that matches the deployment distribution.
 * Doesn't help with activation quantization (it's a weight-only method).
 
-**The current default for weight-only INT4 on dense LLMs.** Part 2 Lecture 03 walks the AWQ pipeline on Llama 3.3 70B and Qwen 2.5 72B step by step.
+**A widely used weight-only INT4 method; select it through paired evaluation.** Part 2 Lecture 03 walks the AWQ pipeline on Llama 3.3 70B and Qwen 2.5 72B step by step.
 
 ### 3.3 QuaRot — Rotation-invariant quantization
 

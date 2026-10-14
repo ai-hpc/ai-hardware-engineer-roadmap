@@ -4,6 +4,8 @@
 
 **Previous:** [Lecture 02](Lecture-02.md) | **Next:** [Lecture 04 - AI smart speaker design studio](Lecture-04.md)
 
+> **Case-study method:** The product judgments below are design interpretations, not a measured causal explanation of commercial success or failure. Turn each claim into a testable hypothesis for your own device—for example setup completion rate or a user's ability to identify microphone state—and keep product specifications separate from that interpretation.
+
 ---
 
 ## The later lesson is bigger than the launch lesson

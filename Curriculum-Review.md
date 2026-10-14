@@ -1,5 +1,7 @@
 # Curriculum review — 2026-10-13
 
+**Latest review:** the [October 14 course-by-course pass](Curriculum-Reviews/README.md) covers all 158 current course entry pages, targeted technical corrections, the connected Physical AI Design Studio, and eight original SVG/PNG teaching diagrams. The report below preserves the earlier expansion and its validation history.
+
 This update reviews repository structure across the roadmap and improves the learning and assessment layer at every existing phase/course entry page. The focused technical expansion covers DeepSeek V4.1 Flash NVFP4 inference and NVIDIA Isaac Sim / Isaac Lab.
 
 ## Scope and evidence

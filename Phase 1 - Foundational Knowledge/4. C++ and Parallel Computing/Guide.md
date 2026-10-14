@@ -109,11 +109,11 @@ The challenge: shared memory means **race conditions**, **deadlocks**, and **cac
 |---|---|---|
 | Cores | 4–96 (complex) | 1,000–16,000 (simple) |
 | Optimized for | Latency (one task fast) | Throughput (many tasks at once) |
-| Control logic | ~50% of die area | ~5% of die area |
+| Control strategy | Complex speculation and latency-oriented cores | Many throughput-oriented execution lanes; scheduling and cache design vary |
 | Cache per core | Large (MB) | Small (KB) |
 | Best for | Sequential code, branching | Data-parallel: matrix math, convolution |
 
-Neural network inference is almost entirely matrix multiplication — perfectly data-parallel. A GPU processes 1,000× more multiply-accumulate operations per second than a CPU at the same power.
+Many neural networks spend much of their arithmetic in matrix multiplication and convolution. End-to-end inference also includes memory movement, normalization, attention, sampling or action generation, and host scheduling. GPU speedup depends on shapes, precision, utilization, and power limits; measure it against an optimized CPU baseline at the same quality target.
 
 ---
 
@@ -278,11 +278,11 @@ HIP is 95% identical to CUDA. The critical difference: AMD wavefronts are **64 t
 
 > *Write once, run anywhere — portable compute across GPU, FPGA, and CPU.*
 
-CUDA locks you to NVIDIA. HIP gets you AMD. OpenCL and SYCL get you **everything**.
+CUDA targets NVIDIA GPUs. HIP, OpenCL, and SYCL offer different portability routes, but each requires a supported compiler, runtime, device, and feature set. A source port does not guarantee equal performance or support for a new custom accelerator.
 
 ```
-OpenCL:  Explicit C API — verbose but runs on any device
-SYCL:    Modern C++ lambdas — clean but same portability
+OpenCL:  Explicit C API — query installed platforms, devices, and extensions
+SYCL:    C++ kernels — verify implementation backends and device aspects
 
 OpenCL setup:   ~50 lines of boilerplate (platform, device, context, queue, ...)
 SYCL equivalent: ~5 lines (queue + parallel_for lambda)
@@ -326,11 +326,11 @@ The **same optimization principle** applies at every level: **minimize memory tr
 | What you learn here | Where it leads |
 |--------------------|---------------|
 | SIMD / vectorization | Phase 4C: MLIR `vector` dialect, compiler auto-vectorization |
-| OpenMP / multi-core | Phase 2: FreeRTOS multi-core on Jetson SPE, Zynq PS |
+| OpenMP / multi-core | Phase 2: concurrent Linux services; compare their scheduling with MCU/RTOS tasks |
 | CUDA kernels | Phase 4B: Jetson inference, Phase 4C: Triton/CUTLASS kernel engineering |
 | ROCm / HIP | Phase 5A: AMD GPU infrastructure (MI300X), portable kernel engineering |
 | OpenCL | Phase 4A: Xilinx Vitis FPGA host API, embedded GPU compute |
-| SYCL | Future portable compute — CPU, GPU, FPGA, custom NPU from one source |
+| SYCL | Portable source across supported backends; a custom NPU still needs compiler/runtime support |
 | Memory hierarchy thinking | Phase 4A: FPGA BRAM/URAM tiling, Phase 5F: scratchpad design for AI chip |
 | Tiled matmul | Phase 4A: HLS matmul accelerator, Phase 5F: systolic array architecture |
 | GPU architecture model | Phase 5B: CUDA-X libraries, Phase 5F: design something better |
@@ -360,4 +360,10 @@ You're learning the workload first. Then you'll build the machine that runs it.
 
 → [**Phase 3 — Neural Networks**](../../Phase%203%20-%20Artificial%20Intelligence/1.%20Neural%20Networks/Guide.md) — the workloads that make all this parallelism necessary.
 
-**Study method:** use the [shared lesson cycle and completion rubric](../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+## Keep one workload while changing execution models
+
+Use vector add, a reduction, and a small matrix product with identical inputs and an explicit tolerance across the subtracks. Start with scalar C++, then SIMD, CPU tasks, and one GPU backend. HIP and SYCL are transfer electives once you can explain one implementation; they are not prerequisites for every learner.
+
+Report kernel time and end-to-end time separately, including allocation, transfer, and synchronization policy. Record shape, dtype, bytes, compiler flags, and CPU/GPU clocks or power mode. A port is successful when it preserves the contract; it is an optimization only after matched measurements show improvement.
+
+**Carry forward:** Shared benchmark inputs and a backend comparison with identical correctness checks. Continue with [the next course](C%2B%2B%20and%20SIMD/Guide.md) and reuse that evidence.

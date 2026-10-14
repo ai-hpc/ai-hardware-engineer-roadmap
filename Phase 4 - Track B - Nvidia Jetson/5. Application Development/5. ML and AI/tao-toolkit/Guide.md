@@ -15,6 +15,8 @@
 ---
 
 
+> **TensorRT API versions:** This reference includes legacy binding-based execution or V2 plugin examples. Pin the installed TensorRT version before using a block. TensorRT 10.x execution uses named tensors, `set_tensor_address`, and `execute_async_v3`; legacy examples are not drop-in 10.x code. Newer major releases have further changes. Use NVIDIA's [8.x→10.x migration guide](https://docs.nvidia.com/deeplearning/tensorrt/10.x.x/api/tensorrt-8x-to-10x-python-api.html) and the API documentation matching your BSP.
+
 ## 1. What is TAO Toolkit?
 
 **TAO** = **Train, Adapt, Optimize** — NVIDIA's no-code/low-code framework for building production-grade AI models with transfer learning, without needing to write training loops from scratch.
@@ -1021,16 +1023,11 @@ TAO models:
 *Previous: [5.5 ML and AI](../Guide.md)*
 *See also: [ML and AI main guide](../Guide.md) for quantization theory, TensorRT manual pipeline, and DLA usage*
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain dataset annotations, task metric, and the model export contract. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Did training and deployment use the same input contract?
 
-1. **Baseline lab:** Train or adapt a small task and compare exported inference with its framework reference.
-2. **Guided variation:** Inspect a difficult held-out subset and test a quantized/exported variant.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Pin the TAO release/task and export path. Keep train/validation/test data separate; compare exported inference with the training reference using identical normalization and class mapping.
 
-**Evidence to submit:** Task score by subset, export parity, latency, memory, and pinned training/export inputs. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Submit export metadata, quantization calibration provenance, held-out quality, and target runtime compatibility. A successful model conversion without output parity does not pass.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [5. ML and AI](../Guide.md). Explain which assumption from this course the next engineer must preserve.

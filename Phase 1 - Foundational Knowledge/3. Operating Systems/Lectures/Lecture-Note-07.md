@@ -26,11 +26,11 @@
 
 ## Cache Coherency: Coherent vs Streaming
 
-- **Coherent DMA:** `dma_alloc_coherent()` — uncached or hardware-coherent; CPU and device always see same data; no explicit sync. Use for small control/descriptor regions.
+- **Coherent DMA:** `dma_alloc_coherent()` — no streaming cache-ownership sync is needed for this mapping, but descriptor ordering and completion still require the device/API contract. Cacheability is platform-dependent.
 - **Streaming DMA:** CPU uses cached memory; driver **synchronizes** explicitly:
-  - **DMA_TO_DEVICE:** CPU wrote data → `dma_map_single()` flushes cache → device reads.
-  - **DMA_FROM_DEVICE:** Device will write → after transfer, `dma_unmap_single()` invalidates cache → CPU reads. Between map and unmap the buffer is "owned" by the device — CPU must not touch it.
-- **dma_map_sg** / **dma_unmap_sg** for scatter-gather (fragmented buffers). Direction controls which cache op is used; wrong direction = silent corruption.
+  - **DMA_TO_DEVICE:** CPU prepares data → map/synchronize for the device → device reads.
+  - **DMA_FROM_DEVICE:** Device writes → completion → unmap/synchronize for CPU → CPU reads. Persistent mappings use explicit `dma_sync_*` ownership transitions.
+- **dma_map_sg** / **dma_unmap_sg** for scatter-gather (fragmented buffers). Direction informs platform-specific cache maintenance; do not hard-code a universal flush/invalidate sequence.
 
 ---
 
@@ -53,7 +53,7 @@
 
 ## GPU Memory & Unified Memory
 
-- Discrete GPU: dedicated VRAM; driver manages allocations and CPU↔GPU copies. **Unified memory (e.g. Jetson):** CPU and GPU share physical RAM; one address space; no explicit copy for shared buffers, but bandwidth and latency depend on placement.
+- Discrete GPU: dedicated VRAM; driver manages allocations and CPU↔GPU copies. **Integrated shared DRAM (e.g. Jetson):** sharing physical memory does not make every CPU allocation GPU-accessible or automatically synchronized. CUDA managed memory and supported shared/imported buffers have separate API contracts.
 - **Resizable BAR (SAM):** GPU BAR1 can cover full VRAM; CPU can address all GPU memory (important for GPUDirect Storage, zero-copy).
 
 ---
@@ -101,7 +101,7 @@
 
 ## Summary Tables
 
-**DMA:** Coherent = uncached/coherent, no sync. Streaming = map (flush/invalidate) → device uses → unmap (invalidate/flush); CPU must not touch between map/unmap.
+**DMA:** Coherent mappings still need ordering and lifetime control. Streaming mappings use map/unmap or explicit `dma_sync_*` ownership transitions; do not assume identical cache operations on every architecture.
 
 **IOMMU:** IOVA→PA; per-device/group; restricts DMA; VFIO exposes to userspace for passthrough.
 

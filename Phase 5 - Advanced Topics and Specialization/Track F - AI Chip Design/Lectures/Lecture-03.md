@@ -378,7 +378,7 @@ llc output.ll -o output.o -filetype=obj
 
 2. **Progressive lowering:** Start with a `tosa.conv2d` operation. Lower it through `tosa-to-linalg` → `linalg-tile` → `linalg-to-loops` → `convert-to-llvm`. At each stage, print the IR and observe how information is preserved then consumed.
 
-3. **Tensor vs MemRef:** Write a function that takes `tensor<16x16xf32>` inputs, performs an element-wise add, and returns a tensor. Run `--one-shot-bufferize` and observe how tensors become memrefs with explicit `memref.alloc` and `memref.dealloc`.
+3. **Tensor vs MemRef:** Write a function that takes `tensor<16x16xf32>` inputs, performs an element-wise add, and returns a tensor. Run `--one-shot-bufferize` and observe where tensors become memrefs and allocations appear. One-Shot Bufferize does not insert deallocations; study the ownership-based buffer deallocation pipeline separately, then check that no live alias outlasts its buffer. [Bufferization reference](https://mlir.llvm.org/docs/Bufferization/).
 
 4. **Dialect design exercise:** Design (on paper) an MLIR dialect for a hypothetical NPU with: a 16×16 INT8 MAC array, 64KB weight SRAM, 32KB activation SRAM, and DMA for host↔SRAM transfers. Define the operations, types, and memory spaces. Sketch the lowering from `linalg.matmul` to your dialect.
 

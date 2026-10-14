@@ -10,126 +10,66 @@
 </div>
 
 
-**Primary source:** [Caltech CS124 Spring 2024](https://users.cms.caltech.edu/~donnie/cs124/lectures/) (Donnie Pinkston).
+This course explains the Linux mechanisms between your VLA runtime and the devices it uses. Start after [computer architecture](../2.%20Computer%20Architecture%20and%20Hardware/Guide.md); use its memory hierarchy model to distinguish scheduling delay, CPU page faults, device DMA, and accelerator execution.
 
-This section is the **OS theory + Linux-shaped practice** layer of Phase 1. It sits after [**§2 — Computer Architecture**](../2.%20Computer%20Architecture%20and%20Hardware/Guide.md) (you need CPU/memory context) and before [**§4 — C++ and Parallel Computing**](../4.%20C%2B%2B%20and%20Parallel%20Computing/Guide.md) (you will use processes, threads, and VM ideas when writing host and CUDA code).
+The repository contains 26 original roadmap lectures plus eight optional consolidation notes. [Caltech CS124](https://users.cms.caltech.edu/~donnie/cs124/lectures/) and [Stanford Pintos](https://web.stanford.edu/class/cs140/projects/pintos/) are supplementary OS resources; their topic numbering is not the numbering below.
 
-**Why it matters for AI hardware:** Deployed stacks run on Linux (Jetson, ADAS, servers) or smaller RTOSes. Scheduling, virtual memory, I/O, and the user/kernel boundary are what you tune when chasing latency, debugging drivers, or reasoning about zero-copy camera → GPU paths.
+## Study sequence and evidence
 
----
+| Lectures | Question to answer | Artifact carried into the next group |
+|---|---|---|
+| 1–5: kernel, processes, interrupts, syscalls, boot | How does an application request a device operation? | Annotated boot log and one userspace → kernel → IRQ trace |
+| 6–11: scheduling and synchronization | Why did a ready task miss its deadline? | Periodic-worker trace with execution, waiting, and contention separated |
+| 12–16: virtual memory, allocation, DMA, NUMA | Which address and ownership domain contains each buffer? | Buffer table: CPU virtual address, DMA address, lifetime, synchronization |
+| 17–20: drivers and I/O | How is work submitted, completed, and reclaimed? | Device probe map and completion timeline |
+| 21–24: storage, OTA, containers, deployed systems | What survives restart, isolation, and resource pressure? | Recoverable image/service configuration and failure log |
+| 25–26: Yocto and eBPF integration | Can another engineer reproduce and diagnose the system? | Pinned image inputs plus a trace explaining a latency outlier |
 
-## How this folder is laid out
-
-Everything you need is **under this directory**—there is no separate “side” tree next to `Lectures/`.
-
-| Location | Role |
-|----------|------|
-| **`Lectures/Lecture-NN.md`** | Main notes for **26** topics (see index below). |
-| **`Lectures/Lecture-Note-NN.md`** | Optional deeper notes where present. |
-| **`Lectures/demos/rt-demo/`** | Small **user-space** C demo tying **Lectures 1–9** to runnable code ([README](Lectures/demos/rt-demo/README.md)). |
-| **`Final-Test-Problems.md`** | Five integration problems with explicit lecture cross-links. |
-
-**Study flow:** Read lectures in the thematic order below → use **rt-demo** after you finish **L9** (optional but useful) → attempt **Final-Test-Problems** near the end of the section.
-
----
-
-## Course snapshot
-
-| Aspect | Details |
-|--------|---------|
-| **Base curriculum** | Caltech CS124 — concepts, slides, and pacing |
-| **Write-ups in this repo** | **26** markdown lectures (including capstone-style **L25** and **L26** extensions aligned with this roadmap) |
-| **Prerequisites** | C programming; Phase 1 §2 (architecture / memory hierarchy) |
-| **Classic hands-on (external)** | [Pintos](https://web.stanford.edu/class/cs140/projects/pintos/) — Stanford teaching kernel (threads, user programs, VM, files) |
-
----
-
-## Recommended order (by theme)
-
-Follow this order rather than skipping around; later lectures assume earlier vocabulary.
-
-1. **System shape & boot (L1–L5)** — history, UNIX I/O, traps and structure, microkernels, firmware/boot.
-2. **Concurrency in the kernel model (L6–L9)** — processes, threads, interrupt context, synchronization and deadlock.  
-   *Optional:* build and run **[rt-demo](Lectures/demos/rt-demo/README.md)** here to connect syscalls, scheduling, affinity, and pthread primitives to real code.
-3. **Scheduling (L10–L12)** — advanced sync, CPU scheduling, real-time and Linux schedulers.
-4. **User/kernel boundary (L13–L14)** — system calls, signals.
-5. **Memory (L15–L20)** — virtual memory, page tables, replacement, thrashing, Pintos VM discussion.
-6. **Filesystems (L21–L24)** — allocation, locking, SSDs, Pintos FS design, journaling.
-7. **Integration (L25–L26)** — Yocto capstone tie-in; eBPF / observability.
-
----
+Use [rt-demo](Lectures/demos/rt-demo/README.md) after L9. Start without elevated scheduling privileges; compare load conditions before changing policy. A good latency histogram is evidence for the tested workload, not proof of a hard real-time bound. Record kernel version/configuration because implementation details and available tracing features vary.
 
 <a id="lecture-index"></a>
-## Lecture index (all topics)
+## Lecture index
 
-| # | Topic | Key concepts |
-|:-:|-------|----------------|
-| [1](Lectures/Lecture-01.md) | Introduction & OS history | Mainframes → time-sharing, virtualization, RTOS |
-| [2](Lectures/Lecture-02.md) | OS components & UNIX I/O | Syscalls, kernel/user mode, fds, pipes, shells |
-| [3](Lectures/Lecture-03.md) | Traps, interrupts & structure | Traps/faults, preemption, monolithic vs microkernel |
-| [4](Lectures/Lecture-04.md) | Microkernels & exokernels | Mach, L4, IPC, hybrid kernels |
-| [5](Lectures/Lecture-05.md) | Bootstrap & firmware | BIOS/UEFI, ACPI, chain loading; **Linux kernel lectures** tie-in to DT, modules |
-| [6](Lectures/Lecture-06.md) | Process abstraction | States, PCB, context switch, queues |
-| [7](Lectures/Lecture-07.md) | Threads | User vs kernel threads, models, Amdahl |
-| [8](Lectures/Lecture-08.md) | Kernel stacks & interrupts | Reentrancy, interrupt context, critical sections |
-| [9](Lectures/Lecture-09.md) | Synchronization & deadlock | Peterson, spinlocks, semaphores, deadlock |
-| [10](Lectures/Lecture-10.md) | Advanced synchronization | RCU, rwlocks, lock granularity |
-| [11](Lectures/Lecture-11.md) | Process scheduling | FCFS, RR, SJF, priority, MLQs |
-| [12](Lectures/Lecture-12.md) | Real-time & Linux schedulers | EDF, rate-monotonic, CFS |
-| [13](Lectures/Lecture-13.md) | System calls | Trap path, arguments, pointer checks |
-| [14](Lectures/Lecture-14.md) | UNIX signals | Handlers, masks, sigreturn |
-| [15](Lectures/Lecture-15.md) | Virtual memory & MMU | Paging, TLB, demand paging |
-| [16](Lectures/Lecture-16.md) | Page tables & COW | PTE bits, fork/vfork |
-| [17](Lectures/Lecture-17.md) | Frame tables & replacement | FIFO, optimal, Belady |
-| [18](Lectures/Lecture-18.md) | Replacement policies | LRU, clock, working set |
-| [19](Lectures/Lecture-19.md) | Pintos VM design | Project-oriented discussion |
-| [20](Lectures/Lecture-20.md) | Allocation & thrashing | Global vs local, working set |
-| [21](Lectures/Lecture-21.md) | Filesystems | Directories, inodes, allocation |
-| [22](Lectures/Lecture-22.md) | File locking & SSDs | flock, FTL, TRIM |
-| [23](Lectures/Lecture-23.md) | Pintos file system design | Project-oriented discussion |
-| [24](Lectures/Lecture-24.md) | Journaling filesystems | Crash consistency |
-| [25](Lectures/Lecture-25.md) | Capstone: custom Linux images | Yocto; pairs with Phase 2 embedded Linux |
-| [26](Lectures/Lecture-26.md) | eBPF deep dive | Verifier, maps, CO-RE, XDP, observability |
+| # | Actual lecture in this repository |
+|---|---|
+| [1](Lectures/Lecture-01.md) | Modern OS Architecture & the Linux Kernel |
+| [2](Lectures/Lecture-02.md) | Processes, task_struct & the Linux Process Model |
+| [3](Lectures/Lecture-03.md) | Interrupts, Exceptions & Bottom Halves |
+| [4](Lectures/Lecture-04.md) | System Calls, vDSO & eBPF |
+| [5](Lectures/Lecture-05.md) | Kernel Modules, Boot Process & Device Tree |
+| [6](Lectures/Lecture-06.md) | CPU Scheduling: CFS, EEVDF & Real-Time Classes |
+| [7](Lectures/Lecture-07.md) | Real-Time Linux: PREEMPT_RT & Determinism |
+| [8](Lectures/Lecture-08.md) | Multi-Core Scheduling, CPU Affinity & isolcpus |
+| [9](Lectures/Lecture-09.md) | Synchronization: Spinlocks, Mutexes, RW Locks & Seqlocks |
+| [10](Lectures/Lecture-10.md) | Lock-Free Programming: RCU, Atomics & Memory Ordering |
+| [11](Lectures/Lecture-11.md) | Deadlock, Priority Inversion & PI Mutexes |
+| [12](Lectures/Lecture-12.md) | Virtual Memory & the Linux Memory Model |
+| [13](Lectures/Lecture-13.md) | Page Tables, TLBs & Huge Pages |
+| [14](Lectures/Lecture-14.md) | Memory Allocation: SLUB, kmalloc & CMA |
+| [15](Lectures/Lecture-15.md) | DMA, IOMMU & GPU Memory Management |
+| [16](Lectures/Lecture-16.md) | NUMA Topology & HPC Memory Optimization |
+| [17](Lectures/Lecture-17.md) | Linux Device Driver Model & Device Tree |
+| [18](Lectures/Lecture-18.md) | Character Drivers, Interrupt-Driven I/O & V4L2 |
+| [19](Lectures/Lecture-19.md) | Modern I/O: io_uring, DMA-BUF & Zero-Copy Pipelines |
+| [20](Lectures/Lecture-20.md) | PCIe, NVMe & GPU Driver Architecture |
+| [21](Lectures/Lecture-21.md) | Filesystems: ext4, btrfs, F2FS & overlayfs |
+| [22](Lectures/Lecture-22.md) | Embedded Storage: eMMC, UFS, NVMe & OTA Partitioning |
+| [23](Lectures/Lecture-23.md) | Containers, cgroups v2 & NVIDIA Container Runtime |
+| [24](Lectures/Lecture-24.md) | OS for AI Systems: L4T, openpilot OS & RT Tuning |
+| [25](Lectures/Lecture-25.md) | Capstone Project — Custom Linux Images with Yocto |
+| [26](Lectures/Lecture-26.md) | eBPF — Programmable Kernel Observability & Networking |
 
----
+## Integration lab: follow one observation to one action
 
-## Practice
+Model a camera producer, inference worker, and controller as separate stages with bounded queues. Put a monotonic timestamp and sequence number on every item. Deliberately delay the inference worker; show whether the controller receives an old observation, a dropped item, or an explicit timeout. Explain the queue policy and account for each buffer until its final consumer releases it.
 
-1. **[Final-Test-Problems.md](Final-Test-Problems.md)** — five problems (kernel build, PREEMPT_RT, ext4, boot chain, modules + DT); each points to specific lectures.
-2. **[Lectures/demos/rt-demo/](Lectures/demos/rt-demo/README.md)** — one program for **L1–L9** (scheduling, affinity, `mlockall`, pthread sync). Requires Linux or WSL.
+A complete submission includes timestamps for capture, dequeue, device submission, device completion, and command publication; p50/p95/p99 latency and deadline misses; and one trace demonstrating the cause of an outlier. State which stages are simulated. This becomes the runtime contract for [embedded Linux](../../Phase%202%20-%20Embedded%20Systems/3.%20Embedded%20Linux/Guide.md) and the host-side baseline for [parallel computing](../4.%20C%2B%2B%20and%20Parallel%20Computing/Guide.md).
 
----
+## Reference and review
 
-## Resources
+- [Final practice problems with answer key](Final-Test-Problems.md).
+- [Linux DMA API guide](https://docs.kernel.org/core-api/dma-api-howto.html): address translation, mapping, ownership, and memory ordering.
+- [Linux EEVDF scheduler documentation](https://docs.kernel.org/scheduler/sched-eevdf.html): distinguish fair scheduling from deadline guarantees.
+- [AGNOS code-reading guide](../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20E%20-%20Autonomous%20Vehicles/2.%20openpilot%20Reference%20Stack/agnos/Guide.md): compare lecture concepts with a real vendor kernel and image build.
 
-- **Slides:** [CS124 lectures (PDF)](https://users.cms.caltech.edu/~donnie/cs124/lectures/)
-- **Textbook:** *Operating System Concepts* (Silberschatz, Galvin, Gagne)
-- **Kernel narrative:** [Linux Insides](https://0xax.gitbooks.io/linux-insides/)
-- **Real fork (openpilot / comma):** [agnos-kernel-sdm845](https://github.com/commaai/agnos-kernel-sdm845), [agnos-builder](https://github.com/commaai/agnos-builder) — [**AGNOS Guide**](../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20E%20-%20Autonomous%20Vehicles/2.%20openpilot%20Reference%20Stack/agnos/Guide.md) maps **all 26** lecture topics to kernel paths and fork-specific changes.
-
----
-
-## AI / embedded relevance
-
-| OS idea | Typical AI / edge use |
-|---------|------------------------|
-| **Real-time scheduling** | Inference deadlines, sensor pipelines |
-| **Virtual memory & DMA** | Weights in RAM, camera → accelerator buffers |
-| **fds & I/O** | Cameras, CAN, logging |
-| **Process / thread model** | Separate daemons for capture, inference, control |
-| **User vs kernel** | Drivers vs userspace ML runtimes |
-| **eBPF** | Profiling, scheduler analysis, XDP filtering |
-
-## Practice and assessment
-
-**Entry diagnostic (prerequisite check):** Explain the difference between process address space, scheduling delay, and device execution time. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
-
-1. **Baseline lab:** Run a producer/consumer or periodic-worker experiment with explicit timestamps and bounded load.
-2. **Guided variation:** Introduce lock contention or queue pressure; identify whether the delay is execution, blocking, or scheduling.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
-
-**Evidence to submit:** Latency distribution, CPU utilization, dropped/deadline-missed work, and a trace explaining one outlier. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+Use the [shared completion rubric](../../Learning-Guide.md#completion-rubric) to separate explanation, reproduced experiments, and hardware work still to do.

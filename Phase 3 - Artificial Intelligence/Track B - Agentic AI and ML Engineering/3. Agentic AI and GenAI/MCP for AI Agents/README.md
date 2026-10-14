@@ -104,3 +104,12 @@ If you can call one tool but can't defend the server or deploy it for someone el
 *Related: [Tool Use & Function Calling](../Lectures/Lecture-08.md) · [Evaluation & the MCP benchmark ladder (L23 §8)](../Lectures/Lecture-23.md) · [OpenClaw Threat Model — MITRE ATLAS](../Lectures/Lecture-40.md) · official spec: [modelcontextprotocol.io](https://modelcontextprotocol.io)*
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Carry this course into the physical-AI system
+
+**Start from:** A tested bounded task API and an authenticated development environment.
+
+**Build and challenge:** Expose observation metadata and task-status tools first. Test schema errors, cancellation, authorization, and duplicate requests; protocol support alone does not authorize an actuator operation.
+
+**Pass forward:** A versioned supervisory tool interface and failure/retry transcript. Continue with [the connected course](../../4.%20ML%20Engineering%20and%20MLOps/Guide.md) and keep the artifact in the [Physical AI Design Studio](../../../../Physical-AI-Design-Studio.md).

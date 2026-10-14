@@ -12,13 +12,31 @@
 
 **Phase 4 — Track B — Module 5.4** · Application Development
 
-> **Focus:** Build hardware-accelerated multimedia pipelines on the **Jetson Orin Nano 8GB** — audio playback/capture, camera integration (USB and CSI), GStreamer video pipelines, display output, and video encode/decode using NVIDIA's NVENC/NVDEC engines.
+> **Focus:** Build hardware-accelerated multimedia pipelines on the **Jetson Orin Nano 8GB** — audio playback/capture, camera integration (USB and CSI), GStreamer video pipelines, display output, and hardware decode where supported and CPU software encode on Orin Nano (NVENC is absent).
 
 **Hub:** [5. Application Development](../Guide.md)
 **Dedicated audio deep dive:** [Jetson Audio Setup and Development](Jetson-Audio-Setup-and-Development/Guide.md)
 **Audio application:** [ESP32-LyraT I2S Microphone Capture on Jetson Orin Nano](ESP32-LyraT-I2S-Mic-Jetson-Orin-Nano/Guide.md)
 
 ---
+
+
+## Nano baseline: make encoding costs visible
+
+**Orin Nano has no NVENC.** NVIDIA documents a software H.264 path using libx264; see [Software Encode in Orin Nano](https://docs.nvidia.com/jetson/archives/r36.2/DeveloperGuide/SD/Multimedia/SoftwareEncodeInOrinNano.html). Shared family diagrams and plugin names do not add hardware to a Nano module.
+
+Start with a generated stream so camera bring-up and encoding are separate problems:
+
+```bash
+# Requires GStreamer good/ugly plugins with x264enc installed.
+gst-inspect-1.0 x264enc
+gst-launch-1.0 -e videotestsrc num-buffers=300 ! \
+  'video/x-raw,width=640,height=480,framerate=30/1,format=I420' ! \
+  x264enc tune=zerolatency speed-preset=ultrafast bitrate=1000 ! \
+  h264parse ! mp4mux ! filesink location=nano-encode-baseline.mp4
+```
+
+Verify the output frame count and duration, then add the real camera conversion path. Measure CPU use and frame age while inference runs. Record bitrate and quality too: reducing encode work by discarding visual information can damage downstream perception. No throughput number is assumed here.
 
 
 ## 1. Audio (Linux)
@@ -329,16 +347,11 @@ cat /dev/urandom > /dev/fb0   # random noise
 | [Orin Nano Camera ISP](../../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Camera-ISP-Sensor-Bringup/Guide.md) | CSI sensor bring-up, ISP pipeline, multi-camera (Module 1 deep dive) |
 | [Orin Nano Video Codec DeepStream](../../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Video-Codec-DeepStream/Guide.md) | Hardware codec details, DeepStream integration (Module 1 deep dive) |
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain sample/frame format, timestamps, buffering, and device routing. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Which conversions occur before a multimedia tensor reaches the model?
 
-1. **Baseline lab:** Capture and replay a known audio/video signal through a bounded pipeline.
-2. **Guided variation:** Change buffer size and inject a discontinuity; identify underruns or dropped frames.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Trace one audio or video sample through capture format, conversion, memory pool, preprocessing, and output. On Nano use software encode if recording is needed; hardware decode does not imply encode support.
 
-**Evidence to submit:** Round-trip/stage latency, sample/frame integrity, buffer occupancy, and error counters. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Submit format/stride/sample-rate metadata and latency per stage. Demonstrate one unsupported-format failure and keep its error distinguishable from a model error.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [5. ML and AI](../5.%20ML%20and%20AI/Guide.md). Explain which assumption from this course the next engineer must preserve.

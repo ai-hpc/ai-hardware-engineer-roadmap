@@ -11,7 +11,7 @@
 
 
 > **What:** Multi-modal 3D object detection that fuses camera images and LiDAR point clouds in a shared **Bird's Eye View (BEV)** feature space.
-> **Why:** Cameras see color/texture; LiDAR sees accurate depth/geometry. Fusion in BEV gets the best of both — better accuracy than either modality alone.
+> **Why:** Cameras see color/texture; LiDAR sees accurate depth/geometry. Fusion in BEV can combine their strengths; improvement must be established with matched ablations and calibration checks.
 > **Hardware:** Jetson Orin Nano 8GB (inference), workstation/cloud (training).
 
 ---
@@ -53,15 +53,11 @@ Each modality contributes its strengths at the feature level before any decision
 | LiDAR    | Precise 3D geometry, range up to 100m | No texture; sparse at distance        |
 | **BEV Fusion** | **Geometry + Semantics**        | **More complex, higher compute**      |
 
-### Performance vs. Single Modality
+### Compare fusion with a controlled ablation
 
-On nuScenes benchmark (mAP / NDS):
+Do not subtract scores from unrelated PointPillars, BEVDet, and BEVFusion configurations and attribute the entire difference to fusion. Match dataset split, backbone, training, augmentations, and evaluation settings. The [authors' repository](https://github.com/mit-han-lab/bevfusion) separates validation and test results and provides checkpoint-specific metrics.
 
-```
-LiDAR only   (PointPillars):   40.1 / 53.0
-Camera only  (BEVDet):         29.8 / 38.8
-BEVFusion    (MIT HAN Lab):    68.5 / 71.4   ← +28 mAP over LiDAR alone
-```
+Measure a camera-only, LiDAR-only, and fused configuration on the same held-out scenes. Then inject a calibration offset or sensor dropout. Fusion can degrade when inputs are misaligned. Published Jetson Orin results do not establish performance on Orin Nano; identify the exact board, memory capacity, model, and runtime.
 
 ---
 
@@ -1388,7 +1384,7 @@ lidar_pts  = np.fromfile('demo/lidar/sample.bin', dtype=np.float32).reshape(-1, 
 detections = bevfusion.run(images, lidar_pts)
 ```
 
-### Expected Performance on Orin Nano 8GB
+### Planning estimates for Orin Nano 8GB — replace with measurements
 
 ```
 Component               FP32     FP16     Notes
@@ -1692,7 +1688,7 @@ sudo nvpmodel -m 1              # 7W mode
 # Accept lower FPS in exchange for 2× lower power
 ```
 
-### Performance Summary Table
+### Illustrative planning table — not measured course results
 
 | Configuration                          | FPS (Orin Nano) | mAP  |
 |----------------------------------------|-----------------|------|
@@ -1774,16 +1770,11 @@ nusc.render_sample('scene-0001')
 *Up: [Sensor Fusion Guide](../Guide.md)*
 *See also: [4. Sensor Fusion / kalman-filter](../kalman-filter/README.md)*
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Transform one point from lidar coordinates into the camera and vehicle frames. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Carry this course into the physical-AI system
 
-1. **Baseline lab:** Inspect a pinned fusion pipeline and evaluate a small held-out split with sensor alignment checked.
-2. **Guided variation:** Remove one sensor or perturb its timestamps/extrinsics; localize the resulting errors.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Start from:** Calibrated camera/LiDAR samples and a checkpoint-specific configuration.
 
-**Evidence to submit:** Detection score by condition, alignment error, modality latency, peak memory, and sample counts. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Build and challenge:** Compare matched single-modality and fused runs on one split. Inject a transform offset and a missing sensor; report quality, memory, and latency rather than importing another board’s FPS.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** A calibrated fusion workload and a modality-ablation report. Continue with [the connected course](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/VLA%20Foundations%20to%20Frontier%202026/README.md) and keep the artifact in the [Physical AI Design Studio](../../../../Physical-AI-Design-Studio.md).

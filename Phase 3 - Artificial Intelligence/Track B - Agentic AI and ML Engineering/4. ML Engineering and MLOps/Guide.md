@@ -14,7 +14,7 @@
 
 > *Build and operate ML training/inference pipelines — model lifecycle, data pipelines, serving infrastructure.*
 
-**Prerequisites:** Module 2 (Frameworks — PyTorch fluency), Module 3B (Agentic AI — understand LLM workloads).
+**Prerequisites:** Module 2 (Frameworks — PyTorch fluency) and one trained model. Agentic AI is a companion when the workload uses tools; it is not a prerequisite for MLOps.
 
 **Role targets:** Machine Learning Engineer · MLOps Engineer · AI/ML Engineer · ML Platform Engineer
 
@@ -37,8 +37,8 @@ ML engineers define the **training and serving workloads** that hardware must su
 ## 1. Training Pipelines
 
 * **Data pipelines:** PyTorch DataLoader, NVIDIA DALI, streaming datasets
-* **Distributed training:** DDP (Data Distributed Parallel), FSDP (Fully Sharded), DeepSpeed
-* **Mixed precision:** `torch.cuda.amp`, BF16, FP8 training
+* **Distributed training:** DDP (DistributedDataParallel), FSDP (Fully Sharded), DeepSpeed
+* **Mixed precision:** `torch.amp` with supported device/dtype choices; BF16 and separately validated FP8 training recipes
 * **Checkpointing:** model saving, resume from checkpoint, elastic training
 * **Hyperparameter tuning:** Optuna, Ray Tune, grid/random/Bayesian search
 
@@ -63,7 +63,7 @@ ML engineers define the **training and serving workloads** that hardware must su
 
 ## 3. Model Serving & Inference Infrastructure
 
-* **Serving frameworks:** Triton Inference Server, TorchServe, vLLM, TensorRT-LLM
+* **Serving frameworks:** Triton Inference Server, vLLM, TensorRT-LLM. Treat [TorchServe](https://github.com/pytorch/serve) as a historical case study: its repository declares limited maintenance
 * **Batching:** static batching, dynamic batching, continuous batching (for LLMs)
 * **Scaling:** horizontal (replicas), vertical (larger GPU), model parallelism for large models
 * **Monitoring:** latency percentiles (p50/p99), throughput (QPS), error rates, GPU utilization
@@ -87,7 +87,7 @@ ML engineers define the **training and serving workloads** that hardware must su
 * **Orchestration:** Kubeflow Pipelines, Apache Airflow, Prefect
 
 **Projects:**
-1. Build a CI/CD pipeline: on push → train → evaluate → if improved → deploy to Triton.
+1. Build a CI/CD pipeline: on push → train → evaluate quality, latency, and compatibility → stage a candidate → test rollback → promote through an explicit release gate. A better aggregate accuracy score alone is insufficient.
 2. Set up GPU-enabled Kubernetes with NVIDIA GPU Operator. Deploy a model serving workload.
 
 ---
@@ -109,3 +109,12 @@ ML engineers define the **training and serving workloads** that hardware must su
 → [**Module 5B — LLM Application Development**](../5.%20LLM%20Application%20Development/Guide.md)
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Carry this course into the physical-AI system
+
+**Start from:** A trained model with dataset and preprocessing revisions.
+
+**Build and challenge:** Build a release candidate with quality, timing, memory, and compatibility gates. Rehearse rollback and prove that restoring weights also restores normalization and runtime configuration.
+
+**Pass forward:** A reproducible release manifest and rollback result for the robot policy. Continue with [the connected course](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/VLA%20Optimization%20and%20Action-Parity%20Harness/README.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

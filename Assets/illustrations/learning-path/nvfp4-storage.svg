@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1008pt" height="532.8pt" viewBox="0 0 1008 532.8" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-10-14T01:40:19.857642</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.6.3, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 532.8 
+L 1008 532.8 
+L 1008 0 
+L 0 0 
+z
+" style="fill: #f5f8fc"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 62.8704 259.911 
+L 471.3696 259.911 
+Q 479.664 259.911 479.664 251.6598 
+L 479.664 144.3942 
+Q 479.664 136.143 471.3696 136.143 
+L 62.8704 136.143 
+Q 54.576 136.143 54.576 144.3942 
+L 54.576 251.6598 
+Q 54.576 259.911 62.8704 259.911 
+z
+" clip-path="url(#p9718fa9ce0)" style="fill: #ffffff; stroke: #c8d5e4; stroke-width: 1.3; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_3">
+    <path d="M 57.6864 252.6912 
+L 61.488 252.6912 
+L 61.488 143.3628 
+L 57.6864 143.3628 
+z
+" clip-path="url(#p9718fa9ce0)" style="fill: #245cbe"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 519.0624 259.911 
+L 716.7456 259.911 
+Q 725.04 259.911 725.04 251.6598 
+L 725.04 144.3942 
+Q 725.04 136.143 716.7456 136.143 
+L 519.0624 136.143 
+Q 510.768 136.143 510.768 144.3942 
+L 510.768 251.6598 
+Q 510.768 259.911 519.0624 259.911 
+z
+" clip-path="url(#p9718fa9ce0)" style="fill: #ffffff; stroke: #c8d5e4; stroke-width: 1.3; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 513.8784 252.6912 
+L 517.68 252.6912 
+L 517.68 143.3628 
+L 513.8784 143.3628 
+z
+" clip-path="url(#p9718fa9ce0)" style="fill: #087e83"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 764.4384 259.911 
+L 951.7536 259.911 
+Q 960.048 259.911 960.048 251.6598 
+L 960.048 144.3942 
+Q 960.048 136.143 951.7536 136.143 
+L 764.4384 136.143 
+Q 756.144 136.143 756.144 144.3942 
+L 756.144 251.6598 
+Q 756.144 259.911 764.4384 259.911 
+z
+" clip-path="url(#p9718fa9ce0)" style="fill: #ffffff; stroke: #c8d5e4; stroke-width: 1.3; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_7">
+    <path d="M 759.2544 252.6912 
+L 763.056 252.6912 
+L 763.056 143.3628 
+L 759.2544 143.3628 
+z
+" clip-path="url(#p9718fa9ce0)" style="fill: #a56808"/>
+   </g>
+   <g id="text_1">
+    <text style="fill: #15243a; font: 700 23px 'DejaVu Sans'; text-anchor: start" x="49.392" y="59.074406" transform="rotate(-0 49.392 59.074406)">Four-bit values do not mean a four-bit tensor</text>
+   </g>
+   <g id="text_2">
+    <text style="fill: #516478; font: 11px 'DejaVu Sans'; text-anchor: start" x="49.392" y="87.774281" transform="rotate(-0 49.392 87.774281)">A teaching example of one-dimensional NVFP4 block storage; actual packing and scale layout belong to the backend.</text>
+   </g>
+   <g id="text_3">
+    <text style="fill: #245cbe; font: 700 13px 'DejaVu Sans'; text-anchor: start" x="68.7456" y="162.867169" transform="rotate(-0 68.7456 162.867169)">16 E2M1 VALUES</text>
+   </g>
+   <g id="text_4">
+    <text style="fill: #15243a; font: 11.2px 'DejaVu Sans'" transform="translate(68.7456 188.31585)">16 × 4 bits = 64 bits = 8 bytes</text>
+    <text style="fill: #15243a; font: 11.2px 'DejaVu Sans'" transform="translate(68.7456 203.835988)">Magnitudes: 0, 0.5, 1, 1.5, 2, 3, 4, 6</text>
+   </g>
+   <g id="text_5">
+    <text style="fill: #087e83; font: 700 13px 'DejaVu Sans'; text-anchor: start" x="524.9376" y="162.867169" transform="rotate(-0 524.9376 162.867169)">BLOCK SCALE</text>
+   </g>
+   <g id="text_6">
+    <text style="fill: #15243a; font: 11.2px 'DejaVu Sans'" transform="translate(524.9376 188.31585)">1 E4M3 value</text>
+    <text style="fill: #15243a; font: 11.2px 'DejaVu Sans'" transform="translate(524.9376 203.835988)">8 bits = 1 byte</text>
+   </g>
+   <g id="text_7">
+    <text style="fill: #a56808; font: 700 13px 'DejaVu Sans'; text-anchor: start" x="770.3136" y="162.867169" transform="rotate(-0 770.3136 162.867169)">GLOBAL SCALE</text>
+   </g>
+   <g id="text_8">
+    <text style="fill: #15243a; font: 11.2px 'DejaVu Sans'" transform="translate(770.3136 188.31585)">FP32, tensor-wide</text>
+    <text style="fill: #15243a; font: 11.2px 'DejaVu Sans'" transform="translate(770.3136 203.835988)">32 bits = 4 bytes</text>
+   </g>
+   <g id="text_9">
+    <text style="fill: #516478; font: 24px 'DejaVu Sans'; text-anchor: middle" x="495.216" y="199.0584" transform="rotate(-0 495.216 199.0584)">+</text>
+   </g>
+   <g id="text_10">
+    <text style="fill: #516478; font: 24px 'DejaVu Sans'; text-anchor: middle" x="740.592" y="199.0584" transform="rotate(-0 740.592 199.0584)">+</text>
+   </g>
+   <g id="text_11">
+    <text style="fill: #15243a; font: 17px 'DejaVu Sans'; text-anchor: start" x="66.672" y="317.3256" transform="rotate(-0 66.672 317.3256)">Reconstruction: value = E2M1 payload × block scale × tensor scale</text>
+   </g>
+   <g id="text_12">
+    <text style="fill: #15243a; font: 15px 'DejaVu Sans'; text-anchor: start" x="66.672" y="371.646" transform="rotate(-0 66.672 371.646)">Per 16-value block: 9 bytes → 4.5 bits/value, before the shared global scale.</text>
+   </g>
+   <g id="text_13">
+    <text style="fill: #15243a; font: 15px 'DejaVu Sans'; text-anchor: start" x="66.672" y="417.7152" transform="rotate(-0 66.672 417.7152)">For N values, when N is divisible by 16:  bytes = N/2 + N/16 + 4</text>
+   </g>
+   <g id="text_14">
+    <text style="fill: #516478; font: 11.5px 'DejaVu Sans'; text-anchor: start" x="66.672" y="474.0984" transform="rotate(-0 66.672 474.0984)">Then account for padding, scale swizzles, unquantized tensors, runtime workspaces, and calibration quality.</text>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p9718fa9ce0">
+   <rect x="25.2" y="10.656" width="967.68" height="508.824"/>
+  </clipPath>
+ </defs>
+</svg>

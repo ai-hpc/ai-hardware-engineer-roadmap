@@ -110,7 +110,7 @@ Study the **Operating Systems** lectures first, then map each topic to AGNOS cod
 | 16 | [NUMA Topology & HPC Memory Optimization](../../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Lectures/Lecture-16.md) | `arch/arm64/mm/`, NUMA if enabled; SDM845 is UMA | — |
 | 17 | [Linux Device Driver Model & Device Tree](../../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Lectures/Lecture-17.md) | `drivers/base/`, `arch/arm64/boot/dts/`, platform_driver, of_* | — |
 | 18 | [Character Drivers, Interrupt-Driven I/O & V4L2](../../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Lectures/Lecture-18.md) | `drivers/media/`, V4L2 camera pipeline for comma 3X | — |
-| 19 | [Modern I/O: io_uring, DMA-BUF & Zero-Copy](../../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Lectures/Lecture-19.md) | `io_uring/`, DMA-BUF in `drivers/dma-buf/` | VisionIpc / zero-copy in openpilot on top |
+| 19 | [Modern I/O: io_uring, DMA-BUF & Zero-Copy](../../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Lectures/Lecture-19.md) | DMA-BUF in `drivers/dma-buf/`; do not assume io_uring exists in this 4.x baseline | VisionIpc / zero-copy in openpilot on top |
 | 20 | [PCIe, NVMe & GPU Driver Architecture](../../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Lectures/Lecture-20.md) | `drivers/pci/`, `drivers/nvme/`, GPU under `drivers/` (Adreno on SDM845) | — |
 | 21 | [Filesystems: ext4, btrfs, F2FS & overlayfs](../../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Lectures/Lecture-21.md) | `fs/ext4/`, `fs/overlayfs/` (often in Android/AGNOS rootfs) | `userspace/` rootfs layout; build_system packs fs |
 | 22 | [Embedded Storage: eMMC, UFS, NVMe & OTA](../../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Lectures/Lecture-22.md) | `drivers/scsi/`, UFS for SDM845 storage, block layer | `firmware/`, partition layout, A/B slots in builder |
@@ -480,6 +480,14 @@ The kernel in AGNOS is **forked from Linux and custom modified**. The table belo
 - **agnos-builder:** [GitHub — commaai/agnos-builder](https://github.com/commaai/agnos-builder) — “Build AGNOS, the operating system for the comma three, 3X, and four.”  
 - **OS course:** [Phase 1 — Operating Systems — Guide](../../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Guide.md) and [Lecture index](../../../../Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/Guide.md#lecture-index).  
 - **openpilot:** Runs on AGNOS; see [Autonomous Driving Guide](../Guide.md) and [flow diagram](../flow-diagram.md).
+
+## A source map is a hypothesis, not a patch history
+
+The tables map OS concepts to candidate source locations. A directory's presence does not prove that comma changed it or enabled a feature. Pin the kernel and builder commits, inspect the actual `.config`, and cite a diff against the relevant baseline before attributing a customization. A shallow clone is sufficient for orientation but not a complete historical attribution exercise. [SDM845 kernel source](https://github.com/commaai/agnos-kernel-sdm845).
+
+For one camera buffer, trace allocation, DMA mapping, synchronization, user-space mapping, and teardown. For one scheduled thread, record policy and affinity from the running target. Do not infer PREEMPT_RT, EEVDF, io_uring, or cgroup-v2 behavior from a modern OS lecture when studying a historical kernel.
+
+**Handoff:** a BSP feature matrix with columns for source location, configured, observed at runtime, and required by the model pipeline. Use it to specify the custom SoC's Linux port rather than copying the SDM845 device tree.
 
 ## Practice and assessment
 

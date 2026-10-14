@@ -18,7 +18,7 @@
 
 **Prerequisites:** one primary Phase 4 track completed to a project-capable level: [Xilinx FPGA](../Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md), [NVIDIA Jetson](../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md), or [ML Compiler](../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md), plus whichever earlier phases your track depends on most heavily.
 
-**What comes after:** Specialization is the endpoint of the curriculum. At this stage, the next step is usually a major portfolio project, open-source contribution, or role-specific job targeting.
+**What comes after:** combine specialization evidence in a model-to-machine capstone. For the physical-AI goal, the endpoint is a versioned VLA workload running through a compiler/runtime and hardware prototype, with Linux, sensor, wireless, and control interfaces documented.
 
 ---
 
@@ -50,7 +50,7 @@ That is the difference between a learner and a differentiated candidate.
 | **Track F — AI Chip Design** | accelerator architecture, dataflow, custom compute design | architecture and chip-design paths | [Guide](Track%20F%20-%20AI%20Chip%20Design/Guide.md) |
 | **Track G — ML Systems Engineering** | training systems, inference runtimes, GPU scheduling, distributed serving, compiler/runtime work | AI infrastructure and MLSys roles | [Guide](Track%20G%20-%20ML%20Systems%20Engineering/Guide.md) |
 
-**Recommended rule:** pick one primary track first. Add a second track only when it strengthens your main specialization instead of diluting it.
+**Recommended rule:** choose Track F as the integration destination for the custom-chip goal, then draw evidence from Robotics/VLA (Track D), deployment (Tracks C/G), and performance/infrastructure (Tracks A/B) as the workload requires. You do not need to finish a cluster-training track before building a small inference accelerator.
 
 ---
 
@@ -92,3 +92,15 @@ You are using this phase correctly when you can:
 Choose one specialization guide above and turn it into a flagship project.
 
 **Study method:** use the [shared lesson cycle and completion rubric](../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## The physical-AI path through specialization
+
+| Step | Input from earlier study | Work here | Artifact used next |
+|---|---|---|---|
+| Define useful behavior | Sensors, ML, embedded systems | Track D VLA and simulation | Timestamped observation/action contract and task-success baseline |
+| Locate the cost | Phase 4 deployment/compiler skills | Tracks C/G, selected A/B experiments | Operator shapes, precision requirements, memory/latency trace |
+| Build one hardware slice | Digital design and compiler fundamentals | Track F simulator and RTL/FPGA | Verified command ABI, driver path, resource/latency evidence |
+| Integrate the machine | Embedded Linux, wireless, control | Track F with D/E system analysis | Closed-loop result, stale-input/link-loss response, reproducible image |
+
+Return to a prior step when the evidence changes the design. If a model's action head dominates latency, optimizing an unrelated text-decoding kernel does not advance the machine. If CPU fallback dominates after acceleration, the next lesson is compiler coverage or data movement. Record the maturity achieved: simulation, FPGA prototype, physical-design estimate, and measured silicon are different outcomes.

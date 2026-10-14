@@ -15,6 +15,8 @@ orchestration, fleet management, CI/CD, monitoring, and security at the edge.
 
 ---
 
+> **TensorRT API versions:** This reference includes legacy binding-based execution or V2 plugin examples. Pin the installed TensorRT version before using a block. TensorRT 10.x execution uses named tensors, `set_tensor_address`, and `execute_async_v3`; legacy examples are not drop-in 10.x code. Newer major releases have further changes. Use NVIDIA's [8.x→10.x migration guide](https://docs.nvidia.com/deeplearning/tensorrt/10.x.x/api/tensorrt-8x-to-10x-python-api.html) and the API documentation matching your BSP.
+
 ## 1. Introduction
 
 ### 1.1 Why Containers Matter for Edge AI
@@ -26,12 +28,10 @@ of these devices without containers quickly becomes untenable.
 
 Containers solve three fundamental problems at the edge:
 
-1. **Reproducibility** -- A container image that works on a developer's Jetson works
-   identically on every Jetson in the fleet. There is no "works on my device" problem.
+1. **Reproducibility** -- An image pins userspace dependencies. Host BSP/driver, module SKU, device permissions, power profile, and model files remain part of the deployment contract.
 2. **Isolation** -- Multiple workloads (inference, preprocessing, telemetry) run
    side-by-side without dependency conflicts.
-3. **Atomic updates** -- A new container image is pulled and started, or it is not.
-   There is no half-updated system state.
+3. **Versioned application updates** -- Immutable image digests help rollback. Database migrations, model volumes, secrets, and service handover still need an explicit transactional update design.
 
 ### 1.2 Containers vs. Bare-Metal on Jetson
 
@@ -3286,16 +3286,11 @@ Orin Nano 8GB. The key takeaways:
    long deployment lifetimes mean you must enforce read-only filesystems, drop
    capabilities, sign images, and manage secrets properly from day one.
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain host-driver versus container userspace responsibilities. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Can the same image fail on a different host BSP?
 
-1. **Baseline lab:** Package one inference service with pinned image and model versions and a health check.
-2. **Guided variation:** Restart the container and simulate dependency failure; verify bounded recovery.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Pin an image digest and external model hash, then record host-driver requirements. Restart the service with a missing model and with an incompatible manifest; verify readiness stays false until inference succeeds.
 
-**Evidence to submit:** Startup time, service health, resource limits, latency, and image/configuration identity. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** A successful process start is insufficient. Submit a known-input inference health check, bounded restart behavior, and a rollback that restores both application and compatible model state.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [Orin-Nano-OTA-Deep-Dive](../Orin-Nano-OTA-Deep-Dive/Guide.md). Explain which assumption from this course the next engineer must preserve.

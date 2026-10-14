@@ -17,6 +17,8 @@
 ---
 
 
+> **TensorRT API versions:** This reference includes legacy binding-based execution or V2 plugin examples. Pin the installed TensorRT version before using a block. TensorRT 10.x execution uses named tensors, `set_tensor_address`, and `execute_async_v3`; legacy examples are not drop-in 10.x code. Newer major releases have further changes. Use NVIDIA's [8.x→10.x migration guide](https://docs.nvidia.com/deeplearning/tensorrt/10.x.x/api/tensorrt-8x-to-10x-python-api.html) and the API documentation matching your BSP.
+
 ## 1. CUDA on Jetson vs Discrete GPU
 
 The critical mental-model shift: **there is no PCIe bus between CPU and GPU**. They share the same physical LPDDR5.
@@ -24,14 +26,14 @@ The critical mental-model shift: **there is no PCIe bus between CPU and GPU**. T
 | Property | Discrete GPU (e.g. A100) | Jetson Orin Nano 8GB |
 |---|---|---|
 | Memory | Separate VRAM (HBM/GDDR) | Shared 8GB LPDDR5 |
-| CPU-GPU transfer | PCIe/NVLink DMA | No transfer -- same DRAM |
+| CPU-GPU transfer | Interconnect transfer for separate allocations | Shared physical DRAM; separate allocations can still require a copy |
 | `cudaMemcpy` H2D/D2H | Real DMA copy | memcpy within DRAM (no bus crossing) |
-| Memory bandwidth | 2 TB/s (A100 HBM) | 68 GB/s shared CPU + GPU + DLA + ISP |
+| Memory bandwidth | 2 TB/s (A100 HBM) | BSP/mode-dependent bandwidth shared by CPU, GPU, camera, and other engines |
 | `cudaMallocManaged` | Page migration over PCIe | Pages already in unified pool |
-| Power envelope | 300-700 W system | 7-15 W module |
+| Power envelope | GPU/SKU-dependent board power | Mode-dependent module power; include carrier and sensors separately |
 | SM count | 108 (A100) | 8 SMs (1024 CUDA cores) |
 
-Practical consequences: prefer `cudaMallocManaged` or zero-copy over explicit `cudaMemcpy`. Bandwidth is the bottleneck -- 68 GB/s is shared across all engines. Kernel launch overhead is proportionally larger; fuse aggressively.
+Shared DRAM removes the discrete-GPU PCIe hop, but does not make allocations identical or synchronization optional. Compare device, managed, and mapped pinned memory for your access pattern: cache behavior and coherency work can outweigh a saved copy. Orin supports I/O coherency; full CPU/GPU cache coherence is a different capability. Query device properties and use the [CUDA for Tegra memory guidance](https://docs.nvidia.com/cuda/cuda-for-tegra-appnote/).
 
 ---
 
@@ -124,7 +126,7 @@ When to use: dense FP16/INT8 matrix ops not covered by cuBLAS/TensorRT (which ro
 |---|---|
 | `cudaMalloc` | GPU-only buffers, CUDA graphs |
 | `cudaMallocHost` | CPU+GPU concurrent access, DMA targets |
-| `cudaMallocManaged` | Default -- pages mapped in both CPU/GPU page tables, no copy |
+| `cudaMallocManaged` | Shared managed allocation; obey synchronization and device capability rules |
 | `NvBufSurface` | Camera/video zero-copy (DMA-BUF backed) |
 
 On Jetson, `cudaMallocManaged` pages never physically migrate -- same LPDDR5 page in both address spaces:
@@ -478,7 +480,7 @@ tegrastats --interval 1000                    # monitor power
 sudo sh -c 'echo 625500000 > /sys/devices/17000000.gpu/devfreq/17000000.gpu/min_freq'
 ```
 
-Maximizing TOPS/watt: use INT8/FP16 (Tensor Core sweet spot), minimize idle GPU time, batch small kernels, offload conv layers to DLA (2-5x better TOPS/watt -- see [DLA Deep Dive](../Orin-Nano-DLA-Deep-Dive/Guide.md)). The GPU governor (`nvhost_podgov`) scales clocks on load; bursty workloads may run at lower clocks during ramp-up.
+Maximizing TOPS/watt: use INT8/FP16 (Tensor Core sweet spot), minimize idle GPU time, batch small kernels, compare supported DLA offload only on NX/AGX hardware (Nano has no DLA; see [DLA comparison](../Orin-Nano-DLA-Deep-Dive/Guide.md)). The GPU governor (`nvhost_podgov`) scales clocks on load; bursty workloads may run at lower clocks during ramp-up.
 
 ---
 
@@ -596,16 +598,11 @@ kern(((data.size + 255) // 256,), (256,), (data, data.size))
 * [CUDA WMMA API](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#wmma)
 * [Jetson Linux Multimedia API](https://docs.nvidia.com/jetson/l4t-multimedia/)
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain stream synchronization and unified physical memory on the target. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Is eliminating a copy faster than retaining device-local reuse?
 
-1. **Baseline lab:** Profile a correct CUDA operator and separate transfer, launch, and kernel costs.
-2. **Guided variation:** Sweep shapes and concurrency while monitoring memory and sustained clocks.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Implement the same reduction using device allocation plus copies, managed memory, and mapped pinned memory where supported. Use repeated GPU reads and a single-pass variant; separate allocation, synchronization, and timed work.
 
-**Evidence to submit:** Numerical error, latency, bandwidth, memory, and power-mode/clock metadata. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** All variants must match a tolerance fixed before benchmarking. Preserve device properties and a timeline explaining which memory access pattern wins; do not infer bandwidth from GPU utilization alone.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [Orin-Nano-Real-Time-Inference](../Orin-Nano-Real-Time-Inference/Guide.md). Explain which assumption from this course the next engineer must preserve.

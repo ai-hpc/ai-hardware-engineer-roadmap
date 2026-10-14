@@ -186,3 +186,12 @@ You are done with this course when you can:
 If an exit criterion is missing, use the corresponding lab to close that gap; mark unavailable hardware experiments as not run.
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Carry this course into the physical-AI system
+
+**Start from:** A model/task/hardware tuple and the measurement discipline in Track G.
+
+**Build and challenge:** Progress from fundamentals to dense/MoE cases and one real-engine optimization, then audit DeepSeek. Carry the same quality and timing definitions through all five parts.
+
+**Pass forward:** An inference evidence bundle reusable by the physical-AI design studio. Continue with [the connected course](../../Track%20D%20-%20Robotics/VLA%20Optimization%20and%20Action-Parity%20Harness/README.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

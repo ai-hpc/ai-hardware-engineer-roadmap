@@ -12,7 +12,7 @@
 
 **Parent:** [ML and AI](../Guide.md)
 
-> **Goal:** Take the optimization techniques used by cloud LLM platforms (vLLM, TensorRT-LLM, RunInfra, etc.) and adapt them to the extreme constraints of Jetson Orin Nano Super 8 GB — 102 GB/s bandwidth, 67 TOPS GPU + ~10 TOPS DLA ≈ 77 TOPS total, shared memory, 7–25W power.
+> **Goal:** Take the optimization techniques used by cloud LLM platforms (vLLM, TensorRT-LLM, RunInfra, etc.) and adapt them to the extreme constraints of Jetson Orin Nano Super 8 GB — 102 GB/s bandwidth, 67 sparse INT8 TOPS on the GPU (no DLA), shared memory, 7–25W power.
 
 ---
 
@@ -210,7 +210,7 @@ Cloud GPU (H100 80GB, 3,350 GB/s, 989 TFLOPS):
   │ 7. Tensor Parallelism (multi-GPU)          │ ← scale beyond 1 GPU
   └─────────────────────────────────────────────┘
 
-Jetson Orin Nano Super 8GB (102 GB/s, 67 TOPS GPU + ~10 TOPS DLA ≈ 77 TOPS):
+Jetson Orin Nano Super 8GB (102 GB/s, 67 sparse INT8 TOPS on the GPU; no DLA):
   ┌─────────────────────────────────────────────┐
   │ 1. Quantization (INT4/INT8) ★★★★★          │ ← MANDATORY: model must fit in 5 GB
   │ 2. Model Selection ★★★★★                    │ ← choose models that fit (≤3B params)
@@ -1204,3 +1204,12 @@ Expected performance on Orin Nano Super 8 GB (25W mode, Q4_K_M, llama.cpp):
 → Back to [ML and AI hub](../Guide.md)
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Integration lab: Which byte traffic dominates a decode step?
+
+Estimate bytes touched by weights and cache, then measure batch-one decode while sweeping context. Compare an optimization at equal sampling policy, prompt lengths, and output lengths.
+
+**Acceptance evidence:** Explain where measured performance falls below the memory-traffic bound. Quantized storage is not proof of native low-bit compute, and a sparse INT8 peak is not an FP decode roofline.
+
+**Continue:** take this artifact to [Qwen Inference Optimization](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20C%20-%20Edge%20AI/Qwen%20Inference%20Optimization/README.md). Explain which assumption from this course the next engineer must preserve.

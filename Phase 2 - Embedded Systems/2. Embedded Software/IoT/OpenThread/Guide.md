@@ -4,7 +4,7 @@
 <div class="course-identity__icon">OPE</div>
 <div markdown="1">
 <p class="course-identity__eyebrow">Deep Dive · Embedded Systems</p>
-<p class="course-identity__title">Specialized course identity for OpenThread.</p>
+<p class="course-identity__title">Prove application freshness after a topology change.</p>
 <p class="course-identity__meta">Artifact: bring-up or firmware demo · Measure: boot, latency, power, reliability</p>
 </div>
 </div>
@@ -32,9 +32,9 @@ That distinction is important. BLE is excellent for short-range peripheral links
 OpenThread's official platform documentation describes the stack as implementing the full Thread networking layers, including **IPv6, 6LoWPAN, IEEE 802.15.4 with MAC security, Mesh Link Establishment, and Mesh Routing**. In practice, that means the stack handles both the radio-facing mechanics and the higher routing behavior that turns many small devices into one stable network.  
 Official source: [OpenThread features](https://openthread.io/)
 
-![Thread commercial network topology](https://docs.silabs.com/thread-fundamentals/0.1/images/commercial-network-topology.png)
+![Thread roles: an IPv6 host reaches a routed mesh through a border router; a sleepy end device polls its parent](../../../../Assets/illustrations/foundations-embedded/thread-role-map.png)
 
-*Official reference topology image showing the main Thread roles and how a border router connects the mesh to the wider IP network. Source: [Silicon Labs Thread Fundamentals](https://docs.silabs.com/thread-fundamentals/latest/).*
+*Original teaching diagram. A border router connects IP networks; a sleepy end device does not forward other nodes’ traffic. Explain which nodes and links participate when one sensor report reaches Linux. Role semantics: [OpenThread node roles](https://openthread.io/guides/thread-primer/node-roles-and-types).*
 
 ---
 
@@ -652,16 +652,10 @@ Use OTBR to bridge the Thread mesh to Ethernet, Wi-Fi, or a USB-backed Linux bri
 * [Jetson ESP-Hosted Host Code](../../../3.%20Embedded%20Linux/Jetson%20ESP-Hosted%20Host%20Code/Guide.md)
 * [ESP32-C6 OpenThread RCP on Jetson Orin Nano](../../../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/5.%20Application%20Development/2.%20Network%20and%20Connectivity/ESP32-C6-OpenThread-RCP-Jetson-Orin-Nano.md)
 
-## Practice and assessment
+## Prove application freshness after a topology change
 
-**Entry diagnostic (prerequisite check):** Explain border router, router, end device, and IPv6 addressing. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+First establish IPv6 reachability, then send sequence-numbered application reports and log receive age. Reset a parent or one router in an isolated lab network; observe attach/role changes separately from application recovery. If clocks are not synchronized, report round-trip timing or state the offset assumption instead of presenting an invalid one-way latency.
 
-1. **Baseline lab:** Connect a sensor node to a Thread network and trace one application request end to end.
-2. **Guided variation:** Remove a link in a controlled test or replay a partition; observe role and route recovery.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Success:** another engineer can reconstruct dataset creation, node roles, source revisions, packet losses, duplicates, and time to fresh reports from the log. Keep credentials out of shared artifacts. An RCP exposes radio control to the host; an NCP runs more of the network stack on the coprocessor—trace the actual split before reusing a host driver design.
 
-**Evidence to submit:** Packet loss, recovery duration, routing/role logs, and radio duty-cycle assumptions. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** Role/route trace plus measured recovery to fresh application data. Continue with [the next course](../Zigbee/Guide.md) and reuse that evidence.

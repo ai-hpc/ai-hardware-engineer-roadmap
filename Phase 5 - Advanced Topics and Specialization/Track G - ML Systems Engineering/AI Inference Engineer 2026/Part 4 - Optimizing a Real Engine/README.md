@@ -95,3 +95,12 @@ You are done with Part 4 when you can:
 If you can do all six, the transferable content of this part has landed. If you can only recite the SparkInfer-K3 numbers, it has not — those numbers are 2026-08 history for one model on one box, and their only job is to make the reasoning concrete.
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Carry this course into the physical-AI system
+
+**Start from:** The cited engine revision and a reproducible local correctness fixture.
+
+**Build and challenge:** Treat published PR numbers as historical evidence. Reproduce one mechanism on a tractable subgraph, checking numerical tolerance and paired performance rather than inferring correctness from greedy decoding.
+
+**Pass forward:** An optimization report with attribution, measured changes, and unresolved portability. Continue with [the connected course](../Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/README.md) and keep the artifact in the [Physical AI Design Studio](../../../../Physical-AI-Design-Studio.md).

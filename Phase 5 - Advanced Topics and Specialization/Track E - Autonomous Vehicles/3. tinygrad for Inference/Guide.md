@@ -33,9 +33,9 @@
 
 ### The Problem with PyTorch for Learning
 
-PyTorch's autograd, JIT, and kernel dispatch live in thousands of lines of C++/CUDA. You can't read them. You can only observe their effects. Tinygrad solves this:
+Both PyTorch and tinygrad expose source code. Tinygrad offers a compact path from tensor expressions to scheduling, lowering, and execution, making it useful for a first compiler investigation:
 
-- **The entire framework is ~5,000 lines of Python**
+- Follow a single expression through Python-visible compiler stages; avoid relying on a changing line count
 - Every optimization, IR transformation, and kernel is readable
 - You can set `DEBUG=4` and watch every stage of compilation
 
@@ -48,7 +48,7 @@ micrograd  →  tinygrad  →  PyTorch
 
 - **micrograd** (Karpathy): pure autograd, no tensors, no GPU — great for understanding backprop
 - **tinygrad**: lazy tensors, real GPU backends, hackable compiler — great for understanding frameworks
-- **PyTorch**: full production framework, opaque internals — great for building things
+- **PyTorch**: broad production framework, with a larger implementation to navigate — great for building things
 
 ### Why It Matters for AI Hardware Engineers
 
@@ -213,7 +213,7 @@ UOps form a DAG (Directed Acyclic Graph). The compiler walks this graph to:
 
 ## Part 5: The Three Operation Types
 
-Everything in tinygrad decomposes to three kinds of primitive operations. **No conv2d primitive. No matmul primitive.** They are built from these three:
+Elementwise, reduction, and movement operations are useful mathematical categories for decomposition. The current UOp IR also represents control, memory, device, and specialized operations; inspect the pinned version rather than treating three categories as its complete instruction set.
 
 ### 1. ElementwiseOps
 

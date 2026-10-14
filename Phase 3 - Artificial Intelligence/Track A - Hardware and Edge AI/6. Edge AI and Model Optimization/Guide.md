@@ -19,74 +19,39 @@
 ---
 
 
-## 1. Definition
+## 1. Define the deployment boundary
 
-**Edge AI** = running AI algorithms **locally on a device** (the "edge") instead of sending data to a remote cloud server.
+Edge inference runs some or all model computation near the sensor or user. Local execution removes a network round trip from that path; it does not guarantee sub-millisecond latency, privacy, or offline operation. Check which preprocessing, model files, authorization, logging, and updates still depend on a service.
 
-```
-Traditional Cloud AI:
-  Device → [internet] → Cloud Server (GPU farm) → [internet] → Result
-  Latency: 50–300ms   Privacy risk   Needs connectivity
+| Constraint | What local inference can change | What to measure |
+|---|---|---|
+| Response time | Avoid remote queueing and transport | Observation-to-action latency, including capture and queueing |
+| Data handling | Keep selected inputs on-device | Actual logs, telemetry, and upload paths |
+| Connectivity | Continue with local assets and fallback | Link-loss behavior and recovery |
+| Cost | Trade hosted inference for device resources | Hardware, energy, maintenance, and fleet updates over one interval |
+| Power and heat | Fit computation into a local envelope | Sustained clock, temperature, energy per accepted result |
 
-Edge AI:
-  Device → Local Chip (CPU/GPU/NPU/FPGA) → Result
-  Latency: <1ms       Data stays local   Works offline
-```
+## 2. Choose a target from the workload
 
----
+MCUs suit small fixed workloads; embedded Linux boards support richer I/O and software; accelerator SoCs add specialized compute; edge servers provide more capacity. These categories overlap. Read the **exact board/SKU** memory, supported operators, I/O, and power documentation instead of assigning one RAM or wattage range to an entire class.
 
-## 2. Why edge AI exists
+Start with a tensor and state inventory: weights, live activations, cache/recurrent state, workspace, camera buffers, and the rest of the system. A model fitting on disk does not establish that its peak runtime allocation fits DRAM.
 
-| Problem with Cloud AI        | Edge AI Solution                        |
-|------------------------------|-----------------------------------------|
-| Network latency (~100ms)     | Sub-millisecond local inference         |
-| Bandwidth cost (video data)  | Only send results, not raw data         |
-| Privacy (face/voice/medical) | Data never leaves the device            |
-| Reliability (no internet)    | Works fully offline                     |
-| Cloud cost at scale          | One-time hardware cost                  |
+## 3. Work a deadline backward
 
----
+Suppose a simulated manipulation task allows **50 ms** from observation capture to accepted action. This is a teaching target, not a universal robot deadline. Allocate 8 ms to capture/preprocessing, 30 ms to policy inference, 5 ms to action validation/dispatch, and 7 ms to reserve. The controller may tick at a different rate and consume an action chunk between policy updates.
 
-## 3. Where edge AI runs (tiers)
+Measure the whole path using trace IDs and a common clock. Stage p99 values cannot generally be added to obtain the end-to-end p99. Record distributions, deadline misses, observation age, and sustained thermal behavior. If inference takes 20 ms but the queued image is already 80 ms old, the action fails this contract.
 
-```
-Tier 1 — Microcontrollers (MCU):
-  STM32, Arduino, RP2040
-  RAM: 256KB–512KB
-  Power: <1W
-  Use: keyword spotting, gesture detection
+## 4. The deployment experiment
 
-Tier 2 — Embedded Linux SBCs:
-  Raspberry Pi, BeagleBone
-  RAM: 1–8GB
-  Power: 2–10W
-  Use: image classification, object detection
+1. Preserve a reference model and held-out task/data split.
+2. Measure the reference on the intended target before optimizing.
+3. Change one supported component: precision, model size, layout, or scheduling.
+4. Export an exchange graph such as ONNX where supported, then build the target runtime artifact. ONNX is a representation; TensorRT is a compiler/runtime, not an interchangeable file format.
+5. Compare quality, timing, memory, and recovery with the reference. Local inference qualifies for a stated real-time requirement only after deadline behavior is established.
 
-Tier 3 — AI Accelerator SoCs:
-  Nvidia Jetson, Google Coral (TPU), Apple Neural Engine
-  RAM: 4–64GB
-  Power: 5–30W
-  Use: real-time video inference, NLP, robotics
-
-Tier 4 — Edge Servers:
-  FPGA + GPU combinations, industrial PCs
-  Power: 50–300W
-  Use: factory automation, autonomous vehicles
-```
-
----
-
-## 4. The edge AI pipeline
-
-```
-1. Train model on a powerful workstation/cloud (large data, many epochs)
-2. Optimize model for edge (quantization, pruning, distillation)
-3. Convert model to edge runtime format (ONNX, TensorRT, TFLite)
-4. Deploy to edge device
-5. Run inference locally in real-time
-```
-
-Step 1 is grounded in **[Neural Networks](../../1.%20Neural%20Networks/Guide.md)**. Steps 2–5 are expanded in **Phase 4 Track B** ([ML and AI](../../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/5.%20Application%20Development/5.%20ML%20and%20AI/Guide.md)) and, for custom silicon, **Phase 4 Track A** and **Phase 5 — AI Chip Design**.
+Carry the report to the Jetson or compiler courses. Use the same recorded inputs and preprocessing manifest so a runtime change remains a controlled experiment.
 
 ---
 
@@ -101,16 +66,11 @@ Step 1 is grounded in **[Neural Networks](../../1.%20Neural%20Networks/Guide.md)
 
 **Hub:** [Phase 3 — Artificial Intelligence](../../Guide.md)
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Estimate model, activation, and runtime memory for a constrained device. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Carry this course into the physical-AI system
 
-1. **Baseline lab:** Compare a reference and one optimized deployment on the same held-out inputs.
-2. **Guided variation:** Run a sustained workload and vary batch/input size within the device budget.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Start from:** The policy reference, memory inventory, and a task deadline.
 
-**Evidence to submit:** Quality, p95 latency, peak memory, sustained power/temperature if available, and fallback behavior. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Build and challenge:** Optimize one supported component and repeat under sustained load. Include preprocessing, queueing, and action dispatch; a fast kernel alone does not establish a fresh action.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** A quality/timing/memory report ready for target deployment. Continue with [the connected course](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/VLA%20Optimization%20and%20Action-Parity%20Harness/README.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

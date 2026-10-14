@@ -4,7 +4,7 @@
 <div class="course-identity__icon">ASPS</div>
 <div markdown="1">
 <p class="course-identity__eyebrow">Deep Dive · Digital Foundations</p>
-<p class="course-identity__title">Specialized course identity for C++ and SIMD (Phase 1 §4 — Sub-Track 1).</p>
+<p class="course-identity__title">Make the host preprocessing reference trustworthy.</p>
 <p class="course-identity__meta">Artifact: working low-level demo · Measure: timing, memory, correctness</p>
 </div>
 </div>
@@ -550,7 +550,7 @@ Modern CUDA and SYCL support lambdas on GPU device code:
 __global__ void kernel(float* a, float* b, int N) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if (i < N) {
-        auto square = [=](float x) { return x * x; };  // [=] only — no refs on device
+        auto square = [=](float x) { return x * x; };  // Captures nothing here; x is a parameter
         a[i] = square(b[i]);
     }
 }
@@ -561,7 +561,7 @@ q.parallel_for(sycl::range{N}, [=](sycl::id<1> i) {
 });
 ```
 
-> **`[&]` is not allowed in GPU device lambdas.** Device code cannot reference host memory addresses. Always use `[=]` (capture by value) for GPU lambdas.
+> **Capture and address space are separate questions.** SYCL kernel lambdas capture by value; copied USM pointers must still address memory accessible to the device. CUDA lambdas created inside device code can refer to device-local objects under CUDA rules. Capturing a host pointer by value does not make its pointee device-accessible. See the [SYCL kernel rules](https://registry.khronos.org/SYCL/specs/sycl-2020/html/sycl-2020.html) and [CUDA programming guide](https://docs.nvidia.com/cuda/cuda-c-programming-guide/).
 
 ---
 
@@ -1660,7 +1660,7 @@ void matmul_4x4_neon(const float* A, const float* B, float* C) {
 | Cross-lane gotchas | 128-bit lane boundary | None (true 128-bit) |
 | Typical platform | Server, workstation | **Jetson, phone, Apple Silicon, Graviton** |
 
-**When to use NEON vs let the compiler vectorize:** Same rule as x86 — try auto-vectorization first (`-O2 -march=armv8.2-a`). Use manual NEON intrinsics when the compiler fails (complex access patterns, interleaved data, FP16 arithmetic) or when you need guaranteed performance (real-time inference on Jetson).
+**When to use NEON vs let the compiler vectorize:** Same rule as x86 — try auto-vectorization first (`-O2 -march=armv8.2-a`). Use manual NEON intrinsics when the compiler fails (complex access patterns, interleaved data, FP16 arithmetic) or when measurements justify tighter control over instruction selection. Intrinsics alone do not guarantee latency; memory contention, scheduling, and clocks still matter.
 
 #### ARM SVE/SVE2 — The Future
 
@@ -1988,12 +1988,13 @@ Peak AVX2 FP32 = 3.6 GHz × 8 lanes × 2 (FMA) = ~58 GFLOPS/core
 Peak DRAM BW   = ~50 GB/s
 Ridge point AI = 58 / 50 ≈ 1.2 FLOP/byte
 
-Vector add:  AI = 4 bytes out / 8 bytes in = 0.5 FLOP/byte → memory-bound
+Vector add:  AI = N FLOP / (3N × 4 bytes) = 1/12 FLOP/byte
+             (two FP32 reads + one write; excludes write-allocate traffic)
 Dot product: AI = 2N FLOP / 2N×4 bytes    = 0.25 FLOP/byte → memory-bound
 Matrix mult: AI = O(N³) FLOP / O(N²) bytes → compute-bound for large N ✓
 ```
 
-**Implication:** SIMD gives the full 8× speedup only on compute-bound kernels. For memory-bound kernels (like vector add), the bottleneck is DRAM bandwidth — SIMD won't help much beyond reducing loop overhead.
+**Interpretation:** These are upper bounds, not measured classifications. The example assumes one 8-lane FP32 FMA issued per cycle on one core; actual issue width and sustained frequency vary. Match a single-core compute roof to bandwidth available to that core. SIMD can improve a memory-heavy loop until it saturates that bandwidth; it does not promise an 8× speedup.
 
 ### SIMD → GPU: Mental Model Bridge
 
@@ -2136,16 +2137,10 @@ These are the issues that consume weeks of debugging in real HPC and ML systems.
 
 → [**Sub-Track 2 — OpenMP and oneTBB**](../OpenMP%20and%20OneTBB/Guide.md) — scale from SIMD to multi-core CPU parallelism.
 
-## Practice and assessment
+## Make the host preprocessing reference trustworthy
 
-**Entry diagnostic (prerequisite check):** Explain alignment, aliasing, vector width, and a scalar tail. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+Implement RGB-to-planar normalization or an INT8 dot product with a scalar reference. State channel order, stride, alignment, tail handling, signedness, and rounding. Test lengths just below and above the vector width, deliberately unaligned inputs, and saturation boundaries. Inspect the compiler’s vectorization report and generated instructions before crediting a SIMD speedup.
 
-1. **Baseline lab:** Implement scalar and vectorized dot products and inspect generated instructions.
-2. **Guided variation:** Use misaligned and non-multiple-of-vector-width inputs; verify the fallback and tail.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Warm and cold cache cases answer different questions. Use an allocation larger than the last-level cache when investigating DRAM, and distinguish logical bytes from write-allocate traffic. The same preprocessing reference will validate a GPU kernel and eventually the compiler’s layout transformation.
 
-**Evidence to submit:** Numerical error, cycles or time per element, input size, and compiler flags. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** Scalar/SIMD parity corpus, vectorization report, and byte-counted timing. Continue with [the next course](../OpenMP%20and%20OneTBB/Guide.md) and reuse that evidence.

@@ -1586,25 +1586,24 @@ if __name__ == "__main__":
     sweep_servo()
 ```
 
-### 8.6 Jetson.GPIO PWM (Software PWM)
+### 8.6 Jetson.GPIO PWM (Hardware PWM)
 
-`Jetson.GPIO` provides software-based PWM on any GPIO pin. This is less precise
-than hardware PWM but works on any available GPIO:
+`Jetson.GPIO` supports PWM only on pins connected to hardware PWM controllers; it does not emulate PWM on arbitrary GPIO. Configure the pinmux first and select a board-supported PWM pin. Source: [NVIDIA Jetson.GPIO](https://github.com/NVIDIA/jetson-gpio#11-pwm).
 
 ```python
 #!/usr/bin/env python3
-"""Software PWM for LED brightness control."""
+"""Hardware PWM for LED brightness on a verified PWM-capable pin."""
 
 import Jetson.GPIO as GPIO
 import time
 
-LED_PIN = 7  # Any GPIO pin
+LED_PIN = 32  # Example only: verify PWM routing on your carrier/BSP
 
 def main():
     GPIO.setmode(GPIO.BOARD)
     GPIO.setup(LED_PIN, GPIO.OUT)
 
-    # Create a software PWM instance at 1 kHz
+    # Create a hardware PWM instance at 1 kHz
     pwm = GPIO.PWM(LED_PIN, 1000)
     pwm.start(0)  # Start with 0% duty cycle
 
@@ -2617,25 +2616,11 @@ if __name__ == "__main__":
     main()
 ```
 
-### 12.3 DSI Display Connection
+### 12.3 Display connector capability
 
-The Orin Nano Developer Kit carrier board includes a DSI (Display Serial Interface)
-connector for direct panel connection. DSI is not on the 40-pin header but is
-mentioned here for completeness.
+The Orin Nano reference developer kit exposes a dedicated DisplayPort connector. It does not provide the claimed DSI panel connector or DisplayPort-over-USB-C. Check NVIDIA's [hardware layout](https://docs.nvidia.com/jetson/orin-nano-devkit/user-guide/latest/hardware_layout.html) before selecting a display. A device-tree change cannot create an unrouted physical interface.
 
-```bash
-# Check connected DSI display
-cat /sys/class/drm/card*/status
-
-# The DSI interface is configured in the device tree:
-# tegra234-p3768-camera-p3768-0000-a0.dtsi or similar
-# Panel drivers: panel-simple, panel-lvds, etc.
-
-# For custom DSI panels, you need:
-# 1. Panel timing parameters (from datasheet)
-# 2. A device tree node under the dsi controller
-# 3. Possibly a panel driver module
-```
+For a custom carrier or bridge, document the actual display controller, lanes, bridge driver, panel timing, and power/reset sequence. Validate that design independently of the reference carrier.
 
 ### 12.4 Displaying Inference Results on Attached Displays
 
@@ -4207,7 +4192,7 @@ if __name__ == "__main__":
    for production deployments.
 
 3. For GPIO, prefer `libgpiod` (C) for performance and `Jetson.GPIO` (Python) for
-   rapid prototyping. Always use interrupt-driven GPIO over polling.
+   rapid prototyping. Choose interrupt-driven GPIO when supported; measure missed edges and callback jitter.
 
 4. I2C is best for slow, multi-device sensor buses. SPI is best for high-speed,
    point-to-point connections. UART is best for GPS, debug consoles, and MCU links.
@@ -4224,16 +4209,11 @@ if __name__ == "__main__":
 8. When debugging, start with the checklist in Section 17.7 and work through it
    systematically.
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain pinmux, voltage levels, bus framing, and ownership of a peripheral. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Which interface owns timing: Linux, the bus controller, or an MCU?
 
-1. **Baseline lab:** Implement a bounded read/write loop for one GPIO/SPI/I2C/CAN interface.
-2. **Guided variation:** Use a loopback or simulator to inject timeout and malformed data without driving unsafe outputs.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Acquire sequence-numbered sensor samples and return commands over a loopback or MCU link. Check signal levels/pinmux before enabling outputs; compare host timestamps with a logic-analyzer trace.
 
-**Evidence to submit:** Logic/timing capture, error count, transfer latency, pin mapping, and recovery behavior. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Report lost samples, bus errors, and command age. For PWM, prove the hardware pin route and frequency; do not treat a Python sleep loop as a motor timing guarantee.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [6. ROS2](../../5.%20Application%20Development/6.%20ROS2/Guide.md). Explain which assumption from this course the next engineer must preserve.

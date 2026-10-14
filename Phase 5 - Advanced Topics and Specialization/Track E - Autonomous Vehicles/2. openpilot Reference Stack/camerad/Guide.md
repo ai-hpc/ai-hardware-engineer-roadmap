@@ -417,6 +417,14 @@ Use the **local openpilot clone** at `../openpilot/system/camerad/` (relative to
 - **modeld consumption:** `selfdrive/modeld/modeld.py` — `VisionIpcClient` for `VISION_STREAM_ROAD` (and wide if used)
 - **Calibration:** `common/transformations/camera.py`, `get_warp_matrix` for model input warp
 
+## Frame ownership and age lab
+
+Treat the sensor models, register values, CPU affinity, and source paths in this walkthrough as revision-specific examples. Record the actual device and commit before copying them. Trace one buffer from allocation through camera completion, publication, GPU consumption, and reuse; shared memory alone does not prove that every preprocessing stage avoids a copy.
+
+Compute `observation_age = action_consumption_time − sensor_capture_time` using timestamps converted into the same clock domain. A sequence number detects loss or reordering but cannot substitute for time. On a bench or recorded stream, introduce a dropped frame and a slow consumer; verify that stale frames are detected and buffers are not reused while the GPU still reads them.
+
+**Handoff:** a frame-lifecycle diagram and measured copy/latency budget for the [tinygrad inference module](../../3.%20tinygrad%20for%20Inference/Guide.md). These define the future SoC's camera DMA, synchronization, and memory-ownership requirements.
+
 ## Practice and assessment
 
 **Entry diagnostic (prerequisite check):** Explain capture timestamp, buffer lifetime, pixel format, and consumer synchronization. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.

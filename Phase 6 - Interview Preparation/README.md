@@ -11,7 +11,7 @@
 
 > *The difference between a pass and a hire at senior level is not knowing what FlashAttention is — it's explaining which bottleneck it moves, which tradeoff it makes, and what you hit when you actually implemented it.*
 
-This phase is not a flashcard bank. Each answer here is written at the level of someone who has shipped the system: specific numbers, real failure modes, tradeoffs defended, and the insight you only get by doing the work. That is exactly what a staff/senior interview expects.
+Use this phase to defend the engineering decisions made in the roadmap. The examples are practice material; do not present them as your own production experience. A clear distinction between estimates, published results, and your measurements is part of a strong technical answer.
 
 ---
 
@@ -31,37 +31,31 @@ More roles coming: Edge AI Engineer, CUDA Kernel Engineer, AI Chip Architect, Ro
 
 **Calibrate level.** Each Q&A is written at senior/staff level. If you're interviewing at L4/E4, you don't need every detail — but you do need the first-principles reasoning and one concrete tradeoff per answer.
 
-**Extend with your own numbers.** The answers reference specific measurements (e.g., 152→620 tok/s prefill, 1289ms→348ms with double-buffer). Swap those for your own project numbers. Interviewers can tell generic answers from ones grounded in real work.
+**Bring your own evidence.** For each performance claim, bring the workload, hardware/software versions, metric definition, sample count, correctness check, and raw result. The Q&A calculations are illustrative exercises, not measurements to put on a résumé.
 
 **Breadth first, then depth.** Read all questions to calibrate what topics an interviewer cares about, then go deep on the two or three you know best. Be honest about the others.
 
 ---
 
-## Interview format by company type
+## Practice by engineering responsibility
 
-| Company type | Typical format | What they probe |
+Interview formats vary by team and role; use the job description and recruiter guidance for the actual process.
+
+| Responsibility | Practice task | Evidence to bring |
 |---|---|---|
-| Inference startup (Groq, Cerebras, Together, Fireworks) | Deep system design, 1 or 2 coding, no LC grind | Bottleneck analysis, kernel writing, latency math |
-| NVIDIA (NIM, TRT-LLM, cuBLAS) | Mix of design + coding + HW questions | PTX, occupancy, plugin APIs, TRT engine lifecycle |
-| Google (XLA, TPU, Google AI) | Design heavy, some coding, ML breadth | Distributed systems, compiler IR, quantization theory |
-| Meta (PyTorch, AITER, infra) | Coding + design + infra | Python extension APIs, CUDA/Triton, distributed training |
-| Edge / Jetson (NVIDIA EGX, Qualcomm, Apple) | End-to-end system design | Memory budget, latency budget, runtime portability |
-| Big tech ML infra | LC coding + broad system design | Less HW-specific, more distributed, scheduling, cost |
+| Inference/runtime | Explain a latency or memory regression | Trace, workload manifest, quality comparison |
+| Kernel/compiler | Derive a legal transformation and its limit | Reference tensors, generated code, profiler counters |
+| Embedded/robotics | Follow an observation through driver, runtime, and controller | Timestamped trace, stale-data and restart tests |
+| Accelerator/SoC | Defend compute, SRAM, DRAM, and interface choices | Operator inventory, traffic model, simulation/implementation boundary |
 
 ---
 
 *Start here: [MLSys Engineer Interview Prep](1.%20MLSys%20Engineer/README.md)*
 
-## Practice and assessment
+## Defend the complete model-to-machine chain
 
-**Entry diagnostic (prerequisite check):** Explain one project with a diagram, a measured constraint, and a failure you fixed. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+Prepare a ten-minute review of one design-studio artifact: task/quality requirement, model/operator inventory, compiler lowering, accelerator traffic, Linux/driver ownership, wireless behavior, and action validity. Mark any unimplemented component as a model or proposal.
 
-1. **Baseline lab:** Give a timed design explanation and reproduce one calculation from your own artifact.
-2. **Guided variation:** Change a key constraint mid-review and revise the design without hiding assumptions.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Ask a reviewer to double the image rate or halve the memory budget. Revise the design using your measurements and state which conclusions need a new experiment. A complete answer can identify an infeasible requirement instead of hiding it behind peak TOPS.
 
-**Evidence to submit:** Correct calculations, tradeoff reasoning, evidence links, and a short list of gaps to revisit. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** A traceable design defense grounded in the learner’s own evidence. Continue with [the next course](1.%20MLSys%20Engineer/README.md) and reuse that evidence.

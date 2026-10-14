@@ -122,16 +122,11 @@ When the model or batch is spread across **multiple GPUs** or **multiple nodes**
 
 → **[03 — Compiler Stack](../03%20-%20Compiler%20Stack/Guide.md)** — How **IR** (intermediate representation), **scheduling** (when and where ops run), and **codegen** (code generation) produce and select these kernels (e.g. in tinygrad, TVM, MLIR).
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Estimate arithmetic intensity and identify synchronization boundaries for one operator. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Can the kernel be correct beyond its preferred tile?
 
-1. **Baseline lab:** Implement a small kernel against a trusted reference with irregular shape coverage.
-2. **Guided variation:** Sweep shape/layout and inject a tail-indexing error to verify the checker.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Implement a matrix or normalization operator for dimensions divisible by and just beyond the tile size. Validate tail masks and accumulation precision before tuning occupancy or vector width.
 
-**Evidence to submit:** Numerical error, latency, bandwidth or operations/s, occupancy evidence, and launch configuration. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Submit per-shape error and latency plus resource limits. Keep compile/warmup time outside steady-state timing; pass supported layouts and alignment restrictions to the compiler.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [03 - Compiler Stack](../03%20-%20Compiler%20Stack/Guide.md). Explain which assumption from this course the next engineer must preserve.

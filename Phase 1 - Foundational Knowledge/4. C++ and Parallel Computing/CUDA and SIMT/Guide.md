@@ -4,7 +4,7 @@
 <div class="course-identity__icon">CAS</div>
 <div markdown="1">
 <p class="course-identity__eyebrow">Deep Dive · Digital Foundations</p>
-<p class="course-identity__title">Specialized course identity for CUDA and SIMT.</p>
+<p class="course-identity__title">Optimize under a verified kernel contract.</p>
 <p class="course-identity__meta">Artifact: working low-level demo · Measure: timing, memory, correctness</p>
 </div>
 </div>
@@ -518,6 +518,8 @@ This is why:
 
 ### 3.5 GPU Architecture Generations
 
+These are selected examples, not a device-support matrix. Use NVIDIA’s [compute-capability table](https://developer.nvidia.com/cuda/gpus) and the [Vera Rubin platform description](https://developer.nvidia.com/blog/inside-the-nvidia-rubin-platform-six-new-chips-one-ai-supercomputer/) to distinguish GPU architecture, CPU name, and CUDA support.
+
 | Generation | Architecture | Compute Cap | Key Feature | Example GPU |
 |------------|-------------|-------------|-------------|-------------|
 | 2017 | Volta | 7.0 | Tensor Cores (1st gen), Independent Thread Scheduling | V100 |
@@ -525,7 +527,7 @@ This is why:
 | 2020 | Ampere | 8.0 / 8.6 | 3rd gen Tensor Cores, TF32, BF16, MIG, sparsity | A100, RTX 3090 |
 | 2022 | Hopper | 9.0 | 4th gen Tensor Cores, TMA, Thread Block Clusters, FP8, Transformer Engine | H100 |
 | 2024 | Blackwell | 10.x | 5th gen Tensor Cores, FP4, NVLink 5, confidential compute | B100, B200 |
-| 2026 | Vera | 12.x | Vera CPU + Rubin GPU on one package, NVLink 6, FP4/FP6 | Vera |
+| 2026 platform example | Rubin GPU / Vera CPU | Query the exact GPU and supported CUDA toolchain | Vera names the CPU; Rubin names the GPU | Vera Rubin platform |
 
 ---
 
@@ -894,7 +896,7 @@ FlashAttention data flow through memory:
                                 (only final output touches DRAM)
 ```
 
-**Why FlashAttention is so important on Jetson:** Jetson's 51 GB/s bandwidth is the bottleneck. FlashAttention reduces DRAM traffic by ~4× for attention, which directly translates to ~4× faster attention.
+**Why this matters on Jetson:** Avoiding materialized attention matrices can reduce traffic to shared LPDDR. The benefit depends on sequence length, head dimension, kernel support, and power mode; a traffic reduction does not translate automatically into the same latency speedup. Compare an available fused implementation against a correct baseline on the exact board.
 
 #### Convolution — im2col + GEMM Tiling
 
@@ -1772,7 +1774,7 @@ Col 5 access:                              Col 5 access:
   Row 3: index101 → Bank 5  ← conflict!     Row 3: index104 → Bank 8  ✓
 ```
 
-**Cost of padding:** 1 extra float per row (128 bytes for 32 rows). Trivial cost, 32× speedup for column access. Always pad when your tile width is a multiple of 32.
+**Cost of padding:** one extra FP32 element per row adds 128 bytes for a 32-row tile. It removes the illustrated 32-way conflict, but kernel speedup also depends on other instructions and memory traffic. Check the access width and bank mapping before applying this layout to another dtype or instruction.
 
 ### 9.4 Bank Conflict Patterns Quick Reference
 
@@ -2452,7 +2454,7 @@ cudaGraphDestroy(graph);
 
 ## 14. Parallel Reduction — Complete Example
 
-Reduction is the canonical shared memory + sync pattern.
+Reduction is the canonical shared memory + sync pattern. Modern GPUs require explicit synchronization: `volatile` is not a substitute for a warp collective. See [NVIDIA’s independent-thread-scheduling guidance](https://docs.nvidia.com/cuda/cuda-programming-guide/03-advanced/advanced-kernel-programming.html). This teaching snippet uses the error-checking conventions from §5.4 when incorporated into a complete program; test ragged input sizes and numerical tolerance against a CPU reference.
 
 ```cpp
 // Parallel sum reduction — each block reduces its chunk to one value
@@ -2476,23 +2478,20 @@ __global__ void reduce_sum(const float* in, float* partial, int N) {
         __syncthreads();
     }
 
-    // Final warp reduction (no sync needed within a warp)
+    // The preceding block barrier makes the final 64 partials visible.
+    // Contract: blockDim.x is a power of two and at least 64 (host uses 256).
     if (tid < 32) {
-        volatile float* s = smem;   // volatile prevents compiler from caching
-        s[tid] += s[tid + 32];
-        s[tid] += s[tid + 16];
-        s[tid] += s[tid + 8];
-        s[tid] += s[tid + 4];
-        s[tid] += s[tid + 2];
-        s[tid] += s[tid + 1];
+        float sum = smem[tid] + smem[tid + 32];
+        // All 32 lanes participate; the intrinsic provides the warp exchange.
+        for (int offset = 16; offset > 0; offset >>= 1)
+            sum += __shfl_down_sync(0xffffffffu, sum, offset);
+        if (tid == 0) partial[blockIdx.x] = sum;
     }
-
-    // Thread 0 writes this block's partial sum
-    if (tid == 0) partial[blockIdx.x] = smem[0];
 }
 
 // Host: launch reduce_sum, then sum the partial results
 float gpu_sum(const float* d_in, int N) {
+    if (N <= 0) return 0.0f;
     int block = 256;
     int grid  = (N + block * 2 - 1) / (block * 2);
 
@@ -2693,22 +2692,18 @@ ncu --set full ./my_program
 
 ### Step 2 — Roofline Analysis
 
-Every kernel is either **compute-bound** or **memory-bound**:
+Roofline gives a compute/bandwidth upper bound. Launch overhead, dependency chains, synchronization, or insufficient parallelism can keep a kernel below both roofs.
 
-```
-Arithmetic Intensity (AI) = FLOPs / bytes accessed
-                                                         │ Tensor Core roof (3958 TFLOPS)
-Performance (FLOP/s)                                     │
-     ╔═══════════════════════════════════════════════════╗
-     ║ memory-bound │               compute-bound        ║
-     ║  AI < ridge  │           AI > ridge point         ║
-     ╚══════════════╧═══════════════════════════════════╝
-                ridge ← Memory BW (3.35 TB/s) / Peak FLOPS
+```text
+attainable FLOP/s <= min(sustained compute roof, sustained bytes/s × FLOP/byte)
+ridge FLOP/byte = compute FLOP/s / memory bytes/s
 
-H100 ridge point: ~3,958 TFLOPS / 3,350 GB/s ≈ 1.18 FLOP/byte
+Illustrative device (not a measured product result):
+  compute = 100 TFLOP/s, bandwidth = 1 TB/s
+  ridge   = (100 × 10^12) / (1 × 10^12) = 100 FLOP/byte
 ```
 
-If your kernel's AI < 1.18 FLOP/byte on H100 → it's memory-bound → focus on coalescing and reuse.
+Match precision, dense/sparse execution, and memory level on both sides. Dividing TFLOP/s by GB/s requires a factor of 1000; do not compare a dense FP16 kernel to a sparse FP8 marketing roof. Then use measured bytes and elapsed time to test the predicted limit.
 
 ### Step 3 — Common Optimizations
 
@@ -2743,7 +2738,7 @@ __global__ void my_kernel(float* data, int N) { ... }
 | Ampere | 8.6 | RTX 3090, A10 | ✓ | ✓ | — | — | — |
 | Hopper | 9.0 | H100 | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Blackwell | 10.x | B100, B200 | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Vera | 12.x | Vera | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Newer products | Query exact SKU | Consult vendor support table | Verify | Verify | Verify | Verify | Verify |
 
 **SM resource limits (selected):**
 
@@ -2796,16 +2791,10 @@ Keep CPU golden references for every kernel. Validate before optimizing.
 
 → [**OpenCL and SYCL**](../OpenCL%20and%20SYCL/Guide.md) — portable compute across vendors.
 
-## Practice and assessment
+## Optimize under a verified kernel contract
 
-**Entry diagnostic (prerequisite check):** Map one block of threads to addresses and predict coalescing. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+Use the CPU corpus to validate the reduction and tiled matrix product, including `N=0`, ragged sizes, and large/small magnitudes. Respect each example’s launch assumptions. Run memory/race checks where the installed tooling supports them; synchronization-free warp code is not made correct by `volatile`.
 
-1. **Baseline lab:** Compare two memory-access patterns in a bounds-checked CUDA kernel against a CPU reference.
-2. **Guided variation:** Sweep size/block shape and include a partial final block; separate launch and device timing.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Change one factor—tile dimensions, shared layout, or streams—and compare output tolerance, register/shared-memory use, measured bytes, and latency. Keep a host trace beside kernel counters. Reuse the resulting shape/dtype/layout table when choosing compiler operators and accelerator instructions; do not design the ISA around one favorable benchmark shape.
 
-**Evidence to submit:** Effective bandwidth, kernel latency, correctness, and a profiler explanation of memory transactions. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** Verified kernel plus a profiler-backed explanation of one optimization. Continue with [the next course](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/02%20-%20Kernel%20Engineering/Guide.md) and reuse that evidence.

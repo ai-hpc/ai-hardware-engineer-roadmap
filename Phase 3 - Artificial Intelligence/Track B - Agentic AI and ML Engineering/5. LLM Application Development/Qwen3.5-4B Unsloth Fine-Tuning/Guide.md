@@ -413,3 +413,12 @@ Deliver:
 -> [Phase 5 - Qwen Inference Optimization](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20C%20-%20Edge%20AI/Qwen%20Inference%20Optimization/README.md) once the fine-tuned artifact is ready to benchmark.
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Carry this course into the physical-AI system
+
+**Start from:** A pinned base model, tokenizer/template, and instruction dataset.
+
+**Build and challenge:** Compare the unchanged base, adapter, and exported artifact on the same split. Record which graph components are trained; text instruction tuning alone does not create an action policy.
+
+**Pass forward:** An adapter/export report and a list of missing action data, head, and embodiment contracts before VLA use. Continue with [the connected course](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/VLA%20Foundations%20to%20Frontier%202026/README.md) and keep the artifact in the [Physical AI Design Studio](../../../../Physical-AI-Design-Studio.md).

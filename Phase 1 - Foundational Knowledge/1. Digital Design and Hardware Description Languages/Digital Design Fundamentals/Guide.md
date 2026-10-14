@@ -4,7 +4,7 @@
 <div class="course-identity__icon">DDF</div>
 <div markdown="1">
 <p class="course-identity__eyebrow">Deep Dive · Digital Foundations</p>
-<p class="course-identity__title">Specialized course identity for Digital Design Fundamentals.</p>
+<p class="course-identity__title">Derive the integer datapath before coding it.</p>
 <p class="course-identity__meta">Artifact: working low-level demo · Measure: timing, memory, correctness</p>
 </div>
 </div>
@@ -327,7 +327,7 @@ Hex digit:      A     D      →  0xAD
 
 ### 1.2 Signed Integers: Two's Complement
 
-Three ways to represent negative numbers have been tried in hardware. Only one survived.
+Two’s complement is the standard signed-integer representation in the processors studied here. Sign-magnitude remains relevant when understanding floating-point sign fields; distinguish integer encodings from floating-point formats.
 
 | Scheme          | +5       | −5       | Problem                          |
 |-----------------|----------|----------|----------------------------------|
@@ -431,7 +431,7 @@ FP8    [S|EEEE|MMM]  or  [S|EEEEE|MM]          8 bits
 | Exponent bits    | 5                     | 8 (same as FP32)            |
 | Range            | ±65504                | ±3.4×10^38                  |
 | Precision        | ~3 decimal digits     | ~2 decimal digits           |
-| FP32 conversion  | Needs range clamp     | Truncate 16 mantissa bits   |
+| FP32 conversion  | Round; overflow behavior depends on instruction/mode | Round to the BF16 significand; handle special values |
 | Usage            | Inference, some training | Mixed-precision training |
 
 **FP8 — two variants for different roles:**
@@ -439,7 +439,7 @@ FP8    [S|EEEE|MMM]  or  [S|EEEEE|MM]          8 bits
 - **E4M3** (4-bit exp, 3-bit mantissa): more precision, less range → weights and activations
 - **E5M2** (5-bit exp, 2-bit mantissa): more range, less precision → gradients
 
-FP8 training requires loss scaling and careful handling of overflow — the range is too small for raw gradients without scaling.
+FP8 use requires a format, scaling, rounding, and overflow contract. E4M3/E5M2 roles are common design choices, not universal rules; FP8 tensor scaling and training loss scaling are related but distinct mechanisms.
 
 ### 1.5 Fixed-Point and Quantization
 
@@ -1619,16 +1619,10 @@ Ideal speedup from N-stage pipeline = N (limited by hazard stalls)
 | **Cache simulator (Python/C++)** | Direct-map vs set-assoc, LRU, miss rates | Memory hierarchy intuition |
 | **RTL-to-GDS with OpenLane** | Synthesis, PnR, DRC/LVS, SkyWater PDK | Experience the full tapeout flow (open-source) |
 
-## Practice and assessment
+## Derive the integer datapath before coding it
 
-**Entry diagnostic (prerequisite check):** Trace a truth table and one clocked state transition without a simulator. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+For signed INT8 inputs, the largest positive product is `(-128)×(-128)=16384`. A length-1024 dot product can reach `2^24`, which does not fit a signed 25-bit accumulator; 26 bits are sufficient for this bound. Verify that calculation for your chosen input range, bias, and partial-sum schedule. Define whether narrowing rounds, wraps, or saturates.
 
-1. **Baseline lab:** Build a small counter or ready/valid block and a self-checking testbench; predict its waveform before simulation.
-2. **Guided variation:** Vary reset timing and apply backpressure; demonstrate that the checker catches one deliberately incorrect transition.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Write a short reference that exercises zeros, extrema, cancellation, and a value halfway between output quantization steps. Compare truncation with your specified rounding rule; BF16 conversion is not universally bit truncation (see [CUDA BF16 functions](https://docs.nvidia.com/cuda/cuda-math-api/cuda_math_api/group__CUDA__MATH____BFLOAT16__FUNCTIONS.html)). Hand these vectors to the HDL testbench before designing the multiplier.
 
-**Evidence to submit:** Waveforms, assertion results, cycle latency, and a stated clock/reset contract. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** Representable-range proof and golden arithmetic vectors. Continue with [the next course](../Hardware%20Description%20Languages%20%28HDLs%29/Guide.md) and reuse that evidence.

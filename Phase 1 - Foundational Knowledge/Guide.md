@@ -88,4 +88,10 @@ That is the minimum base for the rest of the roadmap.
 
 → [**Phase 2 — Embedded Systems**](../Phase%202%20-%20Embedded%20Systems/Guide.md) · [**Phase 3 — Artificial Intelligence**](../Phase%203%20-%20Artificial%20Intelligence/Guide.md)
 
-**Study method:** use the [shared lesson cycle and completion rubric](../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+## Build one contract through the phase
+
+Use one small quantized matrix-vector operator as the connecting example. Digital design establishes its representation; HDL gives it a clock/reset and transfer contract; architecture budgets its bytes and cycles; the OS course owns its buffers; parallel computing builds a measured software reference. Keep a separate file for the operator’s shape, signedness, scale, rounding, saturation, and error tolerance.
+
+A phase review should show the same input/output vectors in the mathematical reference, software implementation, and RTL simulation. A fast result with different rounding or an unaccounted copy is a different experiment. Follow the [physical AI design studio](../Physical-AI-Design-Studio.md) when assembling the artifacts into a SoC project.
+
+**Carry forward:** Operator specification, golden vectors, transfer contract, and measured baseline. Continue with [the next course](../Phase%202%20-%20Embedded%20Systems/Guide.md) and reuse that evidence.

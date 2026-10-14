@@ -2,7 +2,7 @@
 
 Most of this HPC track assumes you control the whole stack: your cluster, your NVLink fabric, your Slurm queue. That assumption breaks the moment compute is **rented, shared, or run on a node you don't physically control** — GPU-cloud capacity, a multi-tenant HPC cluster, or a decentralized compute network where anonymous operators contribute nodes. In that world a new question shows up before any performance question does: **how do you know a remote node actually ran the workload you think it ran, on real hardware, without tampering?**
 
-That's what this deep dive covers: **hardware-rooted remote attestation** for CPU (Intel TDX) and GPU (NVIDIA Confidential Computing), and — because a single-vendor check is a single point of forgery — how to **bind one claim into both hardware roots at once** so a verifier doesn't have to trust either vendor's silicon alone.
+That's what this deep dive covers: **hardware-rooted remote attestation** for CPU (Intel TDX) and GPU (NVIDIA Confidential Computing), and how to **bind session evidence from both components** while documenting the combined trusted computing base. Composing CPU and GPU evidence does not remove trust in either vendor or prove that a claimed computation was performed correctly.
 
 ## Why This Belongs in HPC Infrastructure
 
@@ -40,6 +40,12 @@ Concretely, this matters whenever a training or inference job runs somewhere you
 - **Verifying a GPU's CC-mode attestation token?** → [02 — NVIDIA CC Attestation Chain](./02-NVIDIA-CC-Attestation-Chain.md)
 - **Designing or reviewing a proof-of-training / remote-compute verifier?** → [03 — Dual-Vendor Claim Binding & Verification Review](./03-Dual-Vendor-Claim-Binding-and-Verification.md)
 - **Building or evaluating a "confidential AI" / sealed-model inference API?** → [04 — Confidential Inference: Model Identity & the End-to-End Protocol](./04-Confidential-Inference-Protocol.md)
+
+## Distinguish platform evidence from a result claim
+
+GPU attestation establishes device/firmware state under a verifier policy. An authenticated nonce containing an output hash does not by itself show that the GPU computed that output. A workload protocol must bind fresh evidence to a measured application, its session key, model/input identity, and the channel carrying the result. [NVIDIA attestation overview](https://docs.nvidia.com/attestation/).
+
+Use replayed evidence, a changed model hash, and a substituted session key as separate negative tests. Document whether each rejection is cryptographic, policy-based, or an application check. The handoff to the SoC capstone is a trust-boundary diagram and key-release policy, not a claim that two hardware signatures replace computation verification.
 
 ## Practice and assessment
 

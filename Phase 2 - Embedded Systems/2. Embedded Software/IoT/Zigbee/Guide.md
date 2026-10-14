@@ -4,7 +4,7 @@
 <div class="course-identity__icon">ZLPM</div>
 <div markdown="1">
 <p class="course-identity__eyebrow">Deep Dive · Embedded Systems</p>
-<p class="course-identity__title">Specialized course identity for Zigbee - Low-Power Mesh Networking for Embedded Systems.</p>
+<p class="course-identity__title">Translate a cluster report into a stable host contract.</p>
 <p class="course-identity__meta">Artifact: bring-up or firmware demo · Measure: boot, latency, power, reliability</p>
 </div>
 </div>
@@ -97,16 +97,10 @@ Do not memorize commands first. Build the mental model first.
 
 **Next:** [Lecture 01 - What Zigbee is and where it fits](Lecture/Lecture-01.md)
 
-## Practice and assessment
+## Translate a cluster report into a stable host contract
 
-**Entry diagnostic (prerequisite check):** Explain coordinator/router/end-device roles and endpoint/cluster addressing. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+Pick one actual endpoint and cluster in the selected SDK. Record profile/cluster/attribute identifiers, data type, unit scaling, reporting configuration, and device identity. Trace the attribute report into a Linux-side record with receive time and freshness state; do not infer application meaning from a radio address alone.
 
-1. **Baseline lab:** Implement or inspect a sensor attribute report and its coordinator-side receipt.
-2. **Guided variation:** Rejoin after a controlled disconnect and test duplicate or stale reports.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Exercise rejoin and coordinator/gateway restart. Separate network admission, attribute discovery, report receipt, and usable application state as four checkpoints. Reuse the IoT schema to show what changes when Thread’s IP application path is replaced by Zigbee’s endpoint/cluster model.
 
-**Evidence to submit:** Report delivery, latency, retry count, rejoin time, and endpoint/cluster mapping. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** An endpoint/cluster-to-host mapping with restart and stale-report evidence. Continue with [the next course](Lecture/README.md) and reuse that evidence.

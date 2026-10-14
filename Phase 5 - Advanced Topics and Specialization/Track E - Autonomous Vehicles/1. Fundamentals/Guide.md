@@ -33,7 +33,7 @@ Before studying openpilot's codebase or advanced research, you need the foundati
 
 * **Object detection:**
     * 2D: YOLO family, CenterNet, FCOS — bounding boxes for vehicles, pedestrians, cyclists.
-    * 3D: PointPillars, SECOND (LiDAR); FCOS3D, DETR3D (monocular camera).
+    * 3D: PointPillars, SECOND (LiDAR); FCOS3D (monocular); DETR3D (multi-camera).
     * Bird's Eye View (BEV): lifting 2D camera features to BEV space for unified 3D detection.
 
 * **Semantic segmentation:**
@@ -84,7 +84,7 @@ Before studying openpilot's codebase or advanced research, you need the foundati
     * Vehicle state estimation: combine IMU + wheel odometry + GPS for localization.
 
 * **Lateral control:**
-    * **Stanley controller:** cross-track error + heading error, used in early AV and openpilot.
+    * **Stanley controller:** cross-track error + heading error, a useful geometric baseline from early autonomous-driving research; inspect the selected openpilot release for its actual lateral controller.
     * **Pure pursuit:** geometric path following using a lookahead point.
     * **MPC (Model Predictive Control):** optimize a sequence of steering commands over a horizon, subject to dynamics constraints.
 
@@ -119,6 +119,12 @@ Before studying openpilot's codebase or advanced research, you need the foundati
 ## Next
 
 → **[Module 2 — openpilot Reference Stack](../2.%20openpilot%20Reference%20Stack/Guide.md)** — Study a real, production-deployed ADAS end-to-end.
+
+## Worked bridge: a delayed measurement becomes a control error
+
+At a simulated 10 m/s, an extra 100 ms of observation age corresponds to 1 m of forward travel before the controller uses the observation. This is a kinematic illustration, not a complete stopping-distance model. A faster detector can still make the system worse if batching increases that age.
+
+In one CARLA scenario, log sensor time, inference completion, controller update, and applied command time on a common clock. Add a known delay and compare cross-track error, missed deadlines, and minimum separation against the original run. Keep the route, seed, speed, and controller gains fixed. Carry the timestamped trace into [Module 2](../2.%20openpilot%20Reference%20Stack/Guide.md) and identify where an equivalent delay could enter a real process boundary.
 
 ## Practice and assessment
 

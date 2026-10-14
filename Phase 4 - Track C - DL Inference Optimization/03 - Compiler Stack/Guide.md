@@ -34,8 +34,8 @@ Kernels (02) are either hand-written or compiler-generated. This unit covers how
 
 ## 2. Scheduling and lowering
 
-* **tinygrad** — Scheduler, BEAM search for kernel fusion and placement. One op vs fused op; how BEAM explores fusion choices.
-* **TVM** — TIR (Tensor IR), AutoTVM/AutoScheduler for mapping to hardware. Schedule primitives (tile, vectorize, parallel).
+* **tinygrad** — The scheduler groups graph operations into kernels; BEAM searches implementation choices for an already formed kernel. Keep graph fusion decisions separate from kernel optimization search. See [tinygrad speed documentation](https://docs.tinygrad.org/developer/speed/).
+* **TVM** — Separate Relax graph-level work from TensorIR scheduling and code generation. Pin a TVM release: older AutoTVM/AutoScheduler tutorials and newer tuning APIs are not interchangeable. Start with tile, vectorize, and parallel transformations and inspect the generated loops.
 * **MLIR** — linalg/tensor dialects; progressive lowering (linalg → loops → vector → gpu). How high-level ops become loops and then GPU kernels.
 
 **Takeaway:** Scheduling decides *which* kernels run (fused or not) and *how* they're tiled/parallelized; codegen then emits CUDA/LLVM/etc.
@@ -59,7 +59,7 @@ Kernels (02) are either hand-written or compiler-generated. This unit covers how
 
 ## Projects
 
-1. **BEAM in tinygrad** — Run tinygrad with BEAM on a small model. Compare scheduled kernel count and runtime vs default scheduler; document what BEAM fused.
+1. **BEAM in tinygrad** — Run tinygrad with BEAM on a small model. Compare scheduled kernel count and runtime vs default scheduler; distinguish scheduler grouping from BEAM kernel choices.
 2. **Fusion pass** — Implement a simple fusion pass (e.g. Conv+ReLU) in a graph you control (ONNX or tinygrad). Measure impact on kernel count and latency.
 3. **Trace lowering** — Pick one op (e.g. matmul) in TVM or tinygrad and trace from high-level op to generated code. Document the lowering steps.
 
@@ -69,16 +69,11 @@ Kernels (02) are either hand-written or compiler-generated. This unit covers how
 
 → **[04 — Quantization](../04%20-%20Quantization/Guide.md)** — Low-precision inference (PTQ, QAT) and how it affects kernels and deployment.
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain graph IR, lowering, scheduling, and code generation as separate steps. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: What proof obligation connects a rewrite to a machine instruction?
 
-1. **Baseline lab:** Trace one operator through a pinned compiler and implement or inspect one rewrite.
-2. **Guided variation:** Use a shape or dtype that invalidates the rewrite and verify the legality check.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Trace one matrix operator from graph IR through buffer planning, loop/kernel scheduling, and generated code. Add a legal rewrite with an explicit shape/dtype guard and a counterexample rejected by that guard.
 
-**Evidence to submit:** IR before/after, output parity, kernel count, compile time, and steady-state latency. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Save before/after IR and correctness results. Separate graph fusion from BEAM kernel search, and pass the lowered operator plus memory-layout contract to quantization/runtime work.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [04 - Quantization](../04%20-%20Quantization/Guide.md). Explain which assumption from this course the next engineer must preserve.

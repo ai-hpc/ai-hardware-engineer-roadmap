@@ -4,7 +4,7 @@
 <div class="course-identity__icon">OAO</div>
 <div markdown="1">
 <p class="course-identity__eyebrow">Deep Dive · Digital Foundations</p>
-<p class="course-identity__title">Specialized course identity for OpenMP and oneTBB.</p>
+<p class="course-identity__title">Budget parallelism across the whole pipeline.</p>
 <p class="course-identity__meta">Artifact: working low-level demo · Measure: timing, memory, correctness</p>
 </div>
 </div>
@@ -1012,16 +1012,16 @@ The third optional argument controls how work is divided:
 // auto_partitioner (default): runtime tunes chunk size automatically
 parallel_for(blocked_range<int>(0, N), body);
 
-// affinity_partitioner: reuses same data → same thread (cache-warm)
+// affinity_partitioner: remembers affinity hints to encourage cache reuse
 // Declare static so it persists between calls
 static affinity_partitioner ap;
 parallel_for(blocked_range<int>(0, N), body, ap);
 
-// simple_partitioner: chunk = grainsize exactly, no adaptive splitting (work-stealing still active)
+// simple_partitioner: splits until ranges are no larger than grainsize
 parallel_for(blocked_range<int>(0, N, 1000), body, simple_partitioner());
 
-// static_partitioner: divide evenly upfront, no stealing
-// Deterministic: same thread always gets same range
+// static_partitioner: approximately equal partitions and deterministic affinity hints
+// An affinity hint is not a guarantee of OS-thread identity or CPU pinning
 parallel_for(blocked_range<int>(0, N), body, static_partitioner());
 ```
 
@@ -1029,8 +1029,10 @@ parallel_for(blocked_range<int>(0, N), body, static_partitioner());
 |-------------|------------|--------------------|---------------|---------|
 | `auto_partitioner` | Dynamic | Yes | Yes | Most cases — default |
 | `affinity_partitioner` | Adaptive | Yes | Yes | Re-running same loop over same data (cache-warm) |
-| `simple_partitioner` | Fixed ≈ grainsize | No | Yes | Chunk needs fixed-size temp buffer; work is uniform; N is huge |
-| `static_partitioner` | Pre-divided, fixed mapping | No | No | NUMA/cache locality tuning; strict reproducible thread mapping |
+| `simple_partitioner` | Bounded by grainsize | No adaptive tuning | Yes | Bound the amount of work in each range |
+| `static_partitioner` | Approximately equal partitions | No adaptive tuning | Scheduler-controlled | Predictable partitioning with affinity hints; not CPU pinning |
+
+The [oneTBB partitioner specification](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/v1.1-rev-1/elements/onetbb/source/algorithms/partitioners/static_partitioner) describes affinity as a scheduler hint. Numerical reproducibility is a separate property of the reduction order.
 
 **Grainsize tuning:** Each chunk should take ≥ ~100,000 clock cycles (~50 µs at 2 GHz). Too-small chunks = scheduling overhead dominates. Rule: if loop body takes 10 ns, grainsize of 10,000+ is reasonable.
 
@@ -2703,16 +2705,10 @@ Learning oneTBB's task decomposition makes CUDA's thread/block/grid hierarchy in
 
 → [**CUDA and SIMT**](../CUDA%20and%20SIMT/Guide.md) — GPU parallelism: threads, warps, blocks, and memory hierarchy.
 
-## Practice and assessment
+## Budget parallelism across the whole pipeline
 
-**Entry diagnostic (prerequisite check):** Identify a data race in a shared reduction and explain ownership. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+Run capture/replay, preprocessing, and inference submission as a bounded pipeline. Vary worker counts while keeping the input arrival schedule fixed. Compare throughput with observation age, queue depth, and drops; more workers can oversubscribe a library’s own pool or increase contention. State whether the last stage preserves sequence order.
 
-1. **Baseline lab:** Compare static/dynamic work scheduling or task decomposition against a serial result.
-2. **Guided variation:** Use an imbalanced input and vary workers; detect a deliberately shared accumulator race with an appropriate checker.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+For reductions, separate acceptable floating-point variation from data races. For task placement, separate oneTBB affinity hints from OS CPU affinity. The handoff to CUDA is a host timeline showing whether the GPU is starved, waiting for a copy, or simply finished before the next input arrives.
 
-**Evidence to submit:** Speedup, workload distribution, scheduling overhead, and reproducible correctness. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** A bounded pipeline timeline and worker-count/latency comparison. Continue with [the next course](../CUDA%20and%20SIMT/Guide.md) and reuse that evidence.

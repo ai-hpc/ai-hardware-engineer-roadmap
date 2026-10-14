@@ -1,11 +1,13 @@
 # Lecture 1: Qwen Architecture Deep Dive — Qwen3-4B and Qwen2.5-72B Side by Side
 
+> **Reproduction scope:** Pin the exact checkpoint and runtime revision. Numerical throughput, price, and latency examples without a linked measurement artifact are illustrative planning inputs, not results measured by this course. Record supported APIs from that runtime release before running commands.
+
 ## Overview
 
 Before you can optimize Qwen inference, you need to know what's actually in the weights. This lecture is a complete walk of the architecture for two specific releases:
 
-* **Qwen3-4B-Instruct** — Alibaba's 2026 small-instruct model. The size most people will actually run on edge.
-* **Qwen2.5-72B-Instruct** — the 2024 large-instruct workhorse, still the most-deployed 70B-class open-weight model.
+* **Qwen3-4B-Instruct-2507** — Alibaba's July 2025 instruct checkpoint used for this edge case study.
+* **Qwen2.5-72B-Instruct** — the 2024 large-instruct workhorse, used here as a large-model comparison.
 
 Both are decoder-only causal transformers in the same family. They share design choices (GQA, RoPE-NeoX, SwiGLU FFN, RMSNorm, BPE with 151 936 vocab) but differ in scale, embedding tying, and rotary configuration in ways that change your inference recipe.
 
@@ -18,22 +20,11 @@ By the end you should be able to:
 
 ---
 
-## 1. Family Lineage (the short version)
+## 1. Checkpoint lineage and attention semantics
 
-```
-Qwen 1.5  ──► Qwen2  ──► Qwen2.5  ──► Qwen3
- (2023)     (2024)      (2024)       (2026)
-   │          │            │            │
-   │          │            │            ├─ "thinking" mode (CoT toggleable)
-   │          │            │            ├─ better tool use
-   │          │            ├─ YaRN extended context (128 k)
-   │          │            ├─ improved post-training
-   │          ├─ GQA standard, dual rope-base for short/long ctx
-   │          │
-   ├─ original release, MHA only
-```
+Qwen2.5 is a 2024 family; Qwen3 first appeared in 2025. This course pins the July 2025 Qwen3-4B-Instruct-2507 variant rather than mixing its settings with the original Qwen3-4B. Both studied models use causal attention. RoPE rotates positional features; it does not make their attention bidirectional. Use each checkpoint's tokenizer/chat template rather than assuming family-wide interchangeability.
 
-Both models we cover are **decoder-only**, **causal**, **bidirectional-positional via RoPE**, **left-padded for batch**, **uses ChatML-style template** (`<|im_start|>role\n…<|im_end|>`).
+Source configurations: [Qwen3-4B-Instruct-2507](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507/blob/main/config.json), [Qwen2.5-72B-Instruct](https://huggingface.co/Qwen/Qwen2.5-72B-Instruct/blob/main/config.json).
 
 ---
 
@@ -41,18 +32,18 @@ Both models we cover are **decoder-only**, **causal**, **bidirectional-positiona
 
 `config.json` for each model:
 
-| Field | Qwen3-4B-Instruct | Qwen2.5-72B-Instruct |
+| Field | Qwen3-4B-Instruct-2507 | Qwen2.5-72B-Instruct |
 |---|---|---|
 | `hidden_size` (d_model) | 2560 | 8192 |
-| `intermediate_size` (FFN) | 6912 | 29568 |
+| `intermediate_size` (FFN) | 9728 | 29568 |
 | `num_hidden_layers` | 36 | 80 |
 | `num_attention_heads` | 32 | 64 |
 | `num_key_value_heads` | 8 (GQA group=4) | 8 (GQA group=8) |
 | `head_dim` | 128 | 128 |
 | `vocab_size` | 151 936 | 152 064 |
-| `max_position_embeddings` | 40 960 (262 144 w/ YaRN) | 32 768 (131 072 w/ YaRN) |
-| `rope_theta` | 1 000 000 | 1 000 000 |
-| `rope_scaling` | YaRN (rel) | YaRN (rel) |
+| `max_position_embeddings` | 262 144 | 32 768 (extended deployment requires documented settings) |
+| `rope_theta` | 5 000 000 | 1 000 000 |
+| `rope_scaling` | null in released config | no scaling entry in released config |
 | `tie_word_embeddings` | **true** | **false** |
 | `rms_norm_eps` | 1e-6 | 1e-6 |
 | `torch_dtype` (release) | BF16 | BF16 |
@@ -61,7 +52,7 @@ These twelve numbers determine every shape you'll see in a GEMV trace.
 
 ### 2.1 Deriving shapes by hand
 
-Given the config, every tensor's shape is mechanical:
+The table uses mathematical input-by-output matrix orientation. PyTorch linear weights are stored output-by-input; verify the runtime's actual tensor strides rather than copying table orientation into a loader:
 
 | Tensor | Qwen3-4B | Qwen2.5-72B | Math |
 |---|---|---|---|
@@ -70,34 +61,30 @@ Given the config, every tensor's shape is mechanical:
 | `attn_q.weight` (W_Q) | 2560 × 4096 | 8192 × 8192 | `d × (n_heads · head_dim)` |
 | `attn_k.weight` (W_K) | 2560 × 1024 | 8192 × 1024 | `d × (n_kv_heads · head_dim)` |
 | `attn_v.weight` (W_V) | 2560 × 1024 | 8192 × 1024 | same as K (GQA) |
-| `attn_q.bias` | 4096 | 8192 | Qwen keeps QKV bias |
-| `attn_k.bias` | 1024 | 1024 |  |
-| `attn_v.bias` | 1024 | 1024 |  |
+| `attn_q.bias` | absent | 8192 | Qwen3 disables attention bias; Qwen2.5 differs |
+| `attn_k.bias` | absent | 1024 |  |
+| `attn_v.bias` | absent | 1024 |  |
 | `attn_o.weight` (W_O) | 4096 × 2560 | 8192 × 8192 | `(n_heads · head_dim) × d` |
 | `ffn_norm.weight` | 2560 | 8192 | `d` |
-| `ffn_gate.weight` (W_g) | 2560 × 6912 | 8192 × 29568 | `d × intermediate` |
-| `ffn_up.weight` (W_u) | 2560 × 6912 | 8192 × 29568 | `d × intermediate` |
-| `ffn_down.weight` (W_d) | 6912 × 2560 | 29568 × 8192 | `intermediate × d` |
+| `ffn_gate.weight` (W_g) | 2560 × 9728 | 8192 × 29568 | `d × intermediate` |
+| `ffn_up.weight` (W_u) | 2560 × 9728 | 8192 × 29568 | `d × intermediate` |
+| `ffn_down.weight` (W_d) | 9728 × 2560 | 29568 × 8192 | `intermediate × d` |
 | `output_norm.weight` | 2560 | 8192 | `d` |
 | `output.weight` (LM head) | **tied** | 152064 × 8192 | (only Qwen2.5-72B has a separate one) |
 
 ### 2.2 Parameter count sanity check
 
-For Qwen3-4B:
+For Qwen3-4B-Instruct-2507 (approximate, before small norm terms):
 
+```text
+Tied embeddings: 151936 × 2560                         = 388,956,160
+Attention/layer: 2 × 2560 × 4096 + 2 × 2560 × 1024      = 26,214,400
+FFN/layer:       3 × 2560 × 9728                       = 74,711,040
+36 layers:       36 × (26,214,400 + 74,711,040)         = 3,633,315,840
+Total:           4,022,272,000 plus normalization parameters
 ```
-Embeddings (tied):       151 936 · 2560                   = 389  M
-Per layer attention:     2 · 2560·4096 + 2·2560·1024      ≈   26 M
-  +  bias                4096 + 2·1024                    =   ~ 6 K (negligible)
-Per layer FFN:           3 · 2560 · 6912                  ≈   53 M
-Per layer norms:         2 · 2560                         ≈    5 K
-Per layer total:                                          ≈   79 M
-× 36 layers:                                              ≈ 2.84 B
-+ final norm:                                             negligible
 
-Total: 389 M (embed) + 2.84 B (layers) ≈ 3.23 B params
-Marketing name "4B" — close enough, depending on bias and norm accounting.
-```
+The result reconciles with roughly 4B. A 3.23B result would signal an incorrect configuration assumption, not rounding in a marketing name. Attention Q/K normalization parameters also belong in an exact tensor inventory.
 
 For Qwen2.5-72B:
 
@@ -119,7 +106,7 @@ The huge embedding contribution to the 72B model (2.49 B params, ~3.4% of total)
 
 Both models use **Grouped-Query Attention** with 8 KV heads. What changes is the Q-head count.
 
-### 3.1 Qwen3-4B-Instruct
+### 3.1 Qwen3-4B-Instruct-2507
 
 ```
 n_heads     = 32
@@ -182,7 +169,7 @@ x[d]
 x + o   (residual)
 ```
 
-The Qwen-specific detail you'll forget once and regret: **Qwen keeps QKV bias** (`b_Q, b_K, b_V`). Llama and Mistral don't. Runtimes that strip bias on import will silently break Qwen models. Verify your loader.
+**Checkpoint-specific detail:** Qwen2.5 uses QKV projection biases while this Qwen3 configuration sets `attention_bias=false`. Inspect stored tensors and loader behavior; a family-wide bias assumption is incorrect.
 
 ---
 
@@ -385,7 +372,7 @@ This is implemented as a custom attention kernel, not a pure RoPE patch. As of m
 
 The fields you actually look at when wiring up RoPE for inference:
 
-| Field | Purpose | Qwen3-4B-Instruct | Qwen2.5-72B-Instruct |
+| Field | Purpose | Qwen3-4B-Instruct-2507 | Qwen2.5-72B-Instruct |
 |---|---|---|---|
 | `rope_theta` | Base frequency `θ_base` | 1 000 000 | 1 000 000 |
 | `rope_scaling.type` | Scaling strategy | `yarn` | `yarn` |
@@ -439,14 +426,14 @@ def ffn(x, W_gate, W_up, W_down):
     return h @ W_down               # [intermediate] → [d]
 ```
 
-**Three GEMVs per layer**, intermediate dimension is **2.7× d_model** (Qwen3-4B: 2560 → 6912; Qwen2.5-72B: 8192 → 29568). That ratio is fixed by the choice to keep FFN-vs-attention parameter balance close to 2:1.
+**Three GEMVs per layer**, intermediate dimension is **3.8× d_model for this Qwen3 checkpoint** (Qwen3-4B: 2560 → 9728; Qwen2.5-72B: 8192 → 29568). The ratios are checkpoint-specific and must be derived from configuration.
 
 The FFN is the **larger** of the two blocks by parameter count:
 
 | | Qwen3-4B per layer | Qwen2.5-72B per layer |
 |---|---|---|
 | Attention params | 26 M | 151 M |
-| FFN params       | 53 M | 727 M |
+| FFN params       | 74.7 M | 727 M |
 | FFN / Attention  | 2.0× | 4.8× |
 
 Two takeaways:
@@ -546,7 +533,7 @@ Counting tensor entries:
 
 ## 9. Final Comparison
 
-| | Qwen3-4B-Instruct (Q4_K_M) | Qwen2.5-72B-Instruct (FP16) |
+| | Qwen3-4B-Instruct-2507 (Q4_K_M) | Qwen2.5-72B-Instruct (FP16) |
 |---|---|---|
 | On-disk size | ~2.4 GB | ~145 GB |
 | Active params per token | 4 B | 72 B |
@@ -565,7 +552,7 @@ The next lecture starts where the difference is biggest — quantization, which 
 
 ## Hands-On Exercises
 
-1. **Verify the shapes.** Download Qwen3-4B-Instruct from HuggingFace. Open `config.json`, compute every per-tensor shape from the formulas in §2.1, then load with `transformers` and assert each `param.shape` matches. Anything that doesn't match is either a runtime bug or your config-reading bug.
+1. **Verify the shapes.** Download Qwen3-4B-Instruct-2507 from HuggingFace. Open `config.json`, compute every per-tensor shape from the formulas in §2.1, then load with `transformers` and assert each `param.shape` matches. Anything that doesn't match is either a runtime bug or your config-reading bug.
 
 2. **Param-count sanity.** Compute the total parameter count for Qwen2.5-72B-Instruct from `config.json` alone. Compare with `sum(p.numel() for p in model.parameters())` from a real load. They should agree within 0.1%; if not, you've miscounted norms or biases.
 
@@ -575,7 +562,7 @@ The next lecture starts where the difference is biggest — quantization, which 
 
 5. **RoPE flavor check.** Pick a runtime (llama.cpp, MLC, or your own) and confirm via inspection that its `rope_kernel` uses the NeoX (split) layout for Qwen. The fastest verification: dump the rotation matrix it applies and compare against `cos(theta_i) ± sin(theta_i)` patterns in either order.
 
-6. **YaRN integration test.** Take Qwen3-4B-Instruct and feed it a 50 000-token document with a single distinctive fact buried near token 45 000 ("the password is `puffin-spruce-47`"). Ask the model at the end: "What was the password?" If YaRN is wired correctly the model retrieves it; if not, the answer is gibberish or a refusal. Run this with `--rope-scaling yarn` enabled and disabled to confirm which knob in your runtime matters.
+6. **YaRN integration test.** Take Qwen3-4B-Instruct-2507 and feed it a 50 000-token document with a single distinctive fact buried near token 45 000 ("the password is `puffin-spruce-47`"). Ask the model at the end: "What was the password?" If YaRN is wired correctly the model retrieves it; if not, the answer is gibberish or a refusal. Run this with `--rope-scaling yarn` enabled and disabled to confirm which knob in your runtime matters.
 
 7. **Implement RoPE from scratch.** Copy the §4.5 PyTorch reference. Load Qwen3-4B and replace `transformers`'s built-in RoPE with your implementation. Run a few prompts and confirm bit-identical output to the reference implementation. Then deliberately swap to original-layout pairs (`(2i, 2i+1)` instead of `(i, i+d/2)`) and observe the first ~10 tokens look reasonable before output collapses.
 
@@ -589,7 +576,7 @@ The next lecture starts where the difference is biggest — quantization, which 
 |---|---|
 | Twelve numbers in `config.json` determine every tensor shape | You can predict every GEMV in a trace without loading the model |
 | GQA bounds the KV cache regardless of Q-head count | KV scales with `n_kv_heads · n_layers`, not `n_heads` |
-| Qwen keeps QKV biases — Llama/Mistral don't | Loaders that strip bias silently break Qwen |
+| QKV bias depends on the checkpoint | Qwen3 and Qwen2.5 have different projection-bias contracts |
 | RoPE-NeoX layout (pairs are split halves, not interleaved) | Wrong layout = silent corruption past ~10 generated tokens |
 | `rope_theta = 1e6` spreads frequencies for long-context headroom | The single config value that makes 131 k context possible without retraining |
 | YaRN, not raw `rope_theta`, is what enables 131 k context | Runtimes that only read `rope_theta` silently break long inputs |
@@ -602,9 +589,9 @@ The next lecture starts where the difference is biggest — quantization, which 
 
 ## Resources
 
-* **[Qwen3 Technical Report (2026)](https://arxiv.org/abs/2505.09388):** Official architecture and post-training description.
+* **[Qwen3 Technical Report (2025)](https://arxiv.org/abs/2505.09388):** Official architecture and post-training description.
 * **[Qwen2.5 Technical Report (2024)](https://arxiv.org/abs/2412.15115):** The 72B paper with all configs.
-* **[Hugging Face — Qwen/Qwen3-4B-Instruct](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507):** Weights, tokenizer, generation config.
+* **[Hugging Face — Qwen/Qwen3-4B-Instruct-2507](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507):** Weights, tokenizer, generation config.
 * **[Hugging Face — Qwen/Qwen2.5-72B-Instruct](https://huggingface.co/Qwen/Qwen2.5-72B-Instruct):** Weights and `config.json`.
 * **[RoFormer: Enhanced Transformer with Rotary Position Embedding (Su et al., 2021)](https://arxiv.org/abs/2104.09864):** The original RoPE paper.
 * **[YaRN: Efficient Context Window Extension](https://arxiv.org/abs/2309.00071):** The math behind both models' long-context behavior.

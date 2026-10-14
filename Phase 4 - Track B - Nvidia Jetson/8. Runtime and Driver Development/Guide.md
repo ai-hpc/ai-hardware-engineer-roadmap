@@ -20,6 +20,8 @@
 
 ---
 
+> **TensorRT API versions:** This reference includes legacy binding-based execution or V2 plugin examples. Pin the installed TensorRT version before using a block. TensorRT 10.x execution uses named tensors, `set_tensor_address`, and `execute_async_v3`; legacy examples are not drop-in 10.x code. Newer major releases have further changes. Use NVIDIA's [8.x→10.x migration guide](https://docs.nvidia.com/deeplearning/tensorrt/10.x.x/api/tensorrt-8x-to-10x-python-api.html) and the API documentation matching your BSP.
+
 ## Why runtime & driver matters for Jetson/GPU
 
 The compiler produces optimized kernels and execution plans. The runtime makes them actually run: managing GPU memory, scheduling kernels across CUDA cores and DLA engines, handling multi-stream concurrency, and communicating with the Linux kernel driver. Understanding this layer is essential for hitting latency and throughput targets on real hardware.
@@ -93,8 +95,10 @@ The compiler produces optimized kernels and execution plans. The runtime makes t
 
 ## 3. DLA (Deep Learning Accelerator) Runtime
 
+> **Hardware boundary:** DLA examples in this section require a supported NX/AGX module. Nano has zero DLA cores. Verify TensorRT `builder.num_DLA_cores` before building; GPU fallback is not a substitute for absent hardware.
+
 * **DLA architecture on Orin:**
-    * Two DLA engines (NVDLA-based) on Orin Nano.
+    * No DLA engines on Orin Nano; use a supported NX/AGX module for this optional comparison.
     * Supported layers: Conv, deconv, pooling, LRN, batch norm, element-wise, softmax.
     * Limitations: no custom ops, limited dynamic shapes, restricted concat/split behavior.
 
@@ -134,7 +138,7 @@ The compiler produces optimized kernels and execution plans. The runtime makes t
 
 * **Display and multimedia:**
     * `tegra-dc` / `nvdisplay`: display controller driver.
-    * NVDEC/NVENC: hardware video decode/encode. GStreamer integration via `nvv4l2decoder`.
+    * NVDEC: hardware decode where supported via `nvv4l2decoder`; Orin Nano requires software encode. NVENC examples require a supported NX/AGX module.
 
 * **Power management drivers:**
     * DVFS (Dynamic Voltage and Frequency Scaling): `devfreq` framework.
@@ -214,16 +218,11 @@ The compiler produces optimized kernels and execution plans. The runtime makes t
 | §4 Kernel drivers | GPU monitor module, device tree overlay + sensor driver |
 | §5 System runtime | 4-camera DeepStream pipeline, Triton deployment, priority scheduler |
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain ownership and lifetime of a device buffer across submission and completion. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Which runtime interface must the custom accelerator expose?
 
-1. **Baseline lab:** Trace or implement a bounded host/device queue with a software reference path.
-2. **Guided variation:** Inject timeout, cancellation, or invalid buffer length and verify cleanup/recovery.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Describe allocation, DMA mapping, queue submission, completion, cancellation, and reset for one operator. Pin TensorRT plugin/API generation if studying the GPU implementation; DLA labs require NX/AGX.
 
-**Evidence to submit:** Correctness, submission/completion latency, transfer cost, queue depth, and leak/error checks. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** A queue-level reference test must catch invalid lengths and stale completion IDs. Pass the command ABI, ownership rules, and unsupported-operation policy into compiler lowering.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [03 - Compiler Stack](../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/03%20-%20Compiler%20Stack/Guide.md). Explain which assumption from this course the next engineer must preserve.

@@ -8,7 +8,7 @@ The mental model layer of the course. Five lectures that build, in order, the fo
 4. **What precision means in 2026** — FP16 → FP8 → FP4 → INT4 and the parity validation discipline that keeps quantization honest.
 5. **What runtimes exist and why** — vLLM, SGLang, TensorRT-LLM, llama.cpp, MLX, and the workload matrix for picking between them.
 
-By the end of Part 1, a reader should be able to open a model card for a model they have never heard of, and predict — within a margin defended by the math — what its KV cache will cost, where its decode bandwidth ceiling sits, which precision floor it will tolerate, and which runtime is the right starting point. The model-specific parts (Part 2 dense / Part 3 MoE) then deepen that mental model with two concrete anchor pairs each.
+By the end of Part 1, a reader should be able to open a model card for a model they have never heard of, and predict — within a margin defended by the math — what its KV cache will cost, where its decode bandwidth ceiling sits, which candidate precisions require quality evaluation, and which runtime has the required model/kernel support. The model-specific parts (Part 2 dense / Part 3 MoE) then deepen that mental model with two concrete anchor pairs each.
 
 ## Lectures
 
@@ -36,23 +36,18 @@ You will use this template repo throughout Parts 2 and 3.
 
 You are ready for Part 2 when you can:
 
-* Sketch the prefill-vs-decode split of a transformer forward pass on a whiteboard and label which stage is compute-bound and which is bandwidth-bound at batch=1.
+* Sketch the prefill-vs-decode split of a transformer forward pass on a whiteboard and state the batch/context/shape assumptions under which either stage becomes compute- or bandwidth-bound.
 * Compute the KV cache bytes-per-token formula for any model from its `config.json`.
-* State which precision floor a published model can tolerate without re-validating from scratch — and which it cannot.
+* Propose a precision candidate from prior evidence, then define the task-specific validation needed for this checkpoint and runtime.
 * Defend, in two sentences, why you would pick vLLM over TensorRT-LLM (or vice versa) for a given workload.
 
 If any of these is shaky, re-read the matching lecture before moving on. Part 2 assumes you have all four.
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Compute bytes and operations for a small transformer block. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Carry this course into the physical-AI system
 
-1. **Baseline lab:** Predict memory and latency for a small supported model, then compare with measurements or a labeled analytic exercise.
-2. **Guided variation:** Vary batch/context and explain where the predicted bottleneck changes.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Start from:** A small model, tokenizer, and a CPU or available GPU reference.
 
-**Evidence to submit:** Shapes, precision, byte counts, timing boundaries, and prediction error. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Build and challenge:** Trace prefill and decode for explicit batch/context shapes. Derive weight and state traffic, then explain when compute, bandwidth, or scheduling dominates.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** A baseline benchmark with numerical and resource assumptions for dense serving. Continue with [the connected course](../Part%202%20-%20Dense%20at%20Hopper/README.md) and keep the artifact in the [Physical AI Design Studio](../../../../Physical-AI-Design-Studio.md).

@@ -689,16 +689,11 @@ For custom panel timing, PWM routing, and BSP integration, see:
 | [2. Custom Carrier Board](../../2.%20Custom%20Carrier%20Board%20Design%20and%20Bring-Up/Guide.md) | Connector routing, electrical design, pinmux planning |
 | [3. L4T Customization](../../3.%20L4T%20Customization/Guide.md) | Device tree, BSP integration, flash and production image workflows |
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain user/kernel ownership and the units of one sensor register. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Can userspace distinguish a valid zero from a failed sensor read?
 
-1. **Baseline lab:** Read a peripheral through a documented interface and timestamp its data.
-2. **Guided variation:** Inject missing/invalid samples and verify that the application does not reuse them silently.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Write a peripheral adapter returning value, units, monotonic timestamp, sequence ID, and status. Inject timeout and malformed data through a mock or loopback path.
 
-**Evidence to submit:** Sample rate/jitter, error counts, bus latency, and sensor-to-application mapping. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Invalid data must remain invalid through the caller; no silent substitution with the previous sample. Submit bus-to-application timing and a stable device-identification rule.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [6. ROS2](../6.%20ROS2/Guide.md). Explain which assumption from this course the next engineer must preserve.

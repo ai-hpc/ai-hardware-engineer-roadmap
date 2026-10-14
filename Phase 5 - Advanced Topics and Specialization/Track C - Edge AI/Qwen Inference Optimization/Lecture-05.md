@@ -1,5 +1,7 @@
 # Lecture 5: Cross-Model Strategies and Production Serving — Tying Qwen3-4B and Qwen2.5-72B Together
 
+> **Reproduction scope:** Pin the exact checkpoint and runtime revision. Numerical throughput, price, and latency examples without a linked measurement artifact are illustrative planning inputs, not results measured by this course. Record supported APIs from that runtime release before running commands.
+
 ## Overview
 
 Lectures 3 and 4 treated the edge model (Qwen3-4B-Q4) and the datacenter model (Qwen2.5-72B-FP16) as separate worlds. They aren't. In production they coexist — usually because the same product wants edge latency *and* server-class quality. This lecture covers the architectures that span both:

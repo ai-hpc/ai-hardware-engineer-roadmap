@@ -20,7 +20,7 @@
 
 ## Why safety and deployment
 
-A perception model that works 99% of the time is not safe enough for a 2-ton vehicle at highway speed. This module covers the standards, testing methodologies, and deployment patterns that bridge the gap between a working prototype and a production ADAS.
+A single perception accuracy percentage does not establish vehicle safety: the operational domain, failure modes, exposure, and system response determine the risk. This module covers the standards, testing methodologies, and deployment patterns that bridge the gap between a working prototype and a production ADAS.
 
 ---
 
@@ -34,7 +34,7 @@ A perception model that works 99% of the time is not safe enough for a 2-ton veh
     * Hardware metrics: SPFM (Single Point Fault Metric), LFM (Latent Fault Metric).
 
 * **SOTIF (ISO 21448 — Safety of the Intended Functionality):**
-    * Addresses risks from sensor limitations, algorithm uncertainty, and unpredictable environments — not just hardware faults (which ISO 26262 covers).
+    * Addresses risks from sensor limitations, algorithm uncertainty, and unpredictable environments — distinct from malfunctioning E/E behavior addressed by ISO 26262, including hardware and software aspects.
     * Known/unknown unsafe scenarios, triggering conditions.
     * Validation strategy: reduce residual risk from intended functionality.
 
@@ -54,7 +54,7 @@ A perception model that works 99% of the time is not safe enough for a 2-ton veh
 
 * **Communication standards:**
     * **DSRC (Dedicated Short-Range Communications):** 802.11p-based, mature but limited bandwidth.
-    * **C-V2X (Cellular V2X):** LTE-V2X (PC5 sidelink), 5G NR-V2X — higher bandwidth, lower latency.
+    * **C-V2X (Cellular V2X):** LTE-V2X (PC5 sidelink) and 5G NR-V2X; latency and reliability depend on radio mode, congestion, coverage, and deployment.
     * V2V (vehicle-to-vehicle), V2I (vehicle-to-infrastructure), V2P (vehicle-to-pedestrian).
 
 * **Cooperative perception:**
@@ -72,7 +72,7 @@ A perception model that works 99% of the time is not safe enough for a 2-ton veh
 ## 3. ADAS Validation and Testing
 
 * **Scenario-based testing:**
-    * Scenario databases: OpenSCENARIO, ASAM OSI.
+    * Scenario descriptions: ASAM OpenSCENARIO; simulation interfaces: ASAM OSI. These are standards/interfaces, not scenario databases.
     * Systematic coverage: edge cases, SOTIF-relevant scenarios, ODD (Operational Design Domain) boundaries.
     * Concrete vs. logical vs. functional scenarios.
 
@@ -115,6 +115,14 @@ A perception model that works 99% of the time is not safe enough for a 2-ton veh
 ## Next
 
 → **[Module 6 — Lauterbach TRACE32 Debug](../6.%20Lauterbach%20TRACE32%20Debug/Guide.md)** (optional) — In-circuit debug and trace for automotive ECUs.
+
+## Turn a failure scenario into a testable requirement
+
+For a teaching lane-following system, distinguish: (a) a corrupted sensor message, (b) a valid image whose glare hides the lane, and (c) a stale but plausible action. Map each to the relevant malfunction, intended-function limitation, or timing/system requirement. Define the response and maximum detection time before testing it.
+
+A HARA exercise produces a reasoned assignment for a **safety goal**, not an ASIL label for an entire neural network. Keep the evidence chain explicit: hazard → goal → requirement → monitor/fallback → test result. ISO 26262 and ISO 21448 have different scopes; consult the actual project-applicable standards for compliance work. [ISO 26262 scope](https://www.iso.org/standard/68383.html), [ISO 21448 scope](https://www.iso.org/standard/77490.html).
+
+Use replay or simulation for the baseline, and call a test HIL only when real target hardware participates in the loop. A classroom simulation report does not certify a road vehicle. Pass the monitor's timestamps and failure trace to [Module 6](../6.%20Lauterbach%20TRACE32%20Debug/Guide.md) or the SoC controller testbench.
 
 ## Practice and assessment
 

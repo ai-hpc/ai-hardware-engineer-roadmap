@@ -1,115 +1,33 @@
-# Gemma 4 on Jetson — Edge Deployment, PDL, and Physical AI
+# Gemma 4 at the edge — verified deployment and physical-AI integration
 
 <div class="course-identity edge-ai" markdown="1">
 <div class="course-identity__icon">G4E</div>
 <div markdown="1">
-<p class="course-identity__eyebrow">Phase 5 · Edge AI · Special Course</p>
-<p class="course-identity__title">Deploy Google's Gemma 4 family on Jetson and edge hardware — from architecture internals to speculative decoding, PDL runtime stack, and multimodal physical-AI pipelines.</p>
-<p class="course-identity__meta">Artifact: end-to-end Gemma 4 deployment with measured tok/s, KV-memory, and TTFT on a Jetson target · Measure: tokens/s, tok/s/W, TTFT, KV-cache GB, accuracy vs BF16 baseline</p>
+<p class="course-identity__eyebrow">Edge AI · Six connected lectures</p>
+<p class="course-identity__title">Turn a verified multimodal checkpoint into a measured edge service and an explicit robot interface.</p>
+<p class="course-identity__meta">Artifact: deployment dossier · Measure: quality, memory, TTFT, token latency, observation age</p>
 </div>
 </div>
 
-> *The question for edge AI in 2025 is no longer "can a frontier-quality model run on device?" — Gemma 4 answers that. The question is "what does it cost in watts, bytes, and milliseconds, and how do you design the pipeline to meet the budget?"*
+**Evidence reviewed: 2026-10-14.** Gemma 4 launched on April 2, 2026 under Apache 2.0. Its family includes E2B, E4B, 12B Unified, 26B A4B, and 31B; these are not interchangeable configurations. Use the official [launch announcement](https://blog.google/innovation-and-ai/technology/developers-tools/gemma-4/) and [model card](https://ai.google.dev/gemma/docs/core/model_card_4), then pin the exact checkpoint revision used in your experiment.
 
-Gemma 4 (April 2025, Google DeepMind) is the first open model family that is simultaneously **frontier-competitive** at 27B and **edge-deployable** at 1B–4B — not because the small models are compromised, but because the architecture was explicitly co-designed for constrained compute. The key is **interleaved local/global attention**: 6 of every 7 attention layers are sliding-window (O(1) KV growth with context), making 128 K-token context tractable on a Jetson Orin. At Jetson AGX Thor scale (128 GB, 273 GB/s), the 27B model in INT4 runs with a KV footprint an order of magnitude smaller than a pure-attention equivalent.
+The course goal is an evidence-backed deployment decision, not a promised token rate. An E2B effective parameter count is not its complete weight storage; local attention does not eliminate global-layer KV growth; a VLM producing text is not yet a VLA producing calibrated actions. Those distinctions shape the accelerator, memory system, compiler, and control interface you eventually design.
 
-This course is the engineer's manual for that deployment. It is paired with three concepts you will hear throughout:
+**Before:** [Edge LLM internals](../Edge%20LLM%20Inference%20Internals/Lecture-01.md), [quantization](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/04%20-%20Quantization/Guide.md), and basic Jetson/Linux operation. A host with enough RAM can complete metadata and numerical exercises; label on-device measurements not run until you have a compatible target.
 
-**PDL — Portable Deployment and Loading** is the term this course uses for the end-to-end pipeline from a Gemma checkpoint to a running service on Jetson: quantization calibration → format conversion → runtime compilation → loading optimization → serving configuration. It maps to Google's **AI Edge / LiteRT** ecosystem plus the inference optimization layer (paged KV, speculative decoding, CUDA-graph-backed batching). Every lecture is one stage of this pipeline.
+| Lecture | Engineering question | Artifact passed onward |
+|---|---|---|
+| [01 — Identity and memory](Lecture-01.md) | Which checkpoint, tensor shapes, and cache rules are real? | Hashed configuration and memory model |
+| [02 — Quantization](Lecture-02.md) | Which representation preserves task quality and maps to a kernel? | Format/quality/compatibility record |
+| [03 — Runtime](Lecture-03.md) | Can the selected runtime execute the exact model and modality? | Reproducible service and benchmark protocol |
+| [04 — Speculation](Lecture-04.md) | Does drafting reduce cost per committed token? | Accepted-prefix and timing analysis |
+| [05 — Multimodal robot interface](Lecture-05.md) | How old is the evidence behind a proposed action? | Timestamped observation/result contract |
+| [06 — Official MTP assistant](Lecture-06.md) | Is the assistant paired and supported by this runtime? | Compatibility audit and capstone decision |
 
-**Layer mapping:** L1–L6 — model architecture, quantization, compilation, runtime, serving, and the co-design loop between them.
+## What completion means
 
-**Role targets:** Edge AI Engineer · Embedded AI Engineer · Jetson Inference Engineer · Physical-AI Systems Engineer · On-Device ML Engineer.
+Keep one `deployment-manifest.json` containing checkpoint ID/revision, file hashes, processor/tokenizer, runtime commit, build flags, BSP, module SKU, power mode, dtype/quantization, prompt or image shapes, and measurement definitions. Each lecture extends this manifest instead of restarting with an unrelated demo.
 
-**Prerequisites:**
+Submit the float reference where feasible, one supported optimized deployment, held-out quality, memory at several context lengths, cold/warm TTFT, decode inter-token latency, and failures. A comparison must preserve input/output lengths and sampling policy. Peak advertised TOPS and unsourced “expected tok/s” are not results.
 
-* [Edge LLM Inference Internals](../Edge%20LLM%20Inference%20Internals/Lecture-01.md) — GEMV vs GEMM, roofline, bandwidth ceiling. Every number in this course is grounded in that model.
-* [Qwen Inference Optimization](../Qwen%20Inference%20Optimization/README.md) — quantization, KV cache, decode optimization on Jetson. Gemma 4 covers the same stack; that series fills any gaps.
-* [MLSys Deep Dives → Lecture 04](../../Track%20G%20-%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/Lecture-04.md) — SSM/hybrid architectures and KV cache theory. Gemma 4's interleaved attention is the same design principle.
-* Comfort with Python, `llama.cpp`/`ollama` CLI, and basic CUDA profiling.
-
-**Pairs with:** [TVM Deep Dives](../../Track%20G%20-%20ML%20Systems%20Engineering/TVM%20Deep%20Dives/README.md) (for MLC-LLM compilation) and [AI Inference Engineer 2026](../../Track%20G%20-%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/README.md) (for the datacenter side of the same models).
-
----
-
-## Why Gemma 4 Changes the Edge Landscape
-
-Three other open-model families were competing for the edge slot in mid-2025: **Qwen3** (Alibaba, strong at 4B–14B), **Phi-4** (Microsoft, 14B dense), and **Llama 3.2** (Meta, 1B/3B/11B). Gemma 4 differentiates on three dimensions:
-
-| Differentiator | Gemma 4 | Qwen3 | Phi-4 | Llama 3.2 |
-|---|---|---|---|---|
-| Interleaved local/global attention | **Yes (1:6)** | No (pure global) | No | No |
-| 128K context with bounded KV | **Yes** | No (KV grows) | No | 128K but full KV |
-| Multimodal in same family | **1B–27B all vision** | 7B+ only | No | 11B vision only |
-| Quantization stability (QK-norm) | **Yes** | Yes (Qwen3) | Partial | No |
-| Google AI Edge / LiteRT first-class | **Yes** | No | No | No |
-| Apache-2.0 / Gemma ToS (production) | Gemma ToS | Apache-2.0 | MIT | Llama ToS |
-
-The **interleaved attention** is the architectural moat at the edge. At 128 K context, a pure-attention 4B model needs ~18 GB of KV cache; Gemma 4 4B needs ~3.3 GB — a 5.5× reduction. That is the difference between a model that fits on a Jetson Orin 64 GB and one that doesn't.
-
----
-
-## Course Map (6 lectures)
-
-<div class="lecture-map" markdown>
-
-| # | Lecture | The thread |
-|---|---------|-----------|
-| [01](Lecture-01.md) | **Why Gemma 4 at the Edge** — architecture for edge engineers: interleaved attention, GQA, QK-norm, 128K with linear KV, model lineup and competitive positioning | the case for Gemma 4 |
-| [02](Lecture-02.md) | **Quantization and Format Conversion** — GPTQ/AWQ/K-quants for Gemma 4, calibration, GGUF/LiteRT/ExecuTorch/.pt2/TRT formats, accuracy vs speed tradeoffs | weights to bits |
-| [03](Lecture-03.md) | **The PDL Runtime Stack** — LiteRT (Google AI Edge), llama.cpp, MLC-LLM (TVM Unity), TensorRT-LLM: selection matrix, latency/throughput profiles on Orin and Thor | runtime choice |
-| [04](Lecture-04.md) | **Speculative Decoding with Gemma 4** — 1B draft + 4B/12B target, EAGLE-3-style self-draft heads, lookahead decoding, acceptance-length analysis on edge hardware | the algorithm layer |
-| [05](Lecture-05.md) | **Physical AI and Multimodal Gemma 4** — SigLIP-400M vision encoder, VLM pipeline on Jetson, robot perception use cases, latency budget, capstone | closing the loop |
-| [06](Lecture-06.md) | **MTP with Gemma 4 E2B** — 4-layer E2B MTP drafter architecture, target-state-aware proposals, deployment on vLLM / LiteRT-LM / llama.cpp, E2B vs 1B vs EAGLE-3 decision matrix | the official drafter |
-
-</div>
-
----
-
-## Course Outcomes
-
-By the end you should be able to:
-
-* Explain why Gemma 4's interleaved attention architecture produces a **bounded KV footprint** at long context, and compute the exact KV memory for any (batch, seq, model) configuration.
-* Select the right quantization format and runtime for a given Jetson target, and predict throughput from the bandwidth-ceiling formula.
-* Deploy Gemma 4 from checkpoint to serving on a Jetson Orin or Thor using at least two different runtimes, with measured tokens/s and TTFT.
-* Configure speculative decoding with a Gemma 4 1B draft and a 4B/12B target, report the acceptance length, and verify output parity.
-* Describe the multimodal VLM pipeline (SigLIP encoder + Gemma decoder) and fit it within a robot's latency budget.
-
----
-
-## Exit Criteria
-
-You are done with this course when you can:
-
-* Run `bandwidth_ceiling(HBM_GBs, model_bytes) → max_tok_per_s` on any Gemma 4 configuration on your target and explain which physical bound it's hitting.
-* Produce a deployment table with rung-by-rung measurements: baseline BF16 → INT8 → INT4 → INT4 + speculative decode, with tok/s, KV-GB, and TTFT at each rung.
-* Look at a new edge model release (any architecture) and immediately ask "what is the KV cache growth rate, and does it fit my memory budget at my target context length?" — the analytical habit this course exists to build.
-
----
-
-## Currency / Refresh Discipline
-
-Gemma 4 launched April 2025. The deployment ecosystem is moving fast:
-
-* Every lecture closes with a **`## Current as of`** date and the specific versions / benchmark numbers pinned.
-* Vendor-reported numbers (Google's benchmark claims, NVIDIA's Jetson Thor throughput sheets) are **explicitly flagged** and treated as teaching anchors, not ground truth.
-* The runtime stack (LiteRT versions, llama.cpp GGUF support, MLC-LLM dlight schedules) changes monthly — always re-verify against the tagged release.
-
----
-
-*Related: [Qwen Inference Optimization](../Qwen%20Inference%20Optimization/README.md) · [Edge LLM Inference Internals](../Edge%20LLM%20Inference%20Internals/Lecture-01.md) · [MLSys Deep Dives](../../Track%20G%20-%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/README.md)*
-
-## Practice and assessment
-
-**Entry diagnostic (prerequisite check):** Identify the exact checkpoint, modality, memory requirement, and target runtime. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
-
-1. **Baseline lab:** Audit the model/runtime combination and run a small held-out edge deployment if supported.
-2. **Guided variation:** Compare an optimized variant under the same prompt/input and quality contract.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
-
-**Evidence to submit:** Quality, payload/runtime memory, latency, energy assumptions, and explicit compatibility evidence. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** use the latency, live-memory, and operator-shape evidence in [VLA deployment on Jetson](../../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/5.%20Application%20Development/5.%20ML%20and%20AI/vla-deploy-jetson/Guide.md), then the physical-AI SoC proposal. The original six lecture URLs remain stable; unverified commands and invented benchmark tables have been replaced with explicit experiments.

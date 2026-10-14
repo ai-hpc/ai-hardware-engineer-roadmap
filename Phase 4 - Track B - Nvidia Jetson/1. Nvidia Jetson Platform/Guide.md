@@ -10,7 +10,7 @@
 </div>
 
 
-**Phase 4 — Track B — Nvidia Jetson** · Module 1 of 7
+**Phase 4 — Track B — Nvidia Jetson** · Module 1 of 8
 
 > **Focus:** Go from unboxed **Jetson Orin Nano 8GB** hardware to a production-quality AI pipeline with ROS 2 integration, sensor fusion, optimized inference, OTA updates, and hardened security.
 >
@@ -22,6 +22,8 @@
 
 
 <a id="1-orin-nano-8gb--hardware--boot-chain-internals"></a>
+> **TensorRT API versions:** This reference includes legacy binding-based execution or V2 plugin examples. Pin the installed TensorRT version before using a block. TensorRT 10.x execution uses named tensors, `set_tensor_address`, and `execute_async_v3`; legacy examples are not drop-in 10.x code. Newer major releases have further changes. Use NVIDIA's [8.x→10.x migration guide](https://docs.nvidia.com/deeplearning/tensorrt/10.x.x/api/tensorrt-8x-to-10x-python-api.html) and the API documentation matching your BSP.
+
 ## 1. Orin Nano 8GB — Hardware & Boot Chain Internals
 
 This section walks through the **real boot chain**, firmware layout, memory usage, A/B slots, and what happens specifically on Orin Nano 8GB. Understanding this gives you the foundation to debug boot failures, customize firmware, optimize memory, and work confidently with the Jetson platform at the hardware level.
@@ -470,10 +472,12 @@ Total cold boot to usable shell: **~25 seconds** from SD card. NVMe reduces this
 
 ### Orin Nano 8GB vs the Orin Family
 
+The table below is an original-generation comparison, not a current purchasing or power-mode table. Nano Super profiles raise the advertised sparse INT8 peak to 67 TOPS and memory bandwidth to approximately 102 GB/s; actual clocks depend on BSP, flash configuration, and power mode. Record `nvpmodel -q` in experiments. See [NVIDIA's Super announcement](https://developer.nvidia.com/blog/nvidia-jetson-orin-nano-developer-kit-gets-a-super-boost/).
+
 | Module              | CPU           | GPU         | RAM   | AI TOPS | Power  | Use Case              |
 |---------------------|---------------|-------------|-------|---------|--------|-----------------------|
 | Orin Nano 4GB       | 6-core A78AE  | 512-core A  | 4GB   | 20      | 5–10W  | Light inference       |
-| **Orin Nano 8GB**   | **6-core A78AE** | **1024-core A** | **8GB** | **40** | **5–15W** | **This guide** |
+| **Orin Nano 8GB**   | **6-core A78AE** | **1024-core A** | **8GB** | **40** | **7–15W** | **This guide** |
 | Orin NX 8GB         | 6-core A78AE  | 1024-core A | 8GB   | 70      | 10–20W | Mid-range robotics    |
 | Orin NX 16GB        | 8-core A78AE  | 1024-core A | 16GB  | 100     | 10–25W | Heavy inference       |
 | AGX Orin 32GB       | 12-core A78AE | 2048-core A | 32GB  | 200     | 15–60W | Autonomous vehicles   |
@@ -485,17 +489,18 @@ Total cold boot to usable shell: **~25 seconds** from SD card. NVMe reduces this
 CPU:  6× Arm Cortex-A78AE @ up to 1.5 GHz
 GPU:  1024× CUDA cores (Ampere architecture)
       32× Tensor Cores
-DLA:  1× Deep Learning Accelerator (up to 10 TOPS)
+DLA:  Not present on Orin Nano (use GPU inference)
 RAM:  8GB LPDDR5 (shared between CPU + GPU)
 Storage: microSD + M.2 NVMe slot (2280)
 I/O:
-  1× USB 3.2 Gen2 Type-A
-  1× USB 3.2 Gen2 Type-C (DisplayPort alt mode)
+  4× USB 3.2 Type-A
+  1× USB Type-C (data/recovery; no display output)
+  1× dedicated DisplayPort output
   1× Gigabit Ethernet
   40-pin GPIO header (I2C, SPI, UART, PWM, I2S)
   M.2 Key M (NVMe SSD)
   M.2 Key E (WiFi/BT)
-  Camera connector (CSI-2, 2-lane)
+  2× 22-pin CSI camera connectors (CAM0: x2; CAM1: x2 or x4)
 ```
 
 > **Tensor Cores** are the hardware units that deliver most of the **40 AI TOPS** on Orin Nano: they perform matrix multiply-accumulate (MMA) in one instruction for FP16/INT8, which is why FP16 and INT8 inference are so much faster than FP32. For a detailed explanation of tensor core architecture and how they work, see [**Orin Nano — Tensor Core Architecture and How It Works**](Orin-Nano-Tensor/Guide.md).
@@ -635,7 +640,7 @@ Below is the exact component list for **JetPack 6.2.2** on **Jetson Orin Nano 8G
 | Component | Version | Size | Layer | What it does |
 |-----------|---------|------|:-----:|-------------|
 | NVIDIA Container Runtime | — | 4.9 MB | L3/L4 | Run NGC containers with GPU access (docker + nvidia-container-toolkit) |
-| Multimedia API | 36.5 | 71.9 MB | L3 | NVDEC/NVENC hardware video decode/encode, V4L2 camera, ISP access |
+| Multimedia API | 36.5 | 71.9 MB | L3 | NVDEC decode, software encode on Nano, V4L2 camera, ISP access |
 
 **Jetson SDK Components — Developer tools (host + target)**
 
@@ -1018,20 +1023,11 @@ frame = np.random.randn(1, 3, 640, 640).astype(np.float32)
 result = inferencer.infer(frame)
 ```
 
-### DLA (Deep Learning Accelerator) — Extra Efficiency
+### Accelerator availability is a module property
 
-The Orin Nano has 1 DLA engine. For supported layers, DLA runs at ~10 TOPS while freeing the GPU for other tasks.
+**Orin Nano has no DLA.** A T234-family block diagram does not describe every module SKU. Use the GPU path on Nano; study DLA placement on a supported Orin NX or AGX Orin in the [DLA comparison course](Orin-Nano-DLA-Deep-Dive/Guide.md). Enabling a device-tree node cannot add missing hardware. Source: [NVIDIA Orin power tables](https://docs.nvidia.com/jetson/archives/r36.5/DeveloperGuide/SD/PlatformPowerAndPerformance/JetsonOrinNanoSeriesJetsonOrinNxSeriesAndJetsonAgxOrinSeries.html).
 
-```python
-# Enable DLA in TensorRT engine build
-config.default_device_type = trt.DeviceType.DLA
-config.DLA_core = 0           # Orin Nano has DLA 0 only
-config.set_flag(trt.BuilderFlag.GPU_FALLBACK)  # GPU fallback for unsupported layers
-config.set_flag(trt.BuilderFlag.FP16)           # DLA requires FP16 or INT8
-
-# Check which layers run on DLA vs GPU after building
-# Use: trtexec --onnx=model.onnx --useDLACore=0 --verbose 2>&1 | grep "DLA"
-```
+The connector list above describes the reference developer kit; verify custom carriers independently using NVIDIA's [hardware layout](https://docs.nvidia.com/jetson/orin-nano-devkit/user-guide/latest/hardware_layout.html).
 
 ---
 
@@ -2570,16 +2566,11 @@ docker compose pull && docker compose up -d
 
 *Next: [2. Custom Carrier Board](../2.%20Custom%20Carrier%20Board%20Design%20and%20Bring-Up/Guide.md) → [3. L4T Customization](../3.%20L4T%20Customization/Guide.md) → [4. FSP Customization](../4.%20FSP%20%28Firmware%20Support%20Package%29%20Customization/Guide.md) → [5. Application Development](../5.%20Application%20Development/Guide.md) → [6. Security and OTA](../6.%20Security%20and%20OTA/Guide.md) → [7. Compliance and Manufacturing](../7.%20Compliance%20and%20Manufacturing/Guide.md)*
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Identify the exact module, BSP, power mode, and shared-memory constraints. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: What hardware and software are actually in the experiment?
 
-1. **Baseline lab:** Build a small sensor-to-inference pipeline and save its deployment manifest.
-2. **Guided variation:** Run it long enough to reach steady thermal behavior; test one recoverable input failure.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Record module SKU, carrier revision, Jetson Linux, CUDA/TensorRT, boot medium, and current power mode. Trace one camera frame through capture, preprocessing, model, and result; identify where timestamps originate.
 
-**Evidence to submit:** End-to-end latency distribution, memory, power/temperature, dropped inputs, and recovery time. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Produce a capability manifest with Nano DLA and NVENC marked absent, a boot log, and one validated result. Hardware setup is complete only when a peer can identify the same target from the manifest.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [Orin-Nano-Memory-Architecture](Orin-Nano-Memory-Architecture/Guide.md). Explain which assumption from this course the next engineer must preserve.

@@ -12,7 +12,7 @@
 
 > **Source:** [ethz-asl/kalibr](https://github.com/ethz-asl/kalibr) — ETH Zurich Autonomous Systems Lab
 > **What it solves:** Camera intrinsics, multi-camera extrinsics, camera-IMU spatial+temporal calibration, rolling-shutter calibration — all through batch continuous-time trajectory optimization.
-> **Why it matters:** Every downstream system (BEVFusion, SLAM, openpilot, VIO) depends on correct calibration. A 1° extrinsic rotation error in a camera-IMU system causes odometry drift of ~1.7% of distance traveled.
+> **Why it matters:** Every downstream system (BEVFusion, SLAM, openpilot, VIO) depends on correct calibration. Extrinsic and timing errors can bias downstream estimation; their effect depends on geometry, motion, and the estimator.
 
 ---
 
@@ -36,7 +36,7 @@ Extrinsic calibration:  what is the rigid transform between sensor A and sensor 
 
 ```
 Camera intrinsic error (1 pixel reprojection):
-  At 20m depth: ~4cm lateral position error per pixel
+  At 20m depth and focal length 500px: ~4cm lateral error per pixel
   In BEVFusion: camera features misaligned with LiDAR → fusion hurts accuracy
 
 Camera-LiDAR extrinsic error (1° rotation):
@@ -45,12 +45,12 @@ Camera-LiDAR extrinsic error (1° rotation):
 
 Camera-IMU temporal error (1ms time offset):
   At 1 m/s IMU excitation: 1mm position error per ms
-  In VIO at aggressive motion: position error accumulates every step
-  In SLAM: loop closures fail because frames don't align
+  This constant-velocity displacement is not a universal accumulated VIO error.
+  Test rotational motion and clock offset separately.
 
 Camera-IMU spatial error (1cm translation):
   Gyroscope correction for camera motion uses wrong lever arm
-  In VIO: accelerometer-induced rotation errors
+  In VIO: incorrect rotational acceleration compensation can bias estimation
 ```
 
 ### The Calibration Chain for an Autonomous Vehicle
@@ -219,82 +219,20 @@ Intel RealSense D435i:
 
 ---
 
-## 5. Installation
+## 5. Installation and environment boundary
 
-### Method 1: Docker (Recommended — Works on Any Ubuntu)
+The upstream [installation guide](https://github.com/ethz-asl/kalibr/wiki/installation) documents ROS 1/catkin environments and Dockerfiles. Installing ROS 2 Humble packages is not a substitute for those dependencies. Use a pinned upstream revision and its matching build instructions; keep calibration tooling separate from the robot's ROS 2 runtime.
 
-```bash
-# Pull Kalibr Docker image
-docker pull ghcr.io/ethz-asl/kalibr:latest
+For this course, perform calibration on a workstation and deploy the resulting YAML plus provenance to the embedded target. Save the Git revision, container image digest, command, bag checksum, target dimensions, and output report. Verify the image architecture before attempting to build or run it on Jetson.
 
-# Run interactively with shared folder for data/results
-docker run -it \
-    --volume /path/to/your/data:/data \
-    --volume /tmp/.X11-unix:/tmp/.X11-unix \
-    --env DISPLAY=$DISPLAY \
-    ghcr.io/ethz-asl/kalibr:latest
-
-# Inside container, Kalibr commands are available:
-kalibr_calibrate_cameras --help
-kalibr_calibrate_imu_camera --help
-kalibr_create_target_pdf --help
-```
-
-### Method 2: Build from Source (ROS2 Humble / Ubuntu 22.04)
+Inside the documented and sourced Kalibr environment, first run:
 
 ```bash
-# Install ROS2 Humble first (see Jetson guide)
-sudo apt-get install -y \
-    ros-humble-cv-bridge \
-    ros-humble-image-transport \
-    python3-catkin-tools \
-    libopencv-dev \
-    libsuitesparse-dev
-
-# Create a catkin workspace (Kalibr still uses catkin, not colcon)
-mkdir -p ~/kalibr_ws/src
-cd ~/kalibr_ws/src
-git clone https://github.com/ethz-asl/kalibr.git
-
-cd ~/kalibr_ws
-catkin build -DCMAKE_BUILD_TYPE=Release -j4
-# Build takes 10–20 minutes
-
-# Source the workspace
-echo "source ~/kalibr_ws/devel/setup.bash" >> ~/.bashrc
-source ~/.bashrc
-
-# Verify
-kalibr_calibrate_cameras --help
+rosrun kalibr kalibr_calibrate_cameras --help
+rosrun kalibr kalibr_calibrate_imu_camera --help
 ```
 
-### Method 3: Build on Jetson Orin Nano
-
-```bash
-# Same as Method 2, but reduce parallel jobs to avoid OOM
-catkin build -DCMAKE_BUILD_TYPE=Release -j2
-
-# Kalibr calibration itself is CPU-intensive
-# Run calibration on desktop/laptop, not on Jetson
-# Only deploy calibration RESULTS (yaml files) to Jetson
-```
-
-### Verify Installation
-
-```bash
-# Check all tools are available
-kalibr_calibrate_cameras --help
-kalibr_calibrate_imu_camera --help
-kalibr_create_target_pdf --help
-kalibr_bagcreater --help
-kalibr_bag_extractor --help
-
-# Create test target PDF
-kalibr_create_target_pdf \
-    --type apriltag --nx 6 --ny 6 \
-    --tsize 0.088 --tspace 0.3
-# Should produce: target.pdf
-```
+Then use the upstream sample data before a new sensor recording. For ROS 2 recordings, follow the upstream conversion workflow and compare timestamps, topic counts, encodings, and units before and after conversion. The examples below describe calibration arguments; launch them through the selected environment's supported entry point.
 
 ---
 
@@ -1265,16 +1203,11 @@ Write a Python script that:
 *See also: [BEVFusion](../BEVFusion/Guide.md) — uses Kalibr camera intrinsics and extrinsics*
 *See also: [Multi-Object Tracking](../multi-object-tracking/Guide.md)*
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain camera intrinsics, extrinsics, and camera/IMU time offset. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Carry this course into the physical-AI system
 
-1. **Baseline lab:** Calibrate using a recorded sequence and reserve a different motion sequence for validation.
-2. **Guided variation:** Compare a well-excited sequence with a poorly excited one and explain parameter uncertainty.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Start from:** A measured calibration target, sensor models, and an offline recording.
 
-**Evidence to submit:** Reprojection/residual distributions, validation error, motion coverage, and calibration provenance. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Build and challenge:** Fit on one trajectory and validate on another. Verify transform direction, units, clock convention, and timestamp preservation through any bag conversion.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** Calibration YAML, held-out residuals, and provenance for the fusion pipeline. Continue with [the connected course](../BEVFusion/Guide.md) and keep the artifact in the [Physical AI Design Studio](../../../../Physical-AI-Design-Studio.md).

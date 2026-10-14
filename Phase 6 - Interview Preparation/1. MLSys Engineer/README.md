@@ -11,15 +11,15 @@
 
 ---
 
-## What companies actually test
+## What this course practices
 
-A senior MLSys interview probes three things:
+Practice three complementary skills:
 
 1. **Systems reasoning** — can you identify the bottleneck (compute vs memory vs latency), back it with numbers, and design around it? Not "what is roofline" but "what does the roofline tell you this specific kernel should do differently."
 
 2. **Implementation depth** — have you actually written a fused kernel, debugged a quantization regression, ported a new architecture? The tell is specificity: real implementations have failure modes, gotchas, and measured numbers. Generic descriptions do not.
 
-3. **Tradeoff ownership** — can you defend a decision? "We used INT8 KV because X but we left V in FP16 for Gemma because Y" is a senior answer. "INT8 saves memory" is not.
+3. **Tradeoff ownership** — can you defend a decision? Explain which tensors you quantized, what quality checks you ran, and which failure forced an exception. Do not borrow another project’s claim as your experience.
 
 ---
 
@@ -45,7 +45,7 @@ Before the interview, score yourself 1–3 on each topic:
 3 = I have shipped this in production and can defend tradeoffs with numbers
 ```
 
-Target: 3 on your two strongest topics, 2 on the rest, 1 on at most one. Interviewers at senior level expect depth on at least two areas.
+Choose two topics for a detailed evidence review and identify gaps in the others. This is a study aid, not a hiring standard; a reproduced lab and a production deployment are different kinds of experience.
 
 ---
 
@@ -71,4 +71,10 @@ Target: 3 on your two strongest topics, 2 on the rest, 1 on at most one. Intervi
 
 *Up: [Interview Preparation](../README.md)*
 
-**Study method:** use the [shared lesson cycle and completion rubric](../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+## Recalculate before rehearsing
+
+Work the eight Q&As as closed-book derivations. Compute the KV payload, matrix-vector intensity, materialized attention traffic, and speculative-decoding break-even point with units. Then compare one prediction with your own profiler trace. If they disagree, explain an omitted cost before changing the formula.
+
+Finish with one failed optimization and one correctness regression you can reproduce. For the physical AI specialization, explain how tensor accuracy, stale observations, and action validity are different tests. Use the [inference Q&A](01-Inference-Systems-QA.md) as the worked reference, not a script of borrowed experience.
+
+**Carry forward:** An equation sheet, measured counterexample, and honest experience inventory. Continue with [the next course](../../Physical-AI-Design-Studio.md) and reuse that evidence.

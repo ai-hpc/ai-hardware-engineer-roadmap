@@ -12,7 +12,7 @@ The NVIDIA L40S is a PCIe-based GPU designed for AI inference, graphics, and ent
 | Total GPU Memory | 576 GB |
 | Memory Bandwidth | 864 GB/s per GPU |
 | FP8 Tensor Core TFLOPS | ~733 TFLOPS per GPU |
-| BF16 / FP16 TFLOPS | ~366 TFLOPS per GPU (sparse) |
+| BF16 / FP16 TFLOPS | ~366 dense; ~733 with supported structured sparsity |
 | TF32 TFLOPS | ~183 TFLOPS per GPU |
 | GPU Interconnect | PCIe 4.0 x16 (no NVLink) |
 | Form Factor | PCIe full-height, dual-slot |
@@ -25,10 +25,10 @@ The NVIDIA L40S is a PCIe-based GPU designed for AI inference, graphics, and ent
 | Total memory | 576 GB GDDR6 | 1,128 GB HBM3e |
 | Memory bandwidth | 10.4 TB/s total | 38.4 TB/s total |
 | GPU interconnect | PCIe (no NVLink) | NVLink 4.0 900 GB/s |
-| Cost (approx) | ~$60K | ~$400K+ |
+| Cost | Obtain a dated quote for the complete system | Obtain a comparable dated quote |
 | Best for | Cost-efficient inference | Training + large model inference |
-| Power/rack | ~4,200 W (12 GPUs) | ~5,600 W (8 GPUs) |
-| Max single model | ~70B (multi-GPU) | ~405B (multi-GPU) |
+| GPU-only maximum power sum | ~4,200 W (12 GPUs) | ~5,600 W (8 GPUs) |
+| Model capacity | Depends on precision, metadata, KV, workspace, and sharding | Same accounting; larger aggregate HBM |
 
 **Choose L40S when:** inference throughput matters more than model size, cost is constrained, or you're running multiple smaller models simultaneously.
 
@@ -45,9 +45,15 @@ The NVIDIA L40S is a PCIe-based GPU designed for AI inference, graphics, and ent
 ## Quick Navigation
 
 - **Serving a 7B model?** → [04-Deployment-Guide](./04-Deployment-Guide.md) — single GPU inference
-- **Serving a 70B model?** → [03-Multi-GPU-Strategy](./03-Multi-GPU-Strategy.md) — 2 GPUs with TP=2
+- **Serving a 70B model?** → [03-Multi-GPU-Strategy](./03-Multi-GPU-Strategy.md) — compare rank memory and TP/replica choices
 - **Maximizing throughput?** → [02-Inference-Optimization](./02-Inference-Optimization.md)
 - **Performance bottleneck?** → [05-Benchmarks](./05-Benchmarks.md)
+
+## Work the placement decision
+
+A 70B BF16 model needs about 140 GB for weights alone, so it does not fit on two 48 GB L40S devices. A 4-bit representation has a 35 GB raw-weight lower bound, then adds scales, unquantized tensors, KV cache, and workspace. The checkpoint format and supported kernel path therefore come before choosing TP=2.
+
+Measure one model group first, then compare multiple replicas with a larger TP group at the same request mix. Twelve devices behind PCIe switches do not form one 576 GB high-bandwidth device. Save a PCIe topology diagram and per-rank memory/latency report for [platform evaluation](../../../Accelerator%20Platform%20Evaluation/Guide.md). Datasheet peaks distinguish dense and sparse arithmetic, and 12 × 350 W excludes CPUs, memory, NICs, and cooling. [L40S specifications](https://www.nvidia.com/en-us/data-center/l40s/).
 
 ## Practice and assessment
 

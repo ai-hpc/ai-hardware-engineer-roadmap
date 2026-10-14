@@ -6,61 +6,26 @@
 
 The twelve modules produced a method. This capstone turns it into a **reusable subsystem another engineer can run on a model you have never seen** — Level 5 on the roadmap's [artifact ladder](../../../Curriculum-Authoring-Guide.md).
 
-**The benchmark to beat:** `155.75 tok/s` at acceptance length `2.886` on an RTX 5090, from the published [DSpark NVFP4 build](https://huggingface.co/gittensor-model-hub/Qwen3.8-27B-DSpark-NVFP4). Not by shrinking the file. By **allocating precision correctly and fixing what the ledger says is actually binding.**
+**Case-study baseline:** the community [DSpark NVFP4 model card](https://huggingface.co/gittensor-model-hub/Qwen3.8-27B-DSpark-NVFP4) reports `155.75 tok/s` and acceptance length `2.886`. These are attributed results, not measurements reproduced by this curriculum. Establish your own baseline with a pinned checkpoint, runtime, prompts, and device before setting a target.
 
 ---
 
-## 1. Where the headroom is
+## 1. Turn arithmetic into testable hypotheses
 
-Before building anything, decompose the target with the tools from Modules 04 and 10. Start from the non-speculative measurement:
+Under the simplified model `speed = base * tau / (1 + K*c)`, inserting `base=81.6`, `tau=2.886`, `speed=155.75`, and `K=3` gives an **effective** `c≈0.171`. A byte ratio `0.85/15.88≈0.054` is much smaller. This discrepancy does not uniquely identify launch overhead: verification cost, cache traffic, compute intensity, batch shape, synchronization, or a mismatched baseline can also explain it.
 
-```text
-   BW_eff / B_token  =  1296 / 15.88  =  81.6 tok/s        (non-speculative, verified)
-```
+Substituting `c=0.054` predicts approximately 203 tok/s **only if** the other quantities and model assumptions remain valid. It is a sensitivity calculation, not a discovered 30% speedup.
 
-Then invert the speculative speedup model against the observed 155.75:
+| Hypothesis | Experiment | Evidence to retain |
+|---|---|---|
+| Drafter is launch-bound | Trace kernel gaps; vary capture/fusion while holding output contract fixed | Draft and verification timings separately |
+| Output projection dominates traffic | Measure its time and bytes; compare a supported quantized variant | Layer error, task quality, total latency |
+| Memory kernels underuse bandwidth | Measure achieved bytes/s for the real shapes | Traffic counters, cache behavior, occupancy |
+| Precision changes acceptance | Paired prompts and draft configuration | Acceptance distribution and accepted tokens/s |
 
-```text
-                 τ                              81.6 × 2.886
-   tok/s  =  base × ──────────   ⟹   1 + K·c  =  ────────────  =  1.512
-                 1 + K·c                            155.75
+Apply one change at a time, then benchmark the combined configuration. Do not multiply isolated speedups: they may remove the same bottleneck or expose a different one. A well-supported negative result passes this research capstone when it explains why an appealing optimization did not help.
 
-   at K = 3   ⟹   c  =  0.171
-```
-
-Now compare that against what the byte ledger says the drafter *should* cost:
-
-```text
-   MTP head = 0.85 GB,  target = 15.88 GB   ⟹   c_bandwidth  =  0.054
-
-   measured c = 0.171     ≈  3.2× MORE EXPENSIVE than its bytes justify
-```
-
-```text
-   ┌──────────────────────────────────────────────────────────────────┐
-   │  The draft step costs 17 % of a target pass while moving only     │
-   │  5 % of the bytes. That gap is launch overhead and kernel         │
-   │  inefficiency in the drafting path — not physics.                 │
-   │                                                                   │
-   │  Fixing it alone:  81.6 × 2.886 / (1 + 3×0.054)  =  202.9 tok/s   │
-   └──────────────────────────────────────────────────────────────────┘
-```
-
-**That is a +30 % finding derived from arithmetic, before touching a single weight.** It is also the second time the ledger has found headroom that is not a quantization problem — the first was [Module 04's](Lecture-04.md) 72 %-vs-92 % bandwidth gap.
-
-### The staged target ladder
-
-| Stage | Change | Factor | Cumulative |
-|---|---|---:|---:|
-| — | baseline | — | **155.8 tok/s** |
-| 1 | kernel efficiency: 72 % → 92 % achieved BW ([Mod 03](Lecture-03.md), [04](Lecture-04.md)) | ×1.273 | 198.3 |
-| 2 | `lm_head` BF16 → NVFP4 ([Mod 04](Lecture-04.md), [11](Lecture-11.md)) | ×1.130 | 224.1 |
-| 3 | drafter path: `c` 0.171 → 0.08 ([Mod 10](Lecture-10.md)) | ×1.220 | 273.5 |
-| 4 | reallocation recovers acceptance ([Mod 11](Lecture-11.md)) | ×1.022 | **279.5** |
-
-**Set your commitment at Stage 2 (~224 tok/s) and your stretch at Stage 4 (~280).** Stages 1 and 3 are kernel work and may be gated by what your runtime exposes; stages 2 and 4 are yours regardless.
-
-Note what is *not* on this ladder: quantizing the transformer body further. It is already NVFP4, it is 58 % MLP which is already the right choice, and going below 4 bits is ruled out by [Module 03](Lecture-03.md). **The remaining wins are elsewhere, and the ledger is what told you so.**
+The deliverable is a measured Pareto comparison within declared quality, latency, and memory limits. There is no universal 224 or 280 tok/s requirement, and this exercise does not establish that every sub-4-bit method is slower.
 
 ---
 
@@ -197,15 +162,15 @@ For each row report: `B_token`, tok/s, predicted tok/s, τ, α, mean KL, p99 KL,
 
 **Target (the artifact is portfolio-grade):**
 
-- [ ] **≥ 224 tok/s** (Stage 2) at acceptance **≥ 2.886** and mean KL **≤ 0.05**.
+- [ ] A paired improvement against the reproduced baseline, or a supported negative result, within quality limits declared before optimization.
 - [ ] The `B_token(ε)` curve with the knee identified and a defended `ε`.
 - [ ] Long-context row at 262 K, with the feasibility analysis from [Module 09](Lecture-09.md).
 - [ ] At least one **documented negative result** with its mechanism explained.
 
 **Stretch (a real contribution):**
 
-- [ ] **≥ 273 tok/s** (Stage 3) — requires fixing the drafter path.
-- [ ] The drafter-efficiency finding confirmed and fixed: `c` from 0.171 toward 0.054.
+- [ ] A combined optimization with separately measured drafting, verification, and accepted-token costs.
+- [ ] The effective-cost discrepancy explained by trace evidence, including assumptions that failed.
 - [ ] Q/K sensitivity-vs-context curve, testing [Module 07 §2](Lecture-07.md)'s RoPE prediction.
 - [ ] TurboQuant runs end-to-end on a **second, different model** with no code changes.
 
@@ -283,7 +248,7 @@ If you can recite quantization algorithms but cannot say which bytes a token rea
 ## Current as of
 
 * **Timeless:** the five-stage architecture, the build order, the ablation-with-controls design, the exit criteria.
-* **Case-study pins:** 155.75 tok/s @ τ 2.886; derived `1 + K·c = 1.512`, `c = 0.171` at `K = 3` versus `c_bandwidth = 0.054`; the staged ladder to ~280 tok/s. The ladder's stage factors are **predictions from the course's models, not measurements** — verifying or refuting them is the capstone.
+* **Case-study assumptions:** reported 155.75 tok/s at τ=2.886 and the simplified cost-model calculation are inputs to hypotheses. They are not independently reproduced course measurements, and isolated estimated speedups must not be multiplied into a promised target.
 * **Related:** [AI Inference Engineer 2026 — Part 4](../AI%20Inference%20Engineer%202026/Part%204%20-%20Optimizing%20a%20Real%20Engine/README.md) runs the same discipline over ~96 PRs on an 8× H200 engine, and is the best companion read for this capstone.
 
 ---

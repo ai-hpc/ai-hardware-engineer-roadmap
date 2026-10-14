@@ -17,6 +17,8 @@
 ---
 
 
+> **TensorRT API versions:** This reference includes legacy binding-based execution or V2 plugin examples. Pin the installed TensorRT version before using a block. TensorRT 10.x execution uses named tensors, `set_tensor_address`, and `execute_async_v3`; legacy examples are not drop-in 10.x code. Newer major releases have further changes. Use NVIDIA's [8.x→10.x migration guide](https://docs.nvidia.com/deeplearning/tensorrt/10.x.x/api/tensorrt-8x-to-10x-python-api.html) and the API documentation matching your BSP.
+
 ## 1. Introduction
 
 ### 1.1 Camera Subsystem Importance in Edge AI
@@ -27,7 +29,7 @@ pose estimation, defect inspection, and autonomous navigation all begin with
 pixel data captured through the camera pipeline. On the Orin Nano 8GB, every
 frame traverses a purpose-built hardware path from the image sensor through
 MIPI CSI-2 receivers, video input DMA engines, and a dedicated image signal
-processor before reaching GPU or DLA compute units. Understanding this path at
+processor before reaching GPU compute (or DLA on supported NX/AGX modules). Understanding this path at
 the register and driver level is essential for anyone building production
 vision systems.
 
@@ -180,7 +182,7 @@ sudo tegrastats --interval 500
 
 ### 2.5 Memory Architecture Implications
 
-The Orin Nano uses unified memory (LPDDR5) shared between CPU, GPU, DLA, and
+The Orin Nano uses unified memory (LPDDR5) shared between CPU, GPU, camera, and
 all camera/video engines. This has important implications:
 
 - VI DMA writes compete with GPU and CPU memory traffic
@@ -2258,6 +2260,8 @@ Common pitfalls that break zero-copy:
 
 ## 14. Camera to DLA/TensorRT Pipeline
 
+> **Hardware boundary:** DLA examples in this section require a supported NX/AGX module. Nano has zero DLA cores. Verify TensorRT `builder.num_DLA_cores` before building; GPU fallback is not a substitute for absent hardware.
+
 ### 14.1 End-to-End Architecture
 
 A production inference pipeline from camera to model output:
@@ -2464,7 +2468,7 @@ End-to-end latency from photon to processed result:
  CSI transfer       < 1 ms
  VI DMA             < 1 ms
  ISP processing     ~5-10 ms
- CUDA/DLA inference ~5-20 ms (model dependent)
+ GPU inference on Nano ~5-20 ms (model dependent)
  -----------------------------------------
  Total              ~60-80 ms typical (30 fps)
 ```
@@ -2996,16 +3000,11 @@ interfaces may differ on other Jetson platforms or JetPack versions. Always
 cross-reference with the official NVIDIA L4T documentation and the sensor
 manufacturer's datasheet for your specific hardware configuration.*
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Trace sensor clock/reset, CSI transport, driver, buffers, and image consumer. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: How old is the image when inference consumes it?
 
-1. **Baseline lab:** Capture a fixed scene with known resolution/format and validate timestamps and frame content.
-2. **Guided variation:** Change one supported mode or simulate dropped frames; diagnose the failing pipeline boundary.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Capture a timestamped scene and record sensor mode, exposure, stride, pixel format, frame sequence, and consumer time. Vary one queue depth, then disconnect or stall capture and observe recovery.
 
-**Evidence to submit:** Frame rate, drop count, capture-to-consumer latency, format/stride, and driver logs. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Count frame gaps and measure age distributions with the timestamp clock domain identified. A higher FPS is not a pass if the robot consumes older frames; pass calibration and format metadata to the VLA pipeline.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [vla-deploy-jetson](../../5.%20Application%20Development/5.%20ML%20and%20AI/vla-deploy-jetson/Guide.md). Explain which assumption from this course the next engineer must preserve.

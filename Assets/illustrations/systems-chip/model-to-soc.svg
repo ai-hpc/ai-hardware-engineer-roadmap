@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="840" viewBox="0 0 1200 840" role="img" aria-labelledby="title desc">
+<title id="title">From a VLA workload to a physical-AI SoC</title>
+<desc id="desc">A versioned observation and action contract feeds compiler lowering and a functional reference. On the prototype, a Linux host submits DMA commands to a matrix accelerator and memory subsystem. Timestamped sensors feed the host; an independent controller checks action age and limits. Wireless integration has an explicit module boundary. Simulation, FPGA, physical design and silicon are distinct maturity levels.</desc>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#2563eb"/></marker><marker id="orange" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#b45309"/></marker></defs>
+<rect width="1200" height="840" rx="24" fill="#f8fafc"/>
+<g font-family="DejaVu Sans, sans-serif" fill="#0f172a">
+<text x="48" y="62" font-size="31" font-weight="700">A model becomes a machine through explicit contracts</text>
+<text x="48" y="98" font-size="19" fill="#475569">Trace one useful action all the way through software, memory, hardware, and control.</text>
+<g fill="#eff6ff" stroke="#93c5fd" stroke-width="2">
+<rect x="48" y="134" width="312" height="138" rx="14"/>
+<rect x="444" y="134" width="312" height="138" rx="14"/>
+<rect x="840" y="134" width="312" height="138" rx="14"/>
+</g>
+<g font-size="20" font-weight="700"><text x="70" y="173">1. VLA workload</text><text x="466" y="173">2. Compiler contract</text><text x="862" y="173">3. Reference check</text></g>
+<g font-size="17" fill="#334155">
+<text x="70" y="207">Checkpoint • shapes • dtype</text><text x="70" y="238">Frames • units • action age</text>
+<text x="466" y="207">Lower • tile • assign buffers</text><text x="466" y="238">Commands • scales • fallback</text>
+<text x="862" y="207">Same input + command ABI</text><text x="862" y="238">Values first; timing separately</text>
+</g>
+<path d="M360 203 H434" stroke="#2563eb" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+<path d="M756 203 H830" stroke="#2563eb" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+<path d="M600 272 V310" stroke="#2563eb" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+<rect x="30" y="320" width="1140" height="259" rx="18" fill="#fff" stroke="#94a3b8" stroke-width="2" stroke-dasharray="8 5"/>
+<text x="48" y="347" font-size="17" fill="#475569">PROTOTYPE SoC BOUNDARY — select the implementation level; do not assume integrated RF</text>
+<g fill="#fff" stroke="#64748b" stroke-width="2"><rect x="48" y="375" width="312" height="170" rx="14"/><rect x="444" y="375" width="312" height="170" rx="14"/><rect x="840" y="375" width="312" height="170" rx="14"/></g>
+<g font-size="20" font-weight="700"><text x="70" y="413">Linux host CPU</text><text x="466" y="413">AI accelerator</text><text x="862" y="413">Memory + interconnect</text></g>
+<g font-size="17" fill="#334155">
+<text x="70" y="450">Driver • mapped buffers</text><text x="70" y="480">Submit • wait • timeout • reset</text><text x="70" y="514">CPU ISA ≠ accelerator ABI</text>
+<text x="466" y="450">DMA + local SRAM + compute</text><text x="466" y="480">Supported operators + formats</text><text x="466" y="514">Completion and error signals</text>
+<text x="862" y="450">External memory + arbitration</text><text x="862" y="480">Bandwidth • live-buffer limits</text><text x="862" y="514">Measure contention and copies</text>
+</g>
+<path d="M360 458 H434" stroke="#2563eb" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+<path d="M756 458 H830" stroke="#2563eb" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+<path d="M204 637 V557" stroke="#2563eb" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+<path d="M600 545 V628" stroke="#b45309" stroke-width="3" fill="none" marker-end="url(#orange)"/>
+<g fill="#fff7ed" stroke="#fdba74" stroke-width="2"><rect x="48" y="639" width="312" height="125" rx="14"/><rect x="444" y="639" width="312" height="125" rx="14"/><rect x="840" y="639" width="312" height="125" rx="14"/></g>
+<g font-size="20" font-weight="700"><text x="70" y="677">Sensor input</text><text x="466" y="677">Controller boundary</text><text x="862" y="677">Wireless module</text></g>
+<g font-size="17" fill="#334155"><text x="70" y="709">Capture time • sequence • frame</text><text x="70" y="739">Track ownership until consumed</text><text x="466" y="709">Check age, units, and limits</text><text x="466" y="739">Apply valid action or fallback</text><text x="862" y="709">Define the host interface</text><text x="862" y="739">Loss • reconnect • contention</text></g>
+<text x="48" y="810" font-size="17" fill="#475569">Evidence levels: functional simulation → FPGA prototype → physical-design estimate → measured silicon</text>
+</g></svg>

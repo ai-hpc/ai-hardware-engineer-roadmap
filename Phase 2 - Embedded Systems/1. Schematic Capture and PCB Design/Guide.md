@@ -42,7 +42,7 @@
 
 ## 4. Outputs and handoff
 
-* **Fab package:** Gerbers/OBD++, drill files, pick-and-place if applicable, fab drawing with stackup notes.
+* **Fab package:** Gerber or ODB++ outputs, drill files, pick-and-place if applicable, and a fabrication drawing with stackup notes. Use the format and layer conventions agreed with the fabricator.
 * **BOM:** Manufacturer part numbers, alternates, lifecycle awareness.
 * **Bring-up plan:** Power rails first (current-limited supply), then clocks/reset, then programming/debug connectors — feeds directly into firmware work in **section 2**.
 
@@ -59,16 +59,10 @@
 
 **[Embedded Software — ARM MCU, FreeRTOS, protocols](../2.%20Embedded%20Software/Guide.md)**
 
-## Practice and assessment
+## Design a board interface the firmware can verify
 
-**Entry diagnostic (prerequisite check):** Follow a supply rail from connector through regulation and decoupling to the load. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+Choose one sensor and one MCU/development-module interface. Create a pin table with connector number, signal name, voltage domain, direction, pull state, reset behavior, and firmware name. Calculate peak current and regulator margin from the selected parts; mark test points that can distinguish absent power, reset held, missing clock, and failed bus traffic.
 
-1. **Baseline lab:** Design a small sensor interface schematic and PCB with explicit power and signal budgets.
-2. **Guided variation:** Review swapped pins, missing pull-ups, and connector orientation using ERC/DRC and a peer-style checklist.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Pass the review when every firmware-visible pin maps to the schematic and datasheet, ERC/DRC findings are resolved or justified, and the bring-up order has measurable expected observations. A clean DRC report does not establish signal integrity or correct component pin numbering. Reuse the pin table in the first driver lab.
 
-**Evidence to submit:** ERC/DRC findings, voltage/current budget, net/pin mapping, and fabrication/bring-up artifacts. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** Reviewed schematic/pin map, power budget, and ordered bring-up observations. Continue with [the next course](../2.%20Embedded%20Software/Guide.md) and reuse that evidence.

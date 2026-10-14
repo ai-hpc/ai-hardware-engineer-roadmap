@@ -33,7 +33,7 @@ point arrives when you face these production realities:
 |---|---|---|
 | Image size | 12-16 GB (full JetPack) | 800 MB - 2 GB (tailored) |
 | Attack surface | ~2,400 packages installed | 150-350 packages (audited) |
-| Reproducibility | Depends on apt mirror state | Deterministic, bit-for-bit |
+| Reproducibility | Requires pinned sources and package inputs | Supports reproducible-build workflows; verify output equality for your image |
 | License audit | Manual, error-prone | Automated SPDX manifests |
 | OTA updates | No native A/B support | SWUpdate/Mender/RAUC integrated |
 | Build automation | Shell scripts, fragile | BitBake, declarative, cacheable |
@@ -5462,3 +5462,12 @@ applications. All code examples are representative of real-world implementations
 and should be adapted to your specific project requirements.*
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Integration lab: Can someone rebuild the exact image that passed the lab?
+
+Freeze layer revisions, recipes, configuration, toolchain, source checksums, and proprietary package inputs. Build the image and compare package manifests; distinguish repeatable function from bit-for-bit reproducibility.
+
+**Acceptance evidence:** Boot and validate one sensor/model path on the exact image. Record licenses/SBOM, build provenance, and a recovery image; a successful BitBake exit is only the first gate.
+
+**Continue:** take this artifact to [Orin-Nano-OTA-Deep-Dive](../Orin-Nano-OTA-Deep-Dive/Guide.md). Explain which assumption from this course the next engineer must preserve.

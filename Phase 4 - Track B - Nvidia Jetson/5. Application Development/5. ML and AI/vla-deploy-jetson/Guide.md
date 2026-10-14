@@ -27,6 +27,11 @@ Sources used in this guide:
 
 ---
 
+
+![Camera, GPU preprocessing, inference, and CPU action validation share one DRAM budget but exchange ownership using completion fences.](../../../../Assets/illustrations/deployment-edge/memory-ownership.png)
+
+*Read the arrows as ownership transfers. Shared DRAM alone does not remove format conversions, copies, or synchronization.*
+
 ## 1. Why VLA edge inference is its own discipline
 
 A VLA model takes pixels + state + a language instruction and emits an action — a continuous joint command, an end-effector pose delta, a chunk of future actions, or a gripper toggle. The architecture typically composes:
@@ -528,16 +533,11 @@ These are unsettled as of mid-2026; expect the answers to move in the next 12 mo
 - [LLM Optimization on Jetson](../llm-optimization-jetson/Guide.md)
 - [Robotics — Advanced Perception and AI](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Advanced%20Perception%20and%20AI%20for%20Robotics/Lecture-01.md)
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** State observation/action order, normalization, coordinate convention, and policy period. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Is a numerically close action still valid for this robot?
 
-1. **Baseline lab:** Compare exported policy actions on identical observations before a simulated closed-loop run.
-2. **Guided variation:** Inject stale observations or a joint-order mismatch and prove detection.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Replay timestamped observation/action episodes through reference and optimized policies. Track camera preprocessing, proprioception ordering, action units/frame, horizon, and gripper encoding; then evaluate paired simulation episodes.
 
-**Evidence to submit:** Action error, closed-loop success, observation age, deadline misses, and memory. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Declare joint/action tolerances and task-success criteria before tuning. Reject stale commands and test sensor dropout; lower kernel time cannot compensate for a broken action contract.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [6. ROS2](../../6.%20ROS2/Guide.md). Explain which assumption from this course the next engineer must preserve.

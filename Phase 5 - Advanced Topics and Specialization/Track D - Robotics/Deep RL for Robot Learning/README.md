@@ -133,3 +133,12 @@ You are done with this special course when you can:
 * Back: [Track D — Robotics Guide](../Guide.md)
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Carry this course into the physical-AI system
+
+**Start from:** A validated simulator task, reward definition, and imitation/reference policy.
+
+**Build and challenge:** Compare training methods at a fixed environment-step and compute budget. Keep evaluation seeds/scenes separate, check reward hacking, and report multiple seeds rather than a best run.
+
+**Pass forward:** A frozen policy and training provenance for independent deployment evaluation. Continue with [the connected course](../VLA%20Optimization%20and%20Action-Parity%20Harness/README.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

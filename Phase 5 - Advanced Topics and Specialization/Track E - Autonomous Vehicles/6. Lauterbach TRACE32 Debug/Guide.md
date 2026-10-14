@@ -103,6 +103,14 @@ Treat this track as **tooling literacy** for **senior embedded / firmware / vali
 
 **Lauterbach TRACE32®** is **advanced embedded debug and trace** tooling for **serious** **SoC** and **ECU** work. Add it to your roadmap when you move from **“printf and GDB”** to **multicore**, **silicon validation**, **automotive**, or **safety**-adjacent **evidence**—and budget for **probe hardware**, **licenses**, and **vendor training**.
 
+## Timing lab: separate the bug from the observer
+
+On a lab board, toggle a GPIO at timer release and ISR entry, then compare an external logic-analyzer trace with the target's available timestamped trace. Measure interrupt response before enabling breakpoints. Halting the core changes timing, so a breakpoint session cannot establish real-time latency.
+
+For each trace, record clock source, timestamp resolution, capture duration, overflow/lost-packet indicators, optimization level, and whether tracing changes execution. A finite maximum observed latency is not a proven worst-case bound. If instruction trace hardware is unavailable, retain the GPIO experiment and mark instruction-level attribution as unmeasured.
+
+**Handoff:** one annotated interrupt-to-completion timeline for the accelerator driver or safety controller, identifying missing visibility that the future SoC should expose through counters, trace buffers, or debug ports.
+
 ## Practice and assessment
 
 **Entry diagnostic (prerequisite check):** Explain halt-based debugging versus nonintrusive trace and their timing effects. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.

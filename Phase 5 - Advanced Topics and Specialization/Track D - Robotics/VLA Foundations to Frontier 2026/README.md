@@ -138,3 +138,12 @@ The 2026 coverage includes verified work on π0.7, GR00T N1.7, Gemini Robotics 2
 ## Connections to the roadmap
 
 Continue with [VLA Optimization and Action-Parity Harness](../VLA%20Optimization%20and%20Action-Parity%20Harness/README.md) for specialist inference work, [Deep RL](../Deep%20RL%20for%20Robot%20Learning/README.md) for deeper control learning, and [Isaac Sim and Isaac Lab](../Isaac%20Sim%20and%20Isaac%20Lab/README.md) for simulator engineering. The [DeepSeek NVFP4 course](../../Track%20G%20-%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/README.md) contributes checkpoint and runtime methods; language-model deployment and robot action deployment still require different output and evaluation contracts.
+
+
+## Carry this course into the physical-AI system
+
+**Start from:** The task/observation contract and a released, usable policy artifact.
+
+**Build and challenge:** Follow history and architecture into action representation, data, training, evaluation, and deployment. Trace a complete action chunk through normalization, frame conversion, expiry, and controller consumption.
+
+**Pass forward:** A workload dossier and closed-loop reference that constrain the future accelerator. Continue with [the connected course](../VLA%20Optimization%20and%20Action-Parity%20Harness/README.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

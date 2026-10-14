@@ -17,6 +17,11 @@
 ---
 
 
+
+![Camera, GPU preprocessing, inference, and CPU action validation share one DRAM budget but exchange ownership using completion fences.](../../../Assets/illustrations/deployment-edge/memory-ownership.png)
+
+*Read the arrows as ownership transfers. Shared DRAM alone does not remove format conversions, copies, or synchronization.*
+
 ## 0. Jetson vs Discrete GPU — The Fundamental Difference
 
 Before any detail: understand **why Jetson memory is fundamentally different** from a desktop/server GPU. This changes everything about how you write CUDA code for edge AI.
@@ -47,7 +52,7 @@ Problem: every byte must cross PCIe (64 GB/s bottleneck)
 │                     T234 SoC (Orin Nano Super)                          │
 │                                                                         │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────┐  │
-│  │  CPU     │  │  GPU     │  │  DLA     │  │  ISP/VI  │  │ NVENC  │  │
+│  │  CPU     │  │  GPU     │  │  VIC     │  │  ISP/VI  │  │ NVDEC  │  │
 │  │  A78AE   │  │  Ampere  │  │          │  │  Camera  │  │ NVDEC  │  │
 │  │  6 cores │  │  1024    │  │ ~10 TOPS │  │          │  │        │  │
 │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘  └───┬────┘  │
@@ -66,7 +71,7 @@ Problem: every byte must cross PCIe (64 GB/s bottleneck)
                     │  SHARED by ALL      │
                     └─────────────────────┘
 
-No PCIe. No copy. CPU, GPU, DLA, camera ALL access the SAME physical memory.
+No CPU-to-GPU PCIe hop. CPU, GPU, and camera share DRAM; copies and synchronization still depend on allocations and formats.
 ```
 
 ### What This Means for Your Code
@@ -105,16 +110,11 @@ cudaDeviceSynchronize();
 read_results_on_cpu(shared);                   // CPU reads GPU output
 ```
 
-**2. Memory bandwidth is your bottleneck — not compute.**
-Discrete H100: 3,350 GB/s HBM → 989 TFLOPS. Jetson Orin Nano Super: 102 GB/s LPDDR5 → 67 TOPS (GPU) + ~10 TOPS (DLA) ≈ 77 TOPS total. The compute-to-bandwidth ratio is dramatically different:
+**2. Classify the bottleneck using matching units.**
 
-```
-H100 ridge point:         989 TFLOPS / 3,350 GB/s ≈ 295 FLOP/byte
-Orin Nano Super ridge:    67 TOPS / 102 GB/s ≈ 0.66 OP/byte
+A roofline ridge is peak operations/s divided by bytes/s. With the advertised illustrative pair `67 × 10^12 sparse INT8 operations/s` and `102 × 10^9 bytes/s`, the quotient is approximately **657 operations/byte**, not 0.66. It is a sparse INT8 roofline, not an FP16 or dense-decode roofline.
 
-→ Almost EVERYTHING is memory-bound on Jetson.
-→ Tiling, data reuse, and INT8 quantization are not optional — they're mandatory.
-```
+Use measured or applicable peak throughput for the actual dtype, sparsity, operation, and clock mode. Low arithmetic-intensity work can be bandwidth-bound; large reused matrix products can be compute-bound. Launch overhead, indexing, and synchronization may dominate small kernels. A hardware name alone cannot classify every workload.
 
 **3. Memory capacity is precious — 8 GB total.**
 On a server, a 7B LLM model takes 14 GB (FP16) in GPU VRAM, leaving 500+ GB system RAM for everything else. On Jetson 8 GB, that same model won't even fit. You must:
@@ -175,7 +175,7 @@ What are you allocating?
 
 ## 1. T234 SoC Memory Architecture Overview
 
-The Tegra234 SoC in Orin Nano 8GB uses a **unified memory architecture** — CPU, GPU, DLA, and all accelerators share a single 8GB LPDDR5 pool. There is no discrete GPU memory.
+The Tegra234 SoC in Orin Nano 8GB uses a **unified memory architecture** — CPU, GPU, camera, and other available engines share a single 8GB LPDDR5 pool. There is no discrete GPU memory.
 
 ```
                         8GB LPDDR5
@@ -187,8 +187,8 @@ The Tegra234 SoC in Orin Nano 8GB uses a **unified memory architecture** — CPU
        │            └───────┬───────┘            │
        │                    │                    │
   ┌────┴────┐         ┌────┴────┐         ┌─────┴────┐
-  │ CPU     │         │ GPU     │         │ DLA/ISP  │
-  │ A78AE   │         │ Ampere  │         │ NVENC    │
+  │ CPU     │         │ GPU     │         │ VIC/ISP  │
+  │ A78AE   │         │ Ampere  │         │ NVDEC    │
   │ cluster │         │ 1024    │         │ NVDEC    │
   │         │         │ cores   │         │ CSI/VI   │
   └─────────┘         └─────────┘         └──────────┘
@@ -228,7 +228,7 @@ GPU (Ampere)
 
 * **CPU L3 is small (2MB)** — large working sets spill to DRAM quickly. This matters for pre/post-processing on CPU.
 * **GPU L2** is shared — inference kernels compete for cache. Kernel tiling and occupancy directly affect L2 hit rates.
-* **No hardware cache coherence between CPU and GPU** — this is why explicit synchronization (e.g., `cudaStreamSynchronize`) is required, and why zero-copy via NVMM/DMA-BUF is preferred over CPU-GPU memcpy.
+* **I/O coherency is not full system coherency.** Orin supports I/O-coherent access, with allocation-specific CPU/GPU caching rules. A shared physical allocation still needs ownership transfer and completion synchronization. Compare allocation types using [CUDA for Tegra](https://docs.nvidia.com/cuda/cuda-for-tegra-appnote/); do not assume mapped pinned memory is fastest for GPU-reused tensors.
 
 ---
 
@@ -673,7 +673,7 @@ This is how real-time 4K vision runs efficiently on Orin Nano without saturating
 NVMM is NVIDIA's buffer management layer for multimedia pipelines (camera, encode, decode). Key properties:
 
 * Buffers are allocated from CMA or carved-out memory
-* Accessible by all NVIDIA engines (ISP, GPU, VIC, NVENC, NVDEC)
+* Importable by compatible consumers (for example ISP, GPU, VIC, and NVDEC), subject to format, layout, and synchronization requirements. Nano has no NVENC.
 * Zero-copy between engines via DMA-BUF
 * Managed by `libnvbufsurface`
 
@@ -714,48 +714,11 @@ On Orin Nano 8GB, GPU and CPU compete for the same 8GB. A large model loaded in 
 
 ---
 
-## 12. DLA Memory Path
+## 12. Accelerator memory paths: compare Nano with NX/AGX
 
-> **Deep dive:** For full DLA coverage — hardware architecture (MAC/SDP/PDP/CDP), TensorRT integration, supported layers, multi-engine scheduling, profiling, and production deployment patterns — see [**Orin Nano DLA Deep Dive**](../Orin-Nano-DLA-Deep-Dive/Guide.md).
+Orin Nano has no DLA. On supported NX/AGX modules, DLA is another consumer of system memory; moving work there does not create more physical RAM. Layout conversions and synchronization can add DRAM traffic even when buffers can be shared. See the [DLA comparison course](../Orin-Nano-DLA-Deep-Dive/Guide.md) and [NVIDIA Orin power tables](https://docs.nvidia.com/jetson/archives/r36.5/DeveloperGuide/SD/PlatformPowerAndPerformance/JetsonOrinNanoSeriesJetsonOrinNxSeriesAndJetsonAgxOrinSeries.html).
 
-Orin Nano 8GB includes **1 DLA (Deep Learning Accelerator)** capable of up to 10 TOPS (INT8).
-
-### How DLA Accesses Memory
-
-DLA uses the same unified DRAM but has its own SMMU stream:
-
-```
-DLA engine
-   ↓
-DLA IOVA
-   ↓
-SMMU (DLA stream context)
-   ↓
-Physical DRAM
-```
-
-### TensorRT DLA Execution
-
-When TensorRT runs layers on DLA:
-
-1. TensorRT allocates input/output buffers in DRAM
-2. Maps them into DLA's SMMU context
-3. Programs DLA registers (layer config, weights pointer, I/O pointers)
-4. DLA executes the layer, reading weights and input from DRAM, writing output to DRAM
-5. If next layer runs on GPU, the same output buffer is mapped into GPU's SMMU — zero-copy handoff
-
-### DLA vs GPU Memory Trade-offs
-
-| Aspect          | GPU                        | DLA                         |
-|-----------------|----------------------------|-----------------------------|
-| Memory bandwidth | High (shared with CPU)    | Lower (limited ports)       |
-| Precision       | FP32, FP16, INT8           | FP16, INT8 only             |
-| Layer support   | All TensorRT layers        | Subset (conv, pool, etc.)   |
-| Power           | Higher                     | Much lower per TOPS         |
-
-Running layers on DLA frees GPU for other tasks and reduces power consumption — critical for edge/battery systems.
-
----
+For the custom SoC, make the same distinction between **storage capacity**, **bandwidth**, and **ownership**. List each tensor's producer, consumer, layout, allocation, DMA mapping, and completion fence. A shared address space alone proves none of these interfaces compatible.
 
 ## 13. TensorRT Engine Memory Management
 
@@ -870,7 +833,7 @@ Example: Autonomous robot vision pipeline
   Camera → YOLOv8-N (detect) → ResNet-18 (classify) → DeepSORT (track)
                   ↓                     ↓                    ↓
               ~30 MB               ~25 MB                ~15 MB
-              GPU + DLA            GPU                   CPU
+              GPU (Nano)           GPU                   CPU
 
 Pipeline memory budget:
   Model weights:      30 + 25 + 15         = ~70 MB
@@ -885,7 +848,9 @@ Pipeline memory budget:
   Remaining from 8 GB:                     ~5343 MB  ← plenty of room
 ```
 
-### GPU + DLA Split — Maximum Throughput
+### Optional NX/AGX comparison: GPU + DLA concurrency
+
+This subsection requires a DLA-equipped module; it does not run on Orin Nano. Numbers below are illustrative budgets, not measured Nano results.
 
 Running detection on DLA while classification runs on GPU achieves overlap — both engines execute in parallel on the same DRAM:
 
@@ -966,7 +931,7 @@ Llama 3.2 3B INT4 decode — one token:
   Weight loading: 1.5 GB read from DRAM
   Computation:    3B × 2 FLOPs = 6 GFLOP
   Time to load:   1.5 GB / 102 GB/s = ~14.7 ms
-  Time to compute: 6 GFLOP / 67 TOPS = ~0.09 ms
+  Compute bound: use measured throughput for the actual dense dtype/kernel; sparse INT8 TOPS is not FP compute throughput
   ─────────────────────────────────────────────
   Decode time:    ~15 ms per token → ~67 tokens/sec
 
@@ -1426,7 +1391,7 @@ If temperature exceeds limits, the system throttles clocks. This can cause infer
 **Solutions:**
 * Reduce model size (quantize to INT8, prune)
 * Reduce camera buffer count or resolution
-* Offload layers to DLA (frees GPU memory for other uses)
+* Reduce activation/workspace lifetimes or model size. DLA offload is unavailable on Nano and would still consume system DRAM on supported modules.
 * Monitor memory budget and set process memory limits
 
 ### Thermal Throttling Causing Latency Spikes
@@ -1467,16 +1432,11 @@ If temperature exceeds limits, the system throttles clocks. This can cause infer
 * [TensorRT DLA Documentation](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/) — DLA integration with TensorRT
 * Main guide: [Nvidia Jetson Platform Guide](../Guide.md)
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Distinguish shared physical DRAM, virtual mappings, copies, and cache coherence. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Does zero-copy mean one allocation, one format, and one owner?
 
-1. **Baseline lab:** Compare two buffer-transfer paths for identical producer/consumer work.
-2. **Guided variation:** Increase working set and queue depth until a bottleneck changes; preserve correctness.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+For a camera-to-model path list allocation, producer, consumer, stride/layout, mapping, and synchronization per edge. Measure live bytes without double-counting CPU/GPU views of the same allocation.
 
-**Evidence to submit:** Copy count, bytes moved, peak RAM, latency, and synchronization boundaries. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Provide a memory ledger including model, cache, workspace, camera pool, OS, and headroom. Demonstrate that the consumer waits for completion and that reclaiming a buffer early is caught.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [Orin-Nano-CUDA-Programming](../Orin-Nano-CUDA-Programming/Guide.md). Explain which assumption from this course the next engineer must preserve.

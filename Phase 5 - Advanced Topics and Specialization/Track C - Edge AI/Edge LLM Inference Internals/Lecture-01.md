@@ -82,12 +82,12 @@ hidden ─► RMSNorm ─► [GEMV] Q  : 2560×2560
                               │
               residual add ─► RMSNorm
                               │
-                ├► [GEMV] FFN gate : 2560×~6912
-                └► [GEMV] FFN up   : 2560×~6912
+                ├► [GEMV] FFN gate : 2560×~9728
+                └► [GEMV] FFN up   : 2560×~9728
                               │
                         SwiGLU activation
                               │
-                   [GEMV] FFN down  : 6912×2560
+                   [GEMV] FFN down  : 9728×2560
                               │
                       residual add
 ```
@@ -251,9 +251,9 @@ sudo jetson_clocks --show
 tegrastats --interval 500
 
 # Look for:
-#   GR3D_FREQ NN%       <- GPU 3D engine load — should be > 80% during decode
+#   GR3D_FREQ NN%       <- GPU load indicator — not sufficient alone to identify a bottleneck
 #   EMC_FREQ NN%        <- memory controller — should be near 100% if you're bandwidth-bound
-#   CPU [...]           <- if CPU is high and GR3D is low, you're on CPU fallback
+#   CPU [...]           <- high CPU and low GPU can indicate preprocessing, launch stalls, or fallback; inspect the trace
 
 # 3. Confirm CUDA is actually used
 nvidia-smi               # works on AGX; not all Orin variants

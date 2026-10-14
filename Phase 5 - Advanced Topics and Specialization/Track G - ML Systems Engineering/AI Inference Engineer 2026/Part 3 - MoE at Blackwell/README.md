@@ -1,15 +1,21 @@
 # Part 3 — MoE Inference at Blackwell
 
-The Blackwell-class production inference stack for modern Mixture-of-Experts models. Five lectures, anchored on a side-by-side comparison of the two dominant 2025 open-weights MoE families:
+The Blackwell-class production inference stack for modern Mixture-of-Experts models. Five lectures, anchored on a side-by-side comparison of the two 2025 open-weight MoE case studies:
 
 * **DeepSeek V3.1** — 671B total / 37B active params, **256 routed experts + 1 shared** per layer, top-8 routing, **MLA** (Multi-head Latent Attention) with compressed KV, native **multi-token prediction (MTP)** head.
 * **Qwen3-MoE 235B-A22B** — 235B total / 22B active params, **128 routed experts + 0 shared** per layer, top-8 routing, standard GQA attention, no native MTP.
 
-The pair is uniquely useful: same era, same year, both well-supported in vLLM/SGLang/TRT-LLM, but architecturally different in three teaching-relevant ways — attention type (MLA vs GQA), shared-expert design, and native speculation. Every concept lands on two concrete deployable systems.
+The pair is uniquely useful: same era, with runtime support to verify per version/precision, and architecturally different in three teaching-relevant ways — attention type (MLA vs GQA), shared-expert design, and native speculation. Every concept lands on two concrete deployable systems.
 
-**Hardware target:** B200 (192 GB HBM3e), B300 (288 GB HBM3e), and primarily **GB200 NVL72** — the 72-GPU NVLink domain that is the production target for trillion-parameter MoE serving in 2026.
+**Hardware case studies:** B200, B300, and GB200 NVL72. Record the exact system SKU, usable per-GPU capacity, topology, and supported formats from its documentation. A connected GPU domain is not one automatically pooled allocation.
 
 By the end of Part 3 you should be able to ship either MoE to production on a multi-Blackwell deployment, defend the precision recipe at FP4 + FP8 KV, defend the EP/TP partition, and ship a reproducible benchmark with `$/MTok` numbers measured on real hardware.
+
+## Access and compatibility route
+
+The full deployment experiment requires appropriate hardware. With a CPU or smaller GPU, complete the config audit, memory/traffic derivation, numerical subgraph checks, and benchmark design; label cluster throughput and cost results **not run**. This is an analysis milestone, not completion of the hardware deployment milestone.
+
+Build a model × runtime × format × parallelism compatibility table first. The parameter lists below describe the desired experiment space, not a promise that every combination is supported. Run only supported cells; explain excluded cells and keep them in the report.
 
 ## Lectures
 
@@ -48,16 +54,11 @@ You can do all of:
 
 You have completed the course when these are all defended by numbers in your benchmark repo.
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain why active experts reduce compute without removing resident model storage. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Carry this course into the physical-AI system
 
-1. **Baseline lab:** Profile a supported MoE baseline with documented expert placement and routing statistics.
-2. **Guided variation:** Change parallelism or request mix and inspect rank imbalance.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Start from:** A verified MoE graph, checkpoint format, and runtime compatibility matrix.
 
-**Evidence to submit:** Quality, per-rank memory/time, dispatch/combine cost, routing load, and useful throughput. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Build and challenge:** Separate total parameter storage from active expert compute. Compare one supported placement and trace communication; reject unsupported model/format/kernel combinations before benchmarking.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** Per-device capacity and traffic budgets that transfer to a named frontier checkpoint. Continue with [the connected course](../Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/README.md) and keep the artifact in the [Physical AI Design Studio](../../../../Physical-AI-Design-Studio.md).

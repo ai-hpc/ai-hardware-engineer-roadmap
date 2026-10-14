@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
 #include <pthread.h>
@@ -116,7 +117,6 @@ static void *worker_thread(void *arg)
 {
 	shared_t *s = (shared_t *)arg;
 	struct timespec ts;
-	int i;
 
 /* Signal that the worker is ready, like a simple completion event (L9). */
 	pthread_mutex_lock(&s->mutex);

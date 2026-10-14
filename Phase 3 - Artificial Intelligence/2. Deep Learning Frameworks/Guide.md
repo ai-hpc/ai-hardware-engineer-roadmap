@@ -173,16 +173,11 @@ print(y.grad)  # dz/dy = x + 2y = 2 + 6 = 8.0
 
 → [**Module 3 — Computer Vision**](../Track%20A%20-%20Hardware%20and%20Edge%20AI/3.%20Computer%20Vision/Guide.md) — the perception workloads that drive edge AI and autonomous systems.
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain tensor shapes, autograd, device placement, and evaluation mode. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Carry this course into the physical-AI system
 
-1. **Baseline lab:** Implement the same small forward/backward computation in two frameworks or against a numerical reference.
-2. **Guided variation:** Test shape boundaries and compare eager versus compiled or scheduled execution where supported.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Start from:** The same network and inputs from Neural Networks.
 
-**Evidence to submit:** Output/gradient error, warmup versus steady-state timing, memory, and environment versions. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Build and challenge:** Trace it in a scalar autograd engine, PyTorch, and a pinned tinygrad revision. Separate backward-graph construction from inference compilation; compare outputs before timing.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** A framework-to-operator trace with shapes, dtypes, layouts, and live tensors. Continue with [the connected course](tinygrad/Guide.md) and keep the artifact in the [Physical AI Design Studio](../../Physical-AI-Design-Studio.md).

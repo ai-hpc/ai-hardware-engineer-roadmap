@@ -242,7 +242,7 @@ memref.dealloc %buf : memref<128x256xf32>
 
 ### Bufferization: Tensor → MemRef
 
-The **one-shot bufferization** pass converts the entire program from tensor semantics to memref semantics in a single analysis, deciding buffer allocation and reuse.
+The **one-shot bufferization** pass analyzes supported tensor operations and rewrites them to buffer semantics, choosing legal in-place reuse or copies. Its analysis is whole-function by default, with options for function boundaries; it does not automatically bufferize arbitrary unsupported operations or deallocate buffers. Deallocation and ownership are separate passes. [MLIR bufferization](https://mlir.llvm.org/docs/Bufferization/).
 
 ```mlir
 // BEFORE (tensor world — functional, no memory):

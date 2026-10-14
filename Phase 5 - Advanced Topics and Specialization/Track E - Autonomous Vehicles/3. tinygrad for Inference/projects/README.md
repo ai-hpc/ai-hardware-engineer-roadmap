@@ -61,7 +61,7 @@ DEBUG=3 python3 01_tensor_basics.py     # read the generated C for the fused ker
 
 What you learn:
 - ElementwiseOps: independent per-element — trivially fuse
-- ReduceOps: dimension-collapsing — break fusion boundaries
+- ReduceOps: dimension-collapsing — analyze dependencies and observe fusion
 - MovementOps: zero-copy via ShapeTracker
 - How matmul decomposes to expand + multiply + sum
 
@@ -70,7 +70,7 @@ python3 02_op_types.py
 DEBUG=1 python3 02_op_types.py
 ```
 
-**Key insight:** Movement ops alone produce **zero kernels**. Verify this with `DEBUG=1`.
+**Experiment:** compare a view with its contiguous materialization and a consuming reduction. Record when a kernel or copy is introduced instead of assuming all movement is free.
 
 ---
 
@@ -192,6 +192,12 @@ Total: ~38 hours of focused work. Return to earlier projects with `DEBUG=4` and 
 - hacking-tinygrad.md — code snippets for internals (see tinygrad source repo)
 - [tinygrad source](https://github.com/tinygrad/tinygrad) — read `tinygrad/tensor.py` and `tinygrad/runtime/ops_clang.py`
 - [abstractions.py](https://github.com/tinygrad/tinygrad/blob/master/docs/abstractions.py) — annotated architecture walkthrough
+
+## Carry one result from tensors to the backend
+
+Use the same fixed matmul inputs for Projects 2, 5, and 7. Add a non-square case, a dimension not divisible by a tile size, and a transposed input. Compare values before timing, and write down accumulation dtype and tolerances.
+
+The backend project should first consume a documented buffer/layout contract and return the reference result. Then measure compile time, warm execution, transfers, and synchronization separately. Do not use MNIST accuracy to prove every operator or backend path correct. Export the tested shape set, generated code, and unsupported cases as the first input to [AI Chip Design](../../../Track%20F%20-%20AI%20Chip%20Design/Guide.md).
 
 ## Practice and assessment
 

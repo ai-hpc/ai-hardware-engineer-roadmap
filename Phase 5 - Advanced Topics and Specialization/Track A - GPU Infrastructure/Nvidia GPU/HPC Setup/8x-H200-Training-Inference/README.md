@@ -1,6 +1,6 @@
 # 8x H200 GPU — Training & Inference Deep Dive
 
-The NVIDIA H200 SXM5 is the current flagship GPU for AI workloads, featuring 141 GB HBM3e memory at 4.8 TB/s bandwidth. An 8-GPU SXM node with NVLink 4.0/NVSwitch is the industry-standard building block for large model training and high-throughput inference.
+The NVIDIA H200 SXM5 is a Hopper-generation GPU used here as a reference platform, featuring 141 GB HBM3e memory at 4.8 TB/s bandwidth. An 8-GPU SXM node with NVLink 4.0/NVSwitch is the industry-standard building block for large model training and high-throughput inference.
 
 ## System Snapshot
 
@@ -11,11 +11,11 @@ The NVIDIA H200 SXM5 is the current flagship GPU for AI workloads, featuring 141
 | Memory per GPU | 141 GB HBM3e |
 | Total GPU Memory | 1,128 GB (1.1 TB) |
 | Memory Bandwidth | 4.8 TB/s per GPU |
-| FP8 Tensor Core TFLOPS | ~3,958 TFLOPS per GPU |
-| BF16 Tensor Core TFLOPS | ~1,979 TFLOPS per GPU |
+| FP8 Tensor Core TFLOPS | ~1,979 dense / ~3,958 with supported structured sparsity |
+| BF16 Tensor Core TFLOPS | ~989.5 dense / ~1,979 with supported structured sparsity |
 | GPU Interconnect | NVLink 4.0 (900 GB/s bidirectional) |
-| NVSwitch | 3rd Gen (full mesh) |
-| Host Interconnect | PCIe 5.0 / CXL |
+| NVSwitch | Switched NVLink fabric; record the server topology |
+| Host Interconnect | PCIe 5.0; do not assume CXL memory support |
 | Form Factor | SXM5 baseboard |
 
 ## Topic Index
@@ -35,6 +35,12 @@ The NVIDIA H200 SXM5 is the current flagship GPU for AI workloads, featuring 141
 - **Inference serving?** → Start with [03-Inference-Setup](./03-Inference-Setup.md)
 - **GPU memory OOM?** → See [04-Memory-Management](./04-Memory-Management.md)
 - **Low GPU utilization?** → See [05-Performance-Optimization](./05-Performance-Optimization.md)
+
+## Capacity is per rank
+
+Eight 141 GB devices provide 1,128 GB of aggregate memory, not a single allocation pool. For a teaching 70-billion-parameter BF16 model, raw weights are about 140 GB decimal before KV cache, activations, runtime allocations, and uneven sharding. A single 141 GB GPU therefore is not a practical fit just because the weights approximately match its label. Under tensor parallelism, inspect the largest per-rank allocation and replicated buffers rather than dividing the total by eight.
+
+Carry the per-rank memory worksheet from Chapter 4 into the serving configuration in Chapter 3. In Chapter 6, use **dense** peak for dense model FLOP utilization; sparse advertised peak is not the denominator for an unpruned model. [NVIDIA H200 specifications](https://www.nvidia.com/en-us/data-center/h200/).
 
 ## Practice and assessment
 

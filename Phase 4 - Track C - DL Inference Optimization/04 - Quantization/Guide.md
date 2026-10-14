@@ -65,16 +65,11 @@ Quantization (INT8, INT4, etc.) is a major lever for latency and throughput. It 
 
 → **[05 — Inference Runtimes and Deployment](../05%20-%20Inference%20Runtimes%20and%20Deployment/Guide.md)** — Production deployment (TensorRT, ONNX Runtime, Triton server) and measurable outcomes.
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain scale, zero point or floating block scale, calibration, and accumulator precision. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Does four-bit storage imply four-bit arithmetic?
 
-1. **Baseline lab:** Compare a reference and one lower-precision operator/model on fixed inputs.
-2. **Guided variation:** Use outliers and changed input distribution; detect a deliberately wrong scale.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Quantize a small matrix with explicit block/group scales, reconstruct it, and execute the supported target path. Measure scale/metadata overhead and detect an intentionally incorrect scale before benchmarking.
 
-**Evidence to submit:** Reconstruction/output error, held-out task quality, payload/runtime memory, and latency. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Compare output and held-out task quality, then identify actual kernel dtypes. Orin does not gain native NVFP4 compute by loading an FP4 file; describe unpack/dequantization work where needed.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [05 - Inference Runtimes and Deployment](../05%20-%20Inference%20Runtimes%20and%20Deployment/Guide.md). Explain which assumption from this course the next engineer must preserve.

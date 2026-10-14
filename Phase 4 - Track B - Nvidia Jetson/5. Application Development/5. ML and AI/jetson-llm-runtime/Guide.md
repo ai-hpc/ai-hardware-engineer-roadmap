@@ -209,16 +209,11 @@ Full testing guide: [`TESTING.md`](../../../../Projects/jetson-llm-runtime/TESTI
 | [llama.cpp](https://github.com/ggerganov/llama.cpp) | Reference GGUF runtime |
 | [GGML CUDA kernels](https://github.com/ggerganov/llama.cpp/tree/master/ggml/src/ggml-cuda) | Reference kernel implementations |
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Trace preprocessing, model input/output, postprocessing, and deployment format. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Can runtime speedup survive request cancellation and changing context?
 
-1. **Baseline lab:** Deploy a small reference-checked model and measure the full application pipeline.
-2. **Guided variation:** Test one shifted input condition and a bounded overload condition.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Run the project at fixed prompt/output lengths, then vary context and cancel one request. Record model hash, tokenizer, runtime commit, cache dtype, and scheduling settings.
 
-**Evidence to submit:** Task score, end-to-end latency, memory, dropped work, and hardware/runtime versions. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Separate prefill, first-token latency, decode inter-token latency, and aggregate throughput. Confirm cancelled work releases ownership and does not contaminate the next response.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [llm-optimization-jetson](../llm-optimization-jetson/Guide.md). Explain which assumption from this course the next engineer must preserve.

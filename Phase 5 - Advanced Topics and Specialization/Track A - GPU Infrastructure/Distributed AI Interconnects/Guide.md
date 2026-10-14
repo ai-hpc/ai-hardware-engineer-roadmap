@@ -863,6 +863,12 @@ The goal is to learn where the stack detects the topology mismatch.
 - UCC source repository: [https://github.com/openucx/ucc](https://github.com/openucx/ucc)
 - NVIDIA NCCL documentation: [https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/)
 
+## Use the chain topology as an experiment, not a routing assumption
+
+For `A ↔ B ↔ C`, draw separate matrices for management IP reachability, chosen TCP/RDMA data-path reachability, and collective success. A successful SSH from A to C says nothing about the selected RDMA interface. A ring algorithm also does not guarantee the engine will use only the physical edges you drew: bootstrap, alternative algorithms, and other collectives can require additional communication.
+
+Begin with the course's small all-reduce test, then map one model layer's communication onto the observed topology. Compare TP, supported PP, and independent replicas only after correctness passes. Deliver a rank-placement diagram plus per-message latency/bandwidth; use the same analysis later for a SoC interconnect with shared DMA and memory channels.
+
 ## Practice and assessment
 
 **Entry diagnostic (prerequisite check):** Draw GPU/CPU/NIC topology and explain bandwidth versus message latency. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.

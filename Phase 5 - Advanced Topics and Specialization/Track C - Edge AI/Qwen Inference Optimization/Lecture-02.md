@@ -1,5 +1,7 @@
 # Lecture 2: Quantizing Qwen3-4B to Q4 — AWQ, GPTQ, K-Quants, and the Bytes-per-Weight Trade
 
+> **Reproduction scope:** Pin the exact checkpoint and runtime revision. Numerical throughput, price, and latency examples without a linked measurement artifact are illustrative planning inputs, not results measured by this course. Record supported APIs from that runtime release before running commands.
+
 ## Overview
 
 Qwen3-4B at BF16 is **~7.6 GB** on disk. An Orin Nano 8 GB has roughly 4 GB of free DRAM after the OS, CUDA context, KV cache, and scratch. The model doesn't fit. Either you shrink it or you don't run it.
@@ -135,8 +137,8 @@ Two paths depending on runtime:
 
 ```bash
 # Starting from HF safetensors:
-git lfs clone https://huggingface.co/Qwen/Qwen3-4B-Instruct
-cd Qwen3-4B-Instruct
+git lfs clone https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507
+cd Qwen3-4B-Instruct-2507
 
 # Step 1: convert to GGUF FP16 (intermediate)
 python -m llama_cpp.convert_hf_to_gguf . \
@@ -161,7 +163,7 @@ pip install autoawq
 python -c "
 from awq import AutoAWQForCausalLM
 from transformers import AutoTokenizer
-model_path = 'Qwen/Qwen3-4B-Instruct'
+model_path = 'Qwen/Qwen3-4B-Instruct-2507'
 quant_path = './qwen3-4b-awq'
 
 tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
@@ -280,7 +282,7 @@ The GGUF file is a single blob with this structure:
 │   - qwen3.block_count = 36          │
 │   - qwen3.attention.head_count = 32 │
 │   - qwen3.attention.head_count_kv=8 │
-│   - qwen3.feed_forward_length = 6912│
+│   - qwen3.feed_forward_length = 9728│
 │   - qwen3.rope.freq_base = 1000000  │
 │   - tokenizer.ggml.tokens = [...]   │
 │   - tokenizer.ggml.merges = [...]   │
@@ -381,6 +383,6 @@ Once you ship a quant choice, the model **becomes that quant** in your users' ey
 * **[AutoAWQ](https://github.com/casper-hansen/AutoAWQ):** Reference AWQ implementation with HF integration.
 * **[AutoGPTQ](https://github.com/AutoGPTQ/AutoGPTQ):** Reference GPTQ implementation.
 * **[llama.cpp quantize tool](https://github.com/ggerganov/llama.cpp/blob/master/examples/quantize/README.md):** K-quant conversion.
-* **[Hugging Face — Qwen3-4B-Instruct-GGUF (community)](https://huggingface.co/Qwen/Qwen3-4B-Instruct-GGUF):** Pre-quantized weights to compare against your local conversion.
+* **[Hugging Face — Qwen3-4B-Instruct-2507-GGUF (community)](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507-GGUF):** Pre-quantized weights to compare against your local conversion.
 * **[lm-eval-harness](https://github.com/EleutherAI/lm-evaluation-harness):** The standard eval framework.
 * **[Marlin GPTQ kernel](https://github.com/IST-DASLab/marlin):** Optimized 4-bit GEMM for GPTQ — used by vLLM.

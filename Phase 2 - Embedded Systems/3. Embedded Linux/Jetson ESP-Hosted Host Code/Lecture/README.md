@@ -12,16 +12,10 @@ Work through these in order. Each file is one session built around the real `esp
 | [Lecture-04](Lecture-04.md) | How Wi-Fi becomes `wlan0` | `wiphy_new`, `wiphy_register`, `register_netdevice` | Linux wireless subsystem integration |
 | [Lecture-05](Lecture-05.md) | How BLE becomes `hci0` and how to validate the full path | `hci_alloc_dev`, `hci_register_dev`, `hci_recv_frame` | HCI and BLE host/controller split |
 
-## Practice and assessment
+## Use one evidence chain across the five lectures
 
-**Entry diagnostic (prerequisite check):** Trace a packet from a Linux network interface to SPI transport and the ESP peer. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+L1 produces a subsystem map; L2 produces a build/board manifest; L3 produces an IRQ-to-transfer trace; L4 verifies Wi-Fi registration and traffic separately; L5 verifies Bluetooth controller registration, an actual exchange, and recovery. Each result names the host kernel, fork commit, peer firmware, carrier/pinmux, and connection used.
 
-1. **Baseline lab:** Annotate one transmit/receive path in the driver and capture a baseline host/peer exchange.
-2. **Guided variation:** Test a controlled peer restart and inspect IRQ, queue, and interface recovery.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+At the final review, restart the peer while a bounded test is running and explain whether pending buffers are drained, cancelled, or retried. Do not mix Wi-Fi data-plane success with Bluetooth success just because both share a transport.
 
-**Evidence to submit:** Source revisions, transport errors, throughput/latency, queue behavior, and recovery duration. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** A board-to-subsystem evidence chain with separate Wi-Fi/Bluetooth results. Continue with [the next course](../../../4.%20Product%20Design/Guide.md) and reuse that evidence.

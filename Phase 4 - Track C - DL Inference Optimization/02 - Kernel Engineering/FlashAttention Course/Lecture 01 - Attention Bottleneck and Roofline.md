@@ -43,7 +43,7 @@ Total HBM traffic (naive, all intermediates materialized): `O(N² + N d)` bytes.
 
 Arithmetic intensity `I = FLOPs / bytes`. The roofline says a kernel can hit at most `min(peak_FLOPs, I · peak_bytes_per_sec)` FLOPs/s.
 
-For naive attention, the bytes scale with `N²` because of `S` and `P`. So `I ≈ 4 N² d / N² = O(d)` — independent of `N`. With `d = 64` and bf16 (2 bytes), `I ≈ 128` FLOPs/byte. Compare:
+For the explicitly materialized bf16 path in the table, count every read and write: total traffic is approximately `8 N² + 8 N d` bytes. At large N, `I ≈ 4 N² d / (8 N²) = d/2` FLOPs/byte, or about **32 FLOPs/byte at d=64**. Ignoring the repeated reads/writes gives the wrong constant. Compare with illustrative hardware rooflines (verify the exact SKU and dense/sparse convention before benchmarking):
 
 | GPU | Peak bf16 (TFLOPS) | HBM BW (TB/s) | Ridge point I (FLOPs/byte) |
 |-----|--------------------|----------------|------------------------------|
@@ -52,11 +52,11 @@ For naive attention, the bytes scale with `N²` because of `S` and `P`. So `I �
 | H200 SXM | ~989 | 4.8 | ~206 |
 | B200 SXM | ~2250 (bf16) | 8.0 | ~280 |
 
-If your kernel's `I` is below the ridge, you are memory-bound. Naive attention at `d = 64` on H100 has `I ≈ 128`, ridge is ~295 → memory-bound. At `d = 128`, `I ≈ 256` → just under the ridge, still mostly memory-bound. This is why the dominant cost on long sequences is HBM traffic on the softmax matrix.
+Below the ridge, the roofline predicts a bandwidth ceiling lower than the compute ceiling under its assumptions. The materialized pipeline at d=64 has aggregate intensity about 32 FLOPs/byte; at d=128, about 64. Its individual GEMMs and softmax can have different bottlenecks. Profile each stage: launch overhead, cache reuse, and non-matmul execution can invalidate a simple whole-pipeline diagnosis.
 
 ### What "exact but IO-aware" means
 
-You cannot reduce the math: the answer is still `softmax(QKᵀ/√d)·V`, bit-for-bit (modulo floating-point reduction order). What you can change is *how* you traverse the math: produce `O` without ever writing the full `[N, N]` matrix to HBM. If you can keep `S` and `P` tiles inside SRAM (shared memory) while you stream `Q`, `K`, `V`, you cut the HBM traffic from `O(N²)` to `O(N · d)` — which moves you above the ridge and into compute-bound territory on most modern GPUs.
+You cannot reduce the math: the answer is still `softmax(QKᵀ/√d)·V`, mathematically, with numerical differences possible from floating-point reduction order. What you can change is *how* you traverse the math: produce `O` without ever writing the full `[N, N]` matrix to HBM. If you can keep `S` and `P` tiles inside SRAM (shared memory) while you stream `Q`, `K`, `V`, you avoid storing the full quadratic score/probability matrices. **Linear auxiliary memory is not the same as linear total HBM traffic.** With SRAM capacity M measured in elements, the FA1 analysis gives an HBM-access term `O(N² d² / M)` in its stated regime, plus required inputs/outputs. Finite tiles can reread Q/K/V. Use the [paper's IO analysis](https://arxiv.org/html/2205.14135v2#S3.SS2) and measure the executed kernel before calling it compute-bound.
 
 That is the entire premise of FlashAttention. The rest of the course is about how to make that traversal correct, fast, and general.
 

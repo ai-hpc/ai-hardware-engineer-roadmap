@@ -234,7 +234,7 @@ The KV cache is the **second precision decision** after weights, especially at l
 
 ### 6.1 FP8 KV cache
 
-FP8 E5M2 (range ±57000) is the safe default for KV.
+E5M2 has a maximum finite magnitude of 57,344, but wider range does not make it a universal KV default. Verify the runtime-supported FP8 variant and scaling, then evaluate long-context quality against the reference.
 
 * **Cuts KV bytes in half** — at 128K context this is 21 GB instead of 42 GB per request.
 * **Halves KV read bandwidth** during decode — meaningful at long context.

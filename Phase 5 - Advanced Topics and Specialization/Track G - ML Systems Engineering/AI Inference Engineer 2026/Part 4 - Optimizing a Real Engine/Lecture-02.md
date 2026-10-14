@@ -104,7 +104,7 @@ And then the correction to that ratchet, which is a good lesson in over-tighteni
 
 ## 3. Measuring speed on hardware that will not sit still
 
-Correctness is deterministic: fixed weights, fixed inputs, greedy decode ⇒ exact, and you verify by re-running. Speed is not. Clocks drift, thermals vary, boxes differ. The two halves of the gate therefore need entirely different trust models, and the repo separates them explicitly.
+A fixed fixture enables repeatable correctness checks, but fixed weights and greedy decoding do not guarantee bitwise equality across kernels or devices. Floating-point reduction order can change logits and even the winning token near a tie. State a numerical tolerance and task-quality gate; reserve exact equality for fixtures that explicitly require it. Performance has additional variability. Clocks drift, thermals vary, boxes differ. The two halves of the gate therefore need entirely different trust models, and the repo separates them explicitly.
 
 The techniques, each traceable to the failure that motivated it:
 
@@ -257,7 +257,7 @@ Then the defense against abusing that shortcut: a PR that stubbed `--seek` would
 * Deep parity depths (8192/16384/32768) exist and are committed but default off, because 32768 costs 812 s per measured build against 136 s for 4096 — the deep pass runs through the decode path one token at a time. The cost is stated; the tradeoff is a choice, not an oversight.
 * `--merge-admin` can land a change with no human reading it, within stated bounds. Documented, the repo says, "*because a contributor is entitled to know what can merge their work.*"
 
-There is also a genuine structural limit on speed attestation, which the project's trust document states rather than papers over: **there is no cryptographic proof of a benchmark number.** Correctness is deterministic and can be re-run or sealed in a TEE; speed is not, and is made trustworthy by *reproduction and consensus* within a tolerance. Claiming more than that would be the dishonest option.
+There is also a genuine structural limit on speed attestation, which the project's trust document states rather than papers over: **there is no cryptographic proof of a benchmark number.** Correctness is evaluated against a declared numerical and behavioral contract; a TEE can attest an execution identity but does not prove the contract is sufficient. Speed requires *reproduction and controlled measurement* within a stated tolerance. Claiming more than that would be the dishonest option.
 
 ---
 

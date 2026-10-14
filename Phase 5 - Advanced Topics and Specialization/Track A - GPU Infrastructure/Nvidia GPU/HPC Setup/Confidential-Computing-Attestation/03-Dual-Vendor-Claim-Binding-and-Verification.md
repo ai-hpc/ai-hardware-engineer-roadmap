@@ -5,7 +5,7 @@
 A verifier for a remote or rented compute job wants two paths:
 
 ```text
-   Slow path:  recipe + dataset ──▶ re-execute from source ──▶ compare to claim   (expensive, always correct)
+   Slow path:  recipe + dataset ──▶ re-execute from source ──▶ compare to claim   (expensive; requires matching inputs, implementation, and numerical tolerance)
    Fast path:  claim + attestation bundle ──▶ verify cryptographically             (cheap, only as strong as the attestation)
 ```
 
@@ -49,7 +49,7 @@ tdx_signature:           true, UpToDate    # Intel DCAP / PCS
 output_hash_match:       true              # claim manifest matches submitted output files
 ```
 
-Forging this now requires compromising **both** Intel's and NVIDIA's signing infrastructure simultaneously — a materially different bar than writing convincing JSON against a single-vendor check.
+Authenticating both reports excludes simply fabricating unsigned JSON. It does **not** imply that an attacker must compromise both vendors: a trusted application that binds attacker-chosen result bytes, replay, or session misbinding can defeat the result claim without forging either signature. Require a fresh verifier challenge, canonical length-delimited claim encoding, a bound session key, and policy-approved workload measurements. The nonce field authenticates supplied bytes, not their computational truth. [NVIDIA attestation scope](https://docs.nvidia.com/attestation/).
 
 ## 3. Binding vs. Authenticity — The Core Review Discipline
 
@@ -66,7 +66,7 @@ When reviewing or designing any attestation-gated system, ask the same three que
 
 1. **What value is being bound in?** (a claim hash, a nonce, a public key)
 2. **Who signed the container that value lives in?** (the prover itself, or a hardware vendor's key?)
-3. **Does that signature chain to a root you actually trust, checked live rather than cached?**
+3. **Does that signature chain to a root you actually trust, with acceptable revocation/TCB collateral and freshness under your policy?**
 
 If the answer to (2) or (3) is "nothing verifies that," the binding in (1) is decorative — it will pass a review that only reads the binding check and stops.
 

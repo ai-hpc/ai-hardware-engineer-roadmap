@@ -308,3 +308,12 @@ You are ready to move on when you can:
 - measure end-to-end acceleration rather than only kernel speed
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Integration lab: Where does a CPU-owned buffer become accelerator-owned?
+
+Move a fixed vector through PS memory, an AXI DMA path, and a PL transform. Annotate physical/DMA addresses separately from userspace pointers. First prove one transaction; then queue multiple buffers with completion handling.
+
+**Acceptance evidence:** Verify every result and test an invalid length before enabling long runs. Show ownership at submit/completion and account for cache maintenance on the selected coherent or noncoherent port.
+
+**Continue:** take this artifact to [4. High-Level Synthesis (HLS)](../4.%20High-Level%20Synthesis%20%28HLS%29/Guide.md). Explain which assumption from this course the next engineer must preserve.

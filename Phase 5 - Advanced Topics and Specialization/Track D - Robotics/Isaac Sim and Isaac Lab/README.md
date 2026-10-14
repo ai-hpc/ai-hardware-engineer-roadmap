@@ -171,3 +171,12 @@ You are done with this special course when you can:
 * Back: [Track D — Robotics Guide](../Guide.md)
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Carry this course into the physical-AI system
+
+**Start from:** A version/hardware manifest and a small scene that resets correctly.
+
+**Build and challenge:** Vary physics step, sensor rate, and policy decimation independently. Compare simulated time with wall time, then inject delayed observations while measuring task outcome.
+
+**Pass forward:** An environment contract, reset test, and observation-to-action traces. Continue with [the connected course](../VLA%20Foundations%20to%20Frontier%202026/README.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

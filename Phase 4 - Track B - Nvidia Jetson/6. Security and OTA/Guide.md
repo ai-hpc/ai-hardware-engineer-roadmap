@@ -553,16 +553,11 @@ done
 | **RAUC** (rauc.io) | Robust Auto-Update Controller |
 | **OP-TEE** (optee.org) | Open-source Trusted Execution Environment |
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Draw the assets, trust boundaries, and update/boot verification chain. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Can the deployed system recover without accepting an incompatible model?
 
-1. **Baseline lab:** Verify a signed test artifact and map the result to an application-level acceptance decision.
-2. **Guided variation:** Corrupt the artifact or metadata in a disposable test and prove rejection without bypassing checks.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Treat firmware/BSP, application, model, and persistent schema as a release compatibility set. Verify a signed disposable artifact and simulate a failed application health check after trial update.
 
-**Evidence to submit:** Verification logs, threat assumptions, rejection cases, and a reproducible trust configuration. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Record rejection of altered content and a successful compatible rollback. Separate image authenticity, confidentiality, and availability claims in the release dossier.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [7. Compliance and Manufacturing](../7.%20Compliance%20and%20Manufacturing/Guide.md). Explain which assumption from this course the next engineer must preserve.

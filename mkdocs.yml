@@ -312,8 +312,15 @@ extra_javascript:
 nav:
   - Home:
     - Overview: README.md
+    - Physical AI Design Studio: Physical-AI-Design-Studio.md
     - How to Learn: Learning-Guide.md
     - Curriculum Review: Curriculum-Review.md
+    - Course-by-Course Review:
+      - Review Scope: Curriculum-Reviews/README.md
+      - Foundations and Embedded: Curriculum-Reviews/foundations-embedded.md
+      - Models, Robotics, and ML Systems: Curriculum-Reviews/models-robotics-mlsys.md
+      - Deployment and Edge: Curriculum-Reviews/deployment-edge.md
+      - Systems and Chip Design: Curriculum-Reviews/systems-chip.md
     - Authoring Guide: Curriculum-Authoring-Guide.md
     - Phase 1 — Digital Foundations: Phase 1 - Foundational Knowledge/Guide.md
     - Phase 2 — Embedded Systems: Phase 2 - Embedded Systems/Guide.md

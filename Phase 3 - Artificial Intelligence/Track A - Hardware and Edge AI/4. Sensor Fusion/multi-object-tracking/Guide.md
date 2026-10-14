@@ -1458,16 +1458,11 @@ Deploy YOLO TensorRT + Kalman-Hungarian tracker on Orin Nano 8GB. Measure:
 *See also: [BEVFusion](../BEVFusion/Guide.md) — 3D detection output that feeds into the 3D tracker*
 *See also: [Kalman Filter Series](../kalman-filter/README.md) — prerequisite for this guide*
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain detection error versus association error and track identity. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Carry this course into the physical-AI system
 
-1. **Baseline lab:** Evaluate a tracker on an annotated sequence with a fixed detector.
-2. **Guided variation:** Introduce occlusion or missed detections and inspect identity switches.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Start from:** Detections from an unchanged detector and the estimator from the Kalman course.
 
-**Evidence to submit:** Association/task metrics, identity switches, latency, and annotated failure frames. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Build and challenge:** Hold detector outputs fixed while changing assignment gating. Create a crossing/occlusion sequence; measure identity switches and track recovery rather than only detector mAP.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** Timestamped tracks with lifecycle rules and identity metrics. Continue with [the connected course](../Guide.md) and keep the artifact in the [Physical AI Design Studio](../../../../Physical-AI-Design-Studio.md).

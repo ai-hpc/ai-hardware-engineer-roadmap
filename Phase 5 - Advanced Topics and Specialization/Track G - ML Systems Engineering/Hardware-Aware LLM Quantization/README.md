@@ -70,6 +70,12 @@ Every module is a different way of attacking one of those two terms, or of provi
 
 ---
 
+## Read the storage before selecting the kernel
+
+[![NVFP4 block payload, per-block scale, and per-tensor scale shown separately](../../../Assets/illustrations/learning-path/nvfp4-storage.svg)](../../../Assets/illustrations/learning-path/nvfp4-storage.svg)
+
+*Derive the 2308-byte storage of 4096 values in this stated 1D layout before padding. Identify which metadata a custom compiler must preserve. [Download PNG](../../../Assets/illustrations/learning-path/nvfp4-storage.png).*
+
 ## Course Map (12 modules + capstone)
 
 <div class="lecture-map" markdown>
@@ -83,12 +89,12 @@ Every module is a different way of attacking one of those two terms, or of provi
 | [05](Lecture-05.md) | **Calibration** — absmax vs percentile vs MSE-optimal clipping, AWQ, GPTQ/Hessian methods, SmoothQuant, and which one matches which error mode | choosing the scales |
 | [06](Lecture-06.md) | **Activation Outliers** — systematic channel outliers vs rare token spikes, attention sinks, massive activations, and why W4A4 is the hard one | why activations fight back |
 | [07](Lecture-07.md) | **Layer Sensitivity** — the softmax amplification argument for why Q/K break while O/MLP survive, RoPE phase error, and why sensitivity ≠ outlier magnitude | which layers can pay |
-| [08](Lecture-08.md) | **Behavior Preservation** — the metric ladder from MSE to benchmarks, and speculative acceptance length as the sharpest cheap behavioral probe you have | proving you didn't break it |
+| [08](Lecture-08.md) | **Behavior Preservation** — the metric ladder from MSE to benchmarks, and speculative acceptance length as one diagnostic alongside task quality | proving you didn't break it |
 | [09](Lecture-09.md) | **KV Cache & Long Context** — GQA KV math, FP8/FP4 KV, the weight-traffic/KV-traffic crossover, and 262 K-context economics on a 32 GB card | the term that grows |
 | [10](Lecture-10.md) | **Speculative Decoding** — the rejection-sampling acceptance rule, the `τ/(1+K·c)` model, MTP heads, and how quantizing the target silently taxes acceptance | multiplying the ceiling |
 | [11](Lecture-11.md) | **Hardware-Aware AutoQuant** — precision allocation as constrained optimization, the sensitivity/traffic ratio, and a greedy solver with hardware-native guard rails | the allocation algorithm |
 | [12](Lecture-12.md) | **Research Methodology** — controlled ablations, clock locking, the paired-comparison discipline, and the invalid comparisons that produce most published quantization claims | proving something |
-| [13](Lecture-13.md) | **Capstone: TurboQuant** — build the policy engine, run the ablation grid, and beat 155.75 tok/s @ 2.886 acceptance without losing behavior | the artifact |
+| [13](Lecture-13.md) | **Capstone: TurboQuant** — build the policy engine, run the ablation grid, and compare against a reproduced local baseline within declared quality tolerances | the artifact |
 
 </div>
 
@@ -100,7 +106,7 @@ By the end you should be able to:
 
 * Decide, from measurements alone, whether a decode workload is **bandwidth-bound, compute-bound, or launch-bound** — and refuse to quantize anything until you know.
 * Build a **per-token byte ledger** for any checkpoint that separates resident bytes from per-token-read bytes, and explain why the two differ by 20 % or more on a typical multimodal model.
-* Encode and decode an **NVFP4 block by hand**, state its effective bits-per-weight (4.5, not 4), and explain why the 16-element group with an E4M3 scale beats MXFP4's 32-element E8M0 group.
+* Encode and decode an **NVFP4 block by hand**, derive 4.5 bits per weight before the tensor scale/padding, and compare its scale granularity with MXFP4 without assuming either always wins.
 * Name what `sm_120` executes **natively** and what it executes by **unpacking to a wider type**, and predict which "smaller" formats will be slower.
 * Choose a calibration method by **error mode** rather than by popularity — clipping vs rounding, weight outliers vs activation outliers.
 * Explain the **softmax-amplification mechanism** that makes Q/K quantization disproportionately damaging, and why that damage is not predicted by outlier magnitude.
@@ -132,7 +138,7 @@ By the end you should be able to:
 
 You are done when you can take an unfamiliar checkpoint on unfamiliar silicon and, without looking anything up:
 
-* Produce its per-token byte ledger and predict its batch-1 decode ceiling within ~10 %.
+* Produce its per-token byte ledger and derive a batch-1 decode bound with explicit traffic assumptions, then explain the measured gap.
 * Say which three tensors to quantize first and why — citing traffic, not size.
 * Name the format you would use and prove it has a native tensor-core path on that silicon.
 * State the behavior budget in KL and acceptance-length terms *before* running the experiment.
@@ -147,3 +153,12 @@ If you can recite quantization algorithms but cannot say which bytes a token act
 **Study method:** use the [shared lesson cycle and completion rubric](../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
 
 **Applied checkpoint case study:** [DeepSeek V4.1 Flash NVFP4](../AI%20Inference%20Engineer%202026/Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/Lecture-03.md) connects packed values and scales to actual loader compatibility, per-rank memory, quality gates, and useful serving throughput.
+
+
+## Carry this course into the physical-AI system
+
+**Start from:** A supported checkpoint/kernel format and a higher-precision reference.
+
+**Build and challenge:** Derive packed bytes including scales and unchanged tensors. Pair each precision change with quality and dispatch evidence; combine optimizations only after measuring them individually.
+
+**Pass forward:** A precision/layout contract with error budgets for the compiler and accelerator. Continue with [the connected course](../TVM%20Deep%20Dives/README.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

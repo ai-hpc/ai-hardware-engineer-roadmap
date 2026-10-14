@@ -305,13 +305,13 @@ The lesson from K1 is ecosystem creation:
 
 ### K3: AI CPU Direction
 
-As of April 30, 2026, public K3 materials position it as a RISC-V AI CPU platform with:
+The following are vendor/platform-partner claims reported in the cited K3 materials, not measurements from this course. Archive the source date and verify the shipped SKU before repeating them:
 
 - eight high-performance X100 RISC-V CPU cores
 - RVA23 compliance
 - 1024-bit RISC-V Vector support
 - native FP8 support for AI inference
-- up to 60 TOPS AI compute
+- up to 60 TOPS advertised AI compute; specify precision, sparsity, and operation-count convention before comparison
 - up to 32 GB LPDDR5 memory
 - local medium-scale AI and multimodal edge workloads as the target
 
@@ -613,6 +613,14 @@ If you cannot answer that, the design is not differentiated.
 - [RISC-V's AI Opportunity Is Real](https://www.abiresearch.com/market-research/insight/7787778-risc-vs-ai-opportunity-is-real-but-can-edg) - ABI Research market note on bounded edge AI roles.
 - [Production-Ready, Automotive-Grade, AI-Native: RISC-V at Embedded World 2026](https://riscv.org/blog/embedded-world-2026/) - RISC-V International overview of edge AI, embedded, and automotive ecosystem momentum.
 - [RISC-V Annual Report 2025](https://riscv.org/wp-content/uploads/2026/01/RISC-V-Annual-Report-2025.pdf) - Ecosystem report covering profiles, edge AI, vector/matrix direction, and software momentum.
+
+## Architecture exercise: choose what the ISA must own
+
+Compare two implementations of the same projection subgraph: (A) vector instructions executed by the CPU, and (B) a CPU-submitted command queue driving a separate matrix engine. For each, draw where weights, accumulators, DMA descriptors, and completion state live. An open CPU ISA does not imply that the NPU, memory controller, compiler, or radio IP is open.
+
+A “1024-bit vector” claim needs interpretation: architectural VLEN, physical datapath width, issue rate, and supported element types are distinct. Likewise a CPU profile does not promise a model runtime or a working peripheral driver. Use the ISA specification and the specific implementation manual, then inspect generated code and measure one operator. [RISC-V specifications](https://docs.riscv.org/reference/isa/unpriv/v-st-ext.html).
+
+For Linux, enumerate privileged architecture/MMU, interrupts/timers, boot firmware, device tree, drivers, and toolchain requirements. For wireless, choose an external module first unless integrated RF is an explicit verified design scope. Deliver a block diagram plus a software-enablement matrix to the [SoC capstone](../Guide.md#physical-ai-soc-capstone). Commercial predictions in the market sections remain hypotheses, not performance evidence.
 
 ## Practice and assessment
 

@@ -47,7 +47,7 @@ If you do not have a GPU locally, a single L4 / A10 / 3090 in a cloud instance i
 | # | Lecture | Lab artifact |
 |---|---------|--------------|
 | 1 | [Attention bottleneck + roofline](Lecture%2001%20-%20Attention%20Bottleneck%20and%20Roofline.md) | Notebook: per-shape arithmetic intensity table; roofline plot for one GPU |
-| 2 | [Online softmax + numerical correctness](Lecture%2002%20-%20Online%20Softmax%20and%20Numerical%20Correctness.md) | NumPy script proving blockwise-LSE equals one-shot softmax bit-for-bit in fp64; tolerance plot for fp16 / bf16 |
+| 2 | [Online softmax + numerical correctness](Lecture%2002%20-%20Online%20Softmax%20and%20Numerical%20Correctness.md) | NumPy script checking blockwise-LSE against one-shot softmax with an explicit fp64 tolerance; tolerance plot for fp16 / bf16 |
 | 3 | [FlashAttention-1 algorithm](Lecture%2003%20-%20FlashAttention-1%20Algorithm.md) | Pseudocode walkthrough + an HBM-byte counter that matches the FA1 paper's IO complexity bound |
 | 4 | [GPU kernel performance basics](Lecture%2004%20-%20GPU%20Kernel%20Performance%20Basics.md) | Nsight Compute capture of a coalesced vs uncoalesced copy kernel; warp-reduction microbenchmark |
 | 5 | [Repo anatomy + Python / CUDA API](Lecture%2005%20-%20Repo%20Anatomy%20and%20Python%20CUDA%20API.md) | Annotated `flash_attn_func` call trace from Python to launched kernel; minimal `setup.py`-style build recipe |
@@ -96,16 +96,11 @@ If you do not have a GPU locally, a single L4 / A10 / 3090 in a cloud instance i
 - Not a transformer-architecture course. We assume you know what Q, K, V, and softmax(QKᵀ/√d)·V are; we focus on how to make that line of math run fast on real hardware.
 - Not exhaustive. We intentionally skip FlashAttention forks for non-NVIDIA hardware and quantized-only variants. After this course you should be able to read those repos on your own.
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Derive stable online-softmax updates on two small score blocks. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: What changes when exact attention changes reduction order?
 
-1. **Baseline lab:** Compare tiled attention with a reference on causal and noncausal small cases.
-2. **Guided variation:** Exercise tails, masks, large logits, and differing sequence lengths.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Implement blockwise online softmax and compare against a stable reference in float64 and lower precision. Include causal, rectangular, tail, and fully masked cases with explicitly defined semantics.
 
-**Evidence to submit:** Output/gradient error as applicable, HBM traffic estimate, latency, memory, and supported shapes. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Declare tolerances rather than promising bit identity. Pass shape/mask coverage and a memory-traffic estimate to the compiler; a fast kernel with the wrong causal alignment fails.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [03 - Compiler Stack](../../03%20-%20Compiler%20Stack/Guide.md). Explain which assumption from this course the next engineer must preserve.

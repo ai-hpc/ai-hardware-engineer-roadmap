@@ -345,3 +345,12 @@ You are ready for the next FPGA modules when you can:
 - explain the engineering evidence behind a working bitstream
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Integration lab: Can the first accelerator block survive stalls and resets?
+
+Build a ready/valid integer multiply-accumulate block. Drive backpressure and reset between transactions; compare each accepted output with a software reference. Include clock and I/O constraints before implementation.
+
+**Acceptance evidence:** Count accepted inputs and outputs separately; no duplicated or missing result is allowed after excluding explicitly cancelled work. Submit a waveform, timing report, and register/stream interface sketch.
+
+**Continue:** take this artifact to [2. Zynq UltraScale+ MPSoC](../2.%20Zynq%20UltraScale%2B%20MPSoC/Guide.md). Explain which assumption from this course the next engineer must preserve.

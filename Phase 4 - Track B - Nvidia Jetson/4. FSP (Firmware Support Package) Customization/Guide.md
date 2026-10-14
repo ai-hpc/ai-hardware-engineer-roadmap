@@ -453,16 +453,11 @@ The **AODMIC** demo shows **DMIC5** capture from SPE, **GPCDMA**, optional **sys
 
 *Primary reference: [Jetson Sensor Processing Engine (SPE) Developer Guide — r35.6](https://docs.nvidia.com/jetson/archives/r35.6.0/spe/index.html) (NVIDIA). Align commands and file names with the archive that matches your Jetson Linux release.*
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain which firmware stage owns board initialization and the handoff to Linux. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Can Linux and the real-time firmware disagree about peripheral ownership?
 
-1. **Baseline lab:** Trace a configuration change through firmware build artifacts and boot logs.
-2. **Guided variation:** Test an invalid setting in an offline validation or disposable target workflow with a recovery path.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Use the documented IVC echo example on a supported matching SPE/BSP release. Add sequence IDs and a timeout; map pinmux, firewall, clocks, and ownership before adding sensor access.
 
-**Evidence to submit:** Firmware revisions, configuration diff, boot-stage logs/timing, and verified recovery. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Prove an echoed message and controlled missing-response behavior. Record the original firmware and recovery procedure; carry the message schema and timing contract into application development.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [5. Application Development](../5.%20Application%20Development/Guide.md). Explain which assumption from this course the next engineer must preserve.

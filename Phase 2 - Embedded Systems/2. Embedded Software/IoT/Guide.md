@@ -4,7 +4,7 @@
 <div class="course-identity__icon">INAD</div>
 <div markdown="1">
 <p class="course-identity__eyebrow">Deep Dive · Embedded Systems</p>
-<p class="course-identity__title">Specialized course identity for IoT Networking and Device Connectivity.</p>
+<p class="course-identity__title">Choose a network from the message contract.</p>
 <p class="course-identity__meta">Artifact: bring-up or firmware demo · Measure: boot, latency, power, reliability</p>
 </div>
 </div>
@@ -58,16 +58,10 @@ AI systems at the edge are rarely isolated. They live inside products with commi
 
 If you can reason about Thread, RCP/NCP splits, border routers, and low-power IPv6 networking, you are much better prepared to build systems where MCUs, Linux hosts, accelerators, and cloud services all cooperate instead of existing as disconnected demos.
 
-## Practice and assessment
+## Choose a network from the message contract
 
-**Entry diagnostic (prerequisite check):** Compare addressing, routing, and application semantics for Thread and Zigbee. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+Define payload size, reporting period, acceptable age, discovery/onboarding, outage behavior, and battery budget before choosing Thread or Zigbee. A sensor report can tolerate a different delivery policy from an actuator command. Neither successful pairing nor a mesh topology proves a deadline will be met.
 
-1. **Baseline lab:** Trace a sensor report from device to gateway with explicit endpoint/message fields.
-2. **Guided variation:** Simulate a lost parent or gateway restart; inspect retry and stale-data behavior.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Create a protocol-neutral report with device ID, sequence, timestamp or age estimate, units, and validity. Map it to each stack and document what the gateway must translate. Compare retries, reconnect time, and stale-message handling using the same arrival schedule. Keep camera frames and other high-bandwidth streams in a separate bandwidth budget.
 
-**Evidence to submit:** Delivery rate, latency distribution, reconnection time, and an energy-use estimate with assumptions. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** Protocol choice with a common data/freshness schema. Continue with [the next course](OpenThread/Guide.md) and reuse that evidence.

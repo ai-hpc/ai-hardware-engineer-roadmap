@@ -22,8 +22,8 @@
 
 ## Why This Matters for AI Hardware
 
-LLM applications are the **largest consumer of GPU inference capacity** in 2025–2026:
-- ChatGPT serves 200M+ weekly users → massive GPU fleet
+LLM applications provide several distinct inference workloads:
+- Interactive assistants → request queues, prompt processing, and decode
 - Enterprise RAG deployments → GPU-accelerated vector search + LLM inference
 - Code assistants → long-context attention, streaming generation
 - Understanding these patterns helps hardware engineers design chips that serve real demand
@@ -229,16 +229,11 @@ The point of the example is the pipeline shape, not the exact classifier choice.
 | [NVIDIA NeMo Guardrails](https://docs.nvidia.com/nemo-guardrails/index.html) | Programmable LLM guardrails |
 | *Building LLM Applications* (various) | End-to-end LLM app development |
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain retrieval, generation, evaluation, and the boundary between them. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Carry this course into the physical-AI system
 
-1. **Baseline lab:** Build a small LLM application with a fixed held-out task set and a simple baseline.
-2. **Guided variation:** Introduce missing retrieval evidence or invalid structured output and verify handling.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Start from:** A task definition and a latency/cost budget.
 
-**Evidence to submit:** Task success, evidence/schema correctness, latency, token cost, and failure categories. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Build and challenge:** Separate retrieval quality, model quality, and tool-result correctness. Keep long-context planning outside the controller tick and test an unavailable remote endpoint.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** A measured optional planning service and a local fallback contract. Continue with [the connected course](../3.%20Agentic%20AI%20and%20GenAI/Guide.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

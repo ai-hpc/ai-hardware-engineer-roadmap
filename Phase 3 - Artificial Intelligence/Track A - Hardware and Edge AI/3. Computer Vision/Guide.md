@@ -465,7 +465,7 @@ Why NV12 and not RGB?
   Cache friendly:  Y plane accessed sequentially → good cache behavior
 
   RGB is expensive:
-    3 bytes per pixel, 3× the bandwidth
+    3 bytes per pixel, 2× the payload of 8-bit NV12 (ignoring stride/padding)
     Conversion from NV12→RGB costs CPU/GPU cycles
     Most inference pipelines avoid RGB entirely
 ```
@@ -510,7 +510,7 @@ Neural networks require:
 - Stable contrast (no flickering exposure)
 - Minimal noise in dark regions
 
-The ISP guarantees these properties. It is the **input contract** for perception.
+The capture pipeline must validate these properties. An ISP does not guarantee calibration, color range, timestamps, or the absence of motion blur. Record them in the **input contract** for perception.
 
 ```
   Bad ISP + good neural net  →  unreliable perception  ✗
@@ -3162,16 +3162,11 @@ class PointNet(nn.Module):
 
 *Previous: [Phase 3 — Artificial Intelligence](../../Guide.md)*
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain train/validation/test separation and the metric for one vision task. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Carry this course into the physical-AI system
 
-1. **Baseline lab:** Build a small detection or segmentation baseline and profile preprocessing, model, and postprocessing separately.
-2. **Guided variation:** Evaluate a held-out change in lighting, scale, or occlusion; inspect false positives and false negatives.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Start from:** A recorded image with known encoding, dimensions, and capture timestamp.
 
-**Evidence to submit:** Task score by condition, end-to-end latency, memory, and sample counts. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Build and challenge:** Compare the reference preprocessing with one optimized implementation. Inject RGB/BGR reversal and wrong normalization; distinguish input-pipeline faults from model faults.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** A preprocessing manifest and golden images feeding the policy observation adapter. Continue with [the connected course](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/VLA%20Foundations%20to%20Frontier%202026/README.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

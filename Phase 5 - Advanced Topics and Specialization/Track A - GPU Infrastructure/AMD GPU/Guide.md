@@ -33,7 +33,7 @@ AMD's Instinct GPUs (MI300X, MI300A, MI350) are the primary alternative to Nvidi
     * Matrix cores: FP16, BF16, FP8, INT8.
     * Infinity Fabric for inter-chiplet and inter-GPU communication.
 * **Compute units:**
-    * Wavefront (64 threads) vs CUDA warp (32 threads).
+    * CDNA wavefronts have 64 threads; RDNA targets can use 32-thread waves. Query the target and avoid a universal AMD=64 assumption.
     * SIMD units, LDS (Local Data Share) vs CUDA shared memory.
     * Occupancy model differences from Nvidia.
 
@@ -47,7 +47,7 @@ AMD's Instinct GPUs (MI300X, MI300A, MI350) are the primary alternative to Nvidi
 * **HIP (Heterogeneous-computing Interface for Portability):**
     * CUDA-like API for AMD GPUs. `hipMalloc`, `hipMemcpy`, `hipLaunchKernelGGL`.
     * **HIPIFY:** Tool to convert CUDA source to HIP (`hipify-perl`, `hipify-clang`).
-    * Write-once kernels that target both AMD and Nvidia GPUs.
+    * Source portability is a starting point; backend support and performance still require separate validation.
 * **Libraries:**
     * **rocBLAS** (GEMM), **MIOpen** (cuDNN equivalent), **rocFFT**, **rocSPARSE**.
     * **RCCL** (ROCm Communication Collectives Library) — AMD's NCCL equivalent for multi-GPU.
@@ -65,8 +65,8 @@ AMD's Instinct GPUs (MI300X, MI300A, MI350) are the primary alternative to Nvidi
     * Automated conversion: `hipify-clang` for source-to-source translation.
     * Manual work: CUDA-specific intrinsics, inline PTX, warp-level primitives.
 * **Key differences:**
-    * Warp size 32 (Nvidia) vs wavefront size 64 (AMD) — affects reduction, ballot, shuffle ops.
-    * Shared memory bank conflicts: 32 banks (Nvidia) vs 64 banks (AMD).
+    * CUDA warps have 32 lanes; AMD wave size depends on the target. Use `warpSize` and a sufficiently wide lane mask for reduction, ballot, and shuffle code.
+    * LDS bank count and access phases depend on architecture and instruction width. MI300/CDNA3 uses 32 banks, so “AMD has 64 banks” is not a portable rule. [AMD LDS guidance](https://rocm.docs.amd.com/projects/HIP/en/latest/understand/performance_optimization.html).
     * Memory coalescing rules differ slightly.
     * No direct equivalent to Nvidia Tensor Cores — use Matrix Cores via `rocWMMA` or CK.
 * **Framework support:**
@@ -122,11 +122,17 @@ AMD's Instinct GPUs (MI300X, MI300A, MI350) are the primary alternative to Nvidi
 
 ## Projects
 
-1. **HIPIFY a CUDA kernel** — Take your CUDA matmul or vector-add kernel from Phase 1 §4. Convert to HIP using `hipify-clang`. Run on AMD GPU (or ROCm Docker). Compare output and performance.
+1. **HIPIFY a CUDA kernel** — Take your CUDA matmul or vector-add kernel from Phase 1 §4. Convert to HIP using `hipify-clang`. Run on a supported AMD GPU; a ROCm container packages userspace and does not emulate an AMD GPU. Compare output and performance.
 2. **Profile with Omniperf** — Profile a PyTorch model on ROCm. Generate a roofline plot. Identify compute-bound vs memory-bound layers.
 3. **RCCL benchmark** — Run RCCL all-reduce across multiple AMD GPUs. Compare bandwidth and latency with NCCL on equivalent Nvidia hardware.
 4. **Triton on AMD** — Write a Triton fused kernel (e.g., layer norm + residual). Run on both Nvidia (CUDA) and AMD (ROCm). Compare generated code and performance.
 5. **CK custom GEMM** — Use Composable Kernel to implement a custom GEMM with epilogue fusion (bias + activation). Benchmark against rocBLAS.
+
+## Port one reduction before a full model
+
+Bring a CUDA reduction from Phase 1 and test input lengths 31, 32, 33, 63, 64, and 65 plus a large nonmultiple. These cases expose hard-coded warp masks, lane counts, and incomplete tail handling. Verify the same numeric contract on CPU and the selected AMD target before profiling.
+
+Separate “HIPIFY produced source,” “the kernel passed,” and “the port is efficient.” Record architecture, wave size, workgroup size, registers/LDS, achieved bandwidth, and backend/library revisions. Pass that result to [platform evaluation](../Accelerator%20Platform%20Evaluation/Guide.md); a container image or successful compilation alone does not establish portability.
 
 ## Practice and assessment
 

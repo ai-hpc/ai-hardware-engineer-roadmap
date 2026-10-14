@@ -33,7 +33,7 @@ tinygrad is a minimal stack that exposes IR, scheduling, and backends in one cod
 ## 2. Scheduler
 
 * **How ops are grouped and scheduled** — Which ops fuse; how the scheduler makes fusion decisions.
-* **BEAM search** — Exploring fusion choices; trading kernel count vs kernel size and register pressure.
+* **BEAM search** — Search equivalent implementations of an individual kernel, such as tiling and local work distribution; graph grouping is the scheduler's responsibility. See [tinygrad speed documentation](https://docs.tinygrad.org/developer/speed/).
 
 ---
 
@@ -72,16 +72,11 @@ You've gone through: **Graph & operators → Kernels → Compiler → Quantizati
 
 Next steps: deepen the areas that match your role (e.g. more Triton/CUTLASS for MTS Kernels, or more TensorRT/Triton server for inference deployment), and keep building portfolio projects (kernels, benchmarks, portability reports).
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Trace a tensor expression into operations, scheduling, and generated execution. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Can a minimal compiler backend preserve model semantics?
 
-1. **Baseline lab:** Follow one matmul or reduction through the pinned tinygrad source and compare with a reference.
-2. **Guided variation:** Change shape/layout and inspect the resulting schedule and kernel choices.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Pin tinygrad to a commit and trace a reduction or matrix operator through graph grouping, code generation, allocation, and launch. Log one backend boundary without changing numerical behavior.
 
-**Evidence to submit:** Source commit, correctness, kernel count, compile/warmup time, execution latency, and memory. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Compare shape/layout variants against a reference; preserve the exact source paths from that commit. Pass an unsupported-op policy and launch/buffer ABI to the custom accelerator project.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [5. Runtime and Driver Development](../../Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/5.%20Runtime%20and%20Driver%20Development/Guide.md). Explain which assumption from this course the next engineer must preserve.

@@ -4,7 +4,7 @@
 <div class="course-identity__icon">EOEP</div>
 <div markdown="1">
 <p class="course-identity__eyebrow">Deep Dive · Embedded Systems</p>
-<p class="course-identity__title">Specialized course identity for Espressif Official Education Path.</p>
+<p class="course-identity__title">Select examples by the evidence they produce.</p>
 <p class="course-identity__meta">Artifact: bring-up or firmware demo · Measure: boot, latency, power, reliability</p>
 </div>
 </div>
@@ -98,16 +98,10 @@ The goal is not to touch everything. The goal is to create a sane study route.
 
 **Next:** [Lecture 01 - How to read Espressif Education as a roadmap](Lecture/Lecture-01.md)
 
-## Practice and assessment
+## Select examples by the evidence they produce
 
-**Entry diagnostic (prerequisite check):** Build and flash a minimal example and identify board/SDK versions. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+Map the official resources to one concrete device requirement. For a battery sensor, select a wake/sampling example and a transport example; for a gateway helper, select a host-link example and reconnect handling. Verify that the chosen SoC supports the peripheral/radio in the SDK release before treating a framework name as compatibility evidence.
 
-1. **Baseline lab:** Extend a sensor or GPIO example with bounded task communication and connection-state logging.
-2. **Guided variation:** Force reconnects and queue pressure while the sampling task continues.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Finish with a three-stage plan: reproduce the baseline, add a timestamped payload, then inject a disconnect or failed peripheral read. Each stage needs a saved configuration and an observable result. Transfer the resulting payload contract into the networking course.
 
-**Evidence to submit:** Build manifest, heap use, sample jitter, connection recovery time, and error counters. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** A targeted study plan with board-supported examples and acceptance evidence. Continue with [the next course](Lecture/README.md) and reuse that evidence.

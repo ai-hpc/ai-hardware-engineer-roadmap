@@ -1,25 +1,21 @@
 # GPUDirect Storage (GDS) — Deep Dive
 
-GPUDirect Storage (GDS) eliminates the CPU from the GPU-to-storage data path. Instead of data traveling GPU → PCIe → CPU RAM → PCIe → NVMe, GDS creates a **direct DMA path** between GPU HBM and NVMe/network storage — the CPU complex is bypassed entirely.
+GPUDirect Storage can move file payloads between storage and GPU memory without staging those payloads through CPU DRAM. The CPU still opens files, submits cuFile operations, handles control work, and may participate in fallback paths. Successful `cuFileRead` is not proof that direct DMA was used. [NVIDIA GDS overview](https://docs.nvidia.com/gpudirect-storage/overview-guide/).
 
-## Why GDS Exists
+## Follow the payload and the control path
 
+```text
+Traditional payload: storage -> CPU bounce buffer -> GPU memory
+Direct payload:      storage -> supported PCIe/NIC path -> GPU memory
+Control in both:     host application -> file/API/driver setup and completion
+Fallback:            cuFile may stage through CPU memory on unsupported paths
 ```
-Without GDS (traditional path):
-  NVMe → PCIe → CPU DRAM (bounce buffer) → PCIe → GPU HBM
-  CPU must be awake and involved for every I/O
-  CPU DRAM becomes the bottleneck (~50 GB/s DRAM bandwidth shared)
 
-With GDS (direct path):
-  NVMe → PCIe → GPU HBM  (direct DMA)
-  No CPU bounce buffer
-  No CPU involvement in the data path
-  Limited only by PCIe bandwidth and NVMe throughput
-```
+Before tuning, record filesystem, mount, kernel, GPU, NIC, cuFile version, and selected I/O mode. Compare equal-size aligned reads with direct and compatibility paths, including CPU usage and end-to-end loader time. The next stage may still require CPU decoding or augmentation, which can erase the I/O gain.
 
 ## Reference Configuration (Western Digital Technical Brief)
 
-This section is based on the WD OpenFlex Data24 + NVIDIA GDS validation setup, which represents a real production GDS deployment:
+This section is based on the WD OpenFlex Data24 + NVIDIA GDS validation setup, used as a historical reference, not a current install matrix. Confirm each component against the pinned vendor brief before provisioning:
 
 | Component | Specification |
 |---|---|
@@ -28,7 +24,7 @@ This section is based on the WD OpenFlex Data24 + NVIDIA GDS validation setup, w
 | GPU | 4× NVIDIA A100 80 GB PCIe |
 | NIC | 6× ConnectX-7 (CX-6 also tested) |
 | CUDA | 12.2.1 |
-| GDS | 2.17.3 |
+| nvidia-fs kernel component (historical reference) | 2.17.3; distinct from the cuFile/GDS release |
 | libcufile | 1.7.1.12 |
 | OS | RHEL 9: 5.14.0-70.70.1.el9_0 |
 | OFED | Mellanox OFED 5.8-3.0.7.0 |

@@ -23,8 +23,8 @@
 micrograd                  PyTorch                   tinygrad
 ──────────────────         ───────────────────        ────────────────────
 Scalar values only         Full tensor engine         Full tensor engine
-~150 lines Python          ~3M lines C++/Python       ~5000 lines Python
-No GPU                     GPU (opaque CUDA)          GPU (readable Python)
+Small scalar engine        Tensor/autograd system     Tensor/compiler system
+No GPU                     Multiple device backends   Multiple device backends
 Pure education             Production                 Hackable production
 
 Teaches:                   Teaches:                   Teaches:
@@ -49,7 +49,7 @@ Karpathy's micrograd implements reverse-mode automatic differentiation (autograd
 - What operation created it (`_op`)
 - What inputs created it (`_prev`)
 
-This is exactly what PyTorch's `Tensor` does — but PyTorch does it over multi-dimensional arrays with C++ kernels. micrograd does it over Python floats so you can read every line.
+This illustrates reverse-mode differentiation; PyTorch adds tensor broadcasting, saved-tensor lifetime, views, device kernels, and gradient-accumulation rules. micrograd does it over Python floats so you can read every line.
 
 ### Implement the `Value` class
 
@@ -146,11 +146,13 @@ class Value:
         return out
 
     def log(self):
-        out = Value(math.log(self.data + 1e-10), (self,), 'log')
+        if self.data <= 0:
+            raise ValueError('log requires a positive input')
+        out = Value(math.log(self.data), (self,), 'log')
 
         def _backward():
             # d(ln(x))/dx = 1/x
-            self.grad += (1.0 / (self.data + 1e-10)) * out.grad
+            self.grad += (1.0 / self.data) * out.grad
 
         out._backward = _backward
         return out
@@ -422,7 +424,7 @@ print(a.mean(), a.max(), a.min())
 t = torch.randn(2, 3, 4)
 print(t.shape)                  # torch.Size([2, 3, 4])
 print(t.reshape(6, 4).shape)    # [6, 4]
-print(t.view(2, -1).shape)      # [2, 12]  (must be contiguous)
+print(t.view(2, -1).shape)      # [2, 12]  (requires compatible strides; reshape may copy)
 print(t.permute(1, 0, 2).shape) # [3, 2, 4]
 print(t.transpose(0, 1).shape)  # [3, 2, 4]
 
@@ -450,7 +452,8 @@ x = torch.tensor([1],   dtype=torch.int8)      # INT8 for quantized inference
 x = x.to(device)
 x = x.to('cuda:0')             # specific GPU
 
-# In-place ops (use with caution — breaks autograd graph)
+# In-place writes have autograd/view restrictions. This example has no gradients.
+x = torch.tensor([1.0], device=device, dtype=torch.float32)
 x.add_(1.0)                    # in-place add
 x.mul_(2.0)                    # in-place mul
 ```
@@ -516,7 +519,7 @@ loss2.backward()
 print(f"After second backward: x.grad = {x.grad}")   # 4.0 + 12.0 = 16.0 ← ACCUMULATES
 
 # Why? In real training you batch gradients before updating weights
-# Always zero gradients before each new backward:
+# Clear leaf gradients before a new optimizer update, unless deliberately accumulating:
 x.grad.zero_()    # in-place zero
 ```
 
@@ -554,7 +557,7 @@ class MyReLU(torch.autograd.Function):
         x, = ctx.saved_tensors
         # Gradient of ReLU: 1 where x > 0, else 0
         grad_input = grad_output.clone()
-        grad_input[x < 0] = 0
+        grad_input[x <= 0] = 0
         return grad_input    # gradient flowing OUT to previous layer
 
 # Use it exactly like a built-in operation
@@ -600,7 +603,7 @@ class Linear(nn.Module):
 #   .parameters()  — iterate all registered Parameter tensors
 #   .to(device)    — move all parameters to device
 #   .train()/.eval() — set training/eval mode (affects BatchNorm, Dropout)
-#   .state_dict()  — serialize all parameters
+#   .state_dict()  — collect parameters and persistent buffers
 #   .load_state_dict() — restore from checkpoint
 ```
 
@@ -644,7 +647,7 @@ labels = torch.randint(0, 10, (32,))
 loss = loss_fn(logits, labels)
 
 # CrossEntropyLoss internally does:
-#   softmax(logits, dim=1) → log → NLLLoss
+#   numerically stable log_softmax(logits, dim=1) → NLLLoss
 # Equivalent to:
 #   F.cross_entropy(logits, labels)
 #   -log_softmax(logits, dim=1).gather(1, labels.unsqueeze(1)).mean()
@@ -794,7 +797,7 @@ class DepthwiseSeparableConv(nn.Module):
 
     Standard conv: in_ch × out_ch × k × k MACs per position
     DSConv:        in_ch × k × k + in_ch × out_ch MACs
-    Speedup:       ~8× for k=3 vs standard conv
+    MAC reduction: approaches 9× for k=3 and large output channels; measure latency
     """
     def __init__(self, in_ch, out_ch, stride=1):
         super().__init__()
@@ -942,10 +945,8 @@ for name, (fn, weights) in models_to_compare.items():
 
     print(f"{name:20s}: {params/1e6:.1f}M params, {lat:.1f}ms/frame")
 
-# Expected (CPU):
-# ResNet-18:           11.7M params, 45ms/frame
-# MobileNetV3-S:        2.5M params, 12ms/frame  ← best for edge
-# EfficientNet-B0:      5.3M params, 30ms/frame
+# Record actual results: CPU model, thread count, library versions, dtype, and input shape.
+# This is average CPU inference time; it does not measure accuracy or device tail latency.
 ```
 
 ---
@@ -955,7 +956,7 @@ for name, (fn, weights) in models_to_compare.items():
 ### Understanding YOLO from PyTorch internals
 
 ```python
-# The YOLO head: for each cell in the grid, predict B boxes
+# Educational anchor-based head (not the full YOLOv8 architecture): predict B boxes per cell
 # Each box: [tx, ty, tw, th, objectness, class1...classN]
 
 class YOLOHead(nn.Module):
@@ -1191,22 +1192,15 @@ c.numpy()
 # You can READ this. Try doing that with PyTorch.
 ```
 
-### Memory management: unified vs separate
+### Memory management: allocation and synchronization
 
-```python
-# PyTorch on GPU: CPU memory and GPU memory are separate
-cpu_tensor = torch.randn(1000)
-gpu_tensor = cpu_tensor.cuda()   # copy: CPU → GPU (PCIe transfer)
-back       = gpu_tensor.cpu()    # copy: GPU → CPU
+On a discrete GPU, a tensor transfer may cross PCIe or another host interconnect. On Jetson, CPU and GPU share physical DRAM, but framework tensors still have allocation, addressing, cache, and synchronization rules. Shared DRAM does **not** make `.cpu()`/`.cuda()` no-ops or establish a zero-copy camera pipeline.
 
-# tinygrad on Jetson: unified memory — no copy needed!
-# (see Edge AI Optimization guide for full discussion)
-# Jetson's LPDDR5 is shared between CPU and GPU
-# tinygrad's cuda backend uses cuMemAllocManaged() for unified alloc
+Inspect the allocator and copy APIs at the pinned tinygrad/PyTorch revision. Record an allocation trace, copy events, and synchronization before claiming zero-copy. Managed, mapped pinned, ordinary host, and device allocations are different mechanisms. A readable Python framework can still call device libraries and generated native kernels.
 
-# PyTorch on Jetson: still works but you must use .cuda()/.cpu() explicitly
-# tinygrad: if running on Jetson with CUDA backend, tensors are already accessible to both
-```
+**Numerical check:** test `MyReLU` at `[-1, 0, 1]`; its backward convention should produce `[0, 0, 1]` for a unit upstream gradient, matching PyTorch. Check finite differences away from zero, where ReLU is differentiable. For the educational scalar engine, construct a fresh forward graph per training step and clear leaf parameter gradients; reusing a graph with accumulated intermediate gradients is not supported by this simple implementation.
+
+**API references:** [PyTorch autograd](https://docs.pytorch.org/docs/stable/notes/autograd.html), [CrossEntropyLoss](https://docs.pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html). Pin a framework revision before using internal graph-inspection examples: compiler IR names such as `LazyBuffer` are historical and can change.
 
 ---
 
@@ -1256,7 +1250,7 @@ back       = gpu_tensor.cpu()    # copy: GPU → CPU
 - **"Deep Learning with PyTorch"** (Eli Stevens et al., Manning): free PDF at pytorch.org/deep-learning-with-pytorch
 
 ### tinygrad connection
-- **tinygrad/tensor.py** — the 1000-line file that replaces micrograd's `Value` + PyTorch's `Tensor`
+- **tinygrad/tensor.py** — the tensor API implementation that replaces micrograd's `Value` + PyTorch's `Tensor`
 - **"tinygrad: a simple and powerful nn/ml framework"** — geohot's original blog post
 - **DEBUG=1,2,3,4** environment variable: the best tinygrad tutorial is running it with increasing debug levels and reading the output
 
@@ -1269,16 +1263,11 @@ back       = gpu_tensor.cpu()    # copy: GPU → CPU
 *Parent: [Neural Networks](../Guide.md)*
 *Next: [tinygrad deep dive](../../../Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/Guide.md)*
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Differentiate a scalar expression by hand using the chain rule. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Carry this course into the physical-AI system
 
-1. **Baseline lab:** Add an operation to a small autodiff graph and validate it with finite differences.
-2. **Guided variation:** Use a reused subexpression to test gradient accumulation and clear gradients between passes.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Start from:** Scalar calculus and a tiny MLP.
 
-**Evidence to submit:** Analytical/numerical gradient error, graph structure, and regression cases. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Build and challenge:** Check shared-parameter gradient accumulation and the ReLU-at-zero convention. Construct a fresh scalar graph each training step; distinguish this educational engine from production autograd.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** A gradient check and an explanation of forward, backward, and parameter-update costs. Continue with [the connected course](../PyTorch/Guide.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

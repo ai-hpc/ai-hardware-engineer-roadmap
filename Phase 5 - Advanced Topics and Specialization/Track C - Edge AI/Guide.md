@@ -22,6 +22,11 @@
 
 ---
 
+
+![Camera, GPU preprocessing, inference, and CPU action validation share one DRAM budget but exchange ownership using completion fences.](../../Assets/illustrations/deployment-edge/memory-ownership.png)
+
+*Read the arrows as ownership transfers. Shared DRAM alone does not remove format conversions, copies, or synchronization.*
+
 ## Why This Track Exists
 
 Edge AI is not "cloud inference on a smaller box." The system has different constraints:
@@ -442,3 +447,12 @@ You are ready to claim edge AI specialization when you can:
 - ship a reproducible edge AI benchmark or case study
 
 **Study method:** use the [shared lesson cycle and completion rubric](../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
+
+
+## Integration lab: Which deployment constraint should change the hardware design?
+
+Select a replayable physical-AI workload and allocate memory, latency, power, sensing, and wireless budgets. Compare one baseline and one optimized implementation under the same observation/action contract.
+
+**Acceptance evidence:** Submit a resource ledger and Pareto comparison with quality included. Carry the dominant operator, buffer lifetime, and communication bottleneck into the SoC proposal.
+
+**Continue:** take this artifact to [vla-deploy-jetson](../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/5.%20Application%20Development/5.%20ML%20and%20AI/vla-deploy-jetson/Guide.md). Explain which assumption from this course the next engineer must preserve.

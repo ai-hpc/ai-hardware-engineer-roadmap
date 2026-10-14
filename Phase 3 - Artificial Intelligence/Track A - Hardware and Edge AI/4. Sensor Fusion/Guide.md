@@ -16,157 +16,41 @@
 
 ---
 
-**Phase 1 (Supercharged): Sensor Fusion (18-36 Months)**
+## Course sequence: one observation contract
 
-**1. Sensor Integration (Beyond the Basics)**
+Begin with two sensors and one coordinate transform. Add modalities only after you can explain a residual plot. This sequence replaces calendar-based lists of advanced topics with artifacts the robotics courses can consume.
 
-* **Advanced Sensor Calibration and Synchronization:**
-    * **Calibration Techniques:**  Explore advanced calibration techniques for different sensor types, including intrinsic and extrinsic calibration for cameras, LiDAR-camera calibration, and IMU calibration using advanced filtering methods.
-    * **Time Synchronization:**  Master precise time synchronization techniques to align data from different sensors with varying sampling rates and latencies. Investigate hardware and software synchronization methods, including clock synchronization protocols (e.g., PTP) and software-based timestamping.
+| Step | Study | Build | Passing evidence |
+|---|---|---|---|
+| 1 | [Kalman filter series](kalman-filter/README.md) | A seeded constant-velocity estimator | State error, innovation, covariance, and behavior during a dropout |
+| 2 | [Kalibr](Kalibr/Guide.md) | Camera/IMU calibration manifest | Transform direction, units, clock convention, and held-out residuals |
+| 3 | [Multi-object tracking](multi-object-tracking/Guide.md) | Gated assignment with track birth/death | Identity switches and tracking metrics on an unchanged detector |
+| 4 | [BEVFusion](BEVFusion/Guide.md) | Camera/LiDAR feature alignment | Same-split modality ablations and measured runtime memory |
+| 5 | ROS 2 integration | Timestamped observation publisher | Replay, stale-message rejection, and frame-consistent outputs |
 
-* **Sensor Data Processing and Feature Extraction:**
-    * **Point Cloud Processing (Advanced):**  Dive deeper into point cloud processing techniques, including point cloud filtering, segmentation, registration, and object recognition using point cloud features.
-    * **Image Processing for Sensor Fusion:**  Learn how to apply image processing techniques (e.g., feature extraction, object detection) to camera data for integration with other sensor modalities.
-    * **Signal Processing for Inertial Data:**  Master signal processing techniques for analyzing and filtering inertial measurement unit (IMU) data, including noise reduction, bias estimation, and sensor fusion with complementary filters.
+**Entry knowledge:** vectors, covariance, coordinate transforms, and basic Python. Learn linear filtering before EKF/UKF; a UKF is not universally more accurate than an EKF. Each approximates nonlinear uncertainty differently, so compare on the same known trajectory.
 
-* **Heterogeneous Sensor Fusion:**
-    * **Combining Diverse Sensor Modalities:**  Explore techniques for fusing data from a wide range of sensors, including cameras, LiDAR, radar, IMU, GPS, ultrasonic sensors, and more.
-    * **Sensor Fusion for Different Applications:**  Investigate how sensor fusion is applied in various domains, such as robotics, autonomous vehicles, augmented reality, and environmental monitoring.
+## Worked error budget
 
+For a pinhole camera near its optical axis, a one-pixel error at depth `Z` corresponds approximately to `Z/f` metres, where `f` is focal length in pixels. At `Z=20 m` and `f=500 px`, that is `0.04 m`. This is geometry under stated assumptions, not a universal odometry drift rate.
 
-**2. Kalman Filtering and Advanced Estimation (Mastering the Math)**
+A one-degree orientation error displaces a ray at 30 m by roughly `30*tan(1°)=0.524 m`. A 1 ms offset at constant 1 m/s is a 1 mm displacement; angular motion, acceleration, rolling shutter, and filter feedback can change the impact. Test them separately.
 
-* **Beyond the Basic Kalman Filter:**
-    * **Extended Kalman Filter (EKF):**  Learn how to apply the EKF for non-linear systems, where the relationship between states and measurements is not linear.
-    * **Unscented Kalman Filter (UKF):**  Explore the UKF, which uses a deterministic sampling approach to handle non-linearity more accurately than the EKF.
-    * **Particle Filter:**  Investigate particle filters, a Monte Carlo-based approach for estimating states in highly non-linear and non-Gaussian systems.
+**Exercise:** replay a reference trajectory, inject a known 10 ms timestamp offset, and compare residuals with a one-degree frame error. Predict which residual changes with speed before running the experiment. Carry the timestamp/frame manifest into the VLA observation adapter.
 
-* **Sensor Fusion with Advanced Estimation Techniques:**
-    * **Factor Graphs and Graph Optimization:**  Learn about factor graphs, a graphical representation of probabilistic relationships between variables, and how they are used for sensor fusion and state estimation. Explore graph optimization techniques for solving these problems.
-    * **Nonlinear Optimization:**  Dive into nonlinear optimization techniques, such as gradient descent and Levenberg-Marquardt algorithms, for solving complex sensor fusion problems.
-    * **Machine Learning for Sensor Fusion:**  Investigate the use of machine learning techniques, such as deep learning and recurrent neural networks (RNNs), for sensor fusion and state estimation.
+## From a good estimate to a usable robot input
 
-* **Robust and Adaptive Sensor Fusion:**
-    * **Outlier Detection and Rejection:**  Learn how to detect and handle outliers in sensor data to improve the robustness of your sensor fusion algorithms.
-    * **Adaptive Filtering:**  Explore adaptive filtering techniques that can adjust their parameters in real-time to adapt to changing sensor characteristics and environmental conditions.
+Every observation needs a frame ID, units, source timestamp, clock domain, validity interval, and covariance or other uncertainty description where meaningful. Distinguish time synchronization from spatial calibration. A low calibration residual on the fitted sequence does not establish accuracy on a new trajectory.
+
+Use ROS 2 for the integrated robot path. Legacy ROS 1 calibration utilities may run offline in their own pinned environment; document bag conversion and verify timestamp preservation. Calibration outputs can then be consumed by a ROS 2 deployment without treating the calibration tool as a ROS 2 package.
+
+**Advanced branches after this gate:** factor graphs/VIO, radar, event cameras, or multi-robot fusion. Select one to answer a task-specific failure seen in the baseline. These are extensions, not requirements before the first working VLA loop.
 
 
-**3. ROS (Robot Operating System) (Beyond the Basics)**
+## Carry this course into the physical-AI system
 
-* **ROS for Advanced Robotics:**
-    * **ROS Navigation Stack:**  Dive deeper into the ROS Navigation Stack, which provides tools and libraries for building autonomous navigation systems. Learn about global and local path planning, obstacle avoidance, and map building.
-    * **ROS Control:**  Explore the ROS Control framework for controlling robot actuators and integrating with different control algorithms.
-    * **ROS Industrial:**  Investigate ROS Industrial, a set of packages and tools for applying ROS in industrial automation and robotics.
+**Start from:** Two timestamped sensors and a known transform convention.
 
-* **ROS for Sensor Fusion:**
-    * **Sensor Drivers and Message Passing:**  Learn how to write ROS drivers for different sensors and how to publish and subscribe to sensor data using ROS topics and messages.
-    * **TF (Transform Library):**  Master the TF library in ROS for managing coordinate frames and transformations between different sensors and robot components.
-    * **Sensor Fusion with ROS Packages:**  Explore ROS packages specifically designed for sensor fusion, such as `robot_localization` and `laser_filters`.
+**Build and challenge:** Work through estimation, calibration, association, then fusion. Inject time offset and spatial error separately so their residual patterns can be distinguished.
 
-* **Advanced ROS Concepts:**
-    * **ROS Actions:**  Learn how to use ROS actions to execute long-running tasks with feedback and preemption capabilities.
-    * **ROS Services:**  Understand ROS services for request-response interactions between nodes.
-    * **ROS Parameters:**  Explore ROS parameters for configuring and tuning your robotic system.
-
-**Resources:**
-
-* **[Kalibr — Multi-Sensor Calibration](Kalibr/Guide.md):**  Complete practical guide to Kalibr (ETH Zurich). Covers camera intrinsic calibration, multi-camera extrinsic calibration, camera-IMU spatial+temporal calibration, Allan variance for IMU noise modelling, output interpretation, and integration with BEVFusion, ORB-SLAM3, and OpenVINS. Essential before any sensor fusion work.
-
-* **[BEVFusion — Camera + LiDAR Fusion in Bird's Eye View](BEVFusion/Guide.md):**  Full guide on multi-modal 3D object detection using BEV feature fusion. Covers architecture (Lift-Splat-Shoot, PointPillars, CenterPoint), training on nuScenes, TensorRT export, ROS2 integration, and Jetson Orin Nano optimization. Start here for state-of-the-art sensor fusion.
-
-* **[Multi-Object Tracking: Hungarian Algorithm + Kalman Filter](multi-object-tracking/Guide.md):**  Complete MOT guide — Kalman filter for motion prediction, Hungarian algorithm for optimal assignment, track lifecycle management. Full Python 3 implementation, YOLO + TensorRT integration for Jetson, 3D tracker for BEVFusion output, ROS2 node with RViz2 markers. Reference: [srianant/kalman_filter_multi_object_tracking](https://github.com/srianant/kalman_filter_multi_object_tracking).
-
-* **[Kalman Filter Learning Series](kalman-filter/README.md):**  A complete educational path from elementary concepts to expert-level implementation—1D, 2D, 6D filters with Python code. Start here before EKF/UKF.
-* **"Probabilistic Robotics" by Sebastian Thrun, Wolfram Burgard, and Dieter Fox:**  A classic textbook on probabilistic robotics, covering sensor fusion, state estimation, and localization.
-* **"State Estimation for Robotics" by Timothy D. Barfoot:**  A comprehensive book on state estimation techniques for robotics, including Kalman filtering, factor graphs, and nonlinear optimization.
-* **ROS Documentation (Advanced Topics):**  Explore the advanced sections of the ROS documentation, including the Navigation Stack, Control framework, and sensor fusion packages.
-* **Online Robotics Courses and Tutorials:**  Take online courses and tutorials on robotics and sensor fusion to deepen your understanding and gain practical experience.
-
-**Projects:**
-
-* **Build a Self-Driving Car Simulation:**  Create a simulation environment (e.g., using Gazebo or CARLA) and develop a self-driving car application that uses sensor fusion for perception, localization, and navigation.
-* **Develop a Drone with Autonomous Navigation:**  Build a drone that can autonomously navigate a complex environment using sensor fusion, including obstacle avoidance and GPS-based waypoint navigation.
-* **Create a 3D Mapping System with Camera and LiDAR:**  Develop a system that combines camera and LiDAR data to create a detailed 3D map of an environment, using techniques like point cloud registration and SLAM (Simultaneous Localization and Mapping).
-* **Contribute to Open-Source Robotics Projects:**  Contribute to open-source robotics projects like ROS or other sensor fusion libraries to gain experience and collaborate with the community.
-
-**Phase 2 (Supercharged++): Sensor Fusion (36-60 Months)**
-
-**1. Sensor Integration (Beyond the Cutting Edge)**
-
-* **Novel Sensor Technologies and Integration:**
-    * **Event-Based Cameras:**  Explore event-based cameras, which only capture changes in pixel intensity, offering high temporal resolution and low latency. Learn how to integrate these cameras with traditional sensors for applications like high-speed object tracking and dynamic vision.
-    * **Hyperspectral and Multispectral Imaging:**  Dive into hyperspectral and multispectral imaging, which capture information beyond the visible spectrum. Learn how to integrate these sensors with LiDAR and cameras for applications like environmental monitoring, precision agriculture, and medical imaging.
-    * **Soft Robotics and Tactile Sensing:**  Investigate the integration of soft robotics with tactile sensors, which can provide rich information about contact and pressure. Explore applications in human-robot interaction, grasping and manipulation, and medical robotics.
-
-* **Sensor Data Fusion in Challenging Environments:**
-    * **Underwater Robotics:**  Learn about the challenges and techniques for sensor fusion in underwater environments, including dealing with limited visibility, acoustic communication, and pressure variations.
-    * **Space Robotics:**  Explore sensor fusion for space robotics, considering factors like radiation effects, extreme temperatures, and communication delays.
-    * **Swarms and Multi-Robot Systems:**  Investigate sensor fusion in swarms of robots or multi-robot systems, where information from multiple robots is combined to achieve collective perception and coordinated action.
-
-* **Sensor Fusion for Human-Computer Interaction:**
-    * **Augmented Reality (AR) and Virtual Reality (VR):**  Explore sensor fusion for AR and VR applications, combining data from cameras, IMUs, and depth sensors to create immersive and interactive experiences.
-    * **Human Activity Recognition:**  Learn how to use sensor fusion to recognize human activities and gestures, with applications in healthcare, sports analysis, and human-computer interaction.
-    * **Brain-Computer Interfaces (BCIs):**  Investigate the integration of brain signals with other sensor modalities for advanced human-computer interaction and control.
-
-
-**2. Kalman Filtering and Advanced Estimation (Beyond the Horizon)**
-
-* **Beyond Traditional Filtering:**
-    * **Adaptive Kalman Filtering:**  Explore adaptive Kalman filtering techniques that can adjust their parameters in real-time to adapt to changing sensor characteristics, noise levels, and environmental conditions.
-    * **Hybrid Kalman Filters:**  Investigate hybrid Kalman filters that combine different filtering approaches, such as Kalman filters with particle filters or neural networks, to achieve better performance in complex scenarios.
-    * **Information Filters:**  Learn about information filters, an alternative representation of the Kalman filter that can be more efficient for certain types of sensor fusion problems.
-
-* **Sensor Fusion with Machine Learning (Advanced):**
-    * **Deep Learning for State Estimation:**  Dive deeper into deep learning techniques for state estimation, including recurrent neural networks (RNNs), long short-term memory (LSTM) networks, and transformers.
-    * **Probabilistic Deep Learning for Sensor Fusion:**  Explore probabilistic deep learning approaches that combine the power of deep learning with probabilistic modeling to handle uncertainty and noise in sensor data.
-    * **Reinforcement Learning for Sensor Fusion:**  Investigate the use of reinforcement learning to learn optimal sensor fusion strategies and adapt to changing environments.
-
-* **Sensor Fusion for Complex Systems:**
-    * **Multi-Target Tracking:**  Learn about multi-target tracking algorithms, such as the Joint Probabilistic Data Association (JPDA) filter and the Multiple Hypothesis Tracker (MHT), for tracking multiple objects simultaneously.
-    * **Simultaneous Localization and Mapping (SLAM) (Advanced):**  Explore advanced SLAM techniques, such as graph-based SLAM and visual-inertial SLAM, for robust and accurate mapping and localization in complex environments.
-    * **Sensor Fusion for Predictive Modeling:**  Investigate the use of sensor fusion for predictive modeling, such as predicting future states of a system or anticipating events based on sensor data.
-
-
-**3. ROS (Robot Operating System) (Mastering the Framework)**
-
-* **ROS 2.0 and Beyond:**
-    * **ROS 2.0 Features and Architecture:**  Dive into the new features and architecture of ROS 2.0, including its improved communication infrastructure, real-time capabilities, and security features.
-    * **Migration from ROS 1 to ROS 2:**  Learn how to migrate existing ROS 1 code and packages to ROS 2.
-    * **ROS 2 for Embedded Systems:**  Explore the use of ROS 2 on resource-constrained embedded platforms.
-
-* **Advanced ROS Tools and Techniques:**
-    * **ROSbag2:**  Learn about ROSbag2, the new bag file format in ROS 2, and how to use it for recording and replaying sensor data.
-    * **RViz2:**  Explore RViz2, the 3D visualization tool in ROS 2, for visualizing sensor data, robot models, and environment maps.
-    * **ROS for Simulation (Advanced):**  Dive deeper into ROS integration with simulation environments like Gazebo and Ignition Gazebo, including creating custom robot models, simulating sensor data, and developing advanced control algorithms.
-
-* **ROS for Industrial and Research Applications:**
-    * **ROS-Industrial (Advanced):**  Explore advanced features of ROS-Industrial, such as motion planning, collision avoidance, and integration with industrial robots and PLCs.
-    * **ROS for Research:**  Investigate the use of ROS in research areas like human-robot interaction, multi-robot systems, and autonomous navigation.
-
-**Resources:**
-
-* **"Programming Robots with ROS" by Morgan Quigley, Brian Gerkey, and William D. Smart:**  A comprehensive guide to ROS, covering its core concepts, tools, and applications.
-* **"ROS Robotics Projects" by Lentin Joseph:**  A collection of practical ROS projects, including sensor fusion, navigation, and manipulation.
-* **ROS 2 Documentation:**  Refer to the official ROS 2 documentation for detailed information on its features, packages, and tools.
-* **Online Robotics Communities and Forums:**  Engage with online robotics communities and forums to learn from experts, share your knowledge, and collaborate on projects.
-
-**Projects:**
-
-* **Develop a Multi-Robot System with Collaborative Perception:**  Create a system with multiple robots that share sensor data and collaborate to achieve a common goal, such as exploring an unknown environment or transporting an object.
-* **Build an Autonomous Drone with Advanced Obstacle Avoidance:**  Develop a drone that can autonomously navigate complex environments with dynamic obstacles using advanced sensor fusion and obstacle avoidance techniques.
-* **Create a Virtual Reality Application with Realistic Sensor Integration:**  Build a VR application that integrates real-world sensor data (e.g., from cameras, IMUs) to create a more immersive and interactive experience.
-* **Contribute to Open-Source Robotics Projects:**  Contribute to open-source robotics projects like ROS 2, sensor fusion libraries, or simulation tools to gain experience and collaborate with the community.
-
-## Practice and assessment
-
-**Entry diagnostic (prerequisite check):** Draw sensor frames and distinguish spatial calibration from time alignment. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
-
-1. **Baseline lab:** Fuse a small recorded or synthetic trajectory and compare with a single-sensor baseline.
-2. **Guided variation:** Inject a timestamp offset or sensor dropout and inspect estimation residuals.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
-
-**Evidence to submit:** Trajectory error, innovation/residual plots, timing offset, and recovery behavior. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** A frame/time/uncertainty contract that the robot observation pipeline can validate. Continue with [the connected course](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Isaac%20Sim%20and%20Isaac%20Lab/README.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

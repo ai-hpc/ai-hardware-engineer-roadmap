@@ -23,16 +23,10 @@ Work through these in order. Each file is one session: read it, do the lab at th
 | [Lecture-15](Lecture-15.md) | Glossary and quick reference |
 | [Lecture-16](Lecture-16.md) | Further reading |
 
-## Practice and assessment
+## Reuse the same package across all sixteen sessions
 
-**Entry diagnostic (prerequisite check):** Explain recipe, layer, machine, distribution, image, and task signatures. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+L1–5 establish a pinned baseline image; L6–8 add the observation service in your own layer; L9 ties boot artifacts to the hardware; L10 builds that service against the matching SDK; L11 records an intentional build failure and recovery. L12–13 add manifests and rebuild evidence. Choose the release-bundle capstone in L14 and use L15–16 as reference.
 
-1. **Baseline lab:** Add a small package to an image and rebuild from pinned layers and configuration.
-2. **Guided variation:** Change one recipe input and identify which tasks rebuild; verify package contents on the target or QEMU.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+For every session retain the diff, command, output artifact, and target observation. A list of concepts or a successful BitBake exit alone cannot prove that the right package reached the target.
 
-**Evidence to submit:** Layer revisions, build/task logs, image manifest, size delta, and runtime smoke test. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** A continuous product-layer history ending in an image plus matching SDK. Continue with [the next course](../../Jetson%20ESP-Hosted%20Host%20Code/Guide.md) and reuse that evidence.

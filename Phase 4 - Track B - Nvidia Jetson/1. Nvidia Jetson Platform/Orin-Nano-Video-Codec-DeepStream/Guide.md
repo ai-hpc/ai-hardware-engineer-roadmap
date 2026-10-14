@@ -1,4 +1,4 @@
-# Jetson Orin Nano 8GB -- Video Codec Hardware, GStreamer Pipelines, and DeepStream SDK
+# Jetson video pipelines — Nano software encode and optional NX/AGX hardware encode
 
 <div class="course-identity auto-course" style="--course-accent: #4f46e5; --course-accent-rgb: 79, 70, 229;" markdown="1">
 <div class="course-identity__icon">JON8</div>
@@ -10,14 +10,34 @@
 </div>
 
 
-> **Target:** Jetson Orin Nano 8GB Developer Kit (T234 SoC, Ampere GPU, JetPack 6.x / L4T 36.x).
+> **Target:** Nano for decode, software encode, and inference; DLA/NVENC comparisons require a compatible NX/AGX module. Examples are tied to the documented JetPack 6.x / L4T 36.x APIs.
 >
 > **Prerequisites:** Familiarity with the [Orin Nano memory architecture](../Orin-Nano-Memory-Architecture/Guide.md) (NVMM, zero-copy, DMA-BUF) and [real-time inference](../Orin-Nano-Real-Time-Inference/Guide.md) (TensorRT engine building).
 
 ---
 
 
+## Nano baseline: make encoding costs visible
+
+**Orin Nano has no NVENC.** NVIDIA documents a software H.264 path using libx264; see [Software Encode in Orin Nano](https://docs.nvidia.com/jetson/archives/r36.2/DeveloperGuide/SD/Multimedia/SoftwareEncodeInOrinNano.html). Shared family diagrams and plugin names do not add hardware to a Nano module.
+
+Start with a generated stream so camera bring-up and encoding are separate problems:
+
+```bash
+# Requires GStreamer good/ugly plugins with x264enc installed.
+gst-inspect-1.0 x264enc
+gst-launch-1.0 -e videotestsrc num-buffers=300 ! \
+  'video/x-raw,width=640,height=480,framerate=30/1,format=I420' ! \
+  x264enc tune=zerolatency speed-preset=ultrafast bitrate=1000 ! \
+  h264parse ! mp4mux ! filesink location=nano-encode-baseline.mp4
+```
+
+Verify the output frame count and duration, then add the real camera conversion path. Measure CPU use and frame age while inference runs. Record bitrate and quality too: reducing encode work by discarding visual information can damage downstream perception. No throughput number is assumed here.
+
+
 ## 1. Introduction
+
+> **Platform scope:** Hardware-encoder (`NVENC`, `nvv4l2h264enc`, `nvv4l2h265enc`) examples in this chapter are for compatible NX/AGX hardware. On Nano use the software-encode baseline below and remeasure CPU load. Decoder availability does not imply encoder availability.
 
 ### 1.1 Video Processing in Edge AI
 
@@ -242,6 +262,8 @@ sudo tegrastats --interval 500
 
 ## 3. NVENC Hardware -- Video Encoder Engine
 
+> **Platform scope:** Hardware-encoder (`NVENC`, `nvv4l2h264enc`, `nvv4l2h265enc`) examples in this chapter are for compatible NX/AGX hardware. On Nano use the software-encode baseline below and remeasure CPU load. Decoder availability does not imply encoder availability.
+
 ### 3.1 Encoder Block Architecture
 
 The T234 contains one NVENC instance. Like NVDEC, this is a fixed-function ASIC block
@@ -302,7 +324,7 @@ gst-launch-1.0 videotestsrc num-buffers=300 ! \
 
 ### 3.5 B-Frame Support and GOP Structure
 
-NVENC on the Orin Nano supports B-frames for both H.264 and H.265:
+On NVENC-equipped NX/AGX modules, encoder support and B-frame restrictions depend on the codec and release. Orin Nano has no NVENC:
 
 ```bash
 # 2 B-frames, IDR every 30 frames
@@ -457,9 +479,11 @@ jetson.utils.saveImage("output.jpg", img, quality=90)
 
 ## 5. V4L2 Codec Interface
 
+> **Platform scope:** Hardware-encoder (`NVENC`, `nvv4l2h264enc`, `nvv4l2h265enc`) examples in this chapter are for compatible NX/AGX hardware. On Nano use the software-encode baseline below and remeasure CPU load. Decoder availability does not imply encoder availability.
+
 ### 5.1 Device Topology
 
-On the Orin Nano, the V4L2 codec devices are exposed as Memory-to-Memory (M2M) devices:
+The following M2M device listing is an illustrative NX/AGX example, not a Nano device inventory. Discover the actual nodes on your target:
 
 ```bash
 $ ls -la /dev/video*
@@ -653,6 +677,8 @@ make
 
 ## 6. GStreamer on Jetson -- NVIDIA Accelerated Plugins
 
+> **Platform scope:** Hardware-encoder (`NVENC`, `nvv4l2h264enc`, `nvv4l2h265enc`) examples in this chapter are for compatible NX/AGX hardware. On Nano use the software-encode baseline below and remeasure CPU load. Decoder availability does not imply encoder availability.
+
 ### 6.1 Plugin Overview
 
 NVIDIA provides hardware-accelerated GStreamer plugins that replace standard software
@@ -780,6 +806,8 @@ directly.
 ---
 
 ## 7. GStreamer Pipeline Patterns
+
+> **Platform scope:** Hardware-encoder (`NVENC`, `nvv4l2h264enc`, `nvv4l2h265enc`) examples in this chapter are for compatible NX/AGX hardware. On Nano use the software-encode baseline below and remeasure CPU load. Decoder availability does not imply encoder availability.
 
 ### 7.1 Pattern 1: Camera to Encode to Stream
 
@@ -919,6 +947,8 @@ dot -Tpng /tmp/gst-dots/*.dot -o pipeline_graph.png
 
 ## 8. Hardware-Accelerated Transcoding
 
+> **Platform scope:** Hardware-encoder (`NVENC`, `nvv4l2h264enc`, `nvv4l2h265enc`) examples in this chapter are for compatible NX/AGX hardware. On Nano use the software-encode baseline below and remeasure CPU load. Decoder availability does not imply encoder availability.
+
 ### 8.1 Full Decode-Scale-Encode Pipeline
 
 Transcoding from H.264 at 4K to H.265 at 1080p, entirely in hardware:
@@ -1048,6 +1078,8 @@ one NVENC instance exists and it must time-slice.
 ---
 
 ## 9. DeepStream SDK Overview
+
+> **Platform scope:** Hardware-encoder (`NVENC`, `nvv4l2h264enc`, `nvv4l2h265enc`) examples in this chapter are for compatible NX/AGX hardware. On Nano use the software-encode baseline below and remeasure CPU load. Decoder availability does not imply encoder availability.
 
 ### 9.1 What is DeepStream
 
@@ -1800,7 +1832,7 @@ On 8 GB total system RAM, plan for:
 
 ### 12.3 Performance Scaling
 
-Benchmarks on Orin Nano 8GB at 15W (JetPack 6.0, DeepStream 7.0):
+Illustrative capacity-planning figures, not measured results in this repository; replace them with your target measurements:
 
 | Model                | Resolution | Streams | FPS/stream | GPU % | NVDEC % | Notes          |
 |----------------------|------------|---------|------------|-------|---------|----------------|
@@ -2241,6 +2273,8 @@ def custom_payload_probe(pad, info, user_data):
 
 ## 14. Zero-Copy Video Pipeline Architecture
 
+> **Platform scope:** Hardware-encoder (`NVENC`, `nvv4l2h264enc`, `nvv4l2h265enc`) examples in this chapter are for compatible NX/AGX hardware. On Nano use the software-encode baseline below and remeasure CPU load. Decoder availability does not imply encoder availability.
+
 ### 14.1 The NvBufSurface Abstraction
 
 `NvBufSurface` is the central data structure that carries video frame data through
@@ -2453,6 +2487,8 @@ gst-launch-1.0 ... ! nvv4l2decoder num-extra-surfaces=2 ! ...
 
 ## 15. Performance Profiling
 
+> **Platform scope:** Hardware-encoder (`NVENC`, `nvv4l2h264enc`, `nvv4l2h265enc`) examples in this chapter are for compatible NX/AGX hardware. On Nano use the software-encode baseline below and remeasure CPU load. Decoder availability does not imply encoder availability.
+
 ### 15.1 tegrastats -- System-Level Monitoring
 
 `tegrastats` is the primary tool for monitoring hardware engine utilization:
@@ -2656,6 +2692,8 @@ echo "Results saved to $OUTPUT_DIR/"
 ---
 
 ## 16. Production Deployment
+
+> **Platform scope:** Hardware-encoder (`NVENC`, `nvv4l2h264enc`, `nvv4l2h265enc`) examples in this chapter are for compatible NX/AGX hardware. On Nano use the software-encode baseline below and remeasure CPU load. Decoder availability does not imply encoder availability.
 
 ### 16.1 RTSP Server Output
 
@@ -3035,6 +3073,8 @@ sudo journalctl -u deepstream-analytics -f   # View logs
 
 ## 17. Common Issues and Debugging
 
+> **Platform scope:** Hardware-encoder (`NVENC`, `nvv4l2h264enc`, `nvv4l2h265enc`) examples in this chapter are for compatible NX/AGX hardware. On Nano use the software-encode baseline below and remeasure CPU load. Decoder availability does not imply encoder availability.
+
 ### 17.1 Pipeline Negotiation Errors
 
 **Symptom:** `not-negotiated (-4)` error or `Internal data stream error`.
@@ -3323,16 +3363,13 @@ ls /proc/$(pgrep deepstream-app)/fd | wc -l
 - Jetson Power and Performance -- https://docs.nvidia.com/jetson/archives/r36.3/DeveloperGuide/SD/PlatformPowerAndPerformance.html
 - V4L2 API Specification -- https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/v4l2.html
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Trace timestamps and buffers through capture, decode, inference, and display/encode. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Can video transport coexist with inference inside the CPU budget?
 
-1. **Baseline lab:** Build a fixed video pipeline and compare stage timing with end-to-end timing.
-2. **Guided variation:** Change queue depth or input rate and examine dropping versus latency growth.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+> **Platform scope:** Hardware-encoder (`NVENC`, `nvv4l2h264enc`, `nvv4l2h265enc`) examples in this chapter are for compatible NX/AGX hardware. On Nano use the software-encode baseline below and remeasure CPU load. Decoder availability does not imply encoder availability.
 
-**Evidence to submit:** Frame rate, dropped frames, age of output frames, memory, and hardware block utilization. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+On Nano, pair hardware decode where supported with software encoding, then run inference concurrently. Bound queues and measure frame age, CPU load, dropped frames, and end-to-end latency.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
+**Acceptance evidence:** The Nano baseline must run without NVENC. Treat any hardware-encode pipeline as an NX/AGX comparison and export the measured CPU/DRAM budget to the robot system design.
 
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [Orin-Nano-Camera-ISP-Sensor-Bringup](../Orin-Nano-Camera-ISP-Sensor-Bringup/Guide.md). Explain which assumption from this course the next engineer must preserve.

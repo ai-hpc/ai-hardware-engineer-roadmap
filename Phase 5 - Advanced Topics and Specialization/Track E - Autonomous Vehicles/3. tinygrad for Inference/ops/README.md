@@ -1,6 +1,6 @@
 # Tinygrad Operations Reference
 
-Tinygrad builds **all of deep learning** from exactly 3 operation types and 25 primitive ops. No CONV or MATMUL primitives — they're composed from the basics.
+This reference groups tensor mathematics into elementwise, reduction, and movement operations. The lists below are a teaching decomposition and historical names, not a complete or version-independent list of current UOps.
 
 ---
 
@@ -14,7 +14,7 @@ Tinygrad builds **all of deep learning** from exactly 3 operation types and 25 p
 | BinaryOps (2 inputs) | 7: ADD, SUB, MUL, DIV, MOD, MAX, CMPLT | `a + b`, `a * b`, `a.maximum(b)` |
 | TernaryOps (3 inputs) | 2: WHERE, MULACC | `cond.where(a, b)`, `a.mulacc(b, c)` |
 
-Key property: multiple elementwise ops fuse automatically into **one GPU kernel**.
+Compatible elementwise operations may fuse; inspect the schedule for the selected shapes, backend, and revision.
 
 ### 2. ReduceOps — collapse a dimension
 
@@ -25,9 +25,9 @@ Key property: multiple elementwise ops fuse automatically into **one GPU kernel*
 
 Derived: MEAN, MIN, VAR, STD, PROD — all built from SUM and MAX.
 
-Reductions **break fusion boundaries**: ops before a reduce fuse together, then a new kernel starts after.
+Reductions impose dependencies, but do not inherently require a separate kernel. Producer/consumer fusion depends on the scheduler, shape, and resource constraints.
 
-### 3. MovementOps — zero-copy reshaping
+### 3. MovementOps — logical index transformations
 
 | Op | Code | Zero-Copy |
 |----|------|-----------|
@@ -39,7 +39,7 @@ Reductions **break fusion boundaries**: ops before a reduce fuse together, then 
 | STRIDE | `x[::n]` | ✅ |
 | PAD | `x.pad(padding)` | ❌ |
 
-ShapeTracker tracks strides/offsets so no data moves until `.realize()`.
+These operations can be represented as index transformations. Padding can also be expressed through masked reads, while some consumers force contiguous materialization. Treat the table as conceptual view capability, not a guarantee of zero physical copies.
 
 ---
 
@@ -98,10 +98,9 @@ w = z.relu()
 # w = max((x + 1) * 2, 0)
 ```
 
-Reduction ops break fusion. This produces 2 kernels:
+Predict a schedule, then inspect it: this expression may fuse into one reduction kernel or be split by the implementation.
 ```python
-# Kernel 1: x + 1 (elementwise)
-# Kernel 2: sum (reduction) + divide (elementwise)
+# Elementwise producer, reduction, and scalar consumer: kernel count is measured
 result = (x + 1).sum() / n
 ```
 

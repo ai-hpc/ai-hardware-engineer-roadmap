@@ -41,11 +41,11 @@ tinygrad/
 | Concept | What It Means |
 |---------|--------------|
 | **Lazy evaluation** | Ops build a graph; nothing executes until `.realize()` |
-| **3 op types** | ElementwiseOps, ReduceOps, MovementOps compose everything |
+| **Mathematical categories** | Elementwise, reduction, and movement explain tensor composition; the actual IR has additional operations |
 | **No CONV/MATMUL** | Built from primitives: `RESHAPE + EXPAND + MUL + SUM` |
 | **UOp IR** | The computation graph is exposed in Python — read and modify it |
-| **Kernel fusion** | Consecutive elementwise ops compile to a single GPU kernel |
-| **ShapeTracker** | Reshape/permute/expand are zero-copy — metadata only |
+| **Kernel fusion** | Inspect whether the scheduler combines compatible operations; dependencies and resource limits matter |
+| **Views/layout** | Logical movement may avoid a copy; materialization depends on the consumer and revision |
 | **All in Python** | Compiler, IR, codegen — no hidden C++/CUDA |
 
 ## Debug Environment Variables
@@ -78,6 +78,12 @@ tinygrad/
 - [Discord](https://discord.gg/tinygrad)
 - [abstractions.py](https://github.com/tinygrad/tinygrad/blob/master/docs/abstractions.py) — annotated architecture walkthrough
 - [Community notes](https://mesozoic-egg.github.io/tinygrad-notes/) — JIT, ShapeTracker, BEAM, pattern matcher
+
+## Start with a versioned experiment
+
+Run the quick-start script from this course directory, then save `python -m pip freeze` and the backend name. For source work, save `git rev-parse HEAD` from the tinygrad checkout. Consult the [current environment-variable reference](https://docs.tinygrad.org/env_vars/) before assuming a historical DEBUG level or CLANG selector still has the same effect.
+
+The success criterion is a correct small tensor result plus an explained execution path. Next, use the [operations reference](ops/README.md) to predict a reduction schedule, then compare that prediction with the actual trace. A script importing successfully is not a compiler-correctness result.
 
 ## Practice and assessment
 

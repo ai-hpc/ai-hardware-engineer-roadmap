@@ -93,19 +93,19 @@ Key power domains:
 | CPU cluster 0   | ARM Cortex-A78AE cores 0-3                  | Per-core       |
 | CPU cluster 1   | ARM Cortex-A78AE cores 4-5                  | Per-core       |
 | GPU             | Ampere GPU (1024 CUDA cores on full Orin)    | Yes            |
-| DLA0            | Deep Learning Accelerator engine 0           | Yes            |
-| DLA1            | Deep Learning Accelerator engine 1           | Yes            |
-| PVA             | Programmable Vision Accelerator              | Yes            |
+| DLA0            | Absent on Orin Nano                          | Not applicable |
+| DLA1            | Absent on Orin Nano                          | Not applicable |
+| PVA             | Absent on Orin Nano                          | Not applicable |
 | VIC             | Video Image Compositor                       | Yes            |
 | NVDEC           | Video decoder                                | Yes            |
-| NVENC           | Video encoder                                | Yes            |
+| NVENC           | Absent on Orin Nano; software encode         | Not applicable |
 | NVJPG           | JPEG encoder/decoder                         | Yes            |
 | SE              | Security Engine (AES, SHA, RNG)              | No             |
 | APE             | Audio Processing Engine                      | Yes            |
 
 On the Orin Nano specifically, some engines present on the full Orin SoC are fused off
 or limited. The Orin Nano 8GB has access to 6 CPU cores, a reduced GPU configuration,
-and one DLA instance (DLA0). DLA1 and PVA are not available on the Orin Nano SKU.
+with no DLA, PVA, or NVENC available on the Orin Nano SKU. See [NVIDIA Orin power tables](https://docs.nvidia.com/jetson/archives/r36.5/DeveloperGuide/SD/PlatformPowerAndPerformance/JetsonOrinNanoSeriesJetsonOrinNxSeriesAndJetsonAgxOrinSeries.html).
 
 ### 2.2 PMIC and Voltage Rails
 
@@ -1056,32 +1056,9 @@ $ echo 306000000 | sudo tee ${GPU_DEV}/max_freq
 $ echo 625000000 | sudo tee ${GPU_DEV}/max_freq
 ```
 
-### 9.3 DLA vs GPU Power Comparison
+### 9.3 Optional DLA versus GPU power comparison
 
-The DLA (Deep Learning Accelerator) is far more power-efficient than the GPU for
-supported operations. On the Orin Nano (DLA0 only):
-
-| Workload (ResNet-50)         | Engine | Throughput  | Power   | Perf/Watt      |
-|-----------------------------|--------|-------------|---------|----------------|
-| FP16, batch=1               | GPU    | ~180 fps    | ~8 W    | ~22.5 fps/W    |
-| INT8, batch=1               | GPU    | ~320 fps    | ~9 W    | ~35.5 fps/W    |
-| INT8, batch=1               | DLA    | ~120 fps    | ~3 W    | ~40.0 fps/W    |
-| INT8, batch=1               | DLA+GPU| ~380 fps    | ~10 W   | ~38.0 fps/W    |
-
-The DLA delivers better perf-per-watt but lower absolute throughput. For power-
-constrained applications, offloading entire models or specific layers to DLA is a
-key optimization strategy. Use TensorRT's `--useDLACore=0` flag to target DLA0.
-
-```bash
-# Run TensorRT with DLA
-$ /usr/src/tensorrt/bin/trtexec \
-    --onnx=resnet50.onnx \
-    --int8 \
-    --useDLACore=0 \
-    --allowGPUFallback \
-    --workspace=1024 \
-    --verbose
-```
+Orin Nano has no DLA. On a supported NX/AGX module, follow the [DLA comparison lab](../Orin-Nano-DLA-Deep-Dive/Guide.md). Use identical inputs, quality criteria, thermal state, and a stated power boundary. Compare joules per completed inference; do not assume DLA is always faster or more efficient once conversions and GPU fallback are included. No DLA performance table in this course is a Nano measurement.
 
 ### 9.4 Memory Bandwidth Optimization
 
@@ -2685,16 +2662,11 @@ step but a continuous engineering discipline. The key principles:
 - Linux Kernel Documentation: cpu-freq, devfreq, thermal
 - INA3221 Triple-Channel Power Monitor Datasheet (Texas Instruments)
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain power mode, clock policy, thermal throttling, and sustained versus burst performance. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Does the deployment still meet its deadline after warming up?
 
-1. **Baseline lab:** Measure a fixed inference workload from cold start through thermal steady state.
-2. **Guided variation:** Change one supported power/cooling setting and repeat the workload.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Run a fixed workload through thermal steady state at two supported power modes. Record input conditions, clocks, temperatures, latency, and the measurement boundary for power; keep fan/enclosure settings in the manifest.
 
-**Evidence to submit:** Throughput over time, latency tails, power, temperature, clocks, and throttling evidence. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Use completed requests in energy calculations: joules per request equals integrated energy divided by completions over the same interval. Explain throttling and publish sustained results, not only a cold burst.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [Orin-Nano-Real-Time-Inference](../Orin-Nano-Real-Time-Inference/Guide.md). Explain which assumption from this course the next engineer must preserve.

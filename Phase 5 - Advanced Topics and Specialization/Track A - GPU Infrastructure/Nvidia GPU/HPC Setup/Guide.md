@@ -173,6 +173,12 @@ Detailed guides for specific GPU cluster configurations and subsystems:
 
 **Projects:** Roofline analysis of a scientific kernel; custom Triton kernel (e.g. layer norm + dropout); auto-tuned cuFFT pipeline.
 
+## Bring-up has an order
+
+First establish one-device correctness and transfers. Next test peer access and collectives within one node. Only then add inter-node transport, scheduling, and storage tuning. A job starting under Slurm does not validate its NIC path, and a container starting does not validate a model's low-precision kernel support.
+
+Keep a runbook with actual device/NUMA/NIC placement, driver/toolkit/runtime versions, per-rank memory, and the first failing layer. Change one layer at a time when diagnosing a hang. The output is a reproducible infrastructure baseline for the hardware-specific deep dive, not a universal set of environment variables to copy between machines.
+
 ## Practice and assessment
 
 **Entry diagnostic (prerequisite check):** Draw GPU/CPU/NIC topology and explain bandwidth versus message latency. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.

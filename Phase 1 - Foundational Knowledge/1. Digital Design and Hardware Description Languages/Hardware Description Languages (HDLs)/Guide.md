@@ -4,7 +4,7 @@
 <div class="course-identity__icon">HDLV</div>
 <div markdown="1">
 <p class="course-identity__eyebrow">Deep Dive · Digital Foundations</p>
-<p class="course-identity__title">Specialized course identity for Hardware Description Languages — Verilog Focus.</p>
+<p class="course-identity__title">Verify accepted transactions, not only waveforms.</p>
 <p class="course-identity__meta">Artifact: working low-level demo · Measure: timing, memory, correctness</p>
 </div>
 </div>
@@ -12,7 +12,7 @@
 
 Verilog is how you turn the digital design concepts from the previous guide into real hardware. You write behavioral or structural descriptions; synthesis tools convert them into gates; place-and-route tools turn those gates into physical layout. This guide teaches Verilog through progressively larger designs — from wires and gates to a pipelined MIPS core — with testbenches at every step.
 
-> **Why Verilog over VHDL?** Both are IEEE standards and fully capable. Verilog dominates in US industry and all major AI chip companies (NVIDIA, AMD, Google, Apple). VHDL is stronger in European defense/aerospace. SystemVerilog extends Verilog with verification features (UVM, assertions) and is covered in Phase 2. Start with Verilog — you can read VHDL in a weekend once you know one HDL.
+> **Language choice:** This course uses Verilog for small synthesizable blocks and introduces SystemVerilog assertions where they make a contract clearer. VHDL is another capable hardware description language; choose the language supported by your project and toolchain. Learning another HDL still requires learning its type, scheduling, and synthesis semantics. The important transferable skill is predicting hardware and checking its behavior, not memorizing syntax.
 
 ---
 
@@ -567,7 +567,7 @@ endmodule
 
 ### 4.5 Synchronous FIFO
 
-FIFOs are everywhere in hardware — between pipeline stages, clock domains, producer-consumer buffers:
+FIFOs connect producer and consumer stages. This example is **single-clock**, with a power-of-two `DEPTH >= 2`, combinational first-word visibility, and reads accepted only when nonempty. It is not a clock-domain crossing FIFO. Asynchronous clock crossings require a separately verified pointer/synchronizer design:
 
 ```verilog
 module sync_fifo #(
@@ -611,7 +611,7 @@ module sync_fifo #(
 endmodule
 ```
 
-The extra MSB in the pointers distinguishes "full" (same address, different MSB) from "empty" (identical pointers). This is the standard trick.
+The extra MSB distinguishes full from empty for this power-of-two pointer design. At full occupancy, a simultaneous read/write accepts the read but rejects the write; at empty occupancy it accepts the write but not the read. Make that conservative boundary behavior part of the testbench contract. The asynchronous read shown here is not a promise of block-RAM inference on every FPGA.
 
 ---
 
@@ -1340,16 +1340,10 @@ set_property -dict {PACKAGE_PIN V16 IOSTANDARD LVCMOS33} [get_ports {sw[1]}]
 | 9 | **Pipelined MIPS + forwarding** | Pipeline registers, hazard detection, MUX | Advanced |
 | 10 | **Matrix multiply accelerator** | BRAM tiling, FSM control, DSP inference | Advanced |
 
-## Practice and assessment
+## Verify accepted transactions, not only waveforms
 
-**Entry diagnostic (prerequisite check):** Explain blocking versus nonblocking assignment using a two-register example. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+Use the FIFO in §4.5 as an executable interface lesson. Build the scoreboard from accepted writes (`wr_en && !full`) and accepted reads (`rd_en && !empty`), not raw enables. Test pointer wrap, reset, prolonged full/empty conditions, and simultaneous requests at both boundaries. State that this implementation requires a power-of-two depth and a single clock; changing either requires a design change.
 
-1. **Baseline lab:** Implement a parameterized FIFO with a reference queue and randomized reads/writes.
-2. **Guided variation:** Exercise full, empty, simultaneous read/write, and reset; introduce and detect an off-by-one occupancy bug.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Next place the arithmetic block from digital fundamentals behind a FIFO and randomize downstream stalls. Pass only when each accepted input produces exactly one correctly ordered result and output data is held through a stall. Synthesis resource/timing results are a separate check from simulation correctness.
 
-**Evidence to submit:** Reference mismatches, boundary coverage, latency, and inferred storage. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** FIFO scoreboard, accepted-transaction trace, and arithmetic-block interface. Continue with [the next course](../../2.%20Computer%20Architecture%20and%20Hardware/Guide.md) and reuse that evidence.

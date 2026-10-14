@@ -4,6 +4,8 @@
 
 **Previous:** [Lecture 01](Lecture-01.md) | **Next:** [Lecture 03 - Later HomePod / 2023-era platform lessons](Lecture-03.md)
 
+> **Case-study method:** The product judgments below are design interpretations, not a measured causal explanation of commercial success or failure. Turn each claim into a testable hypothesis for your own device—for example setup completion rate or a user's ability to identify microphone state—and keep product specifications separate from that interpretation.
+
 ---
 
 ## Why study the 2018 HomePod

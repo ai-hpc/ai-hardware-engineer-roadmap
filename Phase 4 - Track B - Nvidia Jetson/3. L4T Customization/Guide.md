@@ -100,16 +100,11 @@ Use these Platform guides as **implementation** detail for L4T-facing production
 
 **L4T customization** defines **what runs on the OS** (kernel, drivers, rootfs, CUDA install path, services). **Edge AI Optimization** assumes that foundation and focuses on **models** (TensorRT, quantization, DeepStream). Finish or parallel the platform deep dives above before treating inference as the main bottleneck.
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Identify BSP release, board config, device tree, kernel, and root filesystem. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Which source change produced the running DTB and rootfs?
 
-1. **Baseline lab:** Produce one reproducible image customization and verify it on a test target or image inspection.
-2. **Guided variation:** Break one recoverable service/configuration input and diagnose its boot behavior.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Make one reversible BSP change, such as a service or documented overlay. Track its source, build artifact hash, flash input, and post-boot proof; retain serial recovery access.
 
-**Evidence to submit:** Build manifest, boot log, changed artifacts, startup timing, and recovery instructions. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Show the running configuration, not only an edited source file. Pass a manifest with BSP, kernel, DTB, rootfs, and carrier revision to firmware/application integration.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [4. FSP (Firmware Support Package) Customization](../4.%20FSP%20%28Firmware%20Support%20Package%29%20Customization/Guide.md). Explain which assumption from this course the next engineer must preserve.

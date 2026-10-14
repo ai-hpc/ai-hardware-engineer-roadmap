@@ -22,6 +22,11 @@
 
 ---
 
+
+![Camera, GPU preprocessing, inference, and CPU action validation share one DRAM budget but exchange ownership using completion fences.](../Assets/illustrations/deployment-edge/memory-ownership.png)
+
+*Read the arrows as ownership transfers. Shared DRAM alone does not remove format conversions, copies, or synchronization.*
+
 ## Why this track
 
 Tracks A (FPGA) and B (Jetson) teach you to deploy on specific hardware. This track teaches you *how models become hardware instructions* — the compiler stack that sits between a PyTorch/ONNX graph and the kernel code running on any accelerator — and then how to make that code fast enough to ship. Whether you target GPU, FPGA, or a custom NPU, you need IR design, graph optimization, scheduling, and code generation, followed by the kernel authoring, quantization, and runtime work that turns a compiled graph into a served model. This is also the fastest-growing hiring area in AI infrastructure.
@@ -75,7 +80,7 @@ This track has two parts. **Part 1** covers compiler fundamentals (IR, graph opt
     * Why fusion matters: reduces memory traffic and kernel launch overhead.
     * **Vertical fusion:** Conv → BatchNorm → ReLU merged into a single kernel.
     * **Horizontal fusion:** Independent ops run in one kernel to saturate compute.
-    * Fusion in practice: TensorRT's layer fusion, tinygrad's BEAM-based fusion, XLA's fusion heuristics.
+    * Fusion in practice: TensorRT's layer fusion, tinygrad's scheduler fusion, XLA's fusion heuristics.
 
 * **Layout and memory optimizations:**
     * Data layout transformations (NCHW ↔ NHWC) to match hardware preference.
@@ -172,7 +177,7 @@ This track has two parts. **Part 1** covers compiler fundamentals (IR, graph opt
 
 * **tinygrad compiler:**
     * Scheduler: how ops are grouped into kernels.
-    * **BEAM search:** exploring fusion choices to minimize runtime.
+    * **BEAM search:** exploring equivalent kernel implementation choices; graph fusion is a separate scheduler decision.
     * Backends: CUDA, OpenCL, Metal, LLVM, custom.
     * Adding a new backend to tinygrad.
 
@@ -398,19 +403,11 @@ Companies that ask for "Blackwell experience" mean: *can you get the most out of
 | 05 Runtimes | Runtime comparison, Triton server setup, benchmark report |
 | 06 tinygrad (optional) | Pipeline trace, add optimization, backend hook |
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain a tensor graph, an operator roofline, and a correctness tolerance. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: What becomes the input to accelerator design?
 
-1. **Baseline lab:** Carry one small model through graph inspection, kernel profiling, quantization, and serving.
-2. **Guided variation:** Change one optimization at a time and reject any that fail the reference-quality gate.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Carry one workload through graph, kernel, compiler, quantization, and service stages. Keep one shape/dtype manifest and fixed quality cases throughout so improvements are comparable.
 
-**Evidence to submit:** Quality, compile/startup cost, latency distribution, useful throughput, memory, and traces. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** The final bundle contains operator frequencies/shapes, live-memory intervals, measured latency, and a rejected optimization. Use these constraints to size SRAM, DMA, and compute before proposing a chip.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
-
-
-**Next applied specialization:** [DeepSeek V4.1 Flash NVFP4 inference engineering](../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/README.md), after the model-execution and MoE prerequisites in that part.
+**Continue:** take this artifact to [01 - Graph and Operator Optimization](01%20-%20Graph%20and%20Operator%20Optimization/Guide.md). Explain which assumption from this course the next engineer must preserve.

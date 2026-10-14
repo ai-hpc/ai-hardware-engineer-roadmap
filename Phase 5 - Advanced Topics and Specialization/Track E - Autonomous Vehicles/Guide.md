@@ -78,6 +78,12 @@ Modules 2 and 3 reinforce each other: openpilot is the system context, tinygrad 
 | nuScenes Dataset | https://www.nuscenes.org/ |
 | Waymo Open Dataset | https://waymo.com/open/ |
 
+## One continuous project through this track
+
+Carry one timestamped perception/control scenario through the modules: baseline controller → process/message trace → compiler-correct inference → sensor perturbation study → failure response → target trace. Keep the observation/action schema fixed while changing one subsystem. This creates an inspectable chain from model error to hardware requirement.
+
+The output for [AI Chip Design](../Track%20F%20-%20AI%20Chip%20Design/Guide.md) is a workload contract: sensor rate and synchronization, tensor shapes and layouts, memory/transfer trace, action units and age limit, control boundary, and recovery policy. Use replay/simulation evidence to design the prototype. Driver-assistance experiments do not establish autonomous road capability. [openpilot safety scope](https://docs.comma.ai/concepts/safety/).
+
 ## Practice and assessment
 
 **Entry diagnostic (prerequisite check):** Trace perception, prediction, planning, and control with frames and timestamps. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.

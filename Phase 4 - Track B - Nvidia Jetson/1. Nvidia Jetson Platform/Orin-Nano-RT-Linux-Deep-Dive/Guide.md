@@ -1018,7 +1018,7 @@ Example: 30 FPS inference pipeline
   │  ▲ start         ▲ deadline        ▲       │
   └──────────────────────────┘└─────────────────┘
 
-  EDF guarantee: if total utilization < 100%, all deadlines are met
+  Ideal uniprocessor EDF result: utilization <= 1 for independent preemptible implicit-deadline tasks; real blocking/I/O/GPU work needs separate analysis
   U = Σ(runtime_i / period_i) < 1.0
 ```
 
@@ -1113,7 +1113,7 @@ SCHED_FIFO approach:
   - Priority inversion possible (even with PI)
 
 SCHED_DEADLINE approach:
-  + Automatic: kernel guarantees deadline if utilization fits
+  + Admission control reserves CPU bandwidth under stated scheduling assumptions
   + Built-in overrun detection (CBS — Constant Bandwidth Server)
   + No priority inversion (EDF is optimal for uniprocessor)
   + System tells you if workload is schedulable (EBUSY on admission)
@@ -2783,16 +2783,11 @@ For most Jetson edge AI deployments:
 * Kernel internals: [Orin Nano Kernel Internals](../Orin-Nano-Kernel-Internals/Guide.md)
 * Main guide: [Nvidia Jetson Platform Guide](../Guide.md)
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain scheduling latency, execution time, priority inversion, and a deadline. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: What is reserved CPU time allowed to guarantee?
 
-1. **Baseline lab:** Measure a periodic worker under controlled CPU/I/O load.
-2. **Guided variation:** Add bounded lock contention and compare a scheduling or synchronization change.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Compare scheduling jitter and sensor-to-action age under CPU, storage, and network load. Keep cyclictest results separate from GPU execution and end-to-end deadline measurements.
 
-**Evidence to submit:** Latency histogram, deadline misses, load conditions, CPU affinity, and scheduler configuration. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Publish CPU reservation assumptions and missed-deadline counts for the whole path. Passing cyclictest alone cannot certify a VLA loop; give the controller a timeout and stale-data policy.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [Orin-Nano-Real-Time-Inference](../Orin-Nano-Real-Time-Inference/Guide.md). Explain which assumption from this course the next engineer must preserve.

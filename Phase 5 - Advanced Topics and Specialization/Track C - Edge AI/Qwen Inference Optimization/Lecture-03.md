@@ -1,5 +1,7 @@
 # Lecture 3: Decode Optimization for Qwen3-4B on Jetson Orin Nano
 
+> **Reproduction scope:** Pin the exact checkpoint and runtime revision. Numerical throughput, price, and latency examples without a linked measurement artifact are illustrative planning inputs, not results measured by this course. Record supported APIs from that runtime release before running commands.
+
 ## Overview
 
 You now have a Qwen3-4B-Q4_K_M GGUF and a runtime that loads it. The previous JLLM log showed it running at **0.2 tok/s**. The Orin Nano roofline says you should be able to hit **~14–20 tok/s** for this model. This lecture closes that 70–100× gap by walking the optimizations in order of impact:
@@ -24,7 +26,7 @@ By the end you should be able to:
 
 ## 1. Platform Configuration — The First 50× Win
 
-Before anything else, **lock down the platform**. The Orin Nano 8 GB has three power modes; the difference between mode 0 (15 W) and mode 1 (7 W) is roughly **3× in tok/s** for memory-bandwidth-bound workloads.
+Before anything else, **lock down the platform**. Available power modes and their numeric IDs depend on the BSP and flash configuration. Query `nvpmodel -q --verbose`, record clocks and cooling, then measure throughput; do not assume a fixed multiplier between modes.
 
 ```bash
 # Step 1: maximum performance
@@ -68,10 +70,10 @@ Per layer (× 36):
   7.  flash_attention_decode   reads KV cache slice
   8.  gemv_q4k  O              M=2560, K=4096, ~2.6 MB
   9.  fused_rmsnorm_residual   (ffn norm)
-  10. gemv_q4k  gate           M=6912, K=2560, ~4.4 MB
-  11. gemv_q4k  up             M=6912, K=2560, ~4.4 MB
+  10. gemv_q4k  gate           M=9728, K=2560, ~4.4 MB
+  11. gemv_q4k  up             M=9728, K=2560, ~4.4 MB
   12. swiglu_kernel            ~0
-  13. gemv_q6k  down           M=2560, K=6912, ~6.0 MB
+  13. gemv_q6k  down           M=2560, K=9728, ~6.0 MB
 
 Then once:
   - output_norm
@@ -136,13 +138,13 @@ For Qwen3-4B-Q4_K_M the JLLM/llama.cpp default is option 2; vLLM/TRT-LLM (workin
 Same trick on the FFN:
 
 ```
-W_gu = [W_gate | W_up]    # shape: 2560 × (6912 + 6912) = 2560 × 13824
+W_gu = [W_gate | W_up]    # shape: 2560 × (9728 + 9728) = 2560 × 13824
 ```
 
 One GEMV produces both, then SwiGLU is applied as:
 
 ```
-out = silu(gu_out[0:6912]) * gu_out[6912:13824]
+out = silu(gu_out[0:9728]) * gu_out[9728:13824]
 ```
 
 This is a clean win because both matrices have the same quant type (both Q4_K in the standard Q4_K_M recipe). No mixed-type concerns.

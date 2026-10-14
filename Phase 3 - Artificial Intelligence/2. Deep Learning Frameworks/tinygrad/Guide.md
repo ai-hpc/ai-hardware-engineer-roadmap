@@ -12,7 +12,7 @@
 
 **Parent:** [Module 2 — Deep Learning Frameworks](../Guide.md)
 
-> *A minimal DL framework (~10K lines) that exposes the entire compiler pipeline in readable Python. The ideal codebase for understanding what happens between `loss.backward()` and the GPU kernel that actually runs.*
+> *A compact DL framework that exposes the entire compiler pipeline in readable Python. The ideal codebase for understanding what happens between `loss.backward()` and the GPU kernel that actually runs.*
 
 ---
 
@@ -27,11 +27,11 @@
 
 | Concept | What it teaches | Stack connection |
 |---------|----------------|-----------------|
-| Lazy evaluation | Nothing runs until `.realize()` | L2: compiler decides when to execute |
-| 3 operation types | Elementwise, Reduce, Movement (25 primitives) | L5: what the PE array must support |
-| ShapeTracker | Zero-copy reshapes and transposes | L2: memory layout optimization |
+| Lazy evaluation | Builds lazy graphs; realization and host-value access trigger execution | L2: compiler decides when to execute |
+| Operation families | Elementwise, reductions, and movement; inspect the pinned IR | L5: what the PE array must support |
+| Layouts and views | Determine when a view can avoid a copy | L2: memory layout optimization |
 | UOp IR | Intermediate representation before codegen | L2: same concept as MLIR/TVM IR |
-| BEAM search | Explores fusion choices to minimize runtime | L2: auto-tuning |
+| BEAM search | Searches supported kernel optimization choices | L2: auto-tuning |
 | Backends | Same IR generates CUDA, OpenCL, LLVM code | L2: multi-target compilation |
 
 ## Projects
@@ -50,16 +50,11 @@ The full tinygrad learning path (11 parts, 7 projects) is in [Phase 5E — Auton
 - [tinygrad GitHub](https://github.com/tinygrad/tinygrad)
 - [tinygrad Discord](https://discord.gg/tinygrad)
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Trace a tensor expression into operations, scheduling, and generated execution. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Carry this course into the physical-AI system
 
-1. **Baseline lab:** Follow one matmul or reduction through the pinned tinygrad source and compare with a reference.
-2. **Guided variation:** Change shape/layout and inspect the resulting schedule and kernel choices.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Start from:** A passing PyTorch reference and a pinned tinygrad commit.
 
-**Evidence to submit:** Source commit, correctness, kernel count, compile/warmup time, execution latency, and memory. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Build and challenge:** Trace one matmul-plus-activation to IR and generated code. Change a dimension so a tile has a tail and verify output before comparing kernel count.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** A minimal tensor program and correctness vectors for a custom backend. Continue with [the connected course](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/TVM%20Deep%20Dives/README.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

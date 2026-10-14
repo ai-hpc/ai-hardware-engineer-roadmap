@@ -54,7 +54,7 @@ Orin Nano’s GPU is a **Tegra234** (T234) SoC with an **Ampere**-class GPU. The
   * **Tensor cores** (one or more per SM)
   * **Shared memory**, **L1 cache**, **warp schedulers**
 
-* **Orin Nano 8GB** has **32 tensor cores** total (often quoted as “32 tensor cores” in the key specs). These are shared across all SMs; each SM can issue tensor-core instructions from its warps.
+* **Orin Nano 8GB** has **32 tensor cores** total (often quoted as “32 tensor cores” in the key specs). These are distributed among the SMs; each SM issues matrix instructions to its own execution resources.
 
 * **Memory path:** Tensor cores read **A** and **B** matrices (and optionally **C** for accumulate) from **registers** and/or **shared memory**. Data is brought from **global memory** (LPDDR5) by CUDA cores or load instructions, then staged in shared memory and registers so that tensor cores operate on tiles. So **memory bandwidth** (LPDDR5 speed) and **tiling** (how well you reuse data in shared memory) still limit peak tensor-core utilization.
 
@@ -165,7 +165,7 @@ On Orin Nano, most users rely on TensorRT/cuDNN; the deep dive here is so you kn
 * **Power:** Doing more ops per cycle means the same workload finishes sooner and the GPU can sleep sooner — important for battery and thermal limits.
 * **Precision choice:** FP16 and INT8 are the “tensor-core paths”; FP32 is the slow path. Picking FP16 (or INT8 with calibration) is how you get both speed and acceptable accuracy.
 * **Debugging:** If a model is slow, check that the engine is built with FP16/INT8 and that layers are not falling back to FP32 or to non–tensor-core kernels (e.g. small or odd shapes).
-* **DLA vs GPU:** Orin Nano also has a **DLA** (Deep Learning Accelerator). The DLA is a separate fixed-function block; the **tensor cores** are inside the **GPU**. TensorRT can run some layers on DLA and others on GPU (tensor cores + CUDA cores). So “tensor cores” = GPU matmul acceleration; “DLA” = separate accelerator for supported ops.
+* **DLA vs GPU:** Orin Nano has no DLA. Its tensor cores are matrix units inside the GPU. DLA-equipped NX/AGX modules add a separate inference engine; see the [capability comparison](../Orin-Nano-DLA-Deep-Dive/Guide.md).
 
 ---
 
@@ -181,16 +181,11 @@ On Orin Nano, most users rely on TensorRT/cuDNN; the deep dive here is so you kn
 
 *Back to [Nvidia Jetson Platform — Practical Complete Guide](../Guide.md).*
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Map tensor shape, layout, dtype, and strides to an inference engine input. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Does the workload reach matrix instructions?
 
-1. **Baseline lab:** Build a small TensorRT engine and compare output with the framework reference.
-2. **Guided variation:** Test dynamic-shape boundaries and an incorrect binding contract in a local check.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Profile one FP32, FP16, and supported INT8 matrix workload with dimensions that do and do not align with efficient tiles. Inspect executed kernels/instructions and retain a high-precision reference.
 
-**Evidence to submit:** Output error, build/warmup time, steady-state latency, and workspace/peak memory. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Separate sparse advertised TOPS from dense measured work. Submit error and time at equal shapes plus evidence that the intended matrix path ran.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [02 - Kernel Engineering](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/02%20-%20Kernel%20Engineering/Guide.md). Explain which assumption from this course the next engineer must preserve.

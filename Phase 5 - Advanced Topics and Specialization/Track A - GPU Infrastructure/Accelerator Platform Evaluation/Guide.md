@@ -533,6 +533,14 @@ This is the point most teams skip. It is also where the real platform difference
 - [MLPerf Training v5.1 results](https://mlcommons.org/2025/11/training-v5-1-results/)
 - [MLPerf Inference benchmark documentation](https://docs.mlcommons.org/inference/)
 
+## Turn the comparison into a falsifiable decision
+
+The strengths/weaknesses above are hypotheses to test on a named workload, not timeless rankings. Freeze the model, quality threshold, input/output distribution, latency SLO, and measurement boundary before comparing platforms. Permit each platform's best supported implementation, but disclose precision, accuracy, batching, and engineering effort so a speedup is not actually a changed task.
+
+Use a decision table with measured goodput, peak memory, sustained energy, time to first working run, failure recovery, and unsupported operators. A dated vendor result belongs in a separate column from your measurements. If only one platform is available, submit a measured baseline plus explicit unanswered questions for the others.
+
+For the custom SoC, turn the losing cases into requirements: e.g., CPU fallback consumes a third of latency, or small-batch kernels cannot reuse weights. Carry the trace, not a brand preference, to [AI Chip Design](../../Track%20F%20-%20AI%20Chip%20Design/Guide.md).
+
 ## Practice and assessment
 
 **Entry diagnostic (prerequisite check):** Draw GPU/CPU/NIC topology and explain bandwidth versus message latency. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.

@@ -18,6 +18,8 @@
 
 ---
 
+> **TensorRT API versions:** This reference includes legacy binding-based execution or V2 plugin examples. Pin the installed TensorRT version before using a block. TensorRT 10.x execution uses named tensors, `set_tensor_address`, and `execute_async_v3`; legacy examples are not drop-in 10.x code. Newer major releases have further changes. Use NVIDIA's [8.x→10.x migration guide](https://docs.nvidia.com/deeplearning/tensorrt/10.x.x/api/tensorrt-8x-to-10x-python-api.html) and the API documentation matching your BSP.
+
 ## Deep Dive Subfolders
 
 | Subfolder | Description |
@@ -1136,7 +1138,9 @@ class TRTWithCUDAGraph:
 
 ---
 
-## 10. DLA (Deep Learning Accelerator) on Orin Nano
+## 10. Optional DLA comparison on NX/AGX (not Orin Nano)
+
+> **Hardware boundary:** DLA examples in this section require a supported NX/AGX module. Nano has zero DLA cores. Verify TensorRT `builder.num_DLA_cores` before building; GPU fallback is not a substitute for absent hardware.
 
 ### What is DLA?
 
@@ -1144,7 +1148,7 @@ The DLA is a fixed-function neural network accelerator built into the Orin SoC. 
 
 ```
 GPU:           1024 CUDA Ampere cores, 40 TOPS (shared with all workloads)
-DLA:           Fixed-function INT8/FP16 engine, ~10 TOPS dedicated
+DLA:           Fixed-function INT8/FP16 engine on supported NX/AGX modules; absent on Nano
 
 Running on DLA:
   - Frees GPU for other tasks (sensor processing, computer vision)
@@ -1183,7 +1187,7 @@ def build_dla_engine(onnx_path, engine_path):
 
         # DLA configuration
         config.default_device_type = trt.DeviceType.DLA
-        config.DLA_core = 0                          # Orin Nano has 1 DLA (core 0)
+        config.DLA_core = 0                          # supported NX/AGX module only; first query num_DLA_cores
         config.set_flag(trt.BuilderFlag.GPU_FALLBACK) # GPU handles unsupported layers
         config.set_flag(trt.BuilderFlag.FP16)         # DLA requires FP16 or INT8
 
@@ -1243,7 +1247,7 @@ def run_gpu(features):
 ### DLA Benchmark Comparison
 
 ```bash
-# Compare GPU vs DLA on Orin Nano
+# Compare GPU vs DLA on a DLA-equipped NX/AGX module
 # (run while monitoring tegrastats for power)
 
 # GPU only
@@ -1829,16 +1833,11 @@ Use TAO for standard detection/classification on Jetson. Use the manual pipeline
 *Prerequisite map: [Phase 3 — Neural Networks](../../../Phase%203%20-%20Artificial%20Intelligence/1.%20Neural%20Networks/Guide.md)*
 *Next (sub-module): [5.6 ROS2](../6.%20ROS2/Guide.md) · **Sensor fusion** (Phase 3): [Sensor Fusion](../../../Phase%203%20-%20Artificial%20Intelligence/Track%20A%20-%20Hardware%20and%20Edge%20AI/4.%20Sensor%20Fusion/Guide.md)*
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Trace preprocessing, model input/output, postprocessing, and deployment format. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Where did an optimized model change the application behavior?
 
-1. **Baseline lab:** Deploy a small reference-checked model and measure the full application pipeline.
-2. **Guided variation:** Test one shifted input condition and a bounded overload condition.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Preserve a high-precision reference, exact preprocessing, output decoding, and held-out examples. Compare exported and optimized paths on identical tensors before adding camera or ROS transport.
 
-**Evidence to submit:** Task score, end-to-end latency, memory, dropped work, and hardware/runtime versions. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Report output/task quality, memory, and capture-to-result latency independently. The optimization passes only when quality and timing budgets both hold; FPS alone is insufficient.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [vla-deploy-jetson](vla-deploy-jetson/Guide.md). Explain which assumption from this course the next engineer must preserve.

@@ -296,7 +296,7 @@ trtexec \
     --calib=calibration_cache.bin \
     --workspace=2048
 
-# DLA engine (Orin Nano has 1 DLA core: dla0)
+# DLA engine (DLA-equipped NX/AGX only; absent on Nano)
 trtexec \
     --onnx=model.onnx \
     --saveEngine=model_dla.engine \
@@ -693,11 +693,11 @@ def warmup_engine(context, stream, d_input, d_output, h_input,
 
 ## 5. DLA for Deterministic Inference
 
+> **Hardware boundary:** DLA examples in this section require a supported NX/AGX module. Nano has zero DLA cores. Verify TensorRT `builder.num_DLA_cores` before building; GPU fallback is not a substitute for absent hardware.
+
 ### 5.1 DLA Fixed-Function Advantage
 
-The Orin Nano contains one NVDLA v2.0 core. DLA is a fixed-function accelerator --
-unlike the GPU, it does not share execution resources with other workloads. This
-makes DLA inference latency highly predictable.
+Orin Nano has no DLA. On supported NX/AGX modules, a DLA has separate compute resources but shares memory, power, and host scheduling. It can reduce one source of contention; it does not establish a worst-case execution-time guarantee.
 
 ```
 GPU inference jitter:           DLA inference jitter:
@@ -755,7 +755,7 @@ def build_dla_engine(onnx_path, output_path, allow_gpu_fallback=True):
     config.set_flag(trt.BuilderFlag.INT8)
     config.set_flag(trt.BuilderFlag.FP16)
 
-    # Assign to DLA core 0 (Orin Nano has 1 DLA)
+    # Assign to DLA core 0 (supported NX/AGX only; Nano has none)
     config.default_device_type = trt.DeviceType.DLA
     config.DLA_core = 0
 
@@ -787,7 +787,7 @@ trtexec --loadEngine=model_dla.engine \
     --useSpinWait
 ```
 
-Typical results on Orin Nano (ResNet-50 INT8, batch=1):
+Illustrative arithmetic example on hypothetical DLA-equipped hardware; these are not measured results:
 
 | Metric | GPU | DLA |
 |--------|-----|-----|
@@ -806,15 +806,14 @@ is 1.06 for DLA vs 1.63 for GPU.
 
 ### 6.1 GPU + DLA Concurrent Execution
 
-The Orin Nano can run GPU and DLA inference simultaneously because they are
-independent hardware blocks. This enables pipeline parallelism.
+A DLA-equipped NX/AGX module can execute GPU and DLA work concurrently. Both still contend for shared DRAM and power; this optional comparison does not run on Nano.
 
 ```
 Timeline:
   GPU:  [---Model A---][---Model A---][---Model A---]
   DLA:       [--Model B--]  [--Model B--]  [--Model B--]
 
-  Total throughput = GPU throughput + DLA throughput
+  Combined throughput must be measured with both engines active
 ```
 
 **C++ concurrent GPU + DLA execution:**
@@ -1100,7 +1099,7 @@ for frame in camera_stream:
 
 ### 8.1 Understanding the 8 GB Shared Memory
 
-The Orin Nano's 8 GB LPDDR5 is shared between CPU, GPU, and DLA. Typical
+The Orin Nano's 8 GB LPDDR5 is shared between CPU, GPU, and other available engines (Nano has no DLA). Typical
 memory budget for a real-time inference application:
 
 ```
@@ -3100,16 +3099,11 @@ Always rebuild engines when upgrading JetPack.
 https://docs.nvidia.com/jetson/ and the TensorRT documentation at
 https://docs.nvidia.com/deeplearning/tensorrt/.*
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Decompose sensor-to-action latency and identify every queue. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: Which timestamp defines a missed inference deadline?
 
-1. **Baseline lab:** Measure a periodic inference pipeline with timestamped capture, inference, and output.
-2. **Guided variation:** Introduce delayed input and verify bounded queues and stale-result handling.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Set a deadline from sensor capture to action availability and record every stage plus queue residence. Stress the system with competing GPU work; reject stale results at the controller boundary.
 
-**Evidence to submit:** p50/p95/p99 latency, deadline misses, queue depth, and sustained thermal behavior. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Report p50/p95/p99, maximum observed latency, deadline misses, and sample count. Percentiles do not prove a worst-case bound; hand off a measured latency envelope and timeout behavior.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [vla-deploy-jetson](../../5.%20Application%20Development/5.%20ML%20and%20AI/vla-deploy-jetson/Guide.md). Explain which assumption from this course the next engineer must preserve.

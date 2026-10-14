@@ -256,6 +256,14 @@ Community and third-party libraries with GPU acceleration via CUDA.
 | RAPIDS (cuDF, cuML, cuGraph) | https://rapids.ai/ |
 | NVIDIA Developer Program | https://developer.nvidia.com/developer-program |
 
+## First library lab: leading dimensions before TFLOP/s
+
+Use a non-square GEMM, for example `M=37, N=19, K=53`, then test a transposed operand and a padded leading dimension. Write the mathematical shapes separately from physical row/column strides. Compare against a CPU reference with explicit accumulation and error tolerances before a large throughput run.
+
+Time allocation/plan setup, any layout conversion, and warm execution separately. A library result that is fast only after a costly input repack may be a poor batch-one VLA choice. Next test the same operation with an epilogue such as bias or activation and check whether fusion actually removes traffic.
+
+**Handoff:** one operation contract, input corpus, baseline implementation, and latency/traffic table for [AI Chip Design](../../Track%20F%20-%20AI%20Chip%20Design/Guide.md). Treat this catalog as a menu of relevant primitives; completing every library is not necessary for the capstone.
+
 ## Practice and assessment
 
 **Entry diagnostic (prerequisite check):** Choose a library primitive and explain its data layout and synchronization contract. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.

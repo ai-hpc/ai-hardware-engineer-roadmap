@@ -4,16 +4,9 @@ Five techniques used by GPU engineers at NVIDIA, OpenAI, and Meta to push infere
 
 ## Why These Techniques Matter
 
-```
-Naive CUDA kernel:         ~30% of hardware peak  (common)
-With kernel fusion:        ~50% of hardware peak
-With CUDA Graphs:          +10-30% latency reduction
-With cooperative groups:   enables algorithms impossible without them
-With persistent kernels:   near-zero kernel launch overhead
-With warp specialization:  ~70-85% of hardware peak  (elite)
-```
+Each technique addresses a different measured bottleneck. Begin with a trace that distinguishes CPU launch gaps, memory traffic, compute utilization, and synchronization stalls. There is no universal ladder from 30% to 85% of peak: the relevant ceiling depends on arithmetic intensity, precision, shape, and memory level.
 
-Every LLM inference engine (TensorRT-LLM, vLLM, FasterTransformer, FlashAttention) uses all five.
+A graph replay still has a launch cost. A persistent kernel amortizes repeated dispatch but consumes resident resources and needs correct work-queue termination. Fusion can reduce HBM traffic while increasing register pressure. Cooperative launch and synchronization have explicit residency and participation requirements; validate them on the target GPU. [CUDA programming model](https://docs.nvidia.com/cuda/archive/13.0.0/cuda-c-programming-guide/index.html).
 
 ## Topic Index
 
@@ -30,13 +23,13 @@ Every LLM inference engine (TensorRT-LLM, vLLM, FasterTransformer, FlashAttentio
 ```
 CUDA Graphs          → reduces CPU↔GPU interface overhead
 Cooperative Groups   → enables flexible intra-kernel synchronization
-Persistent Kernels   → eliminates kernel launch overhead entirely
+Persistent Kernels   → amortizes dispatch across multiple work items
 Kernel Fusion        → reduces HBM round-trips between operations
 Warp Specialization  → overlaps compute and memory within a single kernel
 
 Combined (e.g. FlashAttention-3):
   Persistent kernel + warp specialization + cooperative groups
-  → 90%+ of H200 BF16 peak on attention kernels
+  → benchmark the combined design; do not multiply isolated speedups
 ```
 
 ## Quick Navigation

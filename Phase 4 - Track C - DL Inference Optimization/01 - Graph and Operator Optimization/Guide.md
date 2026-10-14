@@ -45,6 +45,20 @@ This unit gives you the graph/operator view and profiling skills that every kern
 
 ---
 
+## Worked rewrite: fold fixed batch normalization
+
+For output channel c, let convolution produce `z_c = W_c * x + b_c`. In evaluation mode with fixed running mean `mu_c`, variance `v_c`, scale `gamma_c`, and shift `beta_c`, define:
+
+```text
+a_c  = gamma_c / sqrt(v_c + epsilon)
+W'_c = a_c * W_c
+b'_c = a_c * (b_c - mu_c) + beta_c
+```
+
+Then `Conv(x, W', b')` replaces the convolution-plus-BN output over real arithmetic. ReLU stays after that output; moving it before BN can change the result. If the convolution has no bias, start with `b_c=0`. Training-mode BN depends on the current batch statistics, so this fixed rewrite is not valid there. Floating-point rounding and later quantization still need output checks.
+
+**Worked scalar channel:** `W=2`, `b=1`, `mu=3`, `gamma=4`, `beta=5`, and `sqrt(v+epsilon)=2` give `W'=4`, `b'=1`. At `x=2`, both expressions produce 9. Make gamma negative in a second example and show why changing activation order fails. Pass W'/b' and their dtype/layout to the kernel course, together with the graph hash and validation inputs.
+
 ## 2. Operator-level optimization
 
 * **Kernel selection and dispatch** — How runtimes choose implementations: cuBLAS, cuDNN, oneDNN, or custom kernels. Algorithm selection (e.g. conv algorithm) and heuristics.
@@ -88,16 +102,11 @@ This unit gives you the graph/operator view and profiling skills that every kern
 
 → **[02 — Kernel Engineering](../02%20-%20Kernel%20Engineering/Guide.md)** — Design and implement the high-performance kernels that implement these ops (Triton, CUTLASS, Flash-Attention).
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Draw an operator graph with shapes, layouts, and intermediate tensors. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Integration lab: When is a graph rewrite legal?
 
-1. **Baseline lab:** Compare an unfused reference and one valid fused graph on several input shapes.
-2. **Guided variation:** Test a shape or aliasing boundary where a proposed rewrite is invalid.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+Fold evaluation-mode batch normalization into a convolution using fixed running statistics. Compare the reference and folded outputs; then demonstrate why training-mode batch statistics invalidate the same rewrite.
 
-**Evidence to submit:** Output error, kernel count, memory traffic estimate, compile time, and latency. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Acceptance evidence:** Use irregular shapes and a fixed tolerance, report intermediate bytes and kernels removed, and hand the operator shape/dtype contract to kernel engineering.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Continue:** take this artifact to [02 - Kernel Engineering](../02%20-%20Kernel%20Engineering/Guide.md). Explain which assumption from this course the next engineer must preserve.

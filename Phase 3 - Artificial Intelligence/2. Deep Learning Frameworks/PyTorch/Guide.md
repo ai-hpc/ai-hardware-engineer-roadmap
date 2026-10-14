@@ -12,7 +12,7 @@
 
 **Parent:** [Module 2 — Deep Learning Frameworks](../Guide.md)
 
-> *The framework most models are written in. You need fluency here because every model you deploy on hardware starts as PyTorch code.*
+> *The framework most models are written in. You need fluency here because many deployment workflows begin with a PyTorch reference.*
 
 ---
 
@@ -25,9 +25,9 @@
 | Autograd (`loss.backward()`) | Generates the backward graph that training hardware executes. |
 | Data loading (`DataLoader`) | CPU-GPU pipeline. Bottleneck if not overlapped with compute. |
 | `torch.onnx.export()` | How models leave PyTorch and enter the compiler/runtime stack (Phase 4C). |
-| `torch.compile()` | PyTorch's built-in compiler (Inductor). Generates Triton kernels. |
+| `torch.compile()` | Compilation interface; backend/device determine generated code and library calls. |
 | `torch.profiler` | Where is time spent? Kernel launches, memory copies, CPU overhead. |
-| Mixed precision (`torch.cuda.amp`) | FP16/BF16 training — what tensor cores accelerate. |
+| Mixed precision (`torch.amp`) | FP16/BF16 training — what tensor cores accelerate. |
 | Quantization (`torch.ao.quantization`) | INT8 inference — what L6 PE arrays must support. |
 
 ## Projects
@@ -43,16 +43,11 @@
 - *Deep Learning with PyTorch* (Stevens, Antiga, Viehmann)
 - [PyTorch Profiler](https://pytorch.org/tutorials/recipes/recipes/profiler_recipe.html)
 
-## Practice and assessment
 
-**Entry diagnostic (prerequisite check):** Explain tensor shapes, autograd, device placement, and evaluation mode. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+## Carry this course into the physical-AI system
 
-1. **Baseline lab:** Implement the same small forward/backward computation in two frameworks or against a numerical reference.
-2. **Guided variation:** Test shape boundaries and compare eager versus compiled or scheduled execution where supported.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+**Start from:** A reference model and fixed input batch.
 
-**Evidence to submit:** Output/gradient error, warmup versus steady-state timing, memory, and environment versions. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
+**Build and challenge:** Compare eager evaluation with one supported export/compile path. Include a second input shape and noncontiguous input; record guards, graph breaks, and numerical tolerance.
 
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Pass forward:** An executable reference plus an operator/shape inventory for compiler work. Continue with [the connected course](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/TVM%20Deep%20Dives/README.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).

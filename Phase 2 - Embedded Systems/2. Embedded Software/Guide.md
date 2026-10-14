@@ -29,14 +29,14 @@ Focused mini-courses that sit inside this module:
 
 ### Memory System and MPU
 
-* **Harvard vs. Von Neumann:** Cortex-M uses a modified Harvard architecture with separate instruction and data buses — understand implications for cache behavior and DMA.
+* **Memory architecture:** Cortex-M implementations differ: do not assume every core has separate instruction/data buses, caches, an MPU, or DMA. Record the exact MCU core and SoC memory/bus topology from its reference manual before designing buffer ownership.
 * **Memory-Mapped Peripherals:** All peripherals (GPIO, timers, UART, SPI, I2C) are accessed via memory addresses — registers are just addresses. Master this model to write low-level drivers.
 * **MPU (Memory Protection Unit):** Configure memory regions with access permissions (read/write/execute) to isolate tasks, detect stack overflows, and catch errant pointer writes. Essential for robust production firmware.
-* **Stack Overflow Detection:** Use MPU guard regions and hardware stack protection to trigger controlled HardFault on overflow rather than undefined behavior.
+* **Stack overflow detection:** On supported cores, configure MPU guards or stack-limit registers and record which exception they raise. A guard detects accesses into its protected region, not every possible stack corruption; retain stack high-water measurements and bounded call-depth analysis.
 
 ### CPU Internals
 
-* **Instruction Set (Thumb-2):** Cortex-M executes Thumb-2 — a mix of 16- and 32-bit instructions. Understand how the compiler targets this ISA and where inline assembly is useful (e.g., `__disable_irq()`, `__DSB()`).
+* **Instruction set:** Select the compiler target for the exact core. Cortex-M0/M0+ implement the smaller Armv6-M Thumb instruction set, including selected 32-bit instructions; they do not provide the full Armv7-M instruction set of M3/M4. Prefer CMSIS intrinsics for operations such as `__disable_irq()` and `__DSB()`.
 * **Pipeline and Interrupts:** 3-stage pipeline (M0/M3) or 6-stage with branch prediction (M7). Understand how interrupt latency is determined and how `NVIC` (Nested Vectored Interrupt Controller) manages priority and preemption.
 * **Exception Model:** HardFault, MemManage, BusFault, UsageFault — implement fault handlers that capture register state and stack trace to flash for post-mortem debugging.
 
@@ -58,6 +58,8 @@ Focused mini-courses that sit inside this module:
 
 ---
 
+Primary references for the architecture and allocation distinctions: [Arm Cortex-M0 instruction set](https://support.arm.com/documentation/ddi0432/c/programmers-model/instruction-set-summary?lang=en), [FreeRTOS memory management](https://www.freertos.org/Documentation/02-Kernel/02-Kernel-features/09-Memory-management/01-Memory-management), and [MCUboot design](https://docs.mcuboot.com/design.html).
+
 ## 2. C Programming for ARM Embedded Systems
 
 ### Memory Management
@@ -68,14 +70,14 @@ Focused mini-courses that sit inside this module:
 
 ### Bit Manipulation and Register Access
 
-* **CMSIS-style register access:** Use `typedef struct` + `volatile` + bitfields or `uint32_t` masks for register access. Write portable drivers that work at the register level without HAL overhead.
+* **CMSIS-style register access:** Use vendor register definitions, `volatile` accesses, and documented masks. Avoid inventing C bitfield layouts for MMIO: allocation order and access width depend on the implementation. Read-modify-write is also incorrect for some write-one-to-clear or side-effect registers.
 * **Bit masking patterns:** `SET_BIT()`, `CLEAR_BIT()`, `READ_BIT()` macros, bit-banding on Cortex-M3/M4. Master these to write ISRs and driver code that is both correct and fast.
 
 ### Interrupt Service Routines (ISRs)
 
 * **NVIC priority configuration:** `NVIC_SetPriority()`, priority grouping, and preemption. Understand how to set priorities to ensure time-critical ISRs preempt lower-priority handlers.
 * **Minimal ISRs:** Keep ISRs short — set a flag or post to a queue, do work in task context. This is the bridge from bare-metal to RTOS design.
-* **Volatile and memory barriers:** Use `volatile` correctly for shared variables between ISR and main context. Use `__DSB()` / `__ISB()` where needed.
+* **Volatile and synchronization:** `volatile` expresses observable accesses such as device registers; it does not make read-modify-write atomic or synchronize tasks. For ISR/task sharing use the port’s supported atomics, bounded critical sections, or ISR-safe RTOS APIs. CPU barriers and DMA cache maintenance solve separate ordering and visibility problems.
 
 **Resources:**
 * *"C Programming for Embedded Systems"* — Kirk Zurell.
@@ -105,8 +107,8 @@ Focused mini-courses that sit inside this module:
 
 ### Memory Management
 
-* **Heap schemes (heap_1 through heap_5):** Choose the right allocator — heap_1 (no free), heap_4 (best-fit, most common), heap_5 (non-contiguous regions). Monitor `xPortGetFreeHeapSize()` and `uxTaskGetStackHighWaterMark()`.
-* **Static allocation:** Use `xTaskCreateStatic()` / `xQueueCreateStatic()` to place TCBs and stacks in statically-defined arrays — eliminates heap use entirely, required in safety-critical designs.
+* **Heap schemes (heap_1 through heap_5):** Choose the right allocator — heap_1 (no free), heap_4 (first-fit with adjacent-free-block coalescing), heap_5 (non-contiguous regions). Monitor `xPortGetFreeHeapSize()` and `uxTaskGetStackHighWaterMark()`.
+* **Static allocation:** Use `xTaskCreateStatic()` / `xQueueCreateStatic()` to place TCBs and stacks in statically-defined arrays — avoids dynamic allocation for those RTOS objects. Application libraries may still allocate; choose an allocation policy from the product requirements and verify the whole program.
 
 ### Configuration and Debugging
 
@@ -239,7 +241,7 @@ Focused mini-courses that sit inside this module:
 ### OTA Firmware Updates
 
 * **Bootloader design:** Understand MCUboot — image slots (primary, secondary), signature verification (RSA/ECDSA), and the swap/overwrite update mechanism. Know how to chain from ROM bootloader → MCUboot → application.
-* **Dual-bank A/B updates:** Atomic update — write new firmware to the inactive bank, verify integrity, mark for swap, reboot. Rollback on failed verification.
+* **A/B or slot-based updates:** Write the inactive slot, authenticate the image, request a test boot, and confirm only after health checks. Rollback and power-loss behavior depend on the bootloader’s configured strategy; two slots alone do not make the entire update atomic.
 * **OTA transport:** BLE DFU (Nordic NRF5 SDK / Zephyr), MQTT/HTTP over Wi-Fi, cellular (LwM2M/CoAP). Implement delta updates (BSDiff) to reduce payload size.
 
 **Resources:**
@@ -249,8 +251,8 @@ Focused mini-courses that sit inside this module:
 
 **Projects:**
 * **Secure bootloader:** MCUboot-compatible bootloader for Cortex-M4 with RSA-2048 signature verification and A/B image slots.
-* **Ultra-low-power IoT sensor node:** Temperature + accelerometer node with deep-sleep between measurements, targeting <10 µA average at 1-second reporting interval.
-* **End-to-end OTA system:** BLE or Wi-Fi OTA with delta compression and rollback on hash verification failure.
+* **Low-power IoT sensor node:** Measure sleep, sample, transmit, and retry charge separately. Derive average current from the chosen reporting period and compare it to the battery budget; do not assume a universal microamp target across radios and sensors.
+* **End-to-end OTA system:** First implement full-image signed updates, test-boot confirmation, and rollback. Inject interrupted downloads and failed health checks in a recoverable test setup. Add delta transfer only after the full-image recovery path works.
 
 ---
 
@@ -280,7 +282,7 @@ Start here:
 | Topic | Connection to AI Hardware Engineering |
 |-------|--------------------------------------|
 | ARM Cortex-M + CMSIS-NN | TinyML inference on MCUs — deploy quantized models (keyword spotting, anomaly detection) without an OS |
-| FreeRTOS | Real-time scheduling for sensor pipelines feeding AI inference tasks; used in openpilot's comma 3X panda microcontroller |
+| FreeRTOS | Task scheduling and bounded communication around sensors and control; verify the actual firmware architecture before attributing an RTOS to another project |
 | SPI / I2C / CAN | Sensor interfaces for cameras, IMUs, LiDAR, radar — the input pipeline for AI perception systems |
 | CAN / J1939 | Vehicle bus protocol — how openpilot reads and writes actuator commands on real cars |
 | Power management | Battery-powered edge AI devices: every µA counts when running inference at the edge |
@@ -304,16 +306,10 @@ Start here:
 | MCUboot secure bootloader | Secure boot, A/B slots, signature verification |
 | Ultra-low-power IoT node | Deep sleep, event-driven, power profiling |
 
-## Practice and assessment
+## Separate acquisition, policy inference, and control
 
-**Entry diagnostic (prerequisite check):** Explain interrupt context, task context, and ownership of a DMA buffer. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+Build a sensor producer with a bounded queue. Each sample carries a sequence ID, timestamp, units, and error flags. Let a task consume it at a slower rate, then inject missed reads and queue pressure. Choose and justify a drop policy; no sample should silently acquire a new timestamp during retry.
 
-1. **Baseline lab:** Build a timestamped sensor producer and bounded consumer queue on a development board or simulator.
-2. **Guided variation:** Inject queue saturation or a disconnected sensor; verify recovery without stale data.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+For a robot or drone, the MCU/control loop and higher-level VLA policy have different timing and failure responsibilities. Use a simulated actuator to test freshness checks, bounded commands, and watchdog behavior before hardware motion. Export the message definition, clock relationship, queue policy, and measured timing to Linux integration.
 
-**Evidence to submit:** Sampling jitter, queue high-water mark, drop count, memory use, and recovery time. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** Sensor/control message schema and fault-injection trace. Continue with [the next course](../3.%20Embedded%20Linux/Guide.md) and reuse that evidence.

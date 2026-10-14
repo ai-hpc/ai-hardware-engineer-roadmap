@@ -111,16 +111,10 @@ That is the right kind of artifact because it proves you can connect engineering
 
 **Next:** [Lecture 01 - Why product design belongs in embedded systems](Lecture/Lecture-01.md)
 
-## Practice and assessment
+## Turn the product brief into system requirements
 
-**Entry diagnostic (prerequisite check):** Name one user task, environment constraint, and observable success condition. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
+Keep the speaker case study, then transfer its method to a simulated mobile robot or drone mission. Specify one user task, an operating envelope, time-to-ready, observation-age limit, power/thermal budget, wireless-loss behavior, and a visible recovery/status flow. Classify each value as a product requirement, engineering estimate, or measured result.
 
-1. **Baseline lab:** Prototype the setup and status/error flow for a small embedded product and run a scripted usability walkthrough.
-2. **Guided variation:** Remove connectivity or interrupt setup; check whether the device communicates state and offers recovery.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
+The final brief must connect those requirements to compute, SRAM/DRAM, boot/service policy, and control responsibilities. A VLA model does not replace the controller’s validity checks. Have a second person walk through startup, task execution, reconnect, and a stale-result scenario and record where the intended behavior was unclear.
 
-**Evidence to submit:** Task completion, setup steps/time, observed confusion, and a justified physical-control/interface change. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Carry forward:** A measurable product brief feeding SoC requirements and system tests. Continue with [the next course](Lecture/README.md) and reuse that evidence.
