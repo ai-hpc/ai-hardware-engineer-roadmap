@@ -1,6 +1,6 @@
 <div class="reading-controls" data-reading-controls role="group" aria-label="Reading view" hidden>
   <span class="reading-controls__label" aria-hidden="true">Reading view</span>
-  <div class="reading-controls__actions">
+  <div class="reading-controls__actions" id="reading-actions">
     <button class="reading-controls__button" type="button" data-reading-action="navigation" aria-expanded="true">
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
         <rect x="3" y="4" width="18" height="16" rx="2" />
@@ -28,5 +28,11 @@
       <span data-reading-label>Full screen</span>
     </button>
   </div>
+  <button class="reading-controls__button reading-controls__toggle" type="button" data-reading-action="toolbar" aria-expanded="true" aria-controls="reading-actions">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M6 15l6-6 6 6" />
+    </svg>
+    <span data-reading-label>Hide panel</span>
+  </button>
   <span class="reading-controls__status" data-reading-status role="status" aria-live="polite"></span>
 </div>

@@ -86,6 +86,31 @@
   outline-offset: 2px;
 }
 
+/* Collapsed: only the toggle remains, as a small pill that floats beside the
+   lesson title and scrolls away with the page instead of following the reader. */
+.reading-controls__toggle svg {
+  transition: transform 120ms ease;
+}
+
+.reading-controls[data-reading-collapsed="true"] {
+  position: static;
+  float: right;
+  gap: 0;
+  margin: 0 0.8rem 0.4rem 0.6rem;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.reading-controls[data-reading-collapsed="true"] > :not(.reading-controls__toggle, .reading-controls__status) {
+  display: none;
+}
+
+.reading-controls[data-reading-collapsed="true"] .reading-controls__toggle svg {
+  transform: rotate(180deg);
+}
+
 .reading-controls__status {
   position: absolute;
   width: 1px;
@@ -218,7 +243,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .reading-controls__button {
+  .reading-controls__button,
+  .reading-controls__toggle svg {
     transition: none;
   }
 }

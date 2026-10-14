@@ -7,7 +7,8 @@
   if (!toolbar) return;
 
   const storageKey = "ai-hardware-engineer-roadmap.reading-layout.v1";
-  const preferences = { navigation: true, contents: true, wide: false };
+  // toolbar: false collapses the panel to a single "Reading view" button.
+  const preferences = { navigation: true, contents: true, wide: false, toolbar: true };
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey));
     for (const key of Object.keys(preferences)) {
@@ -47,7 +48,9 @@
 
   const measure = () => {
     root.style.setProperty("--reading-header-height", `${header?.getBoundingClientRect().height || 0}px`);
-    root.style.setProperty("--reading-toolbar-height", `${toolbar.getBoundingClientRect().height}px`);
+    // A collapsed panel is not sticky, so headings need no room for it.
+    const toolbarHeight = preferences.toolbar ? toolbar.getBoundingClientRect().height : 0;
+    root.style.setProperty("--reading-toolbar-height", `${toolbarHeight}px`);
   };
 
   const render = () => {
@@ -55,6 +58,8 @@
     root.dataset.readingToc = preferences.contents ? "visible" : "hidden";
     root.dataset.readingWide = String(preferences.wide);
     root.dataset.readingFocus = String(focusView);
+    toolbar.dataset.readingCollapsed = String(!preferences.toolbar);
+    button("toolbar")?.setAttribute("aria-expanded", String(preferences.toolbar));
     button("navigation")?.setAttribute("aria-expanded", String(preferences.navigation && !focusView));
     button("contents")?.setAttribute("aria-expanded", String(preferences.contents && !focusView));
     button("wide")?.setAttribute("aria-pressed", String(preferences.wide));
@@ -63,6 +68,7 @@
     label("contents", preferences.contents ? "Hide contents" : "Show contents");
     label("wide", preferences.wide ? "Standard view" : "Wide view");
     label("fullscreen", focusView ? "Exit full screen" : "Full screen");
+    label("toolbar", preferences.toolbar ? "Hide panel" : "Reading view");
     measure();
     // Material recomputes its sticky sidebars when the available space changes.
     window.dispatchEvent(new Event("resize"));
