@@ -1,0 +1,598 @@
+{
+  "scope": "synthetic RGB episode conversion and offline exact-start action dispatch",
+  "fixture_sha256": "d0bad8f8d6dce40b0f26ba5da8fd7db98e8878e46fe01f249d5315a2981cd3b4",
+  "rows": [
+    {
+      "episode": "train-a",
+      "session": "morning",
+      "origin": "synthetic-recorder/train-a",
+      "time_us": 0,
+      "action": [
+        0.0,
+        0.01
+      ],
+      "schema": "base_xy_delta_m/v1",
+      "period_us": 20000,
+      "instruction": "move in base positive y",
+      "terminated": false,
+      "truncated": false,
+      "state_base_m": [
+        0.0,
+        0.0
+      ],
+      "observation_valid": true,
+      "frame_id": 0,
+      "rgb_2x2": [
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0
+      ],
+      "frame_age_us": 0,
+      "split": "train"
+    },
+    {
+      "episode": "train-a",
+      "session": "morning",
+      "origin": "synthetic-recorder/train-a",
+      "time_us": 20000,
+      "action": [
+        0.0,
+        0.0
+      ],
+      "schema": "base_xy_delta_m/v1",
+      "period_us": 20000,
+      "instruction": "move in base positive y",
+      "terminated": false,
+      "truncated": false,
+      "state_base_m": [
+        0.0,
+        0.01
+      ],
+      "observation_valid": true,
+      "frame_id": 0,
+      "rgb_2x2": [
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0
+      ],
+      "frame_age_us": 20000,
+      "split": "train"
+    },
+    {
+      "episode": "train-a",
+      "session": "morning",
+      "origin": "synthetic-recorder/train-a",
+      "time_us": 40000,
+      "action": [
+        0.0,
+        0.01
+      ],
+      "schema": "base_xy_delta_m/v1",
+      "period_us": 20000,
+      "instruction": "move in base positive y",
+      "terminated": false,
+      "truncated": false,
+      "state_base_m": [
+        0.0,
+        0.01
+      ],
+      "observation_valid": true,
+      "frame_id": 2,
+      "rgb_2x2": [
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0
+      ],
+      "frame_age_us": 5000,
+      "split": "train"
+    },
+    {
+      "episode": "train-a",
+      "session": "morning",
+      "origin": "synthetic-recorder/train-a",
+      "time_us": 60000,
+      "action": [
+        0.0,
+        0.01
+      ],
+      "schema": "base_xy_delta_m/v1",
+      "period_us": 20000,
+      "instruction": "move in base positive y",
+      "terminated": true,
+      "truncated": false,
+      "state_base_m": [
+        0.0,
+        0.02
+      ],
+      "observation_valid": true,
+      "frame_id": 2,
+      "rgb_2x2": [
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0
+      ],
+      "frame_age_us": 25000,
+      "split": "train"
+    },
+    {
+      "episode": "train-b",
+      "session": "afternoon",
+      "origin": "synthetic-recorder/train-b",
+      "time_us": 0,
+      "action": [
+        0.0,
+        0.01
+      ],
+      "schema": "base_xy_delta_m/v1",
+      "period_us": 20000,
+      "instruction": "move in base positive y",
+      "terminated": false,
+      "truncated": false,
+      "state_base_m": [
+        0.0,
+        0.0
+      ],
+      "observation_valid": true,
+      "frame_id": 0,
+      "rgb_2x2": [
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0
+      ],
+      "frame_age_us": 0,
+      "split": "train"
+    },
+    {
+      "episode": "train-b",
+      "session": "afternoon",
+      "origin": "synthetic-recorder/train-b",
+      "time_us": 20000,
+      "action": [
+        0.0,
+        0.01
+      ],
+      "schema": "base_xy_delta_m/v1",
+      "period_us": 20000,
+      "instruction": "move in base positive y",
+      "terminated": false,
+      "truncated": false,
+      "state_base_m": [
+        0.0,
+        0.0
+      ],
+      "observation_valid": true,
+      "frame_id": 0,
+      "rgb_2x2": [
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0
+      ],
+      "frame_age_us": 20000,
+      "split": "train"
+    },
+    {
+      "episode": "train-b",
+      "session": "afternoon",
+      "origin": "synthetic-recorder/train-b",
+      "time_us": 40000,
+      "action": [
+        0.0,
+        0.0
+      ],
+      "schema": "base_xy_delta_m/v1",
+      "period_us": 20000,
+      "instruction": "move in base positive y",
+      "terminated": false,
+      "truncated": false,
+      "state_base_m": [
+        0.0,
+        0.02
+      ],
+      "observation_valid": true,
+      "frame_id": 2,
+      "rgb_2x2": [
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0
+      ],
+      "frame_age_us": 5000,
+      "split": "train"
+    },
+    {
+      "episode": "train-b",
+      "session": "afternoon",
+      "origin": "synthetic-recorder/train-b",
+      "time_us": 60000,
+      "action": [
+        0.0,
+        0.0
+      ],
+      "schema": "base_xy_delta_m/v1",
+      "period_us": 20000,
+      "instruction": "move in base positive y",
+      "terminated": true,
+      "truncated": false,
+      "state_base_m": [
+        0.0,
+        0.02
+      ],
+      "observation_valid": true,
+      "frame_id": 2,
+      "rgb_2x2": [
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0
+      ],
+      "frame_age_us": 25000,
+      "split": "train"
+    },
+    {
+      "episode": "test-c",
+      "session": "next-day",
+      "origin": "synthetic-recorder/test-c",
+      "time_us": 0,
+      "action": [
+        0.0,
+        0.1
+      ],
+      "schema": "base_xy_delta_m/v1",
+      "period_us": 20000,
+      "instruction": "move in base positive y",
+      "terminated": false,
+      "truncated": false,
+      "state_base_m": [
+        0.0,
+        0.0
+      ],
+      "observation_valid": true,
+      "frame_id": 0,
+      "rgb_2x2": [
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0
+      ],
+      "frame_age_us": 0,
+      "split": "test"
+    },
+    {
+      "episode": "test-c",
+      "session": "next-day",
+      "origin": "synthetic-recorder/test-c",
+      "time_us": 20000,
+      "action": [
+        0.0,
+        0.1
+      ],
+      "schema": "base_xy_delta_m/v1",
+      "period_us": 20000,
+      "instruction": "move in base positive y",
+      "terminated": false,
+      "truncated": false,
+      "state_base_m": [
+        0.0,
+        0.1
+      ],
+      "observation_valid": true,
+      "frame_id": 0,
+      "rgb_2x2": [
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0
+      ],
+      "frame_age_us": 20000,
+      "split": "test"
+    },
+    {
+      "episode": "test-c",
+      "session": "next-day",
+      "origin": "synthetic-recorder/test-c",
+      "time_us": 40000,
+      "action": [
+        0.0,
+        0.1
+      ],
+      "schema": "base_xy_delta_m/v1",
+      "period_us": 20000,
+      "instruction": "move in base positive y",
+      "terminated": false,
+      "truncated": false,
+      "state_base_m": [
+        0.0,
+        0.2
+      ],
+      "observation_valid": true,
+      "frame_id": 2,
+      "rgb_2x2": [
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0
+      ],
+      "frame_age_us": 5000,
+      "split": "test"
+    },
+    {
+      "episode": "test-c",
+      "session": "next-day",
+      "origin": "synthetic-recorder/test-c",
+      "time_us": 60000,
+      "action": [
+        0.0,
+        0.1
+      ],
+      "schema": "base_xy_delta_m/v1",
+      "period_us": 20000,
+      "instruction": "move in base positive y",
+      "terminated": true,
+      "truncated": false,
+      "state_base_m": [
+        0.0,
+        0.30000000000000004
+      ],
+      "observation_valid": true,
+      "frame_id": 2,
+      "rgb_2x2": [
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0
+      ],
+      "frame_age_us": 25000,
+      "split": "test"
+    }
+  ],
+  "normalizer": {
+    "schema": "base_xy_delta_m/v1",
+    "period_us": 20000,
+    "center": [
+      0.0,
+      0.00625
+    ],
+    "scale": [
+      1.0,
+      0.004841229182759271
+    ],
+    "constant": [
+      true,
+      false
+    ],
+    "count": 8,
+    "training_rows_sha256": "191641484e52aeaea603f5adb054b4aeca23e74216c890433852c1e44168f08f",
+    "sha256": "2e41c3efe3adcf45529f47e7fec2bd20df7d39b48e44effaab999bc38181308c"
+  },
+  "boundary_chunk": {
+    "targets": [
+      [
+        0.0,
+        0.01
+      ],
+      [
+        0.0,
+        0.01
+      ],
+      [
+        0.0,
+        0.01
+      ],
+      [
+        0.0,
+        0.01
+      ]
+    ],
+    "mask": [
+      1,
+      1,
+      0,
+      0
+    ]
+  },
+  "masked_zero_prediction_mse_m2": 5e-05,
+  "trace": [
+    {
+      "event": "late_result",
+      "accepted_indices": [
+        4,
+        5
+      ]
+    },
+    {
+      "time_us": 70000,
+      "status": "fallback",
+      "action_m": [
+        0.0,
+        0.0
+      ],
+      "missed": 0
+    },
+    {
+      "time_us": 80000,
+      "status": "execute",
+      "action_m": [
+        0.0,
+        0.01
+      ],
+      "request": 1,
+      "index": 4,
+      "age_us": 80000,
+      "missed": 0
+    },
+    {
+      "event": "replacement",
+      "accepted_indices": [
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "event": "old_result",
+      "rejection": "out-of-order result"
+    },
+    {
+      "time_us": 100000,
+      "status": "execute",
+      "action_m": [
+        0.0,
+        0.019999999999999997
+      ],
+      "request": 2,
+      "index": 2,
+      "age_us": 40000,
+      "missed": 0
+    },
+    {
+      "event": "reset_then_old_result",
+      "rejection": "old or unknown reset epoch"
+    },
+    {
+      "event": "zero_action",
+      "accepted_indices": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "time_us": 20000,
+      "status": "execute",
+      "action_m": [
+        0.0,
+        8.673617379884035e-19
+      ],
+      "request": 1,
+      "index": 1,
+      "age_us": 20000,
+      "missed": 0
+    },
+    {
+      "time_us": 60000,
+      "status": "execute",
+      "action_m": [
+        0.0,
+        8.673617379884035e-19
+      ],
+      "request": 1,
+      "index": 3,
+      "age_us": 60000,
+      "missed": 1
+    },
+    {
+      "time_us": 120000,
+      "status": "fallback",
+      "action_m": [
+        0.0,
+        0.0
+      ],
+      "missed": 2
+    }
+  ]
+}

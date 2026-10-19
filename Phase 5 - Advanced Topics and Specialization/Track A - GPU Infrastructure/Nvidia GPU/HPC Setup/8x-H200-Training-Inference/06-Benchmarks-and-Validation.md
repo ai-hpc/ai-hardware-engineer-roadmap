@@ -1,275 +1,105 @@
-# 06 — Benchmarks & Validation on 8x H200
+# 06 — Benchmark H200 with a reproducible evidence trail
 
-## 1. Standard Benchmark Suite
+**Outcome:** distinguish arithmetic correctness, hardware ceilings and service performance. Source review: 2026-10-18. **No H200 measurements are supplied here**; previous untraceable token-rate/latency tables are not baselines. The [CPU distributed reference](../NCCL-Deep-Dive/CPU-Collectives-Lab/Guide.md) supplies actual portable correctness evidence.
 
-Run these benchmarks in order to validate hardware health, software stack, and end-to-end AI performance.
+## Record the experiment
 
-### Level 0: Hardware Health Check
+Capture GPU SKU/count, driver, CUDA/framework/library versions, model and tokenizer revisions, power/clock policy, topology, parallel groups, precision, input/output token distributions, batch/concurrency and warmup. Retain raw outputs and failures. Change one factor at a time and repeat runs to show variation.
 
 ```bash
-# GPU info and clock state
-nvidia-smi -q | grep -E "Product Name|Memory Total|Clocks|Power"
-
-# Verify all 8 GPUs visible
-nvidia-smi --query-gpu=index,name,memory.total --format=csv
-
-# NVLink health
-nvidia-smi nvlink --status -i 0   # repeat for 0-7
-nvidia-smi nvlink --errorcounters -i 0
-
-# Thermal stress — should stay < 83°C at 700W TDP
-nvidia-smi dmon -s pucvt -d 2
+nvidia-smi --query-gpu=index,name,memory.total,power.limit --format=csv
+nvidia-smi topo -m
+nvidia-smi nvlink --status -i 0
+python -c 'import torch; print(torch.__version__, torch.version.cuda)'
 ```
 
-### Level 1: GPU Compute (HPL / DGEMM)
+Check vendor/site thermal limits and error counters; a universal 83°C threshold is not a server acceptance test. Do not toggle ECC during benchmarking. Hardware errors need the [diagnostic procedure](../NCCL-Deep-Dive/06-Debugging.md).
 
-```bash
-# NVIDIA HPL benchmark (standard Top500 benchmark)
-docker run --gpus all --rm nvcr.io/nvidia/hpc-benchmarks:23.10 \
-    hpl.sh --dat /workspace/hpl-dgx-h100/HPL.dat
+## Small correctness test, then a bounded GPU microbenchmark
 
-# Expected: ~50+ PFLOPS for 8x H200 at FP64
-# (HPL tests FP64; AI workloads use BF16/FP8)
+The script below requires CUDA and BF16 support. It uses at most 256 MiB per copy buffer and chooses a smaller allocation from currently free memory. It measures **one GPU**, not the sum of eight GPU peaks. It was syntax-reviewed but not GPU-executed for this update.
 
-# Quick GEMM bandwidth test
-python - <<'EOF'
-import torch, time
-M, N, K = 4096, 4096, 4096
-a = torch.randn(M, K, device="cuda", dtype=torch.bfloat16)
-b = torch.randn(K, N, device="cuda", dtype=torch.bfloat16)
-for _ in range(10): torch.mm(a, b)  # warmup
-torch.cuda.synchronize()
-t0 = time.perf_counter()
-for _ in range(100): torch.mm(a, b)
-torch.cuda.synchronize()
-t1 = time.perf_counter()
-tflops = 2 * M * N * K * 100 / (t1 - t0) / 1e12
-print(f"GEMM TFLOPS (BF16): {tflops:.0f}")
-# Target: > 1700 TFLOPS (86% of 1979 peak)
-EOF
-```
+```python
+import json
+import torch
 
-### Level 2: NVLink Bandwidth
+if not torch.cuda.is_available() or not torch.cuda.is_bf16_supported():
+    raise SystemExit("A CUDA GPU with BF16 support is required")
+torch.manual_seed(7)
+device = torch.device("cuda:0")
+torch.cuda.set_device(device)
 
-```bash
-# NCCL all-reduce bandwidth test
-git clone https://github.com/NVIDIA/nccl-tests
-cd nccl-tests && make -j MPI=0 CUDA_HOME=/usr/local/cuda
+# Check a small, non-square product before timing a larger shape.
+a = torch.randn(37, 53, device=device, dtype=torch.bfloat16)
+b = torch.randn(53, 19, device=device, dtype=torch.bfloat16)
+actual = (a @ b).float()
+reference = (a.cpu().double() @ b.cpu().double()).float().to(device)
+relative_l2 = ((actual - reference).norm() / reference.norm()).item()
+assert relative_l2 < .01, relative_l2
 
-# All-reduce across 8 GPUs
-./build/all_reduce_perf -b 1G -e 8G -f 2 -g 8
+def mean_ms(operation, repeats=30):
+    for _ in range(5): operation()
+    torch.cuda.synchronize(device)
+    start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+    start.record()
+    for _ in range(repeats): operation()
+    end.record()
+    end.synchronize()
+    return start.elapsed_time(end) / repeats
 
-# Expected: ~450+ GB/s bus bandwidth (out of 900 GB/s bidirectional NVLink)
-# Lower numbers indicate NVLink issues or NCCL misconfiguration
-```
-
-### Level 3: Memory Bandwidth
-
-```bash
-python - <<'EOF'
-import torch, time
-N = 2 * 1024**3 // 2  # 2 GB of BF16 data
-x = torch.randn(N, device="cuda", dtype=torch.bfloat16)
+M, N, K = 2048, 2048, 2048
+a = torch.randn(M, K, device=device, dtype=torch.bfloat16)
+b = torch.randn(K, N, device=device, dtype=torch.bfloat16)
+c = torch.empty(M, N, device=device, dtype=torch.bfloat16)
+gemm_ms = mean_ms(lambda: torch.mm(a, b, out=c))
+free_bytes, _ = torch.cuda.mem_get_info(device)
+# Two buffers consume at most 20% of reported free memory here.
+buffer_bytes = min(256 * 1024**2, int(free_bytes * .10))
+if buffer_bytes < 16 * 1024**2:
+    raise SystemExit("Insufficient free memory for the copy experiment")
+x = torch.full((buffer_bytes // 2,), 1.25, device=device, dtype=torch.bfloat16)
 y = torch.empty_like(x)
-for _ in range(5): y.copy_(x)  # warmup
-torch.cuda.synchronize()
-t0 = time.perf_counter()
-for _ in range(100): y.copy_(x)
-torch.cuda.synchronize()
-t1 = time.perf_counter()
-bw = (2 * N * 2 * 100) / (t1 - t0) / 1e12  # read + write, BF16 = 2 bytes
-print(f"HBM Bandwidth: {bw:.2f} TB/s")
-# Target: > 4.0 TB/s (83% of 4.8 TB/s peak)
-EOF
+copy_ms = mean_ms(lambda: y.copy_(x))
+assert torch.equal(x, y)
+print(json.dumps({
+    "device": torch.cuda.get_device_name(device),
+    "torch": torch.__version__, "cuda": torch.version.cuda,
+    "gemm_relative_l2": relative_l2, "gemm_ms": gemm_ms,
+    "dense_BF16_TFLOPs": 2 * M * N * K / (gemm_ms / 1000) / 1e12,
+    "copy_buffer_bytes": x.numel() * x.element_size(), "copy_ms": copy_ms,
+    "copy_read_plus_write_TBps": 2 * x.numel() * x.element_size() / (copy_ms / 1000) / 1e12
+}, indent=2))
 ```
 
-## 2. Training Benchmarks
+The copy metric counts **read plus write** traffic; a one-way GPU-to-GPU link copy instead counts payload bytes once. A working set smaller than cache can inflate an apparent memory-bandwidth figure. Sweep size, record whether it exceeds cache, and use profiling counters before calling it HBM bandwidth. Event timing excludes allocations and host transfer; end-to-end application measurements must include costs on their path.
 
-### MFU (Model FLOP Utilization)
+The H200 SXM dense BF16 ceiling is about **989.5 TFLOP/s**, not the 1,979 sparse number. Eight GPUs' FP64 Tensor Core peaks total **0.536 PFLOP/s**, so a claimed 50 PFLOP/s FP64 HPL result is impossible for this configuration. HPL, HPL-AI and BF16 GEMM are different workloads. [H200 specification](https://www.nvidia.com/en-us/data-center/h200/).
 
-```python
-import torch, time
-from transformers import LlamaForCausalLM, LlamaConfig
+## Validate communication separately
 
-# Proxy model for benchmarking
-config = LlamaConfig(
-    hidden_size=8192, num_hidden_layers=80,
-    num_attention_heads=64, num_key_value_heads=8,
-    intermediate_size=28672, max_position_embeddings=4096,
-)
-model = LlamaForCausalLM(config).to("cuda:0").to(torch.bfloat16)
+Use the [NCCL sweep](../NCCL-Deep-Dive/02-Algorithms-and-Bandwidth.md), save the nccl-tests commit, and require zero wrong values. Report both algorithm bandwidth and normalized bus bandwidth, operation size, rank count and in-place/out-of-place mode. A result below a guessed 450 GB/s threshold does not by itself diagnose a faulty link.
 
-batch_size, seq_len = 4, 2048
-inputs = torch.randint(0, 32000, (batch_size, seq_len), device="cuda:0")
+## Training throughput and MFU
 
-# Warmup
-for _ in range(3):
-    loss = model(inputs, labels=inputs).loss
-    loss.backward()
-    model.zero_grad()
-torch.cuda.synchronize()
+Start with a model that fits and a working training script; do not instantiate a 70B FP32 model on one GPU as a “quick proxy.” Count **global valid tokens per optimizer step**, including all data-parallel workers and accumulation, once. For a dense model, a rough useful-compute estimate is `6P×global_tokens`. MFU divides this by elapsed step time times the number of GPUs times the **matching dense** arithmetic peak. State omitted attention/recompute costs and report achieved tokens/s alongside this approximation.
 
-# Benchmark
-t0 = time.perf_counter()
-N_STEPS = 20
-for _ in range(N_STEPS):
-    loss = model(inputs, labels=inputs).loss
-    loss.backward()
-    model.zero_grad()
-torch.cuda.synchronize()
-elapsed = time.perf_counter() - t0
+Record warm steady-state steps, optimizer behavior, quality/loss and peak memory on every rank. Report the slowest rank/end-to-end step. A fast result that silently processes fewer examples or omits optimizer work is a different benchmark.
 
-# MFU calculation
-params = sum(p.numel() for p in model.parameters())
-flops_per_token = 6 * params   # forward + backward ≈ 3x forward
-tokens_per_step = batch_size * seq_len
-total_flops = flops_per_token * tokens_per_step * N_STEPS
-achieved_tflops = total_flops / elapsed / 1e12
-mfu = achieved_tflops / 1979.0  # H200 BF16 peak
-print(f"Achieved: {achieved_tflops:.0f} TFLOPS | MFU: {mfu*100:.1f}%")
-# Target single-GPU MFU: > 45%
-```
+## Inference: throughput and latency need a workload
 
-### Multi-GPU Scaling Efficiency
+Use a pinned installed runtime and its `--help`; benchmark interfaces evolve. Current vLLM exposes `vllm bench throughput` for offline execution and `vllm bench serve` for a running server. Set a local immutable model snapshot path after checking capacity and model support; no model is downloaded by the course update.
 
 ```bash
-# Run training script with 1, 2, 4, 8 GPUs and measure throughput
-for N in 1 2 4 8; do
-    torchrun --nproc_per_node=$N train_benchmark.py \
-        --batch-size $((4 * N)) \
-        --seq-len 2048 \
-        --steps 50 \
-        --output scaling_N${N}.json
-done
-
-# Expected scaling efficiency (vs linear):
-# 2 GPUs: > 95%
-# 4 GPUs: > 92%
-# 8 GPUs: > 88%
+vllm --version
+vllm bench throughput --help
+vllm bench serve --help
+# Example offline command after MODEL points to a prepared local snapshot:
+vllm bench throughput --model "$MODEL" --input-len 512 --output-len 128 \
+    --num-prompts 100 --tensor-parallel-size 8
 ```
 
-### Throughput vs Batch Size Curve
+For online tests, state arrival process/rate, concurrency, timeouts, warmup and draining behavior. Report success/error counts, TTFT, inter-token timing, completion latency and **goodput** meeting the task's quality/latency limits. Offline maximum tokens/s is not an online p99 guarantee. [vLLM throughput CLI](https://docs.vllm.ai/en/latest/cli/bench/throughput/), [serving benchmark CLI](https://docs.vllm.ai/en/latest/cli/bench/serve/).
 
-| Batch Size | Tokens/s (Llama-70B, 8x H200, BF16) | GPU Mem Used |
-|---|---|---|
-| 1 | ~1,200 | ~200 GB |
-| 4 | ~4,500 | ~240 GB |
-| 16 | ~14,000 | ~400 GB |
-| 64 | ~18,000 | ~900 GB |
-| 128 | OOM (need FP8 or quant) | — |
+A streaming network chunk is not a model token. Empty role events, partial JSON, multiple tokens per content delta and usage-only events break naive counters. Use the runtime's supported benchmark client and exact tokenizer/usage semantics; do not count lines containing `content`.
 
-## 3. Inference Benchmarks
-
-### Latency vs Throughput Trade-off
-
-```bash
-# vLLM benchmark suite
-python benchmarks/benchmark_serving.py \
-    --model meta-llama/Llama-3-70b-instruct \
-    --tensor-parallel-size 8 \
-    --request-rate 10 \
-    --num-prompts 500 \
-    --input-len 512 \
-    --output-len 256
-
-# Sweep request rates
-for RATE in 1 5 10 20 50 100; do
-    python benchmarks/benchmark_serving.py \
-        --request-rate $RATE \
-        [other args] \
-        --output-json rate_${RATE}.json
-done
-```
-
-### Key Inference Metrics
-
-| Metric | Definition | H200 Target (Llama-70B, TP=8) |
-|---|---|---|
-| **TTFT** | Time to first token (prefill) | < 100 ms (512 input tokens) |
-| **TPOT** | Time per output token (decode) | < 20 ms/token |
-| **Throughput** | Output tokens/second total | > 15,000 tokens/s at BS=64 |
-| **ITL** | Inter-token latency (streaming) | < 30 ms P99 |
-| **MBU** | Memory bandwidth utilization | > 75% (decode is memory-bound) |
-
-### Decode MBU Calculation
-
-```python
-def compute_mbu(model_params_bytes, tokens_per_second, hbm_bw_tbs=4.8):
-    """
-    Decode is memory-bound: GPU loads all model weights per token generated.
-    model_params_bytes: total model size in bytes (e.g., 70B * 2 for BF16 = 140e9)
-    """
-    bytes_per_token = model_params_bytes  # approximately load full model
-    achieved_tb_s = bytes_per_token * tokens_per_second / 1e12
-    mbu = achieved_tb_s / hbm_bw_tbs
-    return mbu
-
-# 70B BF16: 140 GB weights, 15000 tokens/s
-mbu = compute_mbu(140e9, 15000)
-print(f"MBU: {mbu*100:.1f}%")  # ~44% — room for improvement with larger batches
-```
-
-## 4. Validation Checklist
-
-### Before Production Deployment
-
-```
-Hardware:
-[ ] All 8 GPUs detected by nvidia-smi (driver version ≥ 550)
-[ ] NVLink errors = 0 on all links (nvidia-smi nvlink --errorcounters)
-[ ] GPU temperatures stable under load (< 83°C)
-[ ] Power readings ~700W per GPU at full load
-[ ] ECC errors = 0 (nvidia-smi --query-gpu=ecc.errors.uncorrected.volatile.total)
-
-Software stack:
-[ ] CUDA 12.3+, cuDNN 9+, NCCL 2.20+
-[ ] PyTorch ≥ 2.3 (Flash Attention 3 support)
-[ ] vLLM or TRT-LLM latest release
-[ ] Transformer Engine installed for FP8
-
-Networking:
-[ ] NCCL all-reduce latency < 100 µs for 1 MB payload
-[ ] NVLink bus bandwidth > 400 GB/s (nccl-tests all_reduce_perf)
-[ ] No PCIe retrain errors in dmesg
-
-Model serving:
-[ ] Health check endpoint responds < 50 ms
-[ ] TTFT within SLA for p50/p99
-[ ] Memory utilization stable (no slow leak)
-[ ] Graceful handling of max_model_len exceeded requests
-```
-
-### ECC and Error Monitoring
-
-```bash
-# Check for GPU hardware errors
-nvidia-smi --query-gpu=gpu_name,ecc.errors.corrected.volatile.total,\
-ecc.errors.uncorrected.volatile.total --format=csv
-
-# Set ECC mode (requires reboot)
-sudo nvidia-smi -e 1  # enable ECC (reduces memory by ~6%)
-sudo nvidia-smi -e 0  # disable ECC (more memory, no correction)
-
-# For training: ECC ON (data integrity > memory)
-# For inference: ECC ON (production reliability)
-```
-
-## 5. Comparative Baselines
-
-### H200 vs H100 vs A100
-
-| Benchmark | A100 SXM4 80GB | H100 SXM5 80GB | H200 SXM5 141GB |
-|---|---|---|---|
-| BF16 TFLOPS | 312 | 989 | 1,979 |
-| HBM Bandwidth | 2.0 TB/s | 3.35 TB/s | 4.8 TB/s |
-| Llama-70B TTFT (512 in) | ~400 ms | ~150 ms | ~90 ms |
-| Llama-70B throughput | ~5K tok/s | ~10K tok/s | ~18K tok/s |
-| Max context (fits in VRAM) | ~32K tokens | ~32K tokens | ~128K tokens |
-
-## References
-
-- [NVIDIA H200 Performance Data](https://www.nvidia.com/en-us/data-center/h200/)
-- [MLPerf Inference Results](https://mlcommons.org/benchmarks/inference-datacenter/)
-- [nccl-tests Repository](https://github.com/NVIDIA/nccl-tests)
-- [vLLM Benchmarks](https://github.com/vllm-project/vllm/tree/main/benchmarks)
-- [LLM-Perf Benchmark Suite](https://github.com/huggingface/optimum-benchmark)
+**Assessment:** submit one numerical reference check, one bounded compute/copy result if CUDA is available, a collective sweep, and a serving workload manifest. Explain why a faster throughput result can still fail the same robot/cloud service latency requirement. Keep hardware work explicitly unexecuted until raw results exist.

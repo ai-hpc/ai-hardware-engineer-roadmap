@@ -13,9 +13,13 @@ By the end of this lecture you will be able to:
 3. Implement a cross-encoder reranker to reorder initial retrieval results.
 4. Use query expansion and HyDE to improve recall on ambiguous queries.
 5. Build a multi-query retriever to cover multiple phrasings of the same question.
-6. Assemble a complete, production-grade RAG chain using LangChain LCEL.
+6. Assemble an instructional RAG chain and measure retrieval, reranking, and generation separately.
 
 ---
+
+**Execution boundary (checked 2026-10-18):** these are integration examples, not a dependency-locked, locally executed application. Record package versions and immutable embedding/reranker revisions before comparing runs. Current [Hugging Face embeddings integration](https://docs.langchain.com/oss/python/integrations/embeddings/huggingfacehub) lives in `langchain-huggingface`; [MultiQueryRetriever](https://reference.langchain.com/python/langchain-classic/retrievers/multi_query/MultiQueryRetriever) lives in `langchain-classic`. The tiny hardware corpus is a retrieval fixture, not a current hardware buying guide. Apply document permissions before retrieval/reranking when adapting it to private data.
+
+For an executed lexical baseline and concrete evaluation failure, run the [SQLite FTS5 lab](../Local-RAG-Workflow-Lab/Guide.md). It reports recall and abstention separately; more retrieved evidence does not automatically produce a complete answer.
 
 ## 1. Dense vs Hybrid Search
 
@@ -24,13 +28,13 @@ By the end of this lecture you will be able to:
 **Dense retrieval** embeds the query and all documents into a shared **vector space**. Documents are ranked by **cosine similarity** (or dot product) to the query vector. It handles semantic equivalence well: "memory bandwidth" and "data transfer rate" may retrieve the same documents.
 
 ```python
-# pip install langchain langchain-chroma sentence-transformers
+# pip install langchain langchain-chroma langchain-huggingface sentence-transformers
 
 from langchain_chroma import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 
-embedding_fn = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+embedding_fn = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2", encode_kwargs={"normalize_embeddings": True})
 
 vectorstore = Chroma(embedding_function=embedding_fn, collection_name="demo")
 docs = [
@@ -47,7 +51,7 @@ for doc, score in results:
     print(f"  score={score:.4f}  {doc.page_content}")
 ```
 
-**Weakness:** Dense retrieval misses exact keyword matches. If you search for "NVLink 4.0" but no document contains that exact phrase, it may fail.
+**Weakness:** Dense retrieval can confuse similar identifiers, versions, numbers, or negations. Exact lexical retrieval helps when the requested token is actually present; neither method can recover evidence absent from the corpus.
 
 ### 1.2 BM25 (Sparse/Keyword Search)
 
@@ -83,15 +87,15 @@ for score, doc in ranked:
 
 ### 1.3 Hybrid Search (BM25 + Dense)
 
-**Hybrid search** combines both scores using **Reciprocal Rank Fusion (RRF)**:
+**Hybrid search** can fuse the two **rankings** with **Reciprocal Rank Fusion (RRF)**. RRF does not add raw BM25 and cosine scores, which have different scales:
 
 ```python
-# pip install langchain-community rank-bm25 sentence-transformers
+# pip install langchain-huggingface rank-bm25 sentence-transformers
 
 import re
 import numpy as np
 from rank_bm25 import BM25Okapi
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 
 
@@ -99,6 +103,8 @@ class HybridRetriever:
     """Combines BM25 and dense vector search via Reciprocal Rank Fusion."""
 
     def __init__(self, documents: list[Document], embedding_model: str = "all-MiniLM-L6-v2", k: int = 60):
+        if not documents or k <= 0:
+            raise ValueError("provide documents and a positive RRF constant")
         self.documents = documents
         self.k = k  # RRF constant
 
@@ -107,7 +113,7 @@ class HybridRetriever:
         self.bm25 = BM25Okapi(tokenized)
 
         # Dense embeddings
-        self.embedder = HuggingFaceEmbeddings(model_name=embedding_model)
+        self.embedder = HuggingFaceEmbeddings(model_name=embedding_model, encode_kwargs={"normalize_embeddings": True})
         texts = [d.page_content for d in documents]
         self.doc_vectors = np.array(self.embedder.embed_documents(texts))
 
@@ -124,6 +130,8 @@ class HybridRetriever:
         return list(np.argsort(-scores))
 
     def retrieve(self, query: str, top_k: int = 4) -> list[Document]:
+        if top_k < 1:
+            raise ValueError("top_k must be positive")
         dense_ranks = self._dense_ranks(query)
         sparse_ranks = self._bm25_ranks(query)
 
@@ -153,16 +161,24 @@ for doc in retriever.retrieve("NVLink 4.0 bandwidth"):
 
 ---
 
+### 1.4 Work a fusion result by hand
+
+Dense ranks are `[A, B, C]`; lexical ranks are `[B, C, A]`. For a small teaching constant `k=1`, one-based rank gives A `1/2+1/4=0.75`, B `1/3+1/2≈0.8333`, C `1/4+1/3≈0.5833`. The fused order is B, A, C. Production examples often use larger constants; `k` is a tuning choice, not a probability.
+
+**Guided variation:** reverse the lexical ranking to `[C, B, A]`. **Answer:** A and C tie at 0.75, B scores 2/3; declare a deterministic tie rule. If only C contains the answer, does taking top-1 from the original fusion succeed? **Answer:** no. Fusion rank alone cannot establish answer support. Label relevant document IDs and measure recall@k before judging generated prose.
+
+Dot product equals cosine only when both nonzero vectors have unit length. The examples explicitly request normalized embeddings. Similarity-returning APIs may instead expose a **distance**, so read the backend's score convention before applying a cutoff.
+
 ## 2. Maximal Marginal Relevance (MMR)
 
 **MMR** selects documents that are relevant to the query AND **diverse** from each other. It prevents retrieving five near-identical chunks.
 
 ```python
 from langchain_chroma import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 
-embedding_fn = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+embedding_fn = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2", encode_kwargs={"normalize_embeddings": True})
 vs = Chroma(embedding_function=embedding_fn)
 
 # Add some redundant documents
@@ -239,7 +255,7 @@ for i, doc in enumerate(reranked, 1):
     print(f"  {i}. {doc.page_content}")
 ```
 
-**Why reranking helps:** The **bi-encoder** (dense retrieval) encodes query and document independently. The **cross-encoder** attends to every token of both simultaneously, giving much better relevance scores at the cost of O(candidates) inference calls.
+**Why reranking helps:** The **bi-encoder** (dense retrieval) encodes query and document independently. The **cross-encoder** attends to every token of both simultaneously, scoring each candidate pair with richer interaction. This can improve relevance, but needs a held-out test; pairs can be batched, so candidate count is not necessarily the number of model calls. Reranking cannot recover a relevant document absent from the candidate set.
 
 ---
 
@@ -282,11 +298,11 @@ Instead of embedding the short query, generate a **hypothetical document** that 
 ```python
 import numpy as np
 from langchain_openai import ChatOpenAI
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 
 llm = ChatOpenAI(model="your-fast-model-id", temperature=0.3)
-embedder = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+embedder = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2", encode_kwargs={"normalize_embeddings": True})
 
 
 def hyde_retrieve(query: str, documents: list[Document], top_k: int = 3) -> list[Document]:
@@ -318,7 +334,7 @@ corpus = [
     Document(page_content="Python asyncio enables non-blocking I/O operations."),
 ]
 
-results = hyde_retrieve("What is the fastest GPU memory bandwidth available?", corpus)
+results = hyde_retrieve("Which GPU in this small corpus has the greater stated memory bandwidth?", corpus)
 for doc in results:
     print(f"  {doc.page_content}")
 ```
@@ -331,13 +347,13 @@ LangChain's `MultiQueryRetriever` issues multiple rephrasings of the original qu
 
 ```python
 import os
-from langchain.retrievers.multi_query import MultiQueryRetriever
+from langchain_classic.retrievers.multi_query import MultiQueryRetriever  # pip install langchain-classic
 from langchain_openai import ChatOpenAI
 from langchain_chroma import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 
-embedding_fn = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+embedding_fn = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2", encode_kwargs={"normalize_embeddings": True})
 vs = Chroma(embedding_function=embedding_fn)
 vs.add_documents([
     Document(page_content="H100 SXM5 has 3.35 TB/s HBM3 bandwidth."),
@@ -357,7 +373,7 @@ multi_retriever = MultiQueryRetriever.from_llm(
 
 # Enable verbose logging to see generated queries
 import logging
-logging.getLogger("langchain.retrievers.multi_query").setLevel(logging.INFO)
+logging.getLogger("langchain_classic.retrievers.multi_query").setLevel(logging.INFO)
 
 docs = multi_retriever.invoke("How fast is H100 GPU memory?")
 print(f"\nRetrieved {len(docs)} unique documents:")
@@ -379,7 +395,7 @@ from typing import Any
 from operator import itemgetter
 
 from langchain_chroma import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -389,7 +405,7 @@ from sentence_transformers.cross_encoder import CrossEncoder
 
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
-embedding_fn = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+embedding_fn = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2", encode_kwargs={"normalize_embeddings": True})
 cross_encoder = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
 llm = ChatOpenAI(model="your-fast-model-id", temperature=0)
 
@@ -415,7 +431,7 @@ def rerank_docs(inputs: dict) -> list[Document]:
         return []
     pairs = [(query, d.page_content) for d in candidates]
     scores = cross_encoder.predict(pairs)
-    ranked = sorted(zip(scores, candidates), reverse=True)
+    ranked = sorted(zip(scores, candidates), reverse=True, key=lambda pair: pair[0])
     return [doc for _, doc in ranked[:3]]  # top-3 after reranking
 
 
@@ -492,7 +508,7 @@ ask_streaming("Which GPU has faster memory, H100 SXM5 or A100?")
 - **MMR** is a simple but effective way to prevent duplicate chunks from dominating retrieval results.
 - **Two-stage retrieval** (dense top-K → cross-encoder rerank) gives the quality of cross-encoder scoring without the latency of scoring every document.
 - **HyDE** often beats raw query embedding for sparse or short queries by generating a more "document-like" embedding.
-- **Multi-query retrieval** improves recall at the cost of extra LLM calls — worth it for high-stakes questions.
+- **Multi-query retrieval** can improve recall and can also introduce irrelevant results. Compare recall, answer correctness, and added latency/cost on a fixed evaluation set before enabling it.
 - **LCEL** (`|` operator) composes retrieval and generation steps into a clean, inspectable pipeline that supports streaming out of the box.
 
 ---

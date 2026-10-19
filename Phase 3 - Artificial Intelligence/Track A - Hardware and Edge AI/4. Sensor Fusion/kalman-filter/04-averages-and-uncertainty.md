@@ -157,7 +157,7 @@ When you have multiple measurements, you can combine them!
 - Standard deviation: 0.08°F
 - Average: 72.02°F
 
-Which should you trust more? Thermometer B! It has much lower uncertainty.
+Thermometer B has better repeatability. That alone does not establish accuracy: a consistent calibration offset can make all its readings wrong. Compare both against a reference before assigning measurement uncertainty.
 
 ## The 68-95-99.7 Rule
 
@@ -171,13 +171,11 @@ For normally distributed data (bell curve):
 Your average height: 65.5 inches
 Standard deviation: 0.2 inches
 
-- 68% chance your true height is between 65.3 and 65.7 inches
-- 95% chance it's between 65.1 and 65.9 inches
-- 99.7% chance it's between 64.9 and 66.1 inches
+If an individual unbiased measurement has Gaussian noise with standard deviation 0.2 inches, about 68%, 95%, and 99.7% of repeated measurements lie within 0.2, 0.4, and 0.6 inches of the true height. These are measurement-spread statements. Uncertainty of an average is different: with n independent unbiased measurements and known noise standard deviation, its standard error is 0.2/√n. A posterior probability statement about the true height also requires an explicit statistical model/prior.
 
 ## Uncertainty Decreases with More Measurements
 
-The more measurements you take, the more certain you become!
+More independent, unbiased measurements reduce random uncertainty. Repeated copies, correlated errors, and systematic bias do not follow the same reduction rule.
 
 ### Formula
 ```
@@ -244,7 +242,7 @@ The ±5 meters is the uncertainty! Sometimes it's ±3 meters (more certain), som
 ### Scientific Measurements
 
 Scientists always report measurements with uncertainty:
-- "The speed of light is 299,792,458 ± 1 m/s"
+- A measured cart speed might be reported as `2.00 ± 0.03 m/s`, with the interval convention stated. The speed of light in vacuum is an SI defining constant with an exact numerical value of 299,792,458 m/s; assigning it a measurement uncertainty would be the wrong example. [BIPM defining constants](https://www.bipm.org/en/measurement-units/si-defining-constants).
 - "The patient's temperature is 98.6 ± 0.2°F"
 
 ### Weather Forecasts
@@ -284,7 +282,7 @@ The forecast has uncertainty!
 2. **Variance** = How spread out the measurements are
 3. **Standard Deviation** = Square root of variance (easier to interpret)
 4. **Uncertainty** = How much you might be wrong
-5. **More measurements** = Less uncertainty
+5. **More independent unbiased measurements** can reduce random uncertainty
 
 ## What's Next?
 

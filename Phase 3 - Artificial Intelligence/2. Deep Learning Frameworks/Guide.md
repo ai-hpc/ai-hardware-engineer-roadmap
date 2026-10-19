@@ -54,6 +54,14 @@ micrograd          PyTorch              tinygrad
 
 ---
 
+## A first complete experiment
+
+Start with the [PyTorch CPU robot-stop lab](PyTorch/CPU-Robot-Stop-Lab/Guide.md): a nonlinear network, grouped data splits, an analytic baseline, validation-only selection, held-out error analysis, save/reload, export, and a sensor-shift failure. Then use micrograd to explain the gradient mechanism and tinygrad to inspect generated execution. The three frameworks answer different questions; completing a costly vision training run is not a prerequisite for understanding them.
+
+Before starting, answer: does `model.eval()` disable gradients? Does a saved weight file include feature order? Does exporting a graph prove it runs correctly on a robot? **Answers:** no; not unless explicitly recorded; and no. The lab makes each contract visible.
+
+Current APIs were checked 2026-10-18 against [PyTorch AMP](https://docs.pytorch.org/docs/stable/amp.html), [export](https://docs.pytorch.org/docs/stable/export.html), and [tinygrad layout](https://docs.tinygrad.org/developer/layout/). GPU profiling and quantization projects below require their own supported environment and measurements.
+
 ## 1. micrograd — Autograd from Scratch
 
 **[micrograd](https://github.com/karpathy/micrograd)** by Andrej Karpathy. ~100 lines of Python. Implements:
@@ -99,10 +107,10 @@ print(y.grad)  # dz/dy = x + 2y = 2 + 6 = 8.0
 | Autograd (`loss.backward()`) | Generates the backward graph that training hardware executes. |
 | Data loading (`DataLoader`) | CPU-GPU pipeline. Bottleneck if not overlapped with compute. |
 | `torch.onnx.export()` | How models leave PyTorch and enter the compiler/runtime stack (Phase 4C). |
-| `torch.compile()` | PyTorch's built-in compiler (Inductor). Generates Triton kernels. Connection to Phase 4C. |
+| `torch.compile()` | PyTorch's built-in compiler (Inductor). Generates or dispatches target-specific kernels (Triton/C++ and libraries). Connection to Phase 4C. |
 | `torch.profiler` | Where is time spent? Kernel launches, memory copies, CPU overhead. |
-| Mixed precision (`torch.cuda.amp`) | FP16/BF16 training — what tensor cores accelerate. |
-| Quantization (`torch.ao.quantization`) | INT8 inference — what L6 PE arrays must support. |
+| Mixed precision (`torch.amp`) | FP16/BF16 training — what tensor cores accelerate. |
+| Quantization (`torchao` and export-based workflows) | INT8 inference — what L6 PE arrays must support. |
 
 **Projects:**
 1. Train a CNN (ResNet-18) on CIFAR-10 from scratch. Profile with `torch.profiler`. Identify the top-3 time-consuming operations.
@@ -114,7 +122,7 @@ print(y.grad)  # dz/dy = x + 2y = 2 + 6 = 8.0
 
 ## 3. tinygrad — The Hackable Compiler
 
-**[tinygrad](https://github.com/tinygrad/tinygrad)** is a minimal DL framework (~10K lines) that exposes the entire compiler pipeline in readable Python. It's the ideal codebase for understanding what happens between `loss.backward()` and the GPU kernel that actually runs.
+**[tinygrad](https://github.com/tinygrad/tinygrad)** is a compact DL framework that exposes the entire compiler pipeline in readable Python. It's the ideal codebase for understanding what happens between `loss.backward()` and the GPU kernel that actually runs.
 
 **Why tinygrad is uniquely valuable for this roadmap:**
 - It's the inference engine inside openpilot (Phase 5E)

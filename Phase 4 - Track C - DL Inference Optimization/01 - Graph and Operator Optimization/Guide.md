@@ -39,7 +39,7 @@ This unit gives you the graph/operator view and profiling skills that every kern
     * Conv–BN–ReLU, Linear–Activation, Attention (Q/K/V + softmax + matmul).
     * Reduces memory traffic and kernel launch overhead.
 * **Layout and shape transformations** — NCHW vs NHWC, transpose folding, reshape/expand for hardware-friendly layouts.
-* **Framework graph formats** — ONNX, TorchScript, TensorFlow SavedModel; how optimization passes are applied in each.
+* **Framework graph formats** — ONNX, PyTorch exported programs, and TensorFlow SavedModel; preserve shape/dtype constraints and supported control flow. Treat TorchScript tutorials as legacy material for matching deployments.
 
 **Concepts to internalize:** A single "layer" in a model often becomes many ops in the graph; fusion turns them back into fewer, faster kernels.
 
@@ -58,6 +58,8 @@ b'_c = a_c * (b_c - mu_c) + beta_c
 Then `Conv(x, W', b')` replaces the convolution-plus-BN output over real arithmetic. ReLU stays after that output; moving it before BN can change the result. If the convolution has no bias, start with `b_c=0`. Training-mode BN depends on the current batch statistics, so this fixed rewrite is not valid there. Floating-point rounding and later quantization still need output checks.
 
 **Worked scalar channel:** `W=2`, `b=1`, `mu=3`, `gamma=4`, `beta=5`, and `sqrt(v+epsilon)=2` give `W'=4`, `b'=1`. At `x=2`, both expressions produce 9. Make gamma negative in a second example and show why changing activation order fails. Pass W'/b' and their dtype/layout to the kernel course, together with the graph hash and validation inputs.
+
+**Run it:** the [CPU compiler lab](../00%20-%20CPU%20Compiler%20Lab/Guide.md) implements the analogous Linear–BatchNorm–ReLU rewrite with an independent scalar reference, rejection tests, and an executed tinygrad CPU path. Compare explicit materialization, automatic lazy fusion, and folded constants; they need not remove the same number of kernels.
 
 ## 2. Operator-level optimization
 
@@ -92,7 +94,7 @@ Then `Conv(x, W', b')` replaces the convolution-plus-BN output over real arithme
 
 ## Projects
 
-1. **Fusion and measure** — Take a ResNet-style model (or small transformer). Fuse Conv–BN–ReLU in ONNX or TorchScript (or use a framework that does it). Measure latency before and after; document the speedup.
+1. **Fusion and measure** — Take a ResNet-style model (or small transformer). Fold fixed normalization in an ONNX/exported graph or a supported framework path. Compare outputs before measuring latency and executed kernels; report improvements, regressions, or unchanged results.
 2. **Profile and report** — Profile a transformer block (attention + FFN) with Nsight Systems and PyTorch profiler. Identify the top 3 bottlenecks; for each, state whether it is compute-bound or memory-bound and why.
 3. **End-to-end breakdown** — For one inference pipeline (e.g. image → model → result), break down time into: data load, preprocess, each major graph region, postprocess. Draw a simple timeline and note the largest segment.
 

@@ -34,10 +34,11 @@ MemoryBudget probe_system_memory() {
     b.total_mb = parse_meminfo_field("MemTotal");
     int64_t available = parse_meminfo_field("MemAvailable");
     b.cma_mb = parse_meminfo_field("CmaTotal");
+    if (b.cma_mb < 0) b.cma_mb = 0;
+    if (b.total_mb <= 0 || available < 0 || available > b.total_mb) return {};
 
     // Estimate OS usage = total - available (before we load anything)
-    b.os_mb = b.total_mb - available - b.cma_mb;
-    if (b.os_mb < 0) b.os_mb = 500;  // fallback estimate
+    b.os_mb = b.total_mb - available; // all current unavailability; CMA is not added again
 
     // CUDA context: probe by actually initializing
     // (deferred — set estimate, update after cudaSetDevice)
@@ -55,8 +56,10 @@ MemoryBudget probe_system_memory() {
 
 bool OOMGuard::can_extend(int64_t additional_bytes) const {
     int64_t free = real_free_mb();
-    int64_t needed_mb = additional_bytes / (1024 * 1024) + 1;
-    return free > (needed_mb + safety_mb_);
+    if (additional_bytes < 0 || safety_mb_ < 0 || free < safety_mb_) return false;
+    const int64_t unit = 1024 * 1024;
+    const int64_t needed_mb = additional_bytes / unit + (additional_bytes % unit != 0);
+    return needed_mb <= free - safety_mb_;
 }
 
 int64_t OOMGuard::real_free_mb() const {
@@ -64,18 +67,9 @@ int64_t OOMGuard::real_free_mb() const {
 }
 
 void OOMGuard::emergency_free() {
-    // Drop filesystem caches (requires root)
-    FILE* f = fopen("/proc/sys/vm/drop_caches", "w");
-    if (f) {
-        fputs("3\n", f);
-        fclose(f);
-    }
-    // Trigger compaction
-    f = fopen("/proc/sys/vm/compact_memory", "w");
-    if (f) {
-        fputs("1\n", f);
-        fclose(f);
-    }
+    // Reclaim only allocations owned by this runtime in a future implementation.
+    // Global drop_caches/compaction does not reserve memory for this process.
+    fprintf(stderr, "[memory] no owned reclaimable cache is registered\n");
 }
 
 }  // namespace jllm

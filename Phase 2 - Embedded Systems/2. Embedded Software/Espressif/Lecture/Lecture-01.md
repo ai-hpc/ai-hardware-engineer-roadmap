@@ -1,146 +1,50 @@
 # Lecture 1 - What `arduino-esp32` is and where it fits
 
-**Course:** [Espressif guide](../Guide.md) | **Phase 2 - Embedded Software**
+**Course:** [Espressif guide](../Guide.md) | **Next:** [Choose a board and bring it up](Lecture-02.md)
 
-**Next:** [Lecture 02 - Supported chips, install path, and first board bring-up](Lecture-02.md)
+`arduino-esp32` is Espressif's implementation of the Arduino programming model for supported ESP32-family chips. It gives you `setup()`, `loop()`, familiar peripheral APIs, and a board-package workflow. Underneath, it uses ESP-IDF drivers, FreeRTOS, and chip-specific startup support. This course uses that approachable entry point to build a sensor node whose failures you can explain.
 
----
+You need basic C/C++, the ability to build a program, and the distinction between a voltage supply and a signal pin. Start with the [native C telemetry lab](../../labs/Framed-Telemetry.md) if you have no board. Its parser and tests run on a normal computer; a board adds peripheral and timing behavior that must be measured separately.
 
-## The shortest correct definition
+## Trace one byte through the system
 
-`arduino-esp32` is **Espressif's Arduino core for the ESP32 family of SoCs**.
+Imagine a robot's sensor module reporting a temperature to a Linux computer:
 
-That sentence matters because it prevents two common mistakes:
+```text
+physical sensor → I2C peripheral → driver → application record
+               → bounded transmit queue → UART driver → wire → host parser
+```
 
-- it is **not** just "Arduino support for one ESP32 board"
-- it is **not** a separate operating system or separate SDK universe from Espressif
+Arduino's `Wire` API helps perform the bus transaction. Your code still decides what register to read, how to convert its bytes, whether the sample is fresh, and what to do when the bus fails. `Serial.write()` hands bytes to a driver; returning from that call does not necessarily mean the last stop bit is already on the wire.
 
-It is a **compatibility and development layer** that gives you the **Arduino programming model** on top of Espressif chips and Espressif's software stack.
+This distinction makes debugging manageable. An address NACK points you toward wiring, address, power, or device state. A valid read with an implausible value points toward configuration, byte order, signedness, scaling, or calibration. A correct value arriving too late points toward scheduling and queues. “The Arduino library is broken” is too broad to test.
 
-Official references: [project README](https://github.com/espressif/arduino-esp32), [online documentation](https://docs.espressif.com/projects/arduino-esp32/en/latest/)
+## Chip, module, board, framework
 
----
+| Term | What it supplies | What you must still identify |
+|---|---|---|
+| SoC | CPU, memory interfaces, peripherals and selected radios | Exact chip and revision |
+| Module | SoC plus supporting components, often flash and RF integration | Flash/PSRAM options, antenna and integration rules |
+| Development board | Module or SoC plus power, USB/debug and headers | Board revision, schematic, pin routing, USB path |
+| Arduino core | APIs and build integration for supported targets | Core version, selected board and options |
+| Application | Your sensing, communication, and control behavior | Data formats, deadlines, error handling and tests |
 
-## Why this project matters in embedded systems
+Two boards using the same SoC can route different pins to LEDs, USB, flash, or external connectors. A library name does not establish that its assumed pins are safe for your board.
 
-People sometimes treat Arduino and embedded engineering as opposites:
+## Choose the smallest complete application
 
-- Arduino = beginner toy
-- embedded firmware = register-level, RTOS, production work
+For this course, begin with a once-per-second serial heartbeat, then a bounded sensor read, then a framed observation. Add one network transport after those work. Keep motor actuation outside the first experiment: prove observation, age, and disconnect behavior before connecting a control path.
 
-That is too simplistic for Espressif.
+A useful module boundary is `read_sample()` returning either a valid record or an explicit error. Keep conversion and validity logic independent of `Wire`, `Serial`, or Wi-Fi classes. You can then test malformed bytes, extreme values, and counter wrap on a CPU while hardware-specific integration remains small.
 
-With `arduino-esp32`, you are still working with:
+Arduino can remain the application layer in a well-engineered product. ESP-IDF can provide more direct configuration and component control when required. The choice follows the application's constraints; changing framework names does not automatically improve architecture.
 
-- real MCU and wireless SoCs
-- real boot and board support layers
-- FreeRTOS-based systems
-- Wi-Fi and BLE stacks
-- actual peripheral drivers
+## Exercise with an example answer
 
-So the platform is useful for:
+Draw the sensor-to-host path and mark where each fault is detected: absent sensor, corrupt UART packet, duplicate record, stale record, and restarted sender.
 
-- fast prototyping
-- board bring-up
-- connectivity experiments
-- turning hardware ideas into working firmware quickly
+A reasonable answer is: driver detects failed bus transaction; parser checks packet integrity and format; application checks sequence within a session; consumer checks observation age; a boot/session identifier distinguishes restart from an old duplicate. No single checksum solves all five problems.
 
-It is especially relevant if your longer-term target is:
+Your output is one diagram and a one-page interface contract. In the next lecture you will record enough board and software identity to reproduce its first heartbeat.
 
-- IoT products
-- smart home devices
-- connected sensors
-- simple edge AI devices
-- product prototypes that may later migrate to ESP-IDF
-
----
-
-## What `arduino-esp32` gives you
-
-At the surface, it gives you the familiar Arduino model:
-
-- `setup()`
-- `loop()`
-- board selection
-- sketch-centric workflow
-- familiar Arduino APIs
-
-But on Espressif hardware, that surface sits on top of a **more serious platform** than classic 8-bit Arduino boards.
-
-That means the learning opportunity is bigger:
-
-- you can still move fast
-- but you can also start asking real embedded questions
-
-For example:
-
-- Which SoC am I really targeting?
-- Which peripherals are native to the chip?
-- Which features come from the Arduino layer and which come from ESP-IDF?
-- When does this sketch stop being a sketch and become a firmware project?
-
----
-
-## Where it fits relative to ESP-IDF
-
-The most important mental model in this whole course is this:
-
-> `arduino-esp32` is a friendly layer on top of Espressif's platform, not a totally separate world.
-
-That matters because later you will want to:
-
-- use advanced peripherals
-- mix Arduino-friendly code with vendor-specific APIs
-- control memory and timing more tightly
-- move into product firmware
-
-If you understand that **Arduino and ESP-IDF are connected**, the transition becomes much easier.
-
----
-
-## Why this belongs in Phase 2
-
-This is not mainly an "app framework" topic.
-
-It belongs in **Embedded Software** because it helps you reason about:
-
-- MCU software architecture
-- framework layering
-- wireless firmware
-- hardware abstraction
-- portability vs control
-- prototyping vs productization
-
-That is exactly the kind of **engineering judgment** Phase 2 is supposed to build.
-
----
-
-## The mental model to keep
-
-Think of `arduino-esp32` as:
-
-- a **fast entry point**
-- to **real Espressif embedded systems**
-- with **Arduino ergonomics**
-- on top of a **deeper vendor platform**
-
-That is the correct starting point for the rest of this course.
-
----
-
-## Lab
-
-Write a short comparison note with two columns:
-
-- "What feels like Arduino"
-- "What is clearly embedded-system engineering underneath"
-
-Then add one sentence:
-
-- "Why an ESP32 sketch is not the same thing as an AVR hobby example"
-
-If you can explain that clearly, you are ready for the next lecture.
-
----
-
-**Previous:** [Course hub](../Guide.md) | **Next:** [Lecture 02 - Supported chips, install path, and first board bring-up](Lecture-02.md)
+Primary references: [official Arduino ESP32 project](https://github.com/espressif/arduino-esp32), [Arduino ESP32 documentation](https://docs.espressif.com/projects/arduino-esp32/en/latest/), and [ESP-IDF FreeRTOS behavior](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/freertos_idf.html).

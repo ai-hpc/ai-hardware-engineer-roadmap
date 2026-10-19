@@ -10,7 +10,7 @@
 </div>
 
 
-**Timeline:** 12–24 months (fundamentals); 24–48 months for advanced phase.
+**Optional planning example:** reserve two 90-minute sessions each week for one baseline experiment, then revise the plan after running it. Total duration depends on prior systems knowledge, weekly study time, hardware access and the experiments you choose. Use the [artifact-based completion rubric](../../Learning-Guide.md#completion-rubric), rather than a fixed number of months, to decide when to move on.
 
 **Prerequisites:** Phase 4 Track B (Jetson, CUDA stack), Phase 4 Track C (ML compiler + DL inference optimization).
 

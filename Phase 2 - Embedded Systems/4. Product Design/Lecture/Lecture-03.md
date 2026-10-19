@@ -1,238 +1,47 @@
-# Lecture 3 - Later HomePod / 2023-era platform lessons
+# Lecture 3 - HomePod 2023: integration, sensing, and service boundaries
 
-**Course:** [Product Design for Embedded Systems](../Guide.md) | **Phase 2 - Embedded Systems**
+**Course:** [Product Design](../Guide.md) | **Previous:** [2018 case-study method](Lecture-02.md) | **Next:** [Design studio](Lecture-04.md)
 
-**Previous:** [Lecture 02](Lecture-02.md) | **Next:** [Lecture 04 - AI smart speaker design studio](Lecture-04.md)
+The 2023 HomePod announcement illustrates how an appliance combines audio, sensing, networking, and home integration. Use it to examine boundaries between subsystems, while keeping feature descriptions separate from assumptions about user value or commercial outcomes.
 
-> **Case-study method:** The product judgments below are design interpretations, not a measured causal explanation of commercial success or failure. Turn each claim into a testable hypothesis for your own device—for example setup completion rate or a user's ability to identify microphone state—and keep product specifications separate from that interpretation.
+## Read the source with a date attached
 
----
+Apple's January 2023 announcement described computational audio and room sensing, built-in temperature/humidity sensing, and Matter home integration. It also distinguished features scheduled for later software updates. The [original announcement](https://www.apple.com/newsroom/2023/01/apple-introduces-the-new-homepod-with-breakthrough-sound-and-intelligence/) is evidence for what was announced, not proof that every feature was available on launch day or under every configuration.
 
-## The later lesson is bigger than the launch lesson
+For your own release plan, label each feature as implemented, measured, planned, or dependent on a particular update. A product brief should not let future work appear as current behavior.
 
-The 2018 lesson was:
+## Trace three independent paths
 
-- great sound is not enough
+```text
+microphone → audio processing → request interpretation → allowed action
+sensor → calibrated/validated observation → application policy → status
+network endpoint → protocol translation → application state → user feedback
+```
 
-The later platform lesson is broader:
+Each path has its own identity, clock, error, and ownership rules. A room-temperature measurement can lag changes in ambient conditions. An automation system may read a cached value. An acoustic system can adapt to placement while a network connection remains unavailable. One “healthy” indicator cannot explain every subsystem without a defined aggregation policy.
 
-- the winning home device becomes a trusted room object with a clear role in the home
+## Work a latency budget
 
-That is a more mature product lesson.
+Suppose a teaching voice interaction allocates 120 ms to endpoint detection, 80 ms to recognition, 150 ms to action planning/validation, and 100 ms to first audio output. A serialized budget sums to **450 ms** after the chosen reference event. These are assumed allocations, not HomePod measurements. If stages overlap, draw their dependencies before subtracting time; if recognition calls a variable-latency service, measure its distribution and cancellation behavior.
 
-It is not just about winning reviews. It is about becoming part of **everyday household behavior**.
+For a simulated robot, keep the observation-to-controller path separate from conversational response. A spoken “done” must not stand in for actuator completion. Link the acknowledgment to the actual state being claimed.
 
----
+## Study acoustic and thermal coupling
 
-## Lesson 1: room-object quality matters
+A compact enclosure couples microphone placement, loudspeaker vibration, fan noise, heat removal, antenna placement, and service access. A top microphone array or a lower speaker chamber is one candidate arrangement, not a proven default. Compare layout candidates with recorded noise, intelligibility, vibration and temperature under the same workload.
 
-Over time, HomePod showed that a home device becomes stronger when it feels like:
+Measure at the user's task boundary. Peak compute throughput is useful only if sustained temperature and power allow the device to meet its latency target. An idle benchmark cannot represent a simultaneous audio, inference, network and display workload.
 
-- a finished home object
+## Make integration degrade intelligibly
 
-not:
+List dependencies for each user task: local firmware, model availability, network, external service, and paired accessories. Then simulate one dependency failing at a time. Decide whether the task can complete locally, needs a retry, or must report unavailable. Preserve a clear path to cancel and recover.
 
-- visible tech clutter
-- a dev board in a shell
-- a gadget that needs explanation
+Thread is a network technology; Matter supplies application-level interoperability over supported IP transports. A radio joining a network does not prove an accessory command succeeded. The [Thread CPU lab](../../2.%20Embedded%20Software/IoT/OpenThread/labs/CPU-Simulation.md) demonstrates how to separate network attachment, traffic, and application evidence.
 
-That means product value is partly created by:
+## Exercise and answers
 
-- exterior calmness
-- material consistency
-- low visible clutter
-- stable room presence
+Create a dependency table for three tasks, including one fully local task. Remove a network dependency in a paper or software prototype and walk through what the user sees.
 
-For an embedded engineer, this changes real constraints:
+**Answer check:** Can a release note prove good household usability? No. It establishes described features/changes; usability needs appropriate observation. Can local execution alone prove privacy? No. Inspect data collection, retention, permissions, and outgoing paths.
 
-- port visibility
-- cable exit
-- seam placement
-- LED behavior
-- surface layout
-
-This is not styling after the fact. It is **engineering shaped by product intent**.
-
----
-
-## Lesson 2: computational audio matters more than part bragging
-
-Later HomePod lessons reinforced that the product story is not:
-
-- more drivers
-- more watts
-- more specs on paper
-
-The real value is the system:
-
-- beamforming
-- room sensing
-- echo cancellation
-- adaptive tuning
-- controlled acoustics
-
-So the design rule is:
-
-- do not optimize the story around component count alone
-- optimize around room performance and perceived quality
-
-For an AI smart speaker, the most important user outcomes are:
-
-- clear spoken replies
-- strong far-field pickup
-- believable room audio
-- low-noise interaction during real household use
-
----
-
-## Lesson 3: setup is part of the product
-
-A home device is weaker immediately if setup feels like **infrastructure work**.
-
-Good setup should feel:
-
-- appliance-like
-- fast
-- understandable
-- safe
-
-That means setup is not a small app detail. It is **core product behavior**.
-
-For an AI smart speaker, setup should cover:
-
-- onboarding
-- Wi-Fi or local-network connection
-- privacy controls
-- household member setup
-- optional smart-home integration
-- updates and diagnostics path
-
-If setup feels like:
-
-- Linux administration
-- container orchestration
-- advanced home-automation maintenance
-
-then the product has already lost most normal users.
-
----
-
-## Lesson 4: the device gets stronger when it participates in home workflows
-
-Later HomePod value was not only about being a speaker.
-
-It became stronger when it participated in:
-
-- multi-room use
-- intercom
-- home-control routines
-- TV and media workflows
-- Thread and Matter style home-infrastructure roles
-
-The lesson is not:
-
-- copy Apple's ecosystem
-
-The lesson is:
-
-- a room device gets stickier when it becomes part of daily household behavior
-
-For a V1 AI smart speaker, the right version of that is:
-
-- home control
-- reminders and timers
-- household memory
-- routines
-- shared-room voice presence
-
-Not:
-
-- trying to be every home device at once
-
----
-
-## Lesson 5: privacy language is weaker than privacy architecture
-
-A product can say the word privacy all day and still feel weak if the **architecture does not support the claim**.
-
-The stronger lesson is:
-
-- privacy should come from system design, not only messaging
-
-For a local-first AI speaker, that means:
-
-- local wake word
-- local core voice path where possible
-- local memory
-- bounded cloud dependence
-- visible physical controls
-
-That is **product architecture**, not brand language.
-
----
-
-## Lesson 6: avoid feature drift too early
-
-A strong V1 can be weakened by trying to become:
-
-- a smart display
-- a camera hub
-- a robotic tablet
-- a general home terminal
-
-The later smart-home market often drifts toward screens and cameras.
-
-That does not mean your V1 should.
-
-If your strongest product identity is:
-
-- calm
-- voice-first
-- room-safe
-- no camera by default
-
-then **protect that identity**.
-
----
-
-## Translation for a local-first AI speaker
-
-Borrow these ideas:
-
-- premium room presence
-- strong far-field microphones
-- computational audio mindset
-- simple setup
-- clear room role
-- useful participation in everyday home workflows
-
-Reject these patterns:
-
-- cloud dependence hidden behind soft privacy branding
-- another-device dependence for core intelligence
-- being trapped in one closed ecosystem
-- adding screens or cameras before the voice appliance identity is solid
-
----
-
-## One sentence
-
-The later HomePod lesson is that a home AI device wins when it becomes a trusted room object with a clear household role, not just a speaker with assistant features.
-
----
-
-## Lab
-
-Write a short V1 product rule list for your own AI speaker:
-
-- one rule about room presence
-- one rule about setup
-- one rule about privacy architecture
-- one rule about ecosystem boundaries
-- one rule about feature drift you will reject
-
-That rule list is the beginning of a real product strategy.
-
----
-
-**Previous:** [Lecture 02](Lecture-02.md) | **Next:** [Lecture 04 - AI smart speaker design studio](Lecture-04.md)
+Deliver the dependency table, a latency diagram with explicit assumptions, and a failed-dependency walkthrough. Use these in the design studio rather than copying a product's component count.

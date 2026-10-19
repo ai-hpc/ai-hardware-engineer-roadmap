@@ -828,7 +828,7 @@ Why it is attractive:
 - long context for an embedding model
 - Apache-2.0 license
 - practical deployment paths
-- good memory/latency fit for edge RAG
+- a smaller parameter footprint to evaluate under the actual edge memory and latency budget; no Jetson throughput is measured here
 
 Use Granite 97M when:
 
@@ -848,8 +848,8 @@ Use Granite 311M when:
 The important point:
 
 ```text
-Granite 97M is a strong default for efficient local RAG,
-not a universal winner for every retrieval task.
+Granite 97M is a candidate to compare against a lexical baseline
+and other encoders on your own fixed corpus and target hardware.
 ```
 
 ---

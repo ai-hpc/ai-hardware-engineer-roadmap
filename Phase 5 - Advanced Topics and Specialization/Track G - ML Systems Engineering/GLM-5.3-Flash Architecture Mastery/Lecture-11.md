@@ -142,6 +142,8 @@ Build the **full correctness matrix as an executable test suite** — one test g
 
 ## Current as of
 
+**Reviewed October 18, 2026.** [Pinned config, upstream code and CPU evidence](CPU-Hybrid-State-Lab.md#sources-and-execution-boundary) identify what was checked. Hardware capacity and throughput remain deployment-specific.
+
 * **Timeless:** the kernel-replacement-vs-quantization distinction, the correctness matrix (each row derived from an earlier module's specific finding), the prefix/chunk/continuation invariant, and the discipline of specifying a numerical contract before benchmarking.
 * **Checkpoint-specific:** the exact clamp values, tolerance thresholds, and boundary lengths cited in the matrix trace back to this checkpoint's configuration — re-derive them from the corresponding earlier module if you are applying this matrix to a different revision.
 

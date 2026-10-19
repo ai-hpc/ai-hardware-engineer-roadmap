@@ -8,7 +8,7 @@ That is the state of π0.5 on LIBERO. openpi publishes a π0.5 checkpoint fine-t
 
 This kind of work is also scored in public settings — for example, Bittensor subnet SN80 scores improved π0.5 checkpoints in simulation with hidden tests that move objects. The protocol below is what you need to make a claim like that credible whether or not you enter one.
 
-**Project statement.** Starting from openpi's `pi05_libero` checkpoint, produce an RL-post-trained checkpoint that **improves success on perturbed-layout LIBERO tasks by a statistically significant margin without regressing any nominal suite beyond its confidence interval**, with a reproducible config, a seed-controlled evaluation report, a before/after failure taxonomy, and a GPU-hour cost ledger.
+**Project statement.** Design and execute a pinned RL-post-training study for a supported `pi05_libero` checkpoint. Predefine a paired improvement target on held-out perturbed layouts and explicit noninferiority margins for nominal suites. Report confidence intervals for paired differences, regressions, costs, and inconclusive results. This is a hardware-dependent capstone plan: no pretrained π0.5 RL run is supplied or claimed by this checkout. Start with the executable [CPU return checks](CPU-Lab.md) and [trained action-parity bridge](../VLA%20Optimization%20and%20Action-Parity%20Harness/CPU-Action-Parity-Lab.md).
 
 The project follows an eight-step game plan, and every step uses an earlier lecture:
 
@@ -25,7 +25,7 @@ The project follows an eight-step game plan, and every step uses an earlier lect
 
 By the end you should be able to:
 
-* reproduce the published π0.5 LIBERO baseline within its confidence interval and measure its perturbed-layout gap
+* reproduce a pinned π0.5 LIBERO protocol, explain deviations from reported results, and measure a held-out perturbed-layout gap
 * build a failure taxonomy that tells you which training signal to add
 * run at least two RL post-training methods on a flow-matching VLA and compare them at an equal rollout budget
 * keep the policy close to its starting point and prove with measurements that general skills survived
@@ -57,7 +57,7 @@ This is regime C. The simulator is a CPU process. **The policy forward pass domi
 | Policy weights (bf16, ~3.3B params) | ~6.6 GB trainable | ~6.6 GB frozen + adapters (MBs) |
 | Optimizer state (AdamW, fp32 master + 2 moments) | ~40 GB | adapters only — small |
 | Gradients | ~7-13 GB | adapters only |
-| Reference policy for the KL leash | +~6.6 GB frozen copy | **free**: reference = adapters disabled |
+| Reference policy for the KL leash | +~6.6 GB frozen copy | No duplicate base only if adapters-off exactly reconstructs the intended reference; otherwise preserve its frozen adapter/state |
 | Critic | Small MLP on privileged state: negligible. A head on the VLM: shares the trunk, adds activations | same |
 | Activations | Grow with batch × (prefix tokens + chunk × denoising steps) | same, minus frozen-weight grads |
 | Rollout storage | Host RAM / disk: 2 uint8 images ≈ 0.3 MB per call, ~18 MB per 60-call episode | same |
@@ -108,21 +108,23 @@ Goal: reproduce the published `pi05_libero` numbers and wire the evaluation into
    Select a suite with `CLIENT_ARGS="--args.task-suite-name libero_10"`, and serve your own checkpoints with `SERVER_ARGS="--env LIBERO policy:checkpoint --policy.config pi05_libero --policy.dir <dir>"`. The non-Docker path runs `scripts/serve_policy.py --env LIBERO` in one terminal and `examples/libero/main.py` (Python 3.8 venv) in another.
 2. **Patch the client to log one row per episode.** The stock script logs running totals and treats a simulator exception as a failed episode. Separate the two:
 
-   ```python
-   # in examples/libero/main.py, eval_libero(): sketch of the additions
+   ```text
+   # Integration sketch: these lines belong at different places in eval_libero(), not one runnable script.
    rows = []                                   # before the task loop
-   calls, crashed, t_start = 0, False, time.perf_counter()   # at the start of each episode
-   # ... where the script calls client.infer(element): increment `calls`
+   calls, env_steps, done, crashed = 0, 0, False, False      # at the start of each episode
+   t_start = time.perf_counter()
+   # ... increment calls immediately before each client.infer request
+   # ... increment env_steps after each completed env.step (including settling no-ops)
    # ... in the except branch: set crashed = True
    rows.append(dict(policy=POLICY_TAG, suite=args.task_suite_name, task_id=task_id,
                     init_id=episode_idx, eval_seed=args.seed, success=bool(done) and not crashed,
-                    crashed=crashed, steps=t, policy_calls=calls,
+                    crashed=crashed, env_steps=env_steps, policy_calls=calls,
                     wall_s=time.perf_counter() - t_start))           # after each episode
    pd.DataFrame(rows).to_csv(out_csv, index=False)                    # after the task loop
    ```
 
    Also include the episode index in video filenames. The stock names overwrite each other per task and outcome.
-3. Run all four suites. **Gate:** each suite's Wilson 95% interval contains the published number. If not, stop and debug before training anything — image rotation, resize, state layout, normalization statistics, and package versions are the usual suspects.
+3. Run the selected suites with pinned checkpoints, adapters, preprocessing, initial states, and scorer. Compare raw outcomes and configuration against the published protocol. A published point estimate is not a known ground-truth probability, so requiring your Wilson interval to contain it is not a valid reproduction gate. Investigate discrepancies and report both sampling uncertainty and protocol differences before training.
 4. Measure throughput: per-call latency at batch 1 and at your planned batch size, calls per episode, and episodes per GPU-hour. These go into the cost model.
 
 ### 3.1 The perturbed baseline
@@ -132,7 +134,7 @@ Define three layout sources and **keep their roles separate**:
 | Source | Role | Notes |
 |---|---|---|
 | Your own perturbation generator | **Training** distribution for RL | Sample new object placements. Calling `env.reset()` without `set_init_state` gives a fresh placement from the task's BDDL regions — verify by rendering a few. Or perturb object poses in the stored states, letting them settle during the no-op steps |
-| Held-out draws from your generator (test-range seeds) | **Validation** for checkpoint selection | Never used for gradient updates |
+| Held-out development draws from your generator (validation-range seeds) | **Validation** for checkpoint selection | Never used for gradient updates |
 | LIBERO-PRO and/or LIBERO-Plus variants | **Test**: a perturbation generator you did not write | Guards against overfitting to your own generator |
 
 Run the base checkpoint on all of them. **Gate:** the nominal-to-perturbed gap is large enough to measure. With the episode counts from your `episodes_needed.md`, the CIs of the nominal and perturbed rates must not overlap. If the gap is within noise, choose harder perturbations — no improvement you make will be detectable otherwise.
@@ -180,7 +182,7 @@ $$
 A_i = R_i - \frac{1}{G}\sum_{j=1}^{G} R_j
 $$
 
-which is the per-initial-state Monte-Carlo baseline from Lecture 04. Groups where every rollout succeeds or every rollout fails give \(A_i = 0\) for all members: **zero signal, wasted rollouts.** Log their fraction, and use Lecture 12's success-rate-adaptive sampling to spend rollouts on "goldilocks" layouts.
+which is an inclusive per-initial-state group baseline from Lecture 04. Under independent rollouts it scales an unnormalized score-function gradient by `(G−1)/G`; leave-one-out baselines remove that particular bias. Here the advantages instead define weights for an explicitly different regression objective. All-success/all-failure groups have zero centered advantages, but still provide useful outcome/value evidence, and successful examples can support imitation. Log their fraction. Adaptive layout sampling changes the training distribution; retain the original evaluation distribution to assess the resulting policy.
 
 ```python
 # capstone/groups.py — advantages and the dataset for weighted flow-matching regression
@@ -188,28 +190,42 @@ import numpy as np
 
 def group_advantages(success: np.ndarray) -> tuple[np.ndarray, float]:
     """success: (num_layouts, G) in {0,1}. Returns per-rollout advantages and the zero-signal fraction."""
+    success = np.asarray(success, dtype=np.float64)
+    if success.ndim != 2 or success.shape[0] == 0 or success.shape[1] < 2:
+        raise ValueError("nonempty layout-by-group array with G >= 2 required")
+    if not np.isfinite(success).all() or not np.isin(success, (0.0, 1.0)).all():
+        raise ValueError("binary finite episode outcomes required")
     adv = success - success.mean(axis=1, keepdims=True)
     zero_signal = float(np.mean(success.std(axis=1) == 0))
     return adv, zero_signal
 
 def regression_weights(adv: np.ndarray, beta: float = 0.5, mode: str = "awr") -> np.ndarray:
-    if mode == "filtered":                       # filtered BC: keep successes from informative groups
+    adv = np.asarray(adv, dtype=np.float64)
+    if adv.size == 0 or not np.isfinite(adv).all():
+        raise ValueError("nonempty finite advantages required")
+    if mode == "filtered":  # positive-group-advantage filter; drops all-success groups too
         return (adv > 0).astype(np.float32)
+    if mode != "awr" or not np.isfinite(beta) or beta <= 0:
+        raise ValueError("mode awr/filtered and positive finite AWR temperature required")
     # Zero-signal groups (all success / all fail) have adv = 0 -> weight 1: plain self-distillation.
     # Pass a mask (or drop those episodes) if you want only informative groups to move the policy.
-    w = np.exp(adv / beta)                       # AWR-style exp(A / beta), Lecture 10
-    return np.minimum(w, 20.0).astype(np.float32)
+    # Cap the exponent before exp, so a small positive beta cannot overflow it.
+    with np.errstate(over="ignore", under="ignore"):
+        w = np.exp(np.minimum(adv / beta, np.log(20.0)))
+    return w.astype(np.float32)
 ```
 
-Train with the ordinary flow-matching loss, weighting each logged chunk by its episode's weight, mixed with a fixed fraction of the original LIBERO demonstrations. No log-probs are needed. This is the simplest correct form of "copy good tries more strongly" for a flow policy, and the same family as advantage-conditioned approaches such as Physical Intelligence's RECAP (π*0.6), which conditions the policy on an advantage indicator computed by a learned value function.
+The `filtered` branch keeps positive centered advantages, so it also drops successes from all-success groups. That is a deliberate group-relative filter. A success-only BC baseline should instead use the original `success` labels and retain all successes. Reject or skip a zero-total-weight training batch under an explicit update rule.
 
-**Gate:** perturbed-validation success improves over the SFT-augmented baseline with non-overlapping CIs, and no nominal suite regresses beyond its CI. Iterate collect → weight → fine-tune for a few rounds before moving on.
+Train with the ordinary flow-matching loss, weighting each logged chunk by its episode's weight, mixed with a fixed fraction of the original LIBERO demonstrations. No log-probs are needed. This is advantage-weighted regression, not PPO or an unbiased policy-gradient estimator. RECAP (π*0.6) instead conditions a policy on an improvement indicator derived from learned values; sharing the use of advantages does not make the two algorithms identical.
+
+**Gate:** use a prespecified paired development comparison and nominal noninferiority margins; do not infer improvement or non-regression from overlap of separate confidence intervals. Select the next iteration on development evidence, then reserve untouched test cases for the final claim.
 
 ---
 
 ## 7. Phase 4 — A critic that sees everything (step 4)
 
-The group mean is a baseline for \(s_0\) only. A **privileged critic** \(V_\phi(s_t)\) trained on exact object poses, gripper state, and task ID (Lecture 05's asymmetric actor-critic) gives per-call advantages along the episode. That shows *which* chunk caused a drop and lets one rollout score many decisions. With binary success and \(\gamma \approx 1\), \(V_\phi\) estimates the probability of success from here, so it doubles as a progress monitor for the taxonomy.
+The group mean is a baseline for \(s_0\) only. A **privileged critic** \(V_\phi(s_t)\) trained on exact object poses, gripper state, and task ID (Lecture 05's asymmetric actor-critic) gives per-call advantages along the episode. It provides temporal credit estimates for many decisions in one rollout; a critic change alone does not establish that a particular chunk caused the outcome. With only one terminal 0/1 reward and `γ=1`, the exact policy value equals success probability. With discounting it weights success by its delay, and shaping rewards or function-approximation error further change that interpretation. Calibrate any progress-monitor use separately.
 
 * Train \(V_\phi\) on Monte-Carlo returns from Phase 3 rollouts first, then TD targets. Track explained variance on held-out episodes.
 * The critic sees state, never pixels, so it costs almost nothing. The actor still sees only cameras, instruction, and proprio. **Nothing privileged may reach the policy at evaluation.**
@@ -238,11 +254,11 @@ For the full-parameter path, frameworks such as **RLinf** (π0 / π0.5 support, 
 
 RL on perturbed layouts can destroy what made π0.5 work: language following, nominal tasks, smooth motion.
 
-* **KL leash to the base policy.** Flow policies have no closed-form KL between action distributions. With noise injection, each denoising step is Gaussian, so the per-step KL to the reference is closed-form. When both share the step variance \(\sigma^2\) it reduces to \(\mathrm{KL} = \lVert \mu_\theta - \mu_{\text{ref}} \rVert^2 / (2\sigma^2)\); with learned noise (as in ReinFlow) use the general diagonal-Gaussian formula. Otherwise, penalize the squared difference between current and reference velocity predictions on the same noisy inputs, as a proxy. On the LoRA path the reference is the same network with adapters disabled.
+* **KL leash to the base policy.** Flow policies have no closed-form KL between action distributions. With noise injection, each denoising step is Gaussian, so the per-step KL to the reference is closed-form. When both share the step variance \(\sigma^2\) it reduces to \(\mathrm{KL} = \lVert \mu_\theta - \mu_{\text{ref}} \rVert^2 / (2\sigma^2)\); with learned noise (as in ReinFlow) use the general diagonal-Gaussian formula. Otherwise, penalize the squared difference between current and reference velocity predictions on the same noisy inputs, as a proxy. On the LoRA path, adapters-off is the intended reference only when the frozen base and reference adapter state match exactly. A per-step Gaussian penalty on stored chains is a conditional replay-state regularizer, not automatically the action-marginal KL.
 * **Small steps.** A low learning rate, clipped ratios, few epochs per batch, and gradient-norm clipping.
-* **A little randomness.** Keep sampling stochastic during collection. Collapse to one deterministic behavior kills group variance (more zero-signal groups) and robustness.
+* **A little randomness.** Keep sampling stochastic during collection. At identical initial conditions, identical policy/environment randomness can remove between-rollout reward variation. Deterministic deployment policies can still be robust; measure robustness rather than equating it with sampling entropy.
 * **Balanced practice.** Sample training layouts across all four suites with a floor per suite, and mix original demonstrations into every update. Easy suites must not crowd out hard ones, or the reverse.
-* **Regression tests every N iterations.** A small fixed nominal validation set per suite, plus an instruction-swap probe (same scene, a different valid instruction), since robustness studies report that VLAs often ignore language.
+* **Regression tests every N iterations.** A small fixed development set per suite, separate from the official final-evaluation initial states, plus an instruction-swap probe (same scene, a different valid instruction), since robustness studies report that VLAs often ignore language.
 
 ---
 
@@ -260,7 +276,7 @@ The final evaluation is frozen *before* the last training run:
 * ≥ 3 training seeds of the final recipe. Report per-seed results, mean, IQM, and stratified-bootstrap CIs from `eval_harness/`.
 * Per-suite and per-perturbation-type success with Wilson CIs. A paired McNemar test against the base checkpoint on identical episodes.
 * Checkpoints selected on validation layouts only; test sets touched once.
-* **Claim rule:** the perturbed-test improvement CI excludes zero, and no nominal suite regresses beyond its CI. Anything weaker is reported as "no significant difference."
+* **Claim rule:** use a design-appropriate interval for each prespecified **paired difference**. The perturbed improvement lower bound must exceed the chosen target; each nominal noninferiority lower bound must exceed its negative allowed regression margin. Account for multiple suite/variant claims. Otherwise report the measured effect and uncertainty as inconclusive or regressed, as applicable; nonsignificance and overlapping individual intervals do not prove non-regression.
 
 ---
 

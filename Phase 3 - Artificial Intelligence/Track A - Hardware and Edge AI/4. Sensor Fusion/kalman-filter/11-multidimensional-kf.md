@@ -50,8 +50,11 @@ H = np.array([[1, 0, 0, 0],
 ### Complete Implementation
 
 ```python
+import os
 import numpy as np
-import matplotlib.pyplot as plt
+
+# Save plots next to this script
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class KalmanFilter2DTracking:
     def __init__(self, dt=0.1):
@@ -60,6 +63,8 @@ class KalmanFilter2DTracking:
 
         State: [x, y, vx, vy]
         """
+        if not np.isscalar(dt) or not np.isfinite(dt) or dt <= 0:
+            raise ValueError("dt must be finite and positive")
         self.dt = dt
 
         # State transition matrix
@@ -72,7 +77,7 @@ class KalmanFilter2DTracking:
         self.H = np.array([[1, 0, 0, 0],
                           [0, 1, 0, 0]])
 
-        # Process noise covariance
+        # One random acceleration held constant per step: variance in m^2/s^4.
         q = 0.1
         self.Q = q * np.array([[dt**4/4, 0,       dt**3/2, 0      ],
                                [0,       dt**4/4, 0,       dt**3/2],
@@ -108,6 +113,11 @@ class KalmanFilter2DTracking:
         Args:
             z: [x_measured, y_measured] (2×1)
         """
+        z = np.asarray(z, dtype=float)
+        if z.shape == (2,):
+            z = z[:, None]
+        if z.shape != (2, 1) or not np.isfinite(z).all():
+            raise ValueError("z must be finite with shape (2,) or (2,1)")
         # Innovation
         y = z - self.H @ self.x
 
@@ -115,11 +125,13 @@ class KalmanFilter2DTracking:
         S = self.H @ self.P @ self.H.T + self.R
 
         # Kalman gain
-        K = self.P @ self.H.T @ np.linalg.inv(S)
+        K = np.linalg.solve(S.T, (self.P @ self.H.T).T).T
 
         # Update
         self.x = self.x + K @ y
-        self.P = (self.I - K @ self.H) @ self.P
+        a = self.I - K @ self.H
+        self.P = a @ self.P @ a.T + K @ self.R @ K.T
+        self.P = (self.P + self.P.T) / 2
 
         return self.x
 
@@ -127,11 +139,14 @@ class KalmanFilter2DTracking:
 def simulate_2d_tracking():
     """Simulate 2D object tracking"""
 
+    import matplotlib.pyplot as plt
+
+    rng = np.random.default_rng(42)
     dt = 0.1
     kf = KalmanFilter2DTracking(dt)
 
     # True trajectory (circular motion)
-    t = np.linspace(0, 10, 100)
+    t = (np.arange(100) + 1) * dt  # measurements after each predict, 0.1 ... 10.0 s
     radius = 10
     omega = 0.5
 
@@ -144,8 +159,8 @@ def simulate_2d_tracking():
 
     for i in range(len(t)):
         # Noisy measurement
-        z = np.array([[true_x[i] + np.random.normal(0, 1)],
-                     [true_y[i] + np.random.normal(0, 1)]])
+        z = np.array([[true_x[i] + rng.normal(0, 1)],
+                     [true_y[i] + rng.normal(0, 1)]])
 
         meas_x.append(z[0, 0])
         meas_y.append(z[1, 0])
@@ -168,12 +183,11 @@ def simulate_2d_tracking():
     plt.legend()
     plt.grid(True)
     plt.axis('equal')
-    plt.savefig('2d_tracking.png', dpi=150)
+    out_path = os.path.join(_SCRIPT_DIR, '2d_tracking.png')
+    plt.savefig(out_path, dpi=150)
+    print(f"Plot saved as '{out_path}'")
     plt.show()
 
-
-if __name__ == "__main__":
-    simulate_2d_tracking()
 ```
 
 ## Example 2: Constant Acceleration Model (6 States)
@@ -263,6 +277,8 @@ R_imu = np.array([[0.01]])  # IMU noise: ±0.1m/s²
 
 ### Implementation
 
+This fragment assumes a calibrated, bias-free acceleration observation in the same inertial axis as the state, with gravity already removed. A raw IMU measures specific force in its body frame and does not satisfy this observation model directly. The diagonal `Q` below is a fixed-step teaching choice with different units on its diagonal; a physical jerk-noise model requires deriving `Q(dt)`. Pass finite scalar GPS/acceleration observations at their capture times. For checked timing and replay code, use the [camera/time lab](../Camera-Time-Fusion-Lab/Guide.md).
+
 ```python
 class SensorFusionKF:
     def __init__(self, dt=0.01):
@@ -304,10 +320,11 @@ class SensorFusionKF:
 
         y = z_gps - H @ self.x
         S = H @ self.P @ H.T + R
-        K = self.P @ H.T @ np.linalg.inv(S)
+        K = np.linalg.solve(S.T, (self.P @ H.T).T).T
 
         self.x = self.x + K @ y
-        self.P = (self.I - K @ H) @ self.P
+        a = self.I - K @ H
+        self.P = a @ self.P @ a.T + K @ R @ K.T
 
     def update_imu(self, z_imu):
         """Update with IMU measurement"""
@@ -316,10 +333,11 @@ class SensorFusionKF:
 
         y = z_imu - H @ self.x
         S = H @ self.P @ H.T + R
-        K = self.P @ H.T @ np.linalg.inv(S)
+        K = np.linalg.solve(S.T, (self.P @ H.T).T).T
 
         self.x = self.x + K @ y
-        self.P = (self.I - K @ H) @ self.P
+        a = self.I - K @ H
+        self.P = a @ self.P @ a.T + K @ R @ K.T
 ```
 
 ## Example 5: Multi-Sensor Tracking

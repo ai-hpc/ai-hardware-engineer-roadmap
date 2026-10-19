@@ -1,0 +1,33 @@
+{
+  "review_date": "2026-10-18",
+  "openpilot_commit": "b1e88c2357f07dfc4e0872370b64d97ad606391b",
+  "source_version": "0.11.3",
+  "tinygrad_submodule": "02e698160eed1751738212144a7ea2cfb160b3f1",
+  "opendbc_submodule": "b3bd79a659dae961af169a3baac723961f720133",
+  "standalone_tinygrad": "0.14.0",
+  "carla_tag": "0.9.16",
+  "carla_execution": "not available; carla Python module absent",
+  "openpilot_execution": "source review only; complete stack not built/run",
+  "source_files": {
+    "system/hardware/tici/agnos.json": "82bf69fc1a7cb0a4bdd19386c7b2644eed265bfe4565f9455f63e87c942bff39",
+    "openpilot/cereal/services.py": "c9548e1612ab73bf609fee3c20313c678ea7edb0d9df1b2b93950e6d81bd8fd7",
+    "openpilot/common/realtime.py": "8679fa938aeecd513a71f249845e35bd93aa012565730f5a7e1d7c6288e6c36b",
+    "openpilot/common/version.h": "7de18e09df11f7f5e55f9d182b869d79ee07c91f3fc5a66d71eac645aa21102d",
+    "openpilot/selfdrive/modeld/modeld.py": "8eeb7065cb6d672b18d0b5062fe932c1611b3b1b882bf560e81917d79a3501f1",
+    "openpilot/selfdrive/modeld/dmonitoringmodeld.py": "d8b430e9f509b8f07183c94396b180537f43fc066b355f91f88363a6d58ca7cf",
+    "openpilot/selfdrive/car/card.py": "e09855ec8d8f6d5b34acd0a88686b90380bcbb1794726a90d237eb77f4f3dc39",
+    "openpilot/selfdrive/controls/plannerd.py": "57a99dcdcb0c3cfefdb1f3ccff33f7792957fabf4284c0ffe9287df88037aeef",
+    "openpilot/selfdrive/controls/controlsd.py": "cce4689f8942472cf89ce22dfd5a787859a76168475b00821fa547d889939914",
+    "openpilot/tools/sim/README.md": "ef4ad4138fec10d11dbc8712e90e0aa34fc469d2fcdd19a0a6ba1a2d194d81e8",
+    "openpilot/system/manager/process_config.py": "22f4e34c33034da326a2c6ca0563ea31aebfd703d3f158d290fc00b4ed177f56",
+    "openpilot/system/camerad/main.cc": "8fdb68fb9bbbd095fa81647e7663f8ca895e1f6665e8d2dd4d874c9665edaed9",
+    "openpilot/system/camerad/sensors/sensor.h": "12d39dda83696796aeb3a3d0839d284883dc771e04f0fc6895eb6c5e956c1c38",
+    "openpilot/system/camerad/cameras/nv12_info.py": "b3f39bbfdd75c43d396b01f746d460068aa8e98862217d46bf3cd426cd034e1a",
+    "openpilot/system/camerad/cameras/camera_common.h": "937ba8d7a8fe0f776d5978b222c03496dcd951140973b1dc7f4f34059665f016",
+    "openpilot/system/camerad/cameras/camera_qcom2.cc": "d7c783c4181b9a58de70ecd61612a4110d11082fdef16d7c18559d3f82f94a70",
+    "openpilot/system/hardware/tici/agnos.json": "c7aba69023cce9d01dbfc486d5e6ab2d92d7a45a0d3057d43b13844bcc789e6d",
+    "openpilot/system/hardware/comma/agnos.json": "845dfaaea83095c3e3eb80e9b3c198057f31e6fe8b4bcd9da47286591cc94a84",
+    "openpilot/cereal/messaging/tests/test_services.py": "24d424c22d53bf8042d71e4c059cbb12a307cda9e0bf99f1cf6e2ebd886c8fa6",
+    "openpilot/common/hardware/comma/agnos.json": "c581f89ea1fa16814c4f1965cb2113d2e8c628dfa88d5f210bf2f0917cad6693"
+  }
+}

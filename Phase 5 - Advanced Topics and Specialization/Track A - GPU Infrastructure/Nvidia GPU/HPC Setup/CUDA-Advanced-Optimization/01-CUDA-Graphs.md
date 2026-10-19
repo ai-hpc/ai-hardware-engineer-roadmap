@@ -1,346 +1,77 @@
-# 01 — CUDA Graphs
+# 01 — CUDA Graphs: replay work without changing its meaning
 
-## 1. The Problem: CPU Launch Overhead
+**Before:** streams, asynchronous execution, allocation lifetime and a numerical reference. **Outcome:** explain a captured dependency graph and verify that a second input really produces a second result. Use the [shared executable lab](labs/README.md).
 
-Every CUDA kernel launch involves the CPU:
+## 1. Diagnose launch overhead
 
-```
-CPU side:
-  1. Validate kernel arguments
-  2. Compute grid/block dimensions
-  3. Write launch packet to driver queue
-  4. Driver forwards to GPU command queue
-  5. CPU returns (kernel runs asynchronously)
+A host launch submits GPU work. Its duration, the time until GPU execution begins, and the GPU operation's duration are different measurements. Submission can overlap execution, so adding all API durations does not automatically give the critical-path overhead.
 
-Cost per launch: 5–20 µs
+**Hypothetical example:** 100 short operations take 2 µs each on a device, while serial host submission takes 5 µs per operation. A trace might reveal that submission limits the chain. If operations instead take 2 ms each, the same submission cost may be largely hidden. These numbers illustrate a question to measure; they are not CUDA timing guarantees.
 
-LLM decode step with 200 kernels:
-  200 × 10 µs = 2 ms wasted on launch overhead alone
+A CUDA Graph represents operations and dependencies that can be instantiated and replayed with less repeated host setup. Replay still has a cost. Graphs are useful when a repeated dependency structure and a measurable submission bottleneck justify capture and management.
 
-At batch_size=1, TTFT target = 50 ms:
-  2 ms overhead = 4% of budget — significant
-  At higher throughput: GPU waits for CPU to submit next kernel
-```
+## 2. Separate definition, instantiation and execution
 
-This is called **CPU-GPU launch gap** — the GPU sits idle between kernel launches:
+You can define a graph through explicit node APIs or stream capture. Capture records supported operations and their stream/event dependencies; it does not turn arbitrary host code into GPU code. Instantiation creates an executable graph and validates relevant requirements. Launch enqueues an execution of that graph.
 
-```
-Timeline (without CUDA Graphs):
-  CPU: [submit K1][submit K2][submit K3][submit K4]...
-  GPU:     [K1 runs][     K2 runs     ][K3][K4]
-           ↑ idle gaps between kernels ↑
+```text
+allocate stable buffers -> define/capture graph -> instantiate
+                                      |
+             update input contents -> launch -> await completion -> inspect output
+                                      ^                               |
+                                      +-------------------------------+
 ```
 
-CUDA Graphs solve this by submitting the entire operation sequence in **one shot**.
+Dependencies permit valid scheduling. Independent nodes are eligible for concurrency, but resources and scheduling determine whether they overlap. Same-stream capture preserves order; it does not automatically discover every algebraic independence in your program.
 
----
+See [CUDA Graphs](https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/cuda-graphs.html) for current capture restrictions, node types, updates and conditional execution.
 
-## 2. How CUDA Graphs Work
+## 3. Follow a complete small program
 
-CUDA Graphs have three phases:
+Open [cuda_examples.cu](labs/cuda_examples.cu). Its graph captures two operations:
 
-```
-Phase 1 — CAPTURE:
-  Run your code once in "recording" mode.
-  CUDA captures every kernel launch, memcpy, and sync event
-  into a directed acyclic graph (DAG).
-
-Phase 2 — INSTANTIATE:
-  CUDA compiles the graph into an executable object (cudaGraphExec_t).
-  Pre-allocates all resources, validates topology.
-  This takes ~10–50 ms — done once at startup.
-
-Phase 3 — REPLAY:
-  Launch the entire graph with a single API call.
-  GPU executes all operations with no further CPU involvement.
-  Cost: ~3–5 µs (just the launch, not the work).
+```text
+input -> y = 2*x + 1 -> output = max(y,0)
 ```
 
-### Graph DAG Structure
+Allocation happens before capture. Capture includes no device work that needs a host result. After instantiation, each iteration copies new input into the same allocation, launches the graph, copies output back, and synchronizes the stream before comparing with the CPU reference.
 
-```
-     [memcpy H2D]
-          │
-     [embedding kernel]
-        / \
-  [attn]  [mlp]          ← independent nodes run in parallel
-        \ /
-  [residual add]
-          │
-     [layernorm]
-          │
-     [memcpy D2H]
-```
+The harness checks two different inputs at each nonempty size. A test that replays one input repeatedly could miss a stale input or output pointer. Sizes 31/32/33 and 255/256/257 exercise boundaries; zero length is handled on the host instead of launching a zero-sized grid.
 
-Dependencies are tracked automatically — CUDA Graphs preserve exact execution order AND enable parallel execution of independent branches.
+**Worked input:** `x=[-1,0,2]` must produce `[0,1,5]`. Change only the input values and preserve allocation addresses. Then explain which graph node uses each pointer.
 
----
+The source was compiled with CUDA 13.4.92. GPU execution was unavailable during review, so this example is **compiled, not GPU-validated**. The [lab record](labs/validation.json) preserves that distinction.
 
-## 3. CUDA Graphs in C++
+## 4. Know what may change
 
-### Manual Graph Construction
+A captured launch records arguments and dependencies. Updating data in a still-live input allocation is different from replacing the allocation with another pointer. Kernel parameters and graph structure can sometimes be updated using supported graph APIs; updates have compatibility restrictions and may require re-instantiation.
 
-```cpp
-#include <cuda_runtime.h>
+“CUDA Graphs always require fixed shapes” is too broad. A particular framework capture may require stable shapes and addresses; native graphs support specified updates and control mechanisms. Read the exact runtime/framework contract rather than promoting one restriction to the entire CUDA API.
 
-cudaGraph_t     graph;
-cudaGraphExec_t graphExec;
-cudaStream_t    stream;
+**Lifetime rule:** input/output buffers must remain valid until all graph executions that use them finish. One execution's output must not be overwritten while another consumer still needs it. Graph management does not remove buffer ownership obligations.
 
-cudaStreamCreate(&stream);
+## 5. PyTorch capture is a separate integration
 
-// === PHASE 1: CAPTURE ===
-cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal);
+For `torch.cuda.CUDAGraph`, begin with evaluation mode where appropriate, inference/no-grad behavior, representative warmup, the documented stream synchronization, and long-lived inputs/outputs. A returned view of static output can be overwritten on replay; either finish consuming it before replay or make a correctly ordered copy.
 
-// All operations on `stream` are now captured, not executed
-cudaMemcpyAsync(d_input, h_input, size, cudaMemcpyHostToDevice, stream);
-embeddingKernel<<<grid, block, 0, stream>>>(d_input, d_embed, vocab_size);
-attentionKernel<<<grid, block, 0, stream>>>(d_embed, d_qkv, seq_len);
-mlpKernel<<<grid, block, 0, stream>>>(d_embed, d_out, hidden_size);
-cudaMemcpyAsync(h_output, d_out, size, cudaMemcpyDeviceToHost, stream);
+A Python branch that needs `.item()` from a CUDA tensor introduces a host dependency. Python executes during capture; its control flow is not replayed as ordinary Python. Capturable random-number operations and allocator behavior also have framework-specific rules.
 
-cudaStreamEndCapture(stream, &graph);
+`torch.compile(mode="reduce-overhead")` requests a compilation configuration that may use CUDA Graphs for eligible regions. It does not guarantee one graph for every model, fixed microsecond overhead, or a particular speedup. CPU backends and graph breaks further change the path. Consult [PyTorch CUDA Graphs](https://docs.pytorch.org/docs/stable/notes/cuda.html#cuda-graphs) and [torch.compile](https://docs.pytorch.org/docs/stable/generated/torch.compile.html).
 
-// === PHASE 2: INSTANTIATE ===
-cudaGraphInstantiate(&graphExec, graph, NULL, NULL, 0);
-cudaGraphDestroy(graph);   // can free the graph after instantiation
+## 6. Dynamic inputs need semantic checks
 
-// === PHASE 3: REPLAY (inference loop) ===
-for (int request = 0; request < num_requests; request++) {
-    // Update input data
-    update_input_buffer(h_input, request);
+Bucketing is one strategy: pad inputs to a supported bucket and reuse its graph. Padding must preserve attention masks, position IDs, cache positions, lengths and output slicing. Padding token IDs alone is not a complete decoder contract. Handle requests larger than the largest bucket explicitly.
 
-    // Launch entire pipeline with one API call
-    cudaGraphLaunch(graphExec, stream);
-    cudaStreamSynchronize(stream);
+A bucketed graph should be checked against an eager reference for short and boundary lengths, not just the bucket's maximum length. Keep per-bucket memory and warmup cost in the deployment budget.
 
-    process_output(h_output);
-}
+**Exercise:** a graph accepts length 128. For a valid input of length 93, list the 35 padded positions and explain which attention operations must ignore them. Does slicing 93 output rows after execution repair an attention computation that used the padded tokens? No; contamination already happened inside the computation.
 
-// Cleanup
-cudaGraphExecDestroy(graphExec);
-cudaStreamDestroy(stream);
-```
+## 7. Measure the comparison fairly
 
-### Graph Node API (Explicit Construction)
+Compare ordinary launches and graph replay with identical operation semantics, inputs, stream policy and timing boundary. Report capture/instantiation separately, then steady-state repetitions. Include host submission and end-to-end measurements when that is the suspected bottleneck.
 
-For more control, build the graph node-by-node without capture:
+Use a separate [Nsight Systems](https://docs.nvidia.com/nsight-systems/UserGuide/index.html) trace to inspect gaps and dependencies. Profiler overhead and tracing options affect results. Do not publish a fixed speedup table without hardware, software, shapes, sample count and raw measurements.
 
-```cpp
-cudaGraph_t graph;
-cudaGraphCreate(&graph, 0);
+**Completion:** draw the graph, explain stable allocations, pass changing-input reference checks on available hardware, and state whether the measured bottleneck changed. Without a GPU, submit the compiled artifact and predicted outputs and leave runtime correctness/performance unvalidated.
 
-// Add kernel node
-cudaGraphNode_t kernelNode;
-cudaKernelNodeParams kernelParams = {};
-kernelParams.func = (void*)myKernel;
-kernelParams.gridDim  = dim3(grid_x, grid_y);
-kernelParams.blockDim = dim3(block_x, block_y);
-kernelParams.kernelParams = args;
-
-cudaGraphAddKernelNode(&kernelNode, graph, nullptr, 0, &kernelParams);
-
-// Add memcpy node with dependency on kernel
-cudaGraphNode_t memcpyNode;
-cudaGraphAddMemcpyNode1D(&memcpyNode, graph,
-    &kernelNode, 1,      // depends on kernelNode
-    h_out, d_out, size, cudaMemcpyDeviceToHost);
-
-// Instantiate and launch as before
-```
-
----
-
-## 4. CUDA Graphs in PyTorch
-
-PyTorch wraps CUDA Graphs cleanly. Two patterns:
-
-### Pattern A: `torch.cuda.graph`
-
-```python
-import torch
-
-# Must use static (same-shape) tensors for graphs
-batch_size, seq_len, hidden = 1, 512, 4096
-static_input  = torch.zeros(batch_size, seq_len, dtype=torch.long, device="cuda")
-static_output = torch.zeros(batch_size, seq_len, hidden, device="cuda")
-
-# Warmup (fills CUDA caches, JIT compiles ops)
-s = torch.cuda.Stream()
-with torch.cuda.stream(s):
-    for _ in range(3):
-        static_output = model(static_input)
-torch.cuda.current_stream().wait_stream(s)
-
-# Capture
-g = torch.cuda.CUDAGraph()
-with torch.cuda.graph(g):
-    static_output = model(static_input)
-
-# Inference loop — GPU executes graph, no CPU kernel submissions
-def graph_inference(new_input: torch.Tensor) -> torch.Tensor:
-    static_input.copy_(new_input)   # update input in-place
-    g.replay()                       # re-execute captured graph
-    return static_output.clone()    # clone before next replay overwrites it
-```
-
-### Pattern B: `torch.compile(mode="reduce-overhead")`
-
-```python
-import torch
-
-# torch.compile automatically wraps in CUDA Graph
-model = torch.compile(model, mode="reduce-overhead")
-
-# First call: traces + captures graph (~slow)
-out = model(inputs)
-
-# Subsequent calls: replay graph (~3-5 µs overhead)
-for batch in dataloader:
-    out = model(batch)  # graph replay, fast
-```
-
-`mode="reduce-overhead"` is `mode="default"` + automatic CUDA Graph capture.
-
-### Pattern C: Bucketed Graphs for Dynamic Shapes
-
-LLM decode has variable sequence lengths — one graph per bucket:
-
-```python
-BUCKETS = [128, 256, 512, 1024, 2048, 4096]
-
-graphs      = {}
-static_ins  = {}
-static_outs = {}
-
-# Pre-capture one graph per bucket
-for seq_len in BUCKETS:
-    dummy = torch.zeros(1, seq_len, dtype=torch.long, device="cuda")
-
-    # Warmup
-    for _ in range(3):
-        model(dummy)
-    torch.cuda.synchronize()
-
-    # Capture
-    g = torch.cuda.CUDAGraph()
-    s_in  = dummy.clone()
-    s_out = torch.zeros(1, seq_len, model.config.vocab_size, device="cuda")
-    with torch.cuda.graph(g):
-        s_out = model(s_in)
-
-    graphs[seq_len]      = g
-    static_ins[seq_len]  = s_in
-    static_outs[seq_len] = s_out
-
-def bucketed_decode(input_ids: torch.Tensor) -> torch.Tensor:
-    L = input_ids.shape[1]
-    bucket = next(b for b in BUCKETS if b >= L)
-    # Pad to bucket size
-    padded = torch.nn.functional.pad(input_ids, (0, bucket - L))
-    static_ins[bucket].copy_(padded)
-    graphs[bucket].replay()
-    return static_outs[bucket][:, :L, :].clone()
-```
-
----
-
-## 5. CUDA Graph Constraints and Limitations
-
-```
-Works well with:
-  ✓ Fixed shapes (same tensor sizes every call)
-  ✓ Repeated inference (same model, many requests)
-  ✓ Training with fixed batch size and sequence length
-  ✓ Physics simulation time steps
-
-Does NOT work with:
-  ✗ Dynamic control flow (Python if/else based on tensor values)
-  ✗ Variable-length inputs without bucketing
-  ✗ Operations that allocate new memory each call
-  ✗ CPU-GPU synchronization points inside the graph
-  ✗ Python callbacks inside the capture region
-
-Common pitfall:
-  # WRONG — Python branching based on GPU tensor value breaks graph
-  if output.argmax() == stop_token:   # requires D2H sync, breaks capture
-      break
-
-  # CORRECT — implement stopping criteria outside the graph replay loop
-  g.replay()
-  next_token = static_output.argmax(dim=-1)   # D2H after replay
-  if next_token.item() == stop_token:
-      break
-```
-
----
-
-## 6. CUDA Graph Updates (Without Re-capture)
-
-From CUDA 11.1+, you can update parts of a graph without full re-capture:
-
-```cpp
-// Update kernel parameters in existing graph
-cudaGraphExecKernelNodeSetParams(graphExec, kernelNode, &newParams);
-
-// Update memcpy source/destination
-cudaGraphExecMemcpyNodeSetParams(graphExec, memcpyNode, &newMemcpyParams);
-
-// Re-upload to GPU (fast, ~100 µs)
-cudaGraphUpload(graphExec, stream);
-```
-
-Useful when only tensor contents change (not shapes) — avoids full re-instantiation.
-
----
-
-## 7. Profiling CUDA Graphs
-
-```bash
-# CUDA Graphs appear as "CUDA Graph" events in Nsight Systems
-nsys profile \
-    --trace=cuda,nvtx \
-    --gpu-metrics-device=all \
-    python inference.py
-
-# In Nsight Systems GUI:
-# - CUDA Graph launches appear as a single block
-# - Expand to see individual node executions inside the graph
-# - Compare: kernel-by-kernel vs graph — look for removed launch gaps
-```
-
-```python
-# Mark graph capture and replay with NVTX for visibility
-import torch.cuda.nvtx as nvtx
-
-with nvtx.range("graph_capture"):
-    g = torch.cuda.CUDAGraph()
-    with torch.cuda.graph(g):
-        out = model(inp)
-
-for i in range(N):
-    with nvtx.range(f"graph_replay_{i}"):
-        g.replay()
-```
-
----
-
-## 8. Expected Performance Gains
-
-| Workload | Without Graphs | With Graphs | Speedup |
-|---|---|---|---|
-| Llama-3 8B, BS=1, seq=512 | ~45 ms | ~32 ms | 1.4× |
-| ResNet-50, BS=1 | ~3.2 ms | ~1.8 ms | 1.8× |
-| BERT-large, BS=1 | ~12 ms | ~8 ms | 1.5× |
-| Training step (fixed BS) | ~820 ms | ~780 ms | 1.05× |
-
-Graphs have the largest impact at **batch_size=1** (pure latency mode) where kernel launch overhead is a large fraction of total time. At large batch sizes, kernel launch overhead is amortized over more work.
-
----
-
-## References
-
-- [CUDA Graphs Programming Guide](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#cuda-graphs)
-- [PyTorch CUDA Graph Tutorial](https://pytorch.org/docs/stable/notes/cuda.html#cuda-graphs)
-- [TensorRT-LLM CUDA Graph Usage](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/architecture/cuda-graph.md)
-- [Nsight Systems CUDA Graph Analysis](https://docs.nvidia.com/nsight-systems/UserGuide/index.html)
+**Next:** [cooperative groups](02-Cooperative-Groups.md).

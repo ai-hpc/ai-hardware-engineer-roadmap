@@ -2,6 +2,8 @@
 
 This is the evidence map for [Lectures 25–30](Lecture-25.md). Use it to choose an executable study and to distinguish a research claim from an available artifact. **All rows were checked on 2026-10-13; the cutoff is that date, not 2026-10-31.** This selected register is not an exhaustive literature census or a universal model ranking.
 
+**Later review:** the [October 18 update](Current-Update-2026-10-18.md) adds the Pi API beta, pins inspected source interfaces, clarifies GR00T code/weight terms, and records the live RoboCasa page's October 16 update. The historical rows below retain their original review scope.
+
 Dates below identify their event: paper submission, announcement, code release, or revision. A moving repository is an access observation, not a reproducibility pin. Before executing a lab, resolve and record its exact code commit, model revision/hash, dataset revision, configuration, normalizer, runtime, and applicable artifact licenses. No full-model benchmark or hardware reproduction was performed for this register.
 
 ## Physical Intelligence and NVIDIA

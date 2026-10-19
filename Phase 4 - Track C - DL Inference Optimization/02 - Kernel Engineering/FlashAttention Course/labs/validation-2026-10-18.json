@@ -1,0 +1,79 @@
+{
+  "checked_utc": "2026-10-18T22:37:48.777833+00:00",
+  "environment": {
+    "python": "3.12.3",
+    "torch": "2.14.0+cpu",
+    "numpy": "2.3.5",
+    "cuda_available": false,
+    "cuda_build": null
+  },
+  "checks": [
+    {
+      "name": "portable",
+      "command": [
+        "/usr/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/labs",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "test_cache_counts_both_k_and_v (test_attention_contract.Contracts.test_cache_counts_both_k_and_v) ... ok\ntest_fixed_tile_traffic_is_not_linear_in_sequence (test_attention_contract.Contracts.test_fixed_tile_traffic_is_not_linear_in_sequence) ... ok\ntest_invalid_contracts_rejected (test_attention_contract.Contracts.test_invalid_contracts_rejected) ... ok\ntest_page_mapping_and_partial_last_page (test_attention_contract.Contracts.test_page_mapping_and_partial_last_page) ... ok\ntest_rectangular_alignment_is_semantic (test_attention_contract.Contracts.test_rectangular_alignment_is_semantic) ... ok\ntest_square_alignment_agrees (test_attention_contract.Contracts.test_square_alignment_agrees) ... ok\ntest_tail_counts_actual_elements_and_column_tile_not_an_io_free_pass (test_attention_contract.Contracts.test_tail_counts_actual_elements_and_column_tile_not_an_io_free_pass) ... ok\n\n----------------------------------------------------------------------\nRan 7 tests in 0.000s\n\nOK\n"
+    },
+    {
+      "name": "optional",
+      "command": [
+        "/tmp/course-pytorch-cpu-venv/bin/python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/labs/optional",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "test_backward_finite_difference (test_attention_numpy.NumpyAttention.test_backward_finite_difference) ... ok\ntest_empty_rows_and_all_masked_blocks_have_declared_result (test_attention_numpy.NumpyAttention.test_empty_rows_and_all_masked_blocks_have_declared_result) ... ok\ntest_incremental_rope_keeps_absolute_position (test_attention_numpy.NumpyAttention.test_incremental_rope_keeps_absolute_position) ... ok\ntest_invalid_mask_and_nonfinite_input_rejected (test_attention_numpy.NumpyAttention.test_invalid_mask_and_nonfinite_input_rejected) ... ok\ntest_large_max_change_requires_rescaling (test_attention_numpy.NumpyAttention.test_large_max_change_requires_rescaling) ... ok\ntest_tails_and_masked_tiles_match_dense (test_attention_numpy.NumpyAttention.test_tails_and_masked_tiles_match_dense) ... ok\ntest_zero_scale_is_supported_and_not_replaced_by_default (test_attention_numpy.NumpyAttention.test_zero_scale_is_supported_and_not_replaced_by_default) ... ok\ntest_actual_math_forward_and_gradients_match_numpy (test_torch_sdpa.TorchAttention.test_actual_math_forward_and_gradients_match_numpy) ... ok\ntest_bf16_error_separates_input_quantization_and_computation (test_torch_sdpa.TorchAttention.test_bf16_error_separates_input_quantization_and_computation) ... ok\ntest_dropout_is_not_disabled_by_inference_mode (test_torch_sdpa.TorchAttention.test_dropout_is_not_disabled_by_inference_mode) ... ok\ntest_fully_masked_rows_are_zero_and_gradients_finite (test_torch_sdpa.TorchAttention.test_fully_masked_rows_are_zero_and_gradients_finite) ... ok\ntest_gqa_matches_explicit_head_repetition (test_torch_sdpa.TorchAttention.test_gqa_matches_explicit_head_repetition) ... ok\ntest_noncontiguous_last_dimension_and_zero_scale (test_torch_sdpa.TorchAttention.test_noncontiguous_last_dimension_and_zero_scale) ... ok\ntest_sdpa_is_causal_is_upper_left_for_rectangular_inputs (test_torch_sdpa.TorchAttention.test_sdpa_is_causal_is_upper_left_for_rectangular_inputs) ... ok\n\n----------------------------------------------------------------------\nRan 14 tests in 0.683s\n\nOK\n"
+    },
+    {
+      "name": "expected no-CUDA guard",
+      "command": [
+        "/tmp/course-pytorch-cpu-venv/bin/python",
+        "Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/labs/sdpa_experiment.py",
+        "--device",
+        "cuda",
+        "--backend",
+        "flash",
+        "--dtype",
+        "bfloat16"
+      ],
+      "exit_code": 2,
+      "expected_exit_code": 2,
+      "stdout": "",
+      "stderr": "usage: sdpa_experiment.py [-h] [--device {cpu,cuda}]\n                          [--backend {math,flash,efficient,cudnn}]\n                          [--dtype {float64,float32,float16,bfloat16}]\n                          [--q-len Q_LEN] [--kv-len KV_LEN] [--dim DIM]\n                          [--heads HEADS]\n                          [--alignment {none,upper_left,lower_right}]\n                          [--repeats REPEATS]\nsdpa_experiment.py: error: CUDA unavailable; no GPU result produced\n"
+    }
+  ],
+  "sha256": {
+    "attention_contract.py": "ce12ebcf547679362d1aa4a15dc94c64f2f2caaadaf292ef859813ed58f82e80",
+    "attention_reference.py": "f272248d8c27f02d4fb90a97db8ff73480e877032bda95ea16c2c3e959e46895",
+    "optional/test_attention_numpy.py": "0f45af5f452463a7cae16f8f60a58763525794cbdb1f70dd385d69bc031f3de8",
+    "optional/test_torch_sdpa.py": "d20c9610f4ce168d75ff12c7ef8cd6ed3f4bfc6aa56e9821be8501e1f85fc7f6",
+    "requirements-linux-cpu-py312.txt": "528708dce28837ea3d224b9f969569a4ec125c99ebabfa192a5aaba8e2caa13d",
+    "sdpa_experiment.py": "5a1f870fad040c04dc0320033e259d25219d8d2afe0b0e23c247d07828f1dcc9",
+    "test_attention_contract.py": "0d01c25ce56aa4429cb0aacd6161d1f90379e8d9b967dfe26bfd0e169019f0bc"
+  },
+  "not_executed": [
+    "Dao-AILab FA2, FA3, FA4 GPU packages",
+    "CUDA SDPA execution",
+    "Nsight profiling",
+    "model training/serving throughput or quality"
+  ],
+  "scope": "Actual CPU fixtures; logical traffic estimates are not hardware bandwidth measurements."
+}

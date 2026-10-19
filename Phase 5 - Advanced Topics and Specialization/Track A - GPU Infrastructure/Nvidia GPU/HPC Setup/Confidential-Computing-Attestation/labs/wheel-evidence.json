@@ -1,0 +1,21 @@
+{
+  "python": "3.12",
+  "platform": "Linux x86_64",
+  "wheels": [
+    {
+      "filename": "cffi-2.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+      "bytes": 219572,
+      "sha256": "3e17ed538242334bf70832644a32a7aae3d83b57567f9fd60a26257e992b79ba"
+    },
+    {
+      "filename": "cryptography-46.0.5-cp311-abi3-manylinux_2_34_x86_64.whl",
+      "bytes": 4456482,
+      "sha256": "4c3341037c136030cb46e4b1e17b7418ea4cbd9dd207e4a6f3b2b24e0d4ac731"
+    },
+    {
+      "filename": "pycparser-2.23-py3-none-any.whl",
+      "bytes": 118140,
+      "sha256": "e5c6e8d3fbad53479cab09ac03729e0a9faf2bee3db8208a550daf5af81a5934"
+    }
+  ]
+}

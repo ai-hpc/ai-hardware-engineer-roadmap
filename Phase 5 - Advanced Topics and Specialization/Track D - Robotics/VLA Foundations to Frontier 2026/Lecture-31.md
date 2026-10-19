@@ -52,6 +52,8 @@ Choose a change that tests a new hypothesis, not merely more epochs. Possibiliti
 
 If two same-color objects appear, a color centroid lies between them. The baseline cannot implement “reach the left red object” because it has discarded the information needed to distinguish them. More training on its nine logits cannot recover information removed by the encoder. This is an architectural limitation, not an optimizer bug.
 
+For an already implemented closed-loop starting point, use the [Phase 3 trained CPU policy](../../../Phase%203%20-%20Artificial%20Intelligence/0.%20AI%20and%20Robot%20Learning%20Foundations/Lab-01-CPU-Policy.md), its [timed execution experiment](../../../Phase%203%20-%20Artificial%20Intelligence/0.%20AI%20and%20Robot%20Learning%20Foundations/Lab-02-Timed-Robot-Loop.md), and the [action-parity bridge](../VLA%20Optimization%20and%20Action-Parity%20Harness/CPU-Action-Parity-Lab.md). They share one small trained state policy; this lecture's nine-logit image/language model is a different model and task. Connecting the two requires an explicit observation/action adapter and a new evaluation, not simply comparing their scores.
+
 For a closed-loop point robot extension, define dynamics, action clipping, termination, and an observation model. Recompute observations after each action. Compare one-shot target error with completion under disturbed dynamics. Keep this explicitly synthetic; it is an educational control environment, not an Isaac result.
 
 The extension report should include a hypothesis, baseline, changed representation or mechanism, held-out fixture generation, negative control, and failure interpretation. A failed hypothesis with correct evidence earns more credit than an unsupported success claim.

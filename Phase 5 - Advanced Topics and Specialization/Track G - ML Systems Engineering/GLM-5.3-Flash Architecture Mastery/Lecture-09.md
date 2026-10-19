@@ -47,7 +47,7 @@ For a nominal 320B parameters, uniform-precision lower bounds:
    NVFP4, real (0.5625 bytes/param)  :  320e9 × 0.5625  =  180 GB  =  167.64 GiB
 ```
 
-**Cross-check against the reported deployment.** The `sparkinfer-frontier` repository reports approximately **185 GiB of model data**, with a reported residency of **24.8 GB per GPU** across 8 GPUs. Two consistency checks, both worth running on any reported figure before trusting it:
+**Cross-check against the reported deployment.** The [SparkInfer Frontier README at revision `58ca63a`](https://github.com/gittensor-ai-lab/sparkinfer-frontier/blob/58ca63a416bcc866dbf8b8a2605643a51a5b221a/README.md) reports approximately **185 GiB of model data**, with a reported residency of **24.8 GB per GPU** across 8 GPUs. Two consistency checks, both worth running on any reported figure before trusting it:
 
 ```text
    uniformity check:   185 GiB / 8  =  23.125 GiB/GPU  =  24.83 GB/GPU
@@ -56,7 +56,7 @@ For a nominal 320B parameters, uniform-precision lower bounds:
 
    format check:       185 GiB reported  ÷  167.64 GiB pure-NVFP4 floor
                        =  1.104×   (a 10.4% overhead)
-                       ✓ plausible: block-scale metadata plus embeddings/LM-head/
+                       ✓ plausible: extra tensor scales, padding and embeddings/LM-head/
                          selected attention tensors kept at a higher precision
                          than the bulk NVFP4 body
 ```
@@ -138,7 +138,7 @@ The single most damaging mistake in building this budget is assuming uniform ten
    WRONG:   M_cache,per-GPU  =  M_cache,logical / 8
 ```
 
-**Why this fails specifically for MLA.** Conventional head-parallel tensor parallelism shards *heads* across GPUs — each GPU owns a subset of attention heads and only needs the K/V data for *its* heads. But MLA's entire memory advantage ([Module 05 §2](Lecture-05.md)) comes from caching one **shared latent** `c_t` that every head's key and value get reconstructed *from* — the latent is not head-specific. A head-parallel scheme that shards heads across 8 GPUs can require **every participating GPU to hold the full shared latent representation**, because any GPU might need to reconstruct any head's key/value from it, depending on how the attention computation is partitioned. This replication requirement for tensor-parallel latent attention is exactly the problem documented in the literature on this specific scaling pattern — it is not a hypothetical edge case, it is the default behavior of a naive head-parallel MLA implementation.
+**Why this fails specifically for MLA.** Conventional head-parallel tensor parallelism shards *heads* across GPUs — each GPU owns a subset of attention heads and only needs the K/V data for *its* heads. But MLA's entire memory advantage ([Module 05 §2](Lecture-05.md)) comes from caching one **shared latent** `c_t` that every head's key and value get reconstructed *from* — the latent is not head-specific. A head-parallel scheme that shards heads across 8 GPUs can require **every participating GPU to hold the full shared latent representation**, because each GPU's own heads need all coordinates of the shared latent. A GPU does not need to own every head for replication to occur. This replication requirement for tensor-parallel latent attention is exactly the problem documented in the literature on this specific scaling pattern — it is not a hypothetical edge case, it is the default behavior of a naive head-parallel MLA implementation.
 
 ```text
    weights            →  genuinely shardable — each GPU holds a DISJOINT slice
@@ -178,7 +178,7 @@ The single most damaging mistake in building this budget is assuming uniform ten
 | `M_indexer` | request-dependent — the DSA selection metadata from [Module 06](Lecture-06.md), scaled by concurrent requests | Module 06 |
 | `M_workspace` | transient — attention/FFN intermediate buffers, freed after use | — |
 | `M_graphs` | fixed overhead if using CUDA graph capture for decode | — |
-| `M_allocator` | fixed overhead — fragmentation, reserved blocks | — |
+| `M_allocator` | workload-dependent reserved blocks and fragmentation; distinguish used from reserved bytes | — |
 
 ```text
    ┌────────────────────────────────────────────────────────────────┐
@@ -190,18 +190,33 @@ The single most damaging mistake in building this budget is assuming uniform ten
    └────────────────────────────────────────────────────────────────┘
 ```
 
-### Worked example: feasibility at 1M context, this deployment
+### Worked example: one request at 1M context
+
+Use one request consistently in every term. Assume 23.125 GiB of local weights,
+FP32 head-sharded KDA state, BF16 replicated MLA latents, and TP=8:
 
 ```text
-   per-GPU weights (from §1's cross-check)         ≈  23.1 GiB
-   MLA cache at 1M context, IF REPLICATED (§4)      =  11.0 GiB   ← on EVERY GPU, not ÷8
-   KDA state, 100 concurrent requests (§2)          ≈   1.7 GiB
-   indexer + workspace + graphs + allocator         ≈   (measure — don't guess)
-   ─────────────────────────────────────────────────────────────
-   running total, before workspace/indexer          ≈  35.8 GiB   >  32 GiB card capacity
+local weights                         23.125000 GiB
+MLA for one 1,048,576-token request    11.000000 GiB
+KDA for that same request               0.016602 GiB  (17 MiB)
+subtotal                              34.141602 GiB
 ```
 
-That single arithmetic line is the entire point of this module: **a naive "divide the MLA cache by 8" version of this budget would have shown comfortable headroom** (11 GiB ÷ 8 ≈ 1.4 GiB, leaving the running total near 26.2 GiB). The correct, unreplicated accounting shows the deployment is **already over budget on a 32 GB card before workspace, indexer overhead, or a second concurrent request's worth of KDA state are even counted.** Whether your actual runtime replicates the MLA cache this way is an empirical question about its specific tensor-parallel implementation — but the direction of the error if you guess wrong is always the same: naive division makes an infeasible deployment look feasible, never the reverse.
+This already exceeds even a hypothetical 32 GiB usable budget before convolution,
+indexer, workspace and allocator reserves. Read actual device capacity and current
+free bytes when testing a card advertised as 32 GB; do not silently mix GB/GiB or
+assume every installed byte is available to this process.
+
+For **two** requests of that length, both cache terms double: the subtotal is
+45.158203 GiB. For **100** such requests, the MLA term alone is 1,100 GiB per GPU
+under the stated replication assumption. Multiplying KDA concurrency while keeping
+MLA at one request produces an inconsistent budget.
+
+The [CPU lab's ledger](CPU-Hybrid-State-Lab.md) reproduces these byte counts. Its
+assumptions are explicit: a runtime may shard context, quantize the latent cache,
+offload weights or choose a different storage layout. Check that implementation
+before applying this ledger. Assuming sharding when a buffer replicates
+underestimates memory; assuming replication when it shards overestimates it.
 
 ---
 
@@ -213,7 +228,7 @@ You should now be able to:
 2. Compute the KDA state budget for a stated concurrency and the MLA cache for a stated context length.
 3. State exactly why MLA's shared latent breaks the naive tensor-parallel `÷8` assumption that weights satisfy.
 4. Build a complete per-GPU memory equation and correctly classify each term.
-5. Explain why guessing "replicated" versus "sharded" wrong always fails in the same direction (understating usage), never the other.
+5. Explain the direction of error when replication is mistaken for sharding, and when sharding is mistaken for replication.
 
 ---
 
@@ -224,6 +239,8 @@ This is **Stage 7 of the [capstone ladder](Lecture-12.md)**: build the full per-
 ---
 
 ## Current as of
+
+**Reviewed October 18, 2026.** [Pinned config, upstream code and CPU evidence](CPU-Hybrid-State-Lab.md#sources-and-execution-boundary) identify what was checked. Hardware capacity and throughput remain deployment-specific.
 
 * **Timeless:** the sharded-vs-replicated classification discipline, and the specific tensor-parallel latent-attention replication trap in §4.
 * **Checkpoint-and-deployment-specific:** the 320B/18B parameter split ([Module 01](Lecture-01.md)), the 34-KDA/11-MLA layer split, and the `sparkinfer-frontier` 185 GiB / 24.8 GB-per-GPU figures are cited from the checkpoint configuration and the named repository respectively — re-verify both against current sources before relying on them for a capacity decision, and always re-derive whether your specific runtime replicates or shards the MLA cache rather than assuming either.

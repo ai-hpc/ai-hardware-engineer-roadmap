@@ -44,7 +44,7 @@ without_skill
 
 Then a **judge model** grades both outputs against expected behavior and assertions.
 
-That gives you **evidence-backed pass/fail** rather than subjective prompt review.
+This produces a recorded **judge assessment**. It becomes useful evidence only after checking the judge against task-specific labels and deterministic assertions; a judge verdict is not ground truth.
 
 ---
 
@@ -150,12 +150,14 @@ The eval needs to **measure the delta**.
 
 ## 3. Quickstart
 
-Run directly with `npx`:
+The [source revision f10ae2b3](https://github.com/darkrishabh/agent-skills-eval/tree/f10ae2b3c93055cadd82c02a3b7fe4cfbd9a4645) declares package version **0.1.1**. The following is a source-checked optional live-API template, not a run performed for this course. Set accessible target/judge models and credentials in your environment, understand the provider charges, and pin the package. For account-free protocol practice, use the [provider contract lab](Provider-Contract-Lab.md).
+
+Run the pinned CLI:
 
 ```bash
-npx agent-skills-eval ./skills \
-  --target gpt-4o-mini \
-  --judge gpt-4o-mini \
+npx --yes agent-skills-eval@0.1.1 ./skills \
+  --target "${EVAL_TARGET_MODEL:?Set an accessible target model}" \
+  --judge "${EVAL_JUDGE_MODEL:?Set an accessible judge model}" \
   --baseline \
   --strict
 ```
@@ -303,7 +305,7 @@ LLM judges can:
 
 Mitigations:
 
-- keep judge temperature at `0`
+- use supported sampling controls and record them; zero temperature is not universal or deterministic
 - use explicit assertions
 - add deterministic checks where possible
 - review failures and unexpected passes manually
@@ -366,8 +368,8 @@ For repeated runs, use a config file:
 root: ./skills
 workspace: ./agent-skills-workspace
 baseline: true
-target: gpt-4o-mini
-judge: gpt-4o-mini
+target: your-supported-target-model
+judge: your-supported-judge-model
 baseUrl: https://api.openai.com/v1
 apiKeyEnv: OPENAI_API_KEY
 include:
@@ -380,16 +382,14 @@ strict: true
 report:
   enabled: true
   title: Agent Skills Report
-targetParams:
-  temperature: 0
-judgeParams:
-  temperature: 0
+# Add targetParams/judgeParams only when supported by the selected models.
 ```
 
 Run:
 
 ```bash
-OPENAI_API_KEY=... npx agent-skills-eval --config agent-skills-eval.yaml
+# Configure OPENAI_API_KEY securely in your shell first.
+npx --yes agent-skills-eval@0.1.1 --config agent-skills-eval.yaml
 ```
 
 In CI, do **not rely only on console output**.
@@ -523,7 +523,7 @@ Repeated runs disagree.
 
 Fix:
 
-- lower temperature
+- test supported model controls rather than assuming lower temperature fixes grading
 - sharpen assertions
 - add deterministic checks
 - use a stronger judge
@@ -596,9 +596,9 @@ agent-skills-eval.yaml
 Run:
 
 ```bash
-npx agent-skills-eval ./skills \
-  --target gpt-4o-mini \
-  --judge gpt-4o-mini \
+npx --yes agent-skills-eval@0.1.1 ./skills \
+  --target "${EVAL_TARGET_MODEL:?Set an accessible target model}" \
+  --judge "${EVAL_JUDGE_MODEL:?Set an accessible judge model}" \
   --baseline \
   --strict
 ```
@@ -622,6 +622,14 @@ If the skill does **not beat baseline**, do not ship it as-is.
 Either **improve the skill** or admit the skill is unnecessary.
 
 ---
+
+## Paired evaluation and honest uncertainty
+
+Freeze development and held-out task splits before tuning the skill. Repeat both conditions on the same task population, randomize their order, retain every failure and record model/tool/corpus versions. Blind the judge to which condition produced an answer when possible. Use exact tool/action checks for protocol claims, and calibrate a model judge on independently labeled examples.
+
+**Worked example:** across 20 paired tasks, both pass on 12, only the skill passes on 4, only baseline passes on 2, and both fail on 2. Skill pass rate is 16/20 = 80%; baseline is 14/20 = 70%; the observed paired improvement is 10 percentage points. The discordant pairs are only 4 versus 2, so this small sample is weak evidence of a general improvement. Report the counts and uncertainty; do not advertise “10% better” as a universal property. Also compare total calls, latency and cost including judge calls.
+
+Retrying only failed cases and reporting the best result changes the metric. Keep all trials and declare the revision/retry policy in advance. A skill might be useful for a rare critical capability even if an easy aggregate benchmark shows no mean gain; test that capability explicitly instead of declaring all zero-lift skills useless.
 
 ## Key takeaways
 

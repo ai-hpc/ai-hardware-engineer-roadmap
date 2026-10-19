@@ -30,6 +30,10 @@ Start with correctness and a message-size sweep, then inspect topology and algor
 - **Building multi-node cluster?** → [05-Multi-Node-Clusters](./05-Multi-Node-Clusters.md)
 - **Training 70B+ models?** → [07-Trillion-Parameter-Scale](./07-Trillion-Parameter-Scale.md)
 
+## Start on a CPU
+
+Run the [two-process collectives and DDP lab](CPU-Collectives-Lab/Guide.md): test SUM/AllGather, catch an incompatible shape, and compare unequal-batch gradients with a serial reference before using a GPU cluster.
+
 ## Practice and assessment
 
 **Entry diagnostic (prerequisite check):** Explain rank, communicator, collective semantics, and the physical link path. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.

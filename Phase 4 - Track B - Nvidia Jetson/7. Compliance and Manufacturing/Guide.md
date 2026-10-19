@@ -1,452 +1,119 @@
-# Compliance and Manufacturing
+# Manufacturing and compliance: make each result traceable
 
-<div class="course-identity compliance" markdown="1">
-<div class="course-identity__icon">MFG</div>
-<div markdown="1">
-<p class="course-identity__eyebrow">Track B7 · Compliance & Manufacturing</p>
-<p class="course-identity__title">Prepare embedded AI hardware for certification, test fixtures, production, and field reliability.</p>
-<p class="course-identity__meta">Artifact: manufacturing readiness pack · Measure: test coverage, yield risks, compliance gaps</p>
-</div>
-</div>
+**Outcome:** produce a manufacturing-readiness pack that links product configuration, applicable requirements, fixture qualification, per-unit measurements, software identity and field support. **Pace:** five 60–90-minute sessions. Start with the [SQLite factory-record lab](labs/README.md), which runs on a CPU with Python's standard library.
 
+A board that boots is an engineering observation. A shippable product also needs a repeatable build, defined acceptance limits, applicable conformity evidence and a way to identify and support the exact units shipped. This module teaches how those records fit together.
 
-**Phase 4 — Track B — Nvidia Jetson** · Module 7 of 7
+**Regulatory snapshot reviewed 18 October 2026.** Applicability depends on intended use, markets, power, radios and product category. Use the official sources below to build a product-specific requirements register with the responsible compliance specialist/laboratory. This chapter is an engineering planning exercise, not a certification decision for an unspecified product.
 
-> **Focus:** Take a validated **Jetson Orin Nano 8GB** product from engineering prototype through **regulatory certification** (FCC/CE/IC), **DFM review**, **production flashing infrastructure**, **supply-chain management**, and **fleet operations** — the last mile before volume shipping and field sustaining.
->
-> **Primary hardware:** Jetson Orin Nano 8GB on custom carrier (from Module 2)
+## 1. Define the configuration being qualified
 
-**Previous:** [6. Security and OTA](../6.%20Security%20and%20OTA/Guide.md)
+Freeze a configuration identity for each qualification run: module SKU/revision, carrier revision, BOM variants, enclosure, cables, power supply, radios/antennas, firmware, kernel, application/model and relevant operating modes. A test report for a bare board with one cable does not automatically cover a different enclosure and cable harness.
 
----
+Separate design qualification from production screening. Qualification investigates the product's specified operating range and failure behavior. Production screening checks each manufactured unit for defined defects using an efficient fixture. A one-frame camera test can detect a disconnected cable; it does not establish long-term frame integrity, EMC robustness or perception quality.
 
+For a robot, include sensor calibration identity and controller/actuator configuration. A valid AI model paired with the wrong camera transform or action units is a different system from the evaluated one.
 
-## 1. The last mile — why this module exists
+## 2. Build a requirements register, not a universal badge list
 
-Engineering prototypes work on the bench. Shipping products must also be:
+Use one row per requirement with its source/revision, applicability rationale, evidence owner, tested configuration and status. “Not applicable” needs a reason; an empty cell is not evidence.
 
-- **Legal** — pass regulatory testing (FCC, CE) before you can sell
-- **Manufacturable** — a contract manufacturer can build them repeatably at scale
-- **Supportable** — you can update, monitor, and repair devices in the field
+| Topic | Questions for the product-specific review |
+| --- | --- |
+| US equipment authorization | Which Part 2/15 route applies, including SDoC/certification and any intentional-radio conditions? |
+| EU conformity/CE | Which product legislation applies, what assessment route is required, and which technical documentation/declarations are needed? |
+| Radio integration | Are antenna, enclosure, simultaneous-transmission and host integration conditions satisfied? |
+| Electrical/mechanical safety | Which use environment, supply, accessible energy and product-category requirements apply? |
+| Materials/end-of-life | Which substance restrictions, labeling and producer obligations apply in each market? |
+| Product cybersecurity | Which lifecycle, vulnerability handling, reporting and update duties apply? |
+| Robot application | Does the intended machinery, industrial, vehicle, medical or other use introduce additional requirements? |
 
-This module covers everything between "board works" and "product in customer hands."
+FCC equipment authorization includes SDoC and certification procedures; they are not interchangeable names for one “FCC certificate.” A transmitter module's grant and integration conditions also do not automatically authorize every completed host configuration. Use the [FCC equipment-authorization guidance database](https://apps.fcc.gov/oetcf/kdb/index.cfm) and [module-integration guidance](https://apps.fcc.gov/oetcf/kdb/forms/FTSSearchResultPage.cfm?id=44637&switch=P).
 
----
+CE marking expresses conformity with applicable EU legislation; it is not a single test purchased from a laboratory. Not every electronic item has the same assessment route or set of directives. Retain the applicable technical documentation and declaration for the actual product. [European Commission CE guidance](https://single-market-economy.ec.europa.eu/single-market/goods/ce-marking_en).
 
-## 2. Regulatory landscape for Jetson products
+Do not state that UKCA universally replaced CE in Great Britain. Current UK guidance continues to recognize CE for covered product regulations, with sector-specific rules; Northern Ireland has a different framework. Record the exact market and applicable product regime. [UK government guidance](https://www.gov.uk/guidance/placing-ukca-or-ce-marked-products-on-the-market-in-great-britain).
 
-### What applies to your product
+## 3. Include current cybersecurity obligations
 
-| Regulation | Region | Applies when |
-|-----------|--------|-------------|
-| **FCC Part 15 Subpart B** | USA | Any digital device marketed in the US |
-| **CE (EMC Directive)** | EU | Any electronic product sold in the EU |
-| **IC (ISED)** | Canada | Any digital device marketed in Canada |
-| **UKCA** | UK | Post-Brexit equivalent of CE |
-| **RCM** | Australia/NZ | Any electrical product sold in AU/NZ |
-| **MIC / VCCI** | Japan | Any digital device marketed in Japan |
+The EU Cyber Resilience Act's reporting obligations began on **11 September 2026**; its main obligations apply from **11 December 2027**. The Commission published implementation guidance in July 2026. These dates matter to a course reviewed in October 2026: reporting readiness is not solely a future consideration. Determine scope and responsibilities for the particular product and organization. [European Commission CRA overview](https://digital-strategy.ec.europa.eu/en/policies/cyber-resilience-act).
 
-### Modular vs system-level certification
+For relevant radio equipment, the RED cybersecurity delegated requirements began applying in August 2025. Review the current transition/interaction with the CRA and the applicable consolidated sources rather than assuming all wireless devices have one identical obligation. [Commission RED guidance](https://single-market-economy.ec.europa.eu/sectors/electrical-and-electronic-engineering-industries-eei/radio-equipment-directive-red_en).
 
-The Jetson Orin Nano **module** may have its own EMC characterization data from NVIDIA, but your **system** (module + custom carrier + enclosure + cables) requires **system-level testing**. The enclosure, cable routing, and carrier board design all affect emissions.
+An engineering readiness exercise should identify the shipped dependency/artifact inventory, vulnerability intake owner, supported update mechanism, support-period assumptions and a way to locate affected units. The [security/OTA module](../6.%20Security%20and%20OTA/Guide.md) supplies the artifact, trial and recovery exercises. A successful signature check is one useful control, not a complete regulatory assessment.
 
-**You almost always need system-level FCC/CE testing** for your complete product.
+## 4. Plan EMC work around a reproducible configuration
 
----
+Begin with representative workload modes and cable arrangements. Identify potential emissions paths, return-current discontinuities, switching nodes and external interfaces. Change one factor at a time and record the effect.
 
-## 3. FCC certification (unintentional radiator)
+A near-field probe is useful for locating a noisy region. Its reading is not automatically a calibrated far-field measurement that can be compared directly to a regulatory limit. Likewise, an inexpensive SDR can help observe a signal without replacing the detector, bandwidth, calibration, site and procedure required by an applicable test.
 
-Most Jetson products without built-in wireless are **unintentional radiators** under FCC Part 15 Subpart B.
+Select test levels, detectors, bandwidths and pass criteria from the actual applicable standards/assessment plan. Avoid universal “±8 kV ESD” or “3 V/m immunity” pass statements. Product category, ports, environment and performance criteria affect the plan.
 
-### Testing categories
+Retain both electrical measurements and functional observations. For a robot, define what acceptable behavior means during and after a disturbance: lost frames, stale commands, reboot, recovery, or uncontrolled output have different implications. Do not silently count an automatic restart as uninterrupted service.
 
-| Test | Standard | What it measures |
-|------|----------|-----------------|
-| **Radiated emissions** | ANSI C63.4 | RF energy radiated from the device and cables |
-| **Conducted emissions** | CISPR 32 / FCC Part 15 | RF noise conducted back onto the power line |
+Obtain current laboratory quotations and schedules for the stated configuration. This course does not assign a universal certification cost, six-week schedule or fixed number of retests. Board changes and failed tests can alter both scope and timing.
 
-### Common emission sources on Jetson carriers
+## 5. Design for assembly and test access
 
-| Source | Frequency range | Typical fix |
-|--------|----------------|-------------|
-| **USB 3.0 super-speed** | 2.4–5 GHz spread spectrum | Shielded cables, common-mode chokes, spread-spectrum clocking |
-| **HDMI/DP clock** | Harmonics of pixel clock | Shielded connector, ferrite on cable |
-| **Switching regulators** | 100 kHz–30 MHz | Proper layout, input/output filtering, shielding |
-| **High-speed PCIe** | 2.5–16 GHz (Gen 1–4) | Proper termination, short traces, grounded enclosure |
-| **Ethernet** | 100 MHz–1 GHz | Correct magnetics, proper PHY layout |
+Review component footprints, assembly clearances, polarity, connector seating, mounting loads, thermal interfaces and test-point access with the selected manufacturer. Export fabrication/assembly data from the same released design revision and verify the manufacturer can interpret them. An EDA import or a clean ERC/DRC is useful but does not prove electrical correctness or manufacturability.
 
-### Process timeline
+Create a test-access drawing showing measurement reference points and fixture connections. Distinguish ground references, power injection, communication loopbacks and debug access. Keep the module insertion/removal procedure consistent with the hardware specification; do not insert it into an energized carrier as an ordinary production-test step.
 
-| Step | Duration | Notes |
-|------|----------|-------|
-| Pre-compliance scan (in-house) | 1–2 weeks | Identify issues before paying for lab time |
-| Fix identified issues | 1–4 weeks | Layout changes, filtering, shielding |
-| Formal lab testing | 1–2 weeks | At an accredited test lab (A2LA, NVLAP) |
-| Report and FCC filing | 2–4 weeks | SDoC (Supplier's Declaration of Conformity) for unintentional radiators |
-| **Total** | **6–12 weeks** | Budget for at least one re-test cycle |
+**Coverage exercise:** a local Ethernet loopback may verify part of a PHY path while bypassing the cable/connector fault you intended to detect. For each test, write “fault detected,” “path exercised,” and “faults not covered.” That prevents a long list of passing tests from becoming an unjustified coverage claim.
 
-### Cost estimate
+## 6. Qualify the fixture before judging the device
 
-| Item | Cost range |
-|------|-----------|
-| Pre-compliance scan (rental or lab) | $500–$2,000 |
-| Formal FCC Part 15B test + report | $3,000–$8,000 |
-| Re-test (if fail + fix) | $2,000–$5,000 |
+A measurement is meaningful only when the fixture and instrument are functioning under the stated calibration/configuration. Include a reference measurement or other appropriate fixture check. Separate these outcomes:
 
----
+| Outcome | Meaning | Treatment |
+| --- | --- | --- |
+| Qualified pass | Valid measurements meet the selected limits | Eligible for the next acceptance step |
+| Qualified DUT failure | Valid measurements show an out-of-limit device result | Retain failure and route to investigation/rework |
+| Unqualified station result | Wrong units, expired calibration, failed fixture reference or malformed evidence | Quarantine/retest; do not call it a valid DUT pass or failure |
+| Missing test | Required evidence absent | Acceptance incomplete |
 
-## 4. CE marking (EU)
+The [CPU lab](labs/README.md) enforces that separation. Its voltage limits are explicitly fictional teaching values, not Jetson electrical specifications. It rejects a bad fixture reference before inserting a DUT result, and tests that a corrected station can submit the same still-unused attempt identity.
 
-CE marking requires compliance with multiple directives:
+Choose guard bands using the measurement process and required decision risk. For an illustrative specification of 5.00 ±0.10 V with a simplified ±0.02 V uncertainty bound, an acceptance interval of 4.92–5.08 V keeps that bound inside 4.90–5.10 V. This is a worked bounded-error example; a real uncertainty budget and decision rule need the appropriate method, distributions and agreement.
 
-| Directive | Standard | Applies to |
-|-----------|----------|-----------|
-| **EMC Directive (2014/30/EU)** | EN 55032 (emissions), EN 55035 (immunity) | All electronic products |
-| **LVD (2014/35/EU)** | EN 62368-1 | Products operating 50–1000 VAC or 75–1500 VDC |
-| **RED (2014/53/EU)** | EN 300 328, etc. | Products with intentional radio (WiFi, BT, cellular) |
-| **RoHS (2011/65/EU)** | — | Restriction of hazardous substances in electronics |
+## 7. Preserve attempts and calculate honest yield
 
-### Key differences from FCC
+Do not overwrite a failed attempt when the same unit passes after rework. Store serial, attempt identity, fixture/station, limit revision, image digest, measurement values/units, calibration context and timestamp.
 
-- CE includes **immunity testing** (ESD, surge, conducted immunity, radiated immunity) — FCC does not
-- CE requires a **Declaration of Conformity (DoC)** — you self-declare
-- If you add WiFi/BT/cellular → RED applies, which adds radio-specific testing
+**Worked example:** unit A fails and then passes; unit B passes on its first attempt. There are two units and three qualified attempts. First-pass yield is `1 / 2 = 50%`; latest-result pass fraction is `2 / 2 = 100%`. They share the unit denominator and answer different questions. The fraction of passing attempts, `2 / 3`, is a third metric. Label the metric you report.
 
-### Immunity tests (commonly failed)
+Repeated upload of the same attempt should not create another manufactured unit or inflate yield. A changed payload under the same attempt identity should be rejected or handled through an explicit correction process with retained history. The lab uses a real SQLite transaction and uniqueness constraint for this behavior, and interrupts a child process before commit to test recovery.
 
-| Test | Standard | Common failure mode |
-|------|----------|-------------------|
-| **ESD** (±8 kV contact, ±15 kV air) | EN 61000-4-2 | USB ports, exposed connectors, metal enclosure |
-| **Radiated immunity** (3 V/m) | EN 61000-4-3 | Unshielded cables act as antennas |
-| **EFT (Electrical Fast Transient)** | EN 61000-4-4 | Power supply input |
-| **Surge** | EN 61000-4-5 | Power input, Ethernet |
+A local database digest identifies the stored payload; it does not authenticate a hostile station or prevent an administrator changing the database. A deployed traceability service needs identity, authorization, retention, backup and an appropriate audit design. State those remaining boundaries rather than presenting the teaching ledger as a complete factory system.
 
----
+## 8. Separate flashing from acceptance
 
-## 5. Other markets (IC, MIC, UKCA, RCM)
+Select the host OS, BSP, board configuration, storage layout and secure-state procedure supported by the exact release. NVIDIA's initrd mass-flash workflow separates preparation of a package for a maximum device count from actual concurrent flashing; `--massflash N` is not simply a request to create N independent image copies. Use the documented generation and flash-only stages for the matching BSP. [NVIDIA flashing support](https://docs.nvidia.com/jetson/archives/r39.2/DeveloperGuide/SD/FlashingSupport.html).
 
-### Prioritization strategy
+A preloaded NVMe does not prove that QSPI firmware, board configuration, device identity or encryption/provisioning state is correct. Avoid a “zero-minute flashing” acceptance claim that ignores the rest of the system.
 
-- **Launch with FCC + CE** — covers USA + EU, the two largest markets
-- **Add IC (Canada)** — often bundled with FCC testing (same lab, same trip)
-- **Add others** as market demand requires
+Identify each device explicitly at the station, then record the immutable artifact identity and observed post-flash state. Keep secrets out of ordinary logs. Serial numbers and MAC addresses must follow the product's approved allocation/provisioning process; do not rewrite a module EEPROM or invent globally administered MAC addresses as a generic test step.
 
-| Certification | Effort beyond FCC+CE | Notes |
-|--------------|---------------------|-------|
-| **IC (ISED)** | Minimal — same tests, different filing | Often done simultaneously with FCC |
-| **UKCA** | Similar to CE, separate declaration | Post-Brexit requirement |
-| **RCM** | Based on CISPR 32 (similar to EN 55032) | Register with ACMA |
-| **MIC/VCCI** | VCCI is voluntary self-declaration | Based on CISPR 32 |
+Define boot/application checks from the product requirements, not fixed universal thresholds such as “NVMe over 2 GB/s,” “idle below 50°C,” or “all tests under 60 seconds.” A storage SKU, power mode, ambient temperature or interface width can change a valid range. Verify the intended path with representative workloads and bounded failure handling.
 
----
+## 9. Plan capacity, change control and support
 
-## 6. Pre-compliance testing
+**Station-capacity example:** at 90 seconds of occupied station time, one fixture has a theoretical 40 units/hour. At 80% planned availability/utilization, plan 32 units/hour before rework and bottlenecks. Four fixtures give a theoretical 128 units/hour under those assumptions only if loading, power, network, flashing host and staffing support it. Measure the complete cycle rather than using the image-write interval alone.
 
-Catch emissions problems **before** paying for formal lab time.
+Track module/component revisions and product-change notices. A pin-compatible alternate may differ in firmware, timing, temperature behavior or radio authorization conditions. Qualify the affected requirements and release the revised BOM/software combination together.
 
-### Minimum equipment
+For field support, link the returned unit to its original configuration and all qualified attempts. Capture the failure mode, reproduction conditions, software/model identity and corrective action. Distinguish no-fault-found, fixture-related and confirmed product failures. Use that information to improve screening without changing limits merely to improve the dashboard's yield.
 
-| Equipment | Cost | Purpose |
-|-----------|------|---------|
-| **Near-field probe set** | $200–$500 | Localize emission sources on the PCB |
-| **Spectrum analyzer** (or SDR like HackRF) | $300–$2,000 | View spectrum of emissions |
-| **Current probe** (RF) | $100–$300 | Measure conducted emissions on cables |
+## 10. Submit a manufacturing-readiness pack
 
-### Pre-scan workflow
+Your submission contains a configuration manifest, requirements register with current primary sources, test-coverage table, fixture qualification procedure, example per-unit record, yield calculation, flashing/acceptance flow and change-control plan. Include the CPU ledger test log and the failure-before-commit result.
 
-1. Set up the device in its intended configuration (all cables, enclosure)
-2. Run worst-case workload (AI inference + USB + Ethernet active)
-3. Scan with near-field probes to identify hot spots on the PCB
-4. Use spectrum analyzer to measure approximate field strength
-5. Compare against FCC/CISPR limits with margin
-6. Iterate: add filtering, shielding, or layout fixes
+**Self-checks:**
 
----
-
-## 7. DFM review and design-for-assembly
-
-### DFM checklist for Jetson carrier boards
-
-| Item | Check |
-|------|-------|
-| **Panelization** | Board fits standard panel sizes for your CM's pick-and-place |
-| **Fiducials** | Global and local fiducials placed per IPC-7351 |
-| **Solder paste stencil** | Aperture reductions for fine-pitch parts (SoM connector 0.5 mm pitch) |
-| **Component orientation** | All polarized components oriented consistently for inspection |
-| **Pick-and-place coordinates** | Centroid file generated and verified |
-| **Reflow profile** | Validated for the SoM connector and all components (lead-free SAC305) |
-| **Test access** | ICT test points on bottom side, bed-of-nails accessible |
-| **Conformal coating** | If required (industrial/outdoor), mask keep-out for connectors |
-| **Assembly sequence** | SoM connector → SMT → through-hole → SoM insertion → mechanical |
-
-### Design-for-assembly (DFA)
-
-- Minimize the number of unique screw types
-- Use snap-fit or tool-free assembly where possible
-- Design the enclosure so the PCB drops in from one direction
-- Label test points and debug headers on the silkscreen
-
----
-
-## 8. Production flashing infrastructure
-
-### Flash station design
-
-```
-Flash station:
-  ├─ Host PC (Ubuntu 22.04, 32 GB RAM, NVMe SSD)
-  │     └─ Linux_for_Tegra + signed images
-  │
-  ├─ USB hub (powered, USB 3.0)
-  │     └─ 1–4 USB recovery cables to Jetson devices
-  │
-  ├─ Power supply (one per device, or multi-output)
-  │
-  └─ Flash script (automated: flash + validate + log serial number)
-```
-
-### Batch flashing with `l4t_initrd_flash.sh`
-
-```bash
-# Flash external NVMe on multiple devices
-sudo ./tools/kernel_flash/l4t_initrd_flash.sh \
-    --massflash 4 \
-    <board_config> \
-    external
-```
-
-`--massflash N` creates N flash images that can be applied in parallel to N devices simultaneously.
-
-### Flash time optimization
-
-| Approach | Flash time (per device) |
-|----------|----------------------|
-| Standard `flash.sh` (USB 2.0) | 15–25 min |
-| `l4t_initrd_flash.sh` (USB 3.0) | 8–15 min |
-| Mass-cloned image (write raw image to NVMe) | 3–5 min |
-| Pre-flashed NVMe (SSD pre-loaded by supplier) | 0 min (on-line) |
-
-### Factory image management
-
-- **Golden master:** A signed, tested image tagged with version and build date
-- **Image signing:** Part of CI/CD (see [Module 7 — Security and OTA](../6.%20Security%20and%20OTA/Guide.md))
-- **Version tracking:** Flash script logs `{serial_number, image_version, timestamp, pass/fail}` to a database
-
----
-
-## 9. Factory test fixtures and procedures
-
-### Test jig design
-
-For carrier boards with custom connectors, build a **bed-of-nails** test jig:
-
-- **Pogo pins** contact test points on the bottom of the PCB
-- **Pneumatic or manual press** holds the board in contact
-- **Test controller** (Raspberry Pi, STM32, or host PC) runs automated test sequence
-
-### Automated test sequence
-
-```
-1. Apply power → verify rails (pass/fail per rail)
-2. Insert SoM module (or pre-inserted)
-3. Boot → wait for UART "login:" prompt (timeout = 60s)
-4. Run test script on target:
-   a. USB: enumerate test device
-   b. Ethernet: ping gateway, iperf short burst
-   c. NVMe: read/write test
-   d. CSI: capture one frame (if camera connected)
-   e. I2C: scan for expected device addresses
-   f. CAN: send/receive loopback frame
-   g. GPIO: toggle test pins, read back
-   h. Temperature: read thermal zone (sanity check)
-5. Program serial number and MAC address to EEPROM
-6. Log results to database
-7. Print pass/fail label
-
-Total time target: < 60 seconds per unit
-```
-
-### Pass/fail criteria
-
-Define **quantitative thresholds** for every test:
-
-| Test | Pass criteria |
-|------|-------------|
-| 5V rail | 4.85–5.15 V |
-| Ethernet throughput | > 900 Mbps |
-| NVMe sequential read | > 2 GB/s |
-| Boot time | < 30 s to login prompt |
-| GPU temperature at idle | < 50 C |
-
----
-
-## 10. Supply chain management
-
-### Jetson module procurement
-
-| Source | Lead time | MOQ | Notes |
-|--------|-----------|-----|-------|
-| **NVIDIA direct** | 12–16 weeks | Varies | For large volumes, requires NVIDIA account |
-| **Arrow / Avnet** | 8–16 weeks | 1–100+ | Authorized distributors |
-| **Mouser / Digikey** | Stock or 8–12 weeks | 1+ | For prototyping and small runs |
-
-### Critical component tracking
-
-Maintain a **risk register** for components:
-
-| Risk level | Component | Mitigation |
-|-----------|-----------|------------|
-| **High** | SoM connector (Molex, single source) | Buffer stock (3+ months) |
-| **High** | Jetson Orin Nano module | Long lead time — order early |
-| **Medium** | Ethernet PHY | Second-source qualified alternate |
-| **Low** | Passive components | Multiple manufacturers, standard values |
-
-### Managing SoM revision changes
-
-NVIDIA periodically releases updated module revisions. Your carrier and BSP must be validated against each new revision:
-
-1. Monitor NVIDIA **Product Change Notifications (PCN)**
-2. When a new revision is announced, order samples
-3. Re-run board bring-up validation (Module 4) and BSP tests
-4. Update BSP if device tree or driver changes are required
-5. Qualify and release updated firmware before accepting new-revision modules in production
-
----
-
-## 11. Configuration management and traceability
-
-### Serial number scheme
-
-```
-JET-<year><week>-<sequence>
-Example: JET-2626-00142
-         │    │     │
-         │    │     └─ Unit 142
-         │    └─ Year 2026, week 26
-         └─ Product prefix (example)
-```
-
-### What to track per device
-
-| Field | Source | Stored in |
-|-------|--------|-----------|
-| Serial number | Assigned during factory test | EEPROM + database |
-| MAC address(es) | Assigned from allocated range | EEPROM + database |
-| SoM serial number | Read from module EEPROM | Database |
-| SoM revision | Read from module | Database |
-| Firmware version | Flashed image version tag | Database + device |
-| Factory test result | Test script output | Database |
-| Ship date | Fulfillment system | Database |
-
-### Build artifact management
-
-- Tag every release image in git: `v1.0.0-rc1`, `v1.0.0`
-- Store signed images in a versioned artifact repository (S3, Artifactory, or local NAS)
-- Never overwrite — append new versions
-- Keep build logs and test reports alongside the image
-
----
-
-## 12. Fleet management and field support
-
-### Remote access
-
-| Method | Use case | Security |
-|--------|----------|----------|
-| **SSH over VPN** (WireGuard, Tailscale) | Debug, log collection, manual intervention | Strong (encrypted tunnel, key-based) |
-| **Reverse SSH tunnel** | Devices behind NAT, no VPN infrastructure | Medium (requires jump server) |
-| **MQTT telemetry** | Heartbeat, metrics, light commands | Medium (TLS + auth) |
-| **OTA agent** | Firmware and configuration updates | Strong (signed images, TLS) |
-
-### Fleet dashboard
-
-Connect to the telemetry stack from [Module 7 — Security and OTA](../6.%20Security%20and%20OTA/Guide.md):
-
-- **Device inventory:** Online/offline status, firmware version, last check-in
-- **Health metrics:** CPU/GPU temperature, disk usage, memory usage, uptime
-- **OTA status:** Current version per device, pending updates, rollback events
-- **Alerts:** Offline devices, reboot loops, temperature alarms, disk full
-
-### Firmware update cadence
-
-| Type | Frequency | Trigger |
-|------|-----------|---------|
-| **Security patches** | As needed (ASAP) | CVE in kernel, L4T, or application dependency |
-| **Feature updates** | Monthly or quarterly | Product roadmap |
-| **Emergency hotfix** | Immediate | Critical bug affecting field devices |
-
----
-
-## 13. RMA and failure analysis
-
-### RMA process
-
-```
-Customer reports issue
-  │
-  ├─ Remote triage (logs, telemetry, OTA status check)
-  │     └─ Software fix? → Push OTA update, close
-  │
-  ├─ Hardware suspected → Issue RMA authorization
-  │     └─ Customer ships device back
-  │
-  ├─ Incoming inspection
-  │     ├─ Visual inspection (physical damage, corrosion, burnt components)
-  │     ├─ Re-run factory test sequence
-  │     └─ Compare with original factory test log
-  │
-  ├─ Fault isolation
-  │     ├─ Swap SoM → carrier issue
-  │     ├─ Swap carrier → SoM issue
-  │     └─ Neither → environmental or software root cause
-  │
-  └─ Resolution
-        ├─ Repair and return
-        ├─ Replace with new unit
-        └─ Update design if systemic issue
-```
-
-### Failure tracking
-
-Track all failures in a database with categories:
-
-| Category | Example | Action |
-|----------|---------|--------|
-| **DOA (Dead on Arrival)** | Unit never booted at customer site | Improve factory test coverage |
-| **Infant mortality** | Fails within first 30 days | Possible solder defect — review reflow profile |
-| **Wear-out** | Fan failure after 18 months | Spec higher-MTBF fan, or add fan monitoring |
-| **Environmental** | Corrosion on exposed connector | Add conformal coating or sealed connector |
-| **Software** | OTA bricked device | Improve rollback mechanism (Module 7) |
-
----
-
-## 14. Projects
-
-- **Production flash station:** Build a flash station that can flash 4 Jetson Orin Nano units in parallel using `--massflash`. Time the process and optimize.
-- **Factory test script:** Write an automated test script that validates all peripherals on your custom carrier in under 60 seconds. Output a structured JSON pass/fail report.
-- **Pre-compliance scan:** Using a near-field probe and spectrum analyzer (or SDR), scan your carrier board running a worst-case AI workload. Document the top 3 emission sources and proposed mitigations.
-- **Fleet dashboard:** Deploy 3+ units with unique serial numbers, set up a Grafana dashboard showing device health, OTA version, and uptime. Simulate an OTA rollout to all devices.
-
----
-
-## 15. Resources
-
-| Resource | Description |
-|----------|-------------|
-| **FCC Equipment Authorization** | FCC.gov guide to Part 15 certification process |
-| **CISPR 32 (EN 55032)** | International standard for multimedia equipment emissions |
-| **EN 62368-1** | Safety standard for audio/video, IT, and communication equipment |
-| **IPC-A-610** | Acceptability of electronic assemblies (workmanship standard) |
-| **IPC-7711/7721** | Rework, modification, and repair of electronic assemblies |
-| **NVIDIA Jetson Partner Hardware Design** | OEM Design Guide, reference design files, certification notes |
-| [2. Custom Carrier Board Design](../2.%20Custom%20Carrier%20Board%20Design%20and%20Bring-Up/Guide.md) | Hardware design (this module assumes carrier is built and validated) |
-| [7. Security and OTA](../6.%20Security%20and%20OTA/Guide.md) | Signed images, fleet telemetry (feeds into factory flashing and fleet ops) |
-
-
-## Integration lab: Which manufacturing check predicts a field failure?
-
-Turn board bring-up evidence into fixture checks for power, storage, radio, camera, thermal behavior, and provisioning identity. Define traceability from serial number to firmware/model release.
-
-**Acceptance evidence:** Submit a test record format, bounded pass/fail thresholds, and one injected recoverable fault. List applicable compliance work separately from classroom functional tests; they are not certification evidence.
-
-**Continue:** take this artifact to [8. Runtime and Driver Development](../8.%20Runtime%20and%20Driver%20Development/Guide.md). Explain which assumption from this course the next engineer must preserve.
+- A fixture reference fails but the DUT voltage looks normal: quarantine the station result.
+- A failed unit later passes: retain both attempts and preserve first-pass yield.
+- The same record arrives four times: record one attempt and recognize identical replays.
+- A near-field scan looks quiet: use it as debugging evidence, not a formal conformity verdict.
+- A radio module is approved: still evaluate its integration conditions and complete host obligations.
+- A model update changes sensor preprocessing: re-evaluate the deployed system's relevant behavior and trace the new artifact identity.

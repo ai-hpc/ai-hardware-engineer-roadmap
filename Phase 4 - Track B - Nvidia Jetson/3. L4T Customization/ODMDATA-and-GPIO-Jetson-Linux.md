@@ -1,162 +1,89 @@
-# ODMDATA, pinmux, and GPIO on Jetson Linux
+# ODMDATA, pinmux and GPIO: keep the namespaces separate
 
-**Phase 4 — Track B — Nvidia Jetson** · L4T customization (companion note)
+A schematic names a connector pin. A pinmux spreadsheet names a SoC ball. Device tree uses a controller-specific GPIO specifier. A userspace GPIO request uses a chip and line offset. Those identifiers may describe the same electrical signal while having different numeric values.
 
-This note ties together **ODM data**, **UPHY / PCIe** configuration, and the **three different layers** people mean when they say “GPIO on Jetson”: **MB1 BCT pinmux**, **PADCTL register pokes (`devmem`)**, and **userspace GPIO** (`libgpiod`). It complements [Jetson-Module-Adaptation-Bring-Up-Orin-NX-Nano.md](Jetson-Module-Adaptation-Bring-Up-Orin-NX-Nano.md) (carrier bring-up) and [T23x-Deployment.md](T23x-Deployment.md) (BCT / MB1 DTS detail).
+This lesson is for **T234 Orin NX/Nano**. Current BSP references are **R39.2.1**, reviewed 2026-10-18; older R35/R36 examples must retain their matching source and tool versions. Read [BCT contracts](T23x-Deployment.md) first.
 
-Always confirm **register meanings**, **flash variables**, and **sysfs paths** against the [Jetson Linux Developer Guide](https://docs.nvidia.com/jetson/) for **your JetPack line** and module (Orin NX/Nano vs Xavier, etc.).
+## 1. ODMDATA selects a supported hardware arrangement
 
----
+`ODMDATA` is part of the flash/boot configuration. On Orin NX/Nano, named presets select UPHY arrangements. The choice must agree with carrier routing, controller role, pinmux and Linux device tree. Changing a string cannot physically reroute differential pairs.
 
-## What is ODMDATA?
+The reference arrangement uses `gbe-uphy-config-8` with C7 occupying two lanes; selecting `gbe-uphy-config-9` splits those resources between C7 and C9 as one-lane controllers. This is a topology choice, not two ways to get the same x2 bandwidth. Keep a carrier-specific override after the common board configuration so the default does not overwrite it. [NVIDIA UPHY lane configuration](https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/HR/JetsonModuleAdaptationAndBringUp/JetsonOrinNxNanoSeries.html#uphy-lane-configuration).
 
-In **Jetson Linux** (the BSP people still often call **L4T**), **ODM data** is a **boot-time configuration** value the platform uses (with other BCT / firmware inputs) to select **SoC-level muxing and options** before Linux is fully up.
+**Worked allocation:** a fictional two-lane pool can support one x2 link or two x1 links if the controller supports that arrangement. It cannot provide two x2 links simultaneously. A disabled DT node may prevent a driver from claiming a controller, but that alone does not change the early lane assignment.
 
-In practice, engineers talk about **`ODMDATA`** as the **string or value** you set from the **flash configuration** side so that **MB1 / BPMP / bootloader** pick the right **UPHY** preset (USB vs PCIe vs GBE lane maps), and related **feature** bits documented for your chip.
+The current documented NX/Nano endpoint procedure uses **C4** and `hsio-uphy-config-41`; it is distinct from AGX Orin's endpoint arrangement. An endpoint requires the matching controller mode, reset direction, clock relationship and endpoint function. It is not enabled merely by exposing a character device. Use the release procedure and actual BSP script location; do not transplant an AGX ODMDATA string. [NVIDIA endpoint procedure](https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/SD/Communications/PcieEndpointMode.html).
 
-It is **not** the same thing as “a random `ioctl` at runtime”—it is **primarily decided when you build/flash** (or when you ship a known `.conf` + BCT set to the factory).
+**Check:** changing endpoint metadata back on the build host affects a later generated image. It does not remotely change a board already flashed in endpoint mode.
 
-### Typical things ODMDATA (plus BCT / DT) helps steer
+## 2. Three layers of GPIO configuration
 
-| Area | Idea (high level) |
-|------|-------------------|
-| **UPHY lane maps** | Which high-speed lanes are **USB3**, **PCIe**, **Ethernet (GBE)**, etc. |
-| **PCIe roles** | Some presets interact with whether a controller is used as **root port** vs **endpoint** in a given design (exact mechanism is **SoC- and release-specific**—use NVIDIA’s PCIe endpoint topic for your module). |
-| **Other boot knobs** | Platform-specific bits (watchdog, power, or strap-related options) appear in **official** docs as **bitfield** tables—do not guess from forum posts alone. |
+| Layer | Question answered | Persistence and ownership |
+| --- | --- | --- |
+| Pad/pinmux and boot GPIO configuration | Which function is connected, at what electrical configuration, and in what early state? | Generated BSP inputs must be selected and deployed |
+| Kernel pinctrl/GPIO/controller driver | Which device owns the signal and exposes a supported interface? | Controlled by the running kernel and device description |
+| Userspace GPIO line request | Which logical value/direction/events does this process request? | Valid while the request is held; release does not promise a retained output state |
 
-For **Orin NX / Nano (T234)**, the adaptation guide expresses many UPHY choices as an **`ODMDATA="…"`** string in the **board `.conf`** (often **appended after** sourcing `p3767.conf.common`). See [UPHY lane configuration](Jetson-Module-Adaptation-Bring-Up-Orin-NX-Nano.md#uphy-lane-configuration) in the module adaptation note.
+A line already owned by a driver should not be forcibly repurposed by a user process. Likewise, handing an AON controller to SPE requires removing the conflicting Linux owner and satisfying clocks, pinmux and access permissions. See the [SPE ownership lesson](../4.%20FSP%20%28Firmware%20Support%20Package%29%20Customization/Guide.md).
 
-### How to **set** ODMDATA (production-style)
+## 3. Work through one identifier without touching hardware
 
-1. Work in **`Linux_for_Tegra/`** on the **host** that flashes the device.
-2. Edit or extend your **board-specific** `*.conf` (NVIDIA pattern: set variables **after** `source ...conf.common` so you **override** defaults).
-3. Set **`ODMDATA=`** to the **preset** from the guide for your carrier (HSIO / GBE strings on Orin are documented in the adaptation / flashing topics).
-4. **Flash** with the supported script for your storage layout (`flash.sh`, `l4t_initrd_flash.sh`, etc.—see *Flashing support* in the developer guide).
+Consider **AON port DD, pin 2**, as a mapping exercise rather than a wiring instruction.
 
-Older posts sometimes mention passing a hex word via **`flash.sh`** flags for **older** modules (e.g. Xavier-era **PCIe endpoint** examples). Treat those as **hints**: the **supported** CLI and variable names change by **BSP version**—use **`flash.sh --help`** and the guide for **your** package.
+| Name space | Illustrative value | Meaning |
+| --- | --- | --- |
+| SoC port/pin | DD2 | Named signal inside the GPIO controller |
+| DT binding macro | `TEGRA234_AON_GPIO(DD, 2)` → 26 | Binding encoding uses port index 3 times eight plus pin 2 |
+| Packed gpiochip line offset | 22 | The preceding implemented ports have 8 + 4 + 8 lines; then add 2 |
+| Legacy global GPIO number | Historical base + 22 | Dynamic global numbering; unsuitable as a portable identifier |
+| Carrier connector pin | Board-dependent | Requires the carrier schematic; cannot be derived from 22 or 26 |
 
-### How to **inspect** ODM-related data after boot
+The upstream [T234 GPIO binding header](https://github.com/torvalds/linux/blob/master/include/dt-bindings/gpio/tegra234-gpio.h) defines the DT encoding. The [Tegra GPIO driver's translation](https://github.com/torvalds/linux/blob/master/drivers/gpio/gpio-tegra186.c) maps the specifier into its packed line representation. Confirm the **matched BSP driver and actual `gpioinfo` output** before using any value; the table teaches why blindly copying the macro's numeric value into a userspace request can select the wrong line.
 
-Linux exposes **device-tree blobs** under **`/sys/firmware/devicetree/`**. NVIDIA and community posts often point to paths such as:
+A line name is useful but can be missing or duplicated. Record the verified GPIO chip identity, line name if present, offset, carrier revision and electrical function. `gpiochip0` is a discovery result, not a permanent name for every board and boot configuration.
 
-`/sys/firmware/devicetree/base/chosen/plugin-manager/odm-data/`
+**Exercise:** a historical log reports global base 316 for the AON controller. The old global number for this example is 316 + 22 = 338. Does `gpioset` on a modern character-device API take 338 as the line offset? **Answer:** no. The request identifies the chip and its local line; 338 belongs to a different namespace.
 
-On a running system you can **discover** nodes (paths differ by release and boot chain):
+## 4. Inspect the installed GPIO API
 
-```bash
-find /sys/firmware/devicetree -iname '*odm*' 2>/dev/null | head
-```
-
-Properties are often **binary**; read with **`hexdump -C`** or **`od`** on the files inside those directories.
-
-Use this to answer: “**What did the booted image think the ODM/plugin-manager view is?**” It does not replace **source control** of your **`.conf`** and **DT** in `Linux_for_Tegra/`.
-
----
-
-## Three layers: pinmux vs `devmem` vs GPIO userspace
-
-When you “make a pin GPIO” on Jetson, you usually touch **more than one layer**:
-
-| Layer | What it controls | Persists? |
-|-------|-------------------|-----------|
-| **1. MB1 BCT pinmux (DTS)** | Whether a ball is **SFIO** (I2C, UART, …) or **GPIO**, pulls, etc. | **Yes** (after rebuild + reflash of BCT/related images) |
-| **2. `devmem` / PADCTL** | **Hardware registers** that **mux** and **pad-configure** the pin | **No** if you only poke RAM-mapped registers from Linux—**lost on reset** unless firmware saved it (usually it did not) |
-| **3. `libgpiod` / gpiochip** | **GPIO line** direction and level **once** the pin is already a **GPIO** in the pinmux | **N**/`A` at runtime; pinmux still wins on reboot |
-
-**JetPack 6** direction: NVIDIA deprecates the old **GPIO sysfs** (`/sys/class/gpio`); use **`libgpiod`** on top of **`/dev/gpiochip*`** for **product** code.
-
----
-
-## 1. `devmem` (direct MMIO)
-
-**What it is:** A tiny utility (commonly **`busybox devmem`**) that **reads or writes a 32-bit word** at a **physical** (or bus-visible) **address** the kernel maps for you. On Jetson bring-up docs, it is used to **peek/poke PADCTL** and similar blocks while validating **pinmux** math from the **TRM**.
-
-**When to use it**
-
-- **Bring-up / debug**: confirm **base + offset** for a pin’s **PADCTL** register matches the **Orin TRM** and your spreadsheet.
-- **Short experiments**: see if a **mux** change makes a **scope** or **logic analyzer** trace look right **before** you freeze the change in **BCT `.dtsi`**.
-
-**Risks**
-
-- You are **bypassing** the kernel’s normal driver model.
-- Wrong addresses or values can **hang** the SoC, **glitch** power domains, or **damage** hardware if you fight enabled drivers.
-- Changes are usually **volatile**—treat as **lab only** unless you mirror the same intent in **BCT** and reflash.
-
-**Typical pattern** (from NVIDIA’s adaptation text):
+On a target with the tools installed, these observations do not intentionally change line values:
 
 ```bash
-sudo apt-get install -y busybox
-sudo busybox devmem 0x02430080      # read
-sudo busybox devmem 0x02430080 w 0x…  # write (syntax per busybox build)
+gpiodetect
+gpioinfo --version
+gpioinfo --help
+gpioset --help
 ```
 
-**TRM:** [Jetson Orin SoC TRM](https://developer.nvidia.com/orin-series-soc-technical-reference-manual) — **Pinmux** / **PADCTL** chapters.
+Then use the matching version's `gpioinfo` syntax to inspect the chosen chip. libgpiod 1.x and 2.x command formats differ. For example, the older `--mode=wait` idiom is not a generic option for every release. In current 2.x tools, requests are held until the tool exits unless another supported mode is selected; after release the line state is not guaranteed. [Official GPIO tools](https://libgpiod.readthedocs.io/en/master/gpio_tools.html).
 
----
+Reading with `gpioget` can request/reconfigure a line; it is not interchangeable with inspecting line information. Do not run it against an output or bus signal merely to “see what happens.” For a known safe test signal, select the proper bias, active-low and drive mode from the circuit's contract.
 
-## 2. GPIO **sysfs** (`/sys/class/gpio`) — legacy
+The old `/sys/class/gpio` interface is deprecated for new work. The character-device API improves request ownership, but it cannot prove that a voltage is safe or that a signal should be driven. Continue with the [current GPIO/SPI/I2C/CAN guide](../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-GPIO-SPI-I2C-CAN/Guide.md) for actual application interfaces and CPU protocol exercises.
 
-**What it was:** A **virtual filesystem** API under **`/sys/class/gpio/`**: **export** a line by **Linux GPIO number**, then set **direction** and **value** by writing to small text files.
+## 5. Active-low describes logic, not an inverter you can ignore
 
-**Status on JetPack 6**
+Suppose `RESET_N` is active-low. A logical **active** request means asserting reset and therefore driving the electrical signal low, subject to the configured drive type. A logical **inactive** request deasserts it. Writing raw `1` without considering the API's active-low flag can reverse your intent.
 
-- NVIDIA’s direction matches upstream Linux: **sysfs GPIO is deprecated** for new work.
-- Old scripts and tutorials still show **`echo 396 > /sys/class/gpio/export`** style flows—they may **break** or **race** with **libgpiod**-aware drivers.
+A signal with an external pull-up and open-drain output is released by ceasing to pull it low. It is not equivalent to connecting an additional push-pull high driver. Internal bias is also not a substitute for a required external resistor, particularly across reset and unpowered states.
 
-**When it still shows up**
+## 6. Direct MMIO is a diagnostic technique with a narrower contract
 
-- **Legacy** bring-up scripts, CI, or third-party libraries not yet ported.
+`devmem` bypasses the normal driver's ownership and sequencing. Even a read may have side effects for some registers. Before any board experiment, identify the exact TRM block, offset, width, legal access semantics, clock/power state and current owner. A borrowed hexadecimal write is not a portable pinmux setup procedure.
 
-**Production guidance:** plan **`libgpiod`** (or a kernel driver) instead of **sysfs**.
+For reasoning practice, do the masked-write exercise in [BCT contracts](T23x-Deployment.md#3-a-masked-write-preserves-unrelated-bits) entirely in Python. If a target experiment confirms a pinmux hypothesis, express the intended setting in the supported source configuration and validate it across cold boot and suspend/resume. A successful runtime poke is not evidence that the production boot image has changed.
 
----
+Never interpret an SCR table index such as `reg@1359` as an MMIO address. The index selects a predefined firmware entry; it does not identify where userspace should map memory.
 
-## 3. `libgpiod` — current standard
+## 7. Diagnose a failed line or link
 
-**What it is:** A **C library** and **CLI tools** for the **GPIO character device** API: **`/dev/gpiochipN`** (`GPIO_CDEV`). The kernel exposes **chips** and **lines** with stable **line names** where the DT provides them.
+| Observation | Plausible next checks |
+| --- | --- |
+| GPIO request returns busy | Inspect the existing consumer and intended ownership |
+| Output API succeeds but no measured transition | Wrong line namespace, mux/SFIO state, electrical routing, driver mode, measurement reference |
+| Line works until the tool exits | The request was released; design a persistent owner or hardware default |
+| Works after a register poke, fails after reboot | The boot inputs or selected artifacts were not updated |
+| PCIe link does not train | Routing, clock/reset/power sequence, UPHY selection, controller role and DT |
+| Correct GPIO edge but late reaction | Separate capture time, interrupt delivery, scheduling, queueing and application work |
 
-**Common CLI tools**
-
-| Tool | Purpose |
-|------|---------|
-| **`gpiodetect`** | List **`gpiochip`** devices |
-| **`gpioinfo`** | Lines, names, **used** / **unused**, **direction** |
-| **`gpioget`** | Read a line |
-| **`gpioset`** | Drive a line (often with **`--mode=wait`** for tests) |
-
-**Why prefer it**
-
-- **Atomic** and **race-resistant** compared to sysfs **export** games.
-- Works with **line labels** from **device tree** (when present).
-- Aligns with **mainline** Linux direction.
-
-**Prerequisite:** the pin must already be **muxed as GPIO** in **MB1 BCT** (or a safe runtime equivalent you fully understand). **`gpioset`** does **not** replace **pinmux spreadsheet → `.dtsi`**.
-
-**Docs:** [libgpiod](https://git.kernel.org/pub/scm/libs/libgpiod/libgpiod.git/about/) (kernel.org).
-
----
-
-## Comparison (quick)
-
-| Mechanism | You touch | Risk | Typical use |
-|-----------|-----------|------|-------------|
-| **`devmem`** | **SoC registers** (e.g. PADCTL) | **High** | TRM-aligned **debug**, prove an address, **temporary** mux experiments |
-| **sysfs GPIO** | **Legacy** sysfs files | **Low** if it works | **Avoid** for new JetPack 6 designs |
-| **`libgpiod`** | **`/dev/gpiochip*`** lines | **Low** (normal API) | **Apps**, **services**, **tests** once **pinmux** is correct |
-
----
-
-## End-to-end mental model (JetPack 6, Orin-class)
-
-1. **Product intent** — Pick **functions** per ball (UART, I2C, GPIO, CSI, PCIe, USB, …) in the **pinmux spreadsheet**; generate **`.dtsi`** for **MB1 BCT**; align **UPHY** choice via **`ODMDATA`** and related **DT** (see module adaptation + T23x BCT doc).
-2. **Flash** — Board **`*.conf`** selects **BCT** fragments, **DTB**, and **`ODMDATA`** preset.
-3. **Bring-up debug** — Use **`devmem`** only if you need **register-level** confirmation; document the **address** and **bit** meaning in your **engineering log**.
-4. **Runtime GPIO** — Use **`libgpiod`** for **line** control in **userspace**; keep **pinmux** in **BCT**, not in **shell** `devmem` scripts, for **shipping** products.
-
----
-
-## See also
-
-- [Jetson-Module-Adaptation-Bring-Up-Orin-NX-Nano.md](Jetson-Module-Adaptation-Bring-Up-Orin-NX-Nano.md) — **UPHY**, **`ODMDATA`**, **PCIe**, **USB**, **flash**
-- [T23x-Deployment.md](T23x-Deployment.md) — **MB1 BCT** DTS fragments (**ODM data for T234** appears in the BCT deployment guide)
-- [Jetson Linux Developer Guide](https://docs.nvidia.com/jetson/) — **Flashing support**, **PCIe endpoint**, **GPIO** / **Jetson-IO** topics for your release
+Submit a complete mapping for one schematic signal and explain at least two numeric identifiers that must not be substituted for one another. No physical access is required to demonstrate the mapping arithmetic; target behavior remains a separate acceptance step.

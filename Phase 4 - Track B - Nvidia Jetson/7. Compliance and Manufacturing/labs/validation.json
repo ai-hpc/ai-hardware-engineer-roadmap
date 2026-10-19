@@ -1,0 +1,64 @@
+{
+  "reviewed_at_utc": "2026-10-18T22:04:25.211200+00:00",
+  "host": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3",
+  "sqlite": "3.45.1",
+  "tests": 11,
+  "passed": 11,
+  "test_output": "test_attempt_order_and_empty_yield (test_factory_records.FactoryRecords.test_attempt_order_and_empty_yield) ... ok\ntest_calibration_interval_and_identifier_validation (test_factory_records.FactoryRecords.test_calibration_interval_and_identifier_validation) ... ok\ntest_conflicting_attempt_rejected_without_overwriting (test_factory_records.FactoryRecords.test_conflicting_attempt_rejected_without_overwriting) ... ok\ntest_duplicate_json_keys_and_nonfinite_json_rejected (test_factory_records.FactoryRecords.test_duplicate_json_keys_and_nonfinite_json_rejected) ... ok\ntest_first_pass_and_latest_outcomes_use_same_unit_denominator (test_factory_records.FactoryRecords.test_first_pass_and_latest_outcomes_use_same_unit_denominator) ... ok\ntest_fixture_reference_failure_is_unqualified_and_preserves_dut_yield (test_factory_records.FactoryRecords.test_fixture_reference_failure_is_unqualified_and_preserves_dut_yield) ... ok\ntest_real_process_exit_before_commit_does_not_leave_half_record (test_factory_records.FactoryRecords.test_real_process_exit_before_commit_does_not_leave_half_record) ... ok\ntest_reference_pass_and_inclusive_limits (test_factory_records.FactoryRecords.test_reference_pass_and_inclusive_limits) ... ok\ntest_replay_does_not_inflate_yield_or_attempts (test_factory_records.FactoryRecords.test_replay_does_not_inflate_yield_or_attempts) ... ok\ntest_units_missing_and_nonfinite_rejected (test_factory_records.FactoryRecords.test_units_missing_and_nonfinite_rejected) ... ok\ntest_wrong_board_image_limits_and_schema_rejected (test_factory_records.FactoryRecords.test_wrong_board_image_limits_and_schema_rejected) ... ok\n\n----------------------------------------------------------------------\nRan 11 tests in 0.089s\n\nOK\n",
+  "scope": "Actual local SQLite and subprocess interruption; fictional measurement records; no physical measurement, hostile-station authentication or power-loss test",
+  "sources": {
+    "factory_records.py": "bb589ccbc8ef50480c2cf344fe07f7be9fc8cceb236f5c5e8adbb5382bb6529f",
+    "test_factory_records.py": "15cbe36cd3a3f7a25c00daa6b65aeaf69317fefe0cdaa89e3915ba248af1bd94"
+  },
+  "independent_concurrency": {
+    "scope": "four real processes simultaneously instantiate local SQLite ledger and upload identical record",
+    "results": [
+      {
+        "status": "replayed",
+        "summary": {
+          "units_tested": 1,
+          "attempts": 1,
+          "first_pass_units": 1,
+          "latest_pass_units": 1,
+          "first_pass_yield": 1.0,
+          "latest_pass_yield": 1.0
+        }
+      },
+      {
+        "status": "replayed",
+        "summary": {
+          "units_tested": 1,
+          "attempts": 1,
+          "first_pass_units": 1,
+          "latest_pass_units": 1,
+          "first_pass_yield": 1.0,
+          "latest_pass_yield": 1.0
+        }
+      },
+      {
+        "status": "replayed",
+        "summary": {
+          "units_tested": 1,
+          "attempts": 1,
+          "first_pass_units": 1,
+          "latest_pass_units": 1,
+          "first_pass_yield": 1.0,
+          "latest_pass_yield": 1.0
+        }
+      },
+      {
+        "status": "recorded",
+        "summary": {
+          "units_tested": 1,
+          "attempts": 1,
+          "first_pass_units": 1,
+          "latest_pass_units": 1,
+          "first_pass_yield": 1.0,
+          "latest_pass_yield": 1.0
+        }
+      }
+    ],
+    "limits": "process concurrency only; not power-loss or factory hardware validation"
+  }
+}

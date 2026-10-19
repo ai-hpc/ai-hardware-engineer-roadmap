@@ -2,6 +2,10 @@
 
 **Collection:** [MCP for AI Agents](README.md) | **Previous:** [← Lecture 03](Lecture-03.md) | **Next:** [Lecture 05](Lecture-05.md)
 
+
+**Protocol scope:** the detailed wire/SDK examples below teach the `2025-11-25` compatibility contract. Start with the [current 2026-07-28 protocol lesson](Protocol-2026-07-28.md) for new implementations; do not relabel an old handshake or reverse-request example as current.
+
+
 ---
 
 Lecture 03 covered the three primitives that point *outward* from a server: Tools, Resources, and Prompts. In all three, the client (or its model) reaches into the server and pulls something out — calls a tool, reads a resource, fetches a prompt. That is the direction everyone pictures when they hear "MCP," and it is the direction most of the protocol runs. But it is not the whole protocol, and a server built only on those three is a *passive* server: it can answer, but it cannot reason, it cannot ask, and it cannot be told where its sandbox ends.
@@ -205,7 +209,7 @@ The user fills in the form and the host returns a structured response. The `acti
 
 Now the rule that makes elicitation safe — **SEP-2260**. A server may issue an elicitation request **only while it is actively handling a client request**. Every server→client request must be *associated with* an in-flight client→server request; the server cannot send an elicitation out of nowhere, between calls, or on a background timer. The practical guarantee is that a user is **never prompted out of the blue**: every elicitation traces back to something the user or their agent *just started*. A prompt that appears with no action behind it is, almost by definition, an attempt to manipulate the user, so the spec forbids the shape entirely.
 
-This is also a *required* rule now, not a polite suggestion. Earlier revisions recommended associating server requests with a client request; recent spec revisions made it mandatory for elicitation — out-of-band elicitation is non-conformant. (SEP-2260 generalizes this to server→client requests broadly; the 2026-07-28 RC then reworks exactly *how* that association is carried in a stateless core — see §5 and the "Current as of" note.) When you design a server, the test is simple: if you cannot point at the client request that an elicitation belongs to, you are not allowed to send it.
+This is also a *required* rule now, not a polite suggestion. Earlier revisions recommended associating server requests with a client request; recent spec revisions made it mandatory for elicitation — out-of-band elicitation is non-conformant. (SEP-2260 generalizes this to server→client requests broadly; the current revision replaces this older reverse-request exchange with a multi round-trip result/retry pattern — see §5 and the "Current as of" note.) When you design a server, the test is simple: if you cannot point at the client request that an elicitation belongs to, you are not allowed to send it.
 
 ---
 
@@ -257,7 +261,4 @@ The graceful-degradation contract is what lets the same server run against a ric
 
 ## Current as of
 
-* **Date:** June 2026.
-* **Spec revision:** pinned to the **2025-11-25** stable revision — the current source of truth for Sampling (`sampling/createMessage`), Roots (`roots/list`, `notifications/roots/list_changed`), and Elicitation (`elicitation/create`), and for the capability-gating rules in `initialize`.
-* **SEP-2260** (server→client requests must be associated with an in-flight client request — the rule that forbids out-of-band elicitation) is in force and is *required*, not merely recommended, in the current revision.
-* **Watch:** the **2026-07-28 release candidate** reworks how mid-call server→client requests flow in a **stateless core**; the *contract* of these three primitives is stable, but the wire-level mechanics of associating a server request with its originating client request are exactly what that RC revisits. Re-verify the request-association details against the RC before relying on them.
+The original June-2026 examples target `2025-11-25`. Reviewed 2026-10-18: **2026-07-28 is current**, with a different request, result, subscription, and retry contract. Use the [current lesson and official sources](Protocol-2026-07-28.md) before implementing or migrating. SDK snippets here have not been executed against the new revision; retained benchmark numbers are historical references, not local measurements.

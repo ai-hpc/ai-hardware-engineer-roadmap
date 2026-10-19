@@ -1,0 +1,91 @@
+{
+  "checked_utc": "2026-10-18T22:37:48.777833+00:00",
+  "command": [
+    "/tmp/course-pytorch-cpu-venv/bin/python",
+    "Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/labs/attention_reference.py"
+  ],
+  "result": {
+    "numpy_version": "2.3.5",
+    "scope": "NumPy CPU math; no FlashAttention package or GPU run",
+    "rows": [
+      {
+        "shape": [
+          7,
+          11,
+          8,
+          5
+        ],
+        "accumulator": "float64",
+        "max_abs_error_vs_float64": 2.220446049250313e-16,
+        "fully_masked_rows": 0,
+        "largest_score_tile_elements": 12,
+        "dense_score_elements": 77
+      },
+      {
+        "shape": [
+          7,
+          11,
+          8,
+          5
+        ],
+        "accumulator": "float32",
+        "max_abs_error_vs_float64": 1.1507853048264849e-07,
+        "fully_masked_rows": 0,
+        "largest_score_tile_elements": 12,
+        "dense_score_elements": 77
+      },
+      {
+        "shape": [
+          1,
+          9,
+          8,
+          5
+        ],
+        "accumulator": "float64",
+        "max_abs_error_vs_float64": 1.6653345369377348e-16,
+        "fully_masked_rows": 0,
+        "largest_score_tile_elements": 4,
+        "dense_score_elements": 9
+      },
+      {
+        "shape": [
+          1,
+          9,
+          8,
+          5
+        ],
+        "accumulator": "float32",
+        "max_abs_error_vs_float64": 5.7632956684816605e-08,
+        "fully_masked_rows": 0,
+        "largest_score_tile_elements": 4,
+        "dense_score_elements": 9
+      },
+      {
+        "shape": [
+          9,
+          2,
+          8,
+          5
+        ],
+        "accumulator": "float64",
+        "max_abs_error_vs_float64": 2.220446049250313e-16,
+        "fully_masked_rows": 7,
+        "largest_score_tile_elements": 6,
+        "dense_score_elements": 18
+      },
+      {
+        "shape": [
+          9,
+          2,
+          8,
+          5
+        ],
+        "accumulator": "float32",
+        "max_abs_error_vs_float64": 1.2316445863191916e-07,
+        "fully_masked_rows": 7,
+        "largest_score_tile_elements": 6,
+        "dense_score_elements": 18
+      }
+    ]
+  }
+}

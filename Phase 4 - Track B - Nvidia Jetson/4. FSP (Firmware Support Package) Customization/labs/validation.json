@@ -1,0 +1,32 @@
+{
+  "reviewed_at_utc": "2026-10-18T22:10:00.667174+00:00",
+  "evidence_kind": "actual native C execution on CPU; no SPE firmware build, flash, FreeRTOS scheduler or Jetson hardware execution",
+  "host": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "compiler": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "python": "3.12.3",
+  "command": [
+    "python3",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "Phase 4 - Track B - Nvidia Jetson/4. FSP (Firmware Support Package) Customization/labs",
+    "-p",
+    "test_*.py",
+    "-v"
+  ],
+  "exit_code": 0,
+  "tests_passed": 4,
+  "deadline_boundary_cases_per_native_run": 100,
+  "mutations_detected": [
+    "absolute deadline comparison fails across wrap",
+    "ignored epoch accepts stale-session reply"
+  ],
+  "output": "test_epoch_mutant_is_detected (test_request_protocol.RequestProtocolTests.test_epoch_mutant_is_detected) ... ok\ntest_native_protocol_contracts (test_request_protocol.RequestProtocolTests.test_native_protocol_contracts) ... ok\ntest_native_sanitized_protocol_contracts (test_request_protocol.RequestProtocolTests.test_native_sanitized_protocol_contracts) ... ok\ntest_wraparound_mutant_is_detected (test_request_protocol.RequestProtocolTests.test_wraparound_mutant_is_detected) ... ok\n\n----------------------------------------------------------------------\nRan 4 tests in 1.053s\n\nOK\n",
+  "source_sha256": {
+    "request_protocol.c": "883ae6f930963c06acb33a29595c166c993d23a50baa8344cdf3acd41b7752e8",
+    "request_protocol.h": "b601fc92b0b8deecd422f80427bb32a452edbd6a171e2f385ddaea243bb93265",
+    "test_request_protocol.py": "92cea76d1d8c213b9c7b56dea009537fe2d0b4387b0b89591a18399228fe5edc",
+    "verify_protocol.c": "8f180bd0b0a230d696af55d87be3cce5213c2fd313b798bcc95b358b9bb28fba"
+  }
+}

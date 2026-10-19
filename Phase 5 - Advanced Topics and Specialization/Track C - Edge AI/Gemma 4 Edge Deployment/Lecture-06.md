@@ -43,3 +43,7 @@ An unsupported assistant is a useful negative finding. Finish the target-only co
 Deliver one dossier containing model/assistant identity, format, runtime/BSP compatibility, quality cases, memory accounting, raw timing, and the observation/result contract. Every performance number must identify hardware and workload; every unsupported or unrun configuration must say so.
 
 End with one decision: deploy the baseline, deploy the measured optimization, or reject this hardware/model pairing. Justify it using task quality, sustained latency, memory, and energy evidence. Feed the largest unresolved bottleneck into the custom physical-AI accelerator specification rather than choosing a chip architecture from the model's marketing size.
+
+## Supplied metadata audit
+
+Run the [CPU exercise](README.md#start-with-the-supplied-cpu-exercises) to inspect the pinned assistant configuration. It declares `Gemma4AssistantForCausalLM`, four layers (three sliding, one full), hidden width 256, and `backbone_hidden_size=1536`. The target has hidden width 1,536. These are observed configuration facts, not an executed assistant/target inference result. The runtime's state-sharing, position, acceptance and processor behavior must still be validated before making a speed or quality claim.

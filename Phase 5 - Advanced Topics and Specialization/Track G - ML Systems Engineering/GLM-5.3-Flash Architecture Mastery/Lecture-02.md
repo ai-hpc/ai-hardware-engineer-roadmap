@@ -43,7 +43,7 @@ where `E(x)` is the set of 8 routed experts selected for this token, and the sha
    Same arithmetic (8 experts each). Different traffic (1× vs 2× the fetch).
 ```
 
-This is why "18B active" answers an arithmetic question (FLOPs per token) and answers almost nothing about memory traffic, which is what governs decode throughput on a bandwidth-bound GPU (see [Hardware-Aware LLM Quantization — Module 01](../Hardware-Aware%20LLM%20Quantization/Lecture-01.md) for the general argument). At batch size 1, if every token in flight selects a different set of 8 experts, traffic scales with **arithmetic**, not with the 18B active figure alone — and at larger batch sizes, routing collision rate becomes a first-order serving variable that "18B active" says nothing about.
+This is why "18B active" answers an arithmetic question (FLOPs per token) and answers almost nothing about memory traffic, which is what governs decode throughput on a bandwidth-bound GPU (see [Hardware-Aware LLM Quantization — Module 01](../Hardware-Aware%20LLM%20Quantization/Lecture-01.md) for the general argument). At batch size 1, the current token reads its selected experts, subject to cache residency and kernel layout. At larger batch sizes, the number of distinct selected experts determines potential weight reuse. Parameter counts alone do not describe those cache and batching effects.
 
 ---
 
@@ -110,7 +110,7 @@ A drop-in "standard SwiGLU" replacement — which typically clamps neither, or c
 
 ## 4. Deriving the checkpoint's actual size
 
-The router picks 8 of 288 experts per token, but **all 288 must be resident** for the model to serve arbitrary tokens. Compute the cost of that capacity directly from the checkpoint dimensions.
+The router picks 8 of 288 experts per token, but **all 288 must be available** for the model to serve arbitrary tokens. A fully GPU-resident deployment stores them in device memory; CPU/NVMe offload changes residency and adds transfer constraints. Compute the cost of that capacity directly from the checkpoint dimensions.
 
 **Per-expert parameter count.** Expert intermediate width is 2,048; hidden width is 4,096. Three matrices — gate, up, down — each `4096 × 2048`:
 
@@ -126,15 +126,12 @@ The router picks 8 of 288 experts per token, but **all 288 must be resident** fo
              ≈  304.4 × 10⁹  parameters
 ```
 
-```text
-   ┌────────────────────────────────────────────────────────────────────┐
-   │  The routed-expert matrices ALONE account for ~304.4B of the       │
-   │  ~320B total. The "18B active" figure describes roughly 9 of        │
-   │  those 12,096 experts' worth of arithmetic per token (8 routed      │
-   │  + 1 shared, per MoE layer) — not a reduction in what must be       │
-   │  stored, dispatched, or communicated to serve the model at all.    │
-   └────────────────────────────────────────────────────────────────────┘
-```
+The routed matrices account for about 304.4B parameters. Each token executes
+8 routed plus 1 shared expert in each of 42 MoE layers: **378 expert applications**,
+representing about 9.51B expert parameters. The advertised 18B active count covers
+more than these expert matrices; it also includes other parts of the forward pass.
+Sparse selection reduces arithmetic without deleting unselected checkpoint weights.
+
 
 Add the shared experts (1 per MoE layer, always active, same shape as a routed expert):
 
@@ -149,13 +146,13 @@ That leaves roughly `320B − 305.5B ≈ 14.5B` for everything else in the model
 ### Why this matters for serving, concretely
 
 ```text
-   VRAM required to serve ANY request   ≈  ALL 288 experts/layer resident
+   Fully GPU-resident weight budget    ≈  ALL 288 routed + 1 shared expert/layer
                                              (roughly the full 320B-parameter footprint)
 
-   VRAM required to serve ONE token's compute  ≈  ~18B-parameters' worth of arithmetic
+   Per-token active-parameter estimate ≈  ~18B across the whole model
 
-   These are different budgets. Only the FIRST one determines whether the
-   model fits on your hardware at all. [Module 09](Lecture-09.md) builds the
+   These are different budgets. The first is the weight term in a fully resident design;
+   activations, caches, workspace and communication buffers also need memory. [Module 09](Lecture-09.md) builds the
    full per-GPU budget from this starting point.
 ```
 
@@ -167,12 +164,12 @@ Put the three quantities from §1 next to each other for one concrete scenario: 
 
 | Quantity | Value | What it governs |
 |---|---:|---|
-| **Capacity** | 288 × 25.17M ≈ 7.25 B params resident | whether the layer fits in VRAM at all |
-| **Arithmetic** | 32 requests × 9 experts × 25.17M ≈ 7.25 B params' worth of FLOPs | compute time, if compute-bound |
-| **Traffic (worst case, no reuse)** | up to 32 × 9 = 288 distinct expert fetches → the entire layer's capacity, fetched once | bandwidth, if bandwidth-bound (the common case at low batch — see [Quantization Module 01](../Hardware-Aware%20LLM%20Quantization/Lecture-01.md)) |
-| **Traffic (best case, full reuse)** | 9 distinct experts fetched once, reused across all 32 requests | 32× less bandwidth than the worst case, same arithmetic |
+| **Capacity** | 289 × 25,165,824 ≈ 7.27 B parameters, including the shared expert | weight storage in a fully resident layer |
+| **Arithmetic** | 32 × 9 × 25,165,824 ≈ 7.25 B weight uses; roughly 14.50 GFLOP for the projections counting a multiply-add as two operations | compute time, before activation/router costs |
+| **Traffic (disjoint routed selections)** | 32 × 8 routed experts + 1 shared = 257 distinct expert weight sets | potential batched weight traffic, assuming one fetch per distinct expert |
+| **Traffic (identical routed selections)** | 8 routed + 1 shared = 9 distinct expert weight sets | 257/9 ≈ 28.56× fewer distinct sets than the disjoint case |
 
-**Arithmetic is identical in the last two rows. Traffic differs by 32×.** This is why MoE serving systems care intensely about routing locality, expert-parallel placement, and batch composition — none of which "18B active" or a naive FLOP count will surface. It is also the reason expert-parallel serving systems track *expert popularity skew* as a first-class metric: a batch that happens to concentrate on a few popular experts behaves like the best-case row; a batch with uniformly scattered routing behaves like the worst case, on the exact same hardware, same model, same token count.
+**Arithmetic is identical in the last two rows. The potential distinct-weight traffic differs by about 28.56×.** The shared expert is always shared; counting it as a different expert for every request was an error. Actual fetch traffic can exceed this distinct-set bound when the kernel rereads weights or the cache cannot retain them. This is why MoE serving systems care intensely about routing locality, expert-parallel placement, and batch composition — none of which "18B active" or a naive FLOP count will surface. It is also the reason expert-parallel serving systems track *expert popularity skew* as a first-class metric: a batch that happens to concentrate on a few popular experts behaves like the best-case row; a batch with uniformly scattered routing behaves like the worst case, on the exact same hardware, same model, same token count.
 
 ---
 
@@ -195,6 +192,8 @@ This is half of **Stage 6 of the [capstone ladder](Lecture-12.md)** (paired with
 ---
 
 ## Current as of
+
+**Reviewed October 18, 2026.** [Pinned config, upstream code and CPU evidence](CPU-Hybrid-State-Lab.md#sources-and-execution-boundary) identify what was checked. Hardware capacity and throughput remain deployment-specific.
 
 * **Timeless:** the capacity/arithmetic/traffic distinction, the general DeepSeek-style sparse-MoE selection/weighting pattern this router follows.
 * **Checkpoint-specific:** the routing scale (2.5), clamp bounds (±10, and the gate's asymmetric upper-only clamp), expert intermediate width (2,048), expert count (288 routed + 1 shared), and top-k (8) are properties of this checkpoint's configuration — verify against the actual config before reusing these constants for a different revision.

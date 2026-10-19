@@ -1,0 +1,53 @@
+{
+  "checked_at": "2026-10-18T23:25:59.116606+00:00",
+  "scope": "synthetic scalar distributions, no model download/robot execution",
+  "python": "3.12.3",
+  "torch": "2.14.0+cpu",
+  "tests": {
+    "standard_library": 7,
+    "actual_pytorch": 6,
+    "failures": 0,
+    "skips_with_pytorch": 0,
+    "total": 13
+  },
+  "commands": [
+    "python -m unittest discover -s labs -p test_action*.py -v",
+    "python labs/action_generation.py --output /tmp/course-action-generation-final --updates 4000 --seeds 7 19 31",
+    "python labs/action_results.py /tmp/course-action-generation-final/results.json --plot /tmp/course-action-generation.svg"
+  ],
+  "training_updates_per_model": 4000,
+  "training_seeds": [
+    7,
+    19,
+    31
+  ],
+  "models_trained": 6,
+  "checkpoint_reload_max_error": 0.0,
+  "framework_environment": "reused /tmp/course-pytorch-cpu-venv; same shared hash-locked CPU environment",
+  "plotting": "system matplotlib3.6.3",
+  "local_files": {
+    "action_math.py": "612238a6a4826820ac43a3e747c6df837f58b6aa9499156d7003c0e9b6171ccc",
+    "action_generation.py": "b0f20589a6bedcea992fab5514f4b320191ea0ce1b78eec6afef010e2160a81b",
+    "test_action_math.py": "21ca3ed73b84bdca74aea33eaeeb39b0a735d10f802e738c1c10c34953507c81",
+    "test_action_generation.py": "415c8cf6d42f9d07994c524bf6a169ca1d57366ff2609d9f83197d166fc49d99",
+    "action_results.py": "e5c012c4cb0b2e34f7669b3a92cdabd5fa79d438320d5d92d46fec8c7ea47d14",
+    "action-generation-results.json": "193d398c0c5074ff30174f155a3d5cb0abad83f51e04057f21ae15d2b952a95d",
+    "action-generation.svg": "04da947e58b96be2e1ebf7b640c5c7df31f3eaae896161a2bcce07b7bf47ad25"
+  },
+  "independent_review": {
+    "original_numeric_results_preserved": true,
+    "corrupted_reload": "changed final bias and NaN independently rejected before sampling",
+    "ddim_tensor_path": "perfect per-example noise at 1,3,8,64 jumps; zero-epsilon clipped endpoints independently checked",
+    "schedule": "158-level fixed-floor duplication now rejected; default64 unchanged",
+    "execution_records": ".codex/course-improvement-2026-10-18/action-generation-independent-review.json"
+  },
+  "checkpoint_files": {
+    "flow-7.pt": "dbc22af6fa57b9d5adc37acf8a3d1a54b368cdaa1797ffd51d8e06b129ad1a58",
+    "ddim-19.pt": "3c34b33003eebf619edc46b3a87565d37e6787fa7bab7eddbb08a74ea316ad17",
+    "ddim-31.pt": "1a4f8d13a9324bf47b9caee180339e015c489dd9ac0d6cc2aa93bf8967c22f5d",
+    "flow-19.pt": "81ed8954675521bb6c93505b5cc8e405362303418f3d0b30a430b03aeffba39a",
+    "flow-31.pt": "0efb06eb2972f0c01462eb760351e633f213d07edb0a001224e99e0c8f6431bc",
+    "ddim-7.pt": "8c9b03efd98ec45520c4257a106fc4834b98a78937524186122a126d3e80ad7f"
+  },
+  "training_seconds_sum": 31.916452232951997
+}

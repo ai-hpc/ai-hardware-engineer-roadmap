@@ -1,1442 +1,191 @@
-# Orin Nano 8GB — Memory Architecture Deep Dive
+# Jetson memory: capacity, traffic, and buffer ownership
 
-<div class="course-identity auto-course" style="--course-accent: #be123c; --course-accent-rgb: 190, 18, 60;" markdown="1">
-<div class="course-identity__icon">ON8M</div>
-<div markdown="1">
-<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
-<p class="course-identity__title">Specialized course identity for Orin Nano 8GB — Memory Architecture Deep Dive.</p>
-<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
-</div>
-</div>
+A Jetson robot's CPU, integrated GPU, cameras, and other engines share physical DRAM. This can avoid transfers between separate CPU and GPU memory pools, but it does not remove address translation, cache rules, synchronization, or competition for bandwidth. This lesson teaches you to calculate a memory budget and trace one image through a pipeline.
 
+Allow two study sessions. You need bytes, array shapes, and basic CPU/GPU execution; review the [shapes and bytes lab](../../../Phase%201%20-%20Foundational%20Knowledge/Labs/Numbers-Shapes-and-Bytes.md) if needed. Finish with a one-page memory budget and a buffer ownership diagram. No board is needed for the worked calculations; on-device profiling is an optional second milestone.
 
-> **Scope:** Production-level understanding of how memory works on Jetson Orin Nano 8GB (T234 SoC) — from DRAM initialization through SMMU translation, CMA internals, camera zero-copy pipelines, secure world isolation, and real production debugging.
->
-> **Prerequisites:** You should be familiar with the [Orin Nano boot chain](../Guide.md#1-orin-nano-8gb--hardware--boot-chain-internals) and basic Linux memory concepts.
+**Platform boundary, checked 2026-10-18:** Orin and Thor have different coherency and CUDA capabilities. Read the [compatibility matrix](../../Compatibility.md) and record the exact module, JetPack, and CUDA versions. A property of an 8 GB Orin Nano does not automatically apply to Orin NX, AGX Orin, or Thor.
 
----
+## 1. Four quantities that should never be confused
 
+| Quantity | Question it answers | Example |
+|---|---|---|
+| Capacity, bytes | Does the live working set fit? | Three 6 MB image buffers need about 18 MB |
+| Traffic, bytes | How much data does this operation move? | A full copy reads and writes the image |
+| Bandwidth, bytes/second | How quickly can a path move data? | An assumed 50 GB/s sustained stream |
+| Latency, seconds | When does this request finish? | Queue wait plus processing plus transfer |
 
+Use decimal MB/GB for powers of 1000 and MiB/GiB for powers of 1024. A model advertised as “3B parameters” has approximately three billion parameters, not three gibiparameters. Packed weight payload also excludes metadata, scales, padding, activations, and runtime storage.
 
-![Camera, GPU preprocessing, inference, and CPU action validation share one DRAM budget but exchange ownership using completion fences.](../../../Assets/illustrations/deployment-edge/memory-ownership.png)
+For a 1920×1080 RGB8 image:
 
-*Read the arrows as ownership transfers. Shared DRAM alone does not remove format conversions, copies, or synchronization.*
-
-## 0. Jetson vs Discrete GPU — The Fundamental Difference
-
-Before any detail: understand **why Jetson memory is fundamentally different** from a desktop/server GPU. This changes everything about how you write CUDA code for edge AI.
-
-### Discrete GPU (Desktop/Server: RTX 4090, H100)
-
-```
-┌─────────────────────────────────┐    PCIe Gen5 x16     ┌──────────────────────────┐
-│          CPU (Host)             │◄════════════════════►│       GPU (Device)        │
-│                                 │     64 GB/s          │                          │
-│  DDR5 System RAM                │                      │  HBM3 / GDDR6X           │
-│  64–512 GB                      │                      │  24–192 GB               │
-│  ~100 GB/s                      │                      │  ~1–3.35 TB/s            │
-│                                 │                      │                          │
-│  CPU can NOT access GPU memory  │                      │  GPU can NOT access RAM   │
-│  directly                       │                      │  directly                │
-└─────────────────────────────────┘                      └──────────────────────────┘
-
-Problem: every byte must cross PCIe (64 GB/s bottleneck)
-  cudaMemcpy(d_ptr, h_ptr, size, cudaMemcpyHostToDevice);  ← mandatory, slow
-  cudaMemcpy(h_ptr, d_ptr, size, cudaMemcpyDeviceToHost);  ← mandatory, slow
+```text
+pixels                         = 2,073,600
+logical image bytes            = 1920*1080*3 = 6,220,800
+one stream at 30 frames/second  = 186,624,000 bytes/second
+one full read-and-write copy   = 373,248,000 logical bytes/second
 ```
 
-### Jetson (Orin Nano Super / Orin NX / AGX Orin)
+Two such copies generate 746.496 MB/s of logical read/write traffic before counting capture, conversion, inference, or display. Actual DRAM traffic may differ because of caching, compression, alignment, and layout. Eliminating a copy saves that copy's work; it does not make the remaining pipeline stop reading and writing memory.
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     T234 SoC (Orin Nano Super)                          │
-│                                                                         │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────┐  │
-│  │  CPU     │  │  GPU     │  │  VIC     │  │  ISP/VI  │  │ NVDEC  │  │
-│  │  A78AE   │  │  Ampere  │  │          │  │  Camera  │  │ NVDEC  │  │
-│  │  6 cores │  │  1024    │  │ ~10 TOPS │  │          │  │        │  │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘  └───┬────┘  │
-│       │             │             │             │             │        │
-│       └─────────────┴─────────────┴─────────────┴─────────────┘        │
-│                              │                                          │
-│                    ┌─────────┴─────────┐                                │
-│                    │ Memory Controller │                                │
-│                    │  (MC) + SMMU      │                                │
-│                    └─────────┬─────────┘                                │
-└──────────────────────────────┼──────────────────────────────────────────┘
-                               │
-                    ┌──────────┴──────────┐
-                    │  8 GB LPDDR5        │
-                    │  ~102 GB/s bandwidth │
-                    │  SHARED by ALL      │
-                    └─────────────────────┘
+## 2. Follow one allocation through the address spaces
 
-No CPU-to-GPU PCIe hop. CPU, GPU, and camera share DRAM; copies and synchronization still depend on allocations and formats.
+A CPU virtual address belongs to a process. A physical page is storage in DRAM. A device address is what a particular device uses to access a mapped allocation. These numbers need not be equal. A mapping allows access; ownership and synchronization decide when that access is valid.
+
+```mermaid
+flowchart TB
+    CPU[CPU process virtual address] --> CPUMap[CPU page-table translation]
+    GPU[GPU virtual address] --> GPUMap[GPU memory translation]
+    Camera[Camera or other DMA device address] --> DMAMap[Device DMA mapping]
+    CPUMap --> RAM[Physical DRAM pages]
+    GPUMap --> RAM
+    DMAMap --> RAM
 ```
 
-### What This Means for Your Code
+This is a conceptual diagram, not a complete Orin interconnect schematic. Different engines have different translation paths and constraints. The Linux DMA API may involve an IOMMU, a bus translation, or a direct mapping; drivers must use the device's mapping API rather than assuming a CPU pointer is a DMA address. The [kernel DMA guide](https://docs.kernel.org/core-api/dma-api-howto.html) explains the contract.
 
-| Operation | Discrete GPU | Jetson |
-|-----------|-------------|--------|
-| **Allocate GPU memory** | `cudaMalloc` (separate VRAM) | `cudaMalloc` (same DRAM pool) |
-| **Copy host→device** | `cudaMemcpy` **(mandatory, slow)** | **Often unnecessary** — use zero-copy |
-| **Copy device→host** | `cudaMemcpy` **(mandatory, slow)** | **Often unnecessary** — use zero-copy |
-| **Managed memory** | Page migration over PCIe (very slow) | Page migration in same DRAM (fast) |
-| **Camera → GPU** | Camera→RAM→PCIe→VRAM (3 copies) | Camera→DRAM→GPU reads same DRAM (**0 copies**) |
-| **Memory capacity** | CPU: 512 GB + GPU: 192 GB (separate) | **8 GB total** (shared by everything) |
-| **Bandwidth** | CPU: 100 GB/s, GPU: 3,350 GB/s (separate) | **~102 GB/s shared** (everyone competes) |
+An SMMU can translate and restrict accesses for devices configured to use it. It is not evidence that every peripheral is isolated correctly, that every buffer is physically contiguous, or that a software race is impossible. Driver configuration, mapping permissions, and the platform's security design still matter.
 
-### The Three Programming Implications
+Unified virtual addressing (UVA) organizes address spaces so CUDA can identify supported allocation types. Unified Memory is a managed allocation/access facility. Shared physical DRAM is a hardware property. These are related but different concepts; none alone grants arbitrary simultaneous CPU/GPU access to every pointer.
 
-**1. Zero-copy is your biggest advantage.**
-On discrete GPU, `cudaMemcpy` often dominates execution time. On Jetson, skip it:
+## 3. Select memory by access pattern and actual capabilities
 
-```cpp
-// ── Discrete GPU: mandatory copy ──────────────────────────────
-float *h_data = (float*)malloc(size);          // host RAM
-float *d_data;
-cudaMalloc(&d_data, size);                     // GPU VRAM
-cudaMemcpy(d_data, h_data, size, cudaMemcpyHostToDevice);  // PCIe copy (slow!)
-kernel<<<grid, block>>>(d_data);
-cudaMemcpy(h_data, d_data, size, cudaMemcpyDeviceToHost);  // PCIe copy (slow!)
+For Orin's integrated GPU, the useful first distinction is who accesses a buffer and how often:
 
-// ── Jetson: zero-copy with pinned host memory ─────────────────
-float *shared;
-cudaMallocHost(&shared, size);                 // pinned, in same DRAM
-// Both CPU and GPU access 'shared' directly — NO copy needed
-fill_data_on_cpu(shared);                      // CPU writes
-kernel<<<grid, block>>>(shared);               // GPU reads same memory
-cudaDeviceSynchronize();
-read_results_on_cpu(shared);                   // CPU reads GPU output
+| Use | Starting candidate | What to verify |
+|---|---|---|
+| Intermediate used repeatedly only on GPU | Device allocation | Lifetime, capacity, and GPU cache reuse |
+| Small CPU-produced input read once by GPU | Supported mapped pinned allocation | Mapping capability, ordering, and GPU access cost |
+| Large data reused by CPU and GPU | Compare explicit copies with supported managed memory | Coherency overhead and reuse benefit |
+| Camera surface shared between supported engines | Documented multimedia interop allocation | Format, plane pitch, mapping, and completion |
+
+Orin supports I/O coherency, but Thor introduces additional full-system coherency features. On Orin, pinned host memory is CPU-cached while GPU access is uncached; repeatedly rereading it can lose a GPU cache advantage. Managed allocations on the applicable single-iGPU configuration can be cached on both processors with driver coherency work at execution boundaries. Consequently “pinned is always fastest” and “managed always migrates like a discrete GPU” are both poor rules. Verify `concurrentManagedAccess`, `pageableMemoryAccess`, and host registration support on the actual device. NVIDIA's [CUDA for Tegra guide](https://docs.nvidia.com/cuda/cuda-for-tegra-appnote/) documents these platform distinctions and their limitations.
+
+A capability does not eliminate synchronization. CPU code must not overwrite an input while a GPU reader is active, even if both addresses refer to the same DRAM. Keep a completion event or another documented synchronization mechanism with each in-flight allocation. On platforms without concurrent managed access, follow the managed-memory CPU access restrictions; do not copy a Thor-specific prefetch recipe to Orin.
+
+For a performance experiment, hold the math, shapes, precision, inputs, and correctness tolerance fixed. Compare end-to-end latency and memory occupancy for the candidate paths. Include a repeated-read kernel as well as a single-pass kernel: their cache behavior can favor different allocations.
+
+## 4. Understand camera surfaces and “zero-copy” precisely
+
+A camera pipeline may use NV12 planes, RGB tensors, block-linear surfaces, pitched linear buffers, or compressed representations. A handle to a surface is not necessarily a tightly packed `width*height*channels` array. Read each plane's dimensions and pitch from the API.
+
+For an illustrative 1920×1080 NV12 frame with tightly packed planes, the payload is `width*height*1.5 = 3,110,400` bytes. If the API reports a larger pitch or padded height, use those values for allocated size and indexing. Do not pass an NV12 buffer to a kernel expecting interleaved RGB without a conversion.
+
+An interop path can let two engines use one allocation. It still needs a producer-completion signal before the consumer reads and a consumer-completion signal before the producer reuses the surface. Mapping and unmapping rules depend on the specific API. NVIDIA's [NvBufSurface reference](https://docs.nvidia.com/metropolis/deepstream/7.1/sdk-api/group__ds__aaa.html) is a versioned example; select the matching API for your installed stack.
+
+Draw the pipeline with both **allocations** and **operations**:
+
+```text
+capture surface A → resize/color conversion writes B → inference reads B
+                                                   → output tensor C → controller
 ```
 
-**2. Classify the bottleneck using matching units.**
+Even if A is imported without a copy, conversion writes B and inference reads it. “No extra staging copy” is a useful claim. “No memory traffic” is not.
 
-A roofline ridge is peak operations/s divided by bytes/s. With the advertised illustrative pair `67 × 10^12 sparse INT8 operations/s` and `102 × 10^9 bytes/s`, the quotient is approximately **657 operations/byte**, not 0.66. It is a sparse INT8 roofline, not an FP16 or dense-decode roofline.
+A buffer pool solves repeated allocation only when its lifetime is correct. With three frames in flight, each needs a buffer slot or a proven reuse schedule. A slot may return to FREE only after all consumers are done. Increasing the pool can improve overlap but also permit more queued old observations; measure age as well as throughput.
 
-Use measured or applicable peak throughput for the actual dtype, sparsity, operation, and clock mode. Low arithmetic-intensity work can be bandwidth-bound; large reused matrix products can be compute-bound. Launch overhead, indexing, and synchronization may dominate small kernels. A hardware name alone cannot classify every workload.
+## 5. Budget live memory, including the peak
 
-**3. Memory capacity is precious — 8 GB total.**
-On a server, a 7B LLM model takes 14 GB (FP16) in GPU VRAM, leaving 500+ GB system RAM for everything else. On Jetson 8 GB, that same model won't even fit. You must:
-- Quantize aggressively (INT8 → 7 GB, INT4 → 3.5 GB)
-- Account for OS + camera + CUDA runtime (~2–3 GB)
-- Choose models that fit the budget (YOLOv8-N at 3.2M params, not YOLOv8-X at 68M)
+<a id="memory-planning-for-multi-model-pipelines"></a>
+### Memory planning for multi-model pipelines
 
-### Memory Budget Comparison
+A useful first budget is:
 
-```
-Discrete Server (H100 80GB + 512 GB DDR5):
-  GPU VRAM: 80 GB  │ System RAM: 512 GB
-  ─────────────────│────────────────────
-  Model: 40 GB     │ OS: 4 GB
-  Activations: 20 GB│ App: 2 GB
-  Scratch: 15 GB   │ Datasets: 200 GB
-  Free: 5 GB       │ Free: 306 GB
-
-Jetson Orin Nano 8GB (shared):
-  ┌──────────────────────────────────┐
-  │ 8 GB LPDDR5 (total)             │
-  │                                  │
-  │ Firmware carveouts:   ~0.4 GB   │
-  │ OS + kernel:          ~0.5 GB   │
-  │ CMA (camera buffers): ~0.75 GB  │
-  │ CUDA runtime:         ~0.3 GB   │
-  │ Model (INT8 YOLO):    ~0.1 GB   │
-  │ Inference scratch:     ~0.2 GB   │
-  │ ─────────────────────────────── │
-  │ Free for userspace:    ~5.75 GB │
-  └──────────────────────────────────┘
+```text
+live memory = persistent weights + live activations + execution workspace
+            + input/output pools + KV/state caches + framework/runtime overhead
+            + other applications and operating-system use
 ```
 
-### CUDA Memory API Decision Tree for Jetson
+Peak memory depends on lifetime overlap. Adding every tensor ever created overestimates the requirement; summing only weights underestimates it. Two models that execute concurrently may need separate contexts, workspaces, and input pools even when some weights are shared by the runtime.
 
-```
-What are you allocating?
-│
-├── Camera frames / video decoder output
-│   └── Use DMA-BUF / NvBufSurface (zero-copy from hardware engine)
-│
-├── Model weights (loaded once, read by GPU)
-│   └── cudaMalloc (pinned device memory, fastest GPU access)
-│
-├── Pre/post-processing buffers (CPU writes, GPU reads, or vice versa)
-│   └── cudaMallocHost (pinned, both CPU and GPU access, no copy)
-│
-├── Prototyping / irregular access pattern
-│   └── cudaMallocManaged (automatic migration, but unpredictable latency)
-│
-└── Temporary GPU-only scratch
-    └── cudaMalloc (standard, fastest)
-```
+Use this **hypothetical planning example**, in MiB:
 
-> **Key mindset shift:** On discrete GPU, you think "minimize PCIe transfers." On Jetson, you think "minimize total DRAM bandwidth consumption" — because CPU, GPU, camera, and display all share the same ~102 GB/s pipe.
+| Component | Budget |
+|---|---:|
+| OS, services, and other processes | 1,800 |
+| Model weights and persistent runtime state | 2,200 |
+| Concurrent activation/workspace peak | 900 |
+| Camera and tensor pools | 120 |
+| KV or recurrent state | 300 |
+| Planned free headroom | 800 |
+| Total | **6,120 MiB** |
 
----
+This is not an Orin Nano measurement. Compare it with the memory visible to the running system and its reservations; an “8 GB” product label is not a promise that an application can allocate 8 GiB. Measure the largest transient during startup, model building/loading, resolution changes, and concurrent execution.
 
-## 1. T234 SoC Memory Architecture Overview
-
-The Tegra234 SoC in Orin Nano 8GB uses a **unified memory architecture** — CPU, GPU, camera, and other available engines share a single 8GB LPDDR5 pool. There is no discrete GPU memory.
-
-```
-                        8GB LPDDR5
-                    ┌───────────────┐
-                    │               │
-       ┌────────────┤  Memory       ├────────────┐
-       │            │  Controllers  │            │
-       │            │  (MC)         │            │
-       │            └───────┬───────┘            │
-       │                    │                    │
-  ┌────┴────┐         ┌────┴────┐         ┌─────┴────┐
-  │ CPU     │         │ GPU     │         │ VIC/ISP  │
-  │ A78AE   │         │ Ampere  │         │ NVDEC    │
-  │ cluster │         │ 1024    │         │ NVDEC    │
-  │         │         │ cores   │         │ CSI/VI   │
-  └─────────┘         └─────────┘         └──────────┘
-```
-
-### Memory Controllers
-
-T234 has multiple memory controller (MC) channels connected to the LPDDR5 interface. The MC handles:
-
-* Arbitration between CPU, GPU, and all accelerators
-* Bandwidth partitioning (configurable via BPMP firmware)
-* Quality-of-Service (QoS) priorities for latency-sensitive engines (e.g., display, camera)
-
-### Unified Virtual Memory (UVM)
-
-CUDA on Jetson supports unified virtual addressing (UVA). A pointer returned by `cudaMallocManaged()` is valid on both CPU and GPU — the runtime handles coherence via page faults and migration. However, for latency-critical paths (camera, inference), explicit allocation with `cudaMalloc()` or NVMM buffers avoids migration overhead.
-
----
-
-## 2. Cache Hierarchy
-
-Understanding caches is critical for optimizing memory-bound inference workloads.
-
-```
-CPU Core (A78AE)
-  L1I: 64KB per core (instruction)
-  L1D: 64KB per core (data)
-  L2:  256KB per core
-  L3:  2MB shared (cluster-level)
-
-GPU (Ampere)
-  L1 / Shared Memory: per-SM (configurable)
-  L2: shared across all SMs
-```
-
-### Key Implications
-
-* **CPU L3 is small (2MB)** — large working sets spill to DRAM quickly. This matters for pre/post-processing on CPU.
-* **GPU L2** is shared — inference kernels compete for cache. Kernel tiling and occupancy directly affect L2 hit rates.
-* **I/O coherency is not full system coherency.** Orin supports I/O-coherent access, with allocation-specific CPU/GPU caching rules. A shared physical allocation still needs ownership transfer and completion synchronization. Compare allocation types using [CUDA for Tegra](https://docs.nvidia.com/cuda/cuda-for-tegra-appnote/); do not assume mapped pinned memory is fastest for GPU-reused tensors.
-
----
-
-## 3. Boot-Time Memory Initialization
-
-On Orin Nano, memory is set up in stages before Linux ever runs.
-
-### MB1 — DRAM Training
-
-MB1 (loaded from QSPI NOR) performs LPDDR5 training:
-
-* Calibrates timing parameters for each DRAM channel
-* Stores training data for fast-boot on subsequent boots
-* Configures ECC if enabled
-
-If DRAM training fails, the board does not boot — no display, no serial output.
-
-### MB2 — Carveout Setup
-
-MB2 reads the device tree and reserves memory regions (carveouts) for firmware processors:
-
-* **BPMP** — power management firmware
-* **SPE** — safety processor
-* **RCE** — camera real-time engine
-* **OP-TEE** — secure world
-* **VPR** — Video Protected Region (DRM)
-
-These carveouts are removed from the Linux-visible memory map before the kernel starts.
-
-### UEFI — Memory Map Handoff
-
-UEFI constructs the EFI memory map describing which regions are:
-
-* Usable by Linux (conventional memory)
-* Reserved (firmware, carveouts)
-* ACPI/runtime services
-
-Linux receives this map via `efi_memmap` and initializes its memory subsystem accordingly.
-
-### Device Tree Memory Nodes
-
-The DTB loaded by UEFI defines:
-
-```dts
-memory@80000000 {
-    device_type = "memory";
-    reg = <0x0 0x80000000 0x0 0x70000000>,   /* Region 1 */
-          <0x0 0xf0200000 0x0 0x0fe00000>;   /* Region 2 */
-};
-```
-
-Carveouts are defined separately:
-
-```dts
-reserved-memory {
-    #address-cells = <2>;
-    #size-cells = <2>;
-    ranges;
-
-    bpmp_carveout: bpmp {
-        compatible = "nvidia,bpmp-shmem";
-        reg = <0x0 0x40000000 0x0 0x200000>;
-        no-map;
-    };
-};
-```
-
-The `no-map` property means Linux cannot touch this memory.
-
-If DTB carveouts are wrong, the system may crash before `start_kernel()` or firmware processors will malfunction.
-
----
-
-## 4. What the 8GB Really Looks Like
-
-On Orin Nano, DRAM is initialized by MB1 → MB2 → UEFI → Linux. Very early boot reserves memory **before Linux even starts**.
-
-### Typical `/proc/iomem` Layout (Conceptual)
-
-```
-00000000-000fffff : Reserved (Boot ROM, vectors)
-00100000-3fffffff : System RAM
-40000000-4fffffff : Reserved (VPR, carveouts)
-50000000-57ffffff : CMA
-58000000-ffffffff : System RAM
-```
-
-### Reserved Regions
-
-| Region                       | Purpose                         |
-|------------------------------|---------------------------------|
-| VPR (Video Protected Region) | DRM / secure video playback     |
-| SPE carveout                 | Safety processor firmware       |
-| BPMP carveout                | Power management firmware       |
-| OP-TEE secure RAM            | Trusted execution environment   |
-| CMA                          | Contiguous DMA for camera / GPU |
-
-These are defined in the **Device Tree (DTB)** loaded by UEFI.
-
-### Inspecting the Real Memory Map
+Read-only Linux observations include:
 
 ```bash
-# Full memory map
-cat /proc/iomem
-
-# Linux-visible memory summary
+free -h
 cat /proc/meminfo
-
-# CMA-specific stats
-grep Cma /proc/meminfo
-```
-
-Example `/proc/meminfo` output on Orin Nano 8GB:
-
-```
-MemTotal:        7633536 kB    ← Not 8GB! Carveouts took the rest
-CmaTotal:         786432 kB    ← 768MB reserved for CMA
-CmaFree:          524288 kB    ← Currently unused CMA
-```
-
-The ~400MB difference between 8GB and `MemTotal` is consumed by firmware carveouts, kernel code, and reserved regions.
-
----
-
-## 5. Linux Memory Zones
-
-Linux divides physical memory into zones:
-
-| Zone        | Address Range    | Purpose                           |
-|-------------|------------------|-----------------------------------|
-| ZONE_DMA    | 0 – 16MB         | Legacy ISA DMA (mostly unused)    |
-| ZONE_DMA32  | 0 – 4GB          | 32-bit addressable DMA            |
-| ZONE_NORMAL | Above 4GB        | General-purpose allocations        |
-
-Orin Nano mostly uses **ZONE_NORMAL** since LPDDR5 is mapped above the 4GB boundary for most of the address space.
-
-You can inspect zone state:
-
-```bash
-cat /proc/zoneinfo
-```
-
-Key fields:
-
-* `free` — pages currently free in this zone
-* `min` / `low` / `high` — watermarks that trigger reclaim
-* `nr_free_pages` — total free across all orders
-
-When `free` drops below `min`, the kernel starts aggressive reclaim (kswapd, direct reclaim). On Jetson with large camera buffers, this can cause latency spikes.
-
----
-
-## 6. Buddy Allocator Internals
-
-The Linux buddy allocator manages free pages in powers of two:
-
-```
-Order 0 =   4KB  (1 page)
-Order 1 =   8KB  (2 pages)
-Order 2 =  16KB  (4 pages)
-Order 3 =  32KB  (8 pages)
-...
-Order 9 =   2MB  (512 pages)
-Order 10 =  4MB  (1024 pages)
-```
-
-### How Allocation Works
-
-When a driver requests 64KB (order 4):
-
-1. Check the order-4 free list
-2. If empty, split a higher-order block (e.g., order 5 → two order 4 blocks)
-3. Return one block, keep the other as free
-
-### How Freeing Works
-
-When a block is freed:
-
-1. Check if the adjacent "buddy" block is also free
-2. If yes, merge into a higher-order block
-3. Repeat up the chain
-
-### Inspecting Fragmentation
-
-```bash
-cat /proc/buddyinfo
-```
-
-Example output:
-
-```
-Node 0, zone   Normal  1024  512  256  128  64  32  16  8  4  2  1
-```
-
-Each number is the count of free blocks at that order (0 through 10). If high-order columns show `0`, the system is fragmented — large contiguous allocations will fail even if total free memory is sufficient.
-
-### Why This Matters on Jetson
-
-Camera and GPU drivers need large contiguous allocations. A fragmented system with plenty of free memory but no high-order blocks will fail to allocate buffers — this is why CMA exists.
-
----
-
-<a id="7-cma--contiguous-memory-allocator"></a>
-## 7. CMA — Contiguous Memory Allocator
-
-CMA is **not** separate memory. It is:
-
-> A reserved movable region inside normal RAM where Linux can guarantee physically contiguous allocations.
-
-Linux marks CMA pages as **MIGRATE_CMA**. When not used for DMA, these pages hold movable data (e.g., userspace pages). When a contiguous allocation is needed, the kernel migrates those pages elsewhere.
-
-### Allocation Flow
-
-When a driver calls `dma_alloc_contiguous()`:
-
-1. Find free pages inside the CMA region
-2. Use the buddy allocator to locate a contiguous block
-3. Compact memory if needed (migrate movable pages out of the way)
-4. Map the allocation into the SMMU for the requesting device
-5. Return the DMA address (IOVA) and kernel virtual address
-
-### Why Long-Running Systems Fail
-
-Over time, memory fragmentation builds up:
-
-```
-CMA region:
-[used][free][used][free][used][free][used]
-```
-
-Even if total free CMA is sufficient, no single contiguous chunk is large enough. The camera fails with:
-
-```
-Failed to allocate buffer
-```
-
-This is a classic embedded production issue. Mitigations:
-
-* **Right-size CMA** for your workload (see next section)
-* **Pre-allocate buffers at boot** and reuse them
-* **Monitor CMA fragmentation** in production (see Section 16)
-* **Use NVMM buffer pools** rather than allocating/freeing per-frame
-
----
-
-## 8. How to Resize CMA
-
-### Method 1: Kernel Command Line
-
-Edit `/boot/extlinux/extlinux.conf`:
-
-```
-APPEND ... cma=1024M
-```
-
-This sets CMA to 1GB.
-
-### Method 2: Device Tree
-
-```dts
-reserved-memory {
-    linux,cma {
-        compatible = "shared-dma-pool";
-        reusable;
-        size = <0x0 0x40000000>;   /* 1GB */
-        linux,cma-default;
-    };
-};
-```
-
-Reflash DTB after modification.
-
-### Sizing Guidelines
-
-| Workload                      | Recommended CMA |
-|-------------------------------|-----------------|
-| Single camera, light inference | 256–512MB       |
-| Single 4K camera + TensorRT   | 512–768MB       |
-| Multi-camera AI pipeline       | 768MB–1GB       |
-| Multi-camera + large models    | 1–1.5GB         |
-
-Trade-offs:
-
-* Too large CMA = less memory for userspace, model weights, and CUDA
-* Too small CMA = camera buffer allocation failures under load
-* 768MB–1GB is common for production multi-camera AI workloads
-
-### Verify After Change
-
-```bash
-grep Cma /proc/meminfo
-```
-
-Confirm `CmaTotal` matches your configured size.
-
----
-
-## 9. SMMU (IOMMU) — Real Translation Path
-
-Orin Nano uses **ARM SMMU v2** (System Memory Management Unit). Every device that performs DMA goes through the SMMU.
-
-### Translation Flow
-
-```
-Device (GPU, CSI, ISP, etc.)
-   ↓
-IOVA (I/O Virtual Address — what the device sees)
-   ↓
-SMMU page tables (owned by Linux kernel)
-   ↓
-Physical DRAM (actual memory location)
-```
-
-Devices **never see physical RAM directly**. The kernel:
-
-1. Allocates memory (from CMA or normal pages)
-2. Maps those physical pages into the SMMU page tables for the target device
-3. Gives the device an IOVA
-4. The device performs DMA using the IOVA
-
-### Why This Architecture Is Powerful
-
-* **Device isolation** — a misbehaving device cannot corrupt another device's memory
-* **No rogue DMA** — unmapped accesses cause SMMU faults (caught and logged)
-* **Shared buffers** — multiple devices can map the same physical pages at different IOVAs
-* **Scatter-gather as contiguous** — physically scattered pages appear contiguous to the device
-
-This is why GPU and camera can share buffers safely without copies.
-
-### SMMU Page Table Structure
-
-ARM SMMU uses multi-level page tables similar to CPU MMU:
-
-```
-Stream Table Entry (per device/stream ID)
-   ↓
-Context Descriptor
-   ↓
-Level 1 Page Table (covers large VA range)
-   ↓
-Level 2 Page Table
-   ↓
-Level 3 Page Table (4KB granule)
-   ↓
-Physical Page
-```
-
-Each device has its own stream ID and its own set of page tables, providing full isolation.
-
-### SMMU Fault Debugging
-
-When a device accesses an unmapped IOVA:
-
-```bash
-dmesg | grep smmu
-```
-
-Example fault:
-
-```
-arm-smmu 12000000.iommu: Unhandled context fault: iova=0x1234000, fsynr=0x11
-```
-
-This means the device tried to access IOVA `0x1234000` but no mapping existed. Common causes:
-
-* Buffer freed while device still referencing it
-* Incorrect DMA-BUF import
-* Driver bug in IOVA mapping
-
----
-
-## 10. Camera → ISP → CUDA Zero-Copy Path
-
-This is the critical data path for real-time AI vision on Orin Nano.
-
-### Step 1 — Sensor Capture
-
-```
-MIPI CSI-2 camera sensor
-    ↓ (serial lanes)
-NVCSI controller (deserializes)
-    ↓
-VI (Video Input — captures frames)
-    ↓
-ISP (Image Signal Processor — debayer, denoise, tone-map)
-```
-
-### Step 2 — ISP Output to CMA
-
-ISP writes processed frames into **CMA memory**. CMA is required because ISP needs physically contiguous buffers for DMA. The ISP hardware has no scatter-gather capability.
-
-### Step 3 — DMA-BUF Export
-
-The V4L2 driver exports the buffer as a **DMA-BUF** file descriptor. Once exported, the same physical memory can be imported by any DMA-BUF-aware consumer:
-
-* CUDA (via `cudaExternalMemory`)
-* NvBufSurface (NVIDIA multimedia buffer API)
-* GStreamer (via `nvv4l2camerasrc`)
-* DeepStream (via source bin)
-
-### Step 4 — GPU Access via SMMU
-
-The GPU imports the DMA-BUF and maps it through its own SMMU context:
-
-```
-GPU IOVA → SMMU → Same physical CMA pages that ISP wrote to
-```
-
-**No memcpy.** This is true zero-copy. The GPU reads the exact same physical memory the ISP wrote, just mapped at a different virtual address through a different SMMU stream.
-
-### Full Zero-Copy Pipeline
-
-```
-Sensor → NVCSI → VI → ISP → CMA buffer
-                                ↓ (DMA-BUF export)
-                          ┌─────┴─────┐
-                          │           │
-                     GPU (CUDA)   Display
-                     via SMMU     via SMMU
-                          │
-                     TensorRT
-                     inference
-```
-
-This is how real-time 4K vision runs efficiently on Orin Nano without saturating memory bandwidth.
-
-### Memory Flow Summary
-
-| Stage       | Memory Type        | Allocated By        |
-|-------------|--------------------|---------------------|
-| CSI/VI      | CMA (contiguous)   | V4L2 / nvargus      |
-| ISP output  | CMA (same buffer)  | Reused from VI      |
-| GPU input   | DMA-BUF import     | CUDA / NvBufSurface |
-| GPU output  | CUDA device memory | cudaMalloc          |
-
----
-
-## 11. GPU Memory Management
-
-### NVMM (NVIDIA Multimedia Memory)
-
-NVMM is NVIDIA's buffer management layer for multimedia pipelines (camera, encode, decode). Key properties:
-
-* Buffers are allocated from CMA or carved-out memory
-* Importable by compatible consumers (for example ISP, GPU, VIC, and NVDEC), subject to format, layout, and synchronization requirements. Nano has no NVENC.
-* Zero-copy between engines via DMA-BUF
-* Managed by `libnvbufsurface`
-
-NVMM is the foundation for GStreamer and DeepStream zero-copy pipelines.
-
-### CUDA Memory on Jetson
-
-On Jetson (unified memory architecture), CUDA memory types behave differently than on discrete GPUs:
-
-| API                    | Where Memory Lives  | CPU Accessible? | GPU Accessible? | Notes                          |
-|------------------------|---------------------|-----------------|-----------------|--------------------------------|
-| `cudaMalloc`           | DRAM (pinned)       | No              | Yes             | Fastest for GPU-only access    |
-| `cudaMallocManaged`    | DRAM (migrating)    | Yes             | Yes             | Page-fault based, higher latency |
-| `cudaMallocHost`       | DRAM (pinned)       | Yes             | Yes             | Good for CPU↔GPU shared data   |
-| DMA-BUF import         | CMA / NVMM          | Yes             | Yes             | Zero-copy from camera/decoder  |
-
-For inference pipelines, prefer:
-
-* **DMA-BUF import** for camera frames (zero-copy)
-* **`cudaMalloc`** for model weights and scratch memory
-* **`cudaMallocHost`** for CPU pre/post-processing buffers shared with GPU
-
-Avoid `cudaMallocManaged` in latency-critical paths — page faults add unpredictable latency.
-
-### GPU Memory Pressure
-
-Monitor GPU memory usage:
-
-```bash
-# Total GPU memory (same as system memory on Jetson)
-nvidia-smi  # or tegrastats
-
-# Detailed CUDA memory
-python3 -c "import torch; print(torch.cuda.memory_summary())"
-```
-
-On Orin Nano 8GB, GPU and CPU compete for the same 8GB. A large model loaded in CUDA reduces memory available for camera buffers, CMA, and OS. Memory planning is essential.
-
----
-
-## 12. Accelerator memory paths: compare Nano with NX/AGX
-
-Orin Nano has no DLA. On supported NX/AGX modules, DLA is another consumer of system memory; moving work there does not create more physical RAM. Layout conversions and synchronization can add DRAM traffic even when buffers can be shared. See the [DLA comparison course](../Orin-Nano-DLA-Deep-Dive/Guide.md) and [NVIDIA Orin power tables](https://docs.nvidia.com/jetson/archives/r36.5/DeveloperGuide/SD/PlatformPowerAndPerformance/JetsonOrinNanoSeriesJetsonOrinNxSeriesAndJetsonAgxOrinSeries.html).
-
-For the custom SoC, make the same distinction between **storage capacity**, **bandwidth**, and **ownership**. List each tensor's producer, consumer, layout, allocation, DMA mapping, and completion fence. A shared address space alone proves none of these interfaces compatible.
-
-## 13. TensorRT Engine Memory Management
-
-TensorRT is the primary inference engine on Jetson. Understanding how it allocates and uses memory is essential for fitting models into the 8 GB budget.
-
-### How TensorRT Uses Memory
-
-```
-TensorRT engine lifecycle:
-
-1. Build phase (on workstation or Jetson):
-   Model (ONNX/UFF) → TensorRT optimizer → serialized engine (.engine file)
-
-2. Load phase (on Jetson at startup):
-   Read .engine from disk → deserialize → allocate:
-     ├── Weight memory:     model weights (pinned, read-only after load)
-     ├── Activation memory: intermediate layer outputs (reused across layers)
-     ├── Workspace memory:  scratch space for conv/GEMM algorithms
-     └── I/O buffers:       input and output tensors
-
-3. Inference phase (per frame):
-   Write input → execute() → read output
-   No new allocations — everything is preallocated
-```
-
-### Memory Breakdown for a Typical Model
-
-```
-YOLOv8-S (INT8, 640×640 input, batch=1):
-
-  Component              Memory      Notes
-  ──────────────────────────────────────────────────
-  Weights (INT8)          ~5 MB      Quantized from ~22 MB FP32
-  Activation buffers     ~12 MB      Largest intermediate tensor
-  Workspace              ~30 MB      Convolution algorithm scratch
-  I/O buffers             ~2 MB      Input image + output detections
-  ──────────────────────────────────────────────────
-  Total                  ~49 MB      Fits easily
-
-ResNet-50 (FP16, 224×224, batch=1):
-
-  Weights (FP16)         ~48 MB
-  Activation buffers     ~25 MB
-  Workspace              ~50 MB
-  I/O buffers             ~1 MB
-  ──────────────────────────────────────────────────
-  Total                 ~124 MB
-
-Llama 3.2 3B (INT4-AWQ, via TensorRT-LLM):
-
-  Weights (INT4)       ~1500 MB      3B × 0.5 bytes
-  KV cache (INT8)       ~110 MB      26 layers × 8 heads × 128 dim × 2048 ctx
-  Activation buffers    ~200 MB      Attention + FFN intermediates
-  Workspace             ~100 MB
-  ──────────────────────────────────────────────────
-  Total               ~1910 MB      Fits, but consumes ~2 GB of 5.5 GB available
-```
-
-### Workspace Memory — The Hidden Consumer
-
-TensorRT tries multiple convolution algorithms during build and picks the fastest. Faster algorithms often need more workspace. You control the trade-off:
-
-```cpp
-config->setMemoryPoolLimit(MemoryPoolType::kWORKSPACE, 64 << 20);  // 64 MB max
-// Larger workspace = TensorRT can try faster algorithms
-// Smaller workspace = less memory used, possibly slower algorithms
-```
-
-**Jetson recommendation:** Set workspace to 64–128 MB. Going higher rarely helps on Orin Nano's smaller SMs.
-
-### Activation Memory Reuse
-
-TensorRT reuses activation buffers across layers. Layer 5's output buffer can be reused for Layer 10's output if Layer 5's data is no longer needed.
-
-```
-Layer 1 → [Buffer A] → Layer 2 → [Buffer B] → Layer 3 → [Buffer A] (reused!)
-                                                           ↑
-                                              Layer 1's data no longer needed
-```
-
-This is why TensorRT uses far less memory than naive PyTorch inference (which keeps all intermediate tensors alive until backward pass).
-
-### Inspecting TensorRT Memory Usage
-
-```python
-import tensorrt as trt
-
-# After building engine
-engine = runtime.deserialize_cuda_engine(engine_data)
-
-# Check memory
-print(f"Device memory: {engine.device_memory_size / 1024**2:.1f} MB")
-print(f"Layers: {engine.num_layers}")
-print(f"Max batch: {engine.max_batch_size}")
-
-# Per-layer memory (advanced)
-inspector = engine.create_engine_inspector()
-print(inspector.get_engine_information(trt.LayerInformationFormat.JSON))
-```
-
----
-
-## 14. Multi-Model and Multi-Engine Inference
-
-Production Jetson systems often run multiple AI models simultaneously: object detection + classification + tracking, or detection + segmentation + LLM.
-
-### Memory Planning for Multi-Model Pipelines
-
-```
-Example: Autonomous robot vision pipeline
-
-  Camera → YOLOv8-N (detect) → ResNet-18 (classify) → DeepSORT (track)
-                  ↓                     ↓                    ↓
-              ~30 MB               ~25 MB                ~15 MB
-              GPU (Nano)           GPU                   CPU
-
-Pipeline memory budget:
-  Model weights:      30 + 25 + 15         = ~70 MB
-  Activation buffers: 12 + 8 + 5           = ~25 MB
-  Workspace:          30 + 20 + 0          = ~50 MB
-  Camera buffers:     4 frames × 3 MB      = ~12 MB
-  ───────────────────────────────────────────────────
-  Total AI pipeline:                        ~157 MB
-
-  + OS/kernel/CMA/CUDA overhead:           ~2500 MB
-  ───────────────────────────────────────────────────
-  Remaining from 8 GB:                     ~5343 MB  ← plenty of room
-```
-
-### Optional NX/AGX comparison: GPU + DLA concurrency
-
-This subsection requires a DLA-equipped module; it does not run on Orin Nano. Numbers below are illustrative budgets, not measured Nano results.
-
-Running detection on DLA while classification runs on GPU achieves overlap — both engines execute in parallel on the same DRAM:
-
-```
-Timeline (overlapped):
-
-  Frame N:   │ DLA: YOLO detect ──────│
-             │ GPU: (idle)            │ GPU: ResNet classify ──│
-             │                         │                        │
-  Frame N+1: │                    DLA: YOLO detect ──────│     │
-             │                         │ GPU: ResNet classify ──│
-
-DLA and GPU read different parts of DRAM simultaneously.
-Memory controller arbitrates bandwidth between them.
-```
-
-**Key constraint:** DLA and GPU compete for the same ~102 GB/s DRAM bandwidth. If both are bandwidth-saturated, total throughput drops. Monitor with `tegrastats`:
-
-```bash
-tegrastats --interval 500
-# Look for: GR3D_FREQ (GPU utilization), EMC_FREQ (memory clock)
-# If EMC is at 100%, you're bandwidth-limited — reduce model size or batch
-```
-
-### Multi-Engine TensorRT Contexts
-
-```cpp
-// Load two engines
-auto det_engine = runtime->deserializeCudaEngine(det_data, det_size);
-auto cls_engine = runtime->deserializeCudaEngine(cls_data, cls_size);
-
-// Create execution contexts (share GPU, separate state)
-auto det_ctx = det_engine->createExecutionContext();
-auto cls_ctx = cls_engine->createExecutionContext();
-
-// Run on separate CUDA streams for overlap
-cudaStream_t det_stream, cls_stream;
-cudaStreamCreate(&det_stream);
-cudaStreamCreate(&cls_stream);
-
-det_ctx->enqueueV2(det_bindings, det_stream, nullptr);
-cls_ctx->enqueueV2(cls_bindings, cls_stream, nullptr);
-
-// Both execute concurrently if resources allow
-cudaStreamSynchronize(det_stream);
-cudaStreamSynchronize(cls_stream);
-```
-
----
-
-## 15. LLM Memory Patterns on Unified Architecture
-
-LLMs have unique memory patterns that interact with Jetson's unified architecture differently than vision models.
-
-### Autoregressive Decode — The Memory Access Pattern
-
-```
-Prefill phase (process entire prompt):
-  All tokens processed in parallel
-  Memory pattern: large GEMM (batch = prompt_length × hidden_dim)
-  Bandwidth usage: HIGH (loading full weight matrices)
-  Compute utilization: GOOD (large batch amortizes weight loading)
-
-Decode phase (generate one token at a time):
-  One token generated per step
-  Memory pattern: skinny GEMV (batch=1 × hidden_dim)
-  Bandwidth usage: HIGH (still load full weight matrices for 1 token!)
-  Compute utilization: TERRIBLE (~1% — almost all time spent loading weights)
-
-This is why LLM decode is severely memory-bandwidth-bound on Jetson.
-```
-
-### Weight Loading Dominates on Jetson
-
-```
-Llama 3.2 3B INT4 decode — one token:
-
-  Weight loading: 1.5 GB read from DRAM
-  Computation:    3B × 2 FLOPs = 6 GFLOP
-  Time to load:   1.5 GB / 102 GB/s = ~14.7 ms
-  Compute bound: use measured throughput for the actual dense dtype/kernel; sparse INT8 TOPS is not FP compute throughput
-  ─────────────────────────────────────────────
-  Decode time:    ~15 ms per token → ~67 tokens/sec
-
-  Compute utilization: 0.09 / 14.7 = 0.6%
-
-  → 99.5% of time is waiting for DRAM to deliver weights
-  → Faster compute (more CUDA cores) would not help
-  → Only bandwidth helps: smaller weights (INT4 > INT8 > FP16)
-```
-
-**This is fundamentally different from server GPUs:**
-
-```
-H100 with same model:
-  Time to load:   1.5 GB / 3350 GB/s = ~0.45 ms
-  → ~2,200 tokens/sec (bandwidth difference)
-
-Jetson Orin Nano Super is ~33× slower for LLM decode purely due to bandwidth.
-This is not fixable by software — it's physics.
-```
-
-### KV Cache in Unified Memory — The Advantage
-
-On discrete GPUs, KV cache lives in GPU VRAM. If you need CPU post-processing of attention patterns (for debugging, interpretability), you must copy back over PCIe.
-
-On Jetson, KV cache is in the same DRAM — CPU can inspect it directly:
-
-```cpp
-// Allocate KV cache with cudaMallocHost (zero-copy on Jetson)
-float* kv_cache;
-cudaMallocHost(&kv_cache, kv_cache_size);
-
-// GPU writes during attention
-attention_kernel<<<grid, block>>>(q, k, v, kv_cache, ...);
-cudaDeviceSynchronize();
-
-// CPU can read KV cache directly — no copy!
-for (int l = 0; l < num_layers; l++) {
-    printf("Layer %d, head 0, token 0: K=%.3f\n",
-           l, kv_cache[l * kv_stride]);
-}
-```
-
-### LLM Memory Growth During Conversation
-
-```
-KV cache grows with each generated token:
-
-Token 1:    Model (1.5 GB) + KV (0.05 MB) = 1500 MB
-Token 100:  Model (1.5 GB) + KV (5.3 MB)  = 1505 MB
-Token 1000: Model (1.5 GB) + KV (53 MB)   = 1553 MB
-Token 2048: Model (1.5 GB) + KV (109 MB)  = 1609 MB
-Token 4096: Model (1.5 GB) + KV (218 MB)  = 1718 MB
-Token 8192: Model (1.5 GB) + KV (436 MB)  = 1936 MB  ← danger zone on 8 GB
-
-Monitor continuously:
-  tegrastats --interval 1000 | grep -oP 'RAM \d+/\d+MB'
-```
-
-Set a hard context limit in production to prevent OOM:
-
-```bash
-# llama.cpp: cap context to prevent OOM
-./llama-cli -m model.gguf -c 2048 --memory-f32 0  # INT8 KV cache
-```
-
----
-
-## 16. Inference Memory Optimization Strategies
-
-### 16.1 Quantization Impact on Memory
-
-Quantization is the single most effective memory optimization — every bit saved is bandwidth saved:
-
-```
-Same model, different precisions — memory and tokens/sec:
-
-  Precision   Size     DRAM reads/token   Est. tokens/sec
-  ─────────────────────────────────────────────────────────
-  FP32        12 GB    12 GB/token        won't fit
-  FP16         6 GB    6 GB/token         ~8 tok/s
-  INT8         3 GB    3 GB/token         ~17 tok/s
-  INT4         1.5 GB  1.5 GB/token       ~33 tok/s
-  INT3         1.1 GB  1.1 GB/token       ~45 tok/s (quality degrades)
-
-  Tokens/sec scales almost linearly with quantization level
-  because decode is 99%+ memory-bandwidth-bound.
-```
-
-### 16.2 Weight Layout for Bandwidth
-
-How weights are stored in memory affects bandwidth utilization:
-
-```
-Row-major (default):
-  Weight matrix [4096 × 4096] stored as 4096 rows of 4096 elements
-  For batch=1 GEMV: read entire matrix row by row
-  Memory access: sequential → good for DRAM burst reads ✓
-
-Blocked layout (TensorRT-LLM):
-  Matrix split into tiles that fit in SM shared memory
-  Each tile loaded once, used for multiple output elements
-  Better reuse → fewer total DRAM reads ✓
-
-Interleaved quantized layout:
-  INT4 weights packed 2 per byte, interleaved for Tensor Core alignment
-  Dequantize in registers during compute → no extra bandwidth ✓
-```
-
-TensorRT and llama.cpp handle layout optimization automatically. If writing custom kernels, layout matters enormously.
-
-### 16.3 Shared Memory Tiling for AI Kernels
-
-The same tiling principle from CUDA Section 3 applies to all AI kernels on Jetson:
-
-```
-Attention kernel without tiling:
-  For each output element:
-    Load Q row from DRAM (4096 × 2 bytes = 8 KB)
-    Load K column from DRAM (context × 2 bytes)
-    Compute dot product
-    Load V column from DRAM
-    Accumulate
-  Total DRAM: O(seq² × d) — quadratic in sequence length
-
-Attention kernel with tiling (FlashAttention):
-  Load Q tile (64 × 128) into shared memory
-  For each K/V tile:
-    Load K tile into shared memory
-    Load V tile into shared memory
-    Compute partial attention in shared memory
-    Accumulate in registers
-  Write final output to DRAM
-  Total DRAM: O(seq × d) — linear! (tiles reused within shared memory)
-```
-
-On Orin Nano with 48 KB shared memory per SM, typical tile sizes:
-- Attention: Q tile 32×64, K/V tile 32×64
-- GEMM: 64×64 tile (INT4 weights + FP16 activations)
-- Convolution: 16×16 output tile
-
-### 16.4 DMA-BUF for AI Vision Pipelines
-
-The zero-copy path from camera to AI model is the most efficient pipeline on Jetson:
-
-```
-Optimal AI vision pipeline (zero-copy throughout):
-
-  Camera → ISP → [DMA-BUF] → GPU preprocess → [same buffer] → TensorRT
-                    ↑                                              ↓
-              CMA allocation                              Detection output
-              (done once at startup)                      in pinned memory
-                                                               ↓
-                                                          CPU post-process
-                                                          (direct access, no copy)
-
-  Total copies: ZERO
-  Total DRAM bandwidth: only what compute needs (no wasted copy traffic)
-```
-
-Compare with naive pipeline:
-```
-  Camera → ISP → memcpy → CPU buffer → cudaMemcpy → GPU buffer → TensorRT → cudaMemcpy → CPU
-  Total copies: 3 (each wastes ~3–12 MB × 30 FPS of bandwidth)
-  Wasted bandwidth: ~360 MB/s for 1080p — 0.35% of total 102 GB/s
-  For 4K: ~1.4 GB/s wasted — 2.7% of total bandwidth
-
-  On bandwidth-starved Jetson, every percent counts.
-```
-
-### 16.5 Multi-Model Memory Sharing Patterns
-
-When running multiple AI models, share buffers where possible:
-
-```cpp
-// Pre-allocate one buffer for the largest input
-size_t max_input_size = std::max({yolo_input_size, resnet_input_size, seg_input_size});
-void* shared_input;
-cudaMallocHost(&shared_input, max_input_size);  // pinned, zero-copy
-
-// Reuse for all models (they run sequentially)
-preprocess_for_yolo(camera_frame, shared_input);
-yolo_ctx->enqueueV2({shared_input, yolo_output}, stream, nullptr);
-
-preprocess_for_resnet(crop, shared_input);  // reuse same buffer
-resnet_ctx->enqueueV2({shared_input, resnet_output}, stream, nullptr);
-```
-
-**Memory saved:** instead of 3 separate input buffers (3 × 3 MB = 9 MB), use 1 × 3 MB = 3 MB. This adds up quickly with multiple models and multiple cameras.
-
----
-
-## 17. OP-TEE and Secure Memory
-
-Orin Nano supports ARM TrustZone with two execution worlds:
-
-```
-Normal World (Linux, CUDA, all userspace)
-─────────────────────────────────────────
-Secure World (OP-TEE Trusted OS)
-```
-
-### Secure Memory Carveout
-
-A region of DRAM is carved out exclusively for the secure world:
-
-* **Not mapped in Linux** — `cat /proc/iomem` will not show it
-* **Protected by TrustZone** — hardware prevents normal-world access
-* **Not accessible by SMMU** — even DMA from devices cannot reach it
-
-Used for:
-
-* DRM key storage and content decryption
-* Secure boot chain validation at runtime
-* Cryptographic services (hardware-accelerated)
-* Secure storage (encrypted key material)
-
-### Memory Impact
-
-If the OP-TEE carveout is configured too large, Linux usable RAM shrinks. On a memory-constrained 8GB system, every MB counts. Default carveouts are typically 16–64MB.
-
-### Interacting with OP-TEE
-
-Linux communicates with OP-TEE via the TEE subsystem:
-
-```bash
-# Check if OP-TEE is running
-ls /dev/tee*
-
-# Typical devices
-/dev/tee0        # TEE device
-/dev/teepriv0    # Privileged TEE device
-```
-
-Applications use the OP-TEE client library (`libteec`) to call Trusted Applications (TAs) in the secure world.
-
----
-
-## 18. Multi-Camera Memory Planning
-
-Production Jetson systems often run 2–6 cameras simultaneously. Memory planning is critical.
-
-### Per-Camera Memory Budget
-
-For a single 1080p camera at 30 FPS:
-
-| Component                  | Memory Per Frame | Frames Buffered | Total      |
-|----------------------------|-----------------|-----------------|------------|
-| CSI/VI capture buffer      | ~6MB (RAW10)    | 4 (ring)        | ~24MB      |
-| ISP output (NV12)          | ~3MB            | 4 (ring)        | ~12MB      |
-| CUDA inference input       | ~3MB            | 2               | ~6MB       |
-| **Total per camera**       |                 |                 | **~42MB**  |
-
-For 4K (3840x2160):
-
-| Component                  | Memory Per Frame | Frames Buffered | Total      |
-|----------------------------|-----------------|-----------------|------------|
-| CSI/VI capture buffer      | ~24MB (RAW10)   | 4 (ring)        | ~96MB      |
-| ISP output (NV12)          | ~12MB           | 4 (ring)        | ~48MB      |
-| CUDA inference input       | ~12MB           | 2               | ~24MB      |
-| **Total per camera**       |                 |                 | **~168MB** |
-
-### System Memory Budget (4-camera 1080p Example)
-
-| Component                    | Memory    |
-|------------------------------|-----------|
-| OS + kernel + services       | ~500MB    |
-| Camera buffers (4 cameras)   | ~168MB    |
-| CMA reserved                 | ~768MB    |
-| TensorRT model (YOLOv8-S)    | ~100MB    |
-| CUDA runtime + scratch       | ~200MB    |
-| Firmware carveouts            | ~400MB    |
-| **Remaining for userspace**  | **~5.5GB** |
-
-With larger models or 4K cameras, this budget tightens significantly. Plan and measure before deployment.
-
-### Buffer Pool Strategy
-
-For production systems:
-
-1. **Pre-allocate all buffers at startup** — avoid runtime allocation/free cycles
-2. **Use fixed-size buffer pools** — NVMM pools or V4L2 REQBUFS with fixed count
-3. **Pin buffers** — prevent kernel from swapping or migrating them
-4. **Monitor fragmentation** — log CMA and buddy state periodically
-
----
-
-## 19. Performance Monitoring and Profiling
-
-### tegrastats
-
-NVIDIA's real-time system monitor:
-
-```bash
-tegrastats --interval 1000
-```
-
-Output includes:
-
-* RAM usage (used/total)
-* CPU utilization per core
-* GPU utilization percentage
-* GPU frequency
-* Temperature (CPU, GPU, board)
-* Power consumption per rail
-
-### /proc/meminfo
-
-Key fields for Jetson memory analysis:
-
-```bash
-cat /proc/meminfo
-```
-
-| Field        | What It Tells You                              |
-|--------------|------------------------------------------------|
-| MemTotal     | Total Linux-visible RAM (after carveouts)      |
-| MemAvailable | Estimated available memory for new allocations |
-| CmaTotal     | Total CMA region size                          |
-| CmaFree      | Free CMA memory                                |
-| Slab         | Kernel slab allocator usage                    |
-| Mapped       | Memory-mapped file pages                       |
-
-### /proc/buddyinfo
-
-Shows fragmentation per zone and order:
-
-```bash
-cat /proc/buddyinfo
-```
-
-Healthy system: numbers across all orders.
-Fragmented system: high counts at order 0–2, zeros at order 6+.
-
-### Nsight Systems
-
-For profiling CUDA + camera + inference together:
-
-```bash
-nsys profile --trace=cuda,nvtx,osrt ./my_inference_app
+cat /proc/self/status
 ```
-
-Shows timeline of:
-
-* CUDA kernel launches
-* Memory allocations and transfers
-* CPU/GPU synchronization points
-* OS runtime events
-
-### SMMU and DMA Debugging
-
-```bash
-# SMMU faults
-dmesg | grep smmu
-
-# IOMMU groups (which devices share SMMU context)
-ls /sys/kernel/iommu_groups/*/devices/
 
-# DMA-BUF usage
-cat /sys/kernel/debug/dma_buf/bufinfo
-```
+On a Jetson, record `tegrastats` together with workload timestamps. Its fields include used RAM, largest free block, engine utilization, and clocks, but they are not a per-tensor accounting system. [NVIDIA documents their meaning](https://docs.nvidia.com/jetson/archives/r36.4.4/DeveloperGuide/AT/JetsonLinuxDevelopmentTools/TegrastatsUtility.html). An EMC utilization sample alone does not prove the model's critical path is bandwidth-bound.
 
----
+In PyTorch, autograd mode affects retained training intermediates. `eval()` changes module behavior such as dropout/batch normalization; it does not disable gradient recording. `inference_mode()` or `no_grad()` addresses that separately. Inference does not inherently retain every intermediate until a backward pass. Allocator-reserved memory also differs from live tensor memory; repeatedly emptying the allocator cache does not fix retained Python references or a true leak. See the [PyTorch CUDA memory notes](https://docs.pytorch.org/docs/stable/notes/cuda.html#cuda-memory-management).
 
-## 20. Production Debug Checklist
+## 6. Distinguish CMA, reservations, and allocation failure
 
-When camera or inference randomly fails after hours of operation:
+CMA reserves a region from which the kernel can satisfy suitable contiguous allocations while allowing eligible movable use under its rules. It is not generally equivalent to a permanently unusable hardware carveout. Do not subtract CMA from total RAM and then count every CMA-backed buffer again as another independent reservation.
 
-### Step 1 — Check Overall Memory
+Physical contiguity and device-address contiguity differ. An IOMMU can present a suitable contiguous device address range backed by separate physical pages, when that device and API support it. Some hardware still needs physical contiguity or other restrictions. Ask what the consumer requires rather than selecting CMA by habit.
 
-```bash
-cat /proc/meminfo | grep -E "MemTotal|MemAvailable|CmaTotal|CmaFree"
-```
+Contiguous allocations can fail despite free memory because of size, alignment, migration, pinned pages, or restrictions on a particular region. The [CMA debugfs documentation](https://docs.kernel.org/admin-guide/mm/cma_debugfs.html) describes observability when enabled. Debug interfaces depend on the kernel build and permissions.
 
-If `MemAvailable` is very low, the system is under memory pressure. If `CmaFree` is low, camera buffers may fail to allocate.
+<a id="8-how-to-resize-cma"></a>
+### When a CMA configuration change is justified
 
-### Step 2 — Check Fragmentation
+First establish that the failing allocation actually uses CMA, inspect the requested size and the driver's logs, and reduce unnecessary buffer lifetimes. Only then consider a platform-specific CMA change using the matching BSP documentation. Boot arguments, device-tree reserved-memory nodes, and firmware reservations do not all mean the same thing. A universal “set CMA to 1 GB” recipe can consume useful memory without repairing the failure.
 
-```bash
-cat /proc/buddyinfo
-```
+Treat such a change as a board configuration experiment: preserve the working configuration, confirm the effective boot state, repeat the failing workload, and compare memory pressure elsewhere. The portable part of this course requires no bootloader or kernel changes.
 
-If high-order columns (order 6+) show `0`, memory is fragmented. Even with free memory, large contiguous allocations will fail.
+## 7. Calculate a KV cache from the model configuration
 
-### Step 3 — Check CMA Usage
+For a conventional decoder cache storing keys and values for every layer, a useful payload formula is:
 
-```bash
-grep Cma /proc/meminfo
+```text
+bytes = 2 * layers * batch * cached_tokens * kv_heads * head_dimension * bytes_per_element
 ```
 
-Compare `CmaFree` to your expected per-frame allocation size. If `CmaFree` is less than the largest single allocation needed, allocation will fail.
-
-### Step 4 — Check for SMMU Faults
-
-```bash
-dmesg | grep smmu
-```
+The factor two is for K and V. Use KV heads, not query heads, for grouped-query or multi-query attention. Architectures with latent, sliding-window, compressed, shared, or other specialized caches require their own formulas.
 
-SMMU fault example:
+Take an explicitly hypothetical model with 26 layers, eight KV heads, head dimension 128, batch one, and 2048 cached tokens. An INT8 payload needs:
 
+```text
+2 * 26 * 1 * 2048 * 8 * 128 * 1 = 109,051,904 bytes = 104 MiB
 ```
-arm-smmu 12000000.iommu: Unhandled context fault: iova=0x1234000, fsynr=0x11
-```
 
-This means a device accessed an unmapped IOVA — typically a use-after-free bug or incorrect DMA-BUF handling.
+FP16 doubles it to 208 MiB. Quantization scales, page tables, block rounding, alignment, and metadata add storage. If four sessions each reserve the full context, the simple payload model grows by four; a serving runtime may instead allocate cache blocks on demand.
 
-### Step 5 — Check for OOM Events
-
-```bash
-dmesg | grep -i "out of memory\|oom"
-```
+**Exercise:** double context length and batch together. **Answer:** the conventional payload grows by four, not two. Weight memory is unchanged for one shared model copy, but activations and runtime contexts may also grow.
 
-The OOM killer may have terminated a process. Check which process was killed and why.
+## 8. Use a bandwidth model as a bound
 
-### Step 6 — Check Thermal Throttling
+Suppose a dense decoder has 3 billion parameters stored at exactly four bits each. Its ideal packed payload is 1.5 GB before scales or metadata. If a batch-one decoding step reads all those bytes from DRAM and an assumed sustainable path supplies 50 GB/s, weight reads alone need at least:
 
-```bash
-cat /sys/devices/virtual/thermal/thermal_zone*/temp
-cat /sys/devices/virtual/thermal/thermal_zone*/type
+```text
+1.5 GB / 50 GB/s = 0.030 s = 30 ms per step
 ```
-
-If temperature exceeds limits, the system throttles clocks. This can cause inference to miss deadlines, buffers to queue up, and memory to grow.
-
----
-
-## 21. Common Production Issues and Solutions
-
-### CMA Exhaustion
-
-**Symptom:** `Failed to allocate buffer` after hours of operation.
-
-**Cause:** CMA fragmentation from repeated alloc/free cycles.
-
-**Solutions:**
-* Pre-allocate buffer pools at startup; never free them
-* Increase CMA size (see Section 8)
-* Use NVMM buffer pools with fixed count
-* Periodically trigger compaction: `echo 1 > /proc/sys/vm/compact_memory`
-
-### SMMU Faults Under Load
-
-**Symptom:** `Unhandled context fault` in dmesg, frames dropped.
-
-**Cause:** Buffer freed while device still performing DMA, or race condition in DMA-BUF handling.
-
-**Solutions:**
-* Ensure proper synchronization before freeing DMA-BUF
-* Check refcounting on shared buffers
-* Use V4L2 QBUF/DQBUF properly (don't access buffer while queued)
-
-### OOM Killer on Jetson
-
-**Symptom:** Application killed unexpectedly; `dmesg` shows OOM.
-
-**Cause:** Combined GPU + CPU + camera memory exceeds available RAM.
-
-**Solutions:**
-* Reduce model size (quantize to INT8, prune)
-* Reduce camera buffer count or resolution
-* Reduce activation/workspace lifetimes or model size. DLA offload is unavailable on Nano and would still consume system DRAM on supported modules.
-* Monitor memory budget and set process memory limits
-
-### Thermal Throttling Causing Latency Spikes
-
-**Symptom:** Inference FPS drops periodically; `tegrastats` shows clock reduction.
-
-**Cause:** SoC temperature exceeds thermal limits.
-
-**Solutions:**
-* Add active cooling (fan, heatsink)
-* Use `nvpmodel` to set appropriate power mode
-* Reduce workload or duty cycle
-* Check ambient temperature and enclosure ventilation
-
-### Memory Leak in Long-Running Inference
-
-**Symptom:** `MemAvailable` steadily decreases over hours/days.
-
-**Cause:** CUDA memory not freed, DMA-BUF not closed, Python object accumulation.
 
-**Solutions:**
-* Use `torch.cuda.empty_cache()` periodically if using PyTorch
-* Ensure every `cudaMalloc` has a matching `cudaFree`
-* Close DMA-BUF file descriptors after use
-* Profile with `cuda-memcheck` or Nsight Compute
+Under those assumptions, no more than about 33.3 such steps/s can be supported by that weight traffic. This is an optimistic bound, not a measured token rate. KV traffic, activations, dequantization, launch overhead, dependencies, and imperfect bandwidth use can make it slower. Cache reuse, batching, sparsity, or a different architecture can change the assumed bytes per step.
 
----
+The general roofline-style lower bound is `max(operations/compute_rate, bytes/bandwidth)` when ideal overlap is assumed. Real serialization and overhead can exceed it. A low arithmetic intensity suggests a worthwhile bandwidth investigation; it does not prove that every kernel is bandwidth-limited.
 
-## 22. References
+Reducing weight precision can lower payload size, but token rate does not scale automatically with bit width. The chosen GPU must support an efficient implementation, and quantization has a quality cost to evaluate. Compare task quality, numerical error, latency, and memory on representative inputs. The [quantization course](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/Hardware-Aware%20LLM%20Quantization/README.md) develops that tradeoff.
 
-* [NVIDIA Jetson Linux Developer Guide](https://docs.nvidia.com/jetson/archives/r36.4/DeveloperGuide/) — official documentation covering boot, memory, drivers
-* [Jetson Orin Nano Datasheet](https://developer.nvidia.com/embedded/jetson-orin-nano) — hardware specifications
-* [ARM SMMU Architecture Specification](https://developer.arm.com/documentation/ihi0070/) — SMMU v3 reference (SMMU v2 subset)
-* [Linux CMA Documentation](https://www.kernel.org/doc/html/latest/mm/cma.html) — kernel CMA subsystem
-* [Linux Buddy Allocator](https://www.kernel.org/doc/html/latest/mm/page_allocator.html) — page allocator internals
-* [OP-TEE Documentation](https://optee.readthedocs.io/) — Trusted Execution Environment
-* [GStreamer on Jetson](https://docs.nvidia.com/jetson/archives/r36.4/DeveloperGuide/SD/Multimedia/AcceleratedGstreamer.html) — hardware-accelerated multimedia pipelines
-* [TensorRT DLA Documentation](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/) — DLA integration with TensorRT
-* Main guide: [Nvidia Jetson Platform Guide](../Guide.md)
+## 9. Complete the memory investigation
 
+For one camera-to-model pipeline, submit:
 
-## Integration lab: Does zero-copy mean one allocation, one format, and one owner?
+1. A table of every live allocation: shape, dtype, pitch/layout, bytes, owner, consumers, and lifetime.
+2. The peak overlap calculation, including multiple in-flight frames and runtime workspace.
+3. A diagram showing each copy, conversion, and synchronization boundary.
+4. A measured or explicitly analytical traffic estimate with units and assumptions.
+5. One proposed improvement and the correctness/quality check that must still pass.
 
-For a camera-to-model path list allocation, producer, consumer, stride/layout, mapping, and synchronization per edge. Measure live bytes without double-counting CPU/GPU views of the same allocation.
+For the no-board route, use the worked RGB8 and KV examples and the hypothetical 6,120 MiB budget. For the board route, add raw telemetry and a profiler trace. Do not turn the hypothetical figures into reported hardware results.
 
-**Acceptance evidence:** Provide a memory ledger including model, cache, workspace, camera pool, OS, and headroom. Demonstrate that the consumer waits for completion and that reclaiming a buffer early is caught.
+**Self-check answers:** shared DRAM does not make all pointers interchangeable; a zero-copy import can still require conversion; a larger buffer pool can increase observation age; free bytes do not guarantee a particular contiguous allocation; lower bit width does not guarantee proportional speedup; a successful allocation does not prove its lifetime is safe.
 
-**Continue:** take this artifact to [Orin-Nano-CUDA-Programming](../Orin-Nano-CUDA-Programming/Guide.md). Explain which assumption from this course the next engineer must preserve.
+Continue to [real-time inference](../Orin-Nano-Real-Time-Inference/Guide.md) to connect memory decisions to queueing, latency, and robot behavior.

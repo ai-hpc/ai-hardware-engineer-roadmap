@@ -23,7 +23,7 @@ This course applies an agent harness to design tasks with machine-checkable outc
 
 ## Why this course, and why now
 
-* **A design-productivity gap.** Transistor budgets and product cadence are outrunning human RTL+verification throughput. **Verification** — not generation — is the dominant cost of a tapeout, and it is exactly the kind of judgment-heavy, unstructured-data work that agents are suited to (see [AI Agent Development · "when to build an agent"](../../../Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Lectures/Lecture-03.md)).
+* **A design-productivity gap.** Transistor budgets and product cadence are outrunning human RTL+verification throughput. **Verification** requires substantial engineering effort; agent assistance is a hypothesis to evaluate on bounded tasks with independent checkers (see [AI Agent Development · "when to build an agent"](../../../Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Lectures/Lecture-03.md)).
 * **Precedent exists.** NVIDIA's **ChipNeMo** (2023) showed domain-adapted LLMs doing real chip-design work — engineering Q&A, EDA-script generation, and bug-report summarization — inside a production design org. The field has since exploded into RTL generation, testbench synthesis, and multi-agent EDA flows.
 * **A living leaderboard.** The **[Chip-Design-LLM-Zoo](https://iprc-dip.github.io/Chip-Design-LLM-Zoo/)** tracks RTL-generation models against shared benchmarks (VerilogEval, RTLLM, RealBench) by **pass@1 / correct-rate**, distinguishing fine-tuned vs base and open vs closed weights. Use it for discovery, then inspect each paper and the exact benchmark revision. Scores from different task sets, sampling budgets, or checking protocols are not directly comparable.
 
@@ -40,7 +40,7 @@ This course applies an agent harness to design tasks with machine-checkable outc
 | # | Lecture |
 |---|---------|
 | [01](Lectures/Lecture-01.md) | Why agents for chip design — the 2026 landscape *(start here)* |
-| 02 | The RTL-to-silicon flow and where agents fit (spec → RTL → verify → synth → PPA → physical → signoff) |
+| [02](Lectures/Lecture-02.md) | The RTL-to-silicon flow and where agents fit (spec → RTL → verify → synth → PPA → physical → signoff) |
 
 </div>
 
@@ -50,8 +50,8 @@ This course applies an agent harness to design tasks with machine-checkable outc
 
 | # | Lecture |
 |---|---------|
-| 03 | LLMs for RTL / Verilog generation — models, fine-tuning, and the Chip-Design-LLM-Zoo |
-| 04 | Evaluation discipline — VerilogEval, RTLLM, RealBench; pass@1, correct-rate, syntax vs functionality |
+| [03](Lectures/Lecture-03.md) | LLMs for RTL / Verilog generation — models, fine-tuning, and the Chip-Design-LLM-Zoo |
+| [04](Lectures/Lecture-04.md) | Evaluation discipline — VerilogEval, RTLLM, RealBench; pass@1, correct-rate, syntax vs functionality |
 
 </div>
 
@@ -61,9 +61,9 @@ This course applies an agent harness to design tasks with machine-checkable outc
 
 | # | Lecture |
 |---|---------|
-| 05 | Verification & testbench generation with agents — the real bottleneck, coverage closure |
-| 06 | Agentic EDA flows — multi-agent spec→RTL→verify→debug loops, tool-calling into EDA tools (the harness, applied) |
-| 07 | PPA optimization and debugging loops with agents |
+| [05](Lectures/Lecture-05.md) | Verification & testbench generation with agents — the real bottleneck, coverage closure |
+| [06](Lectures/Lecture-06.md) | Agentic EDA flows — multi-agent spec→RTL→verify→debug loops, tool-calling into EDA tools (the harness, applied) |
+| [07](Lectures/Lecture-07.md) | PPA optimization and debugging loops with agents |
 
 </div>
 
@@ -73,12 +73,12 @@ This course applies an agent harness to design tasks with machine-checkable outc
 
 | # | Lecture |
 |---|---------|
-| 08 | Serving design agents — latency, token/tool budgets, and cost per successful task |
-| 09 | **Capstone** — build an RTL-generation + self-verification agent loop, evaluated on VerilogEval-style tasks |
+| [08](Lectures/Lecture-08.md) | Serving design agents — latency, token/tool budgets, and cost per successful task |
+| [09](Lectures/Lecture-09.md) | **Capstone** — build an RTL-generation + self-verification agent loop, evaluated on VerilogEval-style tasks |
 
 </div>
 
-> Lectures 02–09 are the curriculum to be built out; Lecture 01 (the opener) is written. The capstone reuses the **genie-claw** harness pattern from AI Agent Development, retargeted: generate RTL → run a simulator/linter as a tool → check against a testbench → iterate within guardrails.
+> All nine lessons are available. Start with the real simulator/checker in Lecture02, prove that it rejects three known faults in Lecture05, then build the bounded repair study in Lecture09. A model/API integration is an optional experiment; the supplied execution evidence is RTL simulation and fault detection, not a measured LLM benchmark.
 
 ---
 
@@ -90,7 +90,7 @@ A small **agentic RTL pipeline**: an agent that, given a module spec, generates 
 
 ## Ready-to-run study design: a bounded RTL repair experiment
 
-Lecture 01 is available; lectures 02–09 remain planned, so the table above is not a claim of nine completed lectures. Use this workshop to turn the opener into a concrete investigation:
+Use the nine lessons and the existing RTL lab to execute this study. Begin with the baseline and controlled mutations before adding a generator:
 
 1. Specify a one-entry ready/valid buffer: transfer occurs only on `valid && ready`, accepted input is neither lost nor duplicated, output stays stable while stalled, and reset clears validity. Keep the specification and reference scoreboard outside the agent's editable files.
 2. Prepare directed tests for empty/full transitions, consecutive transfers, random backpressure, and reset while full. Add a deliberately incorrect candidate that drops an item under stall; confirm the checker rejects it before evaluating generated RTL.

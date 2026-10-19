@@ -22,6 +22,8 @@ State the reference, candidate, task distribution, primary metric, supporting me
 
 Predeclare which outcomes would reject the hypothesis. A candidate that reduces mean inference latency but increases P99 observation age has not necessarily improved deployment. A candidate that succeeds more often only after doubling the time horizon changes the task budget. A candidate trained on extra demonstrations answers a different question from an architecture-only comparison unless that additional data is explicitly part of the treatment.
 
+Use the supplied [action-parity bridge](../VLA%20Optimization%20and%20Action-Parity%20Harness/CPU-Action-Parity-Lab.md) as one concrete review artifact: it has paired outcomes, numerical checks, timing faults, and explicit small-sample limits. Its 12 fixture episodes can catch a regression but cannot establish a tight population noninferiority bound. If the claim is “no unacceptable degradation,” predeclare a margin and test a bound on the paired difference; a nonsignificant superiority test or overlapping individual intervals is insufficient.
+
 Estimate uncertainty and cost before allocating a large run. Use a pilot to measure episode duration, variance, failure prevalence, GPU memory, and logging overhead. Choose task and seed counts based on the claim's precision needs. Do not pretend a tiny pilot establishes final statistical power, and do not repeatedly stop as soon as a favorable result appears without a valid sequential procedure.
 
 ## Select an artifact with a usable contract

@@ -60,7 +60,7 @@ For a hierarchical VLA, verify both the high-level plan and low-level execution.
 
 ## Guided fault-injection lab
 
-Start from the scheduler in Lecture 22 and the action validator in [the CPU lab guide](Lab-Guide.md). Create offline fixtures for a NaN action, swapped schema identifier, old reset epoch, sensor timeout, duplicate result, unreachable target, and a repeated unsuccessful grasp. Each fixture should produce a deterministic transition and a reason code. Do not connect the fixture runner to actuators.
+Start from the runnable [dataset/dispatch replay](Dataset-and-Execution-Lab.md), then the trained-policy [timed robot loop](../../../Phase%203%20-%20Artificial%20Intelligence/0.%20AI%20and%20Robot%20Learning%20Foundations/Lab-02-Timed-Robot-Loop.md). The latter distinguishes commands accepted from commands actually applied and includes a case with terminal successes but no applied model commands. A fallback-assisted terminal success must not become evidence that the policy controlled the task. Both are synthetic environments, not physical supervisor validation. Create offline fixtures for a NaN action, swapped schema identifier, old reset epoch, sensor timeout, duplicate result, unreachable target, and a repeated unsuccessful grasp. Each fixture should produce a deterministic transition and a reason code. Do not connect the fixture runner to actuators.
 
 Then add a synthetic uncertainty score correlated imperfectly with failures. Sweep an acceptance threshold and plot risk, coverage, and intervention demand. Include a counterexample in which the score is confidently wrong. The goal is to expose what your gate can and cannot detect, not to manufacture a perfect score.
 

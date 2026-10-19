@@ -72,7 +72,7 @@ A useful way to describe what happens at each sublayer (attention or feed-forwar
                               silently amplified or discarded)
 ```
 
-A doubly stochastic mixing matrix cannot let the residual stream's overall magnitude explode or collapse purely from the *mixing* step — mass is conserved across the mix regardless of how the specific weights are learned. This is a stability property, not an accuracy claim: **it constrains the residual mixing path specifically. It does not prove every operation elsewhere in the network is non-expansive**, and it says nothing about the attention or feed-forward computation `F` itself, which can still amplify or shrink its input arbitrarily.
+An exactly doubly stochastic matrix preserves the sum across streams for each feature and is nonexpansive in the Euclidean norm, but it can shrink that norm substantially. For example, mixing streams `[1, -1]` with `[[0.5,0.5],[0.5,0.5]]` gives `[0,0]`. Sum preservation does not mean norm preservation, and signed activations can cancel. This is a stability property, not an accuracy claim: **it constrains the residual mixing path specifically. It does not prove every operation elsewhere in the network is non-expansive**, and it says nothing about the attention or feed-forward computation `F` itself, which can still amplify or shrink its input arbitrarily.
 
 ### Reaching the constraint: Sinkhorn normalization
 
@@ -137,7 +137,7 @@ Both follow directly from the collapse-compute-mix structure in §1, and both ar
      full stop.
 ```
 
-The practical cost model this leaves you with: wider residual **activations** (4× the per-position residual memory, since you're carrying `X ∈ R^{4×4096}` instead of a single 4096-vector) is the entire price of mHC, in exchange for the flexibility of learned collapse/distribute/mix behavior. It buys richer information flow between sublayers; it does not buy free parallelism across the decoder's serial depth, and it does not multiply how many times the expensive sublayers execute.
+The practical cost model this leaves you with: wider residual **activations** (4× the per-position residual memory, since you're carrying `X ∈ R^{4×4096}` instead of a single 4096-vector) is one cost of mHC. The learned coefficient projection, normalization, Sinkhorn iterations, collapse/mix operations and their temporary storage add costs too. It buys richer information flow between sublayers; it does not buy free parallelism across the decoder's serial depth, and it does not multiply how many times the expensive sublayers execute.
 
 ---
 
@@ -174,6 +174,8 @@ This is the other half of **Stage 6 of the [capstone ladder](Lecture-12.md)** (p
 ---
 
 ## Current as of
+
+**Reviewed October 18, 2026.** [Pinned config, upstream code and CPU evidence](CPU-Hybrid-State-Lab.md#sources-and-execution-boundary) identify what was checked. Hardware capacity and throughput remain deployment-specific.
 
 * **Timeless:** the collapse/compute/mix decomposition of a multi-stream residual, the Sinkhorn-normalization mechanism and its approximate (not exact) convergence under a finite iteration budget, and the depth/width corrections in §3 — these follow from the structure of any doubly-stochastic-constrained multi-stream residual design, independent of a specific checkpoint.
 * **Checkpoint-specific:** the stream count (4) and the exact placement of mHC pre/post-processing around each sublayer are properties of this checkpoint's configuration.

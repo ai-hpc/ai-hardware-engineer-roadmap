@@ -1,234 +1,78 @@
-# Module 06 — Adaptive Data Pipelines
+# Module 06 — Build a data curriculum you can audit
 
-**Parent:** [Long-Context MoE Foundation Training](README.md)
+A data curriculum changes which examples a model sees as training progresses. The useful question is whether a specific change improves an agreed task at an affordable cost. There is no universal percentage of books, code, synthetic text, or long documents that makes a mixture optimal.
 
-**One-line purpose:** Build a closed-loop data pipeline that turns evaluation failure modes into next-iteration training examples, with the data-quality, length-curriculum, and deduplication discipline that long-context MoE training actually needs.
+**Before this lesson:** understand tokens, training/validation/test splits, and the routing behavior in [Module 05](05-MoE-Systems-Infrastructure.md). **Outcome:** produce a versioned data manifest, calculate the effective token mixture, and propose one controlled curriculum comparison. This lesson contains worked arithmetic and a standard-library exercise. It does not download a corpus or launch foundation-model training.
 
-**Prerequisites:** Modules 01–05. Familiarity with HuggingFace `datasets`, tokenizer pipelines, deduplication tools (`text-dedup`, MinHash).
+## 1. Split the source before making training windows
 
-**Artifact:** One full closed loop — train baseline, evaluate, identify a failure mode, generate or filter targeted data, retrain, re-evaluate, and document the delta.
+Suppose a robotics manual has 20 chapters. You create overlapping 4K-token windows, then randomly allocate those windows to training and evaluation. Adjacent windows share text; different chapters may repeat the same diagrams, instructions, and answers. The evaluation now partly measures recognition of training content.
 
----
+Use a **source family** as the grouping unit: a manual and its revisions, a code repository and forks, or an original document and its translations/paraphrases. Assign groups to training, development, or final test before chunking. A longer window derived from a training manual remains training data at the next curriculum stage.
 
-## Why it matters
+Maintain a global duplicate/overlap index across **all stages and all splits**. An exact content hash detects exact copies under your chosen normalization; approximate matching can propose near-duplicate groups for review. Neither establishes that a public benchmark was absent from an unknown pretrained model's history. Keep both the original content hash and the normalized matching hash so aggressive normalization does not erase provenance.
 
-A static, "scraped + filtered" dataset will get you to the average performance of every model trained on a similar mix. To go further, the data must respond to the model's actual weaknesses. This is the difference between a model that scores well on benchmarks by coincidence and a model that is reliably good at the things you care about.
+| Record | What it lets you check |
+|---|---|
+| Source ID, source-family ID, revision and content hash | Where a window came from and whether related versions cross splits |
+| Split, chunk offsets, tokenizer revision, valid token count | Whether the same source was repackaged or counted differently |
+| License/access record, extraction/filter revision | Whether this particular use and transformation are documented |
+| Stage, selection probability, actual presentations | How often the model consumed the example |
+| Parent IDs and generator/checker revisions for synthetic text | Which original problems and generated variants share lineage |
 
-For long-context + MoE specifically, the data discipline is harder than for dense short-context training because: long documents are scarce, length distribution matters (curriculum), and MoE experts only specialize if the data has enough internal heterogeneity to differentiate.
+A duplicate policy may deliberately retain a full manual instead of several overlapping fragments. Record that decision globally; do not keep the same content in evaluation merely because it appears in a different training stage. Audit filters by language and source type: removing short lines can remove code, while removing uncommon words can remove technical terminology.
 
----
+## 2. Sampling examples is different from sampling tokens
 
-## Mental model
+Consider two sources. Manual examples average 8,000 valid training tokens; code examples average 2,000. Selecting each source with probability 0.5 produces an expected manual token share of:
 
-### The closed loop
+`(0.5 × 8,000) / (0.5 × 8,000 + 0.5 × 2,000) = 0.8`.
 
-```
-[base model]
-     │
-     ▼
-[training run on dataset_v_i]
-     │
-     ▼
-[evaluation harness — broad + targeted]
-     │
-     ▼
-[failure-mode triage]    ←─ explicit categorization
-     │
-     ▼
-[targeted data generation / curation / filtering]
-     │
-     ▼
-[dataset_v_{i+1} = mix(dataset_v_i, targeted_additions)]
-     │
-     └──────────────────► back to training
-```
+For equal expected token shares, choose example probabilities inversely proportional to mean valid length: manuals 0.2 and code 0.8. This calculation assumes stable source lengths and the stated sampling process. Padding, truncation, completion-only loss masks, exhausted sources, and packing can change the realized shares. Log **consumed valid loss tokens**, source IDs, and repetitions instead of inferring exposure from a configuration file.
 
-Two design decisions distinguish a serious loop from a notebook demo:
+Run this from any working directory; it uses only Python's standard library:
 
-1. **Failure-mode triage is explicit.** "The eval went down" is not a category. "Per-position retrieval accuracy in positions 40K–80K dropped" is.
-2. **Targeted additions are bounded.** You do not replace the dataset; you mix in `5–15%` of new data targeting the failure mode, controlled by a config you can roll back.
-
-### Data quality fundamentals (the table-stakes layer)
-
-Before anything adaptive, you need standard data hygiene. Skipping these means your "improvements" later are confounded by noise.
-
-| Step | Tool family | Why |
-|------|-------------|-----|
-| Document-level dedup | MinHash + LSH, `text-dedup` | Prevents memorization of duplicated boilerplate |
-| Substring dedup | Suffix arrays (Google's `deduplicate-text-datasets`) | Removes near-duplicate spans that fool MinHash |
-| Quality filter | KenLM perplexity + simple heuristic rules | Removes machine-generated SEO sludge |
-| Language ID + filter | fastText / GlotLID | Drops mismatched-language documents |
-| PII scrub | Pattern-based + classifier | Compliance and downstream safety |
-| Toxicity filter | Per-domain threshold | Aligns with target use cases |
-
-The MoE-and-long-context layer comes on top of this. A dirty corpus does not get better by being mixed with adaptive additions.
-
-### Length curriculum
-
-A direct jump from 4K to 256K training sequences is wasteful: the model spends most of its early gradient steps figuring out positional patterns it could have learned faster on shorter inputs first.
-
-A typical schedule:
-
-| Stage | Tokens | Sequence length | Position-encoding setting |
-|-------|--------|-----------------|---------------------------|
-| Base pretrain | 1T+ | 4K | base RoPE θ = 10000 |
-| Extension I | 50–100B | 32K | RoPE θ → 500_000 (or YaRN factor=4) |
-| Extension II | 20–50B | 128K | YaRN factor=16 |
-| Extension III | 5–20B | 256K–1M | YaRN factor=32+, very careful data |
-
-The token counts are illustrative; the principle is: each stage uses ~5–10× fewer tokens than the previous, because they are progressively more expensive per token.
-
-**Crucially**, each extension stage's data must contain documents that genuinely need the longer context. Padding short documents to 256K with random text teaches the model that long positions are noise.
-
-### Sources of long-context-rich data
-
-- **Books**: long-form, high coherence. Books3 was the canonical source pre-controversy; reproducible alternatives include public-domain corpora, ArXiv full-text, Project Gutenberg.
-- **Codebases**: file-level + repo-level. Allows multi-file reasoning if structured properly.
-- **Web crawls of long pages**: documentation, wikis, legal filings, scientific papers.
-- **Conversational logs / multi-turn agent traces**: where actually-using-prior-context matters.
-- **Synthetic long-context tasks**: chained reasoning, retrieval-augmented documents, multi-hop QA. Necessary for teaching active context use; risky if quality is low.
-
-For a real long-context MoE foundation training, the mix is typically `~30%` code, `~30%` books/papers, `~20%` curated web, `~10%` conversations, `~10%` synthetic — with the exact split tuned per evaluation failure.
-
-### What "adaptive" actually changes
-
-Adaptive does not mean "the model picks its own data" (that is dangerous: reward hacking, distribution narrowing). It means **the human-controlled pipeline routes evaluation failures into targeted data additions**.
-
-Failure → targeted data mapping (examples):
-
-| Failure mode | Targeted addition |
-|--------------|-------------------|
-| "Lost in the middle": retrieval accuracy dips at positions 30–70% | Documents structured to require mid-context retrieval; distractor-heavy synthetic data |
-| Code multi-file reasoning weak | Repo-scoped tasks: "patch the bug in file X given files A–G" |
-| Long chain-of-thought collapses past step 12 | Math/proof traces with verified long step chains |
-| Multilingual long-context degrades vs English | Long-form non-English documents with parallel structure |
-| MoE expert collapse on a domain | Domain rebalancing in the mix |
-
-Each addition is **bounded**, **versioned**, and **measured**. If the targeted addition does not move the targeted metric in the next eval, you remove it.
-
-### Synthetic data — when and how
-
-Synthetic data is necessary at the long-context end (real 1M-token documents with informative dependencies are rare). It is also dangerous: generated by an LLM, it inherits and amplifies that LLM's biases and errors.
-
-Rules:
-
-- **Verify mechanically when possible.** Math: re-run the proof. Code: compile and test. Multi-hop QA: re-check answer against the provided context.
-- **Bound the synthetic fraction.** Typically `<= 15%` of any extension stage's mix.
-- **Diversify generators.** If all synthetic data comes from one generator model, you are aligning your model to its quirks.
-
-### Anti-patterns that wreck this whole pipeline
-
-- **Training on the evaluation set.** Catastrophic and embarrassingly common. Set up your eval and training shards with explicit "no overlap" enforcement at hash-of-document level.
-- **Targeted addition for benchmark X moves benchmark X but tanks benchmark Y.** Watch a basket of broad metrics every iteration, not just the targeted one.
-- **Aggressive deduplication after extension data is added.** If extension data is similar to base data, MinHash may delete the extension. Run dedup per-stage, not across stages.
-- **Length curriculum without RoPE/YaRN adjustment.** You teach the model 32K, then evaluate at 256K with a position encoding that has never seen those positions.
-
----
-
-## Build it
-
-A real closed loop, scoped to one iteration:
-
-### Step 0 — Baseline training and eval
-
-Take an existing 8B-class long-context base model. Run the eval harness (Module 07 details). Save the per-task, per-position breakdown.
-
-### Step 1 — Failure-mode triage
-
-Open the eval report. Identify the largest single failure. Common ones for first iterations:
-
-- "Position 32K–48K accuracy on needle is 65%, vs 92% at position 8K."
-- "Multi-file Python edit task pass-rate is 18%."
-- "Long-form summary coherence drops past 16K input."
-
-Pick one. Write a one-sentence hypothesis: "*The model under-uses positions in the latter half of the context because the training mix has too few documents where the answer-relevant span is in the late part.*"
-
-### Step 2 — Targeted data generation / curation
-
-For the example above:
-
-- Pull long-form documents (books, papers) ≥ 40K tokens.
-- For each, generate a synthetic QA pair where the answer-bearing span is sampled uniformly across positions, with distractors interleaved.
-- Verify: the answer must be reconstructable from the document.
-- Filter: drop low-quality generations using a heuristic + a small judge model.
-
-Aim for `~100M tokens` of targeted data — enough to matter, not enough to dominate.
-
-### Step 3 — Mix and retrain
-
-Construct `dataset_v_{i+1}` = `0.9 · dataset_v_i + 0.1 · targeted_data`. Continue training for a fixed token budget (typically `~5–20B` tokens — enough to see effect, short enough to iterate).
-
-Use Megatron-LM's `--data-blend` or HuggingFace `datasets.interleave_datasets` with the appropriate ratio.
-
-### Step 4 — Re-evaluate
-
-Run the same eval harness. Compare:
-
-- **Targeted metric**: should improve (otherwise the addition was wrong).
-- **Adjacent metrics**: should not regress meaningfully.
-- **Broad metrics**: should hold or improve.
-
-### Step 5 — Document the delta
-
-Write a short report:
-
-```
-What failure: positions 32K-48K retrieval accuracy 65% → ?
-What hypothesis: under-coverage of mid-context relevant spans
-What data: 100M synthetic QA tokens, position-uniform answer placement
-What result: 65% → 84% on targeted; -1.2% on summary; +0.3% on broad average
-Decision: keep this addition; iterate on summary next
+```bash
+python3 - <<'PYCODE'
+lengths = {'manual': 8000, 'code': 2000}
+for probabilities in ({'manual': .5, 'code': .5},
+                      {'manual': .2, 'code': .8}):
+    exposure = {k: probabilities[k] * lengths[k] for k in lengths}
+    total = sum(exposure.values())
+    print({k: round(v / total, 3) for k, v in exposure.items()})
+PYCODE
 ```
 
-This document is your loop's memory. Without it the loop is just random training.
+Expected token shares are `{'manual': 0.8, 'code': 0.2}` and then `{'manual': 0.5, 'code': 0.5}`. These are calculated expectations, not measurements from a loaded corpus.
 
----
+If you use Hugging Face Datasets, its current `interleave_datasets` chooses sources using example probabilities. `first_exhausted` stops early; `all_exhausted` can repeat shorter sources; `all_exhausted_without_replacement` avoids repeated examples under that strategy. Streaming workers apply exhaustion behavior independently. Pin the installed package and record the strategy; a seed alone is not a complete replay contract. [Official interleaving API](https://huggingface.co/docs/datasets/package_reference/main_classes#datasets.interleave_datasets).
 
-## Use it in the real stack
+## 3. Packing changes the learning problem
 
-- **Megatron-LM data-blend**: `--data-path 0.9 /path/to/v_i 0.1 /path/to/targeted`. Each weight is a fraction; weights need not sum to 1.0 (they are normalized).
-- **HuggingFace `datasets.interleave_datasets`** with `stopping_strategy="all_exhausted"` produces a consistent mix.
-- **Deduplication**: `text-dedup` (<https://github.com/ChenghaoMou/text-dedup>) for MinHash + LSH; Google's `deduplicate-text-datasets` for substring dedup.
-- **Quality filtering**: CCNet (<https://github.com/facebookresearch/cc_net>) is the canonical pipeline, still useful as a reference for KenLM + heuristic combinations.
+Packing combines shorter examples into one sequence to reduce padding. Decide whether examples can attend across their boundaries and whether position IDs reset. These choices affect the attention mask, loss mask, and what context predicts each target. Separating documents with an end token does not by itself block attention across them.
 
-For synthetic data verification:
+For a packed sequence containing a 300-token document, a 500-token document, and 224 padding tokens, the count of predicted loss tokens is determined by the target/label mask. It is **not automatically 1,024**, and may be less than 800 because first-token or prompt targets are excluded. Use the implementation's actual nonignored label count. This same denominator must reach distributed gradient reduction and perplexity in [Module 07](07-Long-Context-Evaluation.md).
 
-- **Code**: spin up a sandboxed `pytest` runner.
-- **Math**: SymPy + Lean / Isabelle for proof verification.
-- **QA**: judge-model with a temperature-0 strict prompt asking "is this answer derivable from this passage."
+Retain enough source offsets to reconstruct a batch. A resume checkpoint needs the data cursor, shuffle state, packing buffer, and any adaptive mixture state, or an equivalent deterministic replay mechanism. Without them, a restarted run can repeat easy examples and omit later ones while its loss still looks plausible.
 
----
+## 4. Make one curriculum change measurable
 
-## Measure it
+Start from a fixed mixture and a small pilot budget. Compare it with one intervention—for example, more complete manuals with cross-chapter questions—while matching total valid training tokens and recording compute time. Changing sequence length changes attention cost, so equal tokens do not imply equal GPU hours. Use the [cost ledger](labs/ledger.py) to explain that difference before choosing a budget.
 
-Per loop iteration:
+Choose a few development tasks connected to the intended use: retrieving a torque limit from the correct manual revision, joining information from two chapters, or generating code that passes held-out tests. Keep a final test set sealed while selecting mixture, model, prompt, and checkpoint. Once you use a test failure to create training data, that case has become development evidence; replace the final test protocol with a new untouched holdout when reporting a new claim.
 
-- Targeted metric pre/post.
-- Adjacent metrics pre/post.
-- Broad benchmark basket pre/post.
-- Wall-clock cost of the iteration (training tokens, GPU-hours).
-- Cost per unit of metric improvement.
+Change context length and positional encoding only with the model's supported configuration and a separate comparison. A larger RoPE base or scaling factor is not a universal curriculum schedule. Verify short-context behavior as well as the new length, and retain the exact checkpoint/configuration used for both.
 
-The cost-per-unit metric is what tells you whether to keep iterating on the same failure or move to the next one.
+## 5. Synthetic examples need a defined checker
 
----
+For a generated robotics calculation, a unit-aware reference calculation can check the numeric answer. For generated code, tests check only the cases and environment they exercise. A language-model judge can triage or score a stated rubric, but deterministic decoding does not turn the judge into an oracle. Record the prompt, model revision, checker, rejected examples, and manual audit sample.
 
-## Ship it
+Synthetic variants inherit their source family's split. Generating ten paraphrases of a held-out problem and putting them in training contaminates that evaluation even when their exact text differs. Measure whether adding accepted synthetic examples improves development performance over a budget-matched baseline; do not assume a fixed synthetic percentage is safe or helpful.
 
-Drop into `lcm-course/`:
+## Exercise and worked check
 
-1. `data_pipeline_loop.md` — the full one-iteration report following the Step 5 template.
-2. `dataset_v_i.yaml` / `dataset_v_{i+1}.yaml` — the actual mix configs.
-3. `eval_before.csv` and `eval_after.csv` — paired evaluation outputs.
-4. One Markdown table summarizing the decision: keep / discard / iterate.
+You have 100 manual examples of 8,000 tokens and 400 code examples of 2,000 tokens. A single pass over both consumes 800,000 tokens from each source, so its token mixture is 50/50. Sampling sources 50/50 with replacement has a different expected mixture, 80/20. Explain both results without changing the dataset.
 
----
+Then design a 4K-to-16K continuation experiment. Submit the source-family split rule, duplicate audit, tokenizer/mask contract, fixed development tasks, realized token counts, and one comparison with a fixed-mixture baseline. Do not invent an expected quality improvement. Completion means you can explain exactly what changed and which evidence would reject your hypothesis.
 
-## Related pages
-
-- [Module 03 — Position encoding](03-Position-Encoding.md)
-- [Module 07 — Long-context evaluation](07-Long-Context-Evaluation.md)
-- [Module 10 — From experiment to general-purpose model](10-General-Purpose-Model.md)
-- CCNet pipeline: <https://github.com/facebookresearch/cc_net>
-- text-dedup: <https://github.com/ChenghaoMou/text-dedup>
-- ICML 2025 Long Context FM workshop (data section): <https://longcontextfm.github.io/>
+**Continue:** [Module 07 — Long-context evaluation](07-Long-Context-Evaluation.md).

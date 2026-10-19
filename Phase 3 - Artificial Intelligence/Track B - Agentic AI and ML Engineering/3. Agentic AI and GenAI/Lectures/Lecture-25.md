@@ -931,7 +931,7 @@ The artifact for this section, slotted into the Phase 3 / Project A spec from §
 - NVIDIA Jetson Secure Boot — [https://docs.nvidia.com/jetson/](https://docs.nvidia.com/jetson/)
 - AMD SEV-SNP — [https://www.amd.com/en/developer/sev.html](https://www.amd.com/en/developer/sev.html)
 - Intel TDX — [https://www.intel.com/content/www/us/en/developer/tools/trust-domain-extensions/overview.html](https://www.intel.com/content/www/us/en/developer/tools/trust-domain-extensions/overview.html)
-- NVIDIA H100 Confidential Computing — [https://developer.nvidia.com/blog/confidential-computing-on-h100-gpus/](https://developer.nvidia.com/blog/confidential-computing-on-h100-gpus/)
+- NVIDIA H100 Confidential Computing — [https://developer.nvidia.com/blog/confidential-computing-on-h100-gpus-for-secure-and-trustworthy-ai/](https://developer.nvidia.com/blog/confidential-computing-on-h100-gpus-for-secure-and-trustworthy-ai/)
 
 ### Redaction discipline (§15)
 

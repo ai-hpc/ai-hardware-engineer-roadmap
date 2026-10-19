@@ -1,5 +1,7 @@
 # Jetson ESP-Hosted Host Code — lectures
 
+**Source boundary — reviewed October 18, 2026:** this is the historical NG fork at `ce36dec9294988e598f04e84c9d28092ca9e9786`. Board observations are attributed to that fork, not rerun here. Complete the [source-reading lab](../Source-Reading-Lab.md); it explains the current migration path and defects in these abbreviated source excerpts. Snippets containing `...` are reading excerpts, not standalone compilable programs.
+
 Work through these in order. Each file is one session built around the real `esp_hosted_ng/host/` Linux host code.
 
 **Hub:** [Jetson ESP-Hosted Host Code guide](../Guide.md)

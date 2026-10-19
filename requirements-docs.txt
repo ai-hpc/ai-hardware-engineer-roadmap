@@ -1,0 +1,8 @@
+# Documentation environment verified for the October 2026 course review.
+# These are reproducible teaching/build pins, not a claim of newest releases.
+mkdocs==1.6.1
+mkdocs-material==9.7.7
+mkdocs-redirects==1.2.3
+pymdown-extensions==10.21.2
+Pillow==12.2.0
+CairoSVG==2.9.0

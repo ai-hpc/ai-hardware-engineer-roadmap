@@ -1,177 +1,65 @@
-# Lecture 4 - Peripherals, libraries, connectivity, and system design with Espressif boards
+# Lecture 4 - Peripherals, libraries, connectivity, and system design
 
-**Course:** [Espressif guide](../Guide.md) | **Phase 2 - Embedded Software**
+**Course:** [Espressif guide](../Guide.md) | **Previous:** [Task and buffer ownership](Lecture-03.md) | **Next:** [Component integration](Lecture-05.md)
 
-**Previous:** [Lecture 03](Lecture-03.md) | **Next:** [Lecture 05 - Arduino as an ESP-IDF component and the path from prototype to product](Lecture-05.md)
+Turn the heartbeat into a sensor report by adding one bounded peripheral transaction. Keep the driver separate from conversion and network code so that a communication failure cannot masquerade as a valid new measurement.
 
----
+## Read a register deliberately
 
-## Why this lecture matters
+Identify the sensor's power domain, 7-bit I2C address, identity register, supported clock rate, register-address width, and byte order from its datasheet. Verify SDA/SCL pins against the board schematic, then call `Wire.begin(sda_pin, scl_pin, frequency)` using those pins. Check the return value and configure a finite timeout using the current [I2C API](https://docs.espressif.com/projects/arduino-esp32/en/latest/api/i2c.html).
 
-Most people meet `arduino-esp32` through examples like:
+A common register read writes a register address without ending the bus transaction, then issues a repeated-start read. This helper illustrates a **one-byte register address and a two-byte big-endian value**; those are assumptions to confirm for your sensor, not universal I2C rules. It is a board exercise fragment, not a hardware-tested driver.
 
-- blink
-- Wi-Fi scan
-- BLE example
-- I2C sensor read
+```cpp
+bool read_u16_be(uint8_t device, uint8_t reg, uint16_t& result) {
+    Wire.beginTransmission(device);
+    if (Wire.write(reg) != 1) {
+        Wire.endTransmission(true);
+        return false;
+    }
+    if (Wire.endTransmission(false) != 0) return false;
+    const size_t received = Wire.requestFrom(device, size_t{2}, true);
+    if (received != 2) {
+        while (Wire.available()) (void)Wire.read();
+        return false;
+    }
+    const int high = Wire.read();
+    const int low = Wire.read();
+    if (high < 0 || low < 0) return false;
+    result = static_cast<uint16_t>((static_cast<unsigned>(high) << 8) |
+                                   static_cast<unsigned>(low));
+    return true;
+}
+```
 
-Those examples are useful, but the **real skill** is learning to see them as parts of a **complete embedded system**.
+The output changes only on success. Do not refresh the sample timestamp when a read fails and you reuse the previous value. If the sensor supplies signed 16-bit data, explicitly interpret values above 32767 as `raw - 65536`, then apply its scale and offset. Some sensors require status checks, multi-byte register addresses, delays, or different transaction boundaries.
 
-This lecture is about that shift.
+## Budget bytes and events
 
----
+For UART, use the [framed telemetry lab](../../labs/Framed-Telemetry.md): a single read may contain half a packet or multiple packets. For UDP, each datagram already has a boundary; still validate its length, schema, session, sequence, and freshness. An ACK from a transport does not prove that a physical actuator completed a command.
 
-## Peripherals are not just APIs
+For network reconnection, use explicit states such as `DISCONNECTED → CONNECTING → READY → BACKOFF`. Keep sensing and local status reporting useful when the network is unavailable. Bound connection attempts and queued data. On reconnect, decide whether old records should be discarded or uploaded with their original timestamps.
 
-When you use:
+ESP32-C6's radio protocols share RF resources. The [official coexistence guide](https://docs.espressif.com/projects/esp-idf/en/stable/esp32c6/api-guides/coexist.html) describes supported combinations and warns that Wi-Fi/BLE activity can increase Thread/Zigbee packet loss for router roles. “The chip supports all three radios” does not imply independent simultaneous throughput or arbitrary role combinations.
 
-- `Wire`
-- `SPI`
-- `Serial`
-- GPIO APIs
+## Keep local control independent of model and network delays
 
-you are not just calling friendly functions. You are making **decisions** about:
+An AI service can suggest an action, but the receiving controller must check command type, range, session, expiry, and current operating state. Keep an explicit local stop/fault path. For this introductory project, represent commands with an LED or logged state transition before attaching a motor.
 
-- pin use
-- timing
-- interrupt behavior
-- buffering
-- bus ownership
-- power
-- library coupling
+A useful separation is:
 
-That is why Phase 2 treats these as embedded software topics, not just "maker features."
+```text
+sensor driver → validated observation → bounded network sender
+remote request → schema/range/age checks → local state machine → output
+```
 
----
+Do not treat generated text as a peripheral register write. Convert an allowed request into a small typed command, then validate it with deterministic code. This makes the same interface usable by a human UI, a test harness, or a model.
 
-## Libraries are helpful, but they define architecture
+## Failure lab and expected results
 
-Espressif's Arduino documentation includes a large set of supported APIs and libraries, but the important engineering question is not only:
+1. Disconnect the sensor in a recoverable bench setup. Expect an error counter and unchanged last-valid timestamp, not a fabricated zero reading.
+2. Make the receiver pause. Expect the documented queue-full behavior and a visible drop/backpressure count.
+3. Restart the sender. Expect a new session, so old sequence values are not compared across unrelated boots.
+4. Remove the network. Expect sensing/status to continue and connection retries to remain bounded.
 
-> "Does a library exist?"
-
-It is:
-
-> "What architecture does this library push me toward?"
-
-For example:
-
-- a simple sensor library may be perfectly fine
-- a networking library may quietly assume its own event model
-- a wireless stack example may shape your tasking and memory use
-
-So when adding libraries, ask:
-
-- is this helping the product?
-- or is it forcing accidental architecture?
-
----
-
-## Connectivity is where Espressif becomes especially valuable
-
-One reason `arduino-esp32` matters more than many classic Arduino cores is that Espressif chips are **connectivity-heavy**.
-
-That means the platform is especially useful for:
-
-- Wi-Fi products
-- BLE devices
-- gateway prototypes
-- low-cost control nodes
-- connected sensor systems
-
-And for newer chips like `ESP32-C6`, it becomes relevant to broader wireless-system learning too.
-
-This is why the Espressif course belongs next to the IoT course family in the roadmap.
-
----
-
-## System design question: what kind of product am I building?
-
-When working with Espressif boards, try to **classify the product early**.
-
-### Type 1: quick proof-of-concept
-
-Example:
-
-- sensor data over Wi-Fi
-- BLE remote
-- simple web dashboard
-
-For this kind of project, Arduino-first is often the right choice.
-
-### Type 2: serious connected device
-
-Example:
-
-- product with OTA
-- multiple peripherals
-- strict power or timing constraints
-- long-lived field deployment
-
-For this kind of project, you need to start thinking beyond "sketches" even if Arduino remains the top-level layer.
-
-### Type 3: advanced vendor-platform firmware
-
-Example:
-
-- heavy wireless integration
-- advanced control over system internals
-- product with feature layering and maintainability constraints
-
-This is where Arduino as an ESP-IDF component or a partial migration becomes much more attractive.
-
----
-
-## Good embedded habits inside Arduino projects
-
-Even in Arduino-style projects, try to keep these habits:
-
-- separate hardware access from application logic
-- avoid giant `loop()` functions that do everything
-- document pin assignments and board assumptions
-- isolate connectivity code from sensor code
-- treat libraries as dependencies, not magic
-- think about failure cases, not only happy-path demos
-
-These habits make **migration much easier** later.
-
----
-
-## The system-level lesson
-
-The real value of `arduino-esp32` is not just that it makes hardware easier.
-
-It lets you prototype complete connected systems quickly, while still teaching you where the deeper embedded boundaries are:
-
-- board support
-- peripheral use
-- wireless stacks
-- runtime behavior
-- framework layering
-
-That is why the platform is worth studying seriously.
-
----
-
-## Lab
-
-Take one example project idea, such as:
-
-- Wi-Fi sensor node
-- BLE remote
-- ESP32-C6 connected switch
-
-Then divide the firmware into four blocks:
-
-- board/peripheral layer
-- connectivity layer
-- application logic
-- update/debug/support layer
-
-Write one sentence for what each block should own.
-
-If you can separate those cleanly, you are already thinking beyond copy-paste sketches.
-
----
-
-**Previous:** [Lecture 03](Lecture-03.md) | **Next:** [Lecture 05 - Arduino as an ESP-IDF component and the path from prototype to product](Lecture-05.md)
+Record which checks ran on hardware and which ran in the CPU lab. A useful final record contains `{session, sequence, sampled_at, value, status}` with units and clock assumptions. The host must distinguish a valid zero, a missing value, and an old value.

@@ -1,24 +1,16 @@
-#!/bin/bash
-# profile.sh — Nsight Systems profiling for kernel optimization
-# Usage: ./scripts/profile.sh model.gguf
-
-MODEL=${1:-"model.gguf"}
-OUTPUT="profile_$(date +%Y%m%d_%H%M%S)"
-
-echo "Profiling jetson-llm with Nsight Systems..."
-echo "Output: ${OUTPUT}.nsys-rep"
-
-nsys profile \
-    --trace=cuda,nvtx,osrt \
-    --cuda-memory-usage=true \
-    --output="$OUTPUT" \
-    ./build/jetson-llm -m "$MODEL" -p "Hello, how are you?" -n 64
-
-echo ""
-echo "▸ Top kernels by time:"
-nsys stats "${OUTPUT}.nsys-rep" 2>/dev/null | head -20
-
-echo ""
-echo "▸ View full trace:"
-echo "  nsys-ui ${OUTPUT}.nsys-rep"
-echo "  (or copy to workstation with GUI)"
+#!/usr/bin/env bash
+# Profile an explicitly selected command with an installed Nsight Systems.
+set -euo pipefail
+if (( $# < 3 )) || [[ "$2" != -- ]]; then
+    echo "Usage: $0 <new-output-prefix> -- <executable> [arguments...]" >&2
+    exit 2
+fi
+output=$1
+shift 2
+command -v nsys >/dev/null
+if [[ -e "$output.nsys-rep" || -e "$output.sqlite" ]]; then
+    echo "Choose a new output prefix; refusing to overwrite an existing trace." >&2
+    exit 2
+fi
+nsys profile --trace=cuda,nvtx,osrt --output="$output" "$@"
+nsys stats "$output.nsys-rep"

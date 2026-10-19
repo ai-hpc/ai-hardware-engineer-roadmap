@@ -11,6 +11,16 @@
 } while(0)
 
 int main() {
+    int device_count = 0;
+    const auto device_status = cudaGetDeviceCount(&device_count);
+    if (device_status == cudaErrorNoDevice || device_status == cudaErrorInsufficientDriver || (device_status == cudaSuccess && device_count == 0)) {
+        fprintf(stderr, "SKIP: no usable CUDA device/driver; target checks were not executed\n");
+        return 77;
+    }
+    if (device_status != cudaSuccess) {
+        fprintf(stderr, "FAIL: device enumeration: %s\n", cudaGetErrorString(device_status));
+        return 1;
+    }
     // Initialize CUDA context
     cudaError_t cerr = cudaSetDevice(0);
     if (cerr != cudaSuccess) {
@@ -48,14 +58,15 @@ int main() {
         ok = scratch.init(pool_size);
     }
     if (!ok) {
-        fprintf(stderr, "[test] cudaMallocHost failed even at 4 MB\n");
-        fprintf(stderr, "[test] Trying regular malloc fallback...\n");
+        fprintf(stderr, "[test] cudaMallocManaged failed even at 4 MB\n");
+        fprintf(stderr, "[test] No regular malloc GPU fallback is supported...\n");
         // This means CUDA pinned alloc isn't working — diagnose
         size_t free_cuda = 0, total_cuda = 0;
         cudaMemGetInfo(&free_cuda, &total_cuda);
         fprintf(stderr, "[test] CUDA mem: %zu MB free / %zu MB total\n",
                 free_cuda / (1024*1024), total_cuda / (1024*1024));
-        fprintf(stderr, "SKIP: ScratchPool (cudaMallocHost unavailable)\n");
+        fprintf(stderr, "FAIL: ScratchPool allocation unavailable on this configured target\n");
+        return 1;
     } else {
         printf("[test] Pool allocated: %ld MB\n", pool_size / (1024*1024));
         printf("[test] Pool capacity: %ld bytes\n", scratch.capacity());

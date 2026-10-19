@@ -1,4 +1,4 @@
-# Lecture 31 - OpenClaw Case Study: Why Real Agents Need a Gateway
+# Lecture 31 - OpenClaw Case Study: When a Gateway Helps
 
 **Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 30](Lecture-30.md) | **Next:** [Lecture 32](Lecture-32.md)
 
@@ -119,7 +119,7 @@ A gateway gives you one place for:
 - health checks
 - operations
 
-Without a gateway, each client must reimplement these concerns.
+A shared application service or workflow runtime can also own these concerns; a dedicated gateway is one architecture choice, not a requirement for every production agent. A small single-user tool loop may not need it.
 
 That leads to:
 
@@ -201,7 +201,9 @@ In OpenClaw, one gateway can host:
 
 That is an important production idea:
 
-> one runtime process can host many isolated agent personalities and workspaces
+> one runtime can organize multiple agent workspaces and sessions
+
+This is logical separation within a trust boundary. The audited OpenClaw security model assumes one trusted operator or mutually trusting team per Gateway. It does not claim hostile-tenant isolation for unrelated adversarial users sharing host administration, credentials and configuration. Separate Gateway credentials and preferably OS users/hosts when those trust boundaries differ. [Pinned security model](https://github.com/openclaw/openclaw/blob/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/gateway/security/index.md).
 
 ---
 

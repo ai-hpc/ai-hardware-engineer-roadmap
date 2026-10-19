@@ -1,118 +1,78 @@
-# MLSys Deep Dives — The 2026 Machine-Learning-Systems Landscape
+# MLSys deep dives: from model computation to useful work
 
-<div class="course-identity mlsys" markdown="1">
-<div class="course-identity__icon">MLS</div>
-<div markdown="1">
-<p class="course-identity__eyebrow">Phase 5 · ML Systems Engineering · Special Course</p>
-<p class="course-identity__title">The whole modern MLSys stack as one connected system: kernel languages, compilers and runtimes, post-transformer architectures, inference-acceleration algorithms, and the economics that ties them together.</p>
-<p class="course-identity__meta">Artifact: an optimization-ladder report for one model + target · Measure: tokens/s, TTFT/TPOT, TOK/$, perf/watt, acceptance length</p>
-</div>
-</div>
+This seven-session course explains how model structure, kernels, compilers,
+runtime scheduling and hardware jointly determine an application's behavior.
+The goal is a small optimization report whose correctness, quality and timing
+claims another learner can check.
 
-> *The model decides what's possible. The system decides what it costs. In 2026, the system is the product.*
+**Start after:** [AI math and training](../../../Phase%203%20-%20Artificial%20Intelligence/0.%20AI%20and%20Robot%20Learning%20Foundations/Guide.md)
+and the [inference fundamentals](../AI%20Inference%20Engineer%202026/Part%201%20-%20Fundamentals/README.md).
+You should be able to trace a matrix shape and distinguish model parameters from
+request state. If robotics and AI are both new, begin with
+[Start here](../../../Start-Here.md) before returning to this advanced survey.
 
-A model's deployment cost depends on hardware, utilization, model architecture, software, energy, and operations. Compare a fixed task and quality bar over a stated accounting interval. API prices also reflect commercial decisions; a price decline alone does not identify a kernel or hardware speedup.
+## A manageable route
 
-This course is a connected tour of that stack as it stands in 2026. Not a survey of disconnected topics — a single argument, told in seven lectures, that the **kernel layer, the compiler layer, the architecture layer, and the inference-algorithm layer are one co-designed system**, and that every win in any of them is a direct, measurable move on tokens-per-second and cost-per-token.
+Study one lesson per session. Spend roughly one hour reading, predicting and
+checking a worked example, then use the linked lab for a longer practical
+session. You do not need to install every tool mentioned. Choose one functioning
+CPU environment first; add a GPU backend only when it supports your workload.
 
-**Layer mapping:** L3–L8 — kernels, codegen, compilers, runtime, scheduling, and the economics on top. This is the MLSys-engineer's whole field of view.
+| Session | Question you will answer | Practice to carry forward |
+|---|---|---|
+| [01 — Useful work and cost](Lecture-01.md) | Which numerator, denominator and quality gate make a result meaningful? | A request/task record with timing and resource boundaries |
+| [02 — Kernel languages](Lecture-02.md) | Which details does a language expose, and which remain your responsibility? | A reference with shape, tail, stride and synchronization cases |
+| [03 — Compilers and runtimes](Lecture-03.md) | Does the change improve computation, launch overhead or scheduling? | An actual compiled CPU result and an explained timeline |
+| [04 — Recurrent and hybrid state](Lecture-04.md) | Which state is fixed-size, and which grows with history? | Output, final-state and continuation comparisons |
+| [05 — Inspect an executable model](Lecture-05.md) | What do a pinned config and implementation establish? | A model/checkpoint/runtime record with explicit unknowns |
+| [06 — Speculative decoding](Lecture-06.md) | When does verified drafting improve accepted progress? | A rejection-identity check and a complete cycle-cost calculation |
+| [07 — Robot deadlines and energy](Lecture-07.md) | Does the output remain useful at actuation? | One paired baseline/candidate report with a failure explanation |
 
-**Role targets:** MLSys Engineer · ML Compiler Engineer · AI Inference Engineer · GPU Kernel Engineer · Model-Systems Co-design Engineer · Edge/Physical-AI Engineer.
+## Reuse the course's working experiments
 
-**Prerequisites:**
+The [native TVM lab](../TVM%20Deep%20Dives/labs/README.md) compiles and executes
+LLVM/Relax examples. The [FlashAttention CPU lab](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/02%20-%20Kernel%20Engineering/FlashAttention%20Course/CPU-Attention-Lab.md)
+checks attention mathematics and gradients. The [hybrid-state lab](../GLM-5.3-Flash%20Architecture%20Mastery/CPU-Hybrid-State-Lab.md)
+compares an independent reference with pinned upstream PyTorch KDA/KPool code.
+The [timed robot-loop lab](../../../Phase%203%20-%20Artificial%20Intelligence/0.%20AI%20and%20Robot%20Learning%20Foundations/Lab-02-Timed-Robot-Loop.md)
+shows how a fixed trained policy behaves under different simulated queues and
+expiry rules.
 
-* Phase 5 — ML Systems Engineering — [Guide](../Guide.md) and the [AI Inference Engineer 2026](../AI%20Inference%20Engineer%202026/README.md) course (the serving-stack companion to this one).
-* Phase 5 — Edge AI — [Edge LLM Inference Internals](../../Track%20C%20-%20Edge%20AI/Edge%20LLM%20Inference%20Internals/Lecture-01.md) — the roofline, GEMV-vs-GEMM, and why decode is memory-bound. Every "Measure it" here assumes it.
-* Comfort reading Python, CUDA/Triton-flavored kernel code, and model cards. No prior compiler-internals knowledge needed.
+These experiments cover different execution boundaries. A CPU component result
+is not a full-model GPU benchmark, and a chosen simulator delay is not a measured
+board latency. Keep that distinction in your own report instead of treating all
+successful commands as the same kind of evidence.
 
-**Pairs with:** the [TVM Deep Dives](../TVM%20Deep%20Dives/README.md) course (a deep build-it tour of one compiler) and [AI Inference Engineer 2026](../AI%20Inference%20Engineer%202026/README.md) (the production serving stack). This course is the *landscape*; those two are *depth probes* into pieces of it.
+## Your capstone report
 
----
+Choose one operator, model component or small robot-policy task. Record the
+baseline before changing it. State the single proposed change and predict which
+term it affects: arithmetic, transferred bytes, cached state, launch overhead,
+queueing, or accepted task progress. Fix the quality and correctness criteria
+before comparing results.
 
-## Why this course is structured the way it is
+Retain inputs/seeds, source revisions, environment, commands, raw output and
+one deliberate failure case. Separate compile/install time from warmed execution.
+Show distributions when timing varies; do not average per-run percentiles and
+present them as a pooled percentile. If the candidate is worse or unchanged,
+explain what that reveals about your original hypothesis.
 
-Most MLSys content is a pile of acronyms. This course threads them onto one spine — **economic value** — because that is what actually decides which technique ships:
+You finish when another learner can reproduce the result and identify where its
+claim stops. A model replacement needs its own quality evaluation. An operator
+speedup needs an end-to-end explanation. A robot application needs observation
+freshness and action semantics as well as inference performance.
 
-```text
-   cost per accepted output = total allocated cost over an interval
-                              / accepted outputs in that same interval
+## Currency and source boundaries
 
-   Include hardware amortization, energy, hosting, and operations consistently.
-   Reject outputs that fail the task-quality gate before computing this metric.
-```
+Reviewed **October 18, 2026**. The [source revision record](sources/verification-2026-10-18.json)
+pins TileRT, cuTile, DFlash and Modular documentation/code used for current tool
+claims. Individual lessons link the relevant research and hardware specifications.
+A public repository, a released binary wheel and a locally executed implementation
+are distinct artifacts. The survey's arithmetic examples are labeled illustrative;
+it does not claim local execution of TileRT, Mojo/MAX, cuTile or a Thor workload.
 
-So the arc moves from the metric down through the stack and back up to the deployment edge:
-
-1. **The economics** — the value layer, the metrics, why MLSys *is* the product now.
-2. **Kernel languages** — how a fast kernel gets written in 2026 (the tile revolution).
-3. **Compilers & runtimes** — how kernels get scheduled, fused, and kept resident at scale.
-4. **Architectures, part 1** — how the *model* itself was redesigned to be cheap to serve (SSMs, hybrids).
-5. **Architectures, part 2** — the 2026 frontier models read as systems artifacts (MoE, MLA, MTP).
-6. **Inference algorithms** — making decode fast without changing the model (speculative decoding, Flash kernels).
-7. **The edge & the capstone** — 1000-TOPS hardware, on-device models, and proving the whole ladder with numbers.
-
----
-
-## Course Map (7 lectures)
-
-<div class="lecture-map" markdown>
-
-| # | Lecture | The thread |
-|---|---------|-----------|
-| [01](Lecture-01.md) | **MLSys as the economic-value layer** — the inference-cost collapse, the metric stack (tokens/s, TOK/$, TCO/Mtok, perf/watt), why systems work *is* the product | the spine |
-| [02](Lecture-02.md) | **The kernel-language explosion** — tiles as the new ISA: Triton, CUTLASS/CuTe/cuTile, ThunderKittens, TileLang, and the ease↔control spectrum | how a kernel is written |
-| [03](Lecture-03.md) | **Compilers & runtimes** — TVM (autoscheduling), Mojo/MAX (a real language), TensorRT-LLM (vendor runtime; inspect open-source and binary component boundaries), IREE, and TileRT (the megakernel runtime) | how kernels run at scale |
-| [04](Lecture-04.md) | **Beyond the dense transformer** — Mamba/SSMs, linear attention, and the hybrid wave: Nemotron-H, Jamba, Falcon-H1, MiniMax-01 | the model made cheap |
-| [05](Lecture-05.md) | **The 2026 frontier as systems artifacts** — Qwen3, Llama Nemotron Ultra 253B, Xiaomi MiMo, DeepSeek V3/R1, and the MoE + MLA + MTP stack | reading a model card |
-| [06](Lecture-06.md) | **Making decode fast** — speculative decoding (EAGLE-3, Medusa, Sequoia), DFlash, Flash kernels (FA-3, FlashInfer), and the Together AI research line | the algorithm layer |
-| [07](Lecture-07.md) | **The edge & physical-AI frontier** — 1000-TOPS hardware (Jetson/DRIVE Thor) vs the 1000-tok/s milestone (MiMo + TileRT), on-device models, and the capstone | closing the co-design loop |
-
-</div>
-
----
-
-## Course Outcomes
-
-By the end you should be able to:
-
-* Read any 2026 model card or serving config and predict its **cost shape** — tokens/s regime, KV-cache behavior, dense vs sparse compute, dominant precision, draft mechanism.
-* Derive an idealized batch-1 decode bandwidth bound under explicit traffic assumptions with the **bandwidth ceiling** (`tokens/s ≤ HBM GB/s ÷ bytes per token`), and use it to sanity-check any vendor throughput claim.
-* Place any kernel tool (Triton, CUTLASS/cuTile, ThunderKittens, TileLang, TVM, Mojo, TensorRT) on the **ease↔control spectrum** and pick one for a workload with a defensible reason.
-* Explain why **SSM/hybrid architectures and MLA** change state/cache growth (recurrent state can be fixed-size; MLA retains token-indexed state), why **MoE** decouples capacity from compute, and what each costs you in memory and interconnect.
-* Stand up **speculative decoding** (and explain EAGLE-3 vs DFlash vs Medusa), and read the acceptance-length / speedup tradeoff.
-* Tie every optimization — kernel, compiler, architecture, decode algorithm — back to a **TOK/$ and tokens/s/watt** number, and defend it.
-
----
-
-## Currency / Refresh Discipline
-
-This field moves weekly, and several topics here (DFlash, the MiMo + TileRT 1000-tok/s milestone, CuTe DSL / cuTile, Falcon-H1R, Qwen3) are 2025–2026 developments. So this course follows the same discipline as [AI Inference Engineer 2026](../AI%20Inference%20Engineer%202026/README.md):
-
-* Every lecture closes with a **`## Current as of`** date and the specific versions / claims it pinned.
-* **Established research** (Mamba, FlashAttention-3, EAGLE-3, DeepSeek MLA) is stated plainly; **very recent or vendor-reported** numbers (MiMo's ~1200 tok/s, Together Inference Engine benchmarks) are explicitly flagged as such, with the source.
-* Treat printed throughput numbers as **teaching anchors**, not truth-at-deployment — software-stack gains move them monthly. For live cross-stack numbers, use a continuously-updated public benchmark such as **[SemiAnalysis InferenceMAX / InferenceX](https://newsletter.semianalysis.com/p/inferencemax-open-source-inference)**.
-
----
-
-## Exit Criteria
-
-You are done with this course when you can:
-
-* Draw the `price = (energy + capital) / tokens-per-second` diagram from memory and place every lecture's topic on it as a lever.
-* Take one model and walk it down an **optimization ladder** — baseline → quantize → speculative decode → tuned kernels/compiler — measuring tokens/s and TOK/$ at each rung, and explain which roofline bound each rung moved.
-* Argue, with a straight face, why a hybrid-architecture 7B on a 1000-TOPS edge box and a 1T-param MoE at 1000 tok/s in a datacenter are **the same MLSys discipline** pointed at two budgets.
-
-If you can name the techniques but can't connect any of them to a cost number, you have flashcards. The point of this course is the connection.
-
----
-
-*Related: [TVM Deep Dives](../TVM%20Deep%20Dives/README.md) · [AI Inference Engineer 2026](../AI%20Inference%20Engineer%202026/README.md) · [Phase 5 — ML Systems Engineering Guide](../Guide.md)*
-
-
-## Carry this course into the physical-AI system
-
-**Start from:** One model and a trace with a known limiting stage.
-
-**Build and challenge:** Choose one kernel, scheduling, architectural, or speculative change to test. Count cost over the same interval as accepted outputs; distinguish commercial prices from engineering cost.
-
-**Pass forward:** A measured optimization ladder with combined results and costs. Continue with [the connected course](../Guide.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).
+Continue into [inference engineering](../AI%20Inference%20Engineer%202026/README.md)
+for a deeper serving sequence, or use the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md)
+to carry your validated component into a larger system. The [learning guide](../../../Learning-Guide.md)
+provides the shared rubric for correctness, reasoning, measurement, reproduction
+and transfer.

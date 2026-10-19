@@ -76,7 +76,7 @@ Errors are largest where the model has seen no data, and a policy that improves 
 | | Aleatoric ("dice") | Epistemic ("knowledge") |
 |---|---|---|
 | Source | The world is genuinely stochastic or partially observed | The model hasn't seen enough data here |
-| More data helps? | No | Yes |
+| More data helps? | More samples at fixed information do not remove intrinsic conditional noise; better sensors/history may reduce partial observability | Can help, with useful coverage and an adequate model |
 | Estimated by | Predicted variance \(\sigma^2_\theta\) | Disagreement between independently trained models |
 | What to do with it | Plan for the spread of outcomes | Avoid, or go collect data there |
 
@@ -86,7 +86,7 @@ $$
 \underbrace{\operatorname{Var}[\Delta s]}_{\text{total}} \;=\; \underbrace{\frac{1}{E}\sum_{e} \sigma_e^2}_{\text{aleatoric}} \;+\; \underbrace{\frac{1}{E}\sum_{e} \big(\mu_e - \bar\mu\big)^2}_{\text{epistemic}}, \qquad \bar\mu = \frac{1}{E}\sum_e \mu_e
 $$
 
-On data the members have all seen, they agree. Far from the data, each extrapolates differently, so disagreement grows. That is a cheap epistemic signal. It is not a calibrated probability — you will plot disagreement against actual error in the lab to see how well it tracks.
+Ensemble disagreement is a practical uncertainty proxy. Members can disagree on familiar data or agree while extrapolating incorrectly; shared architecture and training data can produce shared errors. Compare disagreement against actual held-out prediction error instead of treating it as calibrated epistemic uncertainty.
 
 **PETS** (Chua et al., 2018) combines a probabilistic ensemble with *trajectory sampling*: each imagined trajectory ("particle") is assigned to an ensemble member and samples from that member's Gaussian at every step. The spread of particle returns then reflects both kinds of uncertainty, and the planner optimizes their mean.
 
@@ -106,7 +106,7 @@ execute \(a^*_t\), observe \(s_{t+1}\), and solve again. That is **model-predict
 |---|---|---|
 | **Random shooting** | Sample \(N\) action sequences, simulate each in the model, keep the best | Embarrassingly parallel. Works surprisingly well for small action spaces and short \(H\); degrades as \(H \times d_a\) grows. |
 | **CEM** (cross-entropy method) | Sample \(N\) sequences from a Gaussian; keep the top \(K\) "elites"; refit mean and std to the elites; repeat \(I\) times | The workhorse of PETS-style MPC. Same parallelism as shooting, much better in higher dimensions. |
-| **MPPI** | Like CEM, but weight *all* samples by \(\exp(\hat J / \lambda)\) instead of a hard top-\(K\) | Smoother updates. Standard in robotics MPC (Williams et al., 2017), and the planner inside TD-MPC. |
+| **MPPI / related weighted shooting** | Use exponential trajectory weights rather than only elite selection | Full MPPI includes its control-cost and sampling-distribution corrections; a generic softmax-return optimizer is not automatically the same algorithm |
 | **Gradient-based** | Backpropagate \(\hat J\) through a differentiable model into the actions | Cheap per iteration, but long-horizon gradients through learned dynamics are poorly conditioned and easily exploit the model. |
 | **Tree search** | Expand discrete actions with a search tree (MCTS) | Dominant for discrete games; awkward for continuous 7-D arm actions. |
 
@@ -115,7 +115,7 @@ Two tricks make CEM-MPC practical:
 * **Warm start:** shift last step's optimized mean by one step and use it as the next initial mean. The previous plan is usually almost right.
 * **Execute more than one step** if the planner is slow — the same receding-horizon trade-off as executing \(H\) steps of a VLA action chunk ([Lecture 03](Lecture-03.md)).
 
-The connection to chunking is direct: a VLA that emits a 50-step chunk is a policy that has *amortized* the planning step — it outputs in one forward pass what a CEM planner would have searched for.
+An action-chunk policy and an MPC controller can both propose multiple future controls and execute only a prefix. A behavior-cloned policy has not necessarily learned or amortized an MPC objective; flow inference can also require multiple network evaluations. Compare the actual computation and feedback schedule.
 
 ---
 
@@ -135,7 +135,7 @@ $$
 e_k \;\le\; \epsilon \,\frac{L^k - 1}{L - 1}
 $$
 
-which is linear in \(k\) when \(L \approx 1\) and exponential when \(L > 1\). Contact-rich manipulation has steep local dynamics (a tiny gripper offset decides whether the bowl is grasped), so the effective \(L\) is large exactly where it matters. And this is the error for a *fixed* action sequence. A policy optimized against the model also drifts into states where \(\epsilon\) itself is larger. This is the model-based version of the compounding error in behavioral cloning ([Lecture 02](Lecture-02.md)).
+For L=1 the continuous limit is k×epsilon. For 0≤L<1 the bound is at most epsilon/(1−L); for L>1 it grows geometrically. Saying L is close to one gives a useful linear approximation only over a corresponding finite horizon. Contact-rich manipulation has steep local dynamics (a tiny gripper offset decides whether the bowl is grasped), so the effective \(L\) is large exactly where it matters. And this is the error for a *fixed* action sequence. A policy optimized against the model also drifts into states where \(\epsilon\) itself is larger. This is the model-based version of the compounding error in behavioral cloning ([Lecture 02](Lecture-02.md)).
 
 ### 4.2 Dyna and MBPO: short branches from real states
 

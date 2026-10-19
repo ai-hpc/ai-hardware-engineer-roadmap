@@ -1,0 +1,26 @@
+[
+  {
+    "path": "megatron/training/arguments.py",
+    "revision": "ce852bfb93f364f64a556602fc71a5d9ed2c377e",
+    "url": "https://raw.githubusercontent.com/NVIDIA/Megatron-LM/ce852bfb93f364f64a556602fc71a5d9ed2c377e/megatron/training/arguments.py",
+    "sha256": "fa0df51942af46de4af237397c81dc5200f86de11078334aaf19709c95a684fb"
+  },
+  {
+    "path": "megatron/core/transformer/transformer_config.py",
+    "revision": "ce852bfb93f364f64a556602fc71a5d9ed2c377e",
+    "url": "https://raw.githubusercontent.com/NVIDIA/Megatron-LM/ce852bfb93f364f64a556602fc71a5d9ed2c377e/megatron/core/transformer/transformer_config.py",
+    "sha256": "ec8de7059bf8d6c78663384a489794d0712eaa1b81685ad0339e2c77cb9e32e3"
+  },
+  {
+    "path": "megatron/core/transformer/moe/moe_utils.py",
+    "revision": "ce852bfb93f364f64a556602fc71a5d9ed2c377e",
+    "url": "https://raw.githubusercontent.com/NVIDIA/Megatron-LM/ce852bfb93f364f64a556602fc71a5d9ed2c377e/megatron/core/transformer/moe/moe_utils.py",
+    "sha256": "d1aff14179353c469d891aa367ca7dc8ff756add1999eb9b5e897a19ca234295"
+  },
+  {
+    "path": "megatron/core/parallel_state.py",
+    "revision": "ce852bfb93f364f64a556602fc71a5d9ed2c377e",
+    "url": "https://raw.githubusercontent.com/NVIDIA/Megatron-LM/ce852bfb93f364f64a556602fc71a5d9ed2c377e/megatron/core/parallel_state.py",
+    "sha256": "57ab2c1765c4a20a92379bf50a6485bcd50859de86a59af5332e6b2bb8bcfd2a"
+  }
+]

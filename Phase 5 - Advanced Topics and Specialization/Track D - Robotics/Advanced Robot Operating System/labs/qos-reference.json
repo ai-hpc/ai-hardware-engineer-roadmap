@@ -1,0 +1,60 @@
+{
+  "scope": "actual ROS 2 Jazzy/Fast DDS localhost transport; two nodes in one process",
+  "python": "3.12.3",
+  "domain_id": 79,
+  "namespace": "/course_qos_1448537b89",
+  "checks_passed": 6,
+  "results": [
+    {
+      "case": "best_effort_to_best_effort",
+      "compatible": true,
+      "received": 10,
+      "incompatible_events": 0,
+      "preflight_reason": ""
+    },
+    {
+      "case": "best_effort_to_reliable",
+      "compatible": false,
+      "received": 0,
+      "incompatible_events": 1,
+      "preflight_reason": "ERROR: Best effort publisher and reliable subscription;"
+    },
+    {
+      "case": "reliable_to_best_effort",
+      "compatible": true,
+      "received": 10,
+      "incompatible_events": 0,
+      "preflight_reason": ""
+    },
+    {
+      "case": "reliable_to_reliable",
+      "compatible": true,
+      "received": 10,
+      "incompatible_events": 0,
+      "preflight_reason": ""
+    },
+    {
+      "case": "late_volatile",
+      "historical": [],
+      "after_new_publish": [
+        "after-subscription"
+      ]
+    },
+    {
+      "case": "late_transient_local",
+      "historical": [
+        "before-subscription"
+      ],
+      "after_new_publish": [
+        "before-subscription",
+        "after-subscription"
+      ]
+    }
+  ],
+  "limitations": [
+    "no sensors, TF, robot or actuator",
+    "observed deliveries are not reliability/latency benchmarks",
+    "durable writer remains alive; no persistence after writer shutdown claimed"
+  ],
+  "script_sha256": "85d5a6f48bfeb52a4c089104ec98fe0948c4f7b521bf80d7018c335751c3da93"
+}

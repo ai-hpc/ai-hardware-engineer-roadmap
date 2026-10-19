@@ -1,0 +1,679 @@
+opened device PYTHON from pid:710844
+scheduled     1 kernels in    48.98 ms | CACHE MISS 3b395996 |      27 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+loading libc from /lib/x86_64-linux-gnu/libc.so.6
+loading mesa failed: not found on system
+loading rt from /lib/x86_64-linux-gnu/libgcc_s.so.1
+loading m from /lib/x86_64-linux-gnu/libm.so.6
+
+void signal_prog(unsigned int* restrict data0_1, const int data1_) {
+  *(data0_1+0) = ((unsigned int)(data1_));
+}
+
+
+void wait_prog(volatile unsigned int* restrict data0_1, const int data1_) {
+  for (;;) {
+    unsigned int val0 = (*(data0_1+0));
+    if (!((val0<((unsigned int)(data1_))))) { break; }
+  }
+}
+
+
+void timestamp_prog(unsigned long* restrict data0_1, unsigned long* restrict data1_1) {
+  unsigned long buf0[2];
+  unsigned long val0 = (*(data1_1+0));
+  (((void(*)(int, unsigned long))(val0))((int)(1), (unsigned long)((buf0+0))));
+  *(data0_1+0) = (((*(buf0+0))*1000000000ul)+(*(buf0+1)));
+}
+
+
+void worker_prog(volatile unsigned long* restrict data0_1048576, volatile unsigned long* restrict data1_1, volatile unsigned long* restrict data2_1, unsigned long* restrict data3_1) {
+  for (unsigned long Lidx0 = 0; Lidx0 < 18446744073709551615ul; Lidx0++) {
+    for (;;) {
+      unsigned long val0 = (*(data1_1+0));
+      int alu0 = (((int(*)(unsigned long*))(val0))((unsigned long*)((data3_1+0))));
+      if (!((alu0!=0))) { break; }
+    }
+    unsigned long alu2 = ((Lidx0&16383ul)<<6ul);
+    unsigned long val1 = (*(data0_1048576+(alu2+1ul)));
+    unsigned long val2 = (*(data0_1048576+(alu2+2ul)));
+    unsigned long val3 = (*(data0_1048576+(alu2+3ul)));
+    unsigned long val4 = (*(data0_1048576+(alu2+4ul)));
+    unsigned long val5 = (*(data0_1048576+(alu2+5ul)));
+    unsigned long val6 = (*(data0_1048576+(alu2+6ul)));
+    unsigned long val7 = (*(data0_1048576+(alu2+7ul)));
+    unsigned long val8 = (*(data0_1048576+(alu2+8ul)));
+    unsigned long val9 = (*(data0_1048576+(alu2+9ul)));
+    unsigned long val10 = (*(data0_1048576+(alu2+10ul)));
+    unsigned long val11 = (*(data0_1048576+(alu2+11ul)));
+    unsigned long val12 = (*(data0_1048576+(alu2+12ul)));
+    unsigned long val13 = (*(data0_1048576+(alu2+13ul)));
+    unsigned long val14 = (*(data0_1048576+(alu2+14ul)));
+    unsigned long val15 = (*(data0_1048576+(alu2+15ul)));
+    unsigned long val16 = (*(data0_1048576+(alu2+16ul)));
+    unsigned long val17 = (*(data0_1048576+(alu2+17ul)));
+    unsigned long val18 = (*(data0_1048576+(alu2+18ul)));
+    unsigned long val19 = (*(data0_1048576+(alu2+19ul)));
+    unsigned long val20 = (*(data0_1048576+(alu2+20ul)));
+    unsigned long val21 = (*(data0_1048576+(alu2+21ul)));
+    unsigned long val22 = (*(data0_1048576+(alu2+22ul)));
+    unsigned long val23 = (*(data0_1048576+(alu2+23ul)));
+    unsigned long val24 = (*(data0_1048576+(alu2+24ul)));
+    unsigned long val25 = (*(data0_1048576+(alu2+25ul)));
+    unsigned long val26 = (*(data0_1048576+(alu2+26ul)));
+    unsigned long val27 = (*(data0_1048576+(alu2+27ul)));
+    unsigned long val28 = (*(data0_1048576+(alu2+28ul)));
+    unsigned long val29 = (*(data0_1048576+(alu2+29ul)));
+    unsigned long val30 = (*(data0_1048576+(alu2+30ul)));
+    unsigned long val31 = (*(data0_1048576+(alu2+31ul)));
+    unsigned long val32 = (*(data0_1048576+(alu2+32ul)));
+    unsigned long val33 = (*(data0_1048576+(alu2+33ul)));
+    unsigned long val34 = (*(data0_1048576+(alu2+34ul)));
+    unsigned long val35 = (*(data0_1048576+(alu2+35ul)));
+    unsigned long val36 = (*(data0_1048576+(alu2+36ul)));
+    unsigned long val37 = (*(data0_1048576+(alu2+37ul)));
+    unsigned long val38 = (*(data0_1048576+(alu2+38ul)));
+    unsigned long val39 = (*(data0_1048576+(alu2+39ul)));
+    unsigned long val40 = (*(data0_1048576+(alu2+40ul)));
+    unsigned long val41 = (*(data0_1048576+(alu2+41ul)));
+    unsigned long val42 = (*(data0_1048576+(alu2+42ul)));
+    unsigned long val43 = (*(data0_1048576+(alu2+43ul)));
+    unsigned long val44 = (*(data0_1048576+(alu2+44ul)));
+    unsigned long val45 = (*(data0_1048576+(alu2+45ul)));
+    unsigned long val46 = (*(data0_1048576+(alu2+46ul)));
+    unsigned long val47 = (*(data0_1048576+(alu2+47ul)));
+    unsigned long val48 = (*(data0_1048576+(alu2+48ul)));
+    unsigned long val49 = (*(data0_1048576+(alu2+49ul)));
+    unsigned long val50 = (*(data0_1048576+(alu2+50ul)));
+    unsigned long val51 = (*(data0_1048576+(alu2+51ul)));
+    unsigned long val52 = (*(data0_1048576+(alu2+52ul)));
+    unsigned long val53 = (*(data0_1048576+(alu2+53ul)));
+    unsigned long val54 = (*(data0_1048576+(alu2+54ul)));
+    unsigned long val55 = (*(data0_1048576+(alu2+55ul)));
+    unsigned long val56 = (*(data0_1048576+(alu2+56ul)));
+    unsigned long val57 = (*(data0_1048576+(alu2+57ul)));
+    unsigned long val58 = (*(data0_1048576+(alu2+58ul)));
+    unsigned long val59 = (*(data0_1048576+(alu2+59ul)));
+    unsigned long val60 = (*(data0_1048576+(alu2+60ul)));
+    unsigned long val61 = (*(data0_1048576+(alu2+61ul)));
+    unsigned long val62 = (*(data0_1048576+(alu2+62ul)));
+    unsigned long val63 = (*(data0_1048576+(alu2+63ul)));
+    unsigned long val64 = (*(data0_1048576+alu2));
+    (((void(*)(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long))(val64))((unsigned long)(val1), (unsigned long)(val2), (unsigned long)(val3), (unsigned long)(val4), (unsigned long)(val5), (unsigned long)(val6), (unsigned long)(val7), (unsigned long)(val8), (unsigned long)(val9), (unsigned long)(val10), (unsigned long)(val11), (unsigned long)(val12), (unsigned long)(val13), (unsigned long)(val14), (unsigned long)(val15), (unsigned long)(val16), (unsigned long)(val17), (unsigned long)(val18), (unsigned long)(val19), (unsigned long)(val20), (unsigned long)(val21), (unsigned long)(val22), (unsigned long)(val23), (unsigned long)(val24), (unsigned long)(val25), (unsigned long)(val26), (unsigned long)(val27), (unsigned long)(val28), (unsigned long)(val29), (unsigned long)(val30), (unsigned long)(val31), (unsigned long)(val32), (unsigned long)(val33), (unsigned long)(val34), (unsigned long)(val35), (unsigned long)(val36), (unsigned long)(val37), (unsigned long)(val38), (unsigned long)(val39), (unsigned long)(val40), (unsigned long)(val41), (unsigned long)(val42), (unsigned long)(val43), (unsigned long)(val44), (unsigned long)(val45), (unsigned long)(val46), (unsigned long)(val47), (unsigned long)(val48), (unsigned long)(val49), (unsigned long)(val50), (unsigned long)(val51), (unsigned long)(val52), (unsigned long)(val53), (unsigned long)(val54), (unsigned long)(val55), (unsigned long)(val56), (unsigned long)(val57), (unsigned long)(val58), (unsigned long)(val59), (unsigned long)(val60), (unsigned long)(val61), (unsigned long)(val62), (unsigned long)(val63)));
+    *(data2_1+0) = (Lidx0+1ul);
+  }
+}
+
+opened device CPU from pid:710844
+*** CPU        1 copy       12 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    397.23ms/   397.23ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     4.57 ms | CACHE MISS 19b12418 |      44 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU        2 copy       48 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    257.55us/   397.49ms (      0 GFLOPS    0|0      GB/s)compiling:   0%|                                          | 0/1 [00:00<?, ?it/s]compiling r_4_3                                   : 100%|█| 1/1 [00:00<00:00, 17.59it/s]compiling r_4_3                                   : 100%|█| 1/1 [00:00<00:00, 17.56it/s]
+compiling:   0%|                                          | 0/1 [00:00<?, ?it/s]compiling E_4                                     : 100%|█| 1/1 [00:00<00:00, 37.39it/s]compiling E_4                                     : 100%|█| 1/1 [00:00<00:00, 37.25it/s]
+compiling:   0%|                                          | 0/1 [00:00<?, ?it/s]compiling E_4                                     : 100%|█| 1/1 [00:00<00:00, 112.69it/s]compiling E_4                                     : 100%|█| 1/1 [00:00<00:00, 111.69it/s]
+
+scheduled     1 kernels in     2.40 ms | CACHE MISS 71b20255 |      54 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU        3 copy       16 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    152.64us/   397.64ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     0.98 ms |  cache hit 71b20255 |      55 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU        4 copy       16 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    101.12us/   397.74ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     0.91 ms |  cache hit 71b20255 |      56 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU        5 copy       16 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    115.09us/   397.86ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     0.89 ms |  cache hit 71b20255 |      57 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU        6 copy       16 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    128.09us/   397.99ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     3.60 ms |  cache hit 71b20255 |      58 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU        7 copy       16 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    112.94us/   398.10ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     4.02 ms |  cache hit 19b12418 |      63 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU        8 copy       48 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    112.09us/   398.21ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     0.80 ms |  cache hit 71b20255 |      61 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU        9 copy       16 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    100.20us/   398.31ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in    30.15 ms | CACHE MISS ede53fa8 |     124 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:53
+r_4_3                     opts: (Opt(op=OptOps.UNROLL, axis=0, arg=0),)
+typedef float float2 __attribute__((aligned(8),ext_vector_type(2)));
+void r_4_3(float* restrict data0_4, float* restrict data1_3, float* restrict data2_12, float* restrict data3_4) {
+  float val0 = (*(data1_3+2));
+  float2 val1 = (*((float2*)((data1_3+0))));
+  for (int Lidx1 = 0; Lidx1 < 4; Lidx1++) {
+    float val2 = (*(data2_12+(Lidx1+4)));
+    float val3 = (*(data2_12+(Lidx1+8)));
+    float val4 = (*(data2_12+Lidx1));
+    float val5 = (*(data3_4+Lidx1));
+    *(data0_4+Lidx1) = ((val1[0]*val4)+(val1[1]*val2)+(val0*val3)+val5);
+  }
+}
+
+*** CPU       10 r_4_3                                          arg  4 mem   0.00 GB tm     27.52us/   398.34ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     6.97 ms | CACHE MISS d6668a95 |     200 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:54
+E_4                       opts: (Opt(op=OptOps.UPCAST, axis=0, arg=4),)
+typedef float float4 __attribute__((aligned(16),ext_vector_type(4)));
+void E_4(float* restrict data0_4, float* restrict data1_4, float* restrict data2_4, float* restrict data3_4, float* restrict data4_4, float* restrict data5_4) {
+  float4 val0 = (*((float4*)((data1_4+0))));
+  float4 val1 = (*((float4*)((data2_4+0))));
+  float4 val2 = (*((float4*)((data3_4+0))));
+  float4 val3 = (*((float4*)((data4_4+0))));
+  float4 val4 = (*((float4*)((data5_4+0))));
+  *((float4*)((data0_4+0))) = (float4){((((val0[0]-val1[0])/__builtin_sqrtf((val2[0]+9.999999747378752e-06f)))*val3[0])+val4[0]),((((val0[1]-val1[1])/__builtin_sqrtf((val2[1]+9.999999747378752e-06f)))*val3[1])+val4[1]),((((val0[2]-val1[2])/__builtin_sqrtf((val2[2]+9.999999747378752e-06f)))*val3[2])+val4[2]),((((val0[3]-val1[3])/__builtin_sqrtf((val2[3]+9.999999747378752e-06f)))*val3[3])+val4[3])};
+}
+
+*** CPU       11 E_4                                            arg  6 mem   0.00 GB tm     36.64us/   398.38ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     7.89 ms | CACHE MISS ea88de5d |     266 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:55
+E_4                       opts: (Opt(op=OptOps.UPCAST, axis=0, arg=4),)
+typedef float float4 __attribute__((aligned(16),ext_vector_type(4)));
+void E_4(float* restrict data0_4, float* restrict data1_4) {
+  float4 val0 = (*((float4*)((data1_4+0))));
+  float alu0 = ((0.0f<val0[0])?val0[0]:0.0f);
+  float alu1 = ((0.0f<val0[1])?val0[1]:0.0f);
+  float alu2 = ((0.0f<val0[2])?val0[2]:0.0f);
+  float alu3 = ((0.0f<val0[3])?val0[3]:0.0f);
+  *((float4*)((data0_4+0))) = (float4){alu0,alu1,alu2,alu3};
+}
+
+*** CPU       12 E_4                                            arg  2 mem   0.00 GB tm     16.79us/   398.39ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.23 ms |  cache hit ede53fa8 |     294 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:53
+scheduled     1 kernels in     1.17 ms |  cache hit d6668a95 |     297 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:54
+scheduled     1 kernels in     1.63 ms |  cache hit ea88de5d |     289 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:55
+JIT captured 3 linears with 1 inputs
+*** CPU       13 r_4_3                                          arg  4 mem   0.00 GB tm     30.35us/   398.42ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       14 E_4                                            arg  6 mem   0.00 GB tm      8.38us/   398.43ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       15 E_4                                            arg  2 mem   0.00 GB tm      3.42us/   398.44ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       16 r_4_3                                          arg  4 mem   0.00 GB tm      5.03us/   398.44ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       17 E_4                                            arg  6 mem   0.00 GB tm      3.66us/   398.44ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       18 E_4                                            arg  2 mem   0.00 GB tm      2.20us/   398.45ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.19 ms |  cache hit 3b395996 |     295 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU       19 copy       12 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    170.23us/   398.62ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       20 r_4_3                                          arg  4 mem   0.00 GB tm     10.74us/   398.63ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       21 E_4                                            arg  6 mem   0.00 GB tm      5.60us/   398.63ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       22 E_4                                            arg  2 mem   0.00 GB tm      2.67us/   398.64ms (      0 GFLOPS    0|0      GB/s)compiling:   0%|                                          | 0/1 [00:00<?, ?it/s]compiling r_4_3                                   : 100%|█| 1/1 [00:00<00:00, 49.47it/s]compiling r_4_3                                   : 100%|█| 1/1 [00:00<00:00, 49.18it/s]
+compiling:   0%|                                          | 0/1 [00:00<?, ?it/s]compiling r_4_3                                   : 100%|█| 1/1 [00:00<00:00, 93.22it/s]compiling r_4_3                                   : 100%|█| 1/1 [00:00<00:00, 92.44it/s]
+
+*** CPU       23 r_4_3                                          arg  4 mem   0.00 GB tm      6.30us/   398.64ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       24 E_4                                            arg  6 mem   0.00 GB tm      4.83us/   398.65ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       25 E_4                                            arg  2 mem   0.00 GB tm      5.49us/   398.65ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       26 r_4_3                                          arg  4 mem   0.00 GB tm      6.78us/   398.66ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       27 E_4                                            arg  6 mem   0.00 GB tm      6.94us/   398.67ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       28 E_4                                            arg  2 mem   0.00 GB tm      3.39us/   398.67ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       29 r_4_3                                          arg  4 mem   0.00 GB tm      4.15us/   398.67ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       30 E_4                                            arg  6 mem   0.00 GB tm      3.70us/   398.68ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       31 E_4                                            arg  2 mem   0.00 GB tm      1.90us/   398.68ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       32 r_4_3                                          arg  4 mem   0.00 GB tm      5.24us/   398.68ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       33 E_4                                            arg  6 mem   0.00 GB tm      7.12us/   398.69ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       34 E_4                                            arg  2 mem   0.00 GB tm      2.68us/   398.69ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       35 r_4_3                                          arg  4 mem   0.00 GB tm      7.92us/   398.70ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       36 E_4                                            arg  6 mem   0.00 GB tm      6.67us/   398.71ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       37 E_4                                            arg  2 mem   0.00 GB tm      3.39us/   398.71ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     6.74 ms | CACHE MISS cfc464fb |     340 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:59
+r_4_3                     opts: (Opt(op=OptOps.UNROLL, axis=0, arg=0),)
+typedef float float2 __attribute__((aligned(8),ext_vector_type(2)));
+void r_4_3(float* restrict data0_4, float* restrict data1_3, float* restrict data2_12, float* restrict data3_4, float* restrict data4_4, float* restrict data5_4, float* restrict data6_4, float* restrict data7_4) {
+  float val0 = (*(data1_3+2));
+  float2 val1 = (*((float2*)((data1_3+0))));
+  for (int Lidx1 = 0; Lidx1 < 4; Lidx1++) {
+    float val2 = (*(data2_12+(Lidx1+4)));
+    float val3 = (*(data2_12+(Lidx1+8)));
+    float val4 = (*(data2_12+Lidx1));
+    float val5 = (*(data3_4+Lidx1));
+    float val6 = (*(data4_4+Lidx1));
+    float val7 = (*(data5_4+Lidx1));
+    float val8 = (*(data6_4+Lidx1));
+    float val9 = (*(data7_4+Lidx1));
+    float alu0 = ((((((val1[0]*val4)+(val1[1]*val2)+(val0*val3)+val5)-val6)/__builtin_sqrtf((val7+9.999999747378752e-06f)))*val8)+val9);
+    float alu1 = ((0.0f<alu0)?alu0:0.0f);
+    *(data0_4+Lidx1) = alu1;
+  }
+}
+
+*** CPU       38 r_4_3                                          arg  8 mem   0.00 GB tm     11.48us/   398.72ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.12 ms |  cache hit cfc464fb |     366 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:59
+JIT captured 1 linears with 1 inputs
+*** CPU       39 r_4_3                                          arg  8 mem   0.00 GB tm     11.35us/   398.74ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       40 r_4_3                                          arg  8 mem   0.00 GB tm      5.35us/   398.74ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.11 ms |  cache hit 3b395996 |     335 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU       41 copy       12 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    905.84us/   399.65ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       42 r_4_3                                          arg  8 mem   0.00 GB tm     11.05us/   399.66ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       43 r_4_3                                          arg  8 mem   0.00 GB tm      9.55us/   399.67ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       44 r_4_3                                          arg  8 mem   0.00 GB tm      8.67us/   399.68ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       45 r_4_3                                          arg  8 mem   0.00 GB tm      5.88us/   399.68ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       46 r_4_3                                          arg  8 mem   0.00 GB tm      5.31us/   399.69ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       47 r_4_3                                          arg  8 mem   0.00 GB tm      5.06us/   399.69ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     8.36 ms | CACHE MISS a9e09249 |     356 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:62
+r_4_3                     opts: (Opt(op=OptOps.UNROLL, axis=0, arg=0),)
+typedef float float2 __attribute__((aligned(8),ext_vector_type(2)));
+void r_4_3(float* restrict data0_4, float* restrict data1_3, float* restrict data2_12, float* restrict data3_4) {
+  float val0 = (*(data1_3+2));
+  float2 val1 = (*((float2*)((data1_3+0))));
+  for (int Lidx1 = 0; Lidx1 < 4; Lidx1++) {
+    float val2 = (*(data2_12+(Lidx1+4)));
+    float val3 = (*(data2_12+(Lidx1+8)));
+    float val4 = (*(data2_12+Lidx1));
+    float val5 = (*(data3_4+Lidx1));
+    float alu0 = ((val1[0]*val4)+(val1[1]*val2)+(val0*val3)+val5);
+    float alu1 = ((0.0f<alu0)?alu0:0.0f);
+    *(data0_4+Lidx1) = alu1;
+  }
+}
+
+*** CPU       48 r_4_3                                          arg  4 mem   0.00 GB tm      9.94us/   399.70ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.52 ms |  cache hit a9e09249 |     366 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:62
+JIT captured 1 linears with 1 inputs
+*** CPU       49 r_4_3                                          arg  4 mem   0.00 GB tm     14.83us/   399.72ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       50 r_4_3                                          arg  4 mem   0.00 GB tm      6.98us/   399.72ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.37 ms |  cache hit 3b395996 |     351 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU       51 copy       12 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    100.37us/   399.82ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       52 r_4_3                                          arg  4 mem   0.00 GB tm      9.11us/   399.83ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       53 r_4_3                                          arg  4 mem   0.00 GB tm      6.60us/   399.84ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       54 r_4_3                                          arg  4 mem   0.00 GB tm      4.89us/   399.84ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       55 r_4_3                                          arg  4 mem   0.00 GB tm      4.95us/   399.85ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       56 r_4_3                                          arg  4 mem   0.00 GB tm      4.97us/   399.85ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       57 r_4_3                                          arg  4 mem   0.00 GB tm      5.16us/   399.86ms (      0 GFLOPS    0|0      GB/s)compiling:   0%|                                          | 0/1 [00:00<?, ?it/s]compiling r_3_7_5                                 : 100%|█| 1/1 [00:00<00:00, 43.20it/s]compiling r_3_7_5                                 : 100%|█| 1/1 [00:00<00:00, 43.00it/s]
+compiling:   0%|                                          | 0/1 [00:00<?, ?it/s]compiling E_3_7                                   : 100%|█| 1/1 [00:00<00:00, 112.57it/s]compiling E_3_7                                   : 100%|█| 1/1 [00:00<00:00, 111.56it/s]
+compiling:   0%|                                          | 0/1 [00:00<?, ?it/s]compiling E_21                                    : 100%|█| 1/1 [00:00<00:00, 261.48it/s]compiling E_21                                    : 100%|█| 1/1 [00:00<00:00, 257.06it/s]
+
+scheduled     1 kernels in     2.96 ms | CACHE MISS 60809012 |     366 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU       58 copy       60 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    161.28us/   400.02ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     2.25 ms | CACHE MISS d2ff9bf1 |     381 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU       59 copy      140 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    169.66us/   400.19ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.71 ms | CACHE MISS 68463461 |     391 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU       60 copy       28 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    129.90us/   400.32ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     0.77 ms |  cache hit 68463461 |     392 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU       61 copy       28 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    131.57us/   400.45ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     0.75 ms |  cache hit 68463461 |     393 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU       62 copy       28 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    102.90us/   400.56ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     0.88 ms |  cache hit 68463461 |     394 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU       63 copy       28 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    117.13us/   400.67ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     0.94 ms |  cache hit 68463461 |     395 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU       64 copy       28 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    114.90us/   400.79ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     0.96 ms |  cache hit d2ff9bf1 |     393 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU       65 copy      140 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    109.78us/   400.90ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     0.77 ms |  cache hit 68463461 |     391 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU       66 copy       28 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    124.06us/   401.02ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     5.56 ms | CACHE MISS 1f74dc8a |     468 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:53
+r_3_7_5                   opts: (Opt(op=OptOps.UNROLL, axis=0, arg=0),)
+
+void r_3_7_5(float* restrict data0_21, float* restrict data1_15, float* restrict data2_35, float* restrict data3_7) {
+  for (int Lidx1 = 0; Lidx1 < 3; Lidx1++) {
+    int alu0 = (Lidx1*5);
+    float val0 = (*(data1_15+(alu0+1)));
+    float val1 = (*(data1_15+(alu0+2)));
+    float val2 = (*(data1_15+(alu0+3)));
+    float val3 = (*(data1_15+(alu0+4)));
+    float val4 = (*(data1_15+alu0));
+    for (int Lidx2 = 0; Lidx2 < 7; Lidx2++) {
+      float val5 = (*(data2_35+(Lidx2+7)));
+      float val6 = (*(data2_35+(Lidx2+14)));
+      float val7 = (*(data2_35+(Lidx2+21)));
+      float val8 = (*(data2_35+(Lidx2+28)));
+      float val9 = (*(data2_35+Lidx2));
+      float val10 = (*(data3_7+Lidx2));
+      *(data0_21+((Lidx1*7)+Lidx2)) = ((val4*val9)+(val0*val5)+(val1*val6)+(val2*val7)+(val3*val8)+val10);
+    }
+  }
+}
+
+*** CPU       67 r_3_7_5                                        arg  4 mem   0.00 GB tm     20.39us/   401.04ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     6.98 ms | CACHE MISS 770ae386 |     567 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:54
+
+void E_3_7(float* restrict data0_21, float* restrict data1_21, float* restrict data2_7, float* restrict data3_7, float* restrict data4_7, float* restrict data5_7) {
+  for (int Lidx0 = 0; Lidx0 < 3; Lidx0++) {
+    for (int Lidx1 = 0; Lidx1 < 7; Lidx1++) {
+      int alu0 = ((Lidx0*7)+Lidx1);
+      float val0 = (*(data1_21+alu0));
+      float val1 = (*(data2_7+Lidx1));
+      float val2 = (*(data3_7+Lidx1));
+      float val3 = (*(data4_7+Lidx1));
+      float val4 = (*(data5_7+Lidx1));
+      *(data0_21+alu0) = ((((val0-val1)/__builtin_sqrtf((val2+9.999999747378752e-06f)))*val3)+val4);
+    }
+  }
+}
+
+*** CPU       68 E_3_7                                          arg  6 mem   0.00 GB tm     19.42us/   401.06ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     3.45 ms | CACHE MISS 80b718a3 |     600 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:55
+
+void E_21(float* restrict data0_21, float* restrict data1_21) {
+  for (int Lidx0 = 0; Lidx0 < 21; Lidx0++) {
+    float val0 = (*(data1_21+Lidx0));
+    float alu0 = ((0.0f<val0)?val0:0.0f);
+    *(data0_21+Lidx0) = alu0;
+  }
+}
+
+*** CPU       69 E_21                                           arg  2 mem   0.00 GB tm     14.78us/   401.08ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.42 ms |  cache hit 1f74dc8a |     622 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:53
+scheduled     1 kernels in     1.40 ms |  cache hit 770ae386 |     625 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:54
+scheduled     1 kernels in     1.31 ms |  cache hit 80b718a3 |     617 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:55
+JIT captured 3 linears with 1 inputs
+*** CPU       70 r_3_7_5                                        arg  4 mem   0.00 GB tm     15.48us/   401.09ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       71 E_3_7                                          arg  6 mem   0.00 GB tm      7.69us/   401.10ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       72 E_21                                           arg  2 mem   0.00 GB tm      3.76us/   401.10ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       73 r_3_7_5                                        arg  4 mem   0.00 GB tm      5.10us/   401.11ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       74 E_3_7                                          arg  6 mem   0.00 GB tm      4.88us/   401.11ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       75 E_21                                           arg  2 mem   0.00 GB tm      2.65us/   401.12ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.23 ms |  cache hit 60809012 |     622 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU       76 copy       60 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    178.28us/   401.29ms (      0 GFLOPS    0|0      GB/s)compiling:   0%|                                          | 0/1 [00:00<?, ?it/s]compiling r_3_7_5                                 : 100%|█| 1/1 [00:00<00:00, 46.77it/s]compiling r_3_7_5                                 : 100%|█| 1/1 [00:00<00:00, 46.59it/s]
+compiling:   0%|                                          | 0/1 [00:00<?, ?it/s]compiling r_3_7_5                                 : 100%|█| 1/1 [00:00<00:00, 64.70it/s]compiling r_3_7_5                                 : 100%|█| 1/1 [00:00<00:00, 64.17it/s]
+
+*** CPU       77 r_3_7_5                                        arg  4 mem   0.00 GB tm     11.19us/   401.30ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       78 E_3_7                                          arg  6 mem   0.00 GB tm      6.18us/   401.31ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       79 E_21                                           arg  2 mem   0.00 GB tm      3.36us/   401.31ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       80 r_3_7_5                                        arg  4 mem   0.00 GB tm      6.33us/   401.32ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       81 E_3_7                                          arg  6 mem   0.00 GB tm      5.36us/   401.33ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       82 E_21                                           arg  2 mem   0.00 GB tm      2.66us/   401.33ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       83 r_3_7_5                                        arg  4 mem   0.00 GB tm      4.34us/   401.33ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       84 E_3_7                                          arg  6 mem   0.00 GB tm      4.90us/   401.34ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       85 E_21                                           arg  2 mem   0.00 GB tm      2.57us/   401.34ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       86 r_3_7_5                                        arg  4 mem   0.00 GB tm      4.01us/   401.34ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       87 E_3_7                                          arg  6 mem   0.00 GB tm      3.91us/   401.35ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       88 E_21                                           arg  2 mem   0.00 GB tm      4.57us/   401.35ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       89 r_3_7_5                                        arg  4 mem   0.00 GB tm      4.29us/   401.36ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       90 E_3_7                                          arg  6 mem   0.00 GB tm      3.86us/   401.36ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       91 E_21                                           arg  2 mem   0.00 GB tm      2.23us/   401.36ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       92 r_3_7_5                                        arg  4 mem   0.00 GB tm      3.37us/   401.37ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       93 E_3_7                                          arg  6 mem   0.00 GB tm      4.14us/   401.37ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       94 E_21                                           arg  2 mem   0.00 GB tm      2.63us/   401.37ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     6.73 ms | CACHE MISS 153af6d1 |     671 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:59
+r_3_7_5                   opts: (Opt(op=OptOps.UNROLL, axis=0, arg=0),)
+
+void r_3_7_5(float* restrict data0_21, float* restrict data1_15, float* restrict data2_35, float* restrict data3_7, float* restrict data4_7, float* restrict data5_7, float* restrict data6_7, float* restrict data7_7) {
+  for (int Lidx1 = 0; Lidx1 < 3; Lidx1++) {
+    int alu0 = (Lidx1*5);
+    float val0 = (*(data1_15+(alu0+1)));
+    float val1 = (*(data1_15+(alu0+2)));
+    float val2 = (*(data1_15+(alu0+3)));
+    float val3 = (*(data1_15+(alu0+4)));
+    float val4 = (*(data1_15+alu0));
+    for (int Lidx2 = 0; Lidx2 < 7; Lidx2++) {
+      float val5 = (*(data2_35+(Lidx2+7)));
+      float val6 = (*(data2_35+(Lidx2+14)));
+      float val7 = (*(data2_35+(Lidx2+21)));
+      float val8 = (*(data2_35+(Lidx2+28)));
+      float val9 = (*(data2_35+Lidx2));
+      float val10 = (*(data3_7+Lidx2));
+      float val11 = (*(data4_7+Lidx2));
+      float val12 = (*(data5_7+Lidx2));
+      float val13 = (*(data6_7+Lidx2));
+      float val14 = (*(data7_7+Lidx2));
+      float alu1 = ((((((val4*val9)+(val0*val5)+(val1*val6)+(val2*val7)+(val3*val8)+val10)-val11)/__builtin_sqrtf((val12+9.999999747378752e-06f)))*val13)+val14);
+      float alu2 = ((0.0f<alu1)?alu1:0.0f);
+      *(data0_21+((Lidx1*7)+Lidx2)) = alu2;
+    }
+  }
+}
+
+*** CPU       95 r_3_7_5                                        arg  8 mem   0.00 GB tm      9.30us/   401.38ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.28 ms |  cache hit 153af6d1 |     698 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:59
+JIT captured 1 linears with 1 inputs
+*** CPU       96 r_3_7_5                                        arg  8 mem   0.00 GB tm     12.89us/   401.40ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       97 r_3_7_5                                        arg  8 mem   0.00 GB tm      5.52us/   401.40ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.02 ms |  cache hit 60809012 |     667 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU       98 copy       60 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm     81.55us/   401.48ms (      0 GFLOPS    0|0      GB/s)
+*** CPU       99 r_3_7_5                                        arg  8 mem   0.00 GB tm      8.77us/   401.49ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      100 r_3_7_5                                        arg  8 mem   0.00 GB tm     14.37us/   401.51ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      101 r_3_7_5                                        arg  8 mem   0.00 GB tm      5.29us/   401.51ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      102 r_3_7_5                                        arg  8 mem   0.00 GB tm      4.11us/   401.52ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      103 r_3_7_5                                        arg  8 mem   0.00 GB tm      3.81us/   401.52ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      104 r_3_7_5                                        arg  8 mem   0.00 GB tm      3.88us/   401.52ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     4.57 ms | CACHE MISS 001d5021 |     688 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:62
+r_3_7_5                   opts: (Opt(op=OptOps.UNROLL, axis=0, arg=0),)
+
+void r_3_7_5(float* restrict data0_21, float* restrict data1_15, float* restrict data2_35, float* restrict data3_7) {
+  for (int Lidx1 = 0; Lidx1 < 3; Lidx1++) {
+    int alu0 = (Lidx1*5);
+    float val0 = (*(data1_15+(alu0+1)));
+    float val1 = (*(data1_15+(alu0+2)));
+    float val2 = (*(data1_15+(alu0+3)));
+    float val3 = (*(data1_15+(alu0+4)));
+    float val4 = (*(data1_15+alu0));
+    for (int Lidx2 = 0; Lidx2 < 7; Lidx2++) {
+      float val5 = (*(data2_35+(Lidx2+7)));
+      float val6 = (*(data2_35+(Lidx2+14)));
+      float val7 = (*(data2_35+(Lidx2+21)));
+      float val8 = (*(data2_35+(Lidx2+28)));
+      float val9 = (*(data2_35+Lidx2));
+      float val10 = (*(data3_7+Lidx2));
+      float alu1 = ((val4*val9)+(val0*val5)+(val1*val6)+(val2*val7)+(val3*val8)+val10);
+      float alu2 = ((0.0f<alu1)?alu1:0.0f);
+      *(data0_21+((Lidx1*7)+Lidx2)) = alu2;
+    }
+  }
+}
+
+*** CPU      105 r_3_7_5                                        arg  4 mem   0.00 GB tm      8.59us/   401.53ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.25 ms |  cache hit 001d5021 |     699 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:62
+JIT captured 1 linears with 1 inputs
+*** CPU      106 r_3_7_5                                        arg  4 mem   0.00 GB tm     15.61us/   401.55ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      107 r_3_7_5                                        arg  4 mem   0.00 GB tm      3.96us/   401.55ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.58 ms |  cache hit 60809012 |     684 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40compiling:   0%|                                          | 0/1 [00:00<?, ?it/s]compiling r_8_9_16                                : 100%|█| 1/1 [00:00<00:00, 22.96it/s]compiling r_8_9_16                                : 100%|█| 1/1 [00:00<00:00, 22.90it/s]
+compiling:   0%|                                          | 0/1 [00:00<?, ?it/s]compiling E_8_9                                   : 100%|█| 1/1 [00:00<00:00, 101.28it/s]compiling E_8_9                                   : 100%|█| 1/1 [00:00<00:00, 100.47it/s]
+compiling:   0%|                                          | 0/1 [00:00<?, ?it/s]
+*** CPU      108 copy       60 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    130.60us/   401.68ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      109 r_3_7_5                                        arg  4 mem   0.00 GB tm     16.41us/   401.70ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      110 r_3_7_5                                        arg  4 mem   0.00 GB tm      8.59us/   401.71ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      111 r_3_7_5                                        arg  4 mem   0.00 GB tm      5.66us/   401.71ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      112 r_3_7_5                                        arg  4 mem   0.00 GB tm      5.06us/   401.72ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      113 r_3_7_5                                        arg  4 mem   0.00 GB tm      3.51us/   401.72ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      114 r_3_7_5                                        arg  4 mem   0.00 GB tm      3.73us/   401.72ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     2.49 ms | CACHE MISS 2a712942 |     698 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU      115 copy      512 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm     84.79us/   401.81ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     2.47 ms | CACHE MISS 7e71e776 |     713 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU      116 copy      576 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    232.82us/   402.04ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     2.46 ms | CACHE MISS 851d0cd1 |     723 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU      117 copy       36 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    195.44us/   402.24ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.24 ms |  cache hit 851d0cd1 |     724 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU      118 copy       36 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    157.74us/   402.40ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.09 ms |  cache hit 851d0cd1 |     725 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU      119 copy       36 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    137.80us/   402.53ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.22 ms |  cache hit 851d0cd1 |     726 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU      120 copy       36 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    145.78us/   402.68ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.18 ms |  cache hit 851d0cd1 |     727 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU      121 copy       36 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    138.21us/   402.82ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.25 ms |  cache hit 7e71e776 |     725 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU      122 copy      576 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    145.21us/   402.96ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.24 ms |  cache hit 851d0cd1 |     723 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU      123 copy       36 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    164.03us/   403.13ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     7.64 ms | CACHE MISS 70b3c590 |     802 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:53
+r_8_9_16                  opts: (Opt(op=OptOps.UNROLL, axis=0, arg=0),)
+typedef float float4 __attribute__((aligned(16),ext_vector_type(4)));
+void r_8_9_16(float* restrict data0_72, float* restrict data1_128, float* restrict data2_144, float* restrict data3_9) {
+  for (int Lidx1 = 0; Lidx1 < 8; Lidx1++) {
+    int alu0 = (Lidx1<<4);
+    float4 val0 = (*((float4*)((data1_128+(alu0+4)))));
+    float4 val1 = (*((float4*)((data1_128+(alu0+8)))));
+    float4 val2 = (*((float4*)((data1_128+(alu0+12)))));
+    float4 val3 = (*((float4*)((data1_128+alu0))));
+    for (int Lidx2 = 0; Lidx2 < 9; Lidx2++) {
+      float val4 = (*(data2_144+(Lidx2+9)));
+      float val5 = (*(data2_144+(Lidx2+18)));
+      float val6 = (*(data2_144+(Lidx2+27)));
+      float val7 = (*(data2_144+(Lidx2+36)));
+      float val8 = (*(data2_144+(Lidx2+45)));
+      float val9 = (*(data2_144+(Lidx2+54)));
+      float val10 = (*(data2_144+(Lidx2+63)));
+      float val11 = (*(data2_144+(Lidx2+72)));
+      float val12 = (*(data2_144+(Lidx2+81)));
+      float val13 = (*(data2_144+(Lidx2+90)));
+      float val14 = (*(data2_144+(Lidx2+99)));
+      float val15 = (*(data2_144+(Lidx2+108)));
+      float val16 = (*(data2_144+(Lidx2+117)));
+      float val17 = (*(data2_144+(Lidx2+126)));
+      float val18 = (*(data2_144+(Lidx2+135)));
+      float val19 = (*(data2_144+Lidx2));
+      float val20 = (*(data3_9+Lidx2));
+      *(data0_72+((Lidx1*9)+Lidx2)) = ((val3[0]*val19)+(val3[1]*val4)+(val3[2]*val5)+(val3[3]*val6)+(val0[0]*val7)+(val0[1]*val8)+(val0[2]*val9)+(val0[3]*val10)+(val1[0]*val11)+(val1[1]*val12)+(val1[2]*val13)+(val1[3]*val14)+(val2[0]*val15)+(val2[1]*val16)+(val2[2]*val17)+(val2[3]*val18)+val20);
+    }
+  }
+}
+
+*** CPU      124 r_8_9_16                                       arg  4 mem   0.00 GB tm     22.81us/   403.15ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     4.69 ms | CACHE MISS 79d2db43 |     998 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:54
+
+void E_8_9(float* restrict data0_72, float* restrict data1_72, float* restrict data2_9, float* restrict data3_9, float* restrict data4_9, float* restrict data5_9) {
+  for (int Lidx0 = 0; Lidx0 < 8; Lidx0++) {
+    for (int Lidx1 = 0; Lidx1 < 9; Lidx1++) {
+      int alu0 = ((Lidx0*9)+Lidx1);
+      float val0 = (*(data1_72+alu0));
+      float val1 = (*(data2_9+Lidx1));
+      float val2 = (*(data3_9+Lidx1));
+      float val3 = (*(data4_9+Lidx1));
+      float val4 = (*(data5_9+Lidx1));
+      *(data0_72+alu0) = ((((val0-val1)/__builtin_sqrtf((val2+9.999999747378752e-06f)))*val3)+val4);
+    }
+  }
+}
+
+*** CPU      125 E_8_9                                          arg  6 mem   0.00 GB tm     16.75us/   403.17ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     3.54 ms | CACHE MISS 47e9874a |    1031 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:55
+E_18_4                    opts: (Opt(op=OptOps.UPCAST, axis=0, arg=4),)
+typedef float float4 __attribute__((aligned(16),ext_vector_type(4)));
+void E_18_4(float* restrict data0_72, float* restrict data1_72) {
+  for (int Lidx0 = 0; Lidx0 < 18; Lidx0++) {
+    int alu0 = (Lidx0<<2);
+    float4 val0 = (*((float4*)((data1_72+alu0))));
+    float alu1 = ((0.0f<val0[0])?val0[0]:0.0f);
+    float alu2 = ((0.0f<val0[1])?val0[1]:0.0f);
+    float alu3 = ((0.0f<val0[2])?val0[2]:0.0f);
+    float alu4 = ((0.0f<val0[3])?val0[3]:0.0f);
+    *((float4*)((data0_72+alu0))) = (float4){alu1,alu2,alu3,alu4};
+  }
+}
+compiling E_18_4                                  : 100%|█| 1/1 [00:00<00:00, 92.43it/s]compiling E_18_4                                  : 100%|█| 1/1 [00:00<00:00, 91.76it/s]
+compiling:   0%|                                          | 0/1 [00:00<?, ?it/s]compiling r_8_9_16                                : 100%|█| 1/1 [00:00<00:00, 28.17it/s]compiling r_8_9_16                                : 100%|█| 1/1 [00:00<00:00, 28.08it/s]
+
+*** CPU      126 E_18_4                                         arg  2 mem   0.00 GB tm     18.57us/   403.18ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.75 ms |  cache hit 70b3c590 |    1070 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:53
+scheduled     1 kernels in     1.42 ms |  cache hit 79d2db43 |    1073 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:54
+scheduled     1 kernels in     1.33 ms |  cache hit 47e9874a |    1065 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:55
+JIT captured 3 linears with 1 inputs
+*** CPU      127 r_8_9_16                                       arg  4 mem   0.00 GB tm     40.19us/   403.22ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      128 E_8_9                                          arg  6 mem   0.00 GB tm     10.37us/   403.24ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      129 E_18_4                                         arg  2 mem   0.00 GB tm      4.95us/   403.24ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      130 r_8_9_16                                       arg  4 mem   0.00 GB tm      6.52us/   403.25ms (      0 GFLOPS    0|1      GB/s)
+*** CPU      131 E_8_9                                          arg  6 mem   0.00 GB tm      5.76us/   403.25ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      132 E_18_4                                         arg  2 mem   0.00 GB tm      3.28us/   403.26ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     1.71 ms |  cache hit 2a712942 |    1071 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU      133 copy      512 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm    185.08us/   403.44ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      134 r_8_9_16                                       arg  4 mem   0.00 GB tm     12.35us/   403.45ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      135 E_8_9                                          arg  6 mem   0.00 GB tm      6.33us/   403.46ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      136 E_18_4                                         arg  2 mem   0.00 GB tm      3.72us/   403.46ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      137 r_8_9_16                                       arg  4 mem   0.00 GB tm      7.76us/   403.47ms (      0 GFLOPS    0|1      GB/s)
+*** CPU      138 E_8_9                                          arg  6 mem   0.00 GB tm      5.00us/   403.48ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      139 E_18_4                                         arg  2 mem   0.00 GB tm      3.24us/   403.48ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      140 r_8_9_16                                       arg  4 mem   0.00 GB tm      6.25us/   403.49ms (      0 GFLOPS    0|1      GB/s)
+*** CPU      141 E_8_9                                          arg  6 mem   0.00 GB tm      5.38us/   403.49ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      142 E_18_4                                         arg  2 mem   0.00 GB tm      3.35us/   403.49ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      143 r_8_9_16                                       arg  4 mem   0.00 GB tm      4.77us/   403.50ms (      0 GFLOPS    0|1      GB/s)
+*** CPU      144 E_8_9                                          arg  6 mem   0.00 GB tm      6.30us/   403.51ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      145 E_18_4                                         arg  2 mem   0.00 GB tm      3.23us/   403.51ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      146 r_8_9_16                                       arg  4 mem   0.00 GB tm      5.79us/   403.51ms (      0 GFLOPS    0|1      GB/s)
+*** CPU      147 E_8_9                                          arg  6 mem   0.00 GB tm      4.38us/   403.52ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      148 E_18_4                                         arg  2 mem   0.00 GB tm      3.04us/   403.52ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      149 r_8_9_16                                       arg  4 mem   0.00 GB tm      4.84us/   403.53ms (      0 GFLOPS    0|1      GB/s)
+*** CPU      150 E_8_9                                          arg  6 mem   0.00 GB tm      4.83us/   403.53ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      151 E_18_4                                         arg  2 mem   0.00 GB tm      3.00us/   403.53ms (      0 GFLOPS    0|0      GB/s)
+scheduled     1 kernels in     8.79 ms | CACHE MISS 9b5f6c2d |    1120 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:59
+r_8_9_16                  opts: (Opt(op=OptOps.UNROLL, axis=0, arg=0),)
+typedef float float4 __attribute__((aligned(16),ext_vector_type(4)));
+void r_8_9_16(float* restrict data0_72, float* restrict data1_128, float* restrict data2_144, float* restrict data3_9, float* restrict data4_9, float* restrict data5_9, float* restrict data6_9, float* restrict data7_9) {
+  for (int Lidx1 = 0; Lidx1 < 8; Lidx1++) {
+    int alu0 = (Lidx1<<4);
+    float4 val0 = (*((float4*)((data1_128+(alu0+4)))));
+    float4 val1 = (*((float4*)((data1_128+(alu0+8)))));
+    float4 val2 = (*((float4*)((data1_128+(alu0+12)))));
+    float4 val3 = (*((float4*)((data1_128+alu0))));
+    for (int Lidx2 = 0; Lidx2 < 9; Lidx2++) {
+      float val4 = (*(data2_144+(Lidx2+9)));
+      float val5 = (*(data2_144+(Lidx2+18)));
+      float val6 = (*(data2_144+(Lidx2+27)));
+      float val7 = (*(data2_144+(Lidx2+36)));
+      float val8 = (*(data2_144+(Lidx2+45)));
+      float val9 = (*(data2_144+(Lidx2+54)));
+      float val10 = (*(data2_144+(Lidx2+63)));
+      float val11 = (*(data2_144+(Lidx2+72)));
+      float val12 = (*(data2_144+(Lidx2+81)));
+      float val13 = (*(data2_144+(Lidx2+90)));
+      float val14 = (*(data2_144+(Lidx2+99)));
+      float val15 = (*(data2_144+(Lidx2+108)));
+      float val16 = (*(data2_144+(Lidx2+117)));
+      float val17 = (*(data2_144+(Lidx2+126)));
+      float val18 = (*(data2_144+(Lidx2+135)));
+      float val19 = (*(data2_144+Lidx2));
+      float val20 = (*(data3_9+Lidx2));
+      float val21 = (*(data4_9+Lidx2));
+      float val22 = (*(data5_9+Lidx2));
+      float val23 = (*(data6_9+Lidx2));
+      float val24 = (*(data7_9+Lidx2));
+      float alu1 = ((((((val3[0]*val19)+(val3[1]*val4)+(val3[2]*val5)+(val3[3]*val6)+(val0[0]*val7)+(val0[1]*val8)+(val0[2]*val9)+(val0[3]*val10)+(val1[0]*val11)+(val1[1]*val12)+(val1[2]*val13)+(val1[3]*val14)+(val2[0]*val15)+(val2[1]*val16)+(val2[2]*val17)+(val2[3]*val18)+val20)-val21)/__builtin_sqrtf((val22+9.999999747378752e-06f)))*val23)+val24);
+      float alu2 = ((0.0f<alu1)?alu1:0.0f);
+      *(data0_72+((Lidx1*9)+Lidx2)) = alu2;
+    }
+  }
+}
+
+*** CPU      152 r_8_9_16                                       arg  8 mem   0.00 GB tm     11.11us/   403.55ms (      0 GFLOPS    0|1      GB/s)
+scheduled     1 kernels in     1.21 ms |  cache hit 9b5f6c2d |    1147 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:59
+JIT captured 1 linears with 1 inputs
+*** CPU      153 r_8_9_16                                       arg  8 mem   0.00 GB tm     18.38us/   403.56ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      154 r_8_9_16                                       arg  8 mem   0.00 GB tm      8.14us/   403.57ms (      0 GFLOPS    0|1      GB/s)
+scheduled     1 kernels in     1.16 ms |  cache hit 2a712942 |    1116 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU      155 copy      512 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm     93.76us/   403.67ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      156 r_8_9_16                                       arg  8 mem   0.00 GB tm     11.54us/   403.68ms (      0 GFLOPS    0|1      GB/s)compiling:   0%|                                          | 0/1 [00:00<?, ?it/s]compiling r_8_9_16                                : 100%|█| 1/1 [00:00<00:00, 27.53it/s]compiling r_8_9_16                                : 100%|█| 1/1 [00:00<00:00, 27.45it/s]
+
+*** CPU      157 r_8_9_16                                       arg  8 mem   0.00 GB tm      6.25us/   403.68ms (      0 GFLOPS    0|1      GB/s)
+*** CPU      158 r_8_9_16                                       arg  8 mem   0.00 GB tm      4.38us/   403.69ms (      1 GFLOPS    0|2      GB/s)
+*** CPU      159 r_8_9_16                                       arg  8 mem   0.00 GB tm      8.79us/   403.70ms (      0 GFLOPS    0|1      GB/s)
+*** CPU      160 r_8_9_16                                       arg  8 mem   0.00 GB tm      5.28us/   403.70ms (      1 GFLOPS    0|1      GB/s)
+*** CPU      161 r_8_9_16                                       arg  8 mem   0.00 GB tm      4.07us/   403.71ms (      1 GFLOPS    0|2      GB/s)
+scheduled     1 kernels in     4.37 ms | CACHE MISS 82e5e962 |    1137 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:62
+r_8_9_16                  opts: (Opt(op=OptOps.UNROLL, axis=0, arg=0),)
+typedef float float4 __attribute__((aligned(16),ext_vector_type(4)));
+void r_8_9_16(float* restrict data0_72, float* restrict data1_128, float* restrict data2_144, float* restrict data3_9) {
+  for (int Lidx1 = 0; Lidx1 < 8; Lidx1++) {
+    int alu0 = (Lidx1<<4);
+    float4 val0 = (*((float4*)((data1_128+(alu0+4)))));
+    float4 val1 = (*((float4*)((data1_128+(alu0+8)))));
+    float4 val2 = (*((float4*)((data1_128+(alu0+12)))));
+    float4 val3 = (*((float4*)((data1_128+alu0))));
+    for (int Lidx2 = 0; Lidx2 < 9; Lidx2++) {
+      float val4 = (*(data2_144+(Lidx2+9)));
+      float val5 = (*(data2_144+(Lidx2+18)));
+      float val6 = (*(data2_144+(Lidx2+27)));
+      float val7 = (*(data2_144+(Lidx2+36)));
+      float val8 = (*(data2_144+(Lidx2+45)));
+      float val9 = (*(data2_144+(Lidx2+54)));
+      float val10 = (*(data2_144+(Lidx2+63)));
+      float val11 = (*(data2_144+(Lidx2+72)));
+      float val12 = (*(data2_144+(Lidx2+81)));
+      float val13 = (*(data2_144+(Lidx2+90)));
+      float val14 = (*(data2_144+(Lidx2+99)));
+      float val15 = (*(data2_144+(Lidx2+108)));
+      float val16 = (*(data2_144+(Lidx2+117)));
+      float val17 = (*(data2_144+(Lidx2+126)));
+      float val18 = (*(data2_144+(Lidx2+135)));
+      float val19 = (*(data2_144+Lidx2));
+      float val20 = (*(data3_9+Lidx2));
+      float alu1 = ((val3[0]*val19)+(val3[1]*val4)+(val3[2]*val5)+(val3[3]*val6)+(val0[0]*val7)+(val0[1]*val8)+(val0[2]*val9)+(val0[3]*val10)+(val1[0]*val11)+(val1[1]*val12)+(val1[2]*val13)+(val1[3]*val14)+(val2[0]*val15)+(val2[1]*val16)+(val2[2]*val17)+(val2[3]*val18)+val20);
+      float alu2 = ((0.0f<alu1)?alu1:0.0f);
+      *(data0_72+((Lidx1*9)+Lidx2)) = alu2;
+    }
+  }
+}
+
+*** CPU      162 r_8_9_16                                       arg  4 mem   0.00 GB tm     10.47us/   403.72ms (      0 GFLOPS    0|1      GB/s)
+scheduled     1 kernels in     1.22 ms |  cache hit 82e5e962 |    1148 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:62
+JIT captured 1 linears with 1 inputs
+*** CPU      163 r_8_9_16                                       arg  4 mem   0.00 GB tm     13.27us/   403.73ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      164 r_8_9_16                                       arg  4 mem   0.00 GB tm      4.65us/   403.73ms (      1 GFLOPS    0|1      GB/s)
+scheduled     1 kernels in     1.23 ms |  cache hit 2a712942 |    1133 uops in cache | /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/labs/optional_tinygrad.py:40
+*** CPU      165 copy      512 B,     CPU <- PYTHON             arg  2 mem   0.00 GB tm     99.28us/   403.83ms (      0 GFLOPS    0|0      GB/s)
+*** CPU      166 r_8_9_16                                       arg  4 mem   0.00 GB tm      9.59us/   403.84ms (      0 GFLOPS    0|1      GB/s)
+*** CPU      167 r_8_9_16                                       arg  4 mem   0.00 GB tm      7.76us/   403.85ms (      0 GFLOPS    0|1      GB/s)
+*** CPU      168 r_8_9_16                                       arg  4 mem   0.00 GB tm      7.89us/   403.86ms (      0 GFLOPS    0|1      GB/s)
+*** CPU      169 r_8_9_16                                       arg  4 mem   0.00 GB tm      4.93us/   403.86ms (      0 GFLOPS    0|1      GB/s)
+*** CPU      170 r_8_9_16                                       arg  4 mem   0.00 GB tm      4.15us/   403.87ms (      1 GFLOPS    0|1      GB/s)
+*** CPU      171 r_8_9_16                                       arg  4 mem   0.00 GB tm      4.17us/   403.87ms (      1 GFLOPS    0|1      GB/s)
+[1, 3, 4] materialized error=9.63e-10 median_us=307.08 kernels=[3]
+[1, 3, 4] lazy         error=9.63e-10 median_us=165.88 kernels=[1]
+[1, 3, 4] folded       error=1.21e-08 median_us=183.69 kernels=[1]
+[3, 5, 7] materialized error=7.36e-08 median_us=257.01 kernels=[3]
+[3, 5, 7] lazy         error=7.36e-08 median_us=122.92 kernels=[1]
+[3, 5, 7] folded       error=1.57e-07 median_us=148.53 kernels=[1]
+[8, 16, 9] materialized error=4.88e-07 median_us=286.23 kernels=[3]
+[8, 16, 9] lazy         error=4.88e-07 median_us=154.47 kernels=[1]
+[8, 16, 9] folded       error=2.79e-07 median_us=167.63 kernels=[1]
+Saved /tmp/trackc-tinygrad-trace-report.json

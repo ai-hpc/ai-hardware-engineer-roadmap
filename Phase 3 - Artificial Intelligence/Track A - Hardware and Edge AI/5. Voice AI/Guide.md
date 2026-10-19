@@ -20,20 +20,22 @@
 
 ---
 
+**Learning sequence:** validate the audio contract → measure recognition → separate streaming/endpoint latency → synthesize audio → connect a small, expiring intent to the robot adapter. Model/API references below were checked on 2026-10-18; pretrained speech inference and target-device timing are optional exercises, not measured results from this course revision.
+
 ## Why Voice AI Matters for Hardware Engineers
 
 Voice systems need explicit budgets for audio buffering, endpoint detection, inference, and response playback. Choose these from the interaction design and measure the complete path:
 
 - **STT (Speech-to-Text):** Measure first partial result, final transcript, and real-time factor separately
 - **TTS (Text-to-Speech):** Implementations include autoregressive, non-autoregressive, flow, and diffusion approaches
-- **On-device voice:** Privacy-critical applications (medical, military, automotive) need inference without cloud — your edge chip must handle it
+- **On-device voice:** Some deployments require local processing; verify model acquisition, logs, telemetry, and fallback behavior as well as inference location
 - **VAD (Voice Activity Detection):** Always-on, ultra-low-power — runs on MCU or dedicated DSP (L4/L5 hardware)
 
 | Voice task | Compute pattern | Hardware implication |
 |-----------|----------------|---------------------|
-| VAD | Tiny CNN, always-on | L4: MCU/DSP, measured always-on power budget |
+| VAD | Small classifier/stateful network, often always-on | L4: MCU/DSP, measured always-on power budget |
 | STT (streaming) | Encoder-decoder, chunked | L1/L3: streaming inference, low latency |
-| TTS (neural) | Autoregressive or diffusion | L1/L3: memory-bound generation, like LLM decode |
+| TTS (neural) | Autoregressive, flow/diffusion, or parallel synthesis | L1/L3: profile each stage; compute/memory bottlenecks vary |
 | Keyword spotting | Small CNN/RNN, always-on | L4: TinyML, dedicated audio NPU |
 | Speaker verification | Embedding model, one-shot | L1: inference + vector similarity |
 | Noise suppression | U-Net or RNNoise, real-time | L4/L6: DSP or FPGA, strict latency budget |
@@ -65,20 +67,23 @@ Audio Input → Feature Extraction → Encoder → Decoder → Text Output
 ```python
 import torchaudio
 
-# Load audio
-waveform, sample_rate = torchaudio.load("speech.wav")
-
-# Convert to mel spectrogram (the "image" that the model sees)
+# Requires matching torch/torchaudio and decoder dependencies in an isolated environment.
+waveform, sample_rate = torchaudio.load("speech.wav")  # [channels, samples]
+waveform = waveform.mean(dim=0, keepdim=True)          # declared mono downmix
+if sample_rate != 16000:
+    waveform = torchaudio.functional.resample(waveform, sample_rate, 16000)
+    sample_rate = 16000
 mel_transform = torchaudio.transforms.MelSpectrogram(
-    sample_rate=16000,
-    n_fft=400,        # FFT window size
-    hop_length=160,   # 10ms hop (160 samples at 16kHz)
-    n_mels=80         # 80 mel frequency bins
+    sample_rate=sample_rate, n_fft=400, hop_length=160, n_mels=80
 )
-mel = mel_transform(waveform)
-# Shape: [1, 80, T] — 80 frequency bins x T time frames
-# This is the input to the encoder
+mel = mel_transform(waveform)  # [1, 80, time_frames]
 ```
+
+This is a **generic power mel spectrogram**, not automatically a pretrained model's input. Whisper needs its exact log-mel normalization, padding/window convention, and model-specific mel count (some checkpoints use 128, not 80). Use the model's processor, and compare preprocessing against its reference implementation. `MelSpectrogram` also uses centred windows by default, which entails padding/lookahead semantics relevant to streaming. Current `torchaudio.load` uses TorchCodec from TorchAudio 2.9 onward; install the matching decoder stack or use the documented TorchCodec API. [TorchAudio documentation](https://docs.pytorch.org/audio/stable/generated/torchaudio.load.html), [Whisper audio implementation](https://github.com/openai/whisper/blob/main/whisper/audio.py).
+
+**Worked audio contract:** 16,000 samples at 16 kHz are 1 second. A 400-sample analysis window spans 25 ms; a 160-sample hop spans 10 ms. Relabelling 48,000 captured samples as 16 kHz produces 3 seconds and changes pitch—it is not resampling. Preserve capture sample index, sample rate, channel policy, amplitude convention, and resampler delay.
+
+
 
 **Why this matters for hardware:**
 - Mel spectrogram computation is an FFT + filterbank — can be accelerated on DSP or FPGA (L6)
@@ -89,20 +94,30 @@ mel = mel_transform(waveform)
 
 | Mode | Latency | Accuracy | Use case |
 |------|---------|----------|----------|
-| **Batch** | Process entire audio file at once | Highest | Transcription, subtitles |
-| **Streaming** | Process chunks in real-time | Slightly lower | Live conversation, voice assistant |
+| **Batch** | Process a complete recording | Depends on model/context/decoding | Transcription, subtitles |
+| **Streaming** | Incremental output under a declared lookahead budget | Compare with the same task and transcript normalization | Live conversation, voice assistant |
 
 Streaming requires:
 - Chunked input (e.g., 1-second windows with overlap)
-- Encoder state caching between chunks
-- Partial hypothesis output with correction
+- Architecture-specific state caching, or repeated window inference with overlap reconciliation
+- Partial hypothesis output with correction and a clear finalization policy
+
+Whisper is not inherently a causal streaming encoder. Sliding windows can provide incremental transcripts, but repeated context, overlap deduplication, timestamp alignment, and endpointing must be designed and measured. Do not assume arbitrary encoder states can be reused across windows.
+
+### Recognition evaluation with a worked example
+
+WER = `(substitutions + deletions + insertions) / reference_word_count`, using minimum edit distance and a declared normalization policy. Reference “move to bay two” versus hypothesis “move bay three” has one deletion and one substitution: WER=2/4=0.5. Added words can make WER exceed 1. For an empty reference, do not divide by zero: report silence false-transcription counts/rate separately. Aggregate corpus edit counts and reference words; averaging utterance WER gives a different weighting.
+
+For a robot, also score intent, slot/unit correctness, negation, and rejection. Losing “not” may change only one word while reversing an action. Split evaluation by speaker/session before tuning. Save errors for silence, machinery noise, accent/language, overlapping speakers, and short commands.
+
+**Exercise:** 20 reference words with 2 substitutions, 1 deletion, and 3 insertions gives WER=0.30. A 4-second clip processed in 1 second has real-time factor `RTF=processing/audio=0.25`; this says nothing about endpoint delay or time to first partial transcript.
 
 ### Projects
 
 1. **Run Whisper** on a sample audio file. Measure inference time and WER (word error rate).
 2. **Whisper on Jetson** — deploy Whisper with TensorRT. Measure latency and compare with CPU.
 3. **Streaming STT** — implement chunked Whisper inference. Measure time-to-first-word.
-4. **Whisper.cpp on edge** — run quantized Whisper on Raspberry Pi or Jetson. Benchmark INT8 vs FP16.
+4. **Whisper.cpp on edge** — compare supported quantized formats against an unquantized reference on the same audio, decoder settings, and hardware. Quantization labels and support differ by runtime.
 
 ---
 
@@ -122,11 +137,11 @@ Text Input → Text Analysis → Acoustic Model → Vocoder → Audio Output
 |-------|------|---------|-------|----------|
 | **VITS** | End-to-end (text → audio) | High | Fast | Production TTS |
 | **Bark** (Suno) | GPT-style autoregressive | Very high, expressive | Slow | Creative, multi-language |
-| **Tortoise TTS** | Autoregressive + diffusion | Highest quality | Very slow | Voice cloning |
-| **Piper** | VITS-based, optimized | Good | Very fast | On-device, embedded |
+| **Tortoise TTS** | Autoregressive + diffusion | Historical expressive synthesis example | Measure actual configuration | Voice synthesis |
+| **Piper** | VITS-based ONNX voices | Voice/model-dependent | Measure CPU RTF and first audio | On-device, embedded |
 | **Coqui TTS** | Multiple architectures | High | Medium | Open-source toolkit |
 | **F5-TTS** | Flow matching | High, zero-shot | Fast | Voice cloning, multilingual |
-| **XTTS** (Coqui) | GPT + VITS | High, voice cloning | Medium | Multi-speaker, multi-language |
+| **XTTS** (Coqui) | Autoregressive acoustic tokens + waveform decoder | Voice/model-dependent | Measure selected checkpoint | Multi-speaker, multi-language |
 
 ### TTS Pipeline Components
 
@@ -138,27 +153,31 @@ Text Input → Text Analysis → Acoustic Model → Vocoder → Audio Output
 **Acoustic model (mel generation):**
 - Generates mel spectrogram from phoneme sequence
 - Autoregressive (Tacotron 2) or non-autoregressive (FastSpeech 2, VITS)
-- Non-autoregressive is faster — better for edge deployment
+- Parallel synthesis can reduce sequential work; actual speed depends on model size, output duration, runtime, and hardware.
 
 **Vocoder (waveform synthesis):**
 - Converts mel spectrogram → audio waveform
 - HiFi-GAN: fast, high-quality, lightweight
-- WaveGlow / WaveNet: higher quality, much slower
+- WaveGlow and WaveNet illustrate different waveform-generation approaches; quality and speed require matched measurements.
 
 ```python
-# Piper TTS — fast on-device TTS
-import piper
+# Current OHF-Voice Piper API; requires a separately downloaded voice and its .onnx.json.
+import wave
+from piper import PiperVoice
 
-voice = piper.PiperVoice.load("en_US-lessac-medium.onnx")
-audio = voice.synthesize("Hello, I am running on edge hardware.")
-# Runs on CPU, ~10x real-time on Raspberry Pi 4
+voice = PiperVoice.load("en_US-lessac-medium.onnx")
+with wave.open("response.wav", "wb") as output:
+    voice.synthesize_wav("The inspection task is ready.", output)
 ```
+
+The maintained project is [OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl), with [Python API/download instructions](https://github.com/OHF-Voice/piper1-gpl/blob/main/docs/API_PYTHON.md). Its `synthesize` streaming method yields audio chunks; assigning the iterator to a variable does not write a waveform. Record the voice/model revision and license separately from the runtime license. This example is source-checked, not reported as executed here.
+
 
 ### Projects
 
-1. **Run Piper TTS** on CPU. Measure real-time factor (RTF). Target: RTF < 0.1 (10x faster than real-time).
+1. **Run Piper TTS** on CPU. Measure real-time factor (RTF). Report RTF, first playable audio, output duration, and CPU threads; set a task-specific target before optimizing.
 2. **VITS on Jetson** — deploy VITS with ONNX Runtime or TensorRT. Measure latency per sentence.
-3. **Voice cloning** — use XTTS or F5-TTS to clone a voice from a 10-second sample.
+3. **Voice adaptation** — use your own or a permitted speaker sample and a supported model; document the voice rights and evaluate intelligibility and speaker similarity separately.
 4. **HiFi-GAN vocoder** — run standalone, benchmark on GPU vs CPU. Understand the mel → waveform bottleneck.
 
 ---
@@ -169,26 +188,29 @@ audio = voice.synthesize("Hello, I am running on edge hardware.")
 
 Always-on, ultra-low-power. Runs continuously to wake up the full STT pipeline.
 
-| Model | Size | Latency | Power | Platform |
-|-------|------|---------|-------|----------|
-| **Silero VAD** | 1.5 MB | <1ms per frame | ~10mW on MCU | CPU, edge |
-| **WebRTC VAD** | <100 KB | <0.1ms | ~1mW | Any CPU |
-| **Custom CNN VAD** | 50–500 KB | <1ms | <5mW | MCU, DSP |
+| Option | Input/state contract to verify | What to measure |
+|---|---|---|
+| Silero VAD | Supported sample rate, frame length, recurrent-state/reset behavior | Missed speech, false speech, endpoint latency, CPU time |
+| WebRTC VAD | Supported PCM rate and 10/20/30 ms frames for the chosen binding | Same metrics plus sensitivity mode |
+| Custom MCU model | Actual operator/memory support and preprocessing | Board-measured always-on power and wake failures |
+
+Published CPU frame timings do not establish MCU milliwatts. Model file size is not peak runtime memory, and compute time is not the full audio-context/endpoint delay.
 
 ```python
 # Silero VAD — production-quality, lightweight
 import torch
-model, utils = torch.hub.load('snakers4/silero-vad', 'silero_vad')
-(get_speech_timestamps, _, read_audio, _, _) = utils
+from silero_vad import load_silero_vad, read_audio, get_speech_timestamps
+model = load_silero_vad()  # install/pin the package in a separate speech environment
 
 wav = read_audio('speech.wav', sampling_rate=16000)
 timestamps = get_speech_timestamps(wav, model, sampling_rate=16000)
-# Returns: [{'start': 1000, 'end': 15000}, ...] — speech segments
+# start/end are sample indices by default: divide by 16000 for seconds.
+# Preserve the original capture offset when mapping chunk-local indices to a stream.
 ```
 
 ### Keyword Spotting — "Hey [Device]"
 
-Always-on wake word detection. Must run at < 1mW for battery-powered devices.
+Always-on wake word detection. Choose a power budget from battery capacity, duty cycle, and required standby time; no universal 1 mW requirement applies.
 
 - **Models:** Small CNNs (DS-CNN), RNNs, or attention-based
 - **Training:** Typically custom-trained on the specific wake word
@@ -199,12 +221,13 @@ Always-on wake word detection. Must run at < 1mW for battery-powered devices.
 
 Real-time audio cleanup before STT.
 
-| Model | Approach | Latency | Quality |
-|-------|----------|---------|---------|
-| **RNNoise** | GRU-based, handcrafted features | <5ms | Good |
-| **DTLN** | Dual-signal transformer | ~10ms | High |
-| **DeepFilterNet** | Attention-based filterbank | ~10ms | Very high |
-| **NSNet2** | Dense + GRU | <5ms | Good |
+| Model | Approach | Engineering question |
+|---|---|---|
+| RNNoise | Recurrent network with signal-processing features | Does suppression improve task WER without clipping speech onset? |
+| DTLN | Dual-signal transformation LSTM network | What frame/lookahead and recurrent state does the exported model require? |
+| DeepFilterNet | Deep filtering with perceptual frequency-band processing | What end-to-end audio latency and quality does this configuration achieve? |
+
+DTLN is not a transformer architecture. Noise reduction can damage speech; score recognition with and without it on identical recordings. Source implementations: [DTLN](https://github.com/breizhn/DTLN), [DeepFilterNet](https://github.com/Rikorose/DeepFilterNet).
 
 ### Projects
 
@@ -238,7 +261,7 @@ Real-time audio cleanup before STT.
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Latency budget for natural conversation:**
+**Illustrative design budget, not achieved measurements:**
 
 | Stage | Target | Model |
 |-------|--------|-------|
@@ -246,12 +269,14 @@ Real-time audio cleanup before STT.
 | STT (streaming) | < 300ms to first word | Whisper / Conformer |
 | NLU / LLM response | < 500ms | On-device small LLM or cloud |
 | TTS synthesis | < 200ms to first audio | VITS / Piper |
-| **Total round-trip** | **< 1 second** | |
+| **End-to-end** | **Measure from a declared start event to first audible response** | Stages overlap; endpoint silence and audio buffering also count |
+
+A timestamped command adapter should receive a finalized transcript, explicit intent/slots, capture/end times, and an expiry. Reject ambiguous units, unsupported actions, and expired commands before requesting a robot task. Test “do not move,” background speech, and silence; do not wire raw transcript strings directly to motion. For interruption, cancel queued playback and pending work using explicit task IDs.
 
 ### Projects
 
 1. **Full pipeline on Jetson** — VAD → Whisper STT → simple NLU → Piper TTS. Measure end-to-end latency.
-2. **Optimize for latency** — quantize STT to INT8, use streaming chunked inference, pre-warm TTS. Target < 800ms round-trip.
+2. **Optimize for latency** — quantize STT to INT8, use streaming chunked inference, pre-warm TTS. Measure the deadline-miss rate against your declared interaction target.
 3. **Compare cloud vs edge** — same pipeline on Jetson vs cloud API. Measure latency, accuracy, and privacy trade-off.
 
 ---
@@ -276,7 +301,7 @@ Real-time audio cleanup before STT.
 | [Whisper](https://github.com/openai/whisper) | Open-source STT model |
 | [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper) | CTranslate2-based fast Whisper |
 | [Whisper.cpp](https://github.com/ggerganov/whisper.cpp) | C/C++ port for edge deployment |
-| [Piper](https://github.com/rhasspy/piper) | Fast on-device TTS |
+| [Piper](https://github.com/OHF-Voice/piper1-gpl) | Fast on-device TTS |
 | [Coqui TTS](https://github.com/coqui-ai/TTS) | Open-source TTS toolkit |
 | [Silero VAD](https://github.com/snakers4/silero-vad) | Production-quality VAD |
 | [RNNoise](https://github.com/xiph/rnnoise) | Real-time noise suppression |
@@ -284,6 +309,12 @@ Real-time audio cleanup before STT.
 | [SpeechBrain](https://github.com/speechbrain/speechbrain) | PyTorch speech toolkit |
 
 ---
+
+## Completion gate
+
+Submit at least 20 held-out, human-checked utterances from more than one session, plus silence/noise controls, with dataset rights/provenance and exact transcript normalization. Report corpus WER, intent/slot errors, silence false transcriptions, RTF, endpoint delay, first response audio, and peak memory. Include a sample-rate mismatch, negation, and expired-command test. Keep real speaker recordings out of train/test overlap. A successful single utterance is a smoke test, not an accuracy estimate.
+
+**Diagnostic answers:** resampling changes sample count while preserving duration; header relabelling changes duration. VAD finds speech regions, not speaker identity or permission to act. RTF<1 is necessary for some sustained workloads but does not prove low interaction latency.
 
 ## Next
 

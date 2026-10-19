@@ -37,7 +37,7 @@ If you collapse "how long did this request take" into a single number, a vision-
    request A:  text-only, 500 tokens                    total = T_prefill + T_decode
    request B:  one image + 500 tokens of text            total = T_preprocess + T_vision + T_prefill + T_decode
 
-   You ship a 30% faster KDA kernel. It improves T_decode specifically.
+   Suppose a KDA decode-only kernel becomes 30% faster; prefill is unchanged.
 
    Measuring only TOTAL time:
      request A: total drops noticeably     (T_decode was a large share of the total)
@@ -87,7 +87,7 @@ And even with all four correctly implemented, the benefit is not a function of "
 
 ## 3. Rollback: the state this architecture actually carries
 
-This is the module's central point, and it follows directly from work already done in this course. A conventional transformer's speculative-decoding rollback is comparatively simple: on a rejected draft token, truncate the KV cache back to the last accepted position, and continue. **That operation is insufficient for this architecture**, because this model carries several other kinds of per-request state that a KV-length truncation does not touch at all.
+This is the module's central point, and it follows directly from work already done in this course. For a conventional transformer, cache rollback can truncate KV entries to the accepted prefix. A complete serving rollback also reconciles position counters, sampler/penalty state, any draft-model state, and random-number handling required by the sampling algorithm. **That operation is insufficient for this architecture**, because this model carries several other kinds of per-request state that a KV-length truncation does not touch at all.
 
 Recall what's actually accumulating, request-scoped, across the hybrid stack:
 
@@ -122,8 +122,8 @@ Recall what's actually accumulating, request-scoped, across the hybrid stack:
    │   that same point, AND reconcile the DSA indexer's selection         │
    │   metadata against the new prefix length.                            │
    │                                                                        │
-   │   Treating rollback as "decrease the KV length" — correct for a       │
-   │   conventional transformer — silently leaves the KDA and             │
+   │   Treating cache rollback as "decrease the KV length" — enough for a       │
+   │   plain token-indexed cache alone — silently leaves the KDA and             │
    │   convolution state pointing at a history that includes REJECTED     │
    │   tokens. Every subsequent token generated from that corrupted        │
    │   state is wrong, and nothing about the symptom will look like an     │
@@ -146,7 +146,7 @@ Two practical designs close this gap, and a real system typically needs some com
                             Costs compute instead of memory.
 ```
 
-Either way, the correctness bar is the same one [Module 04 §4](Lecture-04.md) already established for chunked-versus-recurrent execution: **state after rollback must agree with state from a request that had simply never generated the rejected tokens in the first place** — not merely "close," and not verified by output plausibility alone.
+Either way, the correctness bar is the same one [Module 04 §4](Lecture-04.md) already established for chunked-versus-recurrent execution: **state after rollback must agree with state from a request that had simply never generated the rejected tokens in the first place**. An exact copy/restore should reproduce the stored bits. Recomputing through a different kernel can change floating-point rounding, so use a declared output/state tolerance and test continuation. Plausible text does not establish either contract.
 
 ---
 
@@ -158,7 +158,7 @@ You should now be able to:
 2. List the three timings a multimodal profiling setup must keep separate.
 3. State the four components speculative serving needs beyond "the checkpoint has an MTP head."
 4. Enumerate, for this specific architecture, every kind of state a correct rollback must reconcile — not just the KV/latent cache.
-5. Explain why "decrease the KV length" is a correct rollback strategy for a conventional transformer but an incomplete one here.
+5. Explain why truncating a token-indexed cache does not restore a recurrent state, and name other serving state that must be reconciled.
 
 ---
 
@@ -169,6 +169,8 @@ Design (and, where feasible, implement against a small test harness) a **rollbac
 ---
 
 ## Current as of
+
+**Reviewed October 18, 2026.** [Pinned config, upstream code and CPU evidence](CPU-Hybrid-State-Lab.md#sources-and-execution-boundary) identify what was checked. Hardware capacity and throughput remain deployment-specific.
 
 * **Timeless:** the profiling discipline for multi-stage multimodal requests, the general requirements for a working speculative-decoding system, and the state-reconciliation argument for hybrid recurrent/token-indexed architectures under rollback.
 * **Checkpoint-specific:** the presence of exactly one MTP auxiliary layer, and the specific multimodal encoder/merge design, are properties of this checkpoint — verify against the actual serving implementation before assuming a different revision carries the same speculative-decoding support.

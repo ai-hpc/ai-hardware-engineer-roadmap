@@ -1,4 +1,7 @@
-# Part 4 · Lecture 02 — The Scoreboard: A Benchmark That Cannot Be Gamed
+# Part 4 · Lecture 02 — The Scoreboard: A Benchmark Designed to Resist Gaming
+
+**Practice:** [CPU source lab](CPU-Source-Lab.md). Historical GPU results are source reports; use the **Answers** after attempting the self-check.
+
 
 ## Overview
 
@@ -48,7 +51,7 @@ The single most important structural decision in this harness is the order of tw
      ├─ 1. ACCURACY GATE   top-1 ≥ 0.95   AND   mean KL ≤ 0.05
      │      │                     against the captured reference,
      │      │                     identical weights, identical token ids
-     │      └─ fail → REJECT.  the speed number is never even reported.
+     │      └─ fail → REJECT.  the verdict rejects it; diagnostic speed may still be reported.
      │
      ├─ 2. SIGNIFICANCE GATE   gain > 2% of the current frontier
      │      └─ fail → label `none`  (inside measurement noise)
@@ -62,15 +65,15 @@ This matters more for inference engines than for almost any other software, beca
 
 ### 2.1 What "correctness" means when there is no second implementation
 
-There is no independent reimplementation of Kimi K3 to check against, and the target quantization's *own* top-1 against full precision is only 90.4%. So absolute quality numbers are meaningless here. Correctness is defined narrowly and honestly:
+This project compares its implementation with a pinned llama.cpp fork. Its gate tests implementation parity on the same quantized weights, not model capability or quality lost through quantization. The repository-reported 90.4% quantization agreement belongs to a separate evaluation. Absolute task-quality evaluation remains meaningful and is needed before deployment:
 
 > **Agreement with the reference engine on identical weights and identical token ids.** Nothing else.
 
 That definition has real consequences the repo documents rather than hides:
 
-* **Two reference-server flags are mandatory, not tuning.** `--no-context-shift`, because K3 is a hybrid recurrent architecture that llama.cpp cannot context-shift — a long eval dies mid-run without it. And `--no-jinja`, because the gate posts raw token ids and a chat template would prepend tokens the candidate never saw.
-* **The residual KL is known and accepted.** Mean KLD sits ~400× above the 1e-5 bar you would expect from two runs of the *same* implementation, from an identified cause: K3 keeps f32 activations where ggml quantizes them before a quantized mat-vec. The instruction to contributors is exactly right — *do not go hunting it as a bug; do not make it worse.*
-* **The gate cannot run at the scored context.** Capturing a reference at 131,072 tokens is prohibitively expensive, so parity is graded at short depths. The untested region is stated out loud (§7).
+* **Two reference-server flags are mandatory, not tuning.** `--no-context-shift`, because K3 is a hybrid recurrent architecture that llama.cpp cannot context-shift — a long eval dies mid-run without it. And `--no-jinja`, as part of the pinned server invocation. Raw token-ID completion requests must bypass chat templating; disabling Jinja alone does not prove that every endpoint bypasses templates.
+* **The observed residual KL is documented and accepted for this fixture.** Mean KLD sits ~400× above this tool's chosen 1e-5 same-implementation tolerance, from an identified cause: K3 keeps f32 activations where ggml quantizes them before a quantized mat-vec. The instruction to contributors is exactly right — *do not go hunting it as a bug; do not make it worse.*
+* **The default gate does not run at the scored context.** Capturing a reference at 131,072 tokens is prohibitively expensive, so parity is graded at short depths. The untested region is stated out loud (§7).
 
 ### 2.2 Top-1 and KL do different jobs
 
@@ -78,7 +81,7 @@ A subtlety worth internalizing, because it generalizes to any parity gate you bu
 
 | | What it is | Behaviour |
 |---|---|---|
-| **top-1 ≥ 0.95** | `argmax_ref == argmax_ours` on one logit row per probe | Effectively **boolean**. Any bar in (0, 1] behaves identically. All 48 top-1 values in the sealed log are exactly `1.0`. |
+| **top-1 ≥ 0.95** | `argmax_ref == argmax_ours` on one logit row per probe | For this single-row probe, effectively **boolean**. Any bar in (0, 1] behaves identically; a multi-token agreement rate is different. All 48 top-1 values in the sealed log are exactly `1.0`. |
 | **mean KL ≤ 0.05** | Sum over all 163,840 vocab entries | The **graded** gate. Moves long before an argmax flips. Merged runs sit at **0.004–0.008**. |
 
 So the pair is not redundant: top-1 says *did the decision change*, KL says *how far is the distribution drifting*, and KL is the one that gives you warning. Merged runs sitting an order of magnitude under the bar is what a healthy margin looks like — and is why [PR #147](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/147) could raise the top-1 bar to 0.95 without breaking anything.
@@ -96,7 +99,7 @@ Two consequences the contribution guide spells out:
 * A regression at one depth fails the gate even if every other depth is perfect.
 * Parity is additionally **ratcheted against `main` measured in the same round, per depth** ([PR #83](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/83)) — so drift is visible even while it is legal.
 
-And then the correction to that ratchet, which is a good lesson in over-tightening: [PRs #124](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/124) and [#126](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/126) established that **below the 0.05 bar, a ratio is never a regression.** A change that moves KL from 0.001 to 0.004 is 4× "worse" and still forty times inside the bar. Flagging it trains contributors to ignore the flag. The final rule: `accuracy-regression` applies only when a depth is both ≥2× main **and** at or over the bar — at which point the absolute check rejects anyway.
+And then the correction to that ratchet, which is a good lesson in over-tightening: [PRs #124](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/124) and [#126](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/126) established that **below the 0.05 bar, a ratio is never a regression.** A change that moves KL from 0.001 to 0.004 is 4× "worse" and still 12.5 times below the bar. Flagging it trains contributors to ignore the flag. The final rule: `accuracy-regression` applies only when a depth is both ≥2× main **and** at or over the bar — at which point the absolute check rejects anyway.
 
 > **Steal this.** A ratcheting gate needs an absolute floor below which ratios are ignored, or it generates noise proportional to how good you have become.
 
@@ -110,7 +113,7 @@ The techniques, each traceable to the failure that motivated it:
 
 **Interleave both builds on the same box.** `main` and the PR are built and benched on the same node, interleaved, and scored as a **same-box delta**, so box-to-box hardware variance cancels. How much variance? The repo records `main` reading **18.14 pinned vs 18.88 measured** when the box changed — several percent, which is larger than an `S` tier.
 
-**Never cross-compare boxes.** The llama.cpp pin was originally **16.7026**, a single rep on a different machine. Corrected to **18.4435** — 3-rep median on the box that scores every PR ([PR #101](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/101)). The note in `reference.lock` is exact about what happened: *"Nothing about anyone's measured speed changed; the yardstick was wrong."* Because the tier basis is `delta / llama_ref`, raising it made every tier ~9.4% smaller.
+**Use the same box to isolate an engine change.** Cross-box comparisons are valid hardware experiments when labeled accordingly. The llama.cpp pin was originally **16.7026**, a single rep on a different machine. Corrected to **18.4435** — 3-rep median on the box that scores every PR ([PR #101](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/101)). The note in `reference.lock` is exact about what happened: *"Nothing about anyone's measured speed changed; the yardstick was wrong."* Because the tier basis is `delta / llama_ref`, raising it made every tier ~9.4% smaller.
 
 **A single rep is not a measurement.** The same lock file records a "−8% decode falloff with depth" that turned out to be *a measurement artefact* — one rep (`llama-bench -r 1`) on a different box. Re-measured with 3 reps on the scoring box, llama.cpp holds essentially flat with depth (18.32 → 18.44). The artefact had been flattering: it made the reference look like it degraded with context when it was the candidate that fell off a cliff.
 
@@ -131,7 +134,7 @@ Past the 2% significance gate, the label is:
 ```text
    tier_basis = min( delta / llama_ref ,  delta / frontier )
 
-   xs  < 3.5%        s  3.5–6%        m  6–10%        l  10–18%        xl  > 18%
+   xs  < 3.5%        s  3.5–6%        m  6–10%        l  10–18%        xl  ≥ 18%
 ```
 
 Taking the **worse** of two bases means the tier **can never exceed the speedup actually measured**. The two terms bind in opposite regimes, and that is the entire design:
@@ -244,7 +247,7 @@ The most credible thing in this harness is not a defense. It is the set of place
 
 **The two sides are not measured the same way, and that is in the lock file.** llama.cpp prefills 131,072 real tokens (`llama-bench -d`). SparkInfer had no prefill path — a genuine fill is ~10 hours of sequential `forward_token` calls — so it allocates the cache at 131,072, leaves it **zeroed**, and seeks position.
 
-The justification is specific: **decode cost is data-independent** — the MLA reduction is dense whether the entries are activations or zeros — so the *timing* is faithful. The *correctness* is not, which is exactly why the accuracy gate runs separately at short context against a real capture, and never at 128k.
+A zero-filled cache preserves dense attention loop bounds and nominal cache size, so it is a useful synthetic kernel workload. It does **not** prove representative end-to-end decode timing: routing, expert skipping, sparsity, numerical values, and kernel choices can depend on data. PR #127 enables approximate expert skipping at depth. Report the seek-based number as synthetic; validate real prefixes before making deployment or long-context quality claims.
 
 Then the defense against abusing that shortcut: a PR that stubbed `--seek` would score ctx-64 decode as 128k, roughly a free 10×. So the harness **refuses any run where the bench did not announce the seek it performed.**
 
@@ -315,17 +318,27 @@ Pass criterion: a colleague can read your harness and name the measurement it is
 
 1. Your gate rejects on parity before reporting speed. A contributor argues this wastes node hours, since most PRs pass parity anyway. Answer them in three sentences.
 2. Your frontier is stale-low by 15%. Give the consequence if it is (a) the tier basis, (b) a regression guard whose floor is 1% below it. Which is worse and why?
-3. Tier = `min(delta/reference, delta/frontier)`. Compute the `xl` threshold (>18%) in absolute tok/s for a frontier at 10 tok/s and again at 50 tok/s, with the reference at 18.44. Which term binds in each case?
+3. Tier = `min(delta/reference, delta/frontier)`. Compute the `xl` threshold (≥18%) in absolute tok/s for a frontier at 10 tok/s and again at 50 tok/s, with the reference at 18.44. Which term binds in each case?
 4. You must measure decode at 128k but cannot afford to prefill 128k of real tokens. Describe the shortcut, the property that makes it faithful for *timing*, why it is not faithful for *correctness*, and the assertion that stops someone stubbing it.
 5. A PR reports 5.2× over the frontier. Your ceiling is 5×, so it is rejected as implausible. The author insists it is real. What exactly do you do next — and what would change your mind?
 6. Your accuracy ratchet flags every PR that moves KL from 0.001 to 0.003. After two weeks nobody reads the flag. Diagnose the design error and fix it in one rule.
 7. Why does "one open PR per contributor" follow logically from scoring marginal gains against a merged frontier?
 
+## Answers
+
+1. A performance win is acceptable only after the candidate meets the declared correctness policy. Rejecting early can also avoid timing an invalid candidate. Keep diagnostic timing if useful, but do not award it as an accepted optimization.
+2. With a stale frontier of 0.85 times actual performance, gains against it are inflated. A 1%-below guard can admit 0.99×0.85 = 0.8415 of actual performance, a 15.85% regression. If the bot remeasures the frontier each round, that fresh tier basis avoids the first problem; the stale guard still matters.
+3. Required gain is at least `0.18×max(reference,frontier)`: 3.3192 tok/s at frontier 10 (reference binds), and 9 tok/s at frontier 50 (frontier binds). In exact arithmetic the resulting thresholds are 13.3192 and 59 tok/s; floating comparisons require care at the boundary.
+4. A declared synthetic seek/cache fixture can exercise dense loop bounds. It cannot establish representative model timing or real-prefix correctness; check work counters, cache initialization, routing/skips, and eventually real-prefix runs.
+5. Treat the plausibility ceiling as a review trigger, not a physical law. Reproduce with trusted timing, full work counts, correctness, and a pinned reference; revise the policy if the effect survives.
+6. Use an explicit absolute tolerance plus a documented change policy; a relative ratio near zero is unstable. The source's policy is project-specific, not a universal accuracy standard.
+7. It reduces overlapping claims against stale baselines, but is one scheduling choice. Serializing/rebasing evaluation can enforce marginal attribution without that contributor restriction.
+
 ---
 
 ## References
 
-* **SparkInfer-K3 measurement chain** — [`CONTRIBUTING.md`](https://github.com/gittensor-ai-lab/sparkinfer-k3/blob/main/CONTRIBUTING.md) (gate order, tier bands, the prefill-anchor reasoning), [`bench/scripts/reference.lock`](https://github.com/gittensor-ai-lab/sparkinfer-k3/blob/main/bench/scripts/reference.lock) (pinned baselines and the commentary this lecture quotes), [`EVAL-TRUST.md`](https://github.com/gittensor-ai-lab/sparkinfer-k3/blob/main/EVAL-TRUST.md) (the deterministic-vs-non-deterministic trust split).
+* **SparkInfer-K3 measurement chain** — [`CONTRIBUTING.md`](https://github.com/gittensor-ai-lab/sparkinfer-k3/blob/7689cc77e0e18d4b4f1937cf2a189dcd5a8d90f3/CONTRIBUTING.md) (gate order, tier bands, the prefill-anchor reasoning), [`bench/scripts/reference.lock`](https://github.com/gittensor-ai-lab/sparkinfer-k3/blob/7689cc77e0e18d4b4f1937cf2a189dcd5a8d90f3/bench/scripts/reference.lock) (pinned baselines and the commentary this lecture quotes), [`EVAL-TRUST.md`](https://github.com/gittensor-ai-lab/sparkinfer-k3/blob/7689cc77e0e18d4b4f1937cf2a189dcd5a8d90f3/EVAL-TRUST.md) (the deterministic-vs-non-deterministic trust split).
 * **The hardening PRs** — [pull requests labeled `eval:*` and the `eval:`/`fix(eval):` series](https://github.com/gittensor-ai-lab/sparkinfer-k3/pulls?q=is%3Apr+is%3Aclosed) on `gittensor-ai-lab/sparkinfer-k3`. Reading twenty of them in order is the best available substitute for making the mistakes yourself.
 * **KL divergence and top-1 agreement as a quantization gate** — llama.cpp's `--kl-divergence` / `--kl-divergence-base`; derived in [Logprobs, Perplexity & KL Divergence — Lecture 05](../../Logprobs,%20Perplexity%20and%20KL%20Divergence/Lecture-05.md).
 * **"Which Quantization Should I Use?"** — [arXiv:2601.14277](https://arxiv.org/abs/2601.14277) — the systematic finding that intrinsic metrics (PPL, mean KLD) are *necessary but not sufficient*; a useful caution on §2's narrow definition of correctness.
@@ -340,7 +353,7 @@ Cross-references:
 
 ## Current as of 2026-08
 
-SparkInfer-K3 at `7689cc7`. Gate: top-1 ≥ 0.95, mean KL ≤ 0.05, seven depths, worst-of. Significance 2% of frontier. Tiers `xs` <3.5% / `s` 3.5–6% / `m` 6–10% / `l` 10–18% / `xl` >18%. Scored metric prefill @ 32k with the llama anchor disabled; decode @ 128k as a 1% regression guard. Receipt verification off (`REQUIRE_EVAL_RECEIPT` unset). The *rules* are the durable content here; the thresholds are one project's calibration.
+SparkInfer-K3 at `7689cc7`. Gate: top-1 ≥ 0.95, mean KL ≤ 0.05, seven depths, worst-of. Significance 2% of frontier. Tiers `xs` <3.5% / `s` 3.5–6% / `m` 6–10% / `l` 10–18% / `xl` ≥18%. Scored metric prefill @ 32k with the llama anchor disabled; decode @ 128k as a 1% regression guard. Receipt verification off (`REQUIRE_EVAL_RECEIPT` unset). The *rules* are the durable content here; the thresholds are one project's calibration.
 
 ---
 

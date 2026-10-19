@@ -6,7 +6,7 @@
 
 Tuning is where compute meets diminishing returns. You have a model that fits, a validation scheme that you trust (Lectures 04–05), and now a knob-filled console: learning rate, batch size, weight decay, layer counts, channel widths, optimizer choice, dropout, warmup schedule. Each knob has a plausible range, the ranges multiply into a search space that is exponential in the number of knobs, and every point you evaluate costs a full training run. The discipline of this lecture is *not* "find the best hyperparameters" — that's the goal, not the skill. The skill is **spending a fixed search budget wisely**, and knowing in advance which family of changes — architecture, hyperparameters, or training tricks — is actually going to move the needle for your problem, so you don't burn a thousand GPU-hours discovering that your learning rate was already fine.
 
-CS329P frames this through a cost curve that has only sharpened since 2021: **compute cost per trial falls exponentially, human cost rises.** A data scientist costs >\$500/day; a trial on a typical task is minutes-to-an-hour of CPU/GPU time costing cents to a few dollars. The moment an automated tuner beats a human after ~1000 trials — and a decent one beats roughly 90% of data scientists — the economics say automate the search and spend the human on the parts a search can't do: framing the objective, designing the search space, and reading the results. This is the entire premise of **AutoML**: automate every step of applying ML — data cleaning, feature extraction, model selection — with **Hyperparameter Optimization (HPO)** and **Neural Architecture Search (NAS)** as its two best-developed pillars.
+Automating bounded search can save manual effort, but trial cost varies from seconds on a CPU to large distributed training runs. Do not budget from a universal price, a promised percentage of human experts beaten, or an assumption that each trial is cheap. Declare a wall-time/compute budget, a validation objective, and the set of allowed changes before launching the search.
 
 We teach this in three movements and then a fourth. HPO: the search algorithms, from the embarrassingly simple to the genuinely clever. NAS: searching the *architecture itself*, its brief moment of glory and its honest decline. The deep-network tuning toolkit: the three structural inventions — normalization, residuals, attention — that did more for deep nets than any tuner ever could, because they changed what was *trainable* in the first place. And throughout, the 2026 reality check: the field re-sorted itself, and the right default today is not what it was when these slides were written.
 
@@ -18,7 +18,7 @@ By the end of this lecture you should be able to:
 
 1. **Classify hyperparameters** and decide what to tune manually, what to automate, and what to leave at a well-chosen baseline.
 2. **Choose an HPO algorithm** — grid, random, Bayesian optimization, Hyperband/ASHA, BOHB — and justify it from your budget and parallelism, not from habit.
-3. **Explain why random search beats grid search**, and why multi-fidelity methods beat both when most configurations are bad.
+3. **Explain when random search uses a budget better than a grid**, and when early-fidelity rankings are reliable enough for pruning.
 4. **Describe the NAS pipeline** — search space, search strategy, performance estimation — and explain the cost problem that made naive NAS (~2000 GPU-days) impractical and one-shot methods necessary.
 5. **Contrast batch norm and layer norm**, explain why LN won for transformers, and explain how residual connections keep very deep nets trainable.
 6. **Reason about hardware-aware tuning** — latency-targeted NAS, the effect of norms/residuals on kernel fusion — and state honestly where NAS sits in 2026.
@@ -90,11 +90,11 @@ def grid_search(search_space):
     return best
 ```
 
-It guarantees you find the best point *in the grid* and it's trivially parallel. It also dies to the curse of dimensionality: a 5-value grid over 6 hyperparameters is 15,625 trials, and most of them vary a knob the model doesn't care about while pinning the one it does.
+It finds the best **observed validation result** in the grid and is trivially parallel; stochastic training and validation noise mean this is not a guarantee of the best true generalization. It also dies to the curse of dimensionality: a 5-value grid over 6 hyperparameters is 15,625 trials, and most of them vary a knob the model doesn't care about while pinning the one it does.
 
 ### 2.4 Random search — and why it beats grid
 
-Sample `n` configurations uniformly at random from the space.
+Sample `n` configurations from declared distributions. For a learning rate spanning orders of magnitude, uniform sampling of `log(lr)` is often more informative than uniform sampling of `lr`. Discrete/categorical parameters need their own distributions.
 
 ```python
 def random_search(search_space, n):
@@ -106,7 +106,13 @@ def random_search(search_space, n):
     return best
 ```
 
-The counterintuitive result — established by Bergstra & Bengio, *Random Search for Hyper-Parameter Optimization* — is that random search is **more efficient than grid search, both empirically and in theory.** The reason is the *low effective dimensionality* of most HPO problems: only a couple of hyperparameters actually matter, but you don't know which. A grid wastes its resolution by trying many distinct values of the *unimportant* knobs while testing only `grid_size` distinct values of the important one. Random search, by sampling every knob independently each trial, tries `n` distinct values of the important knob for the same `n` trials. CS329P's practical verdict is unambiguous: **in practice, start with random search.** It's the right default and the baseline every fancier method must beat.
+The counterintuitive result — established by Bergstra & Bengio, *Random Search for Hyper-Parameter Optimization* — is that random search can use the same trial budget more efficiently when only a few hyperparameters matter; it is not a universal dominance theorem. The reason is the *low effective dimensionality* of most HPO problems: only a couple of hyperparameters actually matter, but you don't know which. A grid wastes its resolution by trying many distinct values of the *unimportant* knobs while testing only `grid_size` distinct values of the important one. Random search, by sampling every knob independently each trial, tries `n` distinct values of the important knob for the same `n` trials. CS329P's practical verdict is unambiguous: **in practice, start with random search.** It's the right default and the baseline every fancier method must beat.
+
+### Worked budget and selection example
+
+Three values each for learning rate and weight decay cost nine grid trials. Nine random draws can inspect nine different learning rates rather than three. That helps if learning rate matters much more; a carefully designed small grid can still be a good choice when both ranges are known.
+
+**Guided variation:** the lowest validation loss among 100 noisy trials will often be optimistic. Refit the chosen configuration across declared seeds, then evaluate a final untouched test set once. Do not repeatedly choose the seed with the best test accuracy. In the [CPU lab](../../../2.%20Deep%20Learning%20Frameworks/PyTorch/CPU-Robot-Stop-Lab/Guide.md), both epoch and threshold use validation data; the test split must remain outside any new tuning loop. Record failed and pruned trials so the budget denominator remains honest.
 
 ### 2.5 Bayesian optimization (BO)
 

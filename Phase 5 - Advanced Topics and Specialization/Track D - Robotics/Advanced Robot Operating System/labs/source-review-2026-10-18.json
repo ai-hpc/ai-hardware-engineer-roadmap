@@ -1,0 +1,45 @@
+{
+  "reviewed_utc": "2026-10-18T22:19:52.651453+00:00",
+  "sources": [
+    {
+      "source_url": "https://github.com/ros2/ros2_documentation/blob/rolling/source/Releases.rst",
+      "git_blob_sha": "562e23369540789fd6f38d36fbf5642cb6bcedde",
+      "immutable_blob_api": "https://api.github.com/repos/ros2/ros2_documentation/git/blobs/562e23369540789fd6f38d36fbf5642cb6bcedde",
+      "download_sha256": "37166dc87cd108e1578a7477d8be8cee4c9c4e72562686bbf1ef7e4af027d2ab",
+      "bytes": 9057,
+      "status": "retrieved"
+    },
+    {
+      "source_url": "https://github.com/ros2/ros2_documentation/blob/jazzy/source/Concepts/Intermediate/About-Quality-of-Service-Settings.rst",
+      "git_blob_sha": "a3bef6c9033667a940406ac90414e3a438a6b206",
+      "immutable_blob_api": "https://api.github.com/repos/ros2/ros2_documentation/git/blobs/a3bef6c9033667a940406ac90414e3a438a6b206",
+      "download_sha256": "dacf14cb84e15c0ca3710468202d09e52606b959c28fe618f652d8debcf962fe",
+      "bytes": 13272,
+      "status": "retrieved"
+    },
+    {
+      "source_url": "https://github.com/ros2/ros2_documentation/blob/jazzy/source/How-To-Guides/Using-callback-groups.rst",
+      "git_blob_sha": "829b66d96d7e0de22d5ee29bcdd24196fdcea54f",
+      "immutable_blob_api": "https://api.github.com/repos/ros2/ros2_documentation/git/blobs/829b66d96d7e0de22d5ee29bcdd24196fdcea54f",
+      "download_sha256": "7d4e34db972907d768f9f7fa73e112914e8f040cc36ad65f4678c9d381800914",
+      "bytes": 21275,
+      "status": "retrieved"
+    },
+    {
+      "source_url": "https://github.com/cartographer-project/cartographer/blob/master/README.rst",
+      "git_blob_sha": "a1f8b9c94f9e8d6f4621092936e7c13323499610",
+      "immutable_blob_api": "https://api.github.com/repos/cartographer-project/cartographer/git/blobs/a1f8b9c94f9e8d6f4621092936e7c13323499610",
+      "download_sha256": "495a1dfd9429e8fa87d1fbef4a8482af8bd95c6dd038e8571b5d34069d0374a4",
+      "bytes": 8490,
+      "status": "retrieved"
+    },
+    {
+      "source_url": "https://github.com/cra-ros-pkg/robot_localization/blob/rolling-devel/doc/navsat_transform_node.rst",
+      "git_blob_sha": "6d976f2c33b776cd826800ff9665b951c83ad834",
+      "immutable_blob_api": "https://api.github.com/repos/cra-ros-pkg/robot_localization/git/blobs/6d976f2c33b776cd826800ff9665b951c83ad834",
+      "download_sha256": "c47aa1d9f8b2c984a1452e671cec88021dab5e8c25397a9c8b577c7471449713",
+      "bytes": 8295,
+      "status": "retrieved"
+    }
+  ]
+}

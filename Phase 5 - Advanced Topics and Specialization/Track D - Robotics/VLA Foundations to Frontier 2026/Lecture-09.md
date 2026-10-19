@@ -27,6 +27,8 @@ $$
 {\sum_{b,k,j}M_{bkj}w_j}.
 $$
 
+Require finite nonnegative weights and a strictly positive denominator. An entirely padded batch must be rejected or skipped under an explicit distributed-step rule; it is not a zero-loss training example. Masking by multiplication does not repair NaN padded values (`0 × NaN` is still NaN), so sanitize excluded values or select valid coordinates before evaluating the loss.
+
 This is a mean over valid weighted coordinates, not a mean over padded tensor size. State whether long episodes contribute more samples. State whether each episode or each timestep receives equal weight. Both choices can be reasonable, but they optimize different empirical distributions.
 
 Autoregressive action tokens add teacher forcing: training conditions on the correct previous token, whereas inference conditions on a sampled or predicted token. Measure invalid decoded actions and errors across token positions. Scheduled sampling changes the objective and needs its own justification; it does not automatically solve state-distribution shift.
@@ -40,6 +42,8 @@ Consider an illustrative one-dimensional system \(x_{t+1}=x_t+a_t+d_t\), with ta
 The problem is missing recovery coverage, even though the controller's output range can represent the correct action. Collecting more repeated near-zero examples does not fill that gap. Adding expert-labeled states around the disturbance does. For an illustrative independent per-step failure probability of 0.01, the probability of at least one failure over 100 steps is \(1-0.99^{100}\approx0.634\). Real robot errors are correlated, so this arithmetic illustrates horizon sensitivity rather than predicting a robot success rate.
 
 ## Build the experiment
+
+First run the supplied [CPU policy lesson](../../../Phase%203%20-%20Artificial%20Intelligence/0.%20AI%20and%20Robot%20Learning%20Foundations/Lab-01-CPU-Policy.md), which trains a small policy and evaluates closed-loop behavior, or [this course's grounding baseline](Lab-Guide.md), which learns nine logits from RGB/instruction/state samples. These are implemented references with different scopes. Neither implements the DAgger study below.
 
 **Exercise / pseudocode; the learner implements and runs this experiment.** Use a small MLP and the state system above before introducing image encoders.
 

@@ -1,0 +1,59 @@
+{
+  "checked_utc": "2026-10-18T22:37:48.777833+00:00",
+  "command": [
+    "/tmp/course-pytorch-cpu-venv/bin/python",
+    "Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/labs/sdpa_experiment.py",
+    "--dtype",
+    "bfloat16"
+  ],
+  "result": {
+    "torch": "2.14.0+cpu",
+    "torch_cuda_build": null,
+    "device": "cpu",
+    "device_name": "CPU",
+    "backend_requested": "math",
+    "dtype": "bfloat16",
+    "shape": [
+      1,
+      2,
+      7,
+      11,
+      8
+    ],
+    "alignment": "lower_right",
+    "dropout_p": 0,
+    "seed": 17,
+    "threads": 1,
+    "oracle": "CPU math float64 on the same quantized inputs",
+    "max_abs_error": 0.003368344611412777,
+    "atol": 0.01,
+    "rtol": 0.01,
+    "passes_fixture_tolerance": true,
+    "warmup": 5,
+    "forward_ms_samples": [
+      0.04007,
+      0.04045,
+      0.03693,
+      0.03586,
+      0.04808,
+      0.041882,
+      0.17899,
+      0.06772,
+      0.10123,
+      0.04938,
+      0.04769,
+      0.0453,
+      0.04506,
+      0.04195,
+      0.04394,
+      0.0447,
+      0.0451,
+      0.041881,
+      0.043221,
+      0.043141
+    ],
+    "forward_ms_median": 0.04432,
+    "timing_boundary": "forward SDPA including explicit mask; excludes allocation, transfer, reference and compilation warmup",
+    "scope": "No FlashAttention distribution installed by this script; CPU numbers do not predict GPU speed or serving TPS."
+  }
+}

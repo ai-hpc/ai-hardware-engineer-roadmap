@@ -1,0 +1,342 @@
+{
+  "checked_utc": "2026-10-18T22:23:38.842012+00:00",
+  "method": "HTTP GET; body hashes establish a retrieval snapshot, not a correctness verdict. Teaching changes also read primary documentation. No model weights or hosted providers were used.",
+  "sources": [
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events",
+      "resolved_url": "https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events",
+      "status": 200,
+      "bytes": 163479,
+      "sha256": "763505c0f7458df2682a8d2300148a779d2094edd617745c4d72f01ff3ef0763"
+    },
+    {
+      "url": "https://developers.openai.com/api/docs/guides/agents",
+      "resolved_url": "https://developers.openai.com/api/docs/guides/agents",
+      "status": 200,
+      "bytes": 364603,
+      "sha256": "d3107e684cb05e00182b766b17669586e1f8659496e836f0326cd8420384b603"
+    },
+    {
+      "url": "https://developers.openai.com/api/docs/guides/agents/results",
+      "resolved_url": "https://developers.openai.com/api/docs/guides/agents/results",
+      "status": 200,
+      "bytes": 378607,
+      "sha256": "64a53b1685a8637c6f7ec9748fe22478224924bc3e721dbc40885f42024cba0e"
+    },
+    {
+      "url": "https://developers.openai.com/api/docs/guides/agents/sandboxes",
+      "resolved_url": "https://developers.openai.com/api/docs/guides/agents/sandboxes",
+      "status": 200,
+      "bytes": 557410,
+      "sha256": "2e4a1b69baaf146d8311da53fc77c6e8585229033e2435a55be8546e50fed5c7"
+    },
+    {
+      "url": "https://developers.openai.com/api/docs/guides/agents/sdk",
+      "resolved_url": "https://developers.openai.com/api/docs/guides/agents/sdk",
+      "status": 200,
+      "bytes": 373399,
+      "sha256": "05e620f49245cd14f96b4a2c34fa26431cd157f59c4665cf349f2911191487ac"
+    },
+    {
+      "url": "https://developers.openai.com/api/docs/guides/tools-skills",
+      "resolved_url": "https://developers.openai.com/api/docs/guides/tools-skills",
+      "status": 200,
+      "bytes": 566757,
+      "sha256": "09f95db30e0498060bf92c67aaf76f52632ef1206a11efd1c0c4d76e0c1a9299"
+    },
+    {
+      "url": "https://developers.openai.com/api/docs/models/text-embedding-3-large",
+      "resolved_url": "https://developers.openai.com/api/docs/models/text-embedding-3-large",
+      "status": 200,
+      "bytes": 422202,
+      "sha256": "303926cc23a2ac0ec0f2fd6c5c065e4964eeabc8c558a24bcafd21a161ba6970"
+    },
+    {
+      "url": "https://developers.openai.com/api/reference/resources/responses/methods/create",
+      "resolved_url": "https://developers.openai.com/api/reference/resources/responses/methods/create",
+      "status": 200,
+      "bytes": 5000000,
+      "sha256": "cde323cf82cdde518beaacecb7bf423871be27d13938823264beeaccb04e8fc2"
+    },
+    {
+      "url": "https://docs.cohere.com/docs/embeddings",
+      "resolved_url": "https://docs.cohere.com/docs/embeddings",
+      "status": 200,
+      "bytes": 317883,
+      "sha256": "952a15cf78b13b26e8df162a557873f990665586b1dc352b43ef1f9036d74681"
+    },
+    {
+      "url": "https://docs.langchain.com/oss/python/integrations/embeddings/huggingfacehub",
+      "resolved_url": "https://docs.langchain.com/oss/python/integrations/embeddings/huggingfacehub",
+      "status": 200,
+      "bytes": 732655,
+      "sha256": "4fffff199c26df4ea709aedca8ef45d14036a84cee75660918a84de75266f315"
+    },
+    {
+      "url": "https://docs.langchain.com/oss/python/integrations/splitters/recursive_text_splitter",
+      "resolved_url": "https://docs.langchain.com/oss/python/integrations/splitters/recursive_text_splitter",
+      "status": 200,
+      "bytes": 737153,
+      "sha256": "3fd511da50c7d836e4d5a85d6c58b8de61d421bc3999d7363587a68f22591dba"
+    },
+    {
+      "url": "https://docs.langchain.com/oss/python/langgraph/graph-api",
+      "resolved_url": "https://docs.langchain.com/oss/python/langgraph/graph-api",
+      "status": 200,
+      "bytes": 1646474,
+      "sha256": "202f158079cc244cb5ba43b31ff2b823df7ffbcb53b512bd071c51c3de02ba50"
+    },
+    {
+      "url": "https://docs.langchain.com/oss/python/langgraph/interrupts",
+      "resolved_url": "https://docs.langchain.com/oss/python/langgraph/interrupts",
+      "status": 200,
+      "bytes": 1515955,
+      "sha256": "dde02eb9354c670fb9f9484cfc7f766e2522fe48bcf875bfa5bb20e4c80be2d8"
+    },
+    {
+      "url": "https://docs.langchain.com/oss/python/langgraph/persistence",
+      "resolved_url": "https://docs.langchain.com/oss/python/langgraph/persistence",
+      "status": 200,
+      "bytes": 705060,
+      "sha256": "e784d2718b73e5edfd994697b50b9f5cc761d42c9d66c297fe5117dd7a1204b2"
+    },
+    {
+      "url": "https://docs.voyageai.com/docs/embeddings",
+      "resolved_url": "https://docs.voyageai.com/docs/embeddings",
+      "status": 200,
+      "bytes": 215142,
+      "sha256": "c9fb79ebf053c24d5ae522c76819441bfd40a3f0bfc03bb1cfe28fda4d519233"
+    },
+    {
+      "url": "https://fastapi.tiangolo.com/advanced/events/",
+      "resolved_url": "https://fastapi.tiangolo.com/advanced/events/",
+      "status": 200,
+      "bytes": 132368,
+      "sha256": "7d8790fd544990412e9224783c43c598c3ab6b72566c311353517d86981804c6"
+    },
+    {
+      "url": "https://fastapi.tiangolo.com/async/",
+      "resolved_url": "https://fastapi.tiangolo.com/async/",
+      "status": 200,
+      "bytes": 136911,
+      "sha256": "401c38633f71af67df84bbc7e045c34bc82ae5443100fb9c0b4b1e8827cb96fb"
+    },
+    {
+      "url": "https://github.com/earendil-works/pi/blob/1402973a9dbe8c627341e04c9744c54953e285ca/README.md",
+      "resolved_url": "https://github.com/earendil-works/pi/blob/1402973a9dbe8c627341e04c9744c54953e285ca/README.md",
+      "status": 200,
+      "bytes": 307240,
+      "sha256": "9f2f6d29a4452a351730aec787186102c1032d2d1b447234d3a9e7cac640365a"
+    },
+    {
+      "url": "https://github.com/earendil-works/pi/blob/1402973a9dbe8c627341e04c9744c54953e285ca/packages/coding-agent/docs/extensions.md",
+      "resolved_url": "https://github.com/earendil-works/pi/blob/1402973a9dbe8c627341e04c9744c54953e285ca/packages/coding-agent/docs/extensions.md",
+      "status": 200,
+      "bytes": 450710,
+      "sha256": "c3b54cf330c2603495a6ed84606106fc7afeb71b494f4e906f6746fc8e075b11"
+    },
+    {
+      "url": "https://github.com/earendil-works/pi/blob/1402973a9dbe8c627341e04c9744c54953e285ca/packages/coding-agent/docs/how-pi-works.md",
+      "resolved_url": "https://github.com/earendil-works/pi/blob/1402973a9dbe8c627341e04c9744c54953e285ca/packages/coding-agent/docs/how-pi-works.md",
+      "status": 200,
+      "bytes": 251515,
+      "sha256": "4f25742d521be5ba3b9d96cab9e3a9735e185129cc8ddb59c4df73668dd8ba48"
+    },
+    {
+      "url": "https://github.com/earendil-works/pi/blob/1402973a9dbe8c627341e04c9744c54953e285ca/packages/coding-agent/docs/mcp.md",
+      "resolved_url": "https://github.com/earendil-works/pi/blob/1402973a9dbe8c627341e04c9744c54953e285ca/packages/coding-agent/docs/mcp.md",
+      "status": 200,
+      "bytes": 375612,
+      "sha256": "34bbebf4812e43cb54ffbdd24ad8fdb9dc79c1009f6ec3f01afae449e2e9b7b0"
+    },
+    {
+      "url": "https://github.com/earendil-works/pi/blob/1402973a9dbe8c627341e04c9744c54953e285ca/packages/coding-agent/docs/security.md",
+      "resolved_url": "https://github.com/earendil-works/pi/blob/1402973a9dbe8c627341e04c9744c54953e285ca/packages/coding-agent/docs/security.md",
+      "status": 200,
+      "bytes": 271297,
+      "sha256": "7d1f194b56ee8676b0a09fe57117fed82b7a361f7ffbef311be0b4ad297dcfa1"
+    },
+    {
+      "url": "https://github.com/earendil-works/pi/blob/1402973a9dbe8c627341e04c9744c54953e285ca/packages/coding-agent/docs/session-format.md",
+      "resolved_url": "https://github.com/earendil-works/pi/blob/1402973a9dbe8c627341e04c9744c54953e285ca/packages/coding-agent/docs/session-format.md",
+      "status": 200,
+      "bytes": 452283,
+      "sha256": "c1659eabcc5480b0d967c7cff30e9e38cc2ed809a527824f87ef6dc2809d452a"
+    },
+    {
+      "url": "https://github.com/earendil-works/pi/blob/1402973a9dbe8c627341e04c9744c54953e285ca/packages/coding-agent/docs/sessions.md",
+      "resolved_url": "https://github.com/earendil-works/pi/blob/1402973a9dbe8c627341e04c9744c54953e285ca/packages/coding-agent/docs/sessions.md",
+      "status": 200,
+      "bytes": 262813,
+      "sha256": "22bcd9bb7bfe314425688a79a2e03931d188445856e51b782038b58500997117"
+    },
+    {
+      "url": "https://github.com/earendil-works/pi/blob/1402973a9dbe8c627341e04c9744c54953e285ca/packages/coding-agent/docs/slash-commands.md",
+      "resolved_url": "https://github.com/earendil-works/pi/blob/1402973a9dbe8c627341e04c9744c54953e285ca/packages/coding-agent/docs/slash-commands.md",
+      "status": 200,
+      "bytes": 256204,
+      "sha256": "706acf1d03f2198eb5605be3456f661ff70dbbf41f1bd5afac2d73d488b8bf35"
+    },
+    {
+      "url": "https://github.com/earendil-works/pi/blob/1402973a9dbe8c627341e04c9744c54953e285ca/packages/coding-agent/package.json",
+      "resolved_url": "https://github.com/earendil-works/pi/blob/1402973a9dbe8c627341e04c9744c54953e285ca/packages/coding-agent/package.json",
+      "status": 200,
+      "bytes": 273381,
+      "sha256": "5c484ec2a68369c8be06241aac65df94b88e9a382c7eba8786ccf68af89a50d7"
+    },
+    {
+      "url": "https://github.com/earendil-works/pi/tree/1402973a9dbe8c627341e04c9744c54953e285ca",
+      "resolved_url": "https://github.com/earendil-works/pi/tree/1402973a9dbe8c627341e04c9744c54953e285ca",
+      "status": 200,
+      "bytes": 373536,
+      "sha256": "80f2746f17eedc20820093551676baabb39f500e13b96383c44831702f2008ed"
+    },
+    {
+      "url": "https://github.com/pgvector/pgvector",
+      "resolved_url": "https://github.com/pgvector/pgvector",
+      "status": 200,
+      "bytes": 712290,
+      "sha256": "53841e4ee36b512034b98eda34f5f3a6556081b9451df2f7ac2f1935588d83ae"
+    },
+    {
+      "url": "https://gofastmcp.com/getting-started/upgrading/from-fastmcp-2",
+      "resolved_url": "https://gofastmcp.com/getting-started/upgrading/from-fastmcp-2",
+      "status": 200,
+      "bytes": 957727,
+      "sha256": "73cf4dc638bede17cd6d2d435b4b8d0e4cdc6a30c45ea3a3922dd031af61618f"
+    },
+    {
+      "url": "https://gofastmcp.com/getting-started/upgrading/from-fastmcp-3",
+      "resolved_url": "https://gofastmcp.com/getting-started/upgrading/from-fastmcp-3",
+      "status": 200,
+      "bytes": 820154,
+      "sha256": "7c2de60ad99e34d8364e9967569c517ca1e00908c657f95f60a8c0f68e2573c8"
+    },
+    {
+      "url": "https://huggingface.co/BAAI/bge-m3",
+      "resolved_url": "https://huggingface.co/BAAI/bge-m3",
+      "status": 200,
+      "bytes": 403898,
+      "sha256": "d3e52c1ae352f32d698bd30e12cdaba6284189e1b7ca4af608f18e1afcbcaef9"
+    },
+    {
+      "url": "https://huggingface.co/ibm-granite/granite-embedding-97m-multilingual-r2",
+      "resolved_url": "https://huggingface.co/ibm-granite/granite-embedding-97m-multilingual-r2",
+      "status": 200,
+      "bytes": 271892,
+      "sha256": "dbe2e73ac32af9b6f4826ebc04943364faaeae8c69baa12a9a6379544092f8c5"
+    },
+    {
+      "url": "https://huggingface.co/intfloat/multilingual-e5-large",
+      "resolved_url": "https://huggingface.co/intfloat/multilingual-e5-large",
+      "status": 200,
+      "bytes": 2443100,
+      "sha256": "e5bd9cfacf90993bb2b86cf5318b75e5f21433d62fe7c534cf6d76c35836223f"
+    },
+    {
+      "url": "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2",
+      "resolved_url": "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2",
+      "status": 200,
+      "bytes": 321005,
+      "sha256": "b737996a014d27fbc77aa0c6b67d9c257f39bc20679bf3111d5ce724f7279881"
+    },
+    {
+      "url": "https://kubernetes.io/docs/concepts/configuration/liveness-readiness-startup-probes/",
+      "resolved_url": "https://kubernetes.io/docs/concepts/workloads/pods/probes/",
+      "status": 200,
+      "bytes": 544899,
+      "sha256": "e73fcec5a6fe631d4f04ab6cc5f73029360344ebc139b88c2959c750fd126db1"
+    },
+    {
+      "url": "https://py.sdk.modelcontextprotocol.io/get-started/",
+      "resolved_url": "https://py.sdk.modelcontextprotocol.io/get-started/",
+      "status": 200,
+      "bytes": 50889,
+      "sha256": "fae6be34c513d2e0d26cfeda68404086aac42d660ac418d65c78e76c90fd8409"
+    },
+    {
+      "url": "https://py.sdk.modelcontextprotocol.io/migration/",
+      "resolved_url": "https://py.sdk.modelcontextprotocol.io/migration/",
+      "status": 200,
+      "bytes": 483554,
+      "sha256": "8e86d26707705d9787d6f3cc71ba4095c1d18f3dc658b63c564e7eac8924544d"
+    },
+    {
+      "url": "https://qdrant.tech/documentation/concepts/indexing/",
+      "resolved_url": "https://qdrant.tech/documentation/manage-data/indexing/",
+      "status": 200,
+      "bytes": 441434,
+      "sha256": "6d32b19bde2845254b24f1ceb90fb81514553e8faabddff5548da6319c6c333c"
+    },
+    {
+      "url": "https://qdrant.tech/documentation/overview/",
+      "resolved_url": "https://qdrant.tech/documentation/overview/",
+      "status": 200,
+      "bytes": 84261,
+      "sha256": "f1883b7be54274d14e65f84a010ca4af6e68bca2fd33a0196f84a72e8570e17c"
+    },
+    {
+      "url": "https://qdrant.tech/documentation/search/",
+      "resolved_url": "https://qdrant.tech/documentation/search/",
+      "status": 200,
+      "bytes": 300,
+      "sha256": "6d6ce3563fd3603c28035596050dc0a1a6defb578d3094d9498aa9a5d5299896"
+    },
+    {
+      "url": "https://reference.langchain.com/python/langchain-classic/retrievers/multi_query/MultiQueryRetriever",
+      "resolved_url": "https://reference.langchain.com/python/langchain-classic/retrievers/multi_query/MultiQueryRetriever",
+      "status": 200,
+      "bytes": 296118,
+      "sha256": "5fd9dcde37aaad906ce8a6da08fdf75960f871e6f300328479b781f719257362"
+    },
+    {
+      "url": "https://reference.langchain.com/python/langgraph/graph/state/StateGraph/add_edge",
+      "resolved_url": "https://reference.langchain.com/python/langgraph/graph/state/StateGraph/add_edge",
+      "status": 200,
+      "bytes": 189131,
+      "sha256": "8fa077c19d1ba54a5e57327072e47ccf236d9b877887989a01e3a21ed5c1de4f"
+    },
+    {
+      "url": "https://www.ibm.com/granite/docs/models/embedding",
+      "resolved_url": "https://www.ibm.com/granite/docs/models/embedding",
+      "status": 200,
+      "bytes": 87924,
+      "sha256": "1cbb7f8f0e5eeb5650b84333b230c9d0dab898833ca0dbd938a6a288c113c69c"
+    },
+    {
+      "url": "https://www.sbert.net/docs/sentence_transformer/usage/semantic_textual_similarity.html",
+      "resolved_url": "https://www.sbert.net/docs/sentence_transformer/usage/semantic_textual_similarity.html",
+      "status": 200,
+      "bytes": 156480,
+      "sha256": "0bc2fbd56d48a0fb3f9794c7eb90ee6d62abfe717ece2916e140e7c8c01476a6"
+    },
+    {
+      "url": "https://www.sqlite.org/fts5.html#the_bm25_function",
+      "resolved_url": "https://www.sqlite.org/fts5.html",
+      "status": 200,
+      "bytes": 215354,
+      "sha256": "de3092630358518a6869bf047055b3938e18b476e3fbc54f4e2146d1e593497f"
+    }
+  ],
+  "excluded_example_domains": [
+    "https://login.example-idp.com\"",
+    "https://login.example-idp.com/\"",
+    "https://login.example-idp.com/.well-known/jwks.json\"",
+    "https://weather.example.com/.well-known/oauth-protected-resource\"",
+    "https://weather.example.com/mcp\"",
+    "https://weather.example.com/mcp\",",
+    "https://weather.example.com/mcp`,"
+  ],
+  "repository_revisions": [
+    {
+      "repo": "badlogic/pi-mono",
+      "revision": "1402973a9dbe8c627341e04c9744c54953e285ca",
+      "date": "2026-10-18T20:43:39Z"
+    },
+    {
+      "repo": "modelcontextprotocol/python-sdk",
+      "revision": "2af9e3089ac66b35c1550c500aae86a82efb1e17",
+      "date": "2026-10-17T13:54:35Z"
+    }
+  ]
+}

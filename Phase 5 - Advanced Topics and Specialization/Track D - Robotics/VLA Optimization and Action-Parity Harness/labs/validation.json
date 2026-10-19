@@ -1,0 +1,158 @@
+{
+  "reviewed_utc": "2026-10-18T22:53:07.354516+00:00",
+  "python": "3.12.3",
+  "portable_tests_passed": 20,
+  "skipped": 0,
+  "actual_execution": "CPU training, 180-frame numerical comparison, seven paired 12-episode cart scenarios, CLI gates, INT4 arithmetic and transport variations",
+  "not_executed": [
+    "pretrained VLA checkpoint",
+    "GPU/INT8 kernels",
+    "simulator packages",
+    "physical robot",
+    "measured inference speedup"
+  ],
+  "source_sha256": {
+    "Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/labs/action_parity.py": "0ce193672643fec323b350eeb36cb3c39bf2f749f51170f0abfb4938c3b48b80",
+    "Phase 3 - Artificial Intelligence/0. AI and Robot Learning Foundations/labs/policy_lab.py": "2861d6aa8600ced6e936cc552159545aa85f14c5f3b6f07dfb45ff7fd353dd9a",
+    "Phase 3 - Artificial Intelligence/0. AI and Robot Learning Foundations/labs/timed_policy_lab.py": "e5a0dc6b52fe3cd0d0d882940619d356f888213243a68e70d9361bed3770a828"
+  },
+  "artifact_sha256": {
+    "README.md": "c47064108b8e64782cf9ae418827c02ceb416620ca4f56a16bf6d6eb9d5fa2f6",
+    "Lecture-02.md": "6ac9ebbac31279792acdea7f64328f67d29a70592d9d71d5e63c68c0a6827ee9",
+    "Lecture-01.md": "33096da9a1c6753405df9b117f73c7cfe8d9708e85ceb61ae1b892495d7f11e8",
+    "CPU-Action-Parity-Lab.md": "e95f2a0fae2b9b9033b42f9c00cda2a00ca038f19f465b83f330beb7f764ee2b",
+    "labs/sample-run.json": "d351eb0bcf6bf90ae407621e6816df315c3b4717de9e1abfc711a7fa5802ed31",
+    "labs/action_parity.py": "0ce193672643fec323b350eeb36cb3c39bf2f749f51170f0abfb4938c3b48b80",
+    "labs/sources.json": "334435cb0ad695efd9c5c054776650a79c95b0c00bdc59d197024457c1093881",
+    "labs/test_action_parity.py": "6da23bdd4a77920f0a11eccae6cd4ff6bb9b30fcaa7cb97be4a7cf0a96a1c395"
+  },
+  "scenario_summary": {
+    "identity": {
+      "fixed_fixture_gate": "PASS",
+      "successes": 12,
+      "max_applied_age_ms": 250,
+      "applied_policy_intervals": 23616,
+      "max_position_divergence_m": 0.0,
+      "failure_reasons": []
+    },
+    "folded_normalization": {
+      "fixed_fixture_gate": "PASS",
+      "successes": 12,
+      "max_applied_age_ms": 250,
+      "applied_policy_intervals": 23616,
+      "max_position_divergence_m": 5.828670879282072e-16,
+      "failure_reasons": []
+    },
+    "int8_weight_arithmetic": {
+      "fixed_fixture_gate": "PASS",
+      "successes": 12,
+      "max_applied_age_ms": 250,
+      "applied_policy_intervals": 23616,
+      "max_position_divergence_m": 0.0034560903844265134,
+      "failure_reasons": []
+    },
+    "missing_normalization_fault": {
+      "fixed_fixture_gate": "FAIL",
+      "successes": 5,
+      "max_applied_age_ms": 250,
+      "applied_policy_intervals": 23616,
+      "max_position_divergence_m": 0.6875624767448978,
+      "failure_reasons": [
+        "numerical_action_error",
+        "lost_fixed_suite_success",
+        "trajectory_divergence"
+      ]
+    },
+    "same_weights_slow_fifo": {
+      "fixed_fixture_gate": "FAIL",
+      "successes": 0,
+      "max_applied_age_ms": 7930,
+      "applied_policy_intervals": 23832,
+      "max_position_divergence_m": 81.93429231584975,
+      "failure_reasons": [
+        "expired_observation_applied",
+        "lost_fixed_suite_success",
+        "trajectory_divergence"
+      ]
+    },
+    "same_weights_slow_latest": {
+      "fixed_fixture_gate": "FAIL",
+      "successes": 12,
+      "max_applied_age_ms": 250,
+      "applied_policy_intervals": 17532,
+      "max_position_divergence_m": 0.4351250099548014,
+      "failure_reasons": [
+        "trajectory_divergence"
+      ]
+    },
+    "same_weights_over_budget": {
+      "fixed_fixture_gate": "FAIL",
+      "successes": 2,
+      "max_applied_age_ms": null,
+      "applied_policy_intervals": 0,
+      "max_position_divergence_m": 1.6767322571631977,
+      "failure_reasons": [
+        "no_policy_action_applied",
+        "lost_fixed_suite_success",
+        "trajectory_divergence"
+      ]
+    }
+  },
+  "test_command": [
+    "python3",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/labs",
+    "-p",
+    "test_*.py",
+    "-v"
+  ],
+  "reference_command": [
+    "python3",
+    "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/labs/action_parity.py",
+    "--output",
+    "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/labs/sample-run.json"
+  ],
+  "cli_expected_exit_codes": {
+    "passing-gate": 0,
+    "failing-gate": 2,
+    "invalid-count": 2,
+    "unknown-candidate": 2
+  },
+  "variation_summary": {
+    "int4": [
+      {
+        "candidate": "int8_weight_arithmetic",
+        "fixture_gate": "FAIL",
+        "successes": 12,
+        "max_action_error": 0.019080010153255313,
+        "applied_intervals": 23616
+      },
+      {
+        "candidate": "same_weights_slow_latest",
+        "fixture_gate": "FAIL",
+        "successes": 12,
+        "max_action_error": 0.0,
+        "applied_intervals": 17532
+      }
+    ],
+    "transport": [
+      {
+        "candidate": "int8_weight_arithmetic",
+        "fixture_gate": "PASS",
+        "successes": 12,
+        "max_action_error": 0.0016214453184572285,
+        "applied_intervals": 23616
+      },
+      {
+        "candidate": "same_weights_slow_latest",
+        "fixture_gate": "FAIL",
+        "successes": 12,
+        "max_action_error": 0.0,
+        "applied_intervals": 9708
+      }
+    ]
+  }
+}

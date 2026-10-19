@@ -1,0 +1,26 @@
+{
+  "scope": "CPU arithmetic using pinned checkpoint metadata, hypothetical free-memory and reserve assumptions; not GPU fit validation",
+  "kv_bytes_per_token": 327680,
+  "kv_bytes_32768_tokens": 10737418240,
+  "kv_GiB_32768_tokens": 10.0,
+  "weights_payload_bytes": 145412407296,
+  "assumed_free_bytes": 170000000000,
+  "assumed_workspace_and_reserve_bytes": 8000000000,
+  "remaining_KV_bytes": 16587592704,
+  "arithmetic_token_capacity": 50621,
+  "max_context_from_unmodified_config": 32768,
+  "one_32768_sequence_fits_arithmetic": true,
+  "two_32768_sequences_fit_arithmetic": false,
+  "tp8_query_heads_per_rank": 8,
+  "tp8_kv_heads_per_rank": 1,
+  "tp72_equal_query_partition_legal": false,
+  "72_GPU_TP8_replica_groups": 9,
+  "synthetic_allreduce_1GB_2ms_8ranks": {
+    "algbw_GBps": 500.0,
+    "busbw_GBps": 875.0
+  },
+  "imports_sha256": {
+    "Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/labs/quant_contracts.py": "10de7af659d55fb0ef284de2804f3d9a6329256bab81218e1d074383fa4dd9c4",
+    "Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/CPU-Collectives-Lab/labs/accounting.py": "53faf927bdd8fc4e64b6c72e2851dbdb8ef3b48d2cdcb7932d0984ac41156ec1"
+  }
+}

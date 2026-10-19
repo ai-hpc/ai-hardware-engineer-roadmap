@@ -1,0 +1,22 @@
+{
+  "scope": "actual CPU PyTorch execution of lecture class methods; fake scene/poses/kinematics",
+  "torch": "2.14.0+cpu",
+  "checks_passed": 8,
+  "checks": [
+    "per-environment delay buffer",
+    "31-value observation uses applied action",
+    "known action-rate reward",
+    "soft target limits",
+    "timeout at 360 transitions",
+    "lost-cube termination",
+    "selected reset/history/success isolation",
+    "reset clipping and kinematics request"
+  ],
+  "task_code_sha256": "55099b873cedb4a5f666fe5e80acae1925403c9fbfa1acd883212abf19497fc3",
+  "contract_code_sha256": "552f59b6e63c40e8ef2cd1b35432a4b3e3484493312955eadde894ba95d57174",
+  "limitations": [
+    "constructor and Isaac asset/data APIs not executed",
+    "poses and kinematics are fixtures",
+    "no training, physics, renderer, or learned task success"
+  ]
+}

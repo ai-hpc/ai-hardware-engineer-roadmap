@@ -25,7 +25,7 @@ The trainable parameter count is \(r(d_{in}+d_{out})\), compared with \(d_{in}d_
 
 Quantized-base adaptation adds another distinction: storage precision, compute precision, optimizer precision, and export precision can differ. QLoRA is a specific method with a particular quantization and adaptation recipe. NF4 used in that work is not NVIDIA NVFP4. A quantized text-model recipe does not establish VLA action fidelity or hardware-kernel support. [QLoRA, 2023](https://arxiv.org/abs/2305.14314).
 
-Record target modules, rank, scale, initialization, dropout, and merge procedure. After merging adapters, compare outputs with the unmerged model on held-out inputs using identical sampling noise. Quantization or casting during export can invalidate exact equality; define an appropriate action-space tolerance and report it.
+Record target modules, rank, scale, initialization, dropout, and merge procedure. After merging adapters, compare outputs with the unmerged model on held-out inputs using identical sampling noise and controlled evaluation mode, with dropout disabled and normalization state fixed. Quantization or casting during export can invalidate exact equality; define an appropriate action-space tolerance and report it.
 
 ## Normalization is part of the model
 
@@ -44,6 +44,8 @@ Calibration has several meanings here. Sensor calibration establishes geometric 
 ## Worked example: a quiet scale failure
 
 Suppose a joint-delta output is 0.4 in normalized units. With training scale 0.05 radians and zero mean, that represents 0.02 radians. An accidentally loaded scale of 0.5 radians produces 0.2 radians, ten times larger. The normalized validation loss can remain unchanged because the bug occurs only during deployment decoding.
+
+The [runnable action-parity bridge](../VLA%20Optimization%20and%20Action-Parity%20Harness/CPU-Action-Parity-Lab.md) trains the same small policy used in Phase 3 and compares a correct folded normalizer with an omitted normalizer. It checks both physical actions and paired rollouts; its dequantized-weight variation is a numerical experiment, not a native INT8 speed measurement.
 
 A round-trip test catches algebraic normalizer errors, but it may not catch using the wrong valid normalizer. You also need metadata identity checks and a known physical-action fixture. This is why preprocessing and action transforms must be versioned together with model weights.
 

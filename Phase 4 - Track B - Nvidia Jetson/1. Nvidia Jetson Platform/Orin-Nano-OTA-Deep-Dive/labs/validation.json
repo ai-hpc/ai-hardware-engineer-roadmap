@@ -1,0 +1,11 @@
+{
+  "checked_on": "2026-10-18",
+  "evidence_kind": "real temporary-file and process-exit tests; no physical power loss or Jetson boot",
+  "python": "3.12.3",
+  "tests_passed": 12,
+  "process_exit_points": 5,
+  "files_sha256": {
+    "update_store.py": "4616e8a72791d97830ccb7e3074a993a65fe0f7374e3aa896cb981568ff7b1e1",
+    "test_update_store.py": "f6874d9e66592776f659c1a95654f3504335f8ce55bfe10a1f85adf626ac670f"
+  }
+}

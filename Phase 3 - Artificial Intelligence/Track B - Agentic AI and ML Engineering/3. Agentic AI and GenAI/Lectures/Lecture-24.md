@@ -648,24 +648,23 @@ class ToolCall:
 
 
 def evaluate_tool_policy(ctx: RuntimeContext, call: ToolCall) -> tuple[Decision, str]:
-    if call.name == "delete_file":
-        path = call.arguments.get("path", "")
-        if path.startswith("/etc/") or "/src/" in path:
-            return Decision.BLOCK, "destructive file path"
+    # Example policy dispatch only. The authenticated ctx is supplied by the host,
+    # never copied from model arguments. Tool handlers still validate resources.
+    if type(call.arguments) is not dict:
+        return Decision.BLOCK, "arguments must be an object"
+    if call.name == "search_docs":
+        if set(call.arguments) != {"query"} or type(call.arguments["query"]) is not str:
+            return Decision.BLOCK, "invalid search arguments"
+        if not 0 < len(call.arguments["query"]) <= 2000:
+            return Decision.BLOCK, "query length invalid"
+        return Decision.ALLOW, "search within server-enforced user/tenant scope"
 
-    if call.name == "export_customer_records":
-        if ctx.user_role != "compliance_admin":
-            return Decision.BLOCK, "user lacks export permission"
+    if call.name in {"delete_file", "export_customer_records", "send_email"}:
+        # No real resource-specific authorizer is implemented in this sketch.
+        return Decision.BLOCK, "operation requires a concrete authorizer"
 
-    if call.name == "send_email":
-        recipient = call.arguments.get("to", "")
-        if not recipient.endswith("@company.com"):
-            return Decision.REQUIRE_APPROVAL, "external email recipient"
+    return Decision.BLOCK, "unknown or unavailable tool"
 
-    if ctx.risk_score > 0.8:
-        return Decision.REQUIRE_APPROVAL, "high session risk"
-
-    return Decision.ALLOW, "policy passed"
 
 
 def execute_tool_with_runtime_guard(ctx: RuntimeContext, call: ToolCall):
@@ -675,7 +674,7 @@ def execute_tool_with_runtime_guard(ctx: RuntimeContext, call: ToolCall):
         "user_id": ctx.user_id,
         "session_id": ctx.session_id,
         "tool": call.name,
-        "arguments": call.arguments,
+        "argument_keys": sorted(str(k)[:64] for k in call.arguments)[:16],
         "decision": decision.value,
         "reason": reason,
     }
@@ -690,7 +689,9 @@ def execute_tool_with_runtime_guard(ctx: RuntimeContext, call: ToolCall):
     return run_tool(call.name, call.arguments)
 ```
 
-This is the most important pattern in the lecture.
+This sketch delegates to application-supplied `write_audit_log`, `create_human_approval_request` and `run_tool`; it is not a complete service. The document search must derive user/tenant scope from trusted server state and enforce it in retrieval. Do not accept an arbitrary tenant ID from the model. Log a bounded/redacted argument summary rather than secrets or full retrieved records.
+
+For file operations, string-prefix checks do not handle traversal, symlinks or time-of-check/time-of-use races. Enforce containment and capabilities in the actual filesystem/executor. For email, validate structured recipients and the exact approved action at send time; a raw suffix test is insufficient. A generic risk-score threshold cannot replace either authorizer.
 
 The model can suggest.
 

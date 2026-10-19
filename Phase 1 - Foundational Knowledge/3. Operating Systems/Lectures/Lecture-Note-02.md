@@ -1,101 +1,45 @@
-# Lecture Note 02 (L3, L4): Interrupts, Exceptions & Bottom Halves; System Calls, vDSO & eBPF
+# Lecture Note 02: Interrupts, System Calls, and Measurement
 
-**Combines:** Lecture L3 (Interrupts, Exceptions & Bottom Halves) and Lecture L4 (System Calls, vDSO & eBPF).
+Consolidates [Lecture 3](Lecture-03.md) and [Lecture 4](Lecture-04.md).
 
----
+## Four timestamps, four different events
 
-## How This Note Is Organized
+```text
+device completion → IRQ handler → task wakeup → task actually scheduled
+```
 
-1. **Part 1 (L3) — Interrupts & bottom halves:** Interrupts vs exceptions; GIC/APIC; MSI/MSI-X; top half vs bottom half; softirq, tasklet, workqueue; interrupt flow and latency.
-2. **Part 2 (L4) — System calls & vDSO:** Syscall path (x86/ARM64); overhead and mitigations; vDSO for time; key syscalls (mmap, ioctl); eBPF for observability.
+An IRQ number is a Linux identifier, not necessarily a GIC hardware ID or x86 vector. MSI-X can provide multiple independently routable entries, but queues and vectors are not guaranteed one-to-one. A GPU completion need not trigger one interrupt per operation.
 
----
+Hard-IRQ code cannot sleep. Ordinary threaded workqueues can sleep; `WQ_BH` workqueues run in softirq context and cannot. High-priority worker pools do not provide real-time deadlines. Select `alloc_ordered_workqueue()` when its documented one-at-a-time ordering is required; a private queue need not mean private threads.
 
-# Part 1 (L3): Interrupts, Exceptions & Bottom Halves
+**Question:** An IRQ wakes a thread at 25 µs; the thread runs at 145 µs. What interval is directly visible?
 
-**Context:** Hardware signals the CPU asynchronously (camera frame, GPU done, packet). Kernel uses a **top half** (fast, acknowledge HW, schedule work) and **bottom half** (do work without holding IRQs disabled). Misuse causes dropped frames and latency spikes.
+**Answer:** A 120 µs runnable-to-running delay. A fast handler does not remove it. Investigate scheduling, affinity, throttling, interrupts, and other evidence before attributing a cause.
 
----
+## System-call duration is not entry cost
 
-## Interrupts vs Exceptions
+A syscall can block for a device or lock. `strace -T` reports an observed interval while adding its own tracing effects. Two 200 fps cameras with four calls/frame generate 1,600 calls/s; one camera would generate 800. A hypothetical 300 ns transition cost gives 0.48 ms/s for the two-camera case, not the full camera latency.
 
-| Type | Origin | Sync? | Example |
-|------|--------|-------|--------|
-| Hardware interrupt | Device IRQ | No | NIC, GPU done, camera frame |
-| Software interrupt | INT/SVC | Yes | Syscall, breakpoint |
-| Exception (fault) | CPU error | Yes | Page fault, div-by-zero |
-| Exception (abort) | Unrecoverable | Yes | Machine check |
+Libc can use vDSO helpers for supported time queries. `CLOCK_MONOTONIC` avoids wall-clock steps but can be rate-adjusted. RAW uses a different local clock contract. None automatically synchronizes sensor or remote-host clocks.
 
-**Fault:** re-execute instruction after fix. **Trap:** advance after handler. **Abort:** no return.
+Timer slack is inherited and can be configured for applicable waits. It is not applied under real-time scheduling policies. Reducing it does not eliminate scheduler, interrupt, or device delay.
 
----
+## Shared memory and readiness
 
-## Interrupt Controllers
+A new `shm_open()` object has length zero. The owner must size it before mapping/access, initialize its protocol before publication, and define unlink/lifetime behavior. `MAP_SHARED` shares bytes but does not make a data race legal. A memfd still needs sizing and synchronization; pass descriptors with `SCM_RIGHTS` across processes.
 
-**ARM GIC v3:** SGI (0–15, IPI), PPI (16–31, per-CPU), SPI (32–1019, devices). Priority 0–255; PMR masks. **x86 APIC:** Local APIC + I/O APIC; IDT; TPR. **MSI/MSI-X (PCIe):** Message-signaled interrupts; MSI-X gives **per-queue vectors and CPU affinity** — used by NVMe, GPU, NICs for scalability.
+With edge-triggered epoll, use nonblocking operations and drain until `EAGAIN` before waiting for another edge, while preventing one busy source from starving others. Level-triggered operation is also valid. Readiness is not ownership of a full message.
 
----
+**Question:** Why can an mmap succeed but touching its shared-memory pages later cause SIGBUS?
 
-## Top Half vs Bottom Half
+**Answer:** The requested virtual range can extend beyond the backing object's current length. Check and establish the file size before use; also define who can change that size.
 
-**Top half (ISR):** Runs with IRQs disabled on local CPU; must be very short (acknowledge HW, save pointer, schedule bottom half); cannot sleep. **Bottom half:** Softirq, tasklet, or workqueue; can do real work; some can sleep (workqueue). Long top half blocks other IRQs and adds latency.
+## Evidence from a real build
 
----
+The [BPF build lab](../labs/BPF-Build-Lab.md) compiles an ioctl tracer with a shared event layout, checked entry/exit pairing, and loss counters. A compiler pass is not kernel verifier acceptance. The recorded run does not attach hooks or measure latency.
 
-## Bottom-Half Mechanisms
+BPF verification checks particular execution/memory constraints; it does not prove an inference deadline or make every program read-only. Seccomp filters syscall metadata and reduces accessible operations; it is not a complete sandbox.
 
-**Softirq:** Statically allocated; runs in ksoftirqd or after hardirq; cannot sleep. **Tasklet:** Built on softirq; one at a time per CPU. **Workqueue:** Process context; can sleep; for heavier work (e.g. block I/O). Threaded IRQs run handler in a kthread — preemptible under PREEMPT_RT.
+**Question:** Zero ring-reservation failures means every ioctl was measured—true or false?
 
----
-
-# Part 2 (L4): System Calls, vDSO & eBPF
-
-**Context:** User code reaches kernel only via **syscalls** (toll booth). Cost: mode switch, Spectre/Meltdown mitigations, TLB effects (**~100–400 ns round-trip**). **vDSO** avoids syscall for time; **eBPF** observes kernel without changing code.
-
----
-
-## Syscall Path
-
-x86-64: SYSCALL → entry_SYSCALL_64 → sys_call_table[rax] → SYSRET. ARM64: SVC → el0_svc → sys_call_table. `strace -c` / `strace -T -e mmap,ioctl` to count and time syscalls.
-
----
-
-## Syscall Overhead
-
-**Mode switch ~50–150 ns**; mitigations (KPTI, IBRS, retpoline) add ~50–200 ns on x86; ARM64 lighter. At 200 fps × 4 ioctls = 1600/s × 300 ns ≈ 0.5 ms/s; **batching and zero-copy** (mmap, io_uring) reduce crossings.
-
----
-
-## vDSO
-
-Kernel maps a **read-only page** with time (and a few other) helpers. `clock_gettime(CLOCK_MONOTONIC)`, `gettimeofday()` can resolve **in userspace** (~10–20 ns) without SYSCALL. Use CLOCK_MONOTONIC for timing and sensor fusion; **CLOCK_REALTIME can jump** (NTP).
-
----
-
-## Key Syscalls: mmap, ioctl
-
-**mmap:** MAP_SHARED for zero-copy shm; MAP_HUGETLB for large buffers and TLB reduction; CUDA pinned and Jetson unified memory use mmap on device nodes. **ioctl:** Device control (V4L2, GPU); nearly all device-specific ops; path: sys_ioctl → driver ioctl_ops (e.g. VIDIOC_DQBUF blocks until frame).
-
----
-
-## eBPF
-
-Programs run in kernel (**verified, JIT**); attach to kprobes, tracepoints, uprobes, XDP. **Observability without modifying kernel or app**: profile syscalls, scheduler, driver paths. bpftrace, BCC, libbpf; **production-safe instrumentation**.
-
----
-
-## Summary
-
-| L3 | IRQ vs exception; GIC/APIC; MSI-X; top/bottom half; softirq/tasklet/workqueue; keep top half &lt;1 µs. |
-| L4 | Syscall path and cost; vDSO for time; mmap/ioctl; eBPF for observability. |
-
----
-
-## AI Hardware Connection
-
-- L3: Camera/GPU/NVMe pipelines depend on IRQ flow; MSI-X per queue for NVMe and GPU; long ISR blocks RT tasks — use bottom half for work.
-- L4: V4L2 ioctl cost in camera path; vDSO for timestamps; eBPF to trace inference and driver latency without code changes.
-
----
-
-*Combines Lectures L3, L4 (Interrupts, Exceptions & Bottom Halves; System Calls, vDSO & eBPF).*
+**Answer:** False. Missing entry pairs, attachment windows, filtering, failed map insertion, and shutdown can all omit calls independently of ring pressure.

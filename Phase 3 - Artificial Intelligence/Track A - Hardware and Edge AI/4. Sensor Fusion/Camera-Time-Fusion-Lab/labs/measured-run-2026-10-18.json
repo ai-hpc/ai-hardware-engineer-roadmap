@@ -1,0 +1,226 @@
+{
+  "versions": {
+    "python": "3.12.3",
+    "numpy": "2.3.5",
+    "opencv": "4.13.0"
+  },
+  "configuration": {
+    "seed": 11,
+    "delay_s": 0.6,
+    "pixel_noise_px": 0.35,
+    "board_scale": 1.0,
+    "outliers": true,
+    "wheel_bias_m_s": 0.02,
+    "camera_nis_gate": 9.0
+  },
+  "frame_contract": {
+    "length_unit": "metre",
+    "time_unit": "second",
+    "camera_axes": "x right, y down, z forward",
+    "world_axes": "parallel to initial camera; board centre at (0,0,8)",
+    "timestamp": "capture and arrival in one synthetic monotonic clock"
+  },
+  "counts": {
+    "outputs_per_method": 241,
+    "generated_camera": 61,
+    "dropout_camera": 11,
+    "camera_arrived_by_end": 47
+  },
+  "camera_clean_pose_rmse_m": 0.03135758931663634,
+  "mean_reprojection_rmse_px": 0.46926249210175164,
+  "methods": {
+    "wheel_only": {
+      "rmse_m": 0.1366334941484978,
+      "dropout_rmse_m": 0.11189092289322793,
+      "final_error_m": 0.24385082772878253,
+      "final_position_sigma_m": 0.054991550095832356,
+      "final_rejected_camera": 0,
+      "within_two_sigma_fraction": 0.4730290456431535
+    },
+    "arrival_time": {
+      "rmse_m": 0.13663349414849862,
+      "dropout_rmse_m": 0.11189092289322836,
+      "final_error_m": 0.2438508277287843,
+      "final_position_sigma_m": 0.054991550095832356,
+      "final_rejected_camera": 47,
+      "within_two_sigma_fraction": 0.4730290456431535
+    },
+    "capture_time_replay": {
+      "rmse_m": 0.08608016002505398,
+      "dropout_rmse_m": 0.0879310665640481,
+      "final_error_m": 0.08682029141028735,
+      "final_position_sigma_m": 0.013333228765800441,
+      "final_rejected_camera": 2,
+      "within_two_sigma_fraction": 0.08713692946058091
+    }
+  },
+  "source_sha256": {
+    "camera_fusion.py": "254c13699cc5815b13a5222a95e025b03b5bea67bd27ed354b5dddc4167af404",
+    "contracts.py": "ca5443ae21ef3c3cebe6c34beaeabec369235fb38f6340660db482d189092247"
+  },
+  "limitations": [
+    "Synthetic known-board correspondences, not image detection or calibration.",
+    "Fixed camera variance is a teaching assumption, not a PnP uncertainty estimate.",
+    "Wheel bias is unmodelled; covariance is not a verified physical accuracy guarantee.",
+    "Full-history replay is causal but grows in cost; no runtime deadline claim."
+  ],
+  "measured_date": "2026-10-18",
+  "variations": {
+    "zero-delay": {
+      "configuration": {
+        "seed": 11,
+        "delay_s": 0.0,
+        "pixel_noise_px": 0.35,
+        "board_scale": 1.0,
+        "outliers": true,
+        "wheel_bias_m_s": 0.02,
+        "camera_nis_gate": 9.0
+      },
+      "methods": {
+        "wheel_only": {
+          "rmse_m": 0.1366334941484978,
+          "dropout_rmse_m": 0.11189092289322793,
+          "final_error_m": 0.24385082772878253,
+          "final_position_sigma_m": 0.054991550095832356,
+          "final_rejected_camera": 0,
+          "within_two_sigma_fraction": 0.4730290456431535
+        },
+        "arrival_time": {
+          "rmse_m": 0.0763794208540948,
+          "dropout_rmse_m": 0.08718828260366839,
+          "final_error_m": 0.07310236863161812,
+          "final_position_sigma_m": 0.012207377907983317,
+          "final_rejected_camera": 2,
+          "within_two_sigma_fraction": 0.06639004149377593
+        },
+        "capture_time_replay": {
+          "rmse_m": 0.0763794208540948,
+          "dropout_rmse_m": 0.08718828260366839,
+          "final_error_m": 0.07310236863161812,
+          "final_position_sigma_m": 0.012207377907983317,
+          "final_rejected_camera": 2,
+          "within_two_sigma_fraction": 0.06639004149377593
+        }
+      },
+      "camera_clean_pose_rmse_m": 0.03135758931663634,
+      "mean_reprojection_rmse_px": 0.46926249210175164
+    },
+    "no-gate": {
+      "configuration": {
+        "seed": 11,
+        "delay_s": 0.6,
+        "pixel_noise_px": 0.35,
+        "board_scale": 1.0,
+        "outliers": true,
+        "wheel_bias_m_s": 0.02,
+        "camera_nis_gate": null
+      },
+      "methods": {
+        "wheel_only": {
+          "rmse_m": 0.1366334941484978,
+          "dropout_rmse_m": 0.11189092289322793,
+          "final_error_m": 0.24385082772878253,
+          "final_position_sigma_m": 0.054991550095832356,
+          "final_rejected_camera": 0,
+          "within_two_sigma_fraction": 0.4730290456431535
+        },
+        "arrival_time": {
+          "rmse_m": 0.1255588920146236,
+          "dropout_rmse_m": 0.10803528665386837,
+          "final_error_m": -0.12639418111592704,
+          "final_position_sigma_m": 0.01221736902122926,
+          "final_rejected_camera": 0,
+          "within_two_sigma_fraction": 0.04979253112033195
+        },
+        "capture_time_replay": {
+          "rmse_m": 0.14449205048291544,
+          "dropout_rmse_m": 0.15303062767809392,
+          "final_error_m": 0.14133208635469963,
+          "final_position_sigma_m": 0.013246104032243893,
+          "final_rejected_camera": 0,
+          "within_two_sigma_fraction": 0.08713692946058091
+        }
+      },
+      "camera_clean_pose_rmse_m": 0.03135758931663634,
+      "mean_reprojection_rmse_px": 0.46926249210175164
+    },
+    "high-bias": {
+      "configuration": {
+        "seed": 11,
+        "delay_s": 0.6,
+        "pixel_noise_px": 0.35,
+        "board_scale": 1.0,
+        "outliers": true,
+        "wheel_bias_m_s": 0.06,
+        "camera_nis_gate": 9.0
+      },
+      "methods": {
+        "wheel_only": {
+          "rmse_m": 0.4139143194578386,
+          "dropout_rmse_m": 0.35297919078830076,
+          "final_error_m": 0.7237825540849334,
+          "final_position_sigma_m": 0.054991550095832356,
+          "final_rejected_camera": 0,
+          "within_two_sigma_fraction": 0.13278008298755187
+        },
+        "arrival_time": {
+          "rmse_m": 0.4139143194578384,
+          "dropout_rmse_m": 0.3529791907883003,
+          "final_error_m": 0.7237825540849334,
+          "final_position_sigma_m": 0.054991550095832356,
+          "final_rejected_camera": 47,
+          "within_two_sigma_fraction": 0.13278008298755187
+        },
+        "capture_time_replay": {
+          "rmse_m": 0.31400684823881997,
+          "dropout_rmse_m": 0.22369583086997655,
+          "final_error_m": 0.5914648965756406,
+          "final_position_sigma_m": 0.02184294708330308,
+          "final_rejected_camera": 23,
+          "within_two_sigma_fraction": 0.06639004149377593
+        }
+      },
+      "camera_clean_pose_rmse_m": 0.03135758931663634,
+      "mean_reprojection_rmse_px": 0.46926249210175164
+    },
+    "bad-scale": {
+      "configuration": {
+        "seed": 11,
+        "delay_s": 0.6,
+        "pixel_noise_px": 0.35,
+        "board_scale": 1.1,
+        "outliers": true,
+        "wheel_bias_m_s": 0.02,
+        "camera_nis_gate": 9.0
+      },
+      "methods": {
+        "wheel_only": {
+          "rmse_m": 0.1366334941484978,
+          "dropout_rmse_m": 0.11189092289322793,
+          "final_error_m": 0.24385082772878253,
+          "final_position_sigma_m": 0.054991550095832356,
+          "final_rejected_camera": 0,
+          "within_two_sigma_fraction": 0.4730290456431535
+        },
+        "arrival_time": {
+          "rmse_m": 0.13663349414849862,
+          "dropout_rmse_m": 0.11189092289322836,
+          "final_error_m": 0.2438508277287843,
+          "final_position_sigma_m": 0.054991550095832356,
+          "final_rejected_camera": 47,
+          "within_two_sigma_fraction": 0.4730290456431535
+        },
+        "capture_time_replay": {
+          "rmse_m": 0.1366334941484978,
+          "dropout_rmse_m": 0.11189092289322793,
+          "final_error_m": 0.24385082772878253,
+          "final_position_sigma_m": 0.054991550095832356,
+          "final_rejected_camera": 47,
+          "within_two_sigma_fraction": 0.4730290456431535
+        }
+      },
+      "camera_clean_pose_rmse_m": 0.5327114375697606,
+      "mean_reprojection_rmse_px": 0.4692624921017588
+    }
+  }
+}

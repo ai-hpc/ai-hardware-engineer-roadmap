@@ -1,180 +1,47 @@
-# Lecture 5 - Practical courses and building your own Espressif study plan
+# Lecture 5 - Build one complete Espressif learning project
 
-**Course:** [Official education path guide](../Guide.md) | **Phase 2 - Embedded Software**
+**Course:** [Education guide](../Guide.md) | **Previous:** [Specialization budgets](Lecture-04.md)
 
-**Previous:** [Lecture 04](Lecture-04.md)
+Finish with a sensor companion that another learner can build and diagnose. Use either a real board or the CPU parser plus OpenThread simulation path; label the boundary clearly. The course's CPU tests are available now, while board behavior must come from your own observations.
 
----
+## Define the contract
 
-## Why this lecture matters
+Use a teaching requirement of one observation every 100 ms and an unavailable indication after 500 ms without a valid observation. Choose units, signedness, allowable range, session identifier, sequence policy, and clock interpretation. These times are exercise settings, not safety limits for a physical robot.
 
-Espressif’s official education page does something many vendor pages do not:
+The receiver accepts a record only after checking format, identity, sequence/session, and freshness. It distinguishes a valid zero from missing data. It reports the last valid sample time separately from receive time. If sender/receiver clocks are independent, do not calculate one-way age by subtracting them without an offset/synchronization assumption.
 
-it shows **practical courses** and not just APIs.
+## Build in stages you can inspect
 
-That is valuable because learners need to see:
+1. Run the [C framing tests](../../../labs/Framed-Telemetry.md) and explain one corruption case.
+2. Record a board heartbeat, or run the [OpenThread CPU lab](../../../IoT/OpenThread/labs/CPU-Simulation.md) if no board is available.
+3. Add one sensor or explicitly labeled synthetic data source. Preserve status and original sample time.
+4. Introduce a slow consumer and a connection outage. Verify bounded memory and the selected discard/backpressure behavior.
+5. Add one feature from Lecture 4: an inference indicator, measured low-power schedule, or protocol gateway. Keep the earlier failure tests.
 
-- what complete projects look like
-- how solution areas turn into products
+Do not quietly replace a real sensor requirement with generated data. Synthetic data is useful for deterministic protocol tests; it does not establish sensor accuracy or physical calibration.
 
-Examples currently shown on the official page include projects like:
+## A test table with expected observations
 
-- a desktop robot
-- a smart lighting system
-- a smart pill dispenser
-- a USB/network dongle device
+| Test | Expected behavior | Evidence |
+|---|---|---|
+| Truncated record | Reject; accept a later valid record after resynchronization | Parser result and recovery trace |
+| Queue saturation | Apply the documented bounded policy | Queue peak and discard/backpressure count |
+| Duplicate sequence | No duplicate application event within the same session | Accepted/rejected event log |
+| Restart | New session handled without accepting old records | Boot marker and session transition |
+| Network outage | Data becomes unavailable within the exercise policy | Last-valid time and status transition |
+| Reconnect | Only policy-eligible data becomes current | New sequence and original sample time |
+| Invalid AI input / low confidence | Remain in the documented non-actuating state | Input case and deterministic decision |
 
-Those examples are very different from each other, and that is the point.
+On a physical device, add power/reset, peripheral timeout, and long-duration operation checks. Observe temperature and memory behavior over the relevant workload. A ten-second happy-path demonstration does not establish long-term stability.
 
-They show the **breadth of the ecosystem**.
+## Package the evidence
 
----
+Deliver source/configuration, exact target and dependency versions, a build/run procedure, input fixtures, test results, and the measurements you actually made. Include a short list of pending hardware checks. Keep public test keys separate from deployment credentials.
 
-## How to use practical courses correctly
+For AI work, add dataset split/preprocessing, quantized model identity, error counts, latency distribution, and peak memory. For power work, add measurement location, voltage, per-state duration/current, retries, and the resulting average. For a gateway, add the field mapping and source-clock assumptions.
 
-Do not read practical projects as:
+## Final answer check
 
-- things to copy line by line
+Can a teammate explain why a received packet was rejected, reproduce a reset/reconnect, and tell whether a displayed value is old? If yes, you have built an understandable embedded system with a useful contract. If the only evidence is “the example compiled,” return to the missing stage before adding another feature.
 
-Read them as:
-
-- product patterns
-- integration examples
-- architecture hints
-
-Ask:
-
-- what hardware category is this?
-- what framework level does it assume?
-- what peripherals are involved?
-- what connectivity is involved?
-- what part of this belongs in my own study plan?
-
----
-
-## Three strong Espressif learning directions
-
-Based on the official education structure, three especially strong directions are:
-
-### 1. Voice / AI / HMI
-
-Good if you care about:
-
-- smart assistants
-- displays
-- interaction devices
-- local AI features
-
-Likely areas:
-
-- ESP-SR
-- ESP-DL
-- HMI boards
-- audio and display hardware
-
-### 2. Connectivity / smart home / gateways
-
-Good if you care about:
-
-- wireless control devices
-- protocol bridges
-- gateways
-- automation systems
-
-Likely areas:
-
-- RainMaker
-- Matter
-- Zigbee
-- OpenThread
-- ESP-NOW
-- bridge solutions
-
-### 3. Low-power sensing and control
-
-Good if you care about:
-
-- battery devices
-- environmental sensing
-- wearable or remote nodes
-- event-driven systems
-
-Likely areas:
-
-- sleep modes
-- simple peripherals
-- small wireless payloads
-- careful power management
-
----
-
-## A good personal study plan
-
-Here is a **clean way** to use Espressif’s official education path inside this roadmap:
-
-### Stage 1: fundamentals
-
-- finish core Embedded Software basics
-- understand buses, memory, RTOS, and flashing
-
-### Stage 2: platform entry
-
-- pick one ESP32 board
-- pick one framework path
-- run simple bring-up examples
-
-### Stage 3: choose one solution direction
-
-- voice / AI
-- connectivity / gateway
-- low-power sensing
-
-### Stage 4: build one complete project
-
-Not ten demos.
-
-One integrated project with:
-
-- hardware assumptions
-- peripherals
-- connectivity
-- maintainable code structure
-
-### Stage 5: branch deeper
-
-At this point, move into:
-
-- our IoT courses
-- Phase 3 AI material
-- or later deployment tracks
-
----
-
-## The main lesson from the official education page
-
-The page is quietly teaching a very important engineering truth:
-
-> good platform learning is not just API learning, it is staged system learning
-
-That is why it belongs in this roadmap.
-
----
-
-## Final lab
-
-Write your own Espressif study plan with:
-
-1. one board
-2. one framework entry point
-3. one solution direction
-4. one final practical project
-
-Then add one sentence:
-
-- "What I will deliberately ignore for now so I do not spread myself too thin"
-
-That sentence is important. Good study plans include **deliberate omission**.
-
----
-
-**Previous:** [Lecture 04](Lecture-04.md) | **Back to course hub:** [Official education path guide](../Guide.md)
+Continue into [IoT](../../../IoT/Guide.md), or carry the same observations into the later robotics and AI deployment courses. The interfaces and failure evidence remain useful even when the model, radio, or processor changes.

@@ -1,0 +1,2 @@
+# Install torch==2.14.0 from the CPU wheel index before this file (see Lab-Guide.md).
+transformers==5.20.1

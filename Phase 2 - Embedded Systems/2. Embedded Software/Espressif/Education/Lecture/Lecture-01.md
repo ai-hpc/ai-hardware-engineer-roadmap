@@ -1,148 +1,37 @@
-# Lecture 1 - How to read Espressif Education as a roadmap
+# Lecture 1 - Turn Espressif Education into a learning route
 
-**Course:** [Official education path guide](../Guide.md) | **Phase 2 - Embedded Software**
+**Course:** [Education guide](../Guide.md) | **Next:** [Prerequisites you can demonstrate](Lecture-02.md)
 
-**Next:** [Lecture 02 - Embedded development basics for the ESP32 path](Lecture-02.md)
+Use [Espressif Education](https://www.espressif.com/en/ecosystem/education) to locate official hardware, examples, and solution families. Then choose one measurable learning route. A vendor catalogue is useful for finding resources; your course progress should be demonstrated by artifacts you can explain and reproduce.
 
----
+Start with a **sensor companion for a robot**. It reads one observation, validates it, and sends a timestamped report to a host. The initial output is a log or indicator. This keeps the first experiment small while teaching the same data and failure boundaries needed by larger AI systems.
 
-## The shortest useful definition
+## A route with useful stopping points
 
-Espressif’s education page is not just a page of links.
+| Stage | Task | Evidence before continuing |
+|---|---|---|
+| Foundations | Parse a bounded binary record on your CPU | Corrupt, truncated, oversized and wrapped-counter inputs handled |
+| Board entry | Build, flash, and print a heartbeat | Chip/board/framework identity plus repeated boot observations |
+| Sensor | Read identity, status and one measurement | Correct units, failure code, last-valid time |
+| Transport | Send a structured record to a host | Session/sequence/freshness checks and disconnect behavior |
+| Specialization | Add one AI, low-power or gateway feature | A budget and a test that could disprove success |
 
-It is an **official learning map** that tries to move people from:
+The [framed telemetry lab](../../../labs/Framed-Telemetry.md) completes the first row without hardware. The [Arduino course](../../Guide.md) covers entry and peripheral integration. The [OpenThread CPU lab](../../../IoT/OpenThread/labs/CPU-Simulation.md) exercises a real network stack without purchasing radios. CPU experiments have explicit limits; they do not measure your MCU's power or interrupt latency.
 
-- zero or low background
+## Select a project by constraints
 
-to
+Write three facts before selecting a board: required physical interfaces, data rate and freshness requirement, and power source. A camera stream, a voice trigger, and a battery temperature sensor have different memory/radio constraints. Buying the most capable board does not resolve an unspecified workload.
 
-- hardware understanding
-- development environment choice
-- starter examples
-- solution areas
-- practical projects
+Example teaching requirements:
 
-That makes it more useful than a normal vendor landing page.
+- One sensor record every 100 ms, with units and source session.
+- Display “unavailable” after 500 ms without a valid record.
+- Reconnect without treating buffered old data as current.
 
-Official reference: [Espressif Education](https://www.espressif.com/en/ecosystem/education)
+These numbers are exercise choices, not validated robot safety limits. They let you write concrete tests now and replace the limits when a real application provides its requirements.
 
----
+## Exercise and worked answer
 
-## The key sections on the page
+Choose one feature from the education catalogue and write its dependency chain. For a voice indicator: audio capture → sample format → feature extraction/model input → inference → threshold/debounce → visible state. A wake-word model is not the audio driver, and its score is not permission to move a robot.
 
-The official page is organized around these big ideas:
-
-- **Hardware Resources**
-- **Teaching Resources**
-- **Practical Courses**
-- **Application Examples**
-- **Study Plan**
-
-Those categories matter because they answer different questions.
-
-### Hardware Resources
-
-This answers:
-
-- what boards and kits can I start with?
-- what kind of hardware is beginner-friendly vs more capable?
-
-### Teaching Resources
-
-This answers:
-
-- where do I get material besides a datasheet?
-- what official learning support already exists?
-
-### Practical Courses
-
-This answers:
-
-- what does a complete project look like?
-- what kinds of finished applications does Espressif want learners to build?
-
-### Application Examples
-
-This answers:
-
-- which solutions and SDK directions actually matter in the ecosystem?
-
-### Study Plan
-
-This is the most important part for us.
-
-It answers:
-
-- what order should a learner follow?
-- what comes before complex ESP32 projects?
-
----
-
-## Why this is better than random tutorial hunting
-
-Random tutorial learning usually gives you:
-
-- lots of code
-- little structure
-- weak understanding of what comes next
-
-The official education page is better because it frames development as a **path**:
-
-- basics first
-- board understanding next
-- examples after that
-- solution specialization later
-
-That is much closer to how a real **embedded engineer** should learn.
-
----
-
-## How this maps to our roadmap
-
-In this roadmap, the official Espressif education structure maps naturally to:
-
-- **Phase 1**
-  - digital basics, C/C++, OS foundations
-- **Phase 2**
-  - embedded software, peripherals, RTOS, development environments
-- **Phase 2 IoT**
-  - Zigbee, OpenThread, connectivity thinking
-- **later phases**
-  - AI, edge deployment, Jetson integration, product direction
-
-So the education page does not replace our roadmap.
-
-It gives a very useful **vendor-specific path inside it**.
-
----
-
-## The mental model to keep
-
-Think of Espressif Education as:
-
-- a **vendor learning ladder**
-- that starts with basics
-- then teaches platform entry
-- then expands into solution directions
-
-That is the correct way to use it.
-
----
-
-## Lab
-
-Write a short note with five bullets:
-
-- Hardware Resources means...
-- Teaching Resources means...
-- Practical Courses means...
-- Application Examples means...
-- Study Plan means...
-
-Then write one sentence:
-
-- "Why this is better than learning only from random example sketches"
-
----
-
-**Previous:** [Course hub](../Guide.md) | **Next:** [Lecture 02 - Embedded development basics for the ESP32 path](Lecture-02.md)
+Mark each dependency as already demonstrated, available as an official example, or still to be implemented. Stop adding features when a prerequisite is unexplained. Your deliverable is one route, one input/output contract, and one first runnable test—not a list of everything the vendor supports.

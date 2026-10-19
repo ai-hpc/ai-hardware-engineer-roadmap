@@ -1,217 +1,44 @@
-# Lecture 1 - Why product design belongs in embedded systems
+# Lecture 1 - Turn a product need into an embedded contract
 
-**Course:** [Product Design for Embedded Systems](../Guide.md) | **Phase 2 - Embedded Systems**
+**Course:** [Product Design](../Guide.md) | **Next:** [Read a product case study critically](Lecture-02.md)
 
-**Next:** [Lecture 02 - HomePod 2018 lessons: great sound is not enough](Lecture-02.md)
+Product design connects a person's task to observable system behavior. For an embedded device, that connection changes buttons, indicators, microphone placement, power states, firmware ownership, and recovery—not just the enclosure's appearance.
 
----
+Use an AI voice appliance as the running example, then transfer the method to a simulated robot. You need a basic hardware/software block diagram; no manufactured device or marketing study is assumed.
 
-## Start with the wrong mental model
+## Start with a task and an operating envelope
 
-Many engineers treat **product design** as if it begins after the real engineering work is done.
+“Add an LLM” describes a component. “A person can start a local timer and understand whether it was accepted while the Internet is unavailable” describes a task. The latter lets you decide what runs locally, which states need indicators, and what a test must observe.
 
-That wrong mental model sounds like this:
+Write the environment beside the task: quiet desk or noisy kitchen, fixed power or battery, intended speaking distance, single user or shared room, and available network. Treat each as an assumption until tested. A design optimized for a bedside appliance may be inappropriate for a mobile robot or workshop.
 
-- hardware team builds the board
-- firmware team makes it boot
-- software team makes the features work
-- later someone "designs the product"
+## Translate a need into a measurable requirement
 
-That is **not how good embedded products are made**.
+The values below are **teaching targets**, not measured product performance or validated robot safety limits.
 
-In real systems, product design shows up much earlier in questions like:
+| User need | Example requirement | Engineering consequence | Test |
+|---|---|---|---|
+| Know whether speech is being captured | Visible capture state matches the specified audio boundary | State owned by the audio/privacy path | Inspect transition during recording and recovery |
+| Stop the current interaction | Local cancel reaches the application within 100 ms | Separate input path from model/network wait | Delay inference and inject cancel |
+| Understand network failure | Show unavailable within 2 s of the defined failure condition | Bounded timeout and explicit state | Remove network in a controlled test |
+| Avoid stale robot observations | Reject data older than the selected 200 ms exercise limit | Timestamp/session checks at consumer | Delay/reorder replayed observations |
 
-- should this object live on a desk, wall, shelf, or kitchen counter?
-- should it look like equipment, furniture, or an appliance?
-- what should the user trust at a glance?
-- which states must be visible across the room?
-- where should microphones, speakers, vents, and buttons physically live?
-- what should work before any cloud or app setup exists?
+A requirement must define where timing starts and ends. “Fast response” is ambiguous; time from end-of-utterance detection to first audible response is different from time to a confirmed action. Record each stage rather than hiding all latency in one number.
 
-Those are product questions, but they also change:
+## Make one state authoritative
 
-- PCB shape
-- mechanical layout
-- thermal path
-- audio path
-- EMI risk
-- GPIO and button count
-- software ownership boundaries
+If the UI says “muted” while the audio worker still publishes new microphone frames, the system has conflicting owners. Define which subsystem owns capture permission, how it changes, and which indicators derive from that state. A software mute button is a legitimate design choice when described accurately; a hardware disconnect claim requires the corresponding electrical behavior.
 
----
+For a robot, separate a user cancel request, a controller's accepted stop command, and measured stopped motion. An ordinary UI stop button is not evidence of a certified emergency-stop function. Begin with simulation or an indicator before extending the requirement to physical motion.
 
-## The AI smart-speaker example
+## Choose tradeoffs with an experiment
 
-This course uses an **AI smart speaker / home AI appliance** as the running example because it forces many product and embedded questions into one object.
+Compare two enclosure/control sketches by asking a learner to identify capture, busy, offline, and fault states. Record confusion rather than defending the preferred aesthetic. Evaluate microphone and speaker placement with measurements; putting microphones on top or heavy components below can be a hypothesis, not a universal optimum. Thermal noise, vibration, room reflections, access, and manufacturing all matter.
 
-A good smart speaker is not only:
+## Exercise and answer check
 
-- a Linux box
-- a microphone array
-- a speaker driver
-- an LLM endpoint
+Write three requirements for your appliance or simulated robot. For each, identify the owner, input event, expected output, timeout, and failure behavior. Then let another person walk through startup, normal use, disconnect, and recovery using a paper prototype.
 
-It is also:
+**Example:** “On stale input, the display shows unavailable while retaining the last sample time for diagnosis.” A timestamped stale replay can test this. “The device feels trustworthy” cannot yet be tested until you specify what a person should correctly understand or control.
 
-- a room object
-- a trust object
-- an audio object
-- a setup experience
-- a household behavior system
-
-That is why smart speakers are such a useful design exercise.
-
-They make it obvious that **product design is part of system design**.
-
----
-
-## Product design means system-shaping decisions
-
-For embedded systems, product design usually means decisions in five areas.
-
-### 1. Product role
-
-What is this thing fundamentally trying to be?
-
-Examples:
-
-- dev kit
-- appliance
-- room assistant
-- portable tool
-- hidden module
-
-This choice **changes everything downstream**.
-
-A living-room AI speaker should not feel like:
-
-- a router
-- a surveillance camera
-- a mini PC in a shell
-
-### 2. Trust model
-
-What must the user be able to understand instantly?
-
-Examples:
-
-- is the microphone muted?
-- is the device listening?
-- is it safe in shared space?
-- does it contain a camera?
-
-If trust depends only on app UI, the product is weak.
-
-### 3. Physical interaction model
-
-What can the user do physically?
-
-Examples:
-
-- mute
-- volume
-- pairing
-- reset
-
-A **physical mute switch** is not just a UI detail. It is a product claim implemented in hardware.
-
-### 4. Environmental fit
-
-Where does the product live?
-
-Examples:
-
-- shelf
-- bedside table
-- factory floor
-- car dashboard
-
-This changes:
-
-- size
-- orientation
-- cable exit
-- vent location
-- acoustic tuning
-- button placement
-
-### 5. System boundary
-
-What belongs inside the product, and what belongs outside it?
-
-For a smart speaker, that means questions like:
-
-- what is local-first?
-- what depends on cloud?
-- what is owned by the device brain?
-- what is owned by Home Assistant or another ecosystem?
-
-That is product design too.
-
----
-
-## Why engineers should care
-
-If you ignore product design, you often get a **technically impressive but weak object**.
-
-Typical failure modes:
-
-- good hardware, awkward placement
-- powerful software, weak trust cues
-- strong features, confusing setup
-- premium parts, cheap-feeling object
-- strong acoustics, weak assistant usefulness
-
-In other words:
-
-- the system works
-- but the product loses
-
-That is the exact gap this course is trying to fix.
-
----
-
-## A simple embedded-product checklist
-
-Before building a real embedded product, ask:
-
-1. What room or environment is this designed for?
-2. What does the object need to signal physically?
-3. What user action must always work even if software is degraded?
-4. What should the device own locally?
-5. What external dependency would make the product feel weaker?
-
-If you cannot answer those, the engineering is still **underspecified**.
-
----
-
-## Running example for the rest of this course
-
-For the rest of the lectures, use this imagined product:
-
-- premium local-first AI smart speaker
-- living-room first
-- far-field microphones
-- strong spoken audio
-- no camera by default
-- visible physical mute
-- useful before ecosystem expansion
-
-That is the lens through which the HomePod lessons and the final design studio will make sense.
-
----
-
-## Lab
-
-Write a short paragraph answering:
-
-- what kind of embedded product do you want to design?
-- where does it live?
-- what must users trust instantly?
-- what is one physical control that should exist no matter what?
-
-If you can answer that clearly, you are already doing product design, not just implementation.
-
----
-
-**Next:** [Lecture 02 - HomePod 2018 lessons: great sound is not enough](Lecture-02.md)
+Deliver the requirement table and a state diagram. The next two lectures use historical products to generate testable hypotheses, not to infer commercial success from specifications.

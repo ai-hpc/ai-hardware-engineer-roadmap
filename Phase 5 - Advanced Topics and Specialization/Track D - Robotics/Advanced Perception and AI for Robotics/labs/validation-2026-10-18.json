@@ -1,0 +1,23 @@
+{
+  "verified_utc": "2026-10-18T22:19:31.758471+00:00",
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3",
+  "portable_command": "python3 -m unittest discover -s labs -p 'test_*.py' -v",
+  "portable_tests_passed": 16,
+  "portable_output": "test_angle_wrap_uses_short_arc (test_tracking.GeometryTests.test_angle_wrap_uses_short_arc) ... ok\ntest_bad_depth_intrinsics_noise_and_transform_order (test_tracking.GeometryTests.test_bad_depth_intrinsics_noise_and_transform_order) ... ok\ntest_capture_time_compensates_ego_motion (test_tracking.GeometryTests.test_capture_time_compensates_ego_motion) ... ok\ntest_no_extrapolation_or_future_or_stale_measurement (test_tracking.GeometryTests.test_no_extrapolation_or_future_or_stale_measurement) ... ok\ntest_optical_right_is_body_negative_left (test_tracking.GeometryTests.test_optical_right_is_body_negative_left) ... ok\ntest_yaw_rotation_and_covariance (test_tracking.GeometryTests.test_yaw_rotation_and_covariance) ... ok\ntest_association_unique_and_outliers_can_be_unmatched (test_tracking.TrackingTests.test_association_unique_and_outliers_can_be_unmatched) ... ok\ntest_continuous_acceleration_covariance_prediction (test_tracking.TrackingTests.test_continuous_acceleration_covariance_prediction) ... ok\ntest_covariance_remains_symmetric_positive_over_trace (test_tracking.TrackingTests.test_covariance_remains_symmetric_positive_over_trace) ... ok\ntest_crossing_prediction_preserves_identity_in_fixture (test_tracking.TrackingTests.test_crossing_prediction_preserves_identity_in_fixture) ... ok\ntest_gate_rejection_leaves_track_unchanged (test_tracking.TrackingTests.test_gate_rejection_leaves_track_unchanged) ... ok\ntest_invalid_covariance_and_variance (test_tracking.TrackingTests.test_invalid_covariance_and_variance) ... ok\ntest_known_update_and_joseph_covariance (test_tracking.TrackingTests.test_known_update_and_joseph_covariance) ... ok\ntest_negative_dt_and_duplicate_measurement_rejected (test_tracking.TrackingTests.test_negative_dt_and_duplicate_measurement_rejected) ... ok\ntest_prediction_overflow_is_transactional (test_tracking.TrackingTests.test_prediction_overflow_is_transactional) ... ok\ntest_update_overflow_is_transactional (test_tracking.TrackingTests.test_update_overflow_is_transactional) ... ok\n\n----------------------------------------------------------------------\nRan 16 tests in 0.002s\n\nOK\n",
+  "reference_output": "tracking-reference.json",
+  "additional_executed_records": [
+    "tf2-reference.json"
+  ],
+  "scope": "Synthetic teaching input. Native records distinguish actual library/middleware/TCP execution from model-only checks. No physical robot or sensor execution.",
+  "sha256": {
+    "Lecture-01.md": "8a6435545175017fa883f35354afb84d0bc7cf78668f23020184bbcb31fd95c1",
+    "Tracking-Lab.md": "9a98bcd528c43315a52a7ad48ca9819bb00fca1a630405787f070fe87f13b2f3",
+    "labs/source-review-2026-10-18.json": "f4a28c0a0eb809a8f284e8e7187d37817236f55a8d4fd64f57dd25db222ee7e6",
+    "labs/test_tracking.py": "bd5e7b0e515fc1f587ba23f3ab9bc2a6318f9d28764c6937c2d5dacaf7513e4c",
+    "labs/tf2-reference.json": "e882e479193d4794967baf399e8cf253a29f59d0ee8b96bf3a6c1b8214bce723",
+    "labs/tf2_history.py": "40245547f22a1e2b251550ab7917321f6585f5aef544df99619a7e559c4a5e3a",
+    "labs/tracking-reference.json": "2e74a51eddbb914804e4774035581faa50b6e4f788b2654ebc430baf1549e9ea",
+    "labs/tracking.py": "a60453ef1e61987910059b6b1bb2b49f9d4392bb99255f0f3a5b504eb26a20f6"
+  }
+}

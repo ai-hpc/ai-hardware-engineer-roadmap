@@ -1,0 +1,37 @@
+{
+  "review_date": "2026-10-18",
+  "host": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "openthread_commit": "227561fe2446fa57e8a1aa192c81e31396db9ac9",
+  "mbedtls_commit": "e185d7fd85499c8ce5ca2a54f5cf8fe7dbe3f8df",
+  "compiler": "GCC 13.3.0",
+  "cmake": "3.28.3",
+  "pexpect": "4.9.0",
+  "build": "simulation platform, ot-cli-ftd, Thread 1.4 default, settings path quoted dot",
+  "execution": {
+    "passed": true,
+    "binary_sha256": "6b46df563de18bf2cc8d36d929358221ca91fce7468f9ee07281765322187744",
+    "version": "OPENTHREAD/227561f; SIMULATION; Oct 18 2026 21:01:38",
+    "transport": "OpenThread UDP radio simulation on Linux loopback",
+    "attached_role": "child",
+    "checks": [
+      "leader and second-node attachment",
+      "three ICMPv6 replies",
+      "UDP payload observed on receiver",
+      "offline node returns zero ICMPv6 replies",
+      "reattachment restores new ping and UDP traffic",
+      "both nodes used isolated persistent settings"
+    ]
+  },
+  "not_executed": [
+    "physical 802.15.4 radio",
+    "commissioning handshake",
+    "border router",
+    "multi-hop routing or leader failover",
+    "power or RF timing"
+  ],
+  "source_sha256": {
+    "run_thread_simulation.py": "db9e9b3b785167402074d9c100575951c29c68058446fa807847cac1df351fc6",
+    "test_thread_simulation.py": "8a937bd242df02cfd2487851d22b049e8e6b46cc72c21027660cbcf570e6a7b8",
+    "requirements.txt": "31d13077bf79ba766298a87360eb2145a304d9979e552b13e4f092cefab90d00"
+  }
+}

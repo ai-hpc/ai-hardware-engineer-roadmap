@@ -1,0 +1,26 @@
+{
+  "repository": "https://github.com/tonyzhaozh/act",
+  "commit": "742c753c0d4a5d87076c8f69e5628c79a8cc5488",
+  "inspected_at": "2026-10-18",
+  "scope": "source reading only; no upstream installation/training",
+  "files": [
+    {
+      "path": "imitate_episodes.py",
+      "url": "https://raw.githubusercontent.com/tonyzhaozh/act/742c753c0d4a5d87076c8f69e5628c79a8cc5488/imitate_episodes.py",
+      "sha256": "f2b057cd497f3fef20bdc4197879d1c02e1c751f83154cce0183fcc10f7e2540",
+      "bytes": 17242
+    },
+    {
+      "path": "policy.py",
+      "url": "https://raw.githubusercontent.com/tonyzhaozh/act/742c753c0d4a5d87076c8f69e5628c79a8cc5488/policy.py",
+      "sha256": "352efca415ee0e31073a27ca91560195702d1e9b545e573a3a668a53f06dd127",
+      "bytes": 3277
+    },
+    {
+      "path": "detr/models/detr_vae.py",
+      "url": "https://raw.githubusercontent.com/tonyzhaozh/act/742c753c0d4a5d87076c8f69e5628c79a8cc5488/detr/models/detr_vae.py",
+      "sha256": "499d968a3704156e5e29425a29691c3fa93421481d3609ed6b600b21801270f1",
+      "bytes": 12128
+    }
+  ]
+}

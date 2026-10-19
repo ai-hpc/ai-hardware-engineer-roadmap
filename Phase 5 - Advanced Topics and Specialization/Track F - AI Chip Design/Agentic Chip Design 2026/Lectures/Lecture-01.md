@@ -1,10 +1,10 @@
 # Lecture 01 - Why Agents for Chip Design: The 2026 Landscape
 
-**Course:** [Agentic Chip Design 2026](../Guide.md) | **Previous:** [Course Guide](../Guide.md) | **Next:** Lecture 02 *(curriculum)*
+**Course:** [Agentic Chip Design 2026](../Guide.md) | **Previous:** [Course Guide](../Guide.md) | **Next:** [Lecture 02](Lecture-02.md)
 
 ---
 
-This opener frames the course: the design-productivity problem agents are meant to attack, where LLMs genuinely help versus where silicon economics forbid it, the precedent that proved it works, and how to judge any claim in this fast-moving field.
+This opener frames the course: the design-productivity problem agents are meant to attack, where LLMs genuinely help versus where silicon economics forbid it, a concrete research precedent, and how to judge any claim in this fast-moving field.
 
 This lecture covers:
 
@@ -55,7 +55,7 @@ NVIDIA's **ChipNeMo** ([arXiv:2311.00176](https://arxiv.org/abs/2311.00176), 202
 * **EDA-script generation** (drive the tools in their own languages),
 * **bug-report summarization and triage.**
 
-The lesson that carries: **domain adaptation + tool access + tight scope** beat a bigger general model used naively. That is the same harness thesis as the agent course, applied to silicon.
+The paper studies domain adaptation for specific design-assistance tasks. Its results do not prove that every smaller adapted model beats every larger general model; compare the actual task and evaluation conditions. That is the same harness thesis as the agent course, applied to silicon.
 
 ---
 
@@ -143,3 +143,7 @@ The course capstone is exactly this: a **genie-claw**-style harness that generat
 ---
 
 *Next: Lecture 02 — The RTL-to-silicon flow and where agents fit (curriculum).*
+
+## Answered checks before continuing
+
+A high syntax-pass rate with a low functional-pass rate means many accepted source files violate behavioral expectations; independent simulation or formal properties can expose that gap. First-proposal success and success after repair use different budgets and must be reported separately. ChipNeMo studied design assistance, EDA scripts, and bug summarization; it did not demonstrate autonomous physical signoff. Continue to [Lecture 02](Lecture-02.md) and execute the small protocol design before discussing a larger agent workflow.

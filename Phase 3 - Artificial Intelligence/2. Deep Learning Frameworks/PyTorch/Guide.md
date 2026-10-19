@@ -28,7 +28,29 @@
 | `torch.compile()` | Compilation interface; backend/device determine generated code and library calls. |
 | `torch.profiler` | Where is time spent? Kernel launches, memory copies, CPU overhead. |
 | Mixed precision (`torch.amp`) | FP16/BF16 training — what tensor cores accelerate. |
-| Quantization (`torch.ao.quantization`) | INT8 inference — what L6 PE arrays must support. |
+| Quantization ([torchao](https://docs.pytorch.org/ao/stable/index.html)) | Low-precision representations and supported kernels; verify dtype, operator, and device coverage. |
+
+**API currency, reviewed 2026-10-18:** PyTorch documents the migration of quantization development to [torchao](https://docs.pytorch.org/docs/stable/quantization.html). Treat older `torch.ao.quantization` recipes as version-specific migration material. Pin compatible PyTorch/torchao versions and check backend support; a smaller weight file does not establish a faster runtime.
+
+## Start with a correct reference
+
+Before the larger projects, reproduce the [CPU policy lab](../../0.%20AI%20and%20Robot%20Learning%20Foundations/Lab-01-CPU-Policy.md), then port its three-parameter model to `nn.Linear(2, 1)`. Preserve the episode split, normalization, and held-out metrics. Match predictions against the plain-Python reference on a fixed batch before benchmarking.
+
+Keep these operations separate:
+
+- `model.train()` / `model.eval()` change behavior of modules such as dropout and BatchNorm.
+- `torch.no_grad()` or `torch.inference_mode()` controls gradient recording. `eval()` does not disable autograd.
+- `optimizer.zero_grad()` clears accumulated parameter gradients; `backward()` computes them; `step()` updates parameters.
+
+The [autograd documentation](https://docs.pytorch.org/docs/stable/notes/autograd.html#evaluation-mode-nn-module-eval) explains the distinction. **Self-check:** evaluating under `no_grad()` while leaving dropout in training mode still produces training-mode dropout behavior. Use the correct model mode and gradient context together.
+
+**First artifact:** predictions and parameter shapes, one numerical tolerance check, a train/validation/test manifest, and a deliberately swapped feature column that the reference comparison catches. The CPU route validates model semantics; GPU timing remains a separate experiment.
+
+## Run the complete CPU practical
+
+The [robot-stop classification lab](CPU-Robot-Stop-Lab/Guide.md) uses actual PyTorch 2.14 CPU training and `torch.export`. It includes an exact dependency lock for the tested platform, reproducible synthetic episodes, a nonlinear model, two baselines, threshold selection, error slices, serialization parity, and a deliberate distribution shift. Start here before the larger CNN projects.
+
+For AMP, use `torch.amp.autocast(device_type=...)` and a device-appropriate scaler where needed; do not mechanically enable FP16 on every CPU. Current [AMP documentation](https://docs.pytorch.org/docs/stable/amp.html) describes supported devices/dtypes. `torch.export` captures an operator graph with input constraints; `torch.compile` prepares optimized execution; ONNX export adds another representation/runtime boundary. Validate outputs at each boundary and include preprocessing in the contract.
 
 ## Projects
 

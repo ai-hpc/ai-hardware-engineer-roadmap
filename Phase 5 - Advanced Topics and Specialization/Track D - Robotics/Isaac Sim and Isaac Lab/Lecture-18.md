@@ -36,7 +36,7 @@ Start state-only, then add one sensor. Headless mode removes the GUI but does no
 5. Measure whole-process/device memory as well as PyTorch allocations; the simulator may allocate outside PyTorch.
 6. Re-run task correctness and evaluation after each performance change.
 
-Use the upstream [benchmark command](https://isaac-sim.github.io/IsaacLab/v3.0.0-EA/source/developer-tools/template_generator.html) pattern from the lab guide and save its resolved configuration. Its output is meaningful only with the actual task/backend settings.
+Use the upstream [benchmark command](https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/docs/source/developer-tools/benchmarking/run_benchmarks.rst) pattern from the lab guide and save its resolved configuration. Its output is meaningful only with the actual task/backend settings.
 
 ## Failure clinic
 

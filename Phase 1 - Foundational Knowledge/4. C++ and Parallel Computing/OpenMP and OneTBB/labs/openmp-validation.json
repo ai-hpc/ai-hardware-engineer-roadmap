@@ -1,0 +1,16 @@
+{
+  "checked_at": "2026-10-18",
+  "execution": "actual CPU; GCC13.3 OpenMP",
+  "sanitizer": "UndefinedBehaviorSanitizer; no diagnostics",
+  "scope_limit": "does not prove general race freedom, scheduling fairness or speedup",
+  "commands": [
+    "g++ -O1 -g -std=c++17 -fopenmp -fsanitize=undefined -fno-sanitize-recover=all -Wall -Wextra -Werror openmp_patterns.cpp -o /tmp/course-openmp-patterns-ubsan",
+    "OMP_THREAD_LIMIT=4 /tmp/course-openmp-patterns-ubsan",
+    "OMP_THREAD_LIMIT=1 /tmp/course-openmp-patterns-ubsan"
+  ],
+  "source_hashes": {
+    "../openmp_patterns.cpp": "c45d2733d425b69cf13b46b5df753e449486404849d48716690fb5cf410ce658"
+  },
+  "regular_output": "PASS requested=1 observed_team=1: private lifetime, lastprivate, reduction, barrier/single, SIMD, collapse, task result/count\nPASS requested=2 observed_team=2: private lifetime, lastprivate, reduction, barrier/single, SIMD, collapse, task result/count\nPASS requested=4 observed_team=4: private lifetime, lastprivate, reduction, barrier/single, SIMD, collapse, task result/count\nPASS recurrence counterexample: team=2 parallel=2 serial=4\n",
+  "limited_output": "PASS requested=1 observed_team=1: private lifetime, lastprivate, reduction, barrier/single, SIMD, collapse, task result/count\nPASS requested=2 observed_team=1: private lifetime, lastprivate, reduction, barrier/single, SIMD, collapse, task result/count\nPASS requested=4 observed_team=1: private lifetime, lastprivate, reduction, barrier/single, SIMD, collapse, task result/count\nPASS recurrence counterexample: team=1 parallel=4 serial=4 (runtime serialized; two-thread counterexample not exercised)\n"
+}

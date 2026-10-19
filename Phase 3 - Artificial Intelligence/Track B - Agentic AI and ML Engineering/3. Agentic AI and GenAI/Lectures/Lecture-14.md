@@ -93,7 +93,7 @@ runtime:
 
 This is not the only valid stack.
 
-It is a **strong default** because it keeps each component small enough to reason about.
+Treat it as a candidate architecture to compare with a simpler lexical baseline and the [executed local RAG lab](../Local-RAG-Workflow-Lab/Guide.md). No model or Jetson runtime was executed for this design lecture.
 
 The goal is:
 
@@ -116,7 +116,7 @@ The model card includes examples for Transformers, vLLM, SGLang, and Docker mode
 For this lecture, the reason it is interesting is the size/capability tradeoff:
 
 - small enough for local and edge experiments
-- stronger than many older sub-7B models
+- a candidate whose quality must be measured on the intended tasks
 - useful for coding and multilingual tasks
 - suitable for grounded answer generation when retrieval is good
 
@@ -143,52 +143,32 @@ Do **not assume all Qwen3.5-4B variants behave identically**.
 
 ---
 
-## 3. Quantization strategy
+## 3. Quantization and memory: calculate from the actual architecture
 
-For edge RAG, **INT4-class quantization** is usually the right starting point.
+“INT4” is not a portable artifact format. AWQ, GPTQ and GGUF variants have different layouts, scales, calibration methods and runtime kernels. Verify support for this exact hybrid model, hardware, quantization artifact and runtime revision. A format supported for another Qwen family is not sufficient evidence.
 
-Common formats:
+The pinned [Qwen3.5-4B config](https://huggingface.co/Qwen/Qwen3.5-4B/blob/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a/config.json) has **32 text layers: 8 full-attention and 24 linear-attention layers**. Full attention has 4 KV heads and head dimension 256. Linear attention uses 32 value heads with 128-by-128 recurrent matrices; the configured state dtype is float32. This is not a 32-layer full-attention transformer.
 
-| Format | Typical runtime | Notes |
-|---|---|---|
-| AWQ | vLLM / TensorRT-LLM | good server-oriented weight-only quantization path |
-| GPTQ | ExLlama / vLLM | mature local/server quantization path |
-| GGUF Q4_K_M | llama.cpp | practical low-RAM local deployment format |
-| FP8 | Hopper/Blackwell-class paths | useful on supported GPUs, not the default Jetson path |
-
-Planning estimates for Qwen3.5-4B INT4:
-
-| Component | Rough memory |
-|---|---:|
-| weights | 2.2-2.8 GB |
-| KV cache | 0.5-3 GB |
-| runtime overhead | 0.5-1 GB |
-
-Typical active VRAM planning range:
-
-| Context | Rough VRAM |
-|---|---:|
-| 4K | 4-5 GB |
-| 8K | 5-7 GB |
-| 16K | 8-10 GB |
-
-These are **planning numbers, not guarantees**.
-
-Measure on your exact stack:
+For a batch of one with BF16 full-attention KV, excluding padding and allocator overhead:
 
 ```text
-model revision
-quantization format
-backend
-batch size
-context length
-KV dtype
-GPU memory allocator
-embedding placement
-vector DB placement
+KV bytes/token = 2(K,V) × 8 layers × 4 KV heads × 256 elements × 2 bytes
+               = 32,768 bytes = 32 KiB
 ```
 
----
+| Token positions | Full-attention KV only |
+|---:|---:|
+| 4,096 | 128 MiB |
+| 8,192 | 256 MiB |
+| 16,384 | 512 MiB |
+
+An illustrative recurrent-matrix term is `24 × 32 × 128 × 128 × 4 = 48 MiB` per sequence. Add convolution state, runtime-dependent layout/padding, possible speculative rollback copies, workspaces, multimodal components and allocator reserve. Verify the actual state implementation: this arithmetic is not a measured process-memory result.
+
+Four billion uniformly packed 4-bit parameters would take 2 GB decimal, or about 1.86 GiB. Real artifacts include scales/metadata and often higher-precision tensors; the model's name is a rounded parameter count. Read the artifact's tensor table and file size. Weight-only quantization does not automatically quantize KV or recurrent state.
+
+For total memory, account for loaded weights, full-attention KV, recurrent/conv state, activation/workspace peaks, index, embedding model, OS and other processes. On Jetson these compete in unified physical RAM. The previous unexplained “4K requires 4–5 GB / 16K requires 8–10 GB” table was not a measurement and should not be used as evidence.
+
+**Worked exercise:** doubling context from 4K to 8K adds 128 MiB of this BF16 KV for batch one; doubling simultaneous sequences doubles both KV and per-sequence recurrent state. It does not double shared weights. Report the exclusions alongside the estimate.
 
 ## 4. Embedding model: Granite 97M Multilingual R2
 
@@ -220,7 +200,9 @@ Why it is a strong edge fit:
 
 The 311M version may improve quality in larger server deployments.
 
-For edge RAG, the 97M model is usually the **better default**.
+The [pinned Granite revision](https://huggingface.co/ibm-granite/granite-embedding-97m-multilingual-r2/tree/835ad14087e140460703cf0fae09f97d469d65c2) specifies 384 dimensions and a 32,768-position encoder. Its Sentence Transformers pooling configuration uses the CLS token, not mean pooling. Follow the published model pipeline, including normalization, rather than inventing a pooling method. A maximum sequence length is not a recommended chunk size or a latency guarantee.
+
+Compare the 97M and 311M candidates on the same held-out queries and actual target CPU/GPU. Size alone does not establish lower end-to-end latency or better retrieval. OpenVINO GPU acceleration targets supported Intel devices; it is not a Jetson CUDA execution provider. ONNX Runtime likewise needs an installed provider compatible with the target stack.
 
 ---
 
@@ -249,9 +231,9 @@ better top-3 evidence
 Good retrieval pipeline:
 
 ```text
-embed query
-  -> vector search top 8
-  -> metadata filter
+authorize query scope
+  -> embed query
+  -> vector search top 8 with authorization/version filters
   -> rerank top 8
   -> keep top 3
   -> optionally compress
@@ -459,7 +441,7 @@ Do not use outside knowledge unless explicitly asked.
 Why this helps:
 
 - reduces hallucination
-- forces uncertainty
+- requests abstention, whose reliability must still be tested
 - improves citation behavior
 - prevents over-answering
 - makes failures easier to detect
@@ -534,8 +516,8 @@ Use when:
 Best for:
 
 ```text
-Orin optimization work
-L4/Hopper/Blackwell server optimization
+Supported server GPU/model/runtime combinations
+Check exact release support; do not infer Jetson Orin support
 latency-sensitive production inference
 ```
 
@@ -555,7 +537,7 @@ generator:
 
 embedding:
   Granite 97M Multilingual R2
-  ONNX/OpenVINO/Transformers depending on hardware path
+  Transformers or a verified ONNX execution provider for the exact hardware
 
 vector DB:
   Qdrant
@@ -571,11 +553,7 @@ runtime:
   llama.cpp or carefully tested vLLM path
 ```
 
-Expected active memory planning:
-
-```text
-5-7 GB active VRAM for many 4K-8K configurations
-```
+Compute the component estimate in section 3, then record peak resident/device memory from the actual selected runtime. No measured 5–7 GB memory claim is supplied by this lecture.
 
 But on Jetson, also consider unified memory pressure:
 
@@ -669,7 +647,7 @@ Use when:
 - concurrency matters
 - decode is memory-bound
 
-Connect to Lecture 43 for FP8 KV-cache tradeoffs.
+See [MLSys Deep Dives Lecture 02](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/Lecture-02.md) for FP8 KV tradeoffs. Paging changes allocation, not bytes per scalar by itself; recurrent state needs its own dtype/quality analysis.
 
 ### Prefix caching
 
@@ -805,8 +783,8 @@ Top-K:
 Rerank strategy:
 Prompt budget:
 Backend:
-Expected VRAM:
-Expected RAM:
+Calculated components and exclusions:
+Measured peak unified RAM/device allocation:
 Latency target:
 Evaluation set:
 Failure threshold:

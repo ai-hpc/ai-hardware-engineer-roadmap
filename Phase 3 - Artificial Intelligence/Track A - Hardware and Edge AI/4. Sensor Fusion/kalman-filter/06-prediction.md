@@ -136,7 +136,7 @@ new_acceleration = old_acceleration
 
 ## Prediction Uncertainty
 
-Predictions aren't perfect! The further into the future you predict, the less certain you are.
+Predictions are uncertain. In common motion models, unknown velocity and acceleration make a distant prediction less certain. The amount follows the model and covariance, not a rule that every variance must always increase.
 
 ### Example: Weather Forecast
 
@@ -144,7 +144,7 @@ Predictions aren't perfect! The further into the future you predict, the less ce
 - Next week's forecast: ±5°F uncertainty
 - Next month's forecast: ±10°F uncertainty
 
-**Rule**: Uncertainty grows with time!
+These weather intervals are illustrative; they do not define a Kalman noise model.
 
 ### Why Uncertainty Grows
 
@@ -157,9 +157,10 @@ You know:
 After 5 seconds:
 - Position = 10 + 2×5 = 20 feet
 - But velocity uncertainty affects position!
-- Position uncertainty = 0.1 + 0.2×5 = 1.1 feet
+- Interpret both ± values as standard deviations of independent errors. Position variance becomes `0.1² + 5²*0.2² = 1.01 ft²`.
+- Position standard deviation is `sqrt(1.01)=1.005 feet`.
 
-The prediction is 20 ± 1.1 feet (much more uncertain!)
+The prediction is approximately `20 ± 1.005 feet`. Adding standard deviations gives a conservative bound for bounded errors, not this independent-error variance calculation. If the errors are correlated, include `2*dt*Cov(position,velocity)` as well.
 
 ## Process Noise
 
@@ -179,13 +180,15 @@ This randomness is process noise!
 ### Adding Process Noise to Predictions
 
 ```
-Prediction Uncertainty = Model Uncertainty + Process Noise
+Predicted covariance = Propagated covariance + Process-noise covariance
 ```
 
 **Example**: Car tracking
-- Model uncertainty: ±2 meters
-- Process noise (wind, road bumps): ±1 meter per second
-- After 3 seconds: ±2 + ±1×3 = ±5 meters
+- Simplify to a position random walk with initial standard deviation 2 m.
+- Each one-second step adds an independent zero-mean displacement with standard deviation 1 m.
+- After three steps, variance is `2²+3*1²=7 m²`, so standard deviation is `sqrt(7)=2.646 m`.
+
+A fixed unknown velocity bias of standard deviation 1 m/s produces a different result: after three seconds its position-error variance is `3²*1²=9 m²`, giving total variance 13 m². Describe the stochastic process before assigning a number to `Q`.
 
 ## The Predict-Update Cycle
 
@@ -196,7 +199,7 @@ The Kalman filter alternates between two steps:
 
 ```
 Predicted State = f(Previous State, Time)
-Predicted Uncertainty = Previous Uncertainty + Process Noise
+Predicted Covariance = F * Previous Covariance * Fᵀ + Q
 ```
 
 ### Step 2: UPDATE (Measure)
@@ -209,6 +212,8 @@ New Uncertainty = Reduced (because we combined information!)
 
 ### Example: Tracking a Drone
 
+For this scalar illustration, velocity is treated as known exactly, `±` means one standard deviation, and each 0.5-second step adds independent position variance `Q=1.25 m²`. If velocity is estimated, use the full two-state covariance in lesson 08.
+
 **Time 0.0s**:
 - State: [altitude=100m, velocity=5m/s up]
 - Uncertainty: ±1m
@@ -220,12 +225,12 @@ New Uncertainty = Reduced (because we combined information!)
 
 **Time 0.5s - UPDATE**:
 - Measurement: 102m ± 2m
-- Combined estimate: 102.3m ± 1.2m
+- Combined estimate: 102.32m ± 1.2m (gain=2.25/(2.25+4)=0.36)
 - (Uncertainty decreased!)
 
 **Time 1.0s - PREDICT**:
-- Predicted altitude: 102.3 + 5×0.5 = 104.8m
-- Predicted uncertainty: ±1.7m
+- Predicted altitude: 102.32 + 5×0.5 = 104.82m
+- Predicted uncertainty: sqrt(1.2²+1.25)=±1.640m
 
 And so on...
 
@@ -247,11 +252,11 @@ b) What's its velocity after 5 seconds?
 
 Initial: position = 100 ± 2 meters, velocity = 10 ± 1 m/s
 After 4 seconds, what's the position uncertainty?
-(Assume velocity uncertainty contributes to position)
+(Assume these are independent one-standard-deviation errors and no process noise.)
 
 ### Problem 4: Predict-Update Cycle
 
-**Initial state**: [position=0m, velocity=5m/s], uncertainty=±1m
+**Initial state**: position 0 m with standard deviation 1 m; velocity known exactly as 5 m/s; no process noise.
 
 **Step 1**: Predict after 2 seconds
 **Step 2**: Measure position=11m ± 2m
@@ -263,8 +268,16 @@ What's the final estimate?
 
 You're tracking a ball rolling on a bumpy surface.
 - Initial uncertainty: ±0.5m
-- Process noise: ±0.3m per second
+- Each one-second step adds independent displacement noise with standard deviation 0.3 m
 - After 10 seconds of prediction (no measurements), what's the uncertainty?
+
+### Check your answers
+
+1. `50+10*3=80 cm`.
+2. Position `0.5*2*5²=25 m`; velocity `2*5=10 m/s`.
+3. Position variance `2²+4²*1²=20 m²`; standard deviation `sqrt(20)=4.472 m`.
+4. Predicted position 10 m, variance 1; gain `1/(1+4)=.2`; corrected position 10.2 m, variance .8 m², standard deviation .8944 m.
+5. Variance `.5²+10*.3²=1.15 m²`; standard deviation `sqrt(1.15)=1.0724 m`. Repeated independent errors and one persistent bias accumulate differently.
 
 ## Real World Applications
 
@@ -336,7 +349,7 @@ Meteorologists:
 1. Set up a toy car to roll down a ramp
 2. Time it 5 times
 3. Calculate average time and standard deviation
-4. The standard deviation is your process noise!
+4. This spread contains timing/measurement noise and variation in the motion. Separate these effects before using it to derive a process covariance.
 5. Use this to predict uncertainty for future runs
 
 ## Key Concepts
@@ -344,7 +357,7 @@ Meteorologists:
 1. **Prediction** uses current state to estimate future state
 2. **Motion models** describe how things move (constant velocity, acceleration, etc.)
 3. **State** contains all information needed (position, velocity, etc.)
-4. **Uncertainty grows** during prediction
+4. **Covariance propagates** through the motion model and receives process noise
 5. **Process noise** accounts for model imperfections
 6. **Predict-Update cycle** is the heart of Kalman filtering
 

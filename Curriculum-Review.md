@@ -1,96 +1,91 @@
-# Curriculum review — 2026-10-13
+# Curriculum review — October 18–19, 2026
 
-**Latest review:** the [October 14 course-by-course pass](Curriculum-Reviews/README.md) covers all 158 current course entry pages, targeted technical corrections, the connected Physical AI Design Studio, and eight original SVG/PNG teaching diagrams. The report below preserves the earlier expansion and its validation history.
+The course now has a guided beginner route, substantially revised lessons across all six phases, and runnable experiments connecting AI training to robot behavior and hardware execution. Start with [your first robot and AI experiments](Start-Here.md), use the [beginner reading aid](Beginner-Reading-Aid.md) for units and notation, then follow the [learning guide](Learning-Guide.md) and [Physical AI Design Studio](Physical-AI-Design-Studio.md).
 
-This update reviews repository structure across the roadmap and improves the learning and assessment layer at every existing phase/course entry page. The focused technical expansion covers DeepSeek V4.1 Flash NVFP4 inference and NVIDIA Isaac Sim / Isaac Lab.
+This review prioritizes explanations that a learner can reproduce: a worked calculation, an executable baseline, a deliberate failure or variation, and a result with a clear interpretation. A smaller passing test is not presented as a measurement of a GPU, simulator or physical robot.
 
 ## Scope and evidence
 
-The initial inventory covered **534 tracked source Markdown pages**, including repository and project documentation. It screened structure, topic coverage, course entry points, and local links. Technical close reading concentrated on the shared authoring standard, phase/track guides, inference course, and Isaac course. This is not a claim that every command in all historical lectures was rerun or that every external resource was revalidated.
+The starting inventory contained **623 source Markdown pages**; the revised inventory contains **748**, including **194 course-entry pages**. The review covers the entire curriculum structure and learner entry points, with detailed rewrites and execution concentrated on robotics, AI, compilers, embedded systems and the most consequential technical defects. The [source inventory](Curriculum-Reviews/2026-10-19-inventory.json) records the resulting pages; course-entry counts include phase/track hubs and lab indexes, not only independent lecture series.
 
-The existing uncommitted change in Isaac Lecture 01 was preserved. Generated `docs/` and `_site/` content is rebuilt from the source pages rather than edited directly.
+This is a substantial course improvement, not a certification that every historical statement, external repository or hardware command has been independently executed. Current claims are tied to dated primary sources and, where practical, immutable revisions or downloaded-file hashes. Existing October 13–14 reviews remain available as [historical expansion evidence](Curriculum-Review-2026-10-13-and-14.md) and [the earlier course-by-course ledger](Curriculum-Reviews/README.md).
 
-## Findings and changes
+## A connected robotics and AI route
 
-| Finding | Learning consequence | Change |
+| Stage | What the learner does | What the result establishes |
 |---|---|---|
-| Many guides had long concept/resource lists without an explicit assessment | Reading could be mistaken for mastery | Added topic-specific entry diagnostics, baseline labs, variations, required evidence, and exit criteria to 126 course entry pages |
-| Existing strong courses used different completion expectations | Learners could not compare progress across tracks | Linked the shared learning workflow from 29 additional course entry pages; 155 existing entries addressed in total |
-| Hardware access requirements were mixed with course completion | Learners without a large node could stall or overclaim results | Defined analysis, fixture, simulation, and measured deployment milestones |
-| Inference course lacked a V4.1 Flash checkpoint-specific path | Generic MoE/FP4 knowledge did not address actual serialization and compatibility | Added ten lectures and CPU tools for metadata, FP4 representation, and request metrics |
-| NVFP4 naming could imply uniform format or automatic memory savings | Incorrect capacity plans or loader assumptions | Distinguished upstream FP4 experts, two community conversions, architecture support, and exact loader support |
-| Isaac course needed a progressive validation sequence | Training and deployment failures could hide frame/reset/timing bugs | Added eight lectures, a lab sequence, and executable CPU contract checks |
-| Eight-GiB simulation language could read as a supported baseline | Installation and sensor labs could fail before learning began | Clarified supported RTX requirements versus experimental reduced exercises |
-| Link checker scanned code as if it were prose and skipped untracked files | False failures and missed new-page errors | Excluded fenced/inline code, added new-file and angle-link coverage, and regression tests |
+| [First experiments](Start-Here.md) | Change control gain and observation delay on a one-dimensional cart | Why timestep, units and information age matter |
+| [Train a small policy](Phase%203%20-%20Artificial%20Intelligence/0.%20AI%20and%20Robot%20Learning%20Foundations/Lab-01-CPU-Policy.md) | Train, save, reload and evaluate a CPU policy on held-out episodes | Actual parameter learning and prediction/control comparisons on the declared fixture |
+| [Timed robot loop](Phase%203%20-%20Artificial%20Intelligence/0.%20AI%20and%20Robot%20Learning%20Foundations/Lab-02-Timed-Robot-Loop.md) | Put that trained policy behind processing and transport queues | How FIFO backlog, stale commands, deadlines and fallback alter closed-loop behavior |
+| [Actual CPU physics engine](Phase%203%20-%20Artificial%20Intelligence/0.%20AI%20and%20Robot%20Learning%20Foundations/Lab-03-CPU-Physics.md) | Reuse the saved policy in MuJoCo across mass, force-limit, damping and timestep changes | Actual engine execution; matching-model parity and model-mismatch behavior on 72 episodes, with simulator auto-reset warnings rejected |
+| [Robot dynamics and task execution](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Robot%20Dynamics%20and%20Task%20Execution/Lab-Guide.md) | Work through dynamics, LQR/MPC, trajectory/collision and grasp/task checks | Differences between numerical control exercises and task success; an actual MuJoCo pendulum crosscheck separates point-mass assumptions, finite-body inertia and integrator damping |
+| [Learn diffusion and flow action heads](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/VLA%20Foundations%20to%20Frontier%202026/Action-Generation-Lab.md) | Train six small networks, compare three sampling budgets, and reload saved checkpoints | Actual learned sampling behavior on a known scalar distribution; no language, image or robot capability is implied |
+| [Action-parity lab](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/VLA%20Optimization%20and%20Action-Parity%20Harness/CPU-Action-Parity-Lab.md) | Compare reference and changed policy paths using actual rollouts | Why arithmetic parity, timing, model use and task outcomes need separate checks |
+| [Trace a trained model into a hardware budget](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Programmable%20VLA%20Inference%20Accelerator/Model-to-Hardware-Lab.md) | Export the trained flow network, check changed inputs after reload, and profile CPU calls | Measured operator shapes/calls plus separately derived operation counts, parameter bytes and hypothetical tile occupancy |
+| [Isaac engineering labs](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Isaac%20Sim%20and%20Isaac%20Lab/Lab-Guide.md) | Inspect reset, frames, asset, action and episode semantics before the simulator milestone | A reproducible preparation route with explicit simulator/hardware requirements |
 
-## Coverage by curriculum area
+The timed-loop experiment records accepted commands **and commands actually applied**. A run can accept a command at the final deadline and never apply it during a control interval. The course now makes that distinction explicit. The action-parity exercise also rejects an apparent task success that never used the policy. Its small fixed episode suite does not establish population-level noninferiority or real-robot safety.
 
-| Area | Added or reinforced assessment focus |
+The action-generation experiment retains all three training seeds and both methods, including remaining distribution error. An oracle with known conditional expectations provides a separate reference. More integration steps change both the generated distribution and the work count; the accelerator lesson carries the trained checkpoint across that boundary instead of inventing a workload. Export and reload each pass 12 changed-input probes at batch sizes 1 and 7.
+
+The [PyTorch stop-policy lab](Phase%203%20-%20Artificial%20Intelligence/2.%20Deep%20Learning%20Frameworks/PyTorch/CPU-Robot-Stop-Lab/Guide.md), [camera/time-fusion lab](Phase%203%20-%20Artificial%20Intelligence/Track%20A%20-%20Hardware%20and%20Edge%20AI/4.%20Sensor%20Fusion/Camera-Time-Fusion-Lab/Guide.md), VLA data exercises and ROS 2 integration provide additional executable steps. The beginner sequence states when its action changes from velocity to acceleration and works through the changed equations.
+
+## Improvements across the curriculum
+
+| Area | Substantive teaching and technical changes |
 |---|---|
-| Phase 1 | RTL/testbench behavior, memory/cache reasoning, parallel correctness, synchronization and timing |
-| Phase 2 | Board/interface contracts, firmware queues, connectivity recovery, reproducible Linux images, product setup/error behavior |
-| Phase 3 | Numerical references, held-out evaluation, calibration and timestamps, model/application failure cases |
-| Phase 4A | Constraints, AXI/DMA integrity, timing/CDC, HLS tradeoffs, driver ownership |
-| Phase 4B | BSP/deployment identity, sensor/media timing, shared memory, thermal behavior, bounded recovery |
-| Phase 4C | Rewrite legality, kernel reference checks, compiler traces, quantization quality, serving latency |
-| Phase 5A/B | Topology, collectives, placement, scaling, I/O, library setup versus execution |
-| Phase 5C | Edge quality/latency/memory tradeoffs and sustained operation |
-| Phase 5D | Frames, assets, partial resets, reward/done semantics, evaluation uncertainty, performance, ROS timing, transfer |
-| Phase 5E | Recorded/simulated scenarios, process boundaries, sensor timing, requirements-to-test evidence |
-| Phase 5F | Workload-derived budgets, reference models, verification, constrained architecture decisions |
-| Phase 5G | Checkpoint identity, numerical correctness, execution traces, per-rank capacity, quality-preserving useful throughput |
-| Phase 6 | Evidence-backed explanations, calculations, design changes under a new constraint |
+| Phase 1: foundations | Worked numbers/shapes/bytes, RTL simulations, native SIMD and RISC-V vector examples, real OpenMP/oneTBB/OpenCL work, corrected synchronization and memory ownership |
+| Phase 2: embedded systems | Framed telemetry, observation freshness, a buildable Yocto application/layer, OpenThread simulation, circuit calculations and product-state/error behavior |
+| Phase 3: AI | Actual training/evaluation/export, grouped data splits, finite-difference checks, perception/time fusion, and a local retrieval/agent workflow with real framework integration |
+| Phase 4A: FPGA | Runnable RTL testbenches and failure cases; clearer boundaries between simulation, synthesis, timing closure and board evidence |
+| Phase 4B: Jetson | Updated platform/software boundaries; corrected CUDA, camera, media, real-time, container, device-tree, CAN, update, factory and dashboard lessons |
+| Phase 4C: inference/compiler | Executable CPU compiler and attention paths; corrected masks, gradients, memory accounting, quantization and backend compatibility |
+| Phase 5A/B: GPU infrastructure and HPC | Corrected topology/collective accounting, actual CPU distributed jobs, long-context MoE training exercises, B200/checkpoint capacity planning and source-pinned deployment boundaries |
+| Phase 5C/D/E: edge, robotics and autonomous systems | Connected learned policies, scheduling, ROS/industrial interfaces, planning/dynamics, simulator preparation and system-level task evidence |
+| Phase 5F: chip design | Workload-derived budgets, executable vector examples, portable accelerator contracts and the distinction between analytical budgets and hardware results |
+| Phase 5G: ML systems | Reworked model, compiler, attention, hybrid-state, quantization and speculative-decoding courses around actual source/configuration identities and reproducible CPU checks |
+| Phase 6: interview preparation | Worked calculations, troubleshooting and system-design practice that use the learner's actual evidence |
 
-The practice additions use topic-specific assignments and preserve existing lectures. A common format makes expectations visible, but cannot replace a worked explanation of the underlying subject. New inference and Isaac lectures include worked reasoning, failure cases, and self-check guidance to make that teaching concrete.
+The repository's [Jetson runtime project](Projects/jetson-llm-runtime/README.md) also received source-level repairs and documentation. Its [attention/layout lab](Projects/jetson-llm-runtime/labs/Attention-Layout-Lab.md) checks token-major KV indexing and decode scratch reuse. CUDA translation-unit compilation is recorded separately from execution on a GPU.
 
-## Technical source boundaries
+## Important AI and systems corrections
 
-- The [official DeepSeek V4.1 Flash model](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash), its [configuration](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/raw/main/config.json), and [technical report](https://arxiv.org/html/2609.19969v1) ground the architecture lessons.
-- [s-zaizen's conversion](https://huggingface.co/s-zaizen/DeepSeek-V4.1-Flash-NVFP4) is the default community-checkpoint case. Its card does not claim validated serving commands or quality/throughput benchmarks. [LibertAI's conversion](https://huggingface.co/LibertAIDAI/DeepSeek-V4.1-Flash-NVFP4) is a separate format/quality comparison.
-- [vLLM's V4.1 module](https://docs.vllm.ai/en/latest/api/vllm/models/deepseek_v41/) establishes architecture implementation evidence; each checkpoint/runtime/backend combination still needs verification.
-- [Isaac Sim 6.1 requirements](https://docs.isaacsim.omniverse.nvidia.com/6.1.0/installation/requirements.html) and [Isaac Lab v3.0.0-EA documentation](https://isaac-sim.github.io/IsaacLab/v3.0.0-EA/source/setup/installation/index.html) ground the simulator release family. Learners must save immutable commits and resolved configurations for their experiments.
+- [FlashAttention](Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/02%20-%20Kernel%20Engineering/FlashAttention%20Course/CPU-Attention-Lab.md): dense/tiled outputs and gradients, rectangular masking, grouped heads and dtype behavior are checked; I/O reduction is distinguished from quadratic attention arithmetic and device speed.
+- [Hybrid recurrent/attention models](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/GLM-5.3-Flash%20Architecture%20Mastery/CPU-Hybrid-State-Lab.md): actual pinned upstream CPU functions are compared with references; recurrent state, token-indexed caches, pooling visibility and rollback are distinct. Fixed recurrent state does not make every hybrid model's total memory constant.
+- [Quantization](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/Hardware-Aware%20LLM%20Quantization/CPU-Quantization-Lab.md): real packing, scales, calibration, saved artifacts and shifted inputs replace unsupported quality/speed claims. A better local calibration loss can worsen whole-model metrics. Quantizing a drafter is distinguished from quantizing its target.
+- [Long-context MoE training](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20A%20-%20GPU%20Infrastructure/Nvidia%20GPU/HPC%20Setup/Long-Context-MoE-Foundation-Training/CPU-Training-Lab.md): byte units, causal/full work, expert grids, drop denominators and real router gradients are explicit. Actual small-model training and two-process dispatch replace incomplete “run this” sketches and guaranteed benchmark outcomes.
+- [TVM](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/TVM%20Deep%20Dives/labs/README.md): current pinned CPU compilation/execution and export are exercised. A failed tuning trial with no valid timing is retained as a failure, not described as an optimization result.
+- [Inference engine source lab](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/Part%204%20-%20Optimizing%20a%20Real%20Engine/CPU-Source-Lab.md): upstream native/Python tests and approximation counterexamples are separated from full-model/GPU evidence.
+- [Provider tool protocols](Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Lectures/Provider-Contract-Lab.md): actual Anthropic/OpenAI SDKs serialize requests and parse local HTTP fixtures. Twenty SDK tests complement eight portable contract tests. The lessons distinguish continuation, incomplete output, refusal, tool-result correlation and bounded execution; no hosted model output is presented as measured.
+- [Concurrency](Phase%201%20-%20Foundational%20Knowledge/4.%20C%2B%2B%20and%20Parallel%20Computing/OpenMP%20and%20OneTBB/Guide.md): compiled counterexamples correct private-value lifetime, `lastprivate`, reduction/task semantics and work isolation. oneTBB isolation restricts task scheduling; it is not mutual exclusion. The example demonstrates two isolated regions overlapping without creating an intentional data race.
+- [Attestation and channel binding](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20A%20-%20GPU%20Infrastructure/Nvidia%20GPU/HPC%20Setup/Confidential-Computing-Attestation/CPU-Binding-Lab.md): actual CPU cryptography checks a bounded binding/replay exercise, including concurrent replay rejection. Hardware measurements, verifier policy, application identity and channel binding remain separate claims.
+- [Operating-system tracing](Phase%201%20-%20Foundational%20Knowledge/3.%20Operating%20Systems/labs/BPF-Build-Lab.md): real BPF object, skeleton and userspace-reader compilation teaches the build boundary. No kernel attach or privileged execution is inferred from the successful compile.
 
-## Reproduce the portable checks
+## Reproduce the checks
 
 From the repository root:
 
 ```bash
 python3 scripts/audit_curriculum.py
 python3 scripts/check_links.py
-python3 -m unittest discover -s scripts -p 'test_*.py'
-python3 -m unittest discover -s 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/labs' -p 'test_*.py'
-python3 -m unittest discover -s 'Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/labs' -p 'test_*.py'
+python3 scripts/run_portable_checks.py --list
+python3 scripts/run_portable_checks.py --json /tmp/course-checks.json
+python3 -m pip install -r requirements-docs.txt
 STRICT=1 bash scripts/build_docs_local.sh
 ```
 
-The audit script emits review signals and can export the complete inventory with `--json`. Keyword presence is not a quality grade. Link checks validate local file targets; MkDocs also reports anchor/navigation issues. Neither proves external URL availability.
+Use the lab-specific instructions for optional frameworks and native tools. The check runner isolates suites in separate processes, includes new source files, works in a source archive without Git, and reports skipped tests separately. A machine without a compiler, runtime or optional Python package may skip checks; that is not evidence those checks passed. CI installs the documented baseline native dependencies before running its portable suites and strict documentation build.
 
-**Local validation:** 23 portable tests passed, all local file targets resolved, all four CPU demos ran, and the strict MkDocs build passed. Hardware execution was not part of these checks.
+The [retained portable run](Curriculum-Reviews/2026-10-19-portable-checks.json) records **749 executed test methods with no failures or errors**, across 72 passing suites. It separately reports 30 skipped methods and one skipped setup group; one of the 73 suites requires its optional TVM environment and was wholly skipped in this baseline run. TVM was executed separately in its pinned environment. These counts describe this machine and run, not a promise that every optional dependency is installed by default. Additional lab manifests record executions in isolated PyTorch, TVM, tinygrad, ROS, compiler, CPU physics/scene tools and native-library environments. Review the relevant manifest before citing a result. CPU OpenCL, RTL simulation, cross-compilation and CUDA compilation each demonstrate different things.
 
-The new CPU tests validate metric arithmetic, corrupt/invalid inputs, packing, reset isolation, coordinate checks, timing definitions, uncertainty, and command freshness. They do **not** establish full-model inference, NVFP4 kernel performance, simulator execution, trained-policy success, or real-robot transfer. Those require the hardware-specific experiments described in the courses.
+The [validation summary](Curriculum-Reviews/2026-10-19-validation-summary.json) separates source checks, browser behavior and archive reproducibility. All **748 source pages** passed the 390-pixel phone review; **25 selected pages passed at 320, 390 and 1440 pixels**. All **2,021 formulas on 96 pages** rendered with external requests blocked, using the locally packaged MathJax renderer and fonts. Search-result navigation, keyboard search, the mobile menu, diagrams and downloadable helpers were checked separately.
 
-[Learning guide](Learning-Guide.md) · [Authoring standard](Curriculum-Authoring-Guide.md) · [Roadmap](README.md)
+The source-archive review uses directories containing spaces, no Git metadata and an unrelated working directory. It verifies the portable test runner, strict documentation build, and byte-identical publication of lesson assets, fonts and licenses. A separate syntax scan parsed **988 Python/shell examples**; parsing does not establish that every command was executed. These checks do not guarantee that external links remain available forever.
 
-## Professional VLA expansion — October 13, 2026
+The career guide now emphasizes [role responsibilities and portfolio evidence](Roles%20and%20Market%20Analysis.md). Unsupported niche salary tables, remote-work percentages and hiring-count forecasts have been removed. Its dated occupational sources and live employer pages have explicitly different scopes.
 
-Added [VLA Foundations to Frontier 2026](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/VLA%20Foundations%20to%20Frontier%202026/README.md): 32 detailed lectures covering history, grounding, action representations, imitation/diffusion/flow learning, data engineering, adaptation, RL, training infrastructure, evaluation, Isaac integration, asynchronous control, robustness, and current research. Four source dossiers and a dated frontier register distinguish papers from available artifacts and restricted access.
+## Remaining hardware milestones
 
-The course adds a 16-week study path, notation/glossary reference, worked examples, negative controls, answered self-checks, and two capstones. Its CPU labs train an inspectable nine-parameter grounding model and check action normalization, episode masks, split groups, scheduling, and paired task statistics. These fixtures do not establish pretrained-model, simulator, or physical-robot performance. New VLA tests are included in curriculum CI; the 23-test result above records the earlier roadmap review, before this expansion.
+The course provides instructions and completion criteria for GPU execution, full-model quality/performance, Isaac scenes and training, FPGA timing/board work, Jetson deployment, physical robots and custom silicon. Those milestones still require their stated equipment and environments. CPU fixtures, source inspection and successful compilation do not substitute for them.
 
-**VLA expansion validation:** 35 portable tests pass across the link checker, inference, Isaac, and VLA suites. All four VLA lab-guide shell blocks execute successfully, local Markdown links resolve, and the strict documentation build renders all 32 lectures and their downloadable Python helpers. No GPU, simulator, API, or physical-robot execution was performed.
-
-## Programmable VLA accelerator expansion — October 14, 2026
-
-Developed the supplied chip proposal into [Programmable VLA Inference Accelerator](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Programmable%20VLA%20Inference%20Accelerator/README.md): ten lectures connecting executable workloads, tensor/vector architecture, memory residency, mixed precision, valid reuse, compiler/runtime interfaces, action scheduling, task-level energy, hardware prototyping, and a reviewed SoC proposal.
-
-Two primary-source ledgers record current hardware specifications, model access, GR00T timing boundaries, and 2026 accelerator/quantization research. They preserve unresolved source discrepancies and distinguish publications, available implementations, analytical assumptions, and measurements. The research snapshot ends on October 14; later October developments are outside its scope.
-
-Five CPU labs reproduce the proposal's arithmetic and test assumptions before hardware commitments. Two original, reproducible SVG/PNG figures explain partial residency and scheduling boundaries. The course is linked from the roadmap, VLA capstone, compiler track, physical-AI studio, and chip-design track, with all ten lectures in site navigation.
-
-**Portable validation:** 51 tests pass across the existing suites and 16 new accelerator tests. The new tests include decimal release/deadline boundaries, partial packed blocks, cold/warm fills, SRAM reserves, tile padding, dispatch cost, failed-attempt energy, and observation age. All local Markdown file targets resolve. These results validate teaching fixtures; no GPU, simulator, FPGA, or silicon measurements were performed for this expansion.
-
-Run the new suite from the repository root:
-
-```bash
-python3 -m unittest discover -s 'Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/labs' -p 'test_*.py'
-```
+Use the exercise's own evidence boundary when reporting completion: **calculated**, **executed on CPU**, **compiled for a target**, **simulated**, or **measured on the named hardware**. This makes the roadmap practical for learners with different resources while keeping the conclusions defensible.

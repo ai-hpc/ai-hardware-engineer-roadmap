@@ -1,183 +1,165 @@
-# ROS 2
+# ROS 2: connect perception to a robot controller
 
 <div class="course-identity auto-course" style="--course-accent: #ca8a04; --course-accent-rgb: 202, 138, 4;" markdown="1">
 <div class="course-identity__icon">ROS</div>
 <div markdown="1">
-<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
-<p class="course-identity__title">Specialized course identity for ROS 2.</p>
-<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
+<p class="course-identity__eyebrow">Jetson Track · Application Development</p>
+<p class="course-identity__title">Build a stamped sensor pipeline, validate frames and age, then measure deployment behavior.</p>
+<p class="course-identity__meta">Artifact: runnable observation loop and failure trace</p>
 </div>
 </div>
 
+**Before:** Python functions, Linux terminals, and the [robotics foundations](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Robotics%20Foundations/README.md). **Time:** three 60–90 minute sessions for the core route. **Equipment:** a computer with ROS 2 Jazzy for the executed lab; a Jetson is optional until the deployment extension.
 
-**Phase 4 — Track B — Module 5.6** · Application Development
+**Start with the [software compatibility record](../../Compatibility.md).** The core lab uses Jazzy on Ubuntu 24.04. Existing JetPack 6/Humble projects and current Isaac ROS releases use different setup instructions. Match the whole stack before installing packages.
 
-> **Focus:** Master **ROS 2** from fundamentals through advanced navigation, real-time safety, and **Jetson Orin Nano** edge deployment—so your robot software is production-grade, deterministic, and GPU-accelerated.
+**Hub:** [Application Development](../Guide.md).
 
-**Hub:** [5. Application Development](../Guide.md)
+## 1. Understand the four interfaces
 
----
+ROS 2 lets separate components exchange typed information. A node is a participant in that graph. It can own publishers, subscriptions, timers, services, and action endpoints. A process may contain several nodes.
 
+| Interface | Robot example | What the caller needs |
+|---|---|---|
+| Topic | Camera publishes stamped frames | A stream; a new sample need not wait for a reply |
+| Service | Ask for a calibration record | A short request and response |
+| Action | Navigate to a goal | Progress, cancellation, and a final outcome |
+| Parameter | Configure a maximum observation age | Configuration with a defined update policy |
 
-## 1. ROS 2 fundamentals
+A service is not a good interface for a long navigation operation that needs feedback and cancellation. A topic is not automatically reliable, timely, or safe to act upon. Those properties require explicit contracts.
 
-### ROS 2 architecture
+ROS 2 uses a middleware abstraction called **RMW**. Common implementations use DDS, but ROS 2 is not restricted to DDS. Record the selected RMW and its supported features. Changing middleware can change discovery, transport, buffering, and performance.
 
-- **Nodes, Topics, Services, Actions:** Master the core ROS 2 communication paradigms. Understand publish-subscribe (topics), request-response (services), and long-running tasks (actions).
-- **DDS (Data Distribution Service):** Learn how ROS 2 uses DDS as its middleware. Understand quality of service (QoS) settings for reliable, real-time, or best-effort communication.
-- **Workspace and Package Structure:** Set up ROS 2 workspaces, create packages, and organize your robot software with the colcon build system.
+**Checkpoint:** name one topic, service, and action for a robot that collects objects. Explain which operation may take seconds and must be cancellable.
 
-### Programming with ROS 2
+## 2. Give every observation a meaning
 
-- **Python and C++ Clients:** Write ROS 2 nodes in both Python and C++. Understand the `rclpy` and `rclcpp` client libraries.
-- **Launch Files and Parameters:** Create launch files to start multiple nodes and configure parameters for different deployments.
-- **Lifecycle Nodes:** Explore managed nodes for state-controlled startup and shutdown in production systems.
+Suppose a camera reports a point `(1,0,0)`. The controller cannot use it until it knows:
 
----
+- the units and frame in which the point is expressed;
+- the capture time and clock domain;
+- the calibration/transform valid at that time;
+- whether the value is finite, sufficiently fresh, and consistent with the current robot session.
 
-## 2. Robot navigation and control
+A `PointStamped` provides a frame name and timestamp as well as coordinates. It does not enforce all these conditions for you. The publisher and consumer still need an agreement about units, time, and validity.
 
-### Navigation Stack (Nav2)
+**Worked transform:** a sensor sits at `(1,2.2,0)` metres in a world frame and is rotated 90° about world z. The sensor point `(1,0,0)` becomes `(1,3.2,0)` in world coordinates. Rotate first into world axes, then add the sensor origin. Applying the inverse transform answers a different question.
 
-- **Costmaps and Path Planning:** Learn costmap generation, global planners (NavFn, Smac Planner), and local planners for obstacle avoidance.
-- **Recovery Behaviors:** Implement recovery behaviors when the robot gets stuck or loses its path.
-- **Multi-Robot Coordination:** Explore Nav2 for coordinating multiple robots in shared environments.
+**Worked age:** capture at 12.000 s, inference finishes at 12.020 s, command validation occurs at 12.044 s. Inference took 20 ms, but the observation is **44 ms old** when used. These subtractions require a common or explicitly related clock. A simulator reset or system-clock adjustment can invalidate a naive subtraction.
 
-### Sensor integration
+Use TF at the **capture timestamp** for moving frames. A successful lookup of the newest transform does not establish the historical pose. Distinguish `map` (global corrections may jump), `odom` (locally continuous but drifting), and `base_link` (robot body). See [REP 103](https://www.ros.org/reps/rep-0103.html) and [REP 105](https://www.ros.org/reps/rep-0105.html).
 
-- **Camera and LiDAR Drivers:** Integrate camera and LiDAR sensors with ROS 2. Use `sensor_msgs` and point cloud processing.
-- **TF2 and Robot State:** Master TF2 for coordinate transforms and robot state publishing (joint states, odometry).
+## 3. Run a real middleware and TF exercise
 
----
+From the repository root:
 
-## 3. Edge deployment on Jetson
+```bash
+source /opt/ros/jazzy/setup.bash
+python3 "Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Robotics Foundations/labs/ros2_integration_lab.py" --domain-id 71 --output /tmp/ros-observation-results.json
+```
 
-### ROS 2 on Jetson Orin Nano
+Read the [complete lab setup and recorded run](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Robotics%20Foundations/ROS2-Lab.md) first if ROS is not installed. The command was executed locally on ROS 2 Jazzy. It creates two nodes, transports messages, and obtains the transform through TF. It uses isolated names and localhost discovery and publishes no actuator commands.
 
-- **Cross-Compilation and Native Build:** Build ROS 2 packages for Jetson. Optimize for ARM architecture and GPU acceleration.
-- **Real-Time Performance:** Tune ROS 2 and DDS for low-latency, deterministic behavior on embedded hardware.
-- **Containerization:** Use Docker / ROS 2 containers for reproducible deployment on Jetson.
+| Input case | Required outcome | Why |
+|---|---|---|
+| Fresh expected frame | Accept; world point `(1,3.2,0)` | Frame, transform and age agree |
+| Capture time 2 s old | Reject stale | Exceeds the lab's 0.5 s limit |
+| Capture time 2 s ahead | Reject future | Violates the lab's same-clock contract |
+| Unknown frame | Reject frame | Coordinates have no accepted interpretation |
 
-### AI and ROS 2 integration
+The four cases are correctness checks. They do not establish network tail latency or a physical stop distance. Save the JSON and identify the field that explains each rejection.
 
-- **TensorRT and ROS 2:** Run TensorRT-optimized models in ROS 2 nodes for perception (object detection, segmentation).
-- **Sensor Fusion with ROS 2:** Combine camera, IMU, and other sensor data in ROS 2 pipelines for robust perception.
+**Guided change:** move the sensor translation to `(2,2.2,0)` and predict `(2,3.2,0)` for the fresh point before editing the known-answer check. Keep the rejection cases passing.
 
----
+**Independent change:** use a moving transform and query between two known timestamps, then outside available history. Predict interpolation and extrapolation behavior. This is an extension to implement, not a result already established by the saved static-transform run.
 
-## 4. Advanced ROS 2 development
+## 4. Choose QoS from the consumer's job
 
-### Custom interfaces and middleware
+For live control, an old but eventually delivered image may be less useful than the newest image. For recording, missing an image may be unacceptable. These are different contracts.
 
-- **Custom Messages and Services:** Design domain-specific ROS 2 message types (`.msg`, `.srv`, `.action`) with appropriate field types and serialization. Understand how interface changes affect downstream packages.
-- **DDS QoS Tuning:** Configure DDS Quality of Service (QoS) policies—reliability (RELIABLE vs. BEST_EFFORT), durability, history depth, deadline, and lifespan—to match application requirements for latency, bandwidth, and reliability.
-- **Custom DDS Middleware:** Swap DDS implementations (FastDDS, CycloneDDS, Connext DDS) and tune middleware configuration for specific use cases (real-time, high throughput, or low-power embedded systems).
+| Policy | What it controls | What it does not establish |
+|---|---|---|
+| Reliability | Best-effort or reliable delivery behavior | A maximum application response time |
+| History / depth | Middleware sample history | Every upstream and downstream queue |
+| Durability | Availability of retained samples to late joiners | That retained state is still valid now |
+| Deadline | Expected publication/reception intervals and missed-deadline events | Scheduler enforcement or automatic motor stop |
+| Lifespan | Middleware expiration of samples | The controller's complete age and session checks |
 
-### ROS 2 executors and concurrency
+Compatibility is directional. A reliable publisher can serve a best-effort subscriber. A best-effort publisher cannot satisfy a subscriber that requests reliability. Durability and other policies also affect matching. See the [ROS QoS compatibility tables](https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Quality-of-Service-Settings.html).
 
-- **Single-Threaded vs. Multi-Threaded Executors:** Understand the implications of executor choice on callback scheduling, latency, and thread safety. Implement callback groups for fine-grained concurrency control.
-- **Custom Executors:** Write custom executors for specialized scheduling requirements—priority-based execution, time-triggered callbacks, or WCET-bounded execution for real-time systems.
-- **Intra-Process Communication:** Enable zero-copy intra-process communication for nodes running in the same process, dramatically reducing latency and memory copies for high-bandwidth data (cameras, LiDAR).
+A queue depth of one can still coexist with an old frame currently executing inside an inference callback, a camera-driver queue, and another output queue. Measure age at the decision point.
 
-### ROS 2 component architecture
+**Exercise:** a sensor produces 100 frames/s and processing consumes 50 frames/s. An unbounded FIFO accumulates approximately 50 frames each second after startup. A latest-value handoff bounds pending work but drops intermediate frames. Run the [observation freshness exercise](../../../Phase%202%20-%20Embedded%20Systems/Labs/Observation-Freshness.md), then explain which policy suits live control and which suits a recording task.
 
-- **Composable Nodes:** Refactor ROS 2 nodes as composable components that can run in a shared process (component container) for lower overhead and intra-process communication.
-- **Managed Lifecycle Nodes:** Implement lifecycle nodes (`rclcpp_lifecycle`) for production-grade state management—configure, activate, deactivate, and cleanup transitions for deterministic startup and shutdown.
-- **Plugin-Based Architecture:** Use `pluginlib` to define plugin interfaces (e.g., for planners, controllers, filters) and dynamically load implementations at runtime without recompilation.
+## 5. Keep callback work bounded
 
----
+A single-threaded executor runs one callback at a time. A long inference callback can delay unrelated timers. A multithreaded executor permits concurrency only when callback groups and available threads allow it; it does not make shared state race-free.
 
-## 5. Advanced navigation, planning, and behavior
+Use a clear ownership design:
 
-### Nav2 deep dive
+```mermaid
+flowchart TB
+  S[Stamped sensor callback] --> Q[Bounded handoff]
+  Q --> I[Inference worker]
+  I --> V[Result validator]
+  V --> C[Controller input]
+  W[Controller watchdog] --> C
+```
 
-- **Custom Planners and Controllers:** Implement Nav2 plugin interfaces to create custom global planners (e.g., hybrid A* with kinematic constraints) and local controllers (e.g., MPPI — Model Predictive Path Integral).
-- **Behavior Trees:** Master BehaviorTree.CPP and Nav2's behavior tree integration. Design hierarchical behavior trees for complex autonomous behaviors—exploration, docking, multi-goal navigation.
-- **Dynamic Obstacle Avoidance:** Integrate dynamic obstacle layers into costmaps using LiDAR or camera detections. Implement predictive obstacle avoidance with velocity obstacles (VO/RVO).
+The sensor callback validates and hands off a sample. The inference worker owns its buffers until computation finishes. The result validator checks frame, age, session and model contract again. The watchdog detects missing valid updates. A physical controller needs its own defined fallback behavior; a logging node saying “stopped” does not prove an actuator stopped.
 
-### SLAM and localization
+Composable C++ nodes and intra-process communication can reduce serialization and copying. Whether a specific edge avoids a copy depends on message ownership, subscriber topology, middleware, and type adaptation. A `sensor_msgs/Image` also does not automatically become a CUDA device buffer. Inspect buffer lifetimes and profile copies on the selected path. See the [official intra-process demonstration source](https://raw.githubusercontent.com/ros2/ros2_documentation/jazzy/source/Tutorials/Demos/Intra-Process-Communication.rst).
 
-- **Advanced SLAM:** Go beyond 2D SLAM to 3D SLAM using packages like LIO-SAM, LOAM, or RTAB-Map with LiDAR or RGB-D cameras. Understand loop closure detection and pose graph optimization.
-- **Multi-Session and Multi-Map:** Implement multi-session SLAM for persistent mapping across power cycles. Merge maps from multiple sessions or robots using map merging packages.
-- **Semantic SLAM:** Combine geometric SLAM with semantic understanding—object detection integrated into the map for semantic place recognition and targeted navigation.
+**Failure experiment:** add 40 ms of processing to a worker that receives at 50 Hz. Record sequence number and capture-to-validation age. Then use a bounded latest-value handoff. Explain any dropped samples and show that the age policy still rejects late results.
 
-### Task and mission planning
+## 6. Add navigation after the observation loop works
 
-- **BT-Based Mission Planning:** Use behavior trees to implement high-level mission planning—room-by-room cleaning, inspection routes, item delivery with pick-up and drop-off sequences.
-- **Task Allocation in Multi-Robot Systems:** Implement auction-based or optimization-based task allocation for multi-robot systems. Use ROS 2 services or action servers for task assignment and status tracking.
-- **ROS 2 with PlanSys2:** Use PlanSys2 (PDDL-based planning in ROS 2) for formal task planning with preconditions and effects, enabling high-level reasoning about robot capabilities and world state.
+Nav2 organizes navigation through a behavior tree, planners, controllers, costmaps, and recovery behaviors. The global planner proposes a path; a controller computes motion commands under its constraints. A valid geometric path is not yet an executable, collision-free robot motion.
 
----
+Start with a small known map and a correctly sized footprint. Check TF, odometry, sensor timestamps and map resolution before tuning planners. A 0.4 m-wide passage cannot safely admit a 0.5 m-wide robot merely because its centerline fits.
 
-## 6. Real-time and safety-critical ROS 2
+MPPI is an existing Nav2 controller option; learn to configure and evaluate it before treating a new MPPI implementation as a beginner assignment. Multiple namespaced Nav2 instances do not by themselves provide fleet traffic negotiation or deadlock avoidance. That needs a separate coordination system and tests.
 
-### Real-time Linux with ROS 2
+**Navigation milestone:** in simulation, save a map, footprint, start/goal, planner/controller settings, and a trace of success and one blocked-path failure. Score task completion, collision checking, path length and recovery behavior. Use the [Nav2 documentation](https://docs.nav2.org/) for the selected release. Physical movement remains a later integration milestone.
 
-- **PREEMPT_RT Kernel:** Build and configure a Linux kernel with the PREEMPT_RT patch for fully preemptible execution. Measure latency improvements for ROS 2 control loops with `cyclictest`.
-- **CPU Isolation and IRQ Affinity:** Isolate CPU cores for real-time ROS 2 nodes using `isolcpus` and configure IRQ affinity to prevent interrupt-induced jitter on real-time cores.
-- **Memory Locking:** Use `mlockall()` to lock process memory pages, preventing page faults from causing latency spikes in real-time nodes.
+For manipulation, add robot description, joint limits, collision geometry, planning and a controller interface. A MoveIt plan and an executed joint trajectory are distinct results. Use the [robotics track](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Guide.md) for the longer route.
 
-### ROS 2 for safety-critical applications
+## 7. Deploy to Jetson and measure the full path
 
-- **ROS 2 Safety Certification:** Understand the landscape of safety certification for ROS 2—Apex.AI's Apex.OS (ASIL-D certified), safety-certified DDS, and formal verification approaches.
-- **Watchdog and Fault Detection:** Implement system-level watchdog nodes that monitor topic heartbeats, detect silent node failures, and trigger safe-state behaviors.
-- **Deterministic Execution:** Design ROS 2 systems with deterministic timing—fixed-rate publishers, deadline QoS, and timer-driven execution to enable WCET analysis.
+Carry the CPU exercise's contracts into the [Jetson environment record](../../Compatibility.md). Preserve model input layout, normalization, output interpretation and tolerances when switching to TensorRT or an accelerated ROS component.
 
-### ROS 2 testing and CI/CD
+For each observation, trace:
 
-- **ROS 2 Test Framework:** Write unit tests for ROS 2 nodes using `ros_testing` with `launch_pytest`. Test node behavior under various conditions using parameterized launch files.
-- **Integration Testing:** Design integration tests that spin up complete multi-node systems and validate end-to-end behavior (e.g., a perception-to-control pipeline).
-- **CI/CD with ROS 2:** Set up GitHub Actions or Jenkins pipelines for automated building, linting, and testing of ROS 2 packages. Integrate with ROS 2 Industrial CI for cross-platform builds.
+```text
+capture -> receive -> preprocess -> inference -> postprocess -> validate -> consume
+```
 
----
+Distinguish latency from throughput. Three overlapped stages taking 3, 4 and 2 ms have at least 9 ms of stage work per item but may sustain one item every 4 ms under ideal steady-state overlap. Queueing, synchronization and transfer costs must be added to an actual measurement.
 
-## 7. Projects
+Report sample count, warmup, clock domains, median, p95/p99, maximum observed age, rejected observations, queue depths, memory, power mode and temperature. A maximum observed in a finite run is not a proven worst-case bound.
 
-### Fundamentals
+PREEMPT_RT reduces important kernel non-preemptible regions; it does not make every interrupt, driver, GPU operation or application callback preemptible. Memory locking must be combined with prefaulting and avoiding uncontrolled allocation in critical paths. Timer frequency and deadline QoS do not establish worst-case execution time. Follow the [ROS real-time programming demonstration](https://raw.githubusercontent.com/ros2/ros2_documentation/jazzy/source/Tutorials/Demos/Real-Time-Programming.rst), then measure the complete application under stated load.
 
-- **Robot Navigation with Nav2:** Build an autonomous mobile robot that navigates in a known environment using Nav2, with costmaps and path planning.
-- **Multi-Robot System:** Create a system with multiple robots (real or simulated) that coordinate via ROS 2 topics and services.
-- **Edge AI Robot:** Deploy a ROS 2-based robot on Jetson Orin Nano with TensorRT-accelerated perception and Nav2 for navigation.
+## 8. Diagnose a failing system
 
-### Advanced
+| Symptom | First checks | Evidence to save |
+|---|---|---|
+| Nodes do not discover one another | ROS domain, discovery settings, RMW, network scope | Node/topic listing and environment |
+| Topic exists but no messages arrive | Requested/offered QoS and exact type | `ros2 topic info --verbose` output |
+| TF extrapolation error | Capture clock, transform history, publisher timing | Requested time and available interval |
+| Fresh input, stale command | All queues, processing time, executor contention | Sequence-linked end-to-end trace |
+| GPU memory rises continuously | Buffer ownership and retained references | Allocation trace and bounded-work count |
+| New container breaks a camera | Host BSP/driver, sensor setup, device access | Host and container manifests |
 
-- **Composable Node Pipeline:** Refactor a multi-node perception pipeline (camera driver → preprocessing → detector → tracker) into composable nodes in a single container with intra-process communication.
-- **Real-Time Executor:** Implement a priority-based custom executor for a control loop node and measure callback jitter with and without real-time scheduling.
-- **QoS Benchmark:** Compare latency and packet loss for RELIABLE vs. BEST_EFFORT QoS on a high-frequency sensor topic under CPU load.
+Use pure numerical unit tests for transforms and validators; use `launch_testing` or `launch_pytest` for process startup, interaction and shutdown checks. An integration test needs a timeout and a meaningful output assertion. Merely keeping nodes alive is insufficient. See [ROS launch testing](https://github.com/ros2/launch/tree/jazzy/launch_testing) and [launch_pytest](https://github.com/ros2/launch/tree/jazzy/launch_pytest).
 
-### Navigation and planning
+## Completion and answers
 
-- **Custom Nav2 Controller Plugin:** Implement an MPPI controller as a Nav2 controller plugin. Benchmark trajectory quality and obstacle avoidance against DWB.
-- **3D LiDAR SLAM:** Run LIO-SAM or LOAM on a Jetson Orin Nano with a 3D LiDAR, building a 3D map of an indoor environment with loop closure.
-- **Multi-Robot Task Allocation:** Implement a centralized task allocator for 3 simulated robots in Gazebo, assigning navigation goals via ROS 2 action clients and tracking completion.
+Submit the environment record, runnable core lab, four expected outcomes, a hand-derived transform, one changed-condition experiment, and an explanation of the untested hardware boundary. The Jetson extension additionally needs a target correctness result and a sustained-load trace.
 
-### Real-time and safety
+- **Does reliable QoS make a 20 ms deadline hold?** No; delivery policy and scheduling/timing guarantees are different properties.
+- **Does rejecting stale input demonstrate safe stopping?** No; controller timeout and physical response require separate evidence.
+- **Does composition guarantee zero-copy camera-to-GPU inference?** No; verify the particular buffer and transport path.
+- **Why test the frame and age again after inference?** A valid input can become stale while queued or executing, and restarted components may change the accepted session or calibration.
 
-- **Real-Time Control Loop:** Implement a 1 kHz control loop in a ROS 2 node on a PREEMPT_RT kernel. Measure and document jitter with and without CPU isolation.
-- **Fault-Tolerant Robot System:** Build a ROS 2 system with a watchdog node that detects sensor node failures and transitions the robot to a safe stop behavior.
-- **Full CI/CD Pipeline:** Set up a GitHub Actions pipeline for a ROS 2 package with colcon build, unit tests, and integration tests running in a Docker container.
-
----
-
-## 8. Resources
-
-| Topic | Resource |
-|-------|----------|
-| **Official docs** | [ROS 2 Documentation](https://docs.ros.org/) — tutorials and API references |
-| **Nav2** | [Navigation 2](https://navigation.ros.org/) — navigation stack guide |
-| **NVIDIA + ROS 2** | NVIDIA guides for running ROS 2 on Jetson platforms |
-| **ROS 2 design** | [ROS 2 Design](https://design.ros2.org/) — architecture decisions, DDS integration, QoS rationale |
-| **Real-time ROS 2** | "A Systematic Approach to Real-Time ROS 2" (Apex.AI) — deterministic ROS 2 on RT systems |
-| **FastDDS** | eProsima FastDDS configuration reference (default ROS 2 middleware) |
-| **Nav2 theory** | *Behavior Trees in Robotics and AI* — Colledanchise and Ögren |
-| **SLAM theory** | *Probabilistic Robotics* — Thrun, Burgard, and Fox |
-| **Testing** | `ros_testing` — official ROS 2 testing framework for node unit and integration tests |
-
-
-## Integration lab: Can middleware deliver fresh observations without blocking control?
-
-Publish sequence-numbered observations with documented clock domains and explicit QoS. Slow a subscriber, drop frames, and restart a node; inspect backlog and stale-action rejection.
-
-**Acceptance evidence:** Bound queue depth and action age. Submit launch/config files plus traces linking sensor sequence to control output, then return the communication and scheduling costs to the inference budget.
-
-**Continue:** take this artifact to [Orin-Nano-Real-Time-Inference](../../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Real-Time-Inference/Guide.md). Explain which assumption from this course the next engineer must preserve.
+**Continue:** [real-time inference](../../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Real-Time-Inference/Guide.md), then [advanced ROS](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Advanced%20Robot%20Operating%20System/Lecture-01.md).

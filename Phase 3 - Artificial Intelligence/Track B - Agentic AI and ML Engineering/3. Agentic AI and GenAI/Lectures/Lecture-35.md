@@ -4,6 +4,9 @@
 
 ---
 
+**Source scope:** checked against OpenClaw commit `24aac3c15a01feb1946dad5b212282e78dc3941e` (2026-10-18), whose package version is `2026.10.4`. These are source observations, not an executed Gateway deployment. See [source evidence](Lecture-Source-Evidence.md) for exact files and limitations.
+
+
 ## Why this lecture exists
 
 The agent loop is the **core execution engine** of an agent system.
@@ -65,7 +68,7 @@ The loop must answer:
 
 So a more accurate definition is:
 
-> the agent loop is a deterministic, serialized, observable execution pipeline for AI agents with tools and memory
+> the agent loop serializes state transitions per physical session and exposes observable events; this does not make model outputs deterministic
 
 ---
 
@@ -79,7 +82,7 @@ OpenClaw's loop can be understood as this sequence:
 3. Resolve session
 4. Queue by session lane
 5. Prepare workspace, skills, and bootstrap context
-6. Acquire session write lock
+6. Claim the durable active writer for the admitted run
 7. Assemble prompt
 8. Resolve model and auth
 9. Run model with streaming
@@ -162,7 +165,7 @@ Why this matters:
 
 - prevents two runs from writing the same transcript concurrently
 - avoids interleaved tool results
-- keeps conversation history deterministic
+- orders transcript mutations and rejects stale writers
 - avoids duplicate or contradictory final replies
 
 The mental model:
@@ -181,33 +184,21 @@ This explains why isolated cron and subagent sessions matter: they let backgroun
 
 ---
 
-## 6. Session write locks
+## 6. Durable writer claims and transaction fencing
 
-Queueing handles **logical order**.
+The current source records an `activeWriterRunId` before streaming. Each transcript append/rewrite supplies `expectedWriterRunId`; the commit transaction checks it against the active claim. A run superseded by a newer owner cannot later commit stale output.
 
-Locks handle **actual file/state mutation**.
+Three boundaries serve different purposes:
 
-OpenClaw protects transcript writes with a **process-aware session write lock**.
+| Boundary | What it controls |
+|---|---|
+| Session controller | Serializes turns by physical session identity before global capacity admission |
+| Writer claim checked in the transaction | Rejects a stale run's append, rewrite or compaction |
+| SQLite writer queue and Gateway state-directory lock | Orders per-agent mutations and prevents competing Gateway/local owners of the same state directory |
 
-That matters because multiple processes may exist:
+An in-process queue alone cannot fence a delayed writer after ownership changes. A file-lock-only description is incomplete for this revision.
 
-- Gateway process
-- CLI process
-- maintenance or doctor commands
-- test workers
-- automation scripts
-
-The rule:
-
-> any transcript write, rewrite, compaction, or truncation must acquire the same session write lock
-
-By default, the lock should **not be reentrant**. Code that intentionally nests the same lock must opt in explicitly.
-
-This is a strong production lesson:
-
-> session state is shared mutable state, so it needs a real concurrency boundary
-
----
+**Worked race:** run A reads claim A, then stalls. Run B becomes owner and commits. A resumes. Checking only the old in-memory claim would admit A; checking `expectedWriterRunId=A` against the stored B inside the commit rejects it. This is the behavior to test in a durable runtime.
 
 ## 7. Session and workspace preparation
 
@@ -451,7 +442,7 @@ After the run, the system writes:
 - usage information
 - lifecycle state
 
-Persistence must happen under the **session write lock**.
+Persistence must pass the **writer-claim check inside the commit transaction**, with the current queue and state-directory ownership rules.
 
 This protects the transcript from **races** and gives future turns a coherent history.
 
@@ -467,7 +458,9 @@ This is also why streaming and persistence are different concerns. A user can se
 
 The `agent` RPC starts a run.
 
-The `agent.wait` RPC waits for a run to reach lifecycle `end` or `error`.
+The `agent.wait` RPC waits for a terminal run outcome. Current Gateway runs also wait for the terminal replay payload to be published. The result can carry `terminalReply` and `terminalReceipt`; `sourceReplyDelivered: true` is delivery evidence, while a display-history entry is not.
+
+A provider `response.completed` event ends one response, not necessarily the agent turn. The current embedded Responses runner continues when `end_turn: false`, including text-only responses. Likewise, a quiet Codex app-server stream does not establish completion; its native terminal outcome does. Lifecycle phases include `start`, `finishing`, `end` and `error`.
 
 A wait result looks conceptually like:
 
@@ -614,7 +607,7 @@ The loop might behave like this:
 1. Gateway receives message.
 2. Gateway resolves session key.
 3. Run enters that session lane queue.
-4. Session lock is acquired.
+4. The admitted run records its durable writer claim.
 5. Workspace and skills are prepared.
 6. Prompt is assembled with history and bootstrap context.
 7. Model starts streaming.
@@ -644,7 +637,7 @@ Fill in this table:
 | Entry points | CLI, Web UI, Slack, cron |
 | Session lane rule | one run at a time per session |
 | Global queue | max 2 concurrent model runs |
-| Write lock | required for transcript writes and compaction |
+| Writer fence | expected writer identity checked in the transaction for transcript writes and compaction |
 | Prompt inputs | base prompt, skills, repo context, session history |
 | Tools | read, search, test runner, issue lookup |
 | Tool policy | write and deploy require approval |
@@ -663,7 +656,7 @@ The value of this exercise is that it forces you to treat the agent as **infrast
 - The agent loop is the execution engine of an agent product.
 - It is a serialized, observable pipeline from input to persisted final state.
 - Per-session queueing prevents transcript and tool races.
-- Session write locks protect durable state across processes.
+- Durable writer claims, transaction fencing, SQLite ordering and state-directory ownership protect different parts of persistence.
 - Prompt assembly, model execution, tool execution, streaming, reply shaping, and persistence are separate runtime concerns.
 - Hooks are policy and extension points inside the loop.
 - `agent.wait` waits for lifecycle completion; it does not define the entire run.

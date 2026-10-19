@@ -1,0 +1,33 @@
+{
+  "torch": "2.14.0+cpu",
+  "transformers": "5.20.1",
+  "full_model_scope": "meta-device shape/parameter inspection only; no checkpoint weights",
+  "full_model_metadata": {
+    "qwen3": {
+      "unique_parameters": 4022468096,
+      "named_parameters": 398,
+      "q_weight_shape": [
+        4096,
+        2560
+      ],
+      "tied_head": true,
+      "storage_device": "meta"
+    },
+    "qwen25": {
+      "unique_parameters": 72706203648,
+      "named_parameters": 963,
+      "q_weight_shape": [
+        8192,
+        8192
+      ],
+      "tied_head": false,
+      "storage_device": "meta"
+    }
+  },
+  "inference_scope": "random two-layer tiny Qwen3, FP32 CPU eager attention, seed123",
+  "cached_vs_full_max_abs": 8.940696716308594e-08,
+  "changed_future_vs_earlier_logits_max_abs": 0.0,
+  "deliberate_wrong_position_max_abs": 0.06963925808668137,
+  "cache_sequence_length": 5,
+  "qwen3_implementation_sha256": "ca9535e36ea4e689c76d7d753b91aec9ea00da837fbf223c8ea4c01a3b50cac0"
+}

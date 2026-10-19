@@ -12,44 +12,32 @@
 
 Phase 1 · Section 2 — How processors and memory systems work, and why that shapes every AI accelerator ever built.
 
-> **Goal:** By the end of this section you can read a GPU or NPU architecture paper, understand why a transformer is memory-bandwidth-bound, and reason about the trade-offs in any custom accelerator design.
+> **Goal:** By the end of this section you can read a GPU or NPU architecture paper, identify when an AI workload is limited by computation, data movement, or scheduling, and reason about the trade-offs in any custom accelerator design.
+
+**Layers:** L5 architecture, with L3 runtime connections. **Prerequisites:** arrays, multiplication, basic digital logic, and the [first numerical lab](../Labs/Numbers-Shapes-and-Bytes.md). **Roles:** AI systems, accelerator, embedded, and robotics engineers. **Next:** [operating systems](../3.%20Operating%20Systems/Guide.md) and [parallel computing](../4.%20C%2B%2B%20and%20Parallel%20Computing/Guide.md).
+
+**Learning route:** first read §§1–4 and complete the numerical lab; then study §§5–9 and one profiling exercise; finish with a workload case study in §10. Assembly snippets are explanatory unless a test status is stated. The important artifact is a correct workload estimate plus measurements that can confirm or reject it, not a memorized product specification table.
 
 ---
 
 ## 1. The Two Computing Paradigms
 
-Every chip designer makes the same fundamental choice: optimise for **latency** or **throughput**. CPUs and GPUs represent the two extremes.
+Processors balance latency, throughput, power, area, and cost. CPU and GPU designs emphasize different kinds of work; neither is universally faster.
 
-```
-CPU — latency optimised                 GPU — throughput optimised
-────────────────────────────────────    ────────────────────────────────────
-Few, powerful cores (4–128)             Thousands of simple cores (1,000s–10,000s)
-Deep OoO execution engine               In-order, warp-scheduled execution
-Large private caches (L1: 32–64 KB)     Small per-SM caches, huge shared pool
-Branch prediction, speculative exec     No branch prediction (divergence penalty)
-Single-thread latency: 1–4 ns          Single-thread latency: 50–100 ns
-Total throughput: 1–10 TFLOPS           Total throughput: 100–1,000 TFLOPS
-Power: 5–350 W                          Power: 70–1,000 W
+| Question | Typical high-performance CPU | Typical GPU |
+|---|---|---|
+| How is work organized? | Independently scheduled cores and software threads | Many threads grouped for SIMT execution |
+| How are stalls hidden? | Caches, speculation, out-of-order execution, and sometimes hardware threads | Caches and scheduling other ready warps |
+| What work fits well? | Irregular control flow, small tasks, OS services | Large regular workloads with enough parallel work |
+| What can dominate a small robot pipeline? | Sensor handling, synchronization, control, preprocessing | Kernel dispatch, transfer, occupancy, and numerical work |
 
-Use-case: operating system, compilers,  Use-case: matrix multiply, convolution,
-  database queries, anything with         attention — embarrassingly parallel,
-  complex control flow                    regular data access patterns
-```
+A CPU core, GPU arithmetic lane, and Tensor Core are different resources. Comparing their counts as if each were an interchangeable processor is misleading. Compare the same workload, precision, correctness criterion, and timing boundary. The [CUDA programming model](https://docs.nvidia.com/cuda/cuda-programming-guide/01-introduction/programming-model.html) explains the host/device and thread hierarchy.
 
-**The transistor budget question:** A modern chip has ~50–100 billion transistors. How do you spend them?
+**The transistor budget question:** more execution units, larger caches, wider interfaces, and richer control logic all consume silicon and power. A useful architecture sketch labels these resources; it does not assign unsupported area percentages to named products.
 
-```
-CPU (Apple M4 Pro die)               GPU (NVIDIA H100 SXM)
-┌──────────────────────────┐         ┌──────────────────────────┐
-│ OoO engines (P-cores) 45%│         │ CUDA/Tensor cores    60% │
-│ Cache hierarchy       30%│         │ HBM memory interface 20% │
-│ Memory controller      8%│         │ L2 cache             10% │
-│ I/O, NPU, other       17%│         │ Control / scheduler  10% │
-└──────────────────────────┘         └──────────────────────────┘
-→ Optimises for the 1 hard task       → Optimises for 10,000 easy tasks
-```
+**AI connection:** dense attention over a sequence of length `n` contains quadratic pairwise work, while projection layers contain matrix multiplications. Small-batch decoding, large-batch prefill, sparse operators, and tiny robot control networks can have different bottlenecks. Predict bytes and operations for the actual shape before deciding where to run it.
 
-**AI connection:** Transformer attention is `O(n²)` parallel multiply-accumulate — exactly what the GPU transistor budget is built for. The CPU's OoO engine is wasted on this workload; the GPU's thousands of Tensor Cores are perfect.
+**First runnable exercise:** [Numbers, shapes, and bytes](../Labs/Numbers-Shapes-and-Bytes.md) walks through a tiny quantized operator and a batch-dependent memory budget, with a CPU reference and answer guidance.
 
 ---
 
@@ -59,16 +47,14 @@ The ISA is the **contract between software and hardware**. Hardware can be redes
 
 ### RISC vs CISC
 
-| Property | RISC (ARM64, RISC-V) | CISC (x86-64) |
-|----------|----------------------|---------------|
-| Instruction length | Fixed 32 bits | Variable 1–15 bytes |
-| Memory access | Load-store only | Any instruction can access memory |
-| Decoder complexity | Simple | Complex (internal RISC micro-ops) |
-| Code density | Lower | Higher |
-| Power efficiency | Excellent | Good |
-| AI hardware usage | Edge, mobile, Apple Silicon, Jetson | Data-centre training servers |
+| Property | AArch64 / RISC-V | x86-64 |
+|---|---|---|
+| Instruction length | AArch64: 32 bits; RISC-V base: 32 bits, with optional compressed encodings | Variable length, up to 15 bytes |
+| Memory operands | Arithmetic generally operates on registers; loads/stores move data | Many instructions allow a memory operand; not every instruction does |
+| Implementation | May be in-order or out-of-order, narrow or wide | May be in-order or out-of-order, narrow or wide |
+| Code density and efficiency | Depend on extensions, compiler, implementation, and workload | Depend on extensions, compiler, implementation, and workload |
 
-> In practice, modern x86 CPUs decode CISC instructions into RISC-like micro-ops internally — the distinction blurs at the microarchitecture level.
+The ISA is a software-visible contract, not a power-efficiency score. Modern implementations may translate architectural instructions into internal operations. RISC-V's [compressed extension](https://docs.riscv.org/reference/isa/unpriv/c-st-ext.html) permits 16-bit instructions mixed with 32-bit instructions; “RISC means every instruction is 32 bits” is incorrect.
 
 ### The Three ISAs You Will Encounter
 
@@ -102,7 +88,7 @@ Used in: Intel/AMD data-centre servers — the dominant platform for model train
 
 ```
 Modular open ISA: RV64I base + extensions (M, F, D, A, V, ...)
-32 general-purpose 64-bit registers
+32 architectural integer registers in RV64I; x0 always reads as zero
 
 add  x1, x2, x3        // x1 = x2 + x3
 vsetvli t0, a0, e32,m4 // V extension: set vector length, FP32, 4x LMUL
@@ -111,17 +97,15 @@ vfmacc.vv v0, v4, v8   // vector FMA (scalable width)
 
 Used in: Emerging edge AI chips (Tenstorrent, SiFive), custom accelerator control cores.
 
-### ISA Comparison
+### ISA comparison: check the target, not just its family
 
-| Feature | ARM64 | x86-64 | RISC-V |
-|---------|-------|--------|--------|
-| Registers (GP) | 31 × 64-bit | 16 × 64-bit | 31 × 64-bit |
-| Instruction size | Fixed 32-bit | Variable 1–15 bytes | Fixed 32-bit (base) |
-| SIMD width | 128-bit NEON, scalable SVE2 | 128/256/512-bit | Scalable RVV |
-| Endianness | Little (bi in theory) | Little | Little |
-| Addressing modes | ~9 | ~20+ | ~4 (simple) |
-| Licensing | ARM license fee | Intel/AMD proprietary | Open (free) |
-| Code density | Good | Best | Moderate |
+| Feature | AArch64 | x86-64 baseline | RV64I with optional extensions |
+|---|---|---|---|
+| Writable integer registers | 31 general-purpose registers | 16 general-purpose registers | 31; x0 is fixed zero |
+| Vector facilities | NEON; SVE/SVE2 on supporting targets | SSE; AVX/AVX2/AVX-512 on supporting targets | V extension on supporting targets |
+| What to record | CPU model, extensions, ABI, compiler target | CPU model, extensions, ABI, compiler target | Exact ISA string, ABI, compiler target |
+
+Do not compile for an extension just because it exists in the architecture family. Query the actual device and toolchain; save the target options with the benchmark.
 
 ---
 
@@ -180,7 +164,7 @@ BEQ X1, X2, Label    // branch resolved in EX (cycle 3)
   →  must flush them: 2-cycle penalty for a 5-stage pipe
 ```
 
-**AI connection:** GPU warps execute in lockstep — there is no branch prediction. If threads in a warp take different branches, they execute **both paths serially** (warp divergence). Good kernel design eliminates branches inside hot loops.
+**AI connection:** when lanes in a warp follow different paths, some lanes are masked while a path executes. This can reduce useful work per instruction. A branch taken uniformly is different from divergence; removing a branch by doing expensive unnecessary work can be slower. Preserve synchronization correctness and measure the actual kernel.
 
 ### 3.3 Superscalar Execution
 
@@ -195,20 +179,10 @@ Cycle 3: Issue up to 4 to execution units (if no dependencies)
 Cycle 4: Multiple ALUs, FP units, load/store units execute in parallel
 
 Ideal: 4 IPC (limited by dependencies, memory stalls, branch mispredictions)
-Real: 2–3.5 IPC on typical code (Apple M4 P-core: ~3+ IPC sustained)
+Observed IPC: measure for the named workload and processor; it need not approach 4
 ```
 
-**Superscalar widths in practice:**
-
-| CPU | Decode width | Issue width | Peak IPC |
-|-----|-------------|-------------|----------|
-| ARM Cortex-A510 (E-core) | 3 | 3 | 3 |
-| ARM Cortex-A720 (P-core) | 5 | 5 | 5 |
-| Apple M4 P-core | 8 | 8 | ~6+ |
-| AMD Zen 5 | 6 | 6 | ~5 |
-| Intel Golden Cove | 6 | 6 | ~5 |
-
-Beyond 6–8 wide, the dispatch logic complexity and diminishing ILP make wider designs impractical for general-purpose code.
+**Measure rather than equate widths:** fetch, decode, dispatch, issue, and retirement widths describe different pipeline boundaries. Decode width alone is not peak IPC, and IPC depends on the instruction mix, dependencies, cache behavior, and measurement interval. Use a named processor's optimization manual when filling in these values.
 
 ### 3.4 Out-of-Order Execution
 
@@ -237,13 +211,15 @@ With renaming: P47 and P49 are independent — 3rd ADD can execute in parallel w
 
 Key hardware structures:
 
-| Structure | Role | Size (modern CPU) |
-|-----------|------|--------------------|
-| **Reorder Buffer (ROB)** | Holds all in-flight instructions; enforces in-order commit | 256–512 entries |
-| **Reservation Stations** | Instructions wait here until operands are ready | 64–128 entries |
-| **Register Renaming** | Maps architectural → physical registers, eliminates false deps | 256–384 physical regs |
-| **Common Data Bus (CDB)** | Broadcasts results to all waiting reservation stations | 6–8 buses |
-| **Load/Store Queue** | Tracks memory operations; enforces ordering | 64–128 entries |
+| Structure | Role | Resource limit to investigate |
+|---|---|---|
+| **Reorder Buffer (ROB)** | Tracks in-flight instructions and in-order retirement | Number of entries and allocation rules |
+| **Issue queues / reservation stations** | Hold operations until operands and execution resources are ready | Queue capacity and issue ports |
+| **Register renaming** | Separates architectural names from physical storage | Physical registers and rename bandwidth |
+| **Result forwarding** | Makes produced values available to dependents | Bypass paths, latency, and fan-out |
+| **Load/store queues** | Track memory operations and ordering constraints | Queue capacity and memory dependencies |
+
+These structures vary by implementation; a textbook common-data-bus diagram is not a literal floorplan of every modern CPU.
 
 **OoO execution pipeline flow:**
 
@@ -264,16 +240,18 @@ Fetch → Decode → Rename → Dispatch → Issue → Execute → Complete → 
 
 ### 3.5 Branch Prediction
 
-Modern predictors achieve 94–98% accuracy on typical code. Every misprediction flushes the pipe — 10–20 cycles wasted on a modern deep pipeline.
+A branch predictor guesses the next control-flow path before the branch resolves. A wrong guess discards speculative work and redirects execution. Accuracy and recovery cost depend on the workload and microarchitecture; measure them for a named processor.
 
 **2-bit saturating counter** — simplest dynamic predictor:
 
 ```
-States: Strongly Not Taken (00) → Weakly Not Taken (01) →
-        Weakly Taken (10) → Strongly Taken (11)
+State:       00            01            10          11
+Prediction: not taken     not taken     taken       taken
 
-Must mispredict TWICE to switch direction.
-Good for loops: only mispredicts on entry and exit (vs 1-bit: every exit).
+On a taken outcome: increment, saturating at 11.
+On a not-taken outcome: decrement, saturating at 00.
+Two opposite outcomes are needed to change prediction from a STRONG state;
+one is enough from a weak state. Initialization and branch history matter.
 ```
 
 **Two-level correlating predictor** — uses global branch history to predict:
@@ -289,35 +267,20 @@ Index into Pattern History Table (PHT):
 Captures correlations: "this branch is taken if the previous two were also taken"
 ```
 
-**TAGE (Tagged Geometric History Length)** — state-of-the-art in modern CPUs:
-
-```
-Multiple predictor tables with geometrically increasing history lengths:
-  Table 0: bimodal (no history)
-  Table 1: 8-cycle history
-  Table 2: 32-cycle history
-  Table 3: 128-cycle history
-  Table 4: 512-cycle history
-
-Prediction = table with longest matching history
-Accuracy: 97–98% on SPEC benchmarks
-Used in: AMD Zen, Intel Golden Cove, ARM Neoverse
-```
+**Longer-history predictors:** several tables can track different lengths of prior branch history. Tagged entries help distinguish contexts that share an index. The useful lesson is that prediction depends on patterns, capacity, and aliasing; do not infer a product's exact predictor design or accuracy from this sketch.
 
 **Additional predictor hardware:**
 
 | Structure | Purpose |
 |-----------|---------|
 | **Branch Target Buffer (BTB)** | Caches `branch PC → target address` (no need to decode to know target) |
-| **Return Stack Buffer (RSB)** | Stack of return addresses — predicts `ret` targets with ~100% accuracy |
+| **Return Stack Buffer (RSB)** | Tracks likely return addresses; nesting and context changes affect prediction |
 | **Indirect Branch Predictor** | Predicts target of `jmp [reg]` (virtual function calls) |
 | **Loop Predictor** | Counts iterations — predicts loop exit after N iterations |
 
-**Cost of misprediction:**
+**Illustrative cost model (assumed values, not a processor measurement):**
 
 ```
-5-stage pipeline: flush 2 instructions → 2-cycle penalty
-20-stage pipeline (modern OoO): flush 10–20 instructions → 10–20 cycle penalty
 4-wide superscalar × 15 cycles = 60 wasted instruction slots per mispredict
 
 If 5% of instructions are branches with 96% accuracy:
@@ -327,26 +290,21 @@ If 5% of instructions are branches with 96% accuracy:
 
 ---
 
-## 4. Memory Hierarchy — The Real Bottleneck
+## 4. Memory Hierarchy — Account for Data Movement
 
-Memory access time is the dominant constraint for AI workloads. A GPU with 1,000 TFLOPS of compute can be throttled to 10 TFLOPS effective throughput by insufficient memory bandwidth.
+Fast arithmetic units are useful only when operands arrive in time. Data movement can limit an AI workload even when peak compute is high; the limiting resource depends on shape, reuse, and implementation.
 
 ### 4.1 The Memory Mountain
 
-```
-Level          | Latency    | Bandwidth     | Capacity  | Location
-───────────────────────────────────────────────────────────────────
-Registers      | 0 cycles   | unlimited     | ~KB       | on-core
-L1 cache       | 4 cycles   | ~1 TB/s       | 32–64 KB  | per-core
-L2 cache       | 12 cycles  | ~500 GB/s     | 256 KB–4 MB  per-core/cluster
-L3 cache       | 40 cycles  | ~200 GB/s     | 8–64 MB   | shared (CPU)
-               |            |               |           |
-DRAM (DDR5)    | 70 ns      | 50–100 GB/s   | 16–512 GB | off-chip
-HBM3 (GPU)     | 100 ns     | 3.35 TB/s     | 80–192 GB | off-chip stacked
-NVMe SSD       | ~100 µs    | 7 GB/s        | TB        | storage
-```
+| Resource | What it holds | Constraint to investigate |
+|---|---|---|
+| Registers | Thread-local live values | Finite capacity, operand ports, instruction dependencies |
+| L1 cache / shared memory | Data close to an execution unit | Locality, banking, capacity, allocation |
+| L2 / last-level cache | Data reused across a larger region | Working set, sharing, contention |
+| DRAM / HBM | Main working memory | Sustained bandwidth, access latency, capacity |
+| Storage | Persistent models and datasets | I/O latency, throughput, filesystem behavior |
 
-**The gap is enormous.** Registers are 10,000× faster than DRAM. Cache hierarchy exists entirely to bridge this gap.
+Registers do not provide zero-latency computation or unlimited bandwidth. Cache and DRAM timings vary by processor, load, access pattern, and clock. A single CPU/GPU timing table cannot supply constants for every platform. Name the boundary and measure: dependent loads reveal latency; independent streams can reveal throughput. Cache reuse can reduce traffic reaching the slower levels.
 
 ### 4.2 Cache Organisation
 
@@ -357,11 +315,12 @@ Address bits:  [  Tag  ] [  Index  ] [ Offset ]
                    ↓          ↓
                Compare    Select set   Byte within line
 
-8-way set-associative example (64-byte lines, 8 MB L3):
-  Sets = 8 MB / (8 ways × 64 bytes) = 16,384 sets
+Illustrative 8-way set-associative cache (64-byte lines, 8 MiB):
+  Sets = 8 MiB / (8 ways × 64 bytes) = 16,384 sets
   Index bits  = log2(16,384) = 14
   Offset bits = log2(64)     = 6
-  Tag bits    = 64 - 14 - 6  = 44
+  Tag bits    = address bits - index bits - offset bits
+  (use the relevant physical/virtual address width, not pointer width blindly)
 ```
 
 **Associativity trade-off:**
@@ -436,49 +395,32 @@ TLB hierarchy:
 **Huge pages** reduce TLB pressure:
 
 ```
-4 KB pages: 4 GB working set = 1M pages → TLB covers only 64 × 4 KB = 256 KB
-2 MB pages: 4 GB working set = 2K pages → TLB covers 64 × 2 MB = 128 MB
+4 KiB pages: 4 GiB working set = 1,048,576 pages → 64 entries cover 256 KiB
+2 MiB pages: 4 GiB working set = 2,048 pages → 64 entries cover 128 MiB
 
-For AI: HBM-resident model weights benefit from huge pages (fewer TLB misses on GPU)
-Linux: echo 1024 > /proc/sys/vm/nr_hugepages
+Analytical coverage examples: 4 GiB, 4 KiB / 2 MiB pages, 64-entry TLB.
+Actual page size and translation support depend on the allocation and device.
 ```
 
 ### 4.5 DRAM and HBM
 
-**DDR5 (CPU memory):**
-- Bandwidth: ~50–100 GB/s per channel (8 channels on EPYC = 800 GB/s)
-- Latency: ~70–80 ns
-- Capacity: up to 512 GB per socket
+**DDR example:** a channel transferring 6,400 million transfers/s over 64 data bits has a theoretical payload rate of `6,400×10⁶ × 8 = 51.2 GB/s`. Eight such channels give `409.6 GB/s` before protocol losses and workload effects. Installed DIMMs, supported rates, channel population, and access pattern determine the useful rate. Capacity and latency are separate properties.
 
-**HBM3 (GPU memory) — the key innovation for AI:**
+**HBM:** stacked DRAM connects through many short, wide interfaces within an advanced package. The number of stacks, interface rate, enabled capacity, and packaging differ by product. Compare an exact SKU's bandwidth with measured sustained traffic rather than assuming a fixed HBM-to-GDDR multiplier.
 
-```
-Traditional GDDR:            HBM (High Bandwidth Memory):
-  Package ─── PCB ──── GPU     GPU die
-                               ━━━━━━━━━
-                               ▓▓▓▓▓▓▓▓  ← HBM stack (stacked DRAM dies)
-                               ━━━━━━━━━
-                               Silicon interposer (CoWoS)
-
-Bus width: 32 bits            Bus width: 1,024 bits per stack
-Bandwidth: ~600 GB/s          Bandwidth: 3.35 TB/s (H100 SXM)
-```
-
-HBM achieves 5× higher bandwidth than GDDR because it uses a **wide, short bus** (1,024 bits × multiple stacks) instead of a narrow, long one. The GPU die and HBM stacks sit on the same silicon interposer — this is CoWoS (Chip-on-Wafer-on-Substrate) packaging.
-
-**AI connection:** LLM inference is almost entirely memory-bandwidth-bound. The rate at which you can load model weights from HBM determines tokens/second — compute is secondary.
+**AI connection:** low-batch autoregressive decode often has little reuse of model weights per token. Batching, prefill, attention length, cache behavior, quantization overhead, and communication can change the limiting resource. “All LLM inference is memory-bound” is not a useful universal rule.
 
 ---
 
 ## 5. SIMD — One Instruction, Many Data
 
-SIMD is the bridge between CPU vector units and GPU Tensor Cores. The same idea — execute one operation on a wide register of packed data — scales from 128-bit NEON to 512-bit AVX-512 to a 32-wide GPU warp.
+SIMD applies one instruction to several packed data elements. SIMT exposes threads that may follow different control-flow paths, and matrix units expose matrix operations. These models share data parallelism, but their programming and synchronization rules differ.
 
 ### 5.1 How SIMD Works
 
 ```
 Scalar (no SIMD):                   SIMD (4-wide FP32):
-  a[0] = b[0] * c[0]   4 cycles       [a0 a1 a2 a3] = [b0 b1 b2 b3]
+  a[0] = b[0] * c[0]   4 scalar multiplies       [a0 a1 a2 a3] = [b0 b1 b2 b3]
   a[1] = b[1] * c[1]                                 × [c0 c1 c2 c3]
   a[2] = b[2] * c[2]                  1 instruction, 4 results
   a[3] = b[3] * c[3]
@@ -491,7 +433,7 @@ Scalar (no SIMD):                   SIMD (4-wide FP32):
 | ARM64 | NEON | 128 bits | 4 | Yes (FMLA) |
 | ARM64 | SVE/SVE2 | 128–2048 bits (scalable) | 4–64 | Yes |
 | x86-64 | SSE4.2 | 128 bits | 4 | No |
-| x86-64 | AVX2 | 256 bits | 8 | Yes (FMA3) |
+| x86-64 | AVX2 | 256 bits | 8 | FMA is a separate feature to check |
 | x86-64 | AVX-512 | 512 bits | 16 | Yes |
 | RISC-V | RVV | 128–65,536 bits (scalable) | variable | Yes |
 
@@ -509,7 +451,8 @@ float dot_scalar(const float* a, const float* b, int N) {
 #include <immintrin.h>
 float dot_avx2(const float* a, const float* b, int N) {
     __m256 acc = _mm256_setzero_ps();
-    for (int i = 0; i < N; i += 8) {
+    int i = 0;
+    for (; i + 8 <= N; i += 8) {
         __m256 va = _mm256_loadu_ps(&a[i]);
         __m256 vb = _mm256_loadu_ps(&b[i]);
         acc = _mm256_fmadd_ps(va, vb, acc);   // acc += va * vb (8-wide FMA)
@@ -520,10 +463,15 @@ float dot_avx2(const float* a, const float* b, int N) {
     lo = _mm_add_ps(lo, hi);
     lo = _mm_hadd_ps(lo, lo);
     lo = _mm_hadd_ps(lo, lo);
-    return _mm_cvtss_f32(lo);
+    float result = _mm_cvtss_f32(lo);
+    for (; i < N; ++i) result += a[i] * b[i]; // scalar tail: no out-of-bounds read
+    return result;
 }
-// Speedup vs scalar: ~6–7× (limited by memory bandwidth for large N)
+// Requires AVX2 and FMA support; compile with matching flags and check the target.
+// Different reduction order and FMA rounding require a stated floating-point tolerance.
 ```
+
+**Tested here:** this example was compiled with GCC 13.3.0, `-O2 -mavx2 -mfma -fsanitize=address,undefined`, and compared with the scalar reference for `N = 0, 1, 7, 8, 9, 17, 101` on an AVX2/FMA-capable x86 host. All comparisons passed with no sanitizer report. This validates the tail handling for those cases, not a speedup claim.
 
 ### 5.3 SIMD → GPU SIMT
 
@@ -535,10 +483,10 @@ CPU SIMD (AVX-512):              GPU SIMT (warp of 32):
   16 FP32 lanes                    32 "lanes" = 32 threads
   all same operation                all same operation (PC)
   same data register               each thread has own registers
-  no divergence possible           divergence possible but costly
+  mask/select per vector lane      per-thread paths can diverge
 ```
 
-Tensor Cores go further — a single `wmma::mma_sync` instruction operates on an entire 16×16×16 matrix fragment, effectively 4,096-wide for FP16.
+Tensor Cores perform matrix multiply-accumulate work. A supported `wmma::mma_sync` call describes a cooperative warp operation on matrix fragments; it is not 4,096 independent scalar lanes or a promise of one machine instruction. Fragment shapes and instruction forms depend on type and architecture.
 
 ---
 
@@ -550,29 +498,11 @@ The CUDA programming model is covered in Section 4. Here we look at the **hardwa
 
 The GPU is a collection of SMs. Every kernel launch distributes thread blocks across available SMs.
 
-```
-One SM (NVIDIA Ampere A100):
-┌─────────────────────────────────────────────────────────┐
-│  4 × Warp Schedulers (issue 1 warp/cycle each)          │
-│                                                         │
-│  4 × Dispatch Units                                     │
-│  ───────────────────────────────────────────────────    │
-│  64 × CUDA Cores (FP32)   │  32 × INT32 cores          │
-│   4 × Tensor Core units   │   4 × FP64 cores           │
-│  16 × Load/Store units    │   4 × SFU (sin, cos, etc.) │
-│  ───────────────────────────────────────────────────    │
-│  192 KB unified shared memory / L1 cache (configurable) │
-│  256 KB register file (32-bit registers per SM)         │
-│                                                         │
-│  Max 1,536 resident threads (48 warps × 32 threads)     │
-└─────────────────────────────────────────────────────────┘
-```
-
-A100 has 108 SMs → 108 × 64 = 6,912 CUDA cores; 108 × 4 = 432 Tensor Core units.
+A concrete memory/occupancy example is A100 (compute capability 8.0): an SM supports up to 64 resident warps, a 64K-entry 32-bit register file, and a 192 KB combined L1/shared-memory resource, with shared-memory carveout up to 164 KB. These are hardware ceilings, not guarantees that any one kernel reaches them. Register use, shared memory, and block size can reduce occupancy. Compute capability 8.6 has different limits; do not mix its 48-warp ceiling into an A100 diagram. [NVIDIA Ampere tuning guide](https://docs.nvidia.com/cuda/ampere-tuning-guide/index.html#occupancy).
 
 ### 6.2 SIMT Execution and Warp Scheduling
 
-All 32 threads in a warp execute the **same instruction** every cycle. When a warp stalls (e.g., waiting for a global memory load that takes 300+ cycles), the warp scheduler **instantly switches** to another ready warp — zero overhead context switch because each warp has its own dedicated register file.
+A warp scheduler selects an eligible warp to issue an instruction. Resident threads retain their state in the SM register file, so selecting another ready warp does not require an OS-style context save. Issue opportunities still depend on dependencies, execution pipelines, scheduling rules, and available work; not every warp executes every cycle.
 
 ```
 Cycle 100: Warp 0 issues LOAD (takes 200+ cycles to return)
@@ -583,31 +513,24 @@ Cycle 103: Warp 3
 Cycle 300: Warp 0's data arrives; it becomes eligible again
 ```
 
-This **latency hiding through massive parallelism** is the GPU's secret: it tolerates 300-cycle memory latency by having 40+ other warps to run while waiting. The CPU hides latency with 10 MB of cache; the GPU hides latency with thousands of threads.
+This timeline is illustrative, not a measured latency. Other ready work can hide some latency, but extra occupancy helps only while it provides useful independent work. Both CPUs and GPUs also depend on caches and data reuse.
 
 ### 6.3 GPU Memory Hierarchy
 
-```
-Thread-private:
-  Registers (fastest)      — local variables, per-thread, ~255 registers each
-  Local memory (slowest)   — register spill → goes to global memory
+| CUDA resource | Scope and purpose | Common mistake |
+|---|---|---|
+| Registers | Per-thread values backed by a finite SM register file | Assuming every local variable stays in a register |
+| Local memory | Per-thread address space backed by device memory and caches | Assuming “local” means physically nearby |
+| Shared memory | Explicitly managed block storage; some features extend access across a cluster | Forgetting barriers, bank conflicts, or capacity limits |
+| L1 / L2 caches | Hardware-managed reuse within the architecture's hierarchy | Treating every global load as an HBM transaction |
+| Global memory | Device-wide allocation space | Ignoring transfers, access patterns, and lifetime |
+| Constant / texture access paths | Specialized read behavior and caching | Assuming their performance is identical for every access pattern |
 
-Block-shared:
-  Shared memory (fast)     — 16–164 KB per SM, programmer-managed, ~4–10 cycles
-  L1 cache (fast)          — same SRAM bank as shared memory, automatic
-
-Device-wide:
-  L2 cache                 — 40–50 MB on H100, shared across all SMs, ~100 cycles
-  Global memory (HBM)      — 80–192 GB, 3.35 TB/s, ~300–400 cycles
-  Constant memory          — 64 KB, cached in L1, read-only
-  Texture memory           — spatial locality cache, hardware interpolation
-```
-
-**Shared memory is the programmer's L1.** Tiled matrix multiplication explicitly loads a tile from global memory into shared memory, so each value is read from HBM once but used many times by threads in the block.
+A tiled matrix multiply stages values for reuse. Whether a value is fetched once from HBM depends on the tiling, cache behavior, and full execution, not merely on using shared memory. Query limits for the exact GPU and kernel.
 
 ### 6.4 Tensor Cores
 
-Tensor Cores are hardwired matrix-multiply-accumulate (MMA) units that compute a 16×16×16 matrix product in a single "instruction":
+Tensor Cores accelerate matrix multiply-accumulate (MMA). The following 16×16×16 operation is a mathematical example; the compiler may lower it to multiple architecture-specific instructions:
 
 ```
 D = A × B + C
@@ -616,14 +539,9 @@ D = A × B + C
   C: 16×16 accumulator (FP32)
   D: 16×16 result (FP32)
 
-Throughput on H100 SXM:
-  FP16  Tensor Core: 989  TFLOPS
-  BF16  Tensor Core: 989  TFLOPS
-  FP8   Tensor Core: 1,979 TFLOPS
-  FP32  CUDA Core:   67   TFLOPS  ← 14.7× slower!
 ```
 
-Every major AI training and inference framework ultimately generates `cublasSgemm` / `cublasHgemm` calls that map to Tensor Core wmma instructions.
+Peak throughput depends on data type, accumulation mode, sparsity assumptions, device SKU, and clock. A matrix-unit peak and scalar FP32 peak describe different operations; they are not an application speedup measurement. Frameworks may dispatch to cuBLAS, cuBLASLt, cuDNN, compiler-generated kernels, or other paths. Inspect the actual call and generated kernel rather than assuming every matrix operation becomes a particular `wmma` instruction.
 
 ---
 
@@ -631,7 +549,7 @@ Every major AI training and inference framework ultimately generates `cublasSgem
 
 ### 7.1 Systolic Arrays
 
-A systolic array is a grid of identical processing elements (PEs) where data flows rhythmically through neighbours. Google's TPU uses a 256×256 systolic array.
+A systolic array is a grid of processing elements (PEs) where data moves between neighbours in a scheduled pattern. Array shape, data type, buffering, and dataflow are architecture choices; they are not fixed across every TPU or accelerator generation.
 
 ```
 Input matrix A rows flow →→→→→→→→
@@ -644,18 +562,17 @@ Weight matrix B cols flow ↓↓↓↓↓↓↓
      PE(2,0) → PE(2,1) → PE(2,2) → ...
 
 Each PE: accumulator += A_val × B_val
-Result flows out the bottom
+Result location and movement depend on the chosen dataflow.
 
-Advantage: weights loaded once, reused across entire array → minimal memory traffic
+Potential benefit: nearby reuse reduces repeated transfers.
+Account for input skew, pipeline fill/drain, partial sums, and edge tiles.
 ```
 
-**NVIDIA Tensor Cores are essentially a 16×16 systolic array** implemented in SRAM-adjacent logic.
+A matrix instruction specifies an operation, not a public transistor-level layout. Do not infer that a Tensor Core is a particular systolic array merely from the fragment shape.
 
 ### 7.2 Dataflow Architectures
 
-Traditional CPUs/GPUs: **von Neumann** — load operands → execute → store result → repeat. Memory traffic dominates.
-
-Dataflow: operations fire as soon as operands arrive. No central memory round-trip.
+In a dataflow view, operations become eligible when their inputs are available. An accelerator can keep intermediate values near the operations that consume them. CPUs and GPUs also retain intermediates in registers and caches; the comparison below deliberately illustrates a poor unfused memory path, not an unavoidable CPU/GPU behavior.
 
 ```
 Von Neumann:                     Dataflow:
@@ -673,23 +590,22 @@ SambaNova SN40L, Cerebras WSE-3, and Graphcore IPU are commercial dataflow archi
 
 ### 7.3 NPUs — Neural Processing Units
 
-Dedicated inference accelerators in mobile/edge SoCs:
+An NPU dedicates hardware and software support to selected neural-network operations. Support can vary by operator, tensor shape, precision, layout, and runtime version. Unsupported operations may fall back to a CPU or GPU and introduce copies or synchronization.
 
-| Chip | NPU | Peak INT8 | Architecture |
-|------|-----|-----------|--------------|
-| Apple M4 | 16-core Neural Engine | 38 TOPS | Apple proprietary |
-| Qualcomm Snapdragon X Elite | Hexagon NPU | 45 TOPS | Qualcomm proprietary |
-| Intel Core Ultra 200V | AI Boost NPU | 48 TOPS | Intel proprietary |
-| Google Tensor G4 | TPU v5 lite | ~30 TOPS | Systolic array |
-| NVIDIA Jetson Orin NX | DLA v2 | 57 TOPS (DLA+GPU) | Mixed |
+| Question before deployment | Evidence |
+|---|---|
+| Can the model run correctly? | Supported-operator report and reference comparison |
+| Does it run on the NPU throughout? | Partition/fallback report and runtime trace |
+| Does it help this robot? | End-to-end age, power, thermal, and quality measurements |
+| Can the result be reproduced? | Exact SoC, runtime/compiler, model, and configuration revisions |
 
-NPUs trade flexibility for efficiency: they are optimised for a fixed set of layer types (conv, matmul, elementwise) at reduced precision (INT8/FP16), consuming 10–50× less power than a discrete GPU for the same throughput.
+A vendor TOPS figure alone does not establish model throughput or energy efficiency. Count supported precision and sparsity assumptions, then benchmark the workload within its latency and accuracy constraints.
 
 ---
 
 ## 8. The Roofline Model — Your Most Important Analysis Tool
 
-The roofline model answers the single most important question about any kernel or workload: **are you memory-bound or compute-bound?**
+The roofline model compares a compute ceiling with a data-movement ceiling. It helps form a bottleneck hypothesis; dispatch overhead, dependencies, synchronization, and poor utilization can keep an implementation below both roofs.
 
 ### 8.1 Arithmetic Intensity
 
@@ -698,8 +614,9 @@ Arithmetic Intensity (AI) = FLOPs executed / Bytes transferred from memory
 
 Examples:
   Vector addition  y = a + b:        1 FLOP / 12 bytes = 0.08 FLOP/byte  (memory-bound)
-  Matrix multiply  C = A × B (N=1K): 2N³ FLOPs / 3N² × 4 bytes          (compute-bound)
-    = 2×10⁹ / 12×10⁶ ≈ 167 FLOP/byte
+  Matrix multiply  C = A × B (N=1000): 2N³ FLOPs / (3N² × 4 bytes)
+    = 2×10⁹ / 12×10⁶ ≈ 167 FLOP/byte (ideal one-read/one-write traffic)
+  Compare intensity with the chosen device/precision roof; 167 is not automatically compute-bound.
   FP32 matrix-vector multiply:       about 2 FLOP / 4 weight bytes = 0.5
   FP16 matrix-vector multiply:       about 2 FLOP / 2 weight bytes = 1.0
   (large matrix, no weight reuse, input/output traffic omitted)
@@ -710,7 +627,7 @@ Examples:
 
 ```
 TFLOPS (log)
- │                          ───────────────── Peak compute (989 TFLOPS FP16)
+ │                          ───────────────── Assumed compute roof (989 TFLOPS)
  │                      ╱
  │                  ╱  ╲── compute-bound region
  │              ╱        (more compute = more speed)
@@ -719,7 +636,8 @@ TFLOPS (log)
  │  ╱       (memory-bound region: more bandwidth = more speed)
  └──────────────────────────────────────────── Arithmetic Intensity (FLOP/byte)
          ↑
-    Ridge point ≈ 989 TFLOPS / 3.35 TB/s ≈ 295 FLOP/byte (H100)
+    Illustrative ridge ≈ 989 TFLOPS / 3.35 TB/s ≈ 295 FLOP/byte
+    Replace both assumptions with the named device and precision mode.
 
 Below this ridge, the bandwidth roof is lower than the selected compute roof.
 This predicts a ceiling; latency, dependencies, and low utilization may dominate first.
@@ -727,24 +645,17 @@ This predicts a ceiling; latency, dependencies, and low utilization may dominate
 
 ### 8.3 Where AI Workloads Live
 
-The ranges below illustrate possible implementations, not fixed properties of an operator. The low decode figure corresponds to FP32 weight streaming; batch, precision, cache reuse, and tiling can move the same workload substantially.
+Follow the changing shape instead of assigning an operator one permanent intensity:
 
-```
-AI (FLOP/byte)      Workload                    Bound
-─────────────────────────────────────────────────────────
-0.5                 LLM decoding (batch=1)       Severely memory-bound
-2–5                 Batch norm, layer norm        Memory-bound
-10–30               Transformer attention         Memory-bound
-50–100              Small batch matmul            Borderline
->295                Large matmul (batch≥64)       Compute-bound
-```
+| Workload change | Predicted effect to test | What may invalidate it |
+|---|---|---|
+| Reuse weights across a batch | More operations per weight byte | Queue delay, memory capacity, insufficient kernel support |
+| Fuse two elementwise operators | Fewer intermediate reads/writes | Register pressure, repeated work, changed numerical behavior |
+| Tile a matrix multiply | More reuse near execution units | Small or irregular shapes, capacity limits, edge handling |
+| Quantize FP16 weights to INT8 | Half the ideal payload bytes | Scales, metadata, padding, conversion, accuracy loss |
+| Increase sequence length | More attention work and cache traffic | Attention variant, caching, tiling, and sparsity |
 
-**Practical implication:** Improving LLM inference token rate requires:
-1. Larger batches (increase arithmetic intensity)
-2. More HBM bandwidth (H100 → H200: 3.35 → 4.8 TB/s)
-3. Weight quantisation: relative to FP16, ideal payload size falls 2× for INT8 and 4× for INT4, before scales, padding, and metadata. This changes bytes per weight, not physical bandwidth. Dequantization and kernel support affect the result.
-
-Use this reasoning only after confirming the actual bottleneck. Clock changes can still affect compute, latency hiding, and memory behavior.
+A robot's latency budget may rule out batching even when batching improves throughput. Use the [freshness lab](../../Phase%202%20-%20Embedded%20Systems/Labs/Observation-Freshness.md) to see how a queue changes capture-to-output age.
 
 ---
 
@@ -757,7 +668,7 @@ Not all code parallelises. Amdahl's Law predicts the maximum speedup from parall
 ```
 Speedup = 1 / ((1 − P) + P/N)
 
-P = fraction of code that is parallel
+P = fraction of baseline execution TIME that benefits from ideal parallelism
 N = number of cores/processors
 ```
 
@@ -766,20 +677,18 @@ N = number of cores/processors
 | Cores | Speedup | Efficiency |
 |-------|---------|------------|
 | 1     | 1.0×    | 100%       |
-| 4     | 3.5×    | 87%        |
-| 16    | 10.9×   | 68%        |
-| 64    | 28.6×   | 45%        |
+| 4     | 3.77×   | 94%        |
+| 16    | 12.31×  | 77%        |
+| 64    | 28.32×  | 44%        |
 | ∞     | 50.0×   | → 0%       |
 
 The serial 2% becomes the bottleneck. No amount of cores can exceed 50× speedup.
 
-**For AI workloads:**
-- **Data parallelism (batching):** near-linear scaling if minimal synchronisation
-- **Model parallelism (split across GPUs):** limited by all-reduce communication
-- **Pipeline parallelism:** scales linearly if stages are balanced
-- **Real-world multi-GPU scaling:** 80% efficiency typical; doubling GPUs → expect ~1.6–1.8× throughput
+**For AI workloads:** communication, imbalance, pipeline bubbles, input loading, and changed batch size can all violate ideal scaling assumptions. Report useful work per second and quality at a fixed workload, then separate strong scaling (fixed total work) from weak scaling (work grows with device count). A fixed “typical efficiency” is not a prediction for your system.
 
 ### 9.2 Profiling Tools
+
+**Command status:** the following are upstream-style exercise templates for your own `./program`; they were not run here. Install compatible tools, query available counters, and account for profiler overhead. The [Nsight Compute profiling guide](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html) explains metric selection, replay, and collection overhead.
 
 **CPU profiling (Linux):**
 
@@ -788,7 +697,7 @@ The serial 2% becomes the bottleneck. No amount of cores can exceed 50× speedup
 perf stat -e cache-references,cache-misses,L1-dcache-misses,branches,\
           branch-misses,instructions,cycles ./program
 
-# Record + flamegraph
+# Record + flamegraph (the two Perl scripts require a separate FlameGraph checkout)
 perf record -F 99 -g ./program
 perf script | stackcollapse-perf.pl | flamegraph.pl > profile.svg
 ```
@@ -813,117 +722,69 @@ cg_annotate cachegrind.out.*
 ```
 
 **Benchmarking checklist:**
-- Disable CPU turbo boost for reproducibility
-- Pin threads to cores (`taskset -c 0-7 ./program`)
-- Warm up (run once before timing)
-- Report median of N runs (not mean — skew from outliers)
+
+- Record CPU/GPU, clock/power policy, temperature, OS, compiler, and command line. Decide whether the question concerns normal deployment behavior or a controlled clock experiment.
+- Record thread placement and background load; pin threads only when it matches the experiment.
+- Separate initialization/cold starts from steady state and choose sufficient warmup.
+- Save raw repeated samples, sample count, median, and tail observations. Include mean or other statistics when they answer the stated question.
+- Check correctness before timing and repeat the comparison on an unfamiliar shape.
 
 ### 9.3 Bottleneck Diagnosis
 
-| Symptom | Root cause | Fix |
-|---------|-----------|-----|
-| Using <20% peak FLOPS | Memory-bound | Increase arithmetic intensity (batch, tile, fuse) |
-| High L3 cache miss rate | Poor locality | Tile/block, change data layout, prefetch |
-| Low IPC (<1.5 on OoO CPU) | Data dependencies | Reorder code, unroll loops, reduce dependency chains |
-| High branch mispredict % | Irregular control | Branchless code (`cmov`), predication, sort input |
-| GPU SM occupancy <50% | Register/shared mem pressure | Reduce per-thread registers, smaller blocks |
-| GPU memory throughput low | Uncoalesced access | Ensure threads in warp access contiguous addresses |
+| Observation | Competing explanations | Next measurement |
+|---|---|---|
+| Low compute utilization | Memory stalls, dependencies, tiny grid, dispatch gaps | Timeline, bytes moved, eligible warps / CPU stalls |
+| Many last-level misses | Large streaming workload or poor locality | Requested bytes, cache reuse, tiling comparison |
+| Low IPC | Dependencies, cache misses, branch recovery, instruction mix | Cycles and relevant stall/branch counters |
+| Low occupancy | Resource limits or small launch | Register/shared-memory allocation and launch size |
+| Low memory throughput | Too little parallel work, uncoalesced access, cached data | Traffic at each cache/memory boundary and transaction efficiency |
 
-**Case study — naive vs tiled matrix multiply:**
+No single percentage identifies a root cause. For example, low occupancy can still accompany an efficient kernel with enough instruction-level parallelism.
 
-```c
-// Naive: ~50 GFLOPS (memory-bound, AI ≈ 0.25 FLOP/byte)
-for (int i = 0; i < N; i++)
-    for (int j = 0; j < N; j++)
-        for (int k = 0; k < N; k++)
-            C[i][j] += A[i][k] * B[k][j];
-
-// Tiled with 64×64 blocks: ~450 GFLOPS (compute-bound, AI ≈ 85 FLOP/byte)
-// 9× improvement from cache locality — not SIMD, not clock speed.
-```
+**Worked hypothesis:** a row-major naive matrix multiply repeatedly accesses a column of `B`. Tiling may improve locality, but the size of the gain depends on cache, compiler, shape, and implementation. Start with zero-initialized `C`, compare with a reference, test edge tiles, and report actual results. Do not attach invented GFLOP/s values to an unmeasured snippet.
 
 ---
 
-## 10. Real-World Case Studies
+## 10. Workload Case Studies for AI and Robotics
 
-### 10.1 Apple M4
+These are design exercises with stated assumptions, not measurements from named products. They connect the architecture vocabulary to a decision you can defend.
 
-```
-Performance Cores (P-cores): 4× custom (wide OoO, ~8-wide decode)
-  L1: 192 KB (64 KB I$, 128 KB D$)
-  L2: 12 MB per 2 cores
+### 10.1 A small robot policy
 
-Efficiency Cores (E-cores): 4× custom
-  L1: 128 KB, L2: 4 MB per 2 cores
+Assume a dense layer with 64 FP32 inputs and 32 outputs, used once per observation. Weights occupy `64×32×4 = 8192 bytes`, and the layer performs about `4096 FLOPs`. A high GPU peak says little about this tiny task: launch, synchronization, and transfers may dominate. A CPU may already hold the weights in cache.
 
-System Cache (L3): 20 MB shared
-Memory: LPDDR5x unified (up to 32 GB, ~120 GB/s)
-GPU: 10-core, ~4.3 TFLOPS FP32
-Neural Engine: 16-core, 38 TOPS INT8
-Process: TSMC N3E, ~20B transistors, 120 mm²
-```
+**Experiment:** compare one warmed CPU call with a GPU call, including the transfers actually required by the application. Keep a second GPU-only timing if useful, but label its smaller boundary. Add the result to the sensor-to-action budget. Do not infer that every small model belongs on a CPU: a fused pipeline with data already on a GPU is a different case.
 
-**Key design choices:**
-- **Unified memory** — CPU, GPU, and Neural Engine share the same LPDDR5x pool. No PCIe copies between CPU and GPU memory (unlike discrete GPU systems). This makes inference on Apple Silicon uniquely efficient for models that fit in RAM.
-- **Wide P-cores** — ~8-wide decode, 6+ IPC. Apple invests in single-thread performance because macOS/iOS workloads (UI, compilers, browsers) demand low latency.
-- **Efficiency-first design** — 20–30W total package. The entire M4 SoC uses less power than a single AMD desktop core under load.
+### 10.2 Camera perception
 
-### 10.2 AMD Ryzen 9 9950X (Zen 5)
+Assume one uncompressed `640×480` RGB8 frame at 30 frames/s. Payload alone is `640×480×3 = 921,600 bytes/frame`, or `27.648 MB/s`. Three full copies add traffic even before resizing and inference. Metadata, stride padding, and transport framing are excluded from this estimate.
 
-```
-Cores: 16× Zen 5 (OoO, 6-wide superscalar)
-  L1: 32 KB I$ + 32 KB D$ per core
-  L2: 1 MB per core
-  L3: 32 MB total (16 MB per CCX, 2 CCX chiplets)
+**Experiment:** draw where capture, resize, inference, and publication run. Count read/write bytes for each buffer copy and state which memory boundary they cross. Record capture time and the final publication time. An optimization that reduces kernel time while adding another frame of queue delay can make the robot's observation older.
 
-Memory: Dual-channel DDR5-5600 (up to 192 GB)
-Process: TSMC N4, Socket AM5
-TDP: 170W, boost up to 5.7 GHz
-```
+### 10.3 A batched language-model projection
 
-**Key design choices:**
-- **Chiplet architecture** — two 8-core CCD chiplets + separate I/O die (IOD). Chiplets are smaller (higher yield), and the IOD can use an older, cheaper process. This is how AMD competes with Intel on cost.
-- **3D V-Cache option** (9950X3D variant) — extra 64 MB L3 cache stacked vertically on top of CCD. Dramatically reduces gaming/simulation workloads that are L3-miss-bound.
-- **Per-core boost** — individual cores can boost to 5.7 GHz independently. Workload-adaptive power management maximises single-thread or multi-thread performance as needed.
+Assume an FP16 `1024×1024` projection. With one input vector, weights occupy 2 MiB and the operation has roughly 1 FLOP per weight byte. Processing eight vectors while reusing those weights increases that weight-only ratio toward 8 FLOP/byte; include input/output traffic before using it as a roofline point.
 
-### 10.3 Qualcomm Snapdragon X Elite (ARM-based PC)
+**Experiment:** sweep batch size and report time per batch, useful outputs/s, peak memory, and per-request age. Hold the input/output quality contract fixed. Throughput, individual latency, and queue delay are separate outcomes.
 
-```
-Cores: 12× Oryon custom ARM (OoO, wide superscalar, Nuvia-derived)
-  L1: 64 KB I$ + 64 KB D$ per core
-  L2: 1 MB per core, L3: 12 MB shared
+### 10.4 Compare devices with an evidence table
 
-GPU: Adreno X1 (~3.8 TFLOPS FP32)
-NPU: Hexagon, 45 TOPS INT8
-Memory: LPDDR5x-8448 (up to 64 GB)
-Process: TSMC N4, TDP 12W base / 30W sustained
-```
+| Field | Device A | Device B |
+|---|---|---|
+| Exact SKU, software, power mode | Record | Record |
+| Same input shapes and numerical criterion | Record | Record |
+| Timing boundary and warmup | Record | Record |
+| Raw latency distribution and useful throughput | Measure | Measure |
+| Sustained temperature/power and memory | Measure if available | Measure if available |
+| Missing capability or unsupported operator | Record | Record |
 
-**Key design choices:**
-- **ARM for laptops** — demonstrates that ARM can match x86 single-thread performance while consuming 5–10× less power. First serious competitor to Apple Silicon on Windows.
-- **On-device NPU** — 45 TOPS enables on-device LLM inference (Phi-2, Llama 7B quantised), voice recognition, and image generation without cloud connectivity.
-- **Software compatibility** — Windows Prism emulates x86 applications on ARM64 with ~80–90% native performance. Native ARM64 apps run at full speed.
-
-### 10.4 Architecture Comparison
-
-| Metric | Apple M4 | AMD 9950X | Snapdragon X Elite |
-|--------|----------|-----------|-------------------|
-| ISA | ARM64 | x86-64 | ARM64 |
-| Cores | 4P + 4E | 16 | 12 |
-| Single-thread | ~2500 (GB6) | ~2700 (GB6) | ~2400 (GB6) |
-| Multi-thread | ~10000 (GB6) | ~21000 (GB6) | ~9500 (GB6) |
-| TDP | 20–30W | 170W | 12–30W |
-| Perf/Watt | Excellent | Moderate | Excellent |
-| NPU | 38 TOPS | None | 45 TOPS |
-| Memory BW | ~120 GB/s | ~89 GB/s (DDR5) | ~135 GB/s |
-
-**Takeaway:** Apple M4 and Snapdragon X Elite show that ARM64 + unified memory + integrated NPU is the future of edge AI. AMD Zen 5 dominates in multi-core throughput for server/workstation workloads. The ISA matters less than the microarchitecture, memory system, and power budget.
+Use vendor documentation to describe capabilities and your measurements to describe workload behavior. An ISA name, advertised TOPS, or a benchmark score from another workload cannot fill the result rows.
 
 ---
 
 ## 11. Speculative Execution Security
 
-Speculative execution is essential for performance but creates side channels. Spectre and Meltdown (2017) showed that speculative loads leave traces in cache timing that leak secret data.
+Speculative execution can improve performance but can expose side channels. Spectre and Meltdown, publicly disclosed in 2018, showed that speculative loads can leave traces in cache timing that leak secret data. See the original [Project Zero disclosure](https://projectzero.google/2018/01/reading-privileged-memory-with-side.html).
 
 ```
 Spectre attack (simplified):
@@ -937,28 +798,23 @@ Spectre attack (simplified):
 4. Speculation is rolled back — but array2 cache state persists
 5. Attacker times access to array2 → deduces the secret byte
 
-Mitigation cost: 2–10% performance overhead on server workloads
 ```
 
-**Hardware mitigations:**
+Mitigation behavior and cost depend on the processor, kernel, enabled controls, and workload. Use platform security advisories and the current OS documentation; a fixed percentage beside a mitigation name is not a transferable performance estimate.
 
-| Mitigation | What it does | Performance cost |
-|-----------|--------------|------------------|
-| LFENCE | Serialise — stop speculating past this point | 2–5% |
-| IBPB | Flush branch predictor on context switch | 1–2% |
-| Retpoline | Replace indirect jumps with return-based trampoline | 1–5% |
-| STIBP | Restrict predictor sharing between SMT threads | 2–8% |
-| SSBD | Speculative Store Bypass Disable | 2–5% |
-
-**AI hardware impact:** GPU SIMT execution is less vulnerable — no speculative execution, no branch prediction, and warps don't share predictor state. But CPU-side code (model loading, preprocessing, serving) must still be patched.
+**AI hardware impact:** attack surfaces differ across CPU, GPU, driver, and shared-service boundaries. SIMT is not a blanket side-channel immunity claim. Consult the exact platform advisories and measure mitigation overhead on the deployed workload.
 
 ---
 
 ## 12. Labs
 
+### Lab 0 — A reference before profiling
+
+Complete [Numbers, shapes, and bytes](../Labs/Numbers-Shapes-and-Bytes.md) to establish a numerical reference, negative cases, and an analytical traffic boundary. It runs on a CPU with no third-party packages.
+
 ### Lab 1 — Cache Miss Profiling
 
-**Goal:** measure how access pattern affects cache performance; tie latency numbers to the memory mountain table.
+**Goal:** measure how access pattern affects cache performance. The following commands are **exercise templates**, not a supplied `matrix_transpose` binary or a tested installation recipe. Package names and available performance events depend on distribution, kernel, and CPU; check `perf list` and permissions.
 
 ```bash
 # Install perf and valgrind
@@ -976,7 +832,7 @@ cg_annotate cachegrind.out.*
 Write a 1024×1024 float matrix. Implement:
 - Row-major transpose (good spatial locality for reads, bad for writes)
 - Column-major transpose (bad for reads)
-- Tiled transpose (32×32 blocks) — should be fastest
+- Tiled transpose (start with 32×32 blocks) — predict and measure whether it improves locality
 
 **Deliverable:** table of L1/L2/L3 miss rates for each version; explain the difference.
 
@@ -986,12 +842,13 @@ Write a 1024×1024 float matrix. Implement:
 
 ```cpp
 // Compile and compare:
-// gcc -O2 -march=native -o dot dot.cpp        (auto-vectorise)
-// gcc -O0 -fno-tree-vectorize -o dot_scalar dot.cpp  (scalar)
+// g++ -O3 -march=native -o dot dot.cpp
+// g++ -O3 -fno-tree-vectorize -o dot_scalar dot.cpp
+// GCC exercise templates; inspect optimization reports and generated instructions.
 // Manual intrinsics version (see section 5.2)
 ```
 
-Benchmark with N = 10M floats. Use `perf stat` to verify SIMD instructions appear.
+Benchmark a size sweep, including sizes not divisible by eight, and verify outputs against the scalar reference. Use compiler vectorization reports and disassembly to inspect instructions; generic `perf stat` counters do not prove vectorization. Record warmup, repetitions, cache assumptions, and timing boundaries. Compare optimized builds so the claimed SIMD effect is not simply an `-O0` versus `-O3` effect.
 
 **Deliverable:** bandwidth (GB/s) for each version; compare to DRAM bandwidth ceiling.
 
@@ -1029,7 +886,7 @@ objdump -d matmul_x86  | grep -E "vmulps|vfmadd"
 objdump -d matmul_arm  | grep -E "fmla|fmul"
 ```
 
-**Deliverable:** instruction count, code size, and measured GFLOPS for each ISA (use QEMU for emulation if no native hardware).
+**Deliverable:** code size, selected instructions, and reference-checked outputs for each target. Use each target toolchain's `objdump` (or a compatible multi-target disassembler). QEMU can support functional testing; emulated timing is not native processor performance. Record native GFLOP/s only on the named hardware and mark unavailable measurements “not run.”
 
 ### Lab 5 — Branch Predictor Simulator
 
@@ -1057,31 +914,30 @@ Feed branch traces from real programs (gcc, matrix multiply, sort). Compare:
 - 2-bit saturating counter
 - Correlating predictor (GHR + PHT)
 
-**Deliverable:** accuracy table for each predictor; explain why correlating wins on nested loops.
+**Deliverable:** accuracy table for each predictor on a stated trace and initialization; explain which pattern helps or hurts each predictor. Correlating prediction is not guaranteed to win on every nested loop.
 
-### Lab 6 — Memory Bandwidth Measurement
+### Lab 6 — Access Pattern and Requested-Byte Rate
 
-**Goal:** measure actual memory bandwidth at each level of the hierarchy.
+**Goal:** distinguish a program's requested bytes from physical cache-line and DRAM traffic.
 
-```c
-#define MB (1024 * 1024)
-double measure_bandwidth(int* data, int size_bytes, int stride) {
-    volatile int sum = 0;
-    struct timespec start, end;
-    clock_gettime(CLOCK_MONOTONIC, &start);
-    for (int iter = 0; iter < 100; iter++)
-        for (int i = 0; i < size_bytes / sizeof(int); i += stride)
-            sum += data[i];
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    double elapsed = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
-    return (100.0 * size_bytes) / elapsed / 1e9;  // GB/s
-}
+For an array with `N` elements, positive stride `s` measured in **elements**, and `R` repetitions, the number of reads is `R × ceil(N/s)`. Compute requested bytes as that count times the element size, then divide by elapsed seconds. Counting the full array size for every strided pass overstates the rate when elements are skipped.
+
+**Exercise / pseudocode:**
+
+```text
+initialize the array outside the timed region
+choose N, stride_in_elements, repetitions, and an unsigned checksum type
+start a monotonic timer
+repeat R times:
+    for i = 0; i < N; i += stride_in_elements:
+        checksum += data[i]
+stop the timer and preserve checksum so the computation remains observable
+requested_GB_per_second = reads × bytes_per_element / elapsed_seconds / 1e9
 ```
 
-Test with array sizes: 16 KB (fits L1), 256 KB (fits L2), 8 MB (fits L3), 128 MB (DRAM).
-Vary stride: 1, 2, 4, 8, 16, 32 cache lines.
+A serial checksum dependency may limit this exercise before memory bandwidth does; inspect generated code and use independent accumulators or an established streaming benchmark when estimating sustained bandwidth. Signed integer overflow is not an acceptable way to prevent optimization.
 
-**Deliverable:** bandwidth vs array size plot — you should see clear L1/L2/L3/DRAM plateaus.
+Sweep working-set sizes relative to the actual processor's cache capacities, and sweep stride separately. A stride of 16 four-byte elements is 64 bytes; it is not 16 cache lines. Report requested-byte rate, checksum, elapsed time, and compiler options. Hardware counters are needed to estimate traffic at a particular cache or DRAM boundary. Cache transitions may be visible, but clean plateaus are not guaranteed.
 
 ### Lab 7 — OoO CPU Simulator (Capstone)
 
@@ -1145,6 +1001,18 @@ This section
 ---
 
 ## Resources
+
+### Check your understanding before moving on
+
+1. **Does 167 FLOP/byte guarantee that a matrix multiply is compute-bound?** No. Compare with the selected compute/bandwidth ridge. With the illustrative 295 FLOP/byte ridge it lies below the compute roof, and other constraints may reduce performance further.
+2. **A workload spends 2% of baseline time in serial work. What is its ideal speedup on four cores?** `1 / (0.02 + 0.98/4) ≈ 3.77`. Use time fractions, not the percentage of source-code lines.
+3. **Does a 32-thread warp mean every thread issues an instruction every clock?** No. Dependencies, scheduling, masking, and execution resources determine issue and completion.
+4. **Why test a vector dot product at N=9?** It exercises a full eight-element vector plus a scalar tail. Testing only multiples of eight hides an out-of-bounds bug.
+5. **A strided loop touches every sixteenth four-byte element. Can you count every array byte as read?** No. Count requested elements separately from transferred cache lines; use hardware evidence for a physical memory boundary.
+
+If one answer is uncertain, repeat that small example before adding a more complex accelerator. For the phase artifact, keep the raw measurements and explain one hypothesis that the data rejected.
+
+### Further reading
 
 | Resource | What for |
 |----------|----------|

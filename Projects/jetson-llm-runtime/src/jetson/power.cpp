@@ -18,6 +18,7 @@ static int read_sysfs_int(const char* path) {
 
 PowerState read_power_state() {
     PowerState ps = {};
+    ps.mode = POWER_UNKNOWN; ps.watts = -1;
 
     // GPU frequency
     ps.gpu_freq_mhz = read_sysfs_int(
@@ -46,7 +47,7 @@ PowerState read_power_state() {
     if (f) {
         char line[256];
         while (fgets(line, sizeof(line), f)) {
-            if (strstr(line, "MAXN"))  { ps.mode = POWER_MAXN; ps.watts = 25; break; }
+            if (strstr(line, "MAXN"))  { ps.mode = POWER_MAXN; ps.watts = -1; break; }
             if (strstr(line, "15W"))   { ps.mode = POWER_15W;  ps.watts = 15; break; }
             if (strstr(line, "10W"))   { ps.mode = POWER_10W;  ps.watts = 10; break; }
             if (strstr(line, "7W"))    { ps.mode = POWER_7W;   ps.watts = 7;  break; }
@@ -61,9 +62,8 @@ PowerState read_power_state() {
 }
 
 void set_power_mode(PowerMode mode) {
-    char cmd[64];
-    snprintf(cmd, sizeof(cmd), "nvpmodel -m %d 2>/dev/null", (int)mode);
-    system(cmd);
+    (void)mode;
+    fprintf(stderr, "[power] semantic mode has no portable nvpmodel ID; inspect the installed configuration\n");
 }
 
 void lock_clocks() {

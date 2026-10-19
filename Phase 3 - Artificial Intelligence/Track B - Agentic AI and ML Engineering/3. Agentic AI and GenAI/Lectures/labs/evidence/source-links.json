@@ -1,0 +1,94 @@
+{
+  "checked_utc": "2026-10-18T23:31:41.980256+00:00",
+  "method": "ordinary HTTP GET plus separately recorded browser-tool reads",
+  "sources": [
+    {
+      "url": "https://platform.claude.com/docs/en/about-claude/model-deprecations",
+      "browser_tool_read": true,
+      "status": 403,
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/build-with-claude/structured-outputs",
+      "browser_tool_read": true,
+      "status": 403,
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls",
+      "browser_tool_read": true,
+      "status": 403,
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "url": "https://developers.openai.com/api/docs/guides/function-calling",
+      "browser_tool_read": true,
+      "status": 200,
+      "final_url": "https://developers.openai.com/api/docs/guides/function-calling",
+      "bytes": 1478838,
+      "sha256": "8fe1917b7c0bd0faf1b8906eb250ca68b16dd577988f34737bc36c9affd4ac16"
+    },
+    {
+      "url": "https://developers.openai.com/api/docs/guides/structured-outputs",
+      "browser_tool_read": true,
+      "status": 200,
+      "final_url": "https://developers.openai.com/api/docs/guides/structured-outputs",
+      "bytes": 3287165,
+      "sha256": "cc5547af3fa2fa0c49fafaf0b5233ea562bb0387db15a9ce1abbfb5894522176"
+    },
+    {
+      "url": "https://developers.openai.com/api/docs/guides/reasoning",
+      "browser_tool_read": true,
+      "status": 200,
+      "final_url": "https://developers.openai.com/api/docs/guides/reasoning",
+      "bytes": 1096952,
+      "sha256": "09e630fe4f6933f06b026495dc2fed8bdfb94a60803e8b832ca82d16be393923"
+    },
+    {
+      "url": "https://developers.openai.com/api/docs/guides/agents",
+      "browser_tool_read": true,
+      "status": 200,
+      "final_url": "https://developers.openai.com/api/docs/guides/agents",
+      "bytes": 364603,
+      "sha256": "d3107e684cb05e00182b766b17669586e1f8659496e836f0326cd8420384b603"
+    },
+    {
+      "url": "https://docs.trychroma.com/reference/python/client",
+      "browser_tool_read": true,
+      "status": 200,
+      "final_url": "https://docs.trychroma.com/reference/python/client",
+      "bytes": 528304,
+      "sha256": "2ba9a5a7278e2aa5a40a45d9b480b63d8918bb23cf776cf6514b76996fca00fb"
+    },
+    {
+      "url": "https://cookbook.chromadb.dev/core/collections/",
+      "browser_tool_read": true,
+      "status": 403,
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "url": "https://dev.risczero.com/proof-system/",
+      "browser_tool_read": true,
+      "status": 200,
+      "final_url": "https://dev.risczero.com/proof-system/",
+      "bytes": 27391,
+      "sha256": "851d82021792e39798ad988aa8666579f311cd8adb0bf746b94776d1e5aec74f"
+    },
+    {
+      "url": "https://dev.risczero.com/api/trusted-setup-ceremony",
+      "browser_tool_read": true,
+      "status": 200,
+      "final_url": "https://dev.risczero.com/api/trusted-setup-ceremony",
+      "bytes": 35755,
+      "sha256": "9e4c9cc75c6ee4146c7a50612588cf93995e0a0d6dded4f255268f36d46d8d7b"
+    },
+    {
+      "url": "https://github.com/zkonduit/ezkl",
+      "browser_tool_read": true,
+      "status": 200,
+      "final_url": "https://github.com/zkonduit/ezkl",
+      "bytes": 342262,
+      "sha256": "83e2d0d4474d0e41df677dd4c5649fd35f05ee2913e8ea9be3ac48760e8d0e1e"
+    }
+  ]
+}

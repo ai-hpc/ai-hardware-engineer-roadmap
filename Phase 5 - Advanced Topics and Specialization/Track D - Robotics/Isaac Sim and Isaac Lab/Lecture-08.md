@@ -4,7 +4,9 @@
 
 Up to now the simulator has been a closed box: your Python script stepped it and read its state. A real robot software stack does not work like that. Nav2, MoveIt 2, perception nodes, and `ros2_control` controllers expect a robot that publishes `/clock`, `/tf`, `/joint_states` and sensor topics, and accepts commands, over DDS, at a steady rate. This lecture makes Isaac Sim 6.1 that robot.
 
-Two things make it hard. First, the integration surface changed in 6.x: OmniGraph publisher nodes no longer read prims themselves, sensor publish rates moved onto the sensor prim, and 6.1 added an in-process `ros2_control` Controller Manager. Second, a ROS-connected simulator has a **contract with wall-clock time**. Every camera you add costs render time, every image costs DDS bandwidth, and if the frame takes longer than its share of real time, the real-time factor falls below 1 and every node that assumed real time misbehaves.
+Two things make it hard. First, the integration surface changed in 6.x: publisher inputs and sensor-rate controls were revised, and 6.1 added an in-process `ros2_control` Controller Manager. Second, each integration needs an explicit clock contract. Every camera costs render time and bandwidth. A real-time factor below 1 matters when an operator or controller expects wall-clock progress; an all-simulation-time pipeline may correctly run slower. Check each component's clock and timeout behavior rather than treating RTF alone as a correctness verdict.
+
+**Before installing the simulator:** the [ROS 2 CPU integration lab](../Robotics%20Foundations/ROS2-Lab.md) already exercises real stamped-message transport, TF, and stale/future/frame rejection. Its measured evidence does not validate the Isaac bridge. Use the [compatibility record](Compatibility.md) to choose the correct host, ROS Python ABI, and full/kit-less workflow.
 
 By the end you should be able to:
 

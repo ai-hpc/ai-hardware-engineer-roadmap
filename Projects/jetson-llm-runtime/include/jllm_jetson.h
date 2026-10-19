@@ -1,7 +1,7 @@
 // jllm_jetson.h — Jetson hardware abstraction (power, thermal, clocks)
 //
 // Reads directly from sysfs/procfs — no NVIDIA SDK dependency.
-// Works on any JetPack 5.x / 6.x.
+// Paths must be checked against the installed BSP; universal release support is not claimed.
 
 #pragma once
 
@@ -12,7 +12,7 @@ namespace jllm {
 // ── Power mode ───────────────────────────────────────────────────────────
 
 enum PowerMode {
-    POWER_MAXN = 0,   // 25W — full performance
+    POWER_MAXN = 0,   // semantic label; MAXN is not a universal 25W limit
     POWER_15W  = 1,
     POWER_10W  = 2,
     POWER_7W   = 3,   // minimum — battery / fanless
@@ -30,7 +30,7 @@ struct PowerState {
 };
 
 PowerState read_power_state();
-void       set_power_mode(PowerMode mode);  // calls nvpmodel
+void       set_power_mode(PowerMode mode);  // legacy unsupported semantic-to-ID mapping
 void       lock_clocks();                   // calls jetson_clocks
 
 // ── Thermal ──────────────────────────────────────────────────────────────

@@ -62,3 +62,5 @@ Create two negative tests: an incorrect global scale and a block-axis swap. Show
 You should distinguish weight-only reconstruction from activation-aware execution, derive bits/value including scales, and demonstrate a check that fails under deliberate corruption. If a fast kernel only matches when you silently change the reference, the gate is incomplete.
 
 [Previous](Lecture-02.md) · [Overview](README.md) · [Next: baseline](Lecture-04.md)
+
+**TensorRT source boundary (2026-10-18):** linked `latest` quantization pages describe TensorRT 11.4. They explain representation/support in that release, not compatibility of this case study's historical loader or a JetPack 10.x runtime. TensorRT 11.4 does not support JetPack; use [NVIDIA's platform migration guidance](https://docs.nvidia.com/deeplearning/tensorrt/latest/api/migration/tensorrt-10x-to-11x-jetson.html) and the selected runtime's exact version when reproducing an engine.

@@ -117,40 +117,13 @@ The provider still matters, but the product owns the **agent contract**.
 
 ---
 
-## 3. The fixed prompt spine
+## 3. Prompt assembly has several lifetimes
 
-OpenClaw uses compact, structured sections.
+At the audited revision, a pure renderer (`buildAgentSystemPrompt`) consumes explicit inputs; a configured facade supplies agent options; runtime adapters gather live tools, workspace and provider facts. This separation keeps previews and execution aligned without making the renderer read mutable global configuration.
 
-The exact wording may evolve, but the architecture is stable.
+The exact sections depend on runtime, channel, enabled tools and prompt mode. Stable project instructions can remain above a cache boundary while changing tool catalogs and current-turn facts arrive through other layers. A list of section headings is not a universal byte-for-byte prompt, and a prompt snapshot is not necessarily the final raw provider request.
 
-An OpenClaw-style prompt looks like this:
-
-```text
-Identity
-Tooling
-Execution Bias
-Safety
-Skills
-OpenClaw Self-Update
-Workspace
-Documentation
-Project Context
-Sandbox
-Current Date & Time
-Reply Tags
-Heartbeats
-Runtime
-Reasoning
-Provider additions
-```
-
-The point is not to make the prompt long.
-
-The point is to make it **predictable**.
-
-Each section has one job.
-
----
+Use the [pinned system-prompt source](https://github.com/openclaw/openclaw/blob/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/concepts/system-prompt.md) and the runtime's diagnostics to inspect the actual route. Provider-generated reasoning controls and executor authorization are separate from the prose assembled here.
 
 ## 4. Tooling section
 
@@ -209,9 +182,9 @@ It means the agent should **carry work through the runtime loop** when it has en
 
 ---
 
-## 6. Safety section
+## 6. Care guidance and enforcement
 
-The Safety section is intentionally brief.
+The current source includes Care guidance; the exact wording and sections depend on the runtime.
 
 It tells the model not to bypass oversight, escalate privileges improperly, hide risky behavior, or seek control outside the user intent.
 
@@ -271,7 +244,7 @@ This avoids **token bloat** and keeps unrelated skills from polluting the run.
 Skills have their own sizing budget:
 
 - global default: `skills.limits.maxSkillsPromptChars`
-- per-agent override: `agents.list[].skillsLimits.maxSkillsPromptChars`
+- per-agent override: `agents.entries.*.skillsLimits.maxSkillsPromptChars`
 
 This is separate from other runtime context limits.
 
@@ -341,10 +314,8 @@ These are bootstrap files such as:
 
 - `AGENTS.md`
 - `SOUL.md`
-- `TOOLS.md`
 - `IDENTITY.md`
 - `USER.md`
-- `HEARTBEAT.md`
 - `BOOTSTRAP.md`
 - `MEMORY.md`
 
@@ -358,7 +329,7 @@ Example:
 Project Context
   AGENTS.md -> project rules
   SOUL.md -> personality and voice
-  TOOLS.md -> custom workspace tool guidance
+  AGENTS.md ## Tools -> project-specific tool guidance
   USER.md -> user preferences
   MEMORY.md -> durable compact memory
 ```
@@ -377,9 +348,9 @@ So OpenClaw trims injection.
 
 Documented defaults include:
 
-- per-file max: `agents.defaults.bootstrapMaxChars`, default `12000`
+- per-file max: `agents.defaults.bootstrapMaxChars`, default `20000`
 - total injected max: `agents.defaults.bootstrapTotalMaxChars`, default `60000`
-- truncation warning: `agents.defaults.bootstrapPromptTruncationWarning`, default `once`
+- truncation notice: built in and not configurable in the audited revision; detailed file/count diagnostics stay outside the concise model notice
 
 The practical rule:
 
@@ -389,7 +360,7 @@ The practical rule:
 
 ## 11. Memory files
 
-`MEMORY.md` can be injected as bootstrap context.
+`MEMORY.md` handling is runtime-specific. Native Codex normally uses memory tools on demand when available, with a bounded prompt fallback otherwise. Other harnesses can inject a bounded copy. The file on disk survives prompt truncation; what the model sees may be only part of it.
 
 Daily memory files under `memory/*.md` are different.
 
@@ -415,126 +386,25 @@ This is the right tradeoff:
 
 ## 12. Prompt modes
 
-OpenClaw supports multiple prompt modes.
+`promptMode` is chosen by the runtime. `full` renders the applicable sections; `minimal` reduces context for delegated work; `none` retains only the base identity line.
 
-### Full mode
+Current minimal mode can retain **Skills when supplied**, as well as tooling, Care guidance, workspace/sandbox/runtime and injected context. It omits several parent-facing sections such as memory recall, model aliases, user identity, messaging and silent-reply guidance. The old rule “minimal always removes Skills” no longer describes this source.
 
-Full mode is the default.
-
-It includes the main sections:
-
-- Tooling
-- Execution Bias
-- Safety
-- Skills
-- OpenClaw Self-Update
-- Workspace
-- Documentation
-- Project Context
-- Sandbox
-- Current Date and Time
-- Reply Tags
-- Heartbeats
-- Runtime
-- Reasoning
-
-Use full mode for the main interactive agent.
-
-### Minimal mode
-
-Minimal mode is used for **sub-agents**.
-
-It keeps the **essential runtime contract** but omits context that would bloat or confuse a delegated worker.
-
-It omits sections like:
-
-- Skills
-- Memory Recall
-- OpenClaw Self-Update
-- Model Aliases
-- User Identity
-- Reply Tags
-- Messaging
-- Silent Replies
-- Heartbeats
-
-It keeps sections like:
-
-- Tooling
-- Safety
-- Workspace
-- Sandbox
-- Current Date and Time
-- Runtime
-- injected context
-
-In minimal mode, injected prompts are labeled **Subagent Context** instead of **Group Chat Context**.
-
-The idea is:
-
-> a sub-agent needs enough context to do its bounded task, not the entire personality and memory system of the main assistant
-
-### None mode
-
-None mode returns only the **base identity line**.
-
-Use it rarely.
-
-It is useful for tests or cases where the caller wants almost no runtime prompt material.
-
----
+A smaller prompt does not grant different permissions by itself. The executor still decides which tools and resources a child can access. Test both prompt visibility and actual denied operations.
 
 ## 13. Sub-agent bootstrap behavior
 
-Sub-agent sessions inject less context.
+Current OpenClaw bootstrap filtering injects `AGENTS.md` for sub-agent sessions; the former `AGENTS.md` plus separate `TOOLS.md` list is outdated. Native Codex additionally has its own project-document discovery, including tool guidance inside `AGENTS.md`.
 
-OpenClaw limits sub-agent bootstrap to:
+Distinguish configured agent workspace from execution folder. The latter's project `AGENTS.md` can supply project context; it does not automatically replace the configured persona and user memory with arbitrary files in the execution directory. Native managed app-server and other connections also differ in which parent-local persona instructions children inherit.
 
-- `AGENTS.md`
-- `TOOLS.md`
-
-This is intentional.
-
-A sub-agent should know project rules and tool rules.
-
-It usually does not need the full user profile, memory, heartbeat behavior, or self-update instructions.
-
-This keeps delegated work **cheaper and less noisy**.
-
----
+**Worked test:** put a harmless marker in configured persona, execution-folder `AGENTS.md` and an execution-folder `USER.md`. Inspect the parent/child prompt surfaces on your pinned route. Do not assume every file is loaded just because it exists. A text marker test demonstrates inclusion, not authorization.
 
 ## 14. Time handling and prompt-cache stability
 
-The Current Date and Time section is designed carefully.
+The audited implementation puts the user's calendar date and time zone in **current-turn Temporal Context**, outside the stable system prompt. It refreshes the current turn without rewriting prior messages. The exact current timestamp can be requested through `session_status` when available.
 
-It includes timezone and time-format guidance.
-
-It avoids injecting a live clock into every prompt.
-
-Why?
-
-Because a live timestamp **changes every run**.
-
-Changing every run can **hurt prompt caching**.
-
-So OpenClaw keeps the prompt-cache boundary stable and tells the model how to get exact time when needed.
-
-When the exact timestamp matters, use:
-
-```text
-session_status
-```
-
-Relevant config keys:
-
-- `agents.defaults.userTimezone`
-- `agents.defaults.timeFormat`
-
-This is a strong production lesson:
-
-> do not put high-churn values into the stable prompt unless the model truly needs them every turn
-
----
+This matters for prefix caches: changing an early byte can invalidate reuse even if the new information is tiny. But cache stability must not keep stale task facts. Put changing facts in the appropriate later carrier, preserve the full instruction semantics and measure actual cache behavior. `agents.defaults.userTimezone` configures the time zone; the old static “Current Date and Time” section is not a universal assembly rule.
 
 ## 15. Provider tuning and cache-aware overlays
 
@@ -603,24 +473,11 @@ Use the right layer:
 
 ---
 
-## 17. Reply Tags and Heartbeats
+## 17. Reply directives and heartbeat context
 
-Reply Tags are optional provider-specific syntax guidance.
+Output/attachment/reply directives depend on the channel and available tools. They do not replace the host's delivery routing. A visible text fragment is not proof that an external message was delivered; inspect the terminal receipt.
 
-They help models format replies in a way the runtime can parse or route.
-
-Heartbeats are also optional.
-
-When enabled, OpenClaw can include heartbeat prompt and acknowledgement behavior.
-
-But heartbeats are omitted from normal runs when:
-
-- heartbeats are disabled for the default agent
-- `agents.defaults.heartbeat.includeSystemPromptSection` is false
-
-This keeps the prompt clean when heartbeat behavior is not active.
-
----
+In the audited source, heartbeat monitor scratch is appended only to the scheduled heartbeat user message. There is no heartbeat-specific system-prompt section. Normal turns and delegated workers should not inherit heartbeat scratch merely because the gateway also runs scheduled checks. Test each route separately when changing prompt assembly.
 
 ## 18. Runtime and Reasoning sections
 
@@ -711,7 +568,7 @@ Workspace:
 
 Project Context:
   AGENTS.md: lab rules
-  TOOLS.md: audio test commands
+  AGENTS.md ## Tools: audio test commands
   USER.md: preferred report format
   MEMORY.md: concise project memory
 

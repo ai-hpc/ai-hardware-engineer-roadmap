@@ -1,5 +1,7 @@
 # Lecture 3 — SPI transport, GPIOs, and IRQ-driven bring-up
 
+**Source boundary — reviewed October 18, 2026:** this is the historical NG fork at `ce36dec9294988e598f04e84c9d28092ca9e9786`. Board observations are attributed to that fork, not rerun here. Complete the [source-reading lab](../Source-Reading-Lab.md); it explains the current migration path and defects in these abbreviated source excerpts. Snippets containing `...` are reading excerpts, not standalone compilable programs.
+
 **Course:** [Jetson ESP-Hosted Host Code guide](../Guide.md) · **Phase 2 — Embedded Linux**
 
 **Previous:** [Lecture 02](Lecture-02.md) · **Next:** [Lecture 04 — How Wi-Fi becomes `wlan0`](Lecture-04.md)
@@ -143,7 +145,7 @@ That snippet is the transport bring-up story in one place:
 
 ## 4. Why the IRQs matter more than the GPIO names
 
-The validated Jetson path used:
+The reported legacy Jetson path used:
 
 - `spi_handshake_gpio=471`
 - `spi_dataready_gpio=433`
@@ -178,7 +180,7 @@ That matters because Linux may already have:
 - a bus number
 - a chip-select mapping
 
-This is better than always forcing the driver to invent a new SPI device object.
+Reusing the existing object avoids describing the same chip-select twice. This legacy mechanism still needs balanced device references, failure cleanup and ownership checks; current integration uses the supported driver/device-tree binding.
 
 Embedded Linux lesson:
 
@@ -206,13 +208,13 @@ The shell script unbinds `spidev`, but the transport code is written to cooperat
 
 ## 6. Runtime clock clamping is a real bring-up policy
 
-The validated Jetson work changed the runtime clock behavior.
+The reported legacy Jetson work changed the runtime clock behavior.
 
 The host can receive a request from the ESP boot-up path to move to:
 
 - `26 MHz`
 
-But the validated Jetson flow intentionally keeps the host capped at:
+But the reported legacy Jetson flow intentionally keeps the host capped at:
 
 - `10 MHz`
 

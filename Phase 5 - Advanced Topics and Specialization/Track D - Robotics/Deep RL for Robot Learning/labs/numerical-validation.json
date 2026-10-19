@@ -1,0 +1,86 @@
+{
+  "checked_at": "2026-10-19T00:35:47.618506+00:00",
+  "scope": "16 standard-library numerical tests and 15 actual optional CPU snippet tests; no simulator, pretrained VLA or GPU training execution",
+  "python": "3.12.3",
+  "torch": "2.14.0+cpu",
+  "numpy": "2.3.5",
+  "scipy": "1.18.1",
+  "portable_tests": 16,
+  "optional_tests": 15,
+  "skipped": 0,
+  "environment": "reused isolated /tmp/course-sionna-venv; fresh installation commands documented but not claimed executed in this review",
+  "source_sha256": {
+    "Lecture-13.md": "01235d402988080d08f13230a900bc1d8a6a6dc1b2968fdda1bb3abb0d149eac",
+    "Lecture-12.md": "bad8af193cdf669e2534c4309877db8c7596c249b146e1c56cfaea9f1dd39f44",
+    "Lecture-05.md": "1123eb7bf7a7f347b526de80251709efccaa9b4e40c3a76b92ed732ee49481ad",
+    "Lecture-09.md": "c93f4f9f4140c6f59d76bddcfe12a6404483ea686cda586fffb4b28b6f77c915",
+    "Lecture-08.md": "76196aab48b86612110a5baa32b0421365b336dbf5322107fba727acde11d86b",
+    "Lecture-14.md": "99e4f9c0c09ed199f2b4aff59f4525bad6f1715ff65abf86e79b571591869b91",
+    "Lecture-07.md": "9a826ae129fa23e2e87a6bc1792d8493ad55c7f835f70a7fdc33bf5620f1c1b1",
+    "Lecture-02.md": "b72f5b4100cf4e1e2983283f86bbef29f375fcda92d16f7e1f62028c68b503ea",
+    "Lecture-04.md": "79af375b5ab7d5a9decc4c1dae67e3cd1fc3402bdbf16844394e5d5b94ad104d",
+    "Lecture-01.md": "0bd51c68c45911210469ab42ef40be7cc2c58680d2cdedd4275f0b1a7fd67b4e",
+    "Lecture-03.md": "c776710909500f4e7ac8ea3e7ecdb7e4dcf2ef89252fb9ada23383ff4096a667",
+    "Lecture-10.md": "a3deba169e34049064fdcddbc71b1489bd7d9768106fd5414d252f0e98a27ddd",
+    "Lecture-06b.md": "52a8a3a5cd09f353eb351ca9b339c654e711a6ac88d44627e229bbaac6802774",
+    "Lecture-06.md": "7981f22434c456699d54dfe3497db9653d0aae82b99afdc85d431433add04d69",
+    "Lecture-11.md": "0ab0139c37ad0528ceab14e97892cf358733d959d12f29b1803a5f04f922b1ed",
+    "README.md": "1619238914bb8cf5e8063cb2ba546c3b050a9048815a7dee768ac81d13727131",
+    "CPU-Lab.md": "b41824d869893cf3e3eec1296145111575584bbcbd15f830af802a616c033268",
+    "labs/returns.py": "500a602b94003d48b2ceb6931d14f75ca4b9e5a5d32fb38b9c8de4ac73f91122",
+    "labs/test_returns.py": "3962ce2b8dc5c1d5e73ff2cd0fe9dad697b2ac438acb9eca463913322f1e493c",
+    "labs/optional/test_lesson_numerics.py": "e590fd9c6ce04ff9df79fc8aec8cf10c9a411538aeab5ac29a87d6a520a209e2",
+    "labs/requirements-scipy-linux-py312.txt": "a920bca02d7fb1cbb5c486a712476ad37417ed4e7263433d330ee878886af241",
+    "labs/rl-source-evidence.json": "a57fbd600b6bf76aedac8ad1f04538ed85d2b149d2c2708c946416b121f80f52"
+  },
+  "runs": [
+    {
+      "command": [
+        "python3",
+        "labs/returns.py"
+      ],
+      "returncode": 0,
+      "stdout": "{\n  \"execution_status\": \"synthetic arithmetic fixture; no training\",\n  \"gamma\": 0.9,\n  \"lambda\": 0.8,\n  \"two_step_chunk_target\": 10.900000000000002,\n  \"two_step_terminal_target\": 2.8,\n  \"advantages\": [\n    4.712,\n    4.6,\n    -6.0\n  ],\n  \"value_targets\": [\n    5.212,\n    5.6,\n    3.0\n  ],\n  \"timeout_correct_target\": 5.6,\n  \"timeout_wrong_terminal_target\": 2.0,\n  \"timeout_wrong_reset_bootstrap_target\": 10.1,\n  \"ppo_examples\": [\n    {\n      \"ratio\": 0.5,\n      \"advantage\": -2.0,\n      \"objective\": -1.6\n    },\n    {\n      \"ratio\": 0.5,\n      \"advantage\": 2.0,\n      \"objective\": 1.0\n    },\n    {\n      \"ratio\": 1.0,\n      \"advantage\": -2.0,\n      \"objective\": -2.0\n    },\n    {\n      \"ratio\": 1.0,\n      \"advantage\": 2.0,\n      \"objective\": 2.0\n    },\n    {\n      \"ratio\": 1.5,\n      \"advantage\": -2.0,\n      \"objective\": -3.0\n    },\n    {\n      \"ratio\": 1.5,\n      \"advantage\": 2.0,\n      \"objective\": 2.4\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "labs",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "test_discount_endpoints (test_returns.ChunkTargets.test_discount_endpoints) ... ok\ntest_duration_discount_matches_nested_one_step_backups (test_returns.ChunkTargets.test_duration_discount_matches_nested_one_step_backups) ... ok\ntest_invalid_or_unexecuted_chunk_rejected (test_returns.ChunkTargets.test_invalid_or_unexecuted_chunk_rejected) ... ok\ntest_terminal_and_shortened_chunk (test_returns.ChunkTargets.test_terminal_and_shortened_chunk) ... ok\ntest_negative_advantage_uses_other_side (test_returns.PpoTests.test_negative_advantage_uses_other_side) ... ok\ntest_positive_advantage_caps_improvement (test_returns.PpoTests.test_positive_advantage_caps_improvement) ... ok\ntest_zero_advantage_zero_objective (test_returns.PpoTests.test_zero_advantage_zero_objective) ... ok\ntest_invalid_inputs (test_returns.ReturnsTests.test_invalid_inputs) ... ok\ntest_lambda_one_full_episode_matches_monte_carlo (test_returns.ReturnsTests.test_lambda_one_full_episode_matches_monte_carlo) ... ok\ntest_lambda_zero_equals_one_step_td (test_returns.ReturnsTests.test_lambda_zero_equals_one_step_td) ... ok\ntest_no_advantage_leakage_across_reset (test_returns.ReturnsTests.test_no_advantage_leakage_across_reset) ... ok\ntest_rollout_cut_keeps_bootstrap (test_returns.ReturnsTests.test_rollout_cut_keeps_bootstrap) ... ok\ntest_terminal_ignores_arbitrary_next_value (test_returns.ReturnsTests.test_terminal_ignores_arbitrary_next_value) ... ok\ntest_terminal_takes_precedence_when_both_flags_are_true (test_returns.ReturnsTests.test_terminal_takes_precedence_when_both_flags_are_true) ... ok\ntest_timeout_bootstraps_final_state (test_returns.ReturnsTests.test_timeout_bootstraps_final_state) ... ok\ntest_wrong_reset_observation_changes_target (test_returns.ReturnsTests.test_wrong_reset_observation_changes_target) ... ok\n\n----------------------------------------------------------------------\nRan 16 tests in 0.001s\n\nOK\n"
+    },
+    {
+      "command": [
+        "/tmp/course-sionna-venv/bin/python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "labs/optional",
+        "-v"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "test_group_filter_and_success_filter_are_different_objectives (test_lesson_numerics.CapstoneWeightNumerics.test_group_filter_and_success_filter_are_different_objectives) ... ok\ntest_invalid_groups_and_temperatures_do_not_become_training_weights (test_lesson_numerics.CapstoneWeightNumerics.test_invalid_groups_and_temperatures_do_not_become_training_weights) ... ok\ntest_small_temperature_caps_weights_without_exp_overflow (test_lesson_numerics.CapstoneWeightNumerics.test_small_temperature_caps_weights_without_exp_overflow) ... ok\ntest_fixed_rollout_inputs_are_detached (test_lesson_numerics.FlowNumerics.test_fixed_rollout_inputs_are_detached) ... ok\ntest_gaussian_kl_and_ppo_gradient_are_separate (test_lesson_numerics.FlowNumerics.test_gaussian_kl_and_ppo_gradient_are_separate) ... ok\ntest_group_mean_bias_by_exact_bernoulli_enumeration (test_lesson_numerics.FlowNumerics.test_group_mean_bias_by_exact_bernoulli_enumeration) ... ok\ntest_groups_reject_partial_singleton_and_nonfinite_rewards (test_lesson_numerics.FlowNumerics.test_groups_reject_partial_singleton_and_nonfinite_rewards) ... ok\ntest_log_density_and_gradient_match_scalar_derivation (test_lesson_numerics.FlowNumerics.test_log_density_and_gradient_match_scalar_derivation) ... ok\ntest_sampling_zero_noise_is_allowed_but_density_is_not (test_lesson_numerics.FlowNumerics.test_sampling_zero_noise_is_allowed_but_density_is_not) ... ok\ntest_vectorization_matches_independent_normal_distribution (test_lesson_numerics.FlowNumerics.test_vectorization_matches_independent_normal_distribution) ... ok\ntest_singleton_last_minibatch_does_not_make_std_nan (test_lesson_numerics.PPONumerics.test_singleton_last_minibatch_does_not_make_std_nan) ... ok\ntest_exact_discordant_pairs_are_not_marginal_ci_overlap (test_lesson_numerics.StatisticalNumerics.test_exact_discordant_pairs_are_not_marginal_ci_overlap) ... ok\ntest_sample_size_inputs_and_known_half_width_count (test_lesson_numerics.StatisticalNumerics.test_sample_size_inputs_and_known_half_width_count) ... ok\ntest_shared_run_bootstrap_preserves_cross_task_dependence (test_lesson_numerics.StatisticalNumerics.test_shared_run_bootstrap_preserves_cross_task_dependence) ... ok\ntest_wilson_endpoint_and_invalid_counts (test_lesson_numerics.StatisticalNumerics.test_wilson_endpoint_and_invalid_counts) ... ok\n\n----------------------------------------------------------------------\nRan 15 tests in 2.172s\n\nOK\n"
+    }
+  ],
+  "followup_findings": [
+    "Runner configuration fragment is now valid Python",
+    "Multi-location client-logging sketch is explicitly text; initializes done per episode and counts completed env.step calls instead of a zero-based loop variable",
+    "44 Python lecture fences parse without indentation/annotation errors",
+    "Group-relative filtering is distinguished from success-only BC; invalid groups and temperatures rejected; exponent capped before exp",
+    "Zero centered reward does not make an episode useless; critic changes are not causal evidence",
+    "RSL-RL training recipe/runtime is explicitly unexecuted; no universal laptop timing or GPU speedup claim"
+  ],
+  "latest_review_note": "Reran all recorded commands after small-screen equation reflow, recap list separation, and upstream pi05_libero/chunk/density clarification; no executable snippet was changed by these final prose edits."
+}

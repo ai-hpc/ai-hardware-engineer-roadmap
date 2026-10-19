@@ -20,8 +20,14 @@ Use this phase to defend the engineering decisions made in the roadmap. The exam
 | # | Role | Focus | Status |
 |---|------|-------|--------|
 | [1](1.%20MLSys%20Engineer/README.md) | **MLSys Engineer** | Inference systems, attention kernels, KV cache, speculative decode, TRT-LLM architecture integration | ✅ Active |
+| [2](2.%20Robotics%20AI%20Engineer/README.md) | **Robotics AI Engineer** | Frames, control timing, learning from demonstrations, evaluation, planning, VLA deployment | Worked scenarios and answer guidance |
+| [3](3.%20Embedded%20and%20Edge%20AI%20Engineer/README.md) | **Embedded and Edge AI Engineer** | Sensor bandwidth, queues, ownership, quantization, updates, sustained operation | Worked scenarios and answer guidance |
+| [4](4.%20Compiler%20and%20Accelerator%20Engineer/README.md) | **Compiler, Kernel, and Accelerator Engineer** | Roofline reasoning, legal fusion, SRAM planning, tile boundaries, runtime interfaces | Worked scenarios and answer guidance |
 
-More roles coming: Edge AI Engineer, CUDA Kernel Engineer, AI Chip Architect, Robotics AI Engineer.
+**Start at your current level.** The three scenario workbooks begin with small
+calculations and add follow-up design changes. Use them before the advanced MLSys
+questions if you are still building your first project. These exercises are
+practice material, not a prediction of a particular company's interview process.
 
 ---
 

@@ -1,5 +1,8 @@
 # Part 4 · Lecture 10 — Silently Wrong: The Failure Mode Unique to Inference Engines
 
+**Practice:** [CPU source lab](CPU-Source-Lab.md). Historical GPU results are source reports; use the **Answers** after attempting the self-check.
+
+
 ## Overview
 
 Most software fails loudly. It crashes, throws, returns an error code, or produces output so obviously broken that nobody ships it. An inference engine does not have that safety net.
@@ -18,9 +21,9 @@ Three properties combine, and all three are inherent to the workload.
 
 **The output space has no invalid values.** A corrupted image has visible artifacts; a corrupted JSON parse throws. A corrupted logit vector is *a logit vector*. Softmax it, argmax it, and you get a token. Every token is a legal token. There is no representation for "this distribution is wrong."
 
-**The correct output is not known.** For most software you can write `assert result == expected`. For a 2.8T-parameter model at 128k context, the expected next token is whatever the model says it is. The only ground truth is another implementation of the same model — which is why [Lecture 02](Lecture-02.md) defines correctness as *agreement with a reference on identical weights and identical token ids*, and why an engine that cannot get a reference has a genuinely hard problem.
+**The correct output is not known.** For most software you can write `assert result == expected`. For a 2.8T-parameter model at 128k context, the expected next token is whatever the model says it is. A second implementation is one reference; algebraic invariants, independently computed subgraphs, and high-precision fixtures provide additional oracles — which is why [Lecture 02](Lecture-02.md) defines correctness as *agreement with a reference on identical weights and identical token ids*, and why an engine that cannot get a reference has a genuinely hard problem.
 
-**Quality degrades smoothly and the eye is a terrible instrument.** A model whose experts are 6% dropped still writes competent prose. Humans reading samples cannot distinguish "top-1 agreement 1.00" from "top-1 agreement 0.93." The case study's own reminder: even the target quantization's top-1 against full precision is **90.4%** — so "it looks fine" has no discriminating power at the scale where bugs live.
+**Plausible text is a weak correctness oracle.** Expert dropping can leave some outputs fluent while seriously changing others. A few human-read samples do not measure token agreement or rare task failures. The case study's own reminder: even the target quantization's top-1 against full precision is **90.4%** — so "it looks fine" has no discriminating power at the scale where bugs live.
 
 Add the incentive from [Lecture 02](Lecture-02.md) — you are being paid for speed — and you have the setup for the worst version of this: **a bug whose only visible symptom is a better benchmark number.**
 
@@ -73,7 +76,7 @@ Every existing test was in the intersection of two blind spots. The bug was not 
    layers = 93   →  KLD 3.47
 ```
 
-That is a beautiful diagnostic shape, and worth recognizing: **a metric that is exactly zero up to a threshold and then large is a structural bug, not numerical drift.** Precision loss accumulates gradually and roughly monotonically. A cliff at `n_layers = 13` points straight at something with a `12` in it — and `max_ckpt = ceil(n_layers / 12)` was one grep away.
+That is a beautiful diagnostic shape, and worth recognizing: **a sharp boundary is evidence to investigate a structural branch or indexing change.** Numerical error can also be nonmonotonic or trigger discontinuous routing/argmax changes; the curve alone is not proof. A cliff at `n_layers = 13` points straight at something with a `12` in it — and `max_ckpt = ceil(n_layers / 12)` was one grep away.
 
 > **The technique to steal.** When a parity metric is bad, do not stare at the kernel. **Sweep the structural parameters** — layers, heads, chunk width, tp_size, context depth — and find where the metric leaves zero. The threshold names the bug.
 
@@ -127,7 +130,7 @@ This inverts the intuition most engineers carry:
 
 Three practices follow directly:
 
-**Correctness gates before speed gates, structurally.** Not "we check both" — the accuracy result must be able to *suppress* the speed number so it never enters the record. [Lecture 02 §2](Lecture-02.md).
+**Correctness gates before speed gates, structurally.** Not "we check both" — the accuracy result must block acceptance of the speed claim; keeping rejected diagnostic timing in the record is useful. [Lecture 02 §2](Lecture-02.md).
 
 **A plausibility ceiling.** [PR #130](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/130) rejects a claim above 5× the reference as implausible rather than banking it. This looks paranoid until you have watched a corrupted kernel post a spectacular number. The ceiling does not assert what is achievable; it asserts that **a result too good to be true gets checked, not recorded.**
 
@@ -166,9 +169,9 @@ Sharding is index arithmetic, and index arithmetic that is slightly wrong yields
 
 **Every axis must divide, not just the interesting one.** K3 has 896 experts and `896 % 7 == 0`, so an expert-only check happily accepts `tp_size 7` — but it also has 96 query heads and `96 % 7 != 0`. `shard_dims()` rejects the whole shape and names the offending field. The repo's note on this is refreshingly human: *"My own first draft of the test made exactly this mistake and the test caught it."*
 
-The strategic decision behind all three is the one to copy: **the shard math is CUDA-free and unit-tested without a GPU** — 4,972 checks on `shard.cpp`, 230 on the weight plan, 44 on backend selection. The reasoning:
+The strategic decision behind all three is the one to copy: **the shard math is CUDA-free and unit-tested without a GPU** — the reviewed snapshot actually runs **5,117** shard assertions, **1,740** weight-plan assertions, and **45** backend-selection assertions. The [CPU source lab](CPU-Source-Lab.md) records these executions; older source prose lists stale counts. The reasoning:
 
-> *"TP bugs do not live in the collective — NCCL is correct. They live in the band arithmetic, and that is exactly the part you can verify on a laptop before burning node hours."*
+> *"Partition math is valuable CPU-testable coverage." Correct partitioning still does not prove collective ordering, stream dependencies, peer visibility, or backend correctness on a GPU.*
 
 ### 4.3 Collective placement and count
 
@@ -180,7 +183,7 @@ This family is unique to distributed inference and is the most elegant of the fi
    rms_norm(Σ partial)  ≠  Σ rms_norm(partial)
 ```
 
-RMS norm is **not linear**, so the cross-rank sum must complete *before* it. Move the reduce two ops later, after `routed_up`, and two things go wrong at once: you skip the reduce the experts needed, *and* — because `routed_norm` / `routed_up` / `shexp` are all replicated, so every rank already holds the complete tensor — you reduce a complete tensor and **multiply the FFN output by `tp_size`.**
+RMS norm is **not linear**, so the cross-rank sum must complete *before* it. Move the reduce two ops later, after `routed_up`, and two things go wrong at once: you skip the reduce the experts needed, *and* — because `routed_norm` / `routed_up` / `shexp` are all replicated, so every rank already holds the complete tensor — you may duplicate replicated contributions by `tp_size` while also normalizing incomplete partials. In general this changes more than the final scale.
 
 Multiplying an FFN output by 8 does not crash. It produces fluent text.
 
@@ -188,14 +191,14 @@ Multiplying an FFN output by 8 does not crash. It produces fluent text.
 
 The general rule, which applies to any parallel forward pass:
 
-> **A collective's position is determined by the first non-linearity downstream of the partial sum.** Derive it from the algebra, assert the count, and never place it from a diagram.
+> **Reduce partial sums before any nonlinear operation that needs the full value.** Linear maps may commute with the sum, but replicated residual/bias additions must occur once, not once per rank. Derive it from the algebra, assert the count, and never place it from a diagram.
 
 Two more defenses in this family worth naming:
 
-* **The reduction is verified by construction.** `tp_allreduce_check` has rank *r* fill its buffer with `r + 1`, so the only correct total is `tp(tp+1)/2`. A missing rank, a double-counted rank, or a rank reducing the wrong buffer each produce a *different* number. And **every rank is checked, not just rank 0** — a collective that is correct on one rank and wrong on another is a real bug, and checking only rank 0 is how it ships.
+* **The reduction is verified by construction.** `tp_allreduce_check` has rank *r* fill its buffer with `r + 1`, so the only correct total is `tp(tp+1)/2`. This catches many missing/duplicated contributions, but not every corruption: offsetting errors or a wrong buffer with the same pattern can collide. Add element-index-dependent patterns, negative values, repeated calls, and cross-stream tests for broader coverage. And **every rank is checked, not just rank 0** — a collective that is correct on one rank and wrong on another is a real bug, and checking only rank 0 is how it ships.
 * **Precision is part of correctness.** K3 runs an f32 residual stream deliberately. Routing it through a bf16 all-reduce would truncate to ~8 mantissa bits **at every layer boundary**, undoing the executor's numerics. So `make_collective(..., need_f32=true)` downgrades a bf16-only fast backend to NCCL *before* the 20-minute weight load, rather than failing at the first collective. Fail early, at the cheap moment.
 
-The positive result is what this buys: TP and layer-split pipeline outputs agree to **1.85e-09**, and the all-reduce is exact to **1.127e-07** of peak — below f32 epsilon, one ulp.
+The positive result is what this buys: TP and layer-split pipeline outputs agree to **1.85e-09**, and the reported all-reduce max absolute error divided by peak reference magnitude is **1.127e-07**. This normalized error is not a per-element ULP bound; small entries can have much larger relative or ULP error.
 
 ### 4.4 Work that silently does not happen
 
@@ -224,9 +227,9 @@ Milder, but it is what a parity gate spends most of its time on. The case study'
 
 A KL of 5.34 nats is not a subtle drift — it is a different model. The causes were a wrong activation variant and a **decay applied along the wrong axis**. Both produce fluent output; both are invisible without a reference; both were found by the gate rather than by reading samples.
 
-And the counterpart worth holding onto: **not all divergence is a bug.** Mean KLD in this engine sits ~400× above the 1e-5 you would expect from two runs of the same implementation, from an identified cause — K3 keeps f32 activations where ggml quantizes them before a quantized mat-vec. The instruction to contributors is exactly right: *"Do not go hunting it as a bug; do not make it worse."*
+And the counterpart worth holding onto: **not all divergence is a bug.** Mean KLD in this engine sits ~400× above the comparator's chosen 1e-5 tolerance, from an identified cause — K3 keeps f32 activations where ggml quantizes them before a quantized mat-vec. The instruction to contributors is exactly right: *"Do not go hunting it as a bug; do not make it worse."*
 
-> Knowing your **irreducible** divergence, and its cause, is what lets you treat any *change* in divergence as signal. A team that has not characterized its floor cannot use its gate.
+> Characterizing your **observed fixture** divergence, and its cause, is what lets you treat any *change* in divergence as signal. A team that has not characterized its floor cannot use its gate.
 
 ---
 
@@ -377,11 +380,23 @@ Pass criterion: a corrupted build that is measurably *faster* than `main` and is
 8. Your CI has been green for 100 runs. Give two distinct reasons that is not evidence your guard works.
 9. `n_kv_heads = 1` and `tp_size = 8`. Give the naive shard result, the output it produces, and the correct handling.
 
+## Answers
+
+1. Fluent text does not encode a checksum of weights or activations. Many perturbed distributions still produce plausible strings, so external oracles and invariants are needed.
+2. Investigate a branch/stride at the 12-layer checkpoint boundary, including `ceil(n_layers/12)` and row/slot strides. A cliff is a clue, not proof against numerical effects.
+3. Correct: `W·norm(Σp_r)` with replicated terms added once. Incorrect: `Σ W·norm(p_r)` plus possibly N copies of shared terms. The general error is not merely multiplication by N.
+4. BF16 has seven stored fraction bits (eight significant bits including the leading bit); round-to-nearest relative error is bounded near 2^-8 for ordinary normalized numbers, before accumulation. Repeated reductions can amplify or cancel errors. Count actual calls and reject unsupported dtype/backend combinations before allocation/execution.
+5. Byte comparisons on identical initialized inputs and the claimed shapes/flags, including modified branch boundaries, plus compiler/device provenance. A finite fixture suite supports those cases, not a universal proof.
+6. Validate full work and input sizes, reject skipped/failed kernels, run correctness including deep paths, compare A/A and interleaved A/B, verify clocks/timing/completion, then attribute the improvement.
+7. Surrounding code, frontier, noise, or scoring policy moved. Preserve rejected experiments with context and re-measure after rebasing.
+8. The guard may never execute, or it may execute without checking a meaningful failure. Record execution and run an injected negative case.
+9. Integer division gives zero heads. This implementation replicates the shared latent KV projection/cache and shards query work; other mathematically valid layouts exist, but an empty accidental shard is wrong.
+
 ---
 
 ## References
 
-* **SparkInfer-K3 correctness record** — the stride transposition and retracted 169.72 in [`CHANGELOG.md`](https://github.com/gittensor-ai-lab/sparkinfer-k3/blob/main/CHANGELOG.md) ("Note on a retracted number"); the config traps in [`docs/technical.md`](https://github.com/gittensor-ai-lab/sparkinfer-k3/blob/main/docs/technical.md); the partition and collective-placement traps in [`docs/tensor-parallel.md`](https://github.com/gittensor-ai-lab/sparkinfer-k3/blob/main/docs/tensor-parallel.md).
+* **SparkInfer-K3 correctness record** — the stride transposition and retracted 169.72 in [`CHANGELOG.md`](https://github.com/gittensor-ai-lab/sparkinfer-k3/blob/7689cc77e0e18d4b4f1937cf2a189dcd5a8d90f3/CHANGELOG.md) ("Note on a retracted number"); the config traps in [`docs/technical.md`](https://github.com/gittensor-ai-lab/sparkinfer-k3/blob/7689cc77e0e18d4b4f1937cf2a189dcd5a8d90f3/docs/technical.md); the partition and collective-placement traps in [`docs/tensor-parallel.md`](https://github.com/gittensor-ai-lab/sparkinfer-k3/blob/7689cc77e0e18d4b4f1937cf2a189dcd5a8d90f3/docs/tensor-parallel.md).
 * **The revert cycle** — [#81](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/81) → [#84](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/84) → [#94](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/94). Worth reading in order.
 * **Silent-launch class** — [#33](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/33) (stops launching past ~11.7k), [#49](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/49) (fail the forward on a failed launch), [#112](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/112), [#125](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/125).
 * **compute-sanitizer** — [docs.nvidia.com/compute-sanitizer](https://docs.nvidia.com/compute-sanitizer/) — `memcheck`, `racecheck`, `initcheck`, `synccheck`. Required clean in this repo.
@@ -399,7 +414,7 @@ Cross-references:
 
 ## Current as of 2026-08
 
-SparkInfer-K3 at `7689cc7`. Parity gate: top-1 ≥ 0.95, mean KL ≤ 0.05, seven depths, worst-of; merged runs sit at 0.004–0.008. Known irreducible divergence ~400× the same-implementation floor, cause identified (f32 activations vs pre-quantized mat-vec). TP/pipeline agreement 1.85e-09; all-reduce exact to 1.127e-07 of peak. CUDA 12.8+, `compute-sanitizer` clean required. The five families and the defense stack are the durable content.
+SparkInfer-K3 at `7689cc7`. Parity gate: top-1 ≥ 0.95, mean KL ≤ 0.05, seven depths, worst-of; merged runs sit at 0.004–0.008. Observed fixture divergence ~400× the comparator's chosen same-implementation tolerance, cause identified (f32 activations vs pre-quantized mat-vec). TP/pipeline agreement 1.85e-09; all-reduce reported max-error/peak 1.127e-07 (not a ULP bound). CUDA 12.8+, `compute-sanitizer` clean required. The five families and the defense stack are the durable content.
 
 ---
 

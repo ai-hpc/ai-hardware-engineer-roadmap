@@ -1,0 +1,391 @@
+{
+  "torch": "2.14.0+cpu",
+  "device": "cpu",
+  "dtype": "float32",
+  "train_seed": 41,
+  "validation_seed": 42,
+  "task": "four-dimensional synthetic nonlinear regression; no language/robot training",
+  "ablations": [
+    {
+      "aux_weight": 0.0,
+      "steps": 120,
+      "capacity_factor": null,
+      "initial_validation_mse": 0.6382315754890442,
+      "final_validation_mse": 0.0177365280687809,
+      "final_validation_routing": {
+        "assignment_shares": [
+          0.259765625,
+          0.275390625,
+          0.21875,
+          0.24609375
+        ],
+        "dropped_assignment_fraction": 0.0,
+        "tokens_with_any_drop_fraction": 0.0,
+        "tokens_with_no_expert_fraction": 0.0,
+        "capacity": 256
+      },
+      "history": [
+        {
+          "step": 0,
+          "training_mse": 0.6640495657920837,
+          "regularizer": 0.002193013671785593,
+          "assignment_shares": [
+            0.2392578125,
+            0.2529296875,
+            0.234375,
+            0.2734375
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        },
+        {
+          "step": 20,
+          "training_mse": 0.08937715739011765,
+          "regularizer": 0.0025652919430285692,
+          "assignment_shares": [
+            0.2451171875,
+            0.2490234375,
+            0.248046875,
+            0.2578125
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        },
+        {
+          "step": 40,
+          "training_mse": 0.03850043937563896,
+          "regularizer": 0.002805169206112623,
+          "assignment_shares": [
+            0.2392578125,
+            0.2431640625,
+            0.2509765625,
+            0.2666015625
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        },
+        {
+          "step": 60,
+          "training_mse": 0.023182526230812073,
+          "regularizer": 0.0029566481243819,
+          "assignment_shares": [
+            0.24609375,
+            0.23828125,
+            0.2490234375,
+            0.2666015625
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        },
+        {
+          "step": 80,
+          "training_mse": 0.015429133549332619,
+          "regularizer": 0.0029590826015919447,
+          "assignment_shares": [
+            0.23828125,
+            0.2373046875,
+            0.2529296875,
+            0.271484375
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        },
+        {
+          "step": 100,
+          "training_mse": 0.010762063786387444,
+          "regularizer": 0.002970251487568021,
+          "assignment_shares": [
+            0.236328125,
+            0.23828125,
+            0.2509765625,
+            0.2744140625
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        },
+        {
+          "step": 119,
+          "training_mse": 0.00790378637611866,
+          "regularizer": 0.0029256290290504694,
+          "assignment_shares": [
+            0.2373046875,
+            0.2421875,
+            0.2509765625,
+            0.26953125
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        }
+      ],
+      "reload_max_abs_error": 0.0
+    },
+    {
+      "aux_weight": 0.01,
+      "steps": 120,
+      "capacity_factor": null,
+      "initial_validation_mse": 0.6382315754890442,
+      "final_validation_mse": 0.017776167020201683,
+      "final_validation_routing": {
+        "assignment_shares": [
+          0.259765625,
+          0.275390625,
+          0.21875,
+          0.24609375
+        ],
+        "dropped_assignment_fraction": 0.0,
+        "tokens_with_any_drop_fraction": 0.0,
+        "tokens_with_no_expert_fraction": 0.0,
+        "capacity": 256
+      },
+      "history": [
+        {
+          "step": 0,
+          "training_mse": 0.6640495657920837,
+          "regularizer": 0.01218969002366066,
+          "assignment_shares": [
+            0.2392578125,
+            0.2529296875,
+            0.234375,
+            0.2734375
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        },
+        {
+          "step": 20,
+          "training_mse": 0.08940517902374268,
+          "regularizer": 0.012575479224324226,
+          "assignment_shares": [
+            0.24609375,
+            0.2490234375,
+            0.2470703125,
+            0.2578125
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        },
+        {
+          "step": 40,
+          "training_mse": 0.038485296070575714,
+          "regularizer": 0.012811125256121159,
+          "assignment_shares": [
+            0.2392578125,
+            0.2431640625,
+            0.25,
+            0.267578125
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        },
+        {
+          "step": 60,
+          "training_mse": 0.02319299429655075,
+          "regularizer": 0.012958760373294353,
+          "assignment_shares": [
+            0.2451171875,
+            0.23828125,
+            0.2490234375,
+            0.267578125
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        },
+        {
+          "step": 80,
+          "training_mse": 0.015417290851473808,
+          "regularizer": 0.012959366664290428,
+          "assignment_shares": [
+            0.2373046875,
+            0.2373046875,
+            0.2529296875,
+            0.2724609375
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        },
+        {
+          "step": 100,
+          "training_mse": 0.010755030438303947,
+          "regularizer": 0.012966803275048733,
+          "assignment_shares": [
+            0.2353515625,
+            0.23828125,
+            0.2509765625,
+            0.275390625
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        },
+        {
+          "step": 119,
+          "training_mse": 0.007957416586577892,
+          "regularizer": 0.012923496775329113,
+          "assignment_shares": [
+            0.23828125,
+            0.240234375,
+            0.251953125,
+            0.26953125
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        }
+      ],
+      "reload_max_abs_error": 0.0
+    },
+    {
+      "aux_weight": 0.5,
+      "steps": 120,
+      "capacity_factor": null,
+      "initial_validation_mse": 0.6382315754890442,
+      "final_validation_mse": 0.019364094361662865,
+      "final_validation_routing": {
+        "assignment_shares": [
+          0.275390625,
+          0.27734375,
+          0.2109375,
+          0.236328125
+        ],
+        "dropped_assignment_fraction": 0.0,
+        "tokens_with_any_drop_fraction": 0.0,
+        "tokens_with_no_expert_fraction": 0.0,
+        "capacity": 256
+      },
+      "history": [
+        {
+          "step": 0,
+          "training_mse": 0.6640495657920837,
+          "regularizer": 0.5020268559455872,
+          "assignment_shares": [
+            0.2392578125,
+            0.2529296875,
+            0.234375,
+            0.2734375
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        },
+        {
+          "step": 20,
+          "training_mse": 0.08968064188957214,
+          "regularizer": 0.5029493570327759,
+          "assignment_shares": [
+            0.24609375,
+            0.248046875,
+            0.248046875,
+            0.2578125
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        },
+        {
+          "step": 40,
+          "training_mse": 0.03929547965526581,
+          "regularizer": 0.5029072165489197,
+          "assignment_shares": [
+            0.244140625,
+            0.24609375,
+            0.2470703125,
+            0.2626953125
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        },
+        {
+          "step": 60,
+          "training_mse": 0.024293985217809677,
+          "regularizer": 0.5027078986167908,
+          "assignment_shares": [
+            0.251953125,
+            0.23828125,
+            0.2470703125,
+            0.2626953125
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        },
+        {
+          "step": 80,
+          "training_mse": 0.01630178466439247,
+          "regularizer": 0.5022281408309937,
+          "assignment_shares": [
+            0.2392578125,
+            0.23828125,
+            0.251953125,
+            0.2705078125
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        },
+        {
+          "step": 100,
+          "training_mse": 0.011708441190421581,
+          "regularizer": 0.5023639798164368,
+          "assignment_shares": [
+            0.2451171875,
+            0.244140625,
+            0.2490234375,
+            0.26171875
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        },
+        {
+          "step": 119,
+          "training_mse": 0.008751311339437962,
+          "regularizer": 0.5025350451469421,
+          "assignment_shares": [
+            0.2470703125,
+            0.240234375,
+            0.2578125,
+            0.2548828125
+          ],
+          "dropped_assignment_fraction": 0.0,
+          "tokens_with_any_drop_fraction": 0.0,
+          "tokens_with_no_expert_fraction": 0.0,
+          "capacity": 512
+        }
+      ],
+      "reload_max_abs_error": 0.0
+    }
+  ]
+}

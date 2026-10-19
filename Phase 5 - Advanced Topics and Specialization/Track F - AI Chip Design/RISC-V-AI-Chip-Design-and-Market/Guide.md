@@ -1,637 +1,120 @@
-# RISC-V Based AI Chip Design and Market Analysis
+# RISC-V AI systems: architecture, software and an evidence-based product decision
 
-<div class="course-identity auto-course" style="--course-accent: #4f46e5; --course-accent-rgb: 79, 70, 229;" markdown="1">
-<div class="course-identity__icon">RBAC</div>
-<div markdown="1">
-<p class="course-identity__eyebrow">Deep Dive · Specialization</p>
-<p class="course-identity__title">Specialized course identity for RISC-V Based AI Chip Design and Market Analysis.</p>
-<p class="course-identity__meta">Artifact: specialization case study · Measure: performance, reliability, role fit</p>
-</div>
-</div>
+**Reviewed 18 October 2026.** **Prerequisites:** basic C, arrays, memory bandwidth and the [SIMD lesson](../../../Phase%201%20-%20Foundational%20Knowledge/4.%20C%2B%2B%20and%20Parallel%20Computing/C%2B%2B%20and%20SIMD/Guide.md). **First deliverable:** run one vector binary at three emulated vector lengths, then explain what that says about a proposed AI platform. No board purchase is needed.
 
+[Parent: AI Chip Design](../Guide.md) · [Executable RVV lab](labs/README.md)
 
-**Parent:** [AI Chip Design](../Guide.md)
+## 1. Find the processor that does the arithmetic
 
-> Study RISC-V as an AI-chip platform: when the ISA matters, when the accelerator matters more, how software enablement determines adoption, and why SpacemiT is a useful 2026 case study.
+RISC-V describes instruction semantics. A product also needs an implementation, memory system, firmware, operating system, drivers, compiler and runtime. An open ISA does not make every core implementation, accelerator, peripheral or tool open source or free to license.
 
----
+| Design | RISC-V's role | What to inspect first |
+|---|---|---|
+| Vector CPU | Executes scalar and vector kernels | Instructions, VLEN, physical execution resources, cache and compiler |
+| CPU plus NPU | Schedules a distinct compute engine | Supported operators, buffer ownership, driver/runtime and fallback |
+| Controllers inside an accelerator | Runs DMA, scheduling and firmware | Where tensor arithmetic actually executes and how work is synchronized |
+| Host for a GPU | Runs the OS and submits GPU work | Platform/driver/toolchain support and the attached GPU |
+| Custom instruction design | Adds workload-specific operations | Exact semantics, toolchain, context state and compatibility |
 
-## Why This Course Exists
+Draw weights, activations, accumulators, command queues and completion state on the block diagram. A CPU issuing a descriptor to a tensor engine is not necessarily executing the model's matrix instructions itself.
 
-RISC-V is often discussed as if the open ISA alone will change AI hardware.
+## 2. Separate VLEN from lanes per cycle
 
-That is too simple.
-
-For AI chips, the ISA is only one layer. The real product is:
+**VLEN** is the number of bits in an architectural vector register. **SEW** is the selected element width. **LMUL** groups registers. For a supported configuration:
 
 ```text
-workload -> model graph -> compiler/runtime -> kernels -> memory system -> accelerator fabric -> Linux/driver stack -> board/product
+VLMAX = LMUL * VLEN / SEW
 ```
 
-RISC-V becomes interesting when it helps a company control that whole stack:
+With VLEN=256, SEW=32 and LMUL=1, the maximum is eight elements. That says how many elements fit in the register group; it does not say eight additions retire each cycle. The implementation may process the register over several cycles, and dependencies or memory can dominate.
 
-- custom vector or matrix extensions
-- lower licensing dependency
-- tight CPU-to-accelerator coupling
-- edge inference power efficiency
-- deterministic embedded control
-- open software ecosystem alignment
-- domestic or sovereign silicon strategy
+The program asks `vsetvl` how many elements to handle for the remaining work and advances by the returned value. It must not assume one constant width. Tail and mask policies also matter: values outside the active region may be unspecified, so do not store them as valid output.
 
-This course teaches how to evaluate those claims technically and commercially.
+Use the ratified [Vector 1.0 specification](https://docs.riscv.org/reference/isa/unpriv/v-st-ext.html) for the exact rules. A vector-length-agnostic loop still needs the required ISA, ABI and operating-system support. It is not a promise that every RISC-V binary runs on every RISC-V core, or that live vector state can migrate freely between different VLEN implementations.
 
----
+The [RVV lab](labs/README.md) compiles real vector instructions and executes the same binary under QEMU at VLEN 128, 256 and 512. A deliberately fixed-eight-element increment passes the matching emulator configuration but fails the others. Emulator wall time does not measure a real core's throughput or power.
 
-## Learning Outcomes
+## 3. Understand profiles and extension status
 
-By the end, you should be able to:
+A profile groups architectural requirements to make a software target more predictable. It does not promise a camera driver, a model runtime, memory bandwidth or whole-system reliability. Consult the [ratified specifications library](https://docs.riscv.org/) and the specific profile version.
 
-1. Distinguish a RISC-V CPU, a RISC-V host processor, and a RISC-V AI accelerator.
-2. Explain the main RISC-V AI chip design patterns.
-3. Review SpacemiT K1/K3 as a practical case study.
-4. Analyze why software maturity matters more than TOPS marketing.
-5. Compare RISC-V AI opportunities across edge, robotics, industrial, automotive, AI PC, and data center.
-6. Build an evaluation checklist for any RISC-V AI chip startup.
-7. Write a short architecture and market memo for a RISC-V AI platform.
+Treat these as separate evidence:
 
----
+- A ratified standard with a named version.
+- A draft in an official working group's repository.
+- A vendor instruction extension supported by its compiler.
+- A paper proposing an instruction or implementation.
+- A shipped core on which a particular binary actually runs.
 
-## 1. The Core Mental Model
+The [Vector Matrix Extension repository](https://github.com/riscv/riscv-vme) and [Integrated Matrix Extension snapshots](https://riscv.github.io/integrated-matrix-extension/) are useful current research inputs. Their presence does not make every instruction named “matrix” part of base RVV 1.0. Pin the specification and implementation revision rather than importing an extension's marketing name into a compatibility claim.
 
-A RISC-V AI chip can mean several different things.
+## 4. Read a current chip document carefully: SpacemiT K3
 
-| Design Type | What RISC-V Does | Example Shape | Main Risk |
-|---|---|---|---|
-| RISC-V CPU with vector AI | Runs scalar code and vector kernels directly | Wide RVV CPU or AI CPU | Efficiency may trail fixed tensor engines |
-| RISC-V CPU plus NPU | Controls a separate neural accelerator | Edge SoC with CPU + NPU | NPU software can be proprietary or fragmented |
-| RISC-V control cores inside accelerator | Orchestrates tensor/dataflow fabric | AI accelerator with embedded RISC-V controllers | Developer may never see RISC-V directly |
-| RISC-V host for GPU/accelerator | Replaces Arm/x86 host CPU around a bigger accelerator | RISC-V server/edge host plus GPU | AI performance mostly depends on attached accelerator |
-| RISC-V custom extension platform | Adds vector, matrix, DSP, or domain-specific instructions | Custom ISA extension or CFU | Compiler and ecosystem support become hard |
+The vendor's K3 datasheet V1.9, dated 24 September 2026, distinguishes **eight X100 application cores with VLEN 256** from **eight A100 AI cores with VLEN 1024**. Here A100 is a SpacemiT core name, not NVIDIA's A100 GPU. It also identifies two RT24 management cores. The AI core section qualifies its profile claim as RVA23* without the hypervisor extension. The advertised **60 TOPS is INT4 sparse**, not a generic dense FP16 rate. [Pinned vendor datasheet](https://github.com/spacemit-com/docs-chip/blob/b43b4f7190e540e2e4394fc58c86741de904e4e3/en/key_stone/k3/k3_docs/k3_ds.md).
 
-The mistake is to say:
+This is vendor specification evidence, not a course benchmark. Before running a vector workload, determine which core executes it, which extensions are exposed, and what scheduling/affinity policy the BSP uses. Do not collapse the two different core types into one “eight-core 1024-bit CPU.”
+
+The same datasheet lists a 64-bit LPDDR5 interface at 6,400 Mbit/s per pin and up to 32 GB capacity. The ideal interface calculation is:
 
 ```text
-RISC-V chip = AI accelerator
+6.4 billion transfers/s * 64 bits / 8 = 51.2 GB/s
 ```
 
-The better question is:
+This is a peak payload calculation before utilization losses, not measured application bandwidth. Do not multiply by two again for DDR: the transfer-rate figure already includes both edges.
 
-```text
-Where is the actual AI compute, and can software use it efficiently?
-```
+Now assume a **dense** 30-billion-parameter model stores exactly four bits per weight and reads all weights once per unbatched decode step. Its ideal weight payload is 15 GB before scales or metadata. At 51.2 GB/s, weight traffic alone takes about 293 ms, giving a ceiling near 3.41 steps/s under those assumptions.
 
----
+If a vendor reports a faster “30B” result, investigate active versus total parameters, MoE routing, quantization format, batching, caching and the timing boundary. The right response is to obtain the workload details, not to assume either the calculation or the headline describes the same experiment.
 
-## 2. Why RISC-V Is Attractive for AI Chips
+## 5. Check software availability at the board level
 
-RISC-V gives chip teams architectural freedom.
+Canonical's February announcement distinguished Ubuntu 24.04 enablement for K1 products from Ubuntu 26.04 preview work on K3. That historical announcement cannot establish which current image enables every peripheral on a particular board. Record the image date/hash, kernel, firmware and board revision, then test the required devices. [Canonical announcement](https://canonical.com/blog/spacemit-announces-availability-of-ubuntu-on-k3-k1-series).
 
-That matters because AI workloads change quickly. A company may want to tune the design around:
+Build a small enablement table:
 
-- INT8 and INT4 inference
-- FP8 transformer inference
-- BF16 or FP16 accumulation
-- sparse matrix formats
-- local memory movement
-- camera and sensor pipelines
-- robotics control loops
-- always-on audio
-- real-time safety islands
-
-The attraction is not just "free ISA."
-
-The attraction is **control**:
-
-- control over extensions
-- control over core count and memory hierarchy
-- control over NPU coupling
-- control over compiler target
-- control over supply chain
-- control over long-lifecycle embedded support
-
-That is why RISC-V is strongest first in **bounded systems** where the product owner controls the stack.
-
----
-
-## 3. Where RISC-V AI Wins First
-
-The strongest near-term markets are not general-purpose AI training clusters.
-
-They are edge and embedded systems where power, customization, and product integration matter.
-
-### Strong Markets
-
-| Market | Why RISC-V Can Fit |
+| Requirement | Evidence to obtain |
 |---|---|
-| Industrial vision | Bounded models, local inference, long lifecycle, cost pressure |
-| Robotics | Inference + real-time control + custom I/O |
-| AI edge gateways | Privacy, local processing, appliance-like deployment |
-| Automotive controllers | Safety, determinism, vendor-neutral architecture pressure |
-| AI sensors and TinyML | Always-on inference under strict power limits |
-| Domestic silicon ecosystems | ISA openness and supply-chain control |
-| Developer boards and AI PCs | Ecosystem seeding and Linux bring-up |
+| Boots the intended board | Exact image, boot log and device tree |
+| Uses the intended vector/core path | Compiler flags, generated instructions and CPU affinity |
+| Runs the required model | Pinned converter/runtime, operator coverage and output parity |
+| Captures a sensor stream | Real format, timestamps, dropped frames and recovery |
+| Meets latency and energy budgets | Full workload with sustained clocks, temperature and power boundaries |
+| Can be maintained | Update/rollback procedure, source availability and supported lifecycle |
 
-### Weak Markets for Now
+An upstream compiler patch, vendor BSP and released distribution package are three different delivery stages. A model that silently falls back to scalar CPU work may be correct but miss the product's timing budget.
 
-| Market | Why It Is Hard |
-|---|---|
-| High-end AI training | NVIDIA software, HBM, interconnect, and library moat |
-| Plug-and-play PyTorch research | CUDA assumptions remain common |
-| Broad consumer laptops | Application compatibility and GPU/media stacks still matter |
-| Hyperscale AI servers | Arm/x86 hosts and NVIDIA/ASIC ecosystems dominate today |
+## 6. Update the host-versus-accelerator picture
 
-The near-term thesis:
+The course should not describe RISC-V GPU hosting as only hypothetical. SiFive's August 2026 BigSky announcement reports CUDA running with the RISC-V system acting as a host for NVIDIA GPUs. Its September announcement describes a **demonstration-only** ROCm 10.0 setup using P870-D host CPUs and Radeon AI PRO R9700 GPUs for inference. These are vendor-reported development milestones, not proof of general availability on arbitrary RISC-V boards. [BigSky announcement](https://www.sifive.com/press/risc-v-in-the-datacenter-bigsky-development-server), [ROCm demonstration](https://www.sifive.com/press/sifive-amd-rocm-riscv-datacenter-servers).
 
-> RISC-V AI wins where the system is designed around a known workload. It struggles where users expect every CUDA/PyTorch project to work unmodified.
+The distinction matters: GPU arithmetic still executes on the GPU. This is different from compiling a neural-network kernel into RVV instructions or a vendor matrix extension. Similarly, licensable CPU/vector/matrix IP is not the same product as a board with a supported software image. [SiFive's Intelligence IP announcement](https://www.sifive.com/press/new-x100-series-second-gen-intelligence-family) is an example of that separate stage.
 
----
+## 7. Turn market claims into engineering hypotheses
 
-## 4. Design Pattern A: Wide Vector AI CPU
+Avoid unsupported “high/medium/low threat” scores. Pick a buyer and a task, then define a comparison the buyer can reproduce.
 
-This pattern uses RISC-V Vector (RVV) heavily.
+For an illustrative warehouse camera, requirements might include one named detection model, a quality threshold, capture-to-result latency, a sustained power envelope, two camera interfaces and a defined update lifetime. A new CPU architecture matters only if its complete platform meets those requirements at an acceptable integration cost.
 
-The chip tries to run AI kernels as programmable vector code instead of sending work to a separate opaque NPU.
+Compare candidates on the same input set and quality gate. Record unsupported operators, conversion effort, debugging access, thermal behavior, recovery and maintenance. A lower silicon price can be outweighed by a longer integration effort; an ISA license saving does not remove verification, physical design, packaging, test or software costs.
 
-Advantages:
+A bounded workload can make custom hardware easier to evaluate because the required operations are known. Treat that as a design hypothesis, not a forecast that one ISA must win an entire market. A convincing result may favor an existing Arm/x86/GPU/NPU platform for the selected product.
 
-- programmable
-- easier to expose through compilers
-- potentially simpler memory coherence
-- less CPU/NPU data-copy overhead
-- better for mixed AI and non-AI code
+## 8. A three-session project
 
-Risks:
+| Session | Work | Evidence |
+|---|---|---|
+| 1: instruction contract | Run the RVV lab; predict VLMAX; inspect assembly and two broken variants | Same binary identity, three emulator configurations, detected failures |
+| 2: platform contract | Choose one chip/board and pin its specifications, BSP and runtime | Block diagram and enablement table with unresolved items |
+| 3: product decision | Define one workload and compare two feasible platforms | Quality/latency/energy/cost assumptions and a reproducible next experiment |
 
-- lower peak energy efficiency than fixed tensor engines
-- vector compiler quality becomes critical
-- model kernels must map well to vector lengths
-- TOPS may not translate into tokens/sec or frames/sec
+Without hardware, submit a measurement plan and analytical bounds. Mark device throughput, power and peripheral operation **not run**. Do not convert QEMU timings or a vendor headline into a measured product comparison.
 
-Good workloads:
+## Check your understanding
 
-- medium-scale local LLM inference
-- image preprocessing and postprocessing
-- quantized matrix operations
-- robotics perception plus control
-- edge multimodal pipelines
+1. Does VLEN=1024 imply 32 FP32 additions per cycle? **No.** It gives a register-capacity relationship at SEW=32/LMUL=1; issue rate and execution width are microarchitectural.
+2. Can code compiled for a vendor matrix extension run because a board supports RVV 1.0? **Not necessarily.** The required extension and toolchain contract must also match.
+3. Does 60 sparse INT4 TOPS predict dense FP16 model throughput? **No.** Arithmetic type, sparsity, memory traffic and the actual instruction path differ.
+4. Does CUDA on a RISC-V host mean the CPU executes NVIDIA GPU instructions? **No.** Host and device code execute on their respective processors.
+5. What would disprove a claim that a new ISA lowers deployment cost? **A controlled comparison showing larger integration/maintenance effort or failure to meet the required workload constraints.**
 
-SpacemiT K3 is useful to study in this category because it emphasizes RISC-V AI CPU positioning and wide vector support.
-
----
-
-## 5. Design Pattern B: CPU + NPU SoC
-
-This is the most familiar edge AI pattern.
-
-```text
-RISC-V CPU
-  + NPU
-  + ISP / video codec
-  + DMA
-  + SRAM / LPDDR
-  + Linux or RTOS
-```
-
-The RISC-V CPU handles:
-
-- OS
-- control flow
-- model scheduling
-- sensor management
-- pre/post-processing
-- security and update logic
-
-The NPU handles:
-
-- convolution
-- matrix multiply
-- attention-like kernels if supported
-- quantized inference
-
-Advantages:
-
-- high efficiency for supported operators
-- clear product story for cameras, sensors, and gateways
-- easier power budgeting than large GPU-like designs
-
-Risks:
-
-- NPU compiler may support only a subset of operators
-- fallback to CPU can destroy latency
-- vendor runtime may be closed
-- debugging can be poor
-- unsupported model layers become product blockers
-
-Evaluation rule:
-
-> An NPU is only as useful as its compiler, runtime, and fallback behavior.
-
----
-
-## 6. Design Pattern C: RISC-V Control Cores in an AI Accelerator
-
-Some AI chips use RISC-V internally.
-
-The user may interact with a tensor runtime, not with RISC-V directly.
-
-RISC-V cores can manage:
-
-- command queues
-- DMA
-- synchronization
-- firmware
-- power management
-- tensor engine orchestration
-
-This is common because RISC-V is a good embedded control architecture.
-
-But it should not be confused with "RISC-V is doing the AI math."
-
-The design review question is:
-
-```text
-Is RISC-V in the compute path, the control path, or both?
-```
-
----
-
-## 7. Design Pattern D: RISC-V Host Around GPU or Accelerator
-
-RISC-V can also act as the host CPU around another accelerator.
-
-This matters for future heterogeneous systems.
-
-Example shape:
-
-```text
-RISC-V host CPU
-  -> PCIe / CXL / chiplet link
-  -> GPU or AI ASIC
-```
-
-The AI performance mostly comes from the GPU or ASIC.
-
-RISC-V contributes:
-
-- boot and platform control
-- system management
-- security root of trust
-- workload orchestration
-- open host CPU alternative
-
-This is strategically important, but it is not the same as a RISC-V AI accelerator.
-
----
-
-## 8. SpacemiT Case Study
-
-SpacemiT is a useful example because it is trying to build a visible RISC-V computing platform, not only an invisible embedded controller.
-
-### K1: Ecosystem-Seeding Platform
-
-The K1 generation is useful for:
-
-- Linux on RISC-V
-- developer boards
-- low-end AI experimentation
-- local software ecosystem building
-- showing that real consumer-style RISC-V products can ship
-
-It is not the main AI-performance story.
-
-The lesson from K1 is ecosystem creation:
-
-> Before a RISC-V AI platform can compete on models, developers need Linux images, drivers, boards, documentation, package repositories, and stable toolchains.
-
-### K3: AI CPU Direction
-
-The following are vendor/platform-partner claims reported in the cited K3 materials, not measurements from this course. Archive the source date and verify the shipped SKU before repeating them:
-
-- eight high-performance X100 RISC-V CPU cores
-- RVA23 compliance
-- 1024-bit RISC-V Vector support
-- native FP8 support for AI inference
-- up to 60 TOPS advertised AI compute; specify precision, sparsity, and operation-count convention before comparison
-- up to 32 GB LPDDR5 memory
-- local medium-scale AI and multimodal edge workloads as the target
-
-The important design point is not only the 60 TOPS number.
-
-The important design point is the **homogeneous AI computing** direction:
-
-```text
-general CPU + vector AI + coherent memory + Linux software stack
-```
-
-That is different from a tiny MCU plus separate black-box NPU.
-
-### What Makes K3 Interesting
-
-K3 is interesting because it combines:
-
-- application-class RISC-V
-- AI-oriented vector capability
-- Linux/Ubuntu enablement
-- edge and robotics positioning
-- enough memory capacity for local model experiments
-
-That combination makes it a serious teaching case for the next wave of RISC-V edge AI platforms.
-
-### What Still Needs Proof
-
-The hard questions are practical:
-
-- What are real tokens/sec on useful LLMs?
-- How much of the 60 TOPS is reachable by open runtimes?
-- Which models compile without hand work?
-- How mature are drivers and profilers?
-- Is the GPU/media stack production-ready?
-- How stable is upstream Linux support?
-- What is power under sustained inference?
-- How does it compare with Jetson, Hailo, Qualcomm, Apple, and x86 AI PCs on real workloads?
-
-The serious evaluation is not:
-
-```text
-Does it advertise TOPS?
-```
-
-It is:
-
-```text
-Can a developer deploy a model, profile it, optimize it, and ship a product?
-```
-
----
-
-## 9. Software Stack: The Real Adoption Gate
-
-RISC-V AI chips do not win through hardware alone.
-
-They need a stack like this:
-
-```text
-Linux / RTOS
-  -> boot firmware
-  -> device tree / ACPI
-  -> kernel drivers
-  -> vector/matrix compiler support
-  -> AI runtime
-  -> model converter
-  -> quantization tools
-  -> profiler
-  -> reference applications
-```
-
-For application-class systems, Linux distribution support is a major signal.
-
-Ubuntu support for SpacemiT K1/K3 matters because it reduces developer friction:
-
-- familiar packages
-- standard userland
-- stable release process
-- easier CI and reproducibility
-- wider community testing
-
-For embedded products, the equivalent signal is Yocto, Buildroot, RTOS, safety tooling, and long-term BSP support.
-
-Software questions to ask:
-
-- Is the compiler upstream or vendor-only?
-- Does LLVM know the vector/matrix target?
-- Can TVM, IREE, ONNX Runtime, llama.cpp, or PyTorch use the hardware?
-- Are kernels open enough to debug?
-- Can developers profile compute versus memory stalls?
-- Are fallback paths explicit?
-- Can the board run standard containers?
-
-Hardware without this stack is a demo, not a platform.
-
----
-
-## 10. Market Analysis
-
-### The Bull Case
-
-RISC-V benefits from several market forces:
-
-- edge AI growth
-- automotive software-defined platforms
-- industrial automation
-- robotics
-- supply-chain diversification
-- desire to reduce ISA licensing dependency
-- need for custom accelerators around known workloads
-- open-source software momentum
-
-Omdia has forecast rapid RISC-V shipment growth through 2030, with AI and especially edge AI as major adoption drivers.
-
-ABI Research's April 2026 framing is a useful practical summary: RISC-V's AI opportunity is real, but concentrated first in bounded edge systems rather than broad data-center CPU replacement.
-
-### The Bear Case
-
-RISC-V still faces major adoption barriers:
-
-- fragmented vendor extensions
-- uneven Linux and driver quality
-- weaker commercial software ecosystem than Arm/x86
-- immature AI profiling tools
-- fewer production ML kernels
-- limited developer familiarity
-- unclear long-term support for some startups
-- hard competition from NVIDIA, Arm, Qualcomm, Apple, Hailo, and x86 AI PCs
-
-RISC-V openness helps, but customers still buy working products.
-
-### Most Likely Outcome
-
-RISC-V AI adoption will be selective.
-
-Likely first winners:
-
-- industrial edge cameras
-- robotics controllers
-- AI sensor hubs
-- automotive domain/zonal controllers
-- domestic RISC-V developer ecosystems
-- specialized AI appliances
-
-Less likely near-term winners:
-
-- large-scale training clusters
-- general CUDA replacement
-- mainstream consumer laptops
-- broad hyperscale AI CPU share
-
-The practical forecast:
-
-> RISC-V will matter most where architecture is still fluid and the product team can co-design workload, silicon, runtime, and OS together.
-
----
-
-## 11. Competitive Map
-
-| Platform | RISC-V Threat Level | Why |
-|---|---:|---|
-| NVIDIA GPU training | Low | CUDA, HBM, NVLink, libraries, and ecosystem remain dominant |
-| NVIDIA Jetson edge AI | Medium | RISC-V can compete in lower-power or sovereign edge designs |
-| Hailo edge accelerators | Medium | RISC-V platforms may integrate NPU-like compute directly |
-| Qualcomm robotics/IoT | Medium | RISC-V can target similar heterogeneous edge systems |
-| Arm Cortex-A / Cortex-M | High in new embedded designs | RISC-V directly competes for CPU/control roles |
-| x86 AI PCs | Low to medium | Application compatibility remains a barrier |
-| TinyML MCUs | High | Custom RISC-V MCUs and extensions fit well |
-| Automotive controllers | Medium to high over time | Safety ecosystem and long lifecycle will decide |
-
----
-
-## 12. Evaluation Checklist
-
-Use this checklist for any RISC-V AI chip.
-
-### Architecture
-
-- What is the core count and class?
-- Does it support RVV?
-- Does it support matrix extensions or custom AI instructions?
-- Is AI compute vector-based, NPU-based, tensor-fabric-based, or mixed?
-- What precisions are supported: INT8, INT4, FP8, BF16, FP16?
-- How much on-chip SRAM exists?
-- What is the external memory bandwidth?
-- Is memory coherent between CPU and accelerator?
-- Are DMA and scratchpad transfers explicit?
-
-### Software
-
-- Is Linux upstream support available?
-- Is there Ubuntu, Debian, Yocto, or Buildroot support?
-- Are drivers open, partially open, or closed?
-- Which AI runtimes work today?
-- Which model formats are accepted?
-- What happens on unsupported operators?
-- Is there a profiler?
-- Can developers use containers?
-- Is the compiler integrated with LLVM, MLIR, TVM, IREE, or vendor-only tooling?
-
-### Performance
-
-- What is real tokens/sec for LLM decode?
-- What is prefill throughput?
-- What is vision FPS at batch 1?
-- What is power under sustained load?
-- How much memory is available for model weights and KV cache?
-- Does performance collapse with dynamic shapes?
-- How costly are CPU-to-accelerator transfers?
-
-### Market
-
-- Who is the buyer?
-- What incumbent platform does it replace?
-- Is the workload controlled or general-purpose?
-- Is the software stack mature enough for production?
-- Is there a credible board, module, or system vendor?
-- Is long-term support clear?
-- Is the platform differentiated by openness, power, cost, or integration?
-
----
-
-## 13. Hands-On Project: RISC-V AI Chip Review Memo
-
-Pick one RISC-V AI platform:
-
-- SpacemiT K1 or K3
-- Tenstorrent embedded or accelerator IP
-- SiFive Intelligence family
-- MIPS S8200
-- Semidynamics Cervell NPU
-- Andes AI/vector cores
-- Google Coral/Kelvin-style RISC-V edge AI reference design
-
-Write a 4-page memo:
-
-1. **Architecture summary:** CPU, vector, NPU, memory, I/O, OS.
-2. **Software stack:** Linux, compiler, runtime, model support, profiling.
-3. **Workload fit:** Which models should it run well? Which should it avoid?
-4. **Market fit:** Where can it win first?
-5. **Risks:** What must be proven before production adoption?
-6. **Verdict:** Developer board, product platform, or research curiosity?
-
-Use measured benchmarks where possible. If only marketing data exists, state that clearly.
-
----
-
-## 14. Capstone Project: Design a RISC-V Edge AI SoC
-
-Design a product-level SoC for local multimodal inference.
-
-Target:
-
-- 15-25 W system power
-- local vision and voice inference
-- optional 7B to 30B quantized LLM experiments
-- Linux-capable development environment
-- robotics or industrial gateway form factor
-
-Specify:
-
-- RISC-V CPU profile and core count
-- vector length and precision support
-- NPU or tensor unit design
-- memory capacity and bandwidth
-- on-chip SRAM and DMA strategy
-- camera/video/audio blocks
-- Linux and driver strategy
-- compiler/runtime path
-- benchmark suite
-- target customer
-
-Then answer:
-
-```text
-Why should this be RISC-V instead of Arm, x86, Jetson, or a discrete NPU?
-```
-
-If you cannot answer that, the design is not differentiated.
-
----
-
-## Key Takeaways
-
-- RISC-V is an ISA, not automatically an AI accelerator.
-- The strongest RISC-V AI opportunities are bounded edge systems where workload and software stack can be controlled.
-- SpacemiT is a useful 2026 case study because it combines application-class RISC-V, AI-oriented vector compute, Linux enablement, and edge AI positioning.
-- TOPS is not enough; evaluate tokens/sec, FPS, power, memory bandwidth, operator coverage, and tooling.
-- The market opportunity is real, but selective: edge, robotics, industrial, automotive, and AI appliances before broad data-center replacement.
-- A credible RISC-V AI chip must be designed as a full platform: silicon, compiler, runtime, OS, board, and reference applications.
-
----
-
-## References
-
-- [SpacemiT announces Ubuntu on K3/K1 series RISC-V AI computing platforms](https://canonical.com/blog/spacemit-announces-availability-of-ubuntu-on-k3-k1-series) - Canonical announcement covering Ubuntu enablement and RVA23 positioning.
-- [SpacemiT launches K3 AI CPU](https://www.globenewswire.com/news-release/2026/01/30/3229216/0/en/Chinese-RISC-V-Chipmaker-SpacemiT-Launches-K3-AI-CPU-Highlighting-the-Rise-of-Open-Source-Hardware-in-Intelligent-Computing.html) - Launch article with K3 specifications and product positioning.
-- [RISC-V adoption will be accelerated by AI](https://omdia.tech.informa.com/pr/2024/may/risc-v-adoption-will-be-accelerated-by-ai-according-to-new-omdia-research) - Omdia forecast on RISC-V shipment growth and AI/edge adoption.
-- [RISC-V's AI Opportunity Is Real](https://www.abiresearch.com/market-research/insight/7787778-risc-vs-ai-opportunity-is-real-but-can-edg) - ABI Research market note on bounded edge AI roles.
-- [Production-Ready, Automotive-Grade, AI-Native: RISC-V at Embedded World 2026](https://riscv.org/blog/embedded-world-2026/) - RISC-V International overview of edge AI, embedded, and automotive ecosystem momentum.
-- [RISC-V Annual Report 2025](https://riscv.org/wp-content/uploads/2026/01/RISC-V-Annual-Report-2025.pdf) - Ecosystem report covering profiles, edge AI, vector/matrix direction, and software momentum.
-
-## Architecture exercise: choose what the ISA must own
-
-Compare two implementations of the same projection subgraph: (A) vector instructions executed by the CPU, and (B) a CPU-submitted command queue driving a separate matrix engine. For each, draw where weights, accumulators, DMA descriptors, and completion state live. An open CPU ISA does not imply that the NPU, memory controller, compiler, or radio IP is open.
-
-A “1024-bit vector” claim needs interpretation: architectural VLEN, physical datapath width, issue rate, and supported element types are distinct. Likewise a CPU profile does not promise a model runtime or a working peripheral driver. Use the ISA specification and the specific implementation manual, then inspect generated code and measure one operator. [RISC-V specifications](https://docs.riscv.org/reference/isa/unpriv/v-st-ext.html).
-
-For Linux, enumerate privileged architecture/MMU, interrupts/timers, boot firmware, device tree, drivers, and toolchain requirements. For wireless, choose an external module first unless integrated RF is an explicit verified design scope. Deliver a block diagram plus a software-enablement matrix to the [SoC capstone](../Guide.md#physical-ai-soc-capstone). Commercial predictions in the market sections remain hypotheses, not performance evidence.
-
-## Practice and assessment
-
-**Entry diagnostic (prerequisite check):** Separate ISA semantics, microarchitecture, compiler support, and accelerator integration. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
-
-1. **Baseline lab:** Implement or inspect one small instruction/accelerator interface against a software reference.
-2. **Guided variation:** Test boundary operands and backpressure or memory ordering at the interface.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
-
-**Evidence to submit:** Reference parity, cycle counts, area/power assumptions, compiler/runtime interface, and verification cases. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+Complete the [shared rubric](../../../Learning-Guide.md#completion-rubric), then carry the tested instruction/runtime contract and platform evidence into the [SoC capstone](../Guide.md#physical-ai-soc-capstone).

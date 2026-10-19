@@ -1,6 +1,6 @@
 # 8x H200 GPU — Training & Inference Deep Dive
 
-The NVIDIA H200 SXM5 is a Hopper-generation GPU used here as a reference platform, featuring 141 GB HBM3e memory at 4.8 TB/s bandwidth. An 8-GPU SXM node with NVLink 4.0/NVSwitch is the industry-standard building block for large model training and high-throughput inference.
+The NVIDIA H200 SXM5 is a Hopper-generation GPU used here as a reference platform, featuring 141 GB HBM3e memory at 4.8 TB/s bandwidth. An 8-GPU SXM node with NVLink 4.0/NVSwitch is a useful reference configuration for large-model training and inference; actual feasibility depends on the full server and workload.
 
 ## System Snapshot
 
@@ -27,7 +27,7 @@ The NVIDIA H200 SXM5 is a Hopper-generation GPU used here as a reference platfor
 | 03 | [Inference Setup](./03-Inference-Setup.md) | Tensor parallel inference, vLLM, TensorRT-LLM |
 | 04 | [Memory Management](./04-Memory-Management.md) | KV cache, paged attention, memory pooling |
 | 05 | [Performance Optimization](./05-Performance-Optimization.md) | Profiling, roofline, kernel tuning, CUDA Graphs |
-| 06 | [Benchmarks & Validation](./06-Benchmarks-and-Validation.md) | MFU, MBU, latency, throughput targets |
+| 06 | [Benchmarks & Validation](./06-Benchmarks-and-Validation.md) | Correctness, MFU assumptions, bounded device tests, service goodput |
 
 ## Quick Navigation
 

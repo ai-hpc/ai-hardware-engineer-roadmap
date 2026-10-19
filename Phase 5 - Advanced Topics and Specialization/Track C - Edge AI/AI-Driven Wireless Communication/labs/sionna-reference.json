@@ -1,0 +1,15 @@
+{
+  "sionna": "2.2.0",
+  "torch": "2.14.0+cpu",
+  "device": "cpu",
+  "experiment": "uncoded synthetic QPSK AWGN",
+  "seed": 42,
+  "bits": 100000,
+  "errors": 3914,
+  "ber": 0.03914,
+  "analytic_ber": 0.03750612835892598,
+  "complex_noise_variance": 0.31547868251800537,
+  "mean_symbol_energy": 1.0,
+  "bce": 0.1009710356593132,
+  "gradient_finite_nonzero": true
+}

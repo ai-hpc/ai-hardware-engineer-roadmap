@@ -1,0 +1,395 @@
+{
+  "evidence": "actual MuJoCo CPU dynamics; one hinge and a finite sphere; no contacts or hardware",
+  "mujoco": "3.16.0",
+  "python": "3.12.3",
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "source_sha256": {
+    "dynamics.py": "56526c4ecdc52fd713828891196176963e6d3945372df036fd373f71d3a5e917",
+    "mujoco_pendulum.py": "5f18efef85e3736bb7b95600becadc2408faf1f310df2b7f24972b0c2031d400",
+    "optional/test_mujoco_pendulum.py": "040d069b5af856637716fd599df7e97e41e16c7ca0ed68e842971fdf1c83f0db"
+  },
+  "point_mass_model": {
+    "mass": 2.0,
+    "length": 0.5,
+    "damping": 0.2,
+    "gravity": 9.81
+  },
+  "sphere_radius_m": 0.01,
+  "point_mass_inertia_kg_m2": 0.5,
+  "finite_bob_inertia_kg_m2": 0.50008,
+  "dt_s": 0.005,
+  "steps_per_rollout": 1200,
+  "target_rad": 1.5707963267948966,
+  "initial_state": [
+    0.0,
+    0.0
+  ],
+  "kp_Nm_per_rad": 8.0,
+  "kd_Nm_s_per_rad": 3.8,
+  "dynamics_probes": [
+    {
+      "angle_rad": -1.5707963267948966,
+      "velocity_rad_s": 0.7,
+      "applied_torque_Nm": 0.3,
+      "native_inertia_kg_m2": 0.50008,
+      "native_gravity_bias_Nm": -9.81,
+      "native_damping_torque_Nm": -0.13999999999999999,
+      "native_acceleration_rad_s2": 19.93681011038234,
+      "finite_bob_expected_acceleration_rad_s2": 19.936810110382343
+    },
+    {
+      "angle_rad": -0.4,
+      "velocity_rad_s": 0.7,
+      "applied_torque_Nm": 0.3,
+      "native_inertia_kg_m2": 0.5000800000000001,
+      "native_gravity_bias_Nm": -3.820193938047861,
+      "native_damping_torque_Nm": -0.13999999999999999,
+      "native_acceleration_rad_s2": 7.959114417788873,
+      "finite_bob_expected_acceleration_rad_s2": 7.959114417788878
+    },
+    {
+      "angle_rad": 0.0,
+      "velocity_rad_s": 0.7,
+      "applied_torque_Nm": 0.3,
+      "native_inertia_kg_m2": 0.50008,
+      "native_gravity_bias_Nm": 0.0,
+      "native_damping_torque_Nm": -0.13999999999999999,
+      "native_acceleration_rad_s2": 0.3199488081906895,
+      "finite_bob_expected_acceleration_rad_s2": 0.3199488081906895
+    },
+    {
+      "angle_rad": 0.4,
+      "velocity_rad_s": 0.7,
+      "applied_torque_Nm": 0.3,
+      "native_inertia_kg_m2": 0.5000800000000001,
+      "native_gravity_bias_Nm": 3.820193938047861,
+      "native_damping_torque_Nm": -0.13999999999999999,
+      "native_acceleration_rad_s2": -7.319216801407496,
+      "finite_bob_expected_acceleration_rad_s2": -7.3192168014074985
+    },
+    {
+      "angle_rad": 1.5707963267948966,
+      "velocity_rad_s": 0.7,
+      "applied_torque_Nm": 0.3,
+      "native_inertia_kg_m2": 0.50008,
+      "native_gravity_bias_Nm": 9.81,
+      "native_damping_torque_Nm": -0.13999999999999999,
+      "native_acceleration_rad_s2": -19.29691249400096,
+      "finite_bob_expected_acceleration_rad_s2": -19.29691249400096
+    }
+  ],
+  "cases": [
+    {
+      "name": "PD_only",
+      "compensate": false,
+      "torque_limit_Nm": 12.0,
+      "native_final_error_rad": 0.8287220902927567,
+      "native_final_velocity_rad_s": -1.2208522475007882e-10,
+      "point_mass_final_error_rad": 0.8287220902940501,
+      "max_point_mass_vs_native_angle_difference_rad": 0.00032605125378981636,
+      "max_point_mass_vs_native_velocity_difference_rad_s": 0.0021591789455712718,
+      "max_native_applied_torque_Nm": 12.0,
+      "native_clipped_steps": 2,
+      "finite_bob_explicit_damping_max_difference": {
+        "angle_rad": 1.1102230246251565e-16,
+        "velocity_rad_s": 4.2760933682828295e-16
+      },
+      "native_samples_each_0_5_s": [
+        {
+          "time_s": 0.5000000000000003,
+          "angle_rad": 0.7041346088374505,
+          "velocity_rad_s": 0.6702210259955284,
+          "requested_torque_Nm": 4.33243986605777,
+          "applied_torque_Nm": 4.33243986605777
+        },
+        {
+          "time_s": 1.0000000000000007,
+          "angle_rad": 0.7602276052620061,
+          "velocity_rad_s": -0.07689186483106648,
+          "requested_torque_Nm": 6.774704703575289,
+          "applied_torque_Nm": 6.774704703575289
+        },
+        {
+          "time_s": 1.49999999999999,
+          "angle_rad": 0.7412285814387155,
+          "velocity_rad_s": -0.005120592862654899,
+          "requested_torque_Nm": 6.657097703160078,
+          "applied_torque_Nm": 6.657097703160078
+        },
+        {
+          "time_s": 1.9999999999999793,
+          "angle_rad": 0.7418369787862696,
+          "velocity_rad_s": 0.0017334361451599811,
+          "requested_torque_Nm": 6.625031157731936,
+          "applied_torque_Nm": 6.625031157731936
+        },
+        {
+          "time_s": 2.499999999999969,
+          "angle_rad": 0.7421086224774447,
+          "velocity_rad_s": -5.888932262985899e-05,
+          "requested_torque_Nm": 6.629711500567028,
+          "applied_torque_Nm": 6.629711500567028
+        },
+        {
+          "time_s": 2.9999999999999583,
+          "angle_rad": 0.7420753802564317,
+          "velocity_rad_s": -2.4550244055134094e-05,
+          "requested_torque_Nm": 6.629862997769724,
+          "applied_torque_Nm": 6.629862997769724
+        },
+        {
+          "time_s": 3.4999999999999476,
+          "angle_rad": 0.7420735548469005,
+          "velocity_rad_s": 3.069358783308051e-06,
+          "requested_torque_Nm": 6.629770569153767,
+          "applied_torque_Nm": 6.629770569153767
+        },
+        {
+          "time_s": 3.999999999999937,
+          "angle_rad": 0.7420742743951219,
+          "velocity_rad_s": 1.5948788515552897e-07,
+          "requested_torque_Nm": 6.629775771998916,
+          "applied_torque_Nm": 6.629775771998916
+        },
+        {
+          "time_s": 4.499999999999926,
+          "angle_rad": 0.7420742448872139,
+          "velocity_rad_s": -6.567592594807406e-08,
+          "requested_torque_Nm": 6.629776907321578,
+          "applied_torque_Nm": 6.629776907321578
+        },
+        {
+          "time_s": 4.999999999999916,
+          "angle_rad": 0.7420742351230614,
+          "velocity_rad_s": 2.8145676829174835e-09,
+          "requested_torque_Nm": 6.629776723169946,
+          "applied_torque_Nm": 6.629776723169946
+        },
+        {
+          "time_s": 5.499999999999905,
+          "angle_rad": 0.7420742364474323,
+          "velocity_rad_s": 8.81002509905834e-10,
+          "requested_torque_Nm": 6.629776719348184,
+          "applied_torque_Nm": 6.629776719348184
+        },
+        {
+          "time_s": 5.999999999999894,
+          "angle_rad": 0.7420742365021399,
+          "velocity_rad_s": -1.2208522475007882e-10,
+          "requested_torque_Nm": 6.6297767228046744,
+          "applied_torque_Nm": 6.6297767228046744
+        }
+      ],
+      "implicit_damping_model_xml": "<mujoco model=\"course_pendulum\">\n      <option timestep=\"0.0050000000000000001\" gravity=\"0 0 -9.8100000000000005\" integrator=\"Euler\">\n        <flag eulerdamp=\"enable\"/>\n      </option>\n      <worldbody><body name=\"pendulum\">\n        <joint name=\"hinge\" type=\"hinge\" axis=\"0 1 0\" damping=\"0.20000000000000001\"/>\n        <geom name=\"bob\" type=\"sphere\" pos=\"0 0 -0.5\"\n          size=\"0.01\" mass=\"2\" contype=\"0\" conaffinity=\"0\"/>\n      </body></worldbody>\n      <actuator><motor joint=\"hinge\" gear=\"1\" ctrllimited=\"true\"\n        ctrlrange=\"-12 12\" forcelimited=\"true\"\n        forcerange=\"-12 12\"/></actuator>\n    </mujoco>",
+      "explicit_damping_model_xml": "<mujoco model=\"course_pendulum\">\n      <option timestep=\"0.0050000000000000001\" gravity=\"0 0 -9.8100000000000005\" integrator=\"Euler\">\n        <flag eulerdamp=\"disable\"/>\n      </option>\n      <worldbody><body name=\"pendulum\">\n        <joint name=\"hinge\" type=\"hinge\" axis=\"0 1 0\" damping=\"0.20000000000000001\"/>\n        <geom name=\"bob\" type=\"sphere\" pos=\"0 0 -0.5\"\n          size=\"0.01\" mass=\"2\" contype=\"0\" conaffinity=\"0\"/>\n      </body></worldbody>\n      <actuator><motor joint=\"hinge\" gear=\"1\" ctrllimited=\"true\"\n        ctrlrange=\"-12 12\" forcelimited=\"true\"\n        forcerange=\"-12 12\"/></actuator>\n    </mujoco>"
+    },
+    {
+      "name": "gravity_compensated",
+      "compensate": true,
+      "torque_limit_Nm": 12.0,
+      "native_final_error_rad": 4.233754680171842e-09,
+      "native_final_velocity_rad_s": 1.506238627461097e-08,
+      "point_mass_final_error_rad": 4.658943009161476e-09,
+      "max_point_mass_vs_native_angle_difference_rad": 0.00044700566392086305,
+      "max_point_mass_vs_native_velocity_difference_rad_s": 0.00233404905576462,
+      "max_native_applied_torque_Nm": 12.0,
+      "native_clipped_steps": 2,
+      "finite_bob_explicit_damping_max_difference": {
+        "angle_rad": 1.3877787807814457e-17,
+        "velocity_rad_s": 4.440892098500626e-16
+      },
+      "native_samples_each_0_5_s": [
+        {
+          "time_s": 0.5000000000000003,
+          "angle_rad": 0.9393369134243349,
+          "velocity_rad_s": 1.691374134317519,
+          "requested_torque_Nm": 6.496143902636599,
+          "applied_torque_Nm": 6.496143902636599
+        },
+        {
+          "time_s": 1.0000000000000007,
+          "angle_rad": 1.4265922628356642,
+          "velocity_rad_s": 0.45799405833111345,
+          "requested_torque_Nm": 9.110431909204536,
+          "applied_torque_Nm": 9.110431909204536
+        },
+        {
+          "time_s": 1.49999999999999,
+          "angle_rad": 1.5425077559436393,
+          "velocity_rad_s": 0.09519249391414726,
+          "requested_torque_Nm": 9.668376691959866,
+          "applied_torque_Nm": 9.668376691959866
+        },
+        {
+          "time_s": 1.9999999999999793,
+          "angle_rad": 1.5655930205638229,
+          "velocity_rad_s": 0.017973426493860214,
+          "requested_torque_Nm": 9.782741944587443,
+          "applied_torque_Nm": 9.782741944587443
+        },
+        {
+          "time_s": 2.499999999999969,
+          "angle_rad": 1.569869278119919,
+          "velocity_rad_s": 0.003245185332484238,
+          "requested_torque_Nm": 9.804995493783405,
+          "applied_torque_Nm": 9.804995493783405
+        },
+        {
+          "time_s": 2.9999999999999583,
+          "angle_rad": 1.5706339380438903,
+          "velocity_rad_s": 0.0005725538651800725,
+          "requested_torque_Nm": 9.809107934852056,
+          "applied_torque_Nm": 9.809107934852056
+        },
+        {
+          "time_s": 3.4999999999999476,
+          "angle_rad": 1.5707681471022845,
+          "velocity_rad_s": 9.975531227065586e-05,
+          "requested_torque_Nm": 9.80984365552726,
+          "applied_torque_Nm": 9.80984365552726
+        },
+        {
+          "time_s": 3.999999999999937,
+          "angle_rad": 1.5707914625120183,
+          "velocity_rad_s": 1.725853606577764e-05,
+          "requested_torque_Nm": 9.809972859743107,
+          "applied_torque_Nm": 9.809972859743107
+        },
+        {
+          "time_s": 4.499999999999926,
+          "angle_rad": 1.570795489670105,
+          "velocity_rad_s": 2.9739862371276506e-06,
+          "requested_torque_Nm": 9.809995314175117,
+          "applied_torque_Nm": 9.809995314175117
+        },
+        {
+          "time_s": 4.999999999999916,
+          "angle_rad": 1.5707961829784816,
+          "velocity_rad_s": 5.113065798083723e-07,
+          "requested_torque_Nm": 9.809999193490722,
+          "applied_torque_Nm": 9.809999193490722
+        },
+        {
+          "time_s": 5.499999999999905,
+          "angle_rad": 1.5707963021122053,
+          "velocity_rad_s": 8.779150143107071e-08,
+          "requested_torque_Nm": 9.809999861433695,
+          "applied_torque_Nm": 9.809999861433695
+        },
+        {
+          "time_s": 5.999999999999894,
+          "angle_rad": 1.5707963225611419,
+          "velocity_rad_s": 1.506238627461097e-08,
+          "requested_torque_Nm": 9.809999976217416,
+          "applied_torque_Nm": 9.809999976217416
+        }
+      ],
+      "implicit_damping_model_xml": "<mujoco model=\"course_pendulum\">\n      <option timestep=\"0.0050000000000000001\" gravity=\"0 0 -9.8100000000000005\" integrator=\"Euler\">\n        <flag eulerdamp=\"enable\"/>\n      </option>\n      <worldbody><body name=\"pendulum\">\n        <joint name=\"hinge\" type=\"hinge\" axis=\"0 1 0\" damping=\"0.20000000000000001\"/>\n        <geom name=\"bob\" type=\"sphere\" pos=\"0 0 -0.5\"\n          size=\"0.01\" mass=\"2\" contype=\"0\" conaffinity=\"0\"/>\n      </body></worldbody>\n      <actuator><motor joint=\"hinge\" gear=\"1\" ctrllimited=\"true\"\n        ctrlrange=\"-12 12\" forcelimited=\"true\"\n        forcerange=\"-12 12\"/></actuator>\n    </mujoco>",
+      "explicit_damping_model_xml": "<mujoco model=\"course_pendulum\">\n      <option timestep=\"0.0050000000000000001\" gravity=\"0 0 -9.8100000000000005\" integrator=\"Euler\">\n        <flag eulerdamp=\"disable\"/>\n      </option>\n      <worldbody><body name=\"pendulum\">\n        <joint name=\"hinge\" type=\"hinge\" axis=\"0 1 0\" damping=\"0.20000000000000001\"/>\n        <geom name=\"bob\" type=\"sphere\" pos=\"0 0 -0.5\"\n          size=\"0.01\" mass=\"2\" contype=\"0\" conaffinity=\"0\"/>\n      </body></worldbody>\n      <actuator><motor joint=\"hinge\" gear=\"1\" ctrllimited=\"true\"\n        ctrlrange=\"-12 12\" forcelimited=\"true\"\n        forcerange=\"-12 12\"/></actuator>\n    </mujoco>"
+    },
+    {
+      "name": "insufficient_torque",
+      "compensate": true,
+      "torque_limit_Nm": 8.0,
+      "native_final_error_rad": 0.7351532160738579,
+      "native_final_velocity_rad_s": 0.2819354691425159,
+      "point_mass_final_error_rad": 0.7329988342583957,
+      "max_point_mass_vs_native_angle_difference_rad": 0.0032996998626058094,
+      "max_point_mass_vs_native_velocity_difference_rad_s": 0.011559149101348198,
+      "max_native_applied_torque_Nm": 8.0,
+      "native_clipped_steps": 1074,
+      "finite_bob_explicit_damping_max_difference": {
+        "angle_rad": 2.220446049250313e-16,
+        "velocity_rad_s": 1.1102230246251565e-15
+      },
+      "native_samples_each_0_5_s": [
+        {
+          "time_s": 0.5000000000000003,
+          "angle_rad": 0.9130902381699917,
+          "velocity_rad_s": 1.7415755426429718,
+          "requested_torque_Nm": 6.359838301263751,
+          "applied_torque_Nm": 6.359838301263751
+        },
+        {
+          "time_s": 1.0000000000000007,
+          "angle_rad": 1.383591576970988,
+          "velocity_rad_s": 0.14701693310579877,
+          "requested_torque_Nm": 10.518789310585019,
+          "applied_torque_Nm": 8.0
+        },
+        {
+          "time_s": 1.49999999999999,
+          "angle_rad": 1.0880913416273659,
+          "velocity_rad_s": -1.127011889418465,
+          "requested_torque_Nm": 16.795272128989012,
+          "applied_torque_Nm": 8.0
+        },
+        {
+          "time_s": 1.9999999999999793,
+          "angle_rad": 0.6588030645643463,
+          "velocity_rad_s": -0.14530208257570887,
+          "requested_torque_Nm": 13.929984760157003,
+          "applied_torque_Nm": 8.0
+        },
+        {
+          "time_s": 2.499999999999969,
+          "angle_rad": 0.9712825452306237,
+          "velocity_rad_s": 0.9634683176322529,
+          "requested_torque_Nm": 9.235870358597484,
+          "applied_torque_Nm": 8.0
+        },
+        {
+          "time_s": 2.9999999999999583,
+          "angle_rad": 1.2352683491999203,
+          "velocity_rad_s": -0.052953116332699286,
+          "requested_torque_Nm": 12.099528494567329,
+          "applied_torque_Nm": 8.0
+        },
+        {
+          "time_s": 3.4999999999999476,
+          "angle_rad": 0.9638718190473677,
+          "velocity_rad_s": -0.7998719956997268,
+          "requested_torque_Nm": 15.946246675952404,
+          "applied_torque_Nm": 8.0
+        },
+        {
+          "time_s": 3.999999999999937,
+          "angle_rad": 0.7512558066508579,
+          "velocity_rad_s": 0.15427407621882336,
+          "requested_torque_Nm": 12.715192646857716,
+          "applied_torque_Nm": 8.0
+        },
+        {
+          "time_s": 4.499999999999926,
+          "angle_rad": 1.0196840829127531,
+          "velocity_rad_s": 0.6029184690987653,
+          "requested_torque_Nm": 10.4663816524975,
+          "applied_torque_Nm": 8.0
+        },
+        {
+          "time_s": 4.999999999999916,
+          "angle_rad": 1.1281284018125275,
+          "velocity_rad_s": -0.21718788921216073,
+          "requested_torque_Nm": 13.195596236650953,
+          "applied_torque_Nm": 8.0
+        },
+        {
+          "time_s": 5.499999999999905,
+          "angle_rad": 0.8966202589519184,
+          "velocity_rad_s": -0.49031770482033393,
+          "requested_torque_Nm": 14.931707379911028,
+          "applied_torque_Nm": 8.0
+        },
+        {
+          "time_s": 5.999999999999894,
+          "angle_rad": 0.8356431107210387,
+          "velocity_rad_s": 0.2819354691425159,
+          "requested_torque_Nm": 12.113922281317773,
+          "applied_torque_Nm": 8.0
+        }
+      ],
+      "implicit_damping_model_xml": "<mujoco model=\"course_pendulum\">\n      <option timestep=\"0.0050000000000000001\" gravity=\"0 0 -9.8100000000000005\" integrator=\"Euler\">\n        <flag eulerdamp=\"enable\"/>\n      </option>\n      <worldbody><body name=\"pendulum\">\n        <joint name=\"hinge\" type=\"hinge\" axis=\"0 1 0\" damping=\"0.20000000000000001\"/>\n        <geom name=\"bob\" type=\"sphere\" pos=\"0 0 -0.5\"\n          size=\"0.01\" mass=\"2\" contype=\"0\" conaffinity=\"0\"/>\n      </body></worldbody>\n      <actuator><motor joint=\"hinge\" gear=\"1\" ctrllimited=\"true\"\n        ctrlrange=\"-8 8\" forcelimited=\"true\"\n        forcerange=\"-8 8\"/></actuator>\n    </mujoco>",
+      "explicit_damping_model_xml": "<mujoco model=\"course_pendulum\">\n      <option timestep=\"0.0050000000000000001\" gravity=\"0 0 -9.8100000000000005\" integrator=\"Euler\">\n        <flag eulerdamp=\"disable\"/>\n      </option>\n      <worldbody><body name=\"pendulum\">\n        <joint name=\"hinge\" type=\"hinge\" axis=\"0 1 0\" damping=\"0.20000000000000001\"/>\n        <geom name=\"bob\" type=\"sphere\" pos=\"0 0 -0.5\"\n          size=\"0.01\" mass=\"2\" contype=\"0\" conaffinity=\"0\"/>\n      </body></worldbody>\n      <actuator><motor joint=\"hinge\" gear=\"1\" ctrllimited=\"true\"\n        ctrlrange=\"-8 8\" forcelimited=\"true\"\n        forcerange=\"-8 8\"/></actuator>\n    </mujoco>"
+    }
+  ]
+}

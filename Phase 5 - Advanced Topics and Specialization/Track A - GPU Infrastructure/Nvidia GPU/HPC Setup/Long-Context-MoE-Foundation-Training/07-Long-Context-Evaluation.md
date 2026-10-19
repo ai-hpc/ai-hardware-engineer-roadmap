@@ -1,228 +1,76 @@
-# Module 07 — Long-Context Evaluation
+# Module 07 — Measure whether the model uses its context
 
-**Parent:** [Long-Context MoE Foundation Training](README.md)
+A model can accept 128K tokens yet answer using only the last paragraph. An evaluation must separate **accepted length**, **retrieval**, **reasoning over evidence**, and **runtime cost**. A single aggregate score cannot tell you which failed.
 
-**One-line purpose:** Build an honest evaluation harness that measures what matters — per-position retrieval, multi-hop reasoning, long-document synthesis, codebase tasks — and explain why perplexity alone is misleading at long context.
+**Before this lesson:** [the data split and token-count contract](06-Adaptive-Data-Pipelines.md). **Outcome:** calculate perplexity correctly, design a retrieval test without prompt leakage, and specify a paired benchmark comparison. The arithmetic below is executable on CPU. The external model benchmarks are source-checked integration plans, not runs performed by this lesson.
 
-**Prerequisites:** Modules 01–06. Familiarity with standard LLM eval tooling (`lm-evaluation-harness`, `vllm`, etc.).
+## 1. Average loss is not perplexity
 
-**Artifact:** A reproducible harness producing a per-length, per-task breakdown across RULER, LongBench, and at least one needle-in-haystack variant; a written summary of where your model is and is not actually using long context.
+For N valid next-token targets with natural-log negative log likelihoods ℓᵢ:
 
----
+`mean NLL = sum(ℓᵢ) / N`, and `perplexity = exp(mean NLL)`.
 
-## Why it matters
+Exclude padding and all ignored targets. Count each intended target once when scoring overlapping windows. Record context length, stride, document boundaries, tokenizer, and the exact target mask. Changing any of these can change the measurement even when model weights stay fixed.
 
-A model that scores well on a long-context benchmark **on average** can still fail catastrophically at specific positions or specific task types. Without a per-position, per-task breakdown you cannot tell whether your model "supports 256K context" or "supports 4K and gets lucky."
+Two batches have NLL sums 20 and 10, with 10 and 2 valid targets. The pooled mean NLL is 30/12=2.5 and perplexity is about **12.1825**. The unweighted average of batch mean losses is 3.5; the average of batch perplexities is about 77.90. Neither equals the token-weighted result.
 
-Every architectural and data change you make in this course should be paired with an eval delta. This module is the foundation for those deltas.
+Run from any directory:
 
----
-
-## Mental model
-
-### Why perplexity at long context lies
-
-Perplexity is the average negative log-likelihood per token. At long context, the per-position likelihood is dominated by **easy** local-syntax tokens. A few catastrophically wrong tokens at the answer-bearing position contribute almost nothing to the average. The perplexity curve can look fine while retrieval is broken.
-
-**Rule**: never publish a "long-context model" claim based on perplexity alone. Always pair with a downstream task.
-
-### The benchmark families you must run
-
-#### Needle-in-a-Haystack (NIAH)
-
-The simplest probe. Insert a small fact ("the secret code is `BLUE123`") at a controlled position inside a long document of unrelated text, then ask the model to retrieve it.
-
-Variants:
-
-- **Single needle**: one fact, one position.
-- **Multi-needle**: several facts, must retrieve all.
-- **Distractor-heavy**: similar-looking but wrong facts scattered through the context.
-
-Metric: per-(needle position, total length) accuracy. Plot as a heatmap; "lost in the middle" appears as a darker diagonal band.
-
-#### RULER
-
-A modern long-context benchmark covering 13 task types: NIAH variants, variable tracking, common-words extraction, frequent-words extraction, multi-key NIAH, multi-value NIAH, multi-query NIAH, QA, and more. Evaluates at multiple context lengths (4K, 8K, 16K, 32K, 64K, 128K).
-
-RULER is the current default reference for long-context model claims. Source: <https://github.com/hsiehjackson/RULER>.
-
-#### LongBench
-
-Realistic-task benchmark with 21 tasks across multi-doc QA, summarization, few-shot learning, synthetic, code completion. Less synthetic than RULER, more "what would users actually ask." Source: <https://github.com/THUDM/LongBench>.
-
-#### LongBench-v2 / InfiniteBench / 1M-context probes
-
-Push beyond 128K. As of 2026 these are useful for marketing-grade long-context claims (Gemini 2.0, Claude-4 long-context); they are noisier than RULER but cover the regime that RULER does not yet exercise.
-
-#### Code-specific long-context
-
-- **RepoQA / CrossCodeEval**: cross-file code reasoning.
-- **SWE-Bench**: agentic patch generation across a real repo.
-
-If your target use case involves codebases, these matter more than RULER.
-
-#### Multi-hop QA
-
-- **HotpotQA / MuSiQue**: chains of reasoning across distant evidence in long inputs.
-
-The hardest end of long context — requires both retrieval and composition.
-
-### What broad evaluation should also cover
-
-A long-context model that regresses on short-context tasks is broken. Always include:
-
-- **MMLU / MMLU-Pro**: knowledge.
-- **GPQA Diamond**: hard reasoning.
-- **HumanEval / MBPP / LiveCodeBench**: code.
-- **IFEval / Arena-Hard**: instruction following.
-- **HellaSwag / WinoGrande / Arc-Challenge**: common-sense (less informative for modern models but cheap to run).
-
-The shape of a healthy long-context fine-tune: long-context metrics improve, short-context metrics hold within `±1%`.
-
-### Honest reporting
-
-A long-context evaluation report should always include:
-
-1. **Per-position heatmap** for NIAH-style probes (not just aggregate accuracy).
-2. **Per-context-length curve** for RULER tasks (`L = 4K, 8K, ..., 128K`).
-3. **Per-task breakdown**, not a single LongBench average.
-4. **Adjacent broad benchmarks** to show short-context did not regress.
-5. **Confidence intervals**: long-context evals have small N (often 100–200 examples per cell). Bootstrap CIs are mandatory.
-
-A single "RULER avg = 73%" number tells you almost nothing.
-
----
-
-## Build it
-
-### 1. NIAH probe
-
-The minimal version:
-
-```python
-# niah.py
-import random
-from pathlib import Path
-
-def make_haystack(filler_text, target_len_tokens, tokenizer):
-    # Repeat filler until length target met
-    out = []
-    while len(tokenizer(" ".join(out)).input_ids) < target_len_tokens:
-        out.append(filler_text)
-    return " ".join(out)
-
-def insert_needle(haystack, needle, pos_fraction, tokenizer):
-    ids = tokenizer(haystack).input_ids
-    needle_ids = tokenizer(needle).input_ids
-    insert_at = int(len(ids) * pos_fraction)
-    new = ids[:insert_at] + needle_ids + ids[insert_at:]
-    return tokenizer.decode(new)
-
-def probe_one(model, tokenizer, context_len, pos_fraction, needle, question, filler):
-    haystack = make_haystack(filler, context_len, tokenizer)
-    text = insert_needle(haystack, needle, pos_fraction, tokenizer)
-    prompt = f"{text}\n\nQ: {question}\nA:"
-    out = model.generate(prompt, max_tokens=64, temperature=0.0)
-    return needle.lower() in out.lower()
+```bash
+python3 - <<'PYCODE'
+import math
+batches = [(20.0, 10), (10.0, 2)]  # summed natural-log NLL, valid targets
+mean_nll = sum(s for s, n in batches) / sum(n for s, n in batches)
+print('mean_nll', mean_nll)
+print('perplexity', round(math.exp(mean_nll), 4))
+PYCODE
 ```
 
-Sweep `context_len ∈ {4K, 8K, 16K, 32K, 64K, 128K}` and `pos_fraction ∈ {0, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0}`. With 10 needles per cell and bootstrap CIs, you get ~70 cells × 10 = 700 generations — feasible on one GPU in an hour.
+Perplexity is comparable only under compatible tokenization and evaluation protocols. For answer quality, also score the actual task. A model can predict common filler well while missing the one safety-relevant sentence. The [real two-process CPU collectives lab](../NCCL-Deep-Dive/CPU-Collectives-Lab/Guide.md) demonstrates why unequal valid-token counts also require care when averaging gradients.
 
-Plot as a heatmap with `pos_fraction` on the x-axis and `context_len` on the y-axis.
+## 2. Build a retrieval fixture that cannot pass by accident
 
-### 2. RULER
+Use a generated key/value record, such as `inspection_code = ZXQ-4187`, among unrelated records. Ask for the value of that key, and compare the **newly generated answer** with the expected value under a predefined normalization rule. Searching the returned prompt plus completion would find the answer already in the input and falsely pass every case.
 
-Clone the official repo. It ships generation and scoring scripts:
+Use different keys and values for independent trials. Confirm that the answer is absent from filler and the question, and that no conflicting record has the same key. Include absent-key cases with an explicit unknown answer, distractor records, and multiple-evidence tasks. A single unique phrase tests retrieval; it does not establish reasoning or reliable tool use.
 
-```
-git clone https://github.com/hsiehjackson/RULER
-cd RULER
-# Configure model endpoint (vLLM, HuggingFace, or your own)
-bash run.sh <model> <context_length>
-```
+Account for the final serialized prompt, including system messages, chat-template tokens, question, and special tokens. For an illustrative total budget of 4,096 tokens, reserve 64 for output. If the final prompt wrapper/question uses 160 and the needle uses 32, filler has at most **3,840** tokens. Re-tokenize the complete serialized prompt to check the actual count: component token counts need not add exactly after concatenation. Reject or rebuild overlength cases instead of letting a server silently truncate them.
 
-Produces per-task scores at each context length. Save the CSV.
+A token-based filler generator should tokenize once, reject empty filler, allocate the budget, insert at a recorded token position, and verify the final input. Repeatedly tokenizing an ever-growing string wastes work and can loop forever on empty input. Report actual token counts and positions, not only requested character percentages.
 
-### 3. LongBench
+For six lengths, seven insertion positions, and ten trials per cell, there are **420 requests**. This is a design count, not a one-hour runtime promise. Share fixture IDs between candidates so comparison is paired; repeated positions from the same source are related observations.
 
-```
-git clone https://github.com/THUDM/LongBench
-cd LongBench
-python pred.py --model <your_model>
-python eval.py
-```
+## 3. Choose a benchmark for a specific question
 
-Per-task scores in `result.json`. Save it.
+| Evaluation | What it helps answer | What a high score leaves unresolved |
+|---|---|---|
+| Generated retrieval and absent-key fixtures | Can this configuration recover a defined fact at each tested length/position? | Real-document reasoning and robustness to ambiguity |
+| RULER's configured synthetic tasks | How does performance vary across retrieval and other controlled tasks? | Broad real-world competence |
+| LongBench v1 or v2 with a pinned protocol | How does the model handle the selected real-document tasks? | Unseen-data provenance and your application's success rate |
+| Held-out application tasks | Does the candidate satisfy the selected use case? | Generalization beyond that task distribution |
 
-### 4. Broad short-context basket
+RULER's repository describes four task categories and 13 original task configurations. Its checked `scripts/run.sh` takes **model name and benchmark name**; the second argument is not context length. Models, task lists, lengths, directories, and backend requirements live in separate configuration files. A new backend must be checked against its own current API; the repository's older launch snippets are not a promise that every current server version accepts them. [Pinned README](https://github.com/NVIDIA/RULER/blob/c3f5e3b4f87f97e048793bb510a3a6b19a46bf3a/README.md), [checked runner](https://github.com/NVIDIA/RULER/blob/c3f5e3b4f87f97e048793bb510a3a6b19a46bf3a/scripts/run.sh).
 
-Use `lm-evaluation-harness`:
+LongBench's repository now contains v2 at its root and the original v1 under `LongBench/`. They have different tasks and protocols; a v1 score and v2 score are not successive measurements of the same test. In v2, published context lengths are described in **words**, which are not your tokenizer's tokens. Its named Hugging Face split `train` is the distributed evaluation dataset; that label is not permission to train on it and then claim held-out performance. [Pinned benchmark description](https://github.com/THUDM/LongBench/blob/2e00731f8d0bff23dc4325161044d0ed8af94c1e/README.md).
 
-```
-lm_eval --model vllm --model_args pretrained=<your_model> \
-    --tasks mmlu,mmlu_pro,gpqa_diamond,humaneval,mbpp,ifeval,arc_challenge \
-    --batch_size auto --output_path eval_short.json
-```
+A serving endpoint that generates text may lack the log-probability interface needed by a likelihood-scored task. Verify chat formatting, raw completion behavior, tokenizer identity, stop handling, and score support independently. The checked LM Evaluation Harness interface uses commands such as `lm-eval run`; task names and backend parameters remain version-specific. Use its installed help and validate task configurations rather than assuming an old command or generic endpoint is compatible. [Pinned interface](https://github.com/EleutherAI/lm-evaluation-harness/blob/d6de81643928d653435c431bae19945d41d32520/docs/interface.md).
 
-### 5. Bring it together
+## 4. Make the comparison fair and inspectable
 
-A single dashboard:
+Freeze the model/tokenizer revisions, prompts, fixture IDs, output budget, sampling configuration, and scorer before comparing candidates. Record truncation, timeouts, invalid outputs, and missing requests as outcomes under a stated rule; silently dropping failures inflates accuracy. For code tasks, define the test environment and resource limits used to execute generated code.
 
-```
-| Task        | Context | Score | CI    | Notes              |
-|-------------|---------|-------|-------|--------------------|
-| NIAH mean   | 32K     | 91.2  | ±1.4  |                    |
-| NIAH worst-pos | 32K  | 76.0  | ±3.1  | pos_fraction=0.5   |
-| RULER avg   | 32K     | 78.5  | ±0.8  | 13-task mean       |
-| LongBench   | 32K     | 49.2  | ±1.1  | 21-task mean       |
-| MMLU        | 4K      | 67.8  | ±0.5  | (unchanged)        |
-| HumanEval   | 4K      | 71.2  | ±2.4  | (unchanged)        |
-```
+For each length and task family report valid example count, success count, uncertainty, input/output tokens, latency distribution, and peak memory under the same hardware/load. Separate prompt processing from generation and report their units. A shorter generated answer can reduce total latency without making the underlying implementation faster.
 
-This is what you report. Not just the mean.
+Use a confidence method that matches the sampling unit. With several questions from one document, resample whole documents for a cluster bootstrap, preserving paired candidate results. Repeated decoding seeds for one question are not new independent documents. Very small groups give weak uncertainty estimates; show raw counts instead of hiding them behind a narrow-looking interval. Decide the acceptable regression and sample size from the application before inspecting results.
 
----
+**Worked paired example:** among 100 shared cases, the baseline passes 80 and the candidate passes 82. If the candidate fixes 12 baseline failures but breaks 10 baseline successes, the net gain is two cases, yet ten previously working cases regressed. Report both transitions. Two aggregate percentages conceal that information.
 
-## Use it in the real stack
+## Exercise and answer checks
 
-vLLM and SGLang both expose an OpenAI-style endpoint that all these harnesses point at. Spin up your model behind one of those, then run RULER / LongBench / `lm-evaluation-harness` against the endpoint.
+1. A prompt exceeds the configured input limit and the server drops its beginning. Can a retrieval failure measure positional encoding quality? **Answer:** not cleanly; first establish that the evidence reached the model intact.
+2. Every generated answer is wrong, but a scorer searches `prompt + answer` for the key's value. What result can appear? **Answer:** 100% retrieval because every prompt already contains it.
+3. A new context configuration raises long-document scores and lowers short-document scores. What must the report show? **Answer:** both slices, their counts and uncertainty, and the predefined acceptance rule; averaging them without the intended workload weights can conceal a regression.
 
-For long-context inference, configure vLLM with the matching position-encoding scaling (RoPE base / YaRN). If your model config encodes it, vLLM picks it up; otherwise pass via CLI: `--rope-scaling '{"type":"yarn","factor":4,"original_max_position_embeddings":32768}'`.
+Submit the token-budget calculation, a leakage-resistant fixture specification, a pinned benchmark/backend plan, and a paired results schema. Mark unexecuted model comparisons as **planned**; the CPU arithmetic verifies accounting, not long-context model quality.
 
-For the cacheon-sglang-miner project you worked on, the same external benchmark harnesses give you the "outside-its-training-distribution" signal that internal validators cannot provide.
-
----
-
-## Measure it
-
-The evaluation itself has costs. Track:
-
-- Total tokens generated per eval run.
-- Wall-clock per benchmark (RULER at 128K can take many hours).
-- API/compute cost per eval iteration.
-
-A target cadence: a full eval basket per iteration, with smaller daily smoke evals (one RULER task at one length, a small NIAH grid) between full runs.
-
----
-
-## Ship it
-
-Drop into `lcm-course/`:
-
-1. `niah.py` and its heatmap PNG.
-2. `ruler_results.csv` (per-task, per-length).
-3. `longbench_results.json`.
-4. `eval_short.json` from `lm-evaluation-harness`.
-5. `eval_dashboard.md` — the table above filled in for one of your runs, with bootstrap CIs and a written paragraph identifying where this model genuinely uses long context vs where it does not.
-
----
-
-## Related pages
-
-- [Module 03 — Position encoding](03-Position-Encoding.md)
-- [Module 06 — Adaptive data pipelines](06-Adaptive-Data-Pipelines.md)
-- [Module 10 — From experiment to general-purpose model](10-General-Purpose-Model.md)
-- RULER: <https://github.com/hsiehjackson/RULER>
-- LongBench: <https://github.com/THUDM/LongBench>
-- lm-evaluation-harness: <https://github.com/EleutherAI/lm-evaluation-harness>
-- "Lost in the Middle" paper: <https://arxiv.org/abs/2307.03172>
+**Continue:** [Module 08 — Combine context and expert parallelism](08-Combining-LongContext-and-MoE.md).

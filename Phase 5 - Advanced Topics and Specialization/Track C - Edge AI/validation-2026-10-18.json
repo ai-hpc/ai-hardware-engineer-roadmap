@@ -1,0 +1,116 @@
+{
+  "reviewed_utc": "2026-10-18",
+  "scope": "Track C portable CPU arithmetic, stream contracts, tool-evaluation fixtures and optional current-library checks",
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "portable_test_methods": {
+    "Agent Tool-Dispatch Evaluation with BFCL/labs": 10,
+    "Qwen Inference Optimization/labs": 14,
+    "Edge LLM Inference Internals/labs": 8,
+    "Gemma 4 Edge Deployment/labs": 7,
+    "AI-Driven Wireless Communication/labs": 9
+  },
+  "total_portable_test_methods": 48,
+  "portable_suites": [
+    {
+      "suite": "Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/AI-Driven Wireless Communication/labs",
+      "status": "passed",
+      "passed": true,
+      "result": "passed",
+      "elapsed_seconds": 0.72
+    },
+    {
+      "suite": "Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Agent Tool-Dispatch Evaluation with BFCL/labs",
+      "status": "passed",
+      "passed": true,
+      "result": "passed",
+      "elapsed_seconds": 0.115
+    },
+    {
+      "suite": "Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Edge LLM Inference Internals/labs",
+      "status": "passed",
+      "passed": true,
+      "result": "passed",
+      "elapsed_seconds": 0.064
+    },
+    {
+      "suite": "Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Gemma 4 Edge Deployment/labs",
+      "status": "passed",
+      "passed": true,
+      "result": "passed",
+      "elapsed_seconds": 0.064
+    },
+    {
+      "suite": "Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/labs",
+      "status": "passed",
+      "passed": true,
+      "result": "passed",
+      "elapsed_seconds": 0.114
+    }
+  ],
+  "internal_links": "python3 scripts/check_links.py .: 0 broken links",
+  "optional_executed": [
+    {
+      "path": "AI-Driven Wireless Communication/labs/sionna_cpu.py",
+      "environment": "Sionna 2.2.0; PyTorch 2.14.0+cpu; Python 3.12.3; pip check passed",
+      "result_file": "AI-Driven Wireless Communication/labs/sionna-reference.json",
+      "scope": "100000-bit CPU QPSK/AWGN/demapping and differentiable BCE check"
+    },
+    {
+      "path": "Qwen Inference Optimization/labs/transformers_cpu.py",
+      "environment": "Transformers 5.20.1; PyTorch 2.14.0+cpu; Python 3.12.3; pip check passed",
+      "result_file": "Qwen Inference Optimization/labs/transformers-reference.json",
+      "scope": "Full architecture shapes on meta device; tiny random model CPU cache/causality/position checks"
+    },
+    {
+      "path": "Gemma 4 Edge Deployment/labs/transformers_meta.py",
+      "environment": "Same isolated Transformers environment",
+      "result_file": "Gemma 4 Edge Deployment/labs/meta-reference.json",
+      "scope": "Full public config on meta device; parameter shapes and installed implementation ownership inspected"
+    }
+  ],
+  "not_executed": [
+    "Pretrained model weights or language-quality benchmarks",
+    "Official BFCL benchmark evaluation or remote model APIs",
+    "CUDA/cuBLAS or multi-GPU execution",
+    "Jetson deployment or performance claims",
+    "Physical radios, GNU Radio scheduler or O-RAN deployment",
+    "Gemma inference or assistant speculative decoding"
+  ],
+  "artifact_sha256": {
+    "Agent Tool-Dispatch Evaluation with BFCL/labs/fixtures.json": "4d2832f060a39da47a0a9e0878c6be7b99217ca2e082c2b296e6515b7db4f1a5",
+    "Agent Tool-Dispatch Evaluation with BFCL/labs/test_dispatch_eval.py": "f604b1d88fe58d2142b2bbd5904852f46e4858ced52cc3934b35c316445b91db",
+    "Agent Tool-Dispatch Evaluation with BFCL/labs/dispatch_eval.py": "11e2e5c39f4f7e063a722b183afd0f1542576d0c621f013e97909d1618a05086",
+    "Agent Tool-Dispatch Evaluation with BFCL/labs/responses-regression.json": "d384e10f0339c3f3485a604760dc85dc440672625c7c24daf399212052d004b2",
+    "Agent Tool-Dispatch Evaluation with BFCL/labs/responses-good.json": "eb20dbf8eefcadf4b7645be5da5d64b43c12e9fc4381045d2a64cff5616f5f31",
+    "Agent Tool-Dispatch Evaluation with BFCL/labs/reference-report.json": "8a41a674d74dc6fff363ab7cd6b44f8ce8b52d51e328697a25b111411fceab56",
+    "Agent Tool-Dispatch Evaluation with BFCL/labs/regression-report.json": "f0bcbd56328f3c9dd3375cbff3f9984ec3a34279f6be1489bd6cecb188d72dfa",
+    "Qwen Inference Optimization/labs/optimization-reference.json": "df9b17568e9fa5412e71a1e6a626fdb44a0d3e24a5525bcd5607b91719c8051b",
+    "Qwen Inference Optimization/labs/test_optimization.py": "4b84c517aa278e4fe259b3eadca8abb18a873cd3584703a8ca1ec26e0f5a3022",
+    "Qwen Inference Optimization/labs/qwen3-config.json": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+    "Qwen Inference Optimization/labs/transformers_cpu.py": "d0ab633a34b48c8618763b51838b6f97153bf75216584699e8d62e5577cd12f5",
+    "Qwen Inference Optimization/labs/qwen25-config.json": "14ca217334fe0fd10148413592d68c99eeb33431ed89c1afa130fee560be2a29",
+    "Qwen Inference Optimization/labs/requirements-transformers.txt": "5077b3c7a76460a9efc911b9a199c846b1bc8f3a7c984137012ef9c4671d1556",
+    "Qwen Inference Optimization/labs/optimization.py": "1db641a5a5cae8852d21c11b354d6d3741129d544bb01267880ac9bd8c78e9b3",
+    "Qwen Inference Optimization/labs/transformers-reference.json": "653ca8652f9969b5536b112bc09c44a599a8e52a163705e36029a1c7211f2853",
+    "Qwen Inference Optimization/labs/source-review.json": "e6ccff2990778decbe0ecec4de047b5f6176146050f116e834d906da4168a9ec",
+    "Edge LLM Inference Internals/labs/budget.py": "4f09838c6477dd7aa7795360487de81137d7c353ca7524be3348045456d8d746",
+    "Edge LLM Inference Internals/labs/test_budget.py": "25e0aa5bf5a5f00d5fb867af9e9efa00099ec55130ad827cb4c581aed7367109",
+    "Edge LLM Inference Internals/labs/budget-reference.json": "ae3c9ee20cbaf7ea0d6b14cd40d66c24abf69972629d6e4e19adcaaa306e0284",
+    "Edge LLM Inference Internals/labs/qwen3-config.json": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+    "Edge LLM Inference Internals/labs/source-review.json": "e6ccff2990778decbe0ecec4de047b5f6176146050f116e834d906da4168a9ec",
+    "Gemma 4 Edge Deployment/labs/target-config.json": "1b28f3d2c3100f6c594754b81107428bd7b822a7f48272ca681dae9d2ec38330",
+    "Gemma 4 Edge Deployment/labs/transformers_meta.py": "d1318485c056ef3e3772ca0bc0c573fedbd794dec8f6ae166bc6c7f67ca63f47",
+    "Gemma 4 Edge Deployment/labs/cache-reference.json": "b6a3f2f3c977b544143f302344fff17e239e00ed49a43a7eb438ac66e03f3fdc",
+    "Gemma 4 Edge Deployment/labs/cache_plan.py": "ebb30db6655d97f08457eeb678d62208e246bb2bd40e3c81cfe11374bdc9441a",
+    "Gemma 4 Edge Deployment/labs/meta-reference.json": "06204a06b3f96a3ecb946f400312f5485512837414e0c4b7e9539f654f476237",
+    "Gemma 4 Edge Deployment/labs/test_cache_plan.py": "38231eebbdced4e5f0d5cf22ba9951dd4e5b3c76de3e70a7ee756351bb2af9e2",
+    "Gemma 4 Edge Deployment/labs/assistant-config.json": "7f42f559a6a69ffaeaf6b61a1ece3a562a2ed5ad00b8d30f16917ba5ab1bcbe9",
+    "AI-Driven Wireless Communication/labs/sionna-reference.json": "e0ce07d6a365a9104e3576959f80374a43f29cc423c5fd1dbb0771987cdbe039",
+    "AI-Driven Wireless Communication/labs/receiver.py": "e873d004d0e37f83c4ce603277dfaf2b9a79d5e456e6143d1d0555b49c93d1fe",
+    "AI-Driven Wireless Communication/labs/receiver-reference.json": "663ea6a1baa26e97fa65870d63d02f0f2c9b662ee276971b2f2f3c021b763c5e",
+    "AI-Driven Wireless Communication/labs/sionna_cpu.py": "6d1ae0515ad12e07ee195e3f5fa02672eea1d280262c9952b3ee7e9ac49c84b6",
+    "AI-Driven Wireless Communication/labs/requirements-sionna.txt": "fea60dd6e77ce652a7ee9e727808f8d9526a3e0da93b8e4eaad8bb11262395ff",
+    "AI-Driven Wireless Communication/labs/test_receiver.py": "353e147e4c21bceab7cdb125e9f83627b55d83aeb925ae87fca94a34f4e2757c"
+  }
+}

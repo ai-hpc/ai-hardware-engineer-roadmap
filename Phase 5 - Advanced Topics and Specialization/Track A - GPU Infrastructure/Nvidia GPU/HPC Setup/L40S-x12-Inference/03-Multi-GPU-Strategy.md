@@ -1,298 +1,58 @@
-# 03 — Multi-GPU Strategy for L40S x12
+# 03 — Place L40S replicas and model shards deliberately
 
-## 1. The PCIe Bottleneck for Multi-GPU Inference
+**Outcome:** choose a feasible parallel layout from capacity, topology and service objectives. Source review: 2026-10-18. Deployment commands are hardware exercises, not measured results.
 
-Without NVLink, all GPU-to-GPU communication passes through the PCIe fabric. This fundamentally changes parallelism decisions.
+## Capacity comes before a latency prediction
 
-### Communication Latency Comparison
+A 12-card server's 576 GB nominal total is split into twelve 48 GB devices. A 70B BF16 model's approximately 140 GB weights cannot fit in TP=2; TP=4 leaves about 35 GB raw weights/rank before cache/workspace and imbalance. A four-bit artifact might use about 35 GB raw weights in total, plus scales and other tensors. Actual runtime support and peak memory decide the group size.
 
-```
-NVLink 4.0 (H200):
-  All-reduce 1 GB across 8 GPUs: ~2 ms
-  Latency per hop: ~1 µs
+L40S has no NVLink. PCIe path, peer access, switches and NUMA determine communication. The link's Gen4 x16 theoretical one-way rate is roughly 32 GB/s, not a guaranteed P2P or AllReduce rate. Measure actual collectives rather than assigning every call “30–50 ms.” [L40S specifications](https://www.nvidia.com/en-us/data-center/l40s/), [NCCL accounting](../NCCL-Deep-Dive/02-Algorithms-and-Bandwidth.md).
 
-PCIe 4.0 (L40S):
-  All-reduce 1 GB across 2 GPUs (same switch): ~30 ms
-  All-reduce 1 GB across 8 GPUs (cross NUMA): ~60-100 ms
-  Latency per hop: ~5-15 µs
-```
+In a simple tensor-parallel transformer, forward reductions follow the attention **output projection** and MLP down projection. A column-sharded QKV projection can be local on replicated input; it is not inherently an AllReduce. Sequence parallelism, attention layout and backward change the schedule.
 
-For transformer inference with TP, the all-reduce happens **twice per layer** (after QKV projection and after output projection). With 80 layers and TP=8 on PCIe, communication can dominate over compute.
+## Three layouts to compare
 
-### Rule of Thumb for L40S
+| Layout on 12 GPUs | Suitable hypothesis | What might invalidate it |
+|---|---|---|
+| 12 one-GPU replicas | Model and request working set fit on one card; independent requests dominate | CPU/network bottleneck, skewed queues, long requests exhausting cache |
+| 6 two-GPU replicas | Supported quantized/medium model needs two cards | Unsupported head/weight partition, host-staged communication, inadequate capacity |
+| 3 four-GPU replicas | A larger model needs four ranks | Communication and latency cost exceed benefit, uneven memory or cross-NUMA contention |
 
-```
-TP=1  (no tensor parallel):
-  Zero communication overhead. Best for small models (≤ 48 GB).
+A single replica's group should use measured favorable connectivity. Do not assume adjacent numeric GPU IDs share a switch; inspect UUID/PCI bus/topology. More replicas do not guarantee linear throughput when they share host resources.
 
-TP=2  (2 GPUs, same PCIe switch):
-  ~30-50 ms communication per all-reduce.
-  Acceptable for 70B models where compute > communication.
+## Launch one replica, then scale the pattern
 
-TP=4  (may cross NUMA):
-  Communication overhead often exceeds compute benefit.
-  Only worthwhile if model > 2×48 = 96 GB in memory.
-
-TP=8+ on PCIe:
-  Not recommended for L40S. Communication bottleneck dominates.
-  Use pipeline parallelism or separate model replicas instead.
-```
-
-## 2. Deployment Patterns for 12x L40S
-
-### Pattern A: 12 Independent Single-GPU Instances
-
-Best for: models ≤ 48 GB (7B BF16, 13B BF16, 70B INT4)
-
-```
-GPU 0  → Model replica 1 (e.g., Llama-3-8B)  → handles requests 0-N
-GPU 1  → Model replica 2                       → handles requests 0-N
-...
-GPU 11 → Model replica 12                      → handles requests 0-N
-
-Load balancer → round-robin across 12 replicas
-```
-
-```python
-# Launch 12 independent vLLM instances on ports 8000-8011
-for i in range(12):
-    subprocess.Popen([
-        "python", "-m", "vllm.entrypoints.openai.api_server",
-        "--model", "meta-llama/Llama-3-8b-instruct",
-        "--gpu-ids", str(i),
-        "--port", str(8000 + i),
-    ])
-
-# nginx.conf load balancer
-upstream vllm_cluster {
-    least_conn;
-    server localhost:8000;
-    server localhost:8001;
-    # ... up to localhost:8011
-}
-```
-
-**Throughput:** 12× single-GPU throughput, no communication overhead.
-
-### Pattern B: 6 × TP=2 Instances
-
-Best for: models 48-96 GB (70B BF16 needs 140 GB → use INT8 at 70 GB on 2 GPUs)
-
-```
-GPU 0+1   → Model replica 1 (TP=2, same PCIe switch)
-GPU 2+3   → Model replica 2 (TP=2, same PCIe switch)
-GPU 4+5   → Model replica 3 (TP=2)
-GPU 6+7   → Model replica 4 (TP=2)
-GPU 8+9   → Model replica 5 (TP=2)
-GPU 10+11 → Model replica 6 (TP=2)
-
-6 replicas × 70B INT8 = 6× the throughput of a single 2-GPU instance
-```
+Set `MODEL` to a prepared local snapshot and check the installed runtime's support first. Device visibility selects physical devices; the process sees those selected devices renumbered locally. `--gpu-ids` is not the generic vLLM serve selector.
 
 ```bash
-# 6 vLLM instances, each with TP=2
-for i in 0 1 2 3 4 5; do
-    CUDA_VISIBLE_DEVICES=$((i*2)),$((i*2+1)) \
-    python -m vllm.entrypoints.openai.api_server \
-        --model meta-llama/Llama-3-70b-instruct \
-        --quantization awq \
-        --tensor-parallel-size 2 \
-        --port $((8000 + i)) &
-done
+# One replica on physical GPU 0, local-only listening for the initial test.
+CUDA_VISIBLE_DEVICES=0 vllm serve "$MODEL" --served-model-name course-model \
+    --max-model-len 4096 --max-num-seqs 8 --host 127.0.0.1 --port 8000
+
+# A separate two-GPU replica, only if this model/format fits and TP=2 is supported.
+CUDA_VISIBLE_DEVICES=2,3 vllm serve "$MODEL" --served-model-name course-model \
+    --tensor-parallel-size 2 --max-model-len 4096 --max-num-seqs 8 \
+    --host 127.0.0.1 --port 8001
 ```
 
-**Ensure GPU pairs share a PCIe switch** — use `nvidia-smi topo -m` to verify.
+Run these in separate allocated services/terminals, or use a supervisor/scheduler with explicit resource requests. Bind a production endpoint through the deployment's configured access layer. Record ports, device UUIDs, runtime versions, health checks, admission limits and shutdown behavior. [vLLM parallelism](https://docs.vllm.ai/en/latest/serving/parallelism_scaling/).
 
-### Pattern C: 3 × TP=4 Instances
+## Pipeline parallelism trades a different cost
 
-Best for: 180B models (need ~90 GB per shard in INT4)
+Pipeline stages hold different layers. A boundary transfers activations forward and gradients backward during training; inference scheduling differs. For an illustrative BF16 activation `[4,2048,8192]`, the payload is 134,217,728 bytes. At a theoretical exclusive 32 GB/s path, a one-way payload lower bound is **4.194 ms** before overhead. This is arithmetic, not an L40S measurement.
 
-```
-GPU 0-3   → Model replica 1 (TP=4)
-GPU 4-7   → Model replica 2 (TP=4)
-GPU 8-11  → Model replica 3 (TP=4)
-```
+Pipeline parallelism can avoid frequent within-layer collectives but adds stage scheduling and bubble/dependency costs. More microbatches can improve throughput while increasing memory or latency. Check model/runtime support and compare under the same request distribution; there is no unconditional “PP beats TP on PCIe” rule.
 
-```bash
-CUDA_VISIBLE_DEVICES=0,1,2,3 \
-python -m vllm.entrypoints.openai.api_server \
-    --model /models/llama-70b-awq-int4 \
-    --tensor-parallel-size 4 \
-    --port 8000
-```
+## Cross-node networking needs its own baseline
 
-**Warning:** TP=4 on PCIe is communication-heavy. Monitor with Nsight Systems to verify GPU utilization is > 50%.
+An HDR 200 Gb/s port offers a 25 GB/s one-way line-rate ceiling, so a claimed 20 GB/s bidirectional result cannot be compared directly with a 32 GB/s one-way PCIe ceiling. Record direction, payload scope and topology. Host staging, GPU-memory RDMA, multiple NICs and contention change application behavior.
 
-### Pattern D: Pipeline Parallelism (PP) — Better than TP for PCIe
+Do not paste `NCCL_IB_GID_INDEX=3`, numeric GDR levels or a traffic class from another cluster. Modern NCCL can select a GID automatically; fabric policies and actual devices determine valid settings. Follow the [multi-node launch and diagnostics](../NCCL-Deep-Dive/05-Multi-Node-Clusters.md).
 
-Pipeline parallelism splits model layers across GPUs rather than splitting tensors. Communication is only activations between stages (once per layer boundary), not all-reduce.
+## Load balance work, not only request counts
 
-```
-Pipeline Parallel (PP=4):
-  GPU 0: Layers 0-19   (processes batch, sends activations to GPU 1)
-  GPU 1: Layers 20-39  (receives, processes, sends to GPU 2)
-  GPU 2: Layers 40-59  (receives, processes, sends to GPU 3)
-  GPU 3: Layers 60-79  (produces output)
+A 10-token request and a 10,000-token request do not impose equal work. Measure queueing, prefill, decode and cache occupancy per group. Define bounded queues/admission, completion/error timeouts and retry policy; indiscriminate retries can duplicate work and worsen overload. Count successful responses that meet quality and deadline constraints.
 
-Communication: activation tensor (batch × seq × hidden) = much smaller than gradients
-```
+**Worked comparison:** hypothetical group A produces 100 completions/s but only 70 satisfy the deadline; group B produces 90 completions/s with 85 on time. Under the same quality threshold, B has higher deadline-qualified goodput. These are invented arithmetic inputs, not GPU measurements.
 
-```python
-# vLLM pipeline parallel (experimental in recent versions)
-llm = LLM(
-    model="meta-llama/Llama-3-70b-instruct",
-    tensor_parallel_size=1,
-    pipeline_parallel_size=4,  # split layers across 4 GPUs
-    max_model_len=4096,
-)
-
-# TRT-LLM has mature PP support
-trtllm-build \
-    --checkpoint_dir /ckpt \
-    --output_dir /engine \
-    --pp_size 4 \
-    --tp_size 1 \
-    --workers 4
-```
-
-### PP Communication Analysis
-
-```
-Activation per pipeline boundary:
-  batch=32, seq=512, hidden=8192 (70B Llama)
-  = 32 × 512 × 8192 × 2 bytes = 268 MB
-
-PCIe 4.0 transfer time: 268 MB / 32 GB/s = ~8 ms
-Compute per stage (20 layers): ~50 ms (estimated)
-
-Overlap possible with micro-batching (1F1B schedule):
-  Fill pipeline with 4 micro-batches → GPU bubble = 3/7 ≈ 43%
-  Effective utilization: ~57% (acceptable for inference)
-```
-
-## 3. Multi-Node L40S (InfiniBand)
-
-For deployments spanning multiple servers with L40S GPUs, InfiniBand provides fast inter-server communication:
-
-```
-Server 0: GPU 0-7   (L40S x8, InfiniBand HDR 200 Gb/s)
-Server 1: GPU 8-15  (L40S x8, InfiniBand HDR 200 Gb/s)
-...
-Server N: GPU N*8 to N*8+7
-
-Total: N servers × 8 GPUs = scalable cluster
-```
-
-```bash
-# NCCL with InfiniBand (enables GPUDirect RDMA)
-export NCCL_IB_HCA=mlx5_0           # InfiniBand HCA device
-export NCCL_IB_GID_INDEX=3          # RoCE v2 GID
-export NCCL_NET_GDR_LEVEL=5         # GPUDirect RDMA level
-export NCCL_IB_TC=106               # Traffic class for priority
-export NCCL_IB_SL=0                 # Service level
-
-# Launch multi-node with torchrun
-torchrun \
-    --nnodes=2 \
-    --nproc_per_node=8 \
-    --rdzv_backend=c10d \
-    --rdzv_endpoint=server0:29500 \
-    inference_server.py
-```
-
-### RDMA Bandwidth vs PCIe
-
-```
-InfiniBand HDR 200 Gb/s with GPUDirect RDMA:
-  Effective GPU-to-GPU (across servers): ~20 GB/s (bidirectional)
-
-PCIe 4.0 x16 (intra-server):
-  Effective GPU-to-GPU (local switch): ~30 GB/s
-
-Conclusion: InfiniBand is competitive with PCIe for cross-server communication.
-Use TP=2 per server (PCIe), PP=N across servers (InfiniBand).
-```
-
-## 4. Load Balancing Strategies
-
-### Request Router (Python Example)
-
-```python
-import asyncio, aiohttp, random
-from typing import List
-
-class L40SLoadBalancer:
-    def __init__(self, endpoints: List[str]):
-        self.endpoints = endpoints
-        self.request_counts = {ep: 0 for ep in endpoints}
-        self.sessions = None
-
-    async def route(self, request: dict) -> dict:
-        # Least-connections routing
-        endpoint = min(self.request_counts, key=self.request_counts.get)
-        self.request_counts[endpoint] += 1
-        try:
-            async with self.sessions.post(
-                f"{endpoint}/v1/completions", json=request
-            ) as resp:
-                return await resp.json()
-        finally:
-            self.request_counts[endpoint] -= 1
-
-    def get_routing_stats(self):
-        return {ep: count for ep, count in self.request_counts.items()}
-
-# Usage
-balancer = L40SLoadBalancer([
-    "http://localhost:8000",  # GPU 0 — Llama-3-8B
-    "http://localhost:8001",  # GPU 1 — Llama-3-8B
-    # ... up to 12 replicas
-])
-```
-
-### Model-Aware Routing
-
-```python
-# Route based on model size request
-ROUTING_TABLE = {
-    "llama-3-8b":   ["http://localhost:8000", ...],  # GPUs 0-3 (single GPU)
-    "llama-3-70b":  ["http://localhost:8004", ...],  # GPUs 4-7 (2-GPU TP=2)
-    "llama-3-405b": ["http://localhost:8008"],        # GPUs 8-11 (4-GPU TP=4)
-}
-
-async def smart_route(model_name: str, request: dict) -> dict:
-    endpoints = ROUTING_TABLE.get(model_name, ROUTING_TABLE["llama-3-8b"])
-    endpoint = random.choice(endpoints)  # or least-connections
-    async with aiohttp.ClientSession() as session:
-        async with session.post(f"{endpoint}/v1/completions", json=request) as r:
-            return await r.json()
-```
-
-## 5. GPU Affinity and NUMA Binding
-
-Bind processes to correct NUMA node to avoid cross-NUMA PCIe traffic:
-
-```bash
-# Find NUMA node for each GPU
-nvidia-smi topo -m | head -20
-# GPU0 → NUMA node 0, GPU4 → NUMA node 1 (example)
-
-# Bind process to correct NUMA node + CPU cores
-numactl --cpunodebind=0 --membind=0 \
-    CUDA_VISIBLE_DEVICES=0,1,2,3 \
-    python -m vllm.entrypoints.openai.api_server \
-        --model ... --tensor-parallel-size 4 --port 8000
-
-numactl --cpunodebind=1 --membind=1 \
-    CUDA_VISIBLE_DEVICES=4,5,6,7 \
-    python -m vllm.entrypoints.openai.api_server \
-        --model ... --tensor-parallel-size 4 --port 8001
-```
-
-## References
-
-- [vLLM Distributed Inference](https://docs.vllm.ai/en/latest/serving/distributed_serving.html)
-- [TensorRT-LLM Pipeline Parallelism](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/architecture/pipeline-parallelism.md)
-- [NCCL Performance Tuning](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/collectives.html)
-- [GPUDirect RDMA](https://docs.nvidia.com/cuda/gpudirect-rdma/)
-- [NUMA and PCIe Topology](https://www.kernel.org/doc/html/latest/admin-guide/mm/numa_memory_policy.html)
+**Exit artifact:** a physical rank map, per-rank capacity table, topology/collective evidence, and a controlled comparison of two feasible layouts using [chapter 5's method](05-Benchmarks.md).

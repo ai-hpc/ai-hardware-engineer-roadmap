@@ -1,5 +1,7 @@
 # Lecture 5 — How BLE becomes `hci0` and how to validate the full path
 
+**Source boundary — reviewed October 18, 2026:** this is the historical NG fork at `ce36dec9294988e598f04e84c9d28092ca9e9786`. Board observations are attributed to that fork, not rerun here. Complete the [source-reading lab](../Source-Reading-Lab.md); it explains the current migration path and defects in these abbreviated source excerpts. Snippets containing `...` are reading excerpts, not standalone compilable programs.
+
 **Course:** [Jetson ESP-Hosted Host Code guide](../Guide.md) · **Phase 2 — Embedded Linux**
 
 **Previous:** [Lecture 04](Lecture-04.md)
@@ -34,7 +36,7 @@ Lecture 17 matters because the Bluetooth side also follows the same object-regis
 
 The HCI abstraction matters because Bluetooth in Linux is built around a **host/controller split**. The controller may be on USB, UART, SDIO, or in this case SPI, but once the driver feeds packets into the HCI layer, **BlueZ** can manage discovery and connections without caring about the underlying bus details.
 
-That is why BLE validation cannot stop at “`hci0` exists.” A visible controller only proves registration; scanning successfully proves that HCI commands, events, and data packets are flowing correctly across the transport and back into the Linux Bluetooth stack.
+That is why BLE validation cannot stop at “`hci0` exists.” A visible controller only proves registration; a fresh scan with newly received advertisements exercises HCI commands and events for discovery. It does not validate connection data, GATT operations, sustained throughput or reset recovery.
 
 The kernel interfaces to focus on are:
 
@@ -64,7 +66,7 @@ On the SPI path, the bus becomes:
 
 - `HCI_SPI`
 
-That is why the validated Jetson logs and tools showed:
+That is why the reported legacy Jetson logs and tools showed:
 
 - `hci0`
 - `Bus: SPI`
@@ -122,7 +124,7 @@ This is the crucial handoff:
 
 That is exactly how a custom hardware path gets **translated into a standard subsystem view**.
 
-The handoff in `main.c` is direct:
+The historical handoff below has an ownership defect: after `hci_recv_frame` consumes or queues `skb`, the success branch reads its data and length. Save needed scalar metadata before handoff and review the error paths; this excerpt is not a recommended receive implementation. See the [source lab](../Source-Reading-Lab.md).
 
 ```c
 } else if (payload_header->if_type == ESP_HCI_IF) {
@@ -148,7 +150,7 @@ The transport does not expose a custom user API for BLE. It converts remote pack
 
 In `main.c`, the capability printout tells you what the ESP claims to support.
 
-On the validated Jetson path, the logs showed:
+On the reported legacy Jetson path, the logs showed:
 
 - `BT/BLE`
 - `HCI over SPI`
@@ -179,7 +181,7 @@ Those log lines are not decoration. They are the driver telling you how the remo
 
 ---
 
-## 5. The validated Linux-side BLE proof
+## 5. The reported Linux-side BLE discovery result
 
 On real hardware, the validation path was:
 
@@ -210,7 +212,7 @@ That is the same lesson you saw with Wi-Fi:
 
 ## 6. End-to-end success criteria for this codebase
 
-For this Jetson case study, full success means:
+For this Jetson case study, the reported discovery milestone means:
 
 - transport up
 - boot-up event received
@@ -220,7 +222,9 @@ For this Jetson case study, full success means:
 - `hci0` created
 - BLE scan works
 
-That is the right Embedded Linux mindset:
+For application completion, also test actual Wi-Fi data exchange, the required BLE connection/GATT operations, and recovery after peer reset. Discovery alone is an intermediate milestone.
+
+The engineering method is:
 
 - validate at the subsystem level the operating system actually cares about
 - not just at the signal or module-insert level

@@ -25,7 +25,7 @@ By the end you should be able to:
 | **Isaac Lab evaluation** | Same task, DR off or shifted, exported `policy.pt` | Same | Normalization, action clipping, play-mode overrides |
 | **Isaac Sim + ROS 2** | One robot, one cube, standalone Isaac Sim script, policy in another process | Wall clock, DDS, two processes | Joint order, quaternion order, solver settings, gains, friction, latency |
 
-The third row is a stand-in for the real robot. It has the same software shape as hardware: a separate process, messages over DDS, and a clock nobody controls. It also adds physics you did not train in, because Isaac Sim reads the raw USD without Isaac Lab's spawner overrides. If the policy survives this seam, the remaining sim-to-real gap is the physical one from [Lecture 12](Lecture-12.md) §6.
+The third row is a simulator integration exercise with separate processes, DDS transport and independently scheduled work. Isaac Sim also reads the raw USD without every Isaac Lab spawner override. Passing this exercise does not isolate all remaining failures to physics: hardware timing, state estimation, calibration, driver behavior and operating conditions still need their own validation.
 
 ---
 
@@ -36,7 +36,7 @@ A checkpoint maps an ordered observation vector to an ordered action vector. It 
 | Contract item | Capstone value | Checked by |
 |---|---|---|
 | Joint order and names | `panda_joint1..7, panda_finger_joint1, panda_finger_joint2` | Assertion in the env; the ROS node maps by **name** |
-| Action | 7 arm-joint target **deltas**, clipped to [-1, 1], × 0.05 rad, integrated and clamped to soft limits; gripper held closed | Shared `integrate_target()` function |
+| Action | 7 arm-joint target **deltas**, clipped to [-1, 1], × 0.05 rad, integrated and clamped to soft limits; gripper held closed | Equivalent target integration in training and the tested simulator-owned `CommandGate` |
 | Observation | `[q − q0 (9), 0.1·q̇ (9), cube_pos_b (3), goal_pos_b (3), last_action (7)]` = 31 | Shared `build_obs()` layout + lockstep parity gate |
 | Frames | Robot base = env origin, identity rotation; positions in the base frame | Same placement in the bridge scene |
 | Quaternions | Isaac Lab 3.0 **xyzw**; Isaac Sim experimental prims **wxyz** | Explicit conversion at every crossing |
@@ -48,8 +48,8 @@ A checkpoint maps an ordered observation vector to an ordered action vector. It 
    capstone_tasks/push/contract.py  (pure Python + NumPy, no Isaac imports)
         │                         │                               │
         ▼                         ▼                               ▼
-  PushEnv (Isaac Lab)     eval_policy.py (Lab 12)        policy_node.py (ROS 2 Jazzy, CPU torch)
-  writes contract_runtime.json  ─────────────────────►   sim_bridge.py (Isaac Sim 6.1) reads it
+  PushEnv (Isaac Lab)     eval_policy.py (Lab 12)        capstone_policy_node.py (ROS 2 Jazzy, CPU torch)
+  writes contract_runtime.json  ─────────────────────►   isaac_capstone_bridge.py (Isaac Sim 6.1) reads it
 ```
 
 Turning off observation normalization is a deliberate simplification: a normalizer is policy *state* that has to travel with the checkpoint. The observation terms are scaled to order 1 by hand instead.
@@ -87,12 +87,12 @@ Plan VRAM with the Lecture 01 vocabulary before writing reward code:
 The decisions that follow from the table:
 
 * **Training and the bridge never run at the same time on 8 GB.** Each pays the Kit fixed cost.
-* **The policy node runs on CPU.** A 31→7 MLP costs microseconds to milliseconds on a CPU, and a CUDA context in the node would take VRAM from the simulator.
+* **The policy node runs on CPU.** A CPU policy avoids a second CUDA context, but its latency must be measured. Even the supplied tiny known-weight fixture has a much slower cold call than subsequent calls; do not infer a deadline from the network dimensions.
 * Choose `num_envs` from the measured sweep at about **80% of the VRAM that is left** after fixed cost. PPO needs headroom for the update, and the profiler from Lab 12a needs more.
 
-> **8 GB budget.** Expect state-only Franka push training to fit on the 4060 somewhere in the hundreds-to-low-thousands of environments. That is an order-of-magnitude guess; your Lab 13c sweep sets the real number. Turn down: `num_envs` first, then contact-heavy colliders (`FRANKA_MINIMAL_CFG` keeps gripper colliders only, but you must then re-qualify the policy, because arm-floor contact disappears). Never train with `--viz kit` or a livestream attached. The optional camera variant is the first thing that will not fit comfortably; size it with Lecture 07's per-render-product cost, or rent an L40S / RTX PRO 6000 for it. A VLA in the loop (the [VLA course](../VLA%20Optimization%20and%20Action-Parity%20Harness/README.md)) does not fit beside Isaac Sim on 8 GB.
+> **8 GB experiment.** The 4060 is below the published full-simulator minimum. Training fit and throughput have not been established here; first pass the startup check and use Lab 13c to find a measured budget. If startup itself fails, reducing the environment count cannot necessarily remove the fixed cost. Turn down: `num_envs` first, then contact-heavy colliders (`FRANKA_MINIMAL_CFG` keeps gripper colliders only, but you must then re-qualify the policy, because arm-floor contact disappears). Never train with `--viz kit` or a livestream attached. The optional camera variant is the first thing that will not fit comfortably; size it with Lecture 07's per-render-product cost, or rent an L40S / RTX PRO 6000 for it. Budget any VLA server separately using its actual weights, cache and runtime; use a remote or separate-process server when the combined measurement exceeds memory.
 
-**On 16 GB:** more environments per update (check that wall-clock to reward actually improves), the camera variant at small resolution, and the bridge can run while a training job continues. **On 48 GB:** camera policies at useful resolution, many evaluation seeds in parallel, and a VLA policy server beside the simulator.
+**On 16 GB or 48 GB:** repeat the same memory and timing sweep before increasing environments, adding cameras, or overlapping a bridge with training. Capacity alone does not establish that concurrent workloads fit or meet deadlines.
 
 ---
 
@@ -104,7 +104,7 @@ The decisions that follow from the table:
 | **P1 Task** | Rewards, terminations, resets, DR | Per-term episode sums logged; random policy success near zero; no NaNs or exploding cubes in 10⁵ random steps |
 | **P2 Train** | `num_envs` sweep, 3 seeds | All seeds learn; mean success on the nominal eval clears a target you **pre-register** in `PLAN.md` before training |
 | **P3 Evaluate** | Nominal and shifted, disjoint seeds | Wilson CIs for every (seed, condition); checkpoints chosen on validation seeds only |
-| **P4 Bridge** | Export, `sim_bridge.py`, `policy_node.py` | Lockstep bridge success CI overlaps the Lab nominal CI (else it is a contract bug); free-running achieved RTF ≈ 1 with `late_frac` ≈ 0; p99 latency below the 16.7 ms policy period |
+| **P4 Bridge** | Export and the atomic bridge assets below | Known-observation action parity first; matched held-out scenarios with a predeclared regression margin; expired/duplicate/old-episode replies rejected; observed deadlines reported with failures |
 | **P5 Report** | `PERFORMANCE.md`, manifest | A second person reproduces one number from `RUN_MANIFEST.json` |
 
 ---
@@ -130,7 +130,7 @@ Layout (an external project created from Isaac Lab's template with `uv run isaac
 ```text
 capstone/
   capstone_tasks/push/{__init__.py, contract.py, push_env_cfg.py, push_env.py, agents/rsl_rl_ppo_cfg.py}
-  bridge/{sim_bridge.py, policy_node.py}
+  bridge/{isaac_capstone_bridge.py, capstone_policy_node.py, capstone_protocol.py, ros2_capstone_replay.py}
   results/  PLAN.md  PERFORMANCE.md  RUN_MANIFEST.json
 ```
 
@@ -246,6 +246,7 @@ class PushEvalNominalCfg(PushEnvCfg):
 
 @configclass
 class PushEvalShiftedCfg(PushEnvCfg):
+    observation_noise_model = None             # match nominal evaluation noise; vary declared dynamics only
     events: ShiftEvents = ShiftEvents()
     min_action_delay = 3
     max_action_delay = 3
@@ -272,6 +273,7 @@ class PushEnv(DirectRLEnv):
         lim = self.robot.data.soft_joint_pos_limits.torch[:, :7].clone()
         self.q_lo, self.q_hi = lim[..., 0], lim[..., 1]
         self.target, self.last_a = self.q0[:, :7].clone(), torch.zeros(n, 7, device=dev)
+        self.prev_applied = torch.zeros_like(self.last_a)
         self.hist = torch.zeros(n, max(cfg.max_action_delay, 1) + 1, 7, device=dev)  # ≥ 2 slots: hist[:, 1] = previous action
         self.delay = torch.zeros(n, dtype=torch.long, device=dev)
         self.goal = torch.zeros(n, 3, device=dev)
@@ -290,7 +292,8 @@ class PushEnv(DirectRLEnv):
         self.hist = torch.roll(self.hist, 1, dims=1); self.hist[:, 0] = a
         delayed = self.hist[torch.arange(self.num_envs, device=self.device), self.delay]
         self.target = C.integrate_target(self.target, delayed, self.q_lo, self.q_hi)
-        self.last_a = a
+        self.prev_applied = self.last_a.clone()
+        self.last_a = delayed.clone()             # observed history is the action actually applied, as in the bridge
 
     def _apply_action(self):
         cmd = self.robot.actuators.target_command
@@ -312,7 +315,7 @@ class PushEnv(DirectRLEnv):
         c = self.cfg
         r = (c.w_reach * (1 - torch.tanh((ee - push_pt).norm(dim=-1) / 0.1))
              + c.w_push * (1 - torch.tanh(d_goal / 0.1)) + c.w_success * (d_goal < c.success_tol).float()
-             + c.w_rate * (self.last_a - self.hist[:, 1]).square().sum(-1)
+             + c.w_rate * (self.last_a - self.prev_applied).square().sum(-1)
              + c.w_qd * self.robot.data.joint_vel.torch.square().sum(-1))
         return r * self.step_dt
 
@@ -327,7 +330,8 @@ class PushEnv(DirectRLEnv):
         self.last_episode_success[ids] = (self.goal[ids, :2] - cube[ids, :2]).norm(dim=-1) < self.cfg.success_tol
         super()._reset_idx(ids)
         n, dev = len(ids), self.device
-        q = self.q0[ids].clone(); q[:, :7] += sample_uniform(-0.05, 0.05, (n, 7), dev); q[:, 7:] = C.GRIPPER_CLOSED
+        q = self.q0[ids].clone(); q[:, :7] += sample_uniform(-0.05, 0.05, (n, 7), dev)
+        q[:, :7] = q[:, :7].clamp(self.q_lo[ids], self.q_hi[ids]); q[:, 7:] = C.GRIPPER_CLOSED
         self.robot.write_joint_position_to_sim_index(position=q, env_ids=ids)
         self.robot.write_joint_velocity_to_sim_index(velocity=torch.zeros_like(q), env_ids=ids)
         self.target[ids] = q[:, :7]
@@ -340,9 +344,12 @@ class PushEnv(DirectRLEnv):
         r, th = sample_uniform(*self.cfg.goal_offset_range, (n,), dev), sample_uniform(-math.pi, math.pi, (n,), dev)
         self.goal[ids, :2] = xy + torch.stack((r * th.cos(), r * th.sin()), -1)
         self.goal[ids, 0] = self.goal[ids, 0].clamp(0.30, 0.70); self.goal[ids, 2] = C.CUBE_SIZE / 2
-        self.last_a[ids] = 0.0; self.hist[ids] = 0.0
+        self.last_a[ids] = 0.0; self.prev_applied[ids] = 0.0; self.hist[ids] = 0.0
         self.delay[ids] = torch.randint(self.cfg.min_action_delay, self.cfg.max_action_delay + 1, (n,), device=dev)
+        self.sim.forward()                       # refresh kinematics before reset observations; do not advance time
 ```
+
+The CPU fixture [push_tensor_cpu.py](labs/push_tensor_cpu.py) extracts this class and checks delayed applied-action history, action-rate reward, reset isolation and limits with real CPU PyTorch and an explicit fake scene. It does not validate Isaac physics or asset APIs. In particular, issuing action 1 with delay two leaves both the target and observed applied action unchanged for two transitions.
 
 The action and reset calls (`actuators.target_command.set_position_index`, `write_*_to_sim_index`, `.data.*.torch`) are the 3.0 forms used by Isaac Lab's own direct Cartpole and Franka-cabinet tasks. In older code you will see `set_joint_position_target`, `write_root_state_to_sim`, and wxyz root quaternions. For the agent, subclass `RslRlOnPolicyRunnerCfg` the way `core/cartpole/agents/rsl_rl_ppo_cfg.py` does. Use `RslRlMLPModelCfg(hidden_dims=[256, 128, 64], activation="elu", obs_normalization=False)` for the actor and critic, `num_steps_per_env=24`, `experiment_name="capstone_push"`, and the Cartpole PPO hyperparameters as a starting point.
 
@@ -374,149 +381,49 @@ for s in 1 2 3; do for e in 1001 1002 1003 1004 1005; do for c in Nominal Shifte
 done; done; done
 ```
 
-Report, per training seed and condition, \(k/n\) with the **Wilson 95% interval** (`stats.py` from [Deep RL Lecture 13](../Deep%20RL%20for%20Robot%20Learning/Lecture-13.md)). Three training seeds are too few for a bootstrap, so show all three intervals rather than one pooled number. Also report the **robustness drop** (nominal − shifted) per seed. A policy that is excellent on nominal and collapses on shifted dynamics has memorized the simulator, and the bridge will expose it.
+Report, per training seed and condition, \(k/n\) with the **Wilson 95% interval** (`stats.py` from [Deep RL Lecture 13](../Deep%20RL%20for%20Robot%20Learning/Lecture-13.md)). Three training seeds give little information about run-to-run variation; show all three episode intervals and per-seed results rather than disguising them as one pooled trial. Also report the **robustness drop** (nominal − shifted) per seed. A collapse under shifted dynamics demonstrates sensitivity to that tested shift. It does not by itself identify memorization, a particular parameter, or the outcome of the bridge experiment.
 
 ### Lab 13e — Export and bridge over ROS 2
 
-The bridge scene is a standalone Isaac Sim 6.1 script. It follows the official `isaacsim.ros2.bridge/subscriber.py` example pattern: enable the bridge extension, then use `rclpy` directly inside the simulator process.
+Start with the [atomic protocol and measured ROS exercise](Simulation-CPU-Lab.md#3-atomic-observations-and-simulator-owned-actions). The simulator sends **one complete observation per tick**, including episode, sequence, controller-clock timestamp, expiry, frame, ordered joint state, cube, goal, current target, and last applied action. A policy reply echoes the observation digest and returns seven normalized actions. The simulator owns integration and accepts each reply at most once.
 
-```python
-# bridge/sim_bridge.py — run with Isaac Sim 6.1's python (bundled Jazzy libs are auto-selected on 24.04)
-import argparse, json, time
-ap = argparse.ArgumentParser()
-ap.add_argument("--contract", required=True); ap.add_argument("--episodes", type=int, default=100)
-ap.add_argument("--lockstep", action="store_true"); ap.add_argument("--headless", action="store_true")
-args = ap.parse_args()
-from isaacsim import SimulationApp
-simulation_app = SimulationApp({"headless": args.headless})
-import numpy as np
-import isaacsim.core.experimental.utils.app as app_utils
-import isaacsim.core.experimental.utils.stage as stage_utils
-from isaacsim.core.experimental.objects import Cube, GroundPlane
-from isaacsim.core.experimental.prims import Articulation, GeomPrim, RigidPrim
-from isaacsim.core.simulation_manager import SimulationManager
-from isaacsim.storage.native import get_assets_root_path
-app_utils.enable_extension("isaacsim.ros2.bridge"); simulation_app.update()
-import rclpy
-from rclpy.time import Time
-from geometry_msgs.msg import PointStamped, PoseStamped
-from sensor_msgs.msg import JointState
+This prevents a slow reply from advancing a policy-side target that the simulator never applied. It also removes the cross-topic ordering ambiguity of separately publishing goal, cube and joint state. The standard-library gate has deliberate duplicate, expired, future, previous-episode, shape, finite-value and joint-order tests. A six-case Jazzy transport exercise and a separate-process policy adapter with a known-weight TorchScript fixture actually ran. No learned checkpoint or full Isaac scene was executed.
 
-K = json.load(open(args.contract))
-GroundPlane("/World/GroundPlane")
-stage_utils.add_reference_to_stage(get_assets_root_path() + "/Isaac/IsaacLab/Robots/FrankaEmika/franka_panda.usda",
-                                   "/World/Robot", variants=[("Physics", "physx"), ("Colliders", "primitives")])
-robot = Articulation("/World/Robot")
-robot.set_solver_iteration_counts(8, 0); robot.set_enabled_self_collisions(False)  # Isaac Lab's spawner overrides
-Cube("/World/Cube", sizes=0.05, positions=np.array([[0.5, 0.0, 0.025]]))
-GeomPrim("/World/Cube", apply_collision_apis=True)
-cube = RigidPrim("/World/Cube", masses=np.array([0.2]))
-SimulationManager.setup_simulation(dt=K["physics_dt"], device="cuda")
+| Supplied asset | Role | Validation status |
+|---|---|---|
+| [capstone_protocol.py](labs/capstone_protocol.py) | Strict message contract, simulator-owned target/history, freshness and identity checks | 11 portable tests plus real ROS replay |
+| [ros2_capstone_replay.py](labs/ros2_capstone_replay.py) | Two localhost ROS nodes and scripted actions | Executed with Jazzy; six outcomes saved |
+| [capstone_policy_node.py](labs/capstone_policy_node.py) | Loads the exported 31→7 TorchScript policy on CPU | Executed in a separate process with a known-weight fixture; trained artifact still required for the capstone |
+| [isaac_capstone_bridge.py](labs/isaac_capstone_bridge.py) | Creates the Franka/cube scene, publishes atomic observations, applies gated targets | APIs reviewed against 6.1 source; simulator execution pending |
 
-rclpy.init(); node = rclpy.create_node("capstone_sim")
-pub_js = node.create_publisher(JointState, "/capstone/joint_states", 10)
-pub_cube = node.create_publisher(PoseStamped, "/capstone/cube_pose", 10)
-pub_goal = node.create_publisher(PointStamped, "/capstone/goal", 10)
-latest, lat_ms = {}, []
-def on_cmd(m):
-    latest["cmd"] = m
-    lat_ms.append((node.get_clock().now() - Time.from_msg(m.header.stamp)).nanoseconds / 1e6)
-node.create_subscription(JointState, "/capstone/joint_command", on_cmd, 10)
+Keep the files together so their imports resolve. From this lesson directory, start the policy in a ROS-sourced Python 3.12 environment that also has CPU PyTorch. Set paths to the artifacts produced by **your** completed training/export run:
 
-app_utils.play(); simulation_app.update()
-names = list(robot.dof_names)                                     # map by NAME: Isaac Sim's order need not match Lab's
-q_init = np.array([0.0 if "finger" in nm else K["q0"][K["joint_names"].index(nm)] for nm in names])  # gripper closed
-rng, succ, n_steps, late, t0 = np.random.default_rng(7), [], 0, 0, time.perf_counter()
-for ep in range(args.episodes):
-    xy = rng.uniform([0.40, -0.15], [0.60, 0.15]); th = rng.uniform(-np.pi, np.pi)
-    goal = xy + rng.uniform(0.10, 0.20) * np.array([np.cos(th), np.sin(th)]); goal[0] = np.clip(goal[0], 0.30, 0.70)
-    cube.set_world_poses(positions=[[*xy, 0.025]], orientations=[[1.0, 0.0, 0.0, 0.0]])   # wxyz in Isaac Sim!
-    cube.set_velocities(np.zeros((1, 3)), np.zeros((1, 3)))
-    robot.set_dof_positions(q_init[None]); robot.set_dof_position_targets(q_init[None]); latest.clear()
-    g = PointStamped(); g.point.x, g.point.y, g.point.z = float(goal[0]), float(goal[1]), 0.025; pub_goal.publish(g)
-    for k in range(int(6.0 / K["physics_dt"])):
-        if k % K["decimation"] == 0:
-            stamp = node.get_clock().now().to_msg()
-            js = JointState(name=names, position=robot.get_dof_positions().numpy()[0].tolist(),
-                            velocity=robot.get_dof_velocities().numpy()[0].tolist()); js.header.stamp = stamp
-            p, q = (a.numpy()[0] for a in cube.get_world_poses())
-            cp = PoseStamped(); cp.header.stamp = stamp
-            cp.pose.position.x, cp.pose.position.y, cp.pose.position.z = map(float, p)
-            cp.pose.orientation.w, cp.pose.orientation.x, cp.pose.orientation.y, cp.pose.orientation.z = map(float, q)  # wxyz → msg
-            pub_cube.publish(cp); pub_js.publish(js)
-            deadline = time.perf_counter() + 0.5
-            while True:                                            # lockstep waits for the answer to THIS observation
-                rclpy.spin_once(node, timeout_sec=0.0 if not args.lockstep else 0.002)
-                c = latest.get("cmd")
-                if not args.lockstep or (c and c.header.stamp == stamp) or time.perf_counter() > deadline:
-                    break
-            if (c := latest.get("cmd")) is not None:                # zero-order hold on the latest command
-                robot.set_dof_position_targets(np.array([c.position]), dof_indices=[names.index(nm) for nm in c.name])
-        SimulationManager.step(); n_steps += 1
-        if not args.lockstep:                                       # pace to the wall clock, like a real robot
-            slack = t0 + n_steps * K["physics_dt"] - time.perf_counter()
-            if slack > 0: time.sleep(slack)
-            else: late += 1
-    succ.append(float(np.linalg.norm(cube.get_world_poses()[0].numpy()[0, :2] - goal) < 0.03))
-rtf = n_steps * K["physics_dt"] / (time.perf_counter() - t0)
-print(json.dumps(dict(lockstep=args.lockstep, k=int(sum(succ)), n=len(succ), rtf=rtf, late_frac=late / n_steps,
-                      lat_p50=float(np.percentile(lat_ms, 50)), lat_p99=float(np.percentile(lat_ms, 99)))))
-simulation_app.close()
+```bash
+source /opt/ros/jazzy/setup.bash
+: "${POLICY_PT:?Set the exported TorchScript policy path}"
+: "${RUNTIME_CONTRACT:?Set the matching contract_runtime.json path}"
+python3 labs/capstone_policy_node.py --policy "$POLICY_PT" --contract "$RUNTIME_CONTRACT" \
+  --domain-id 77 --namespace /course_push_trial
 ```
 
-```python
-# bridge/policy_node.py — system ROS 2 Jazzy shell (Python 3.12) + CPU torch; NOT inside Isaac Sim
-import json, sys, time, numpy as np, rclpy, torch
-from rclpy.node import Node
-from geometry_msgs.msg import PointStamped, PoseStamped
-from sensor_msgs.msg import JointState
-sys.path.insert(0, "capstone_tasks/push")              # import contract.py by path: the package __init__ pulls in Isaac Lab
-import contract as C
+In a second terminal, use the pinned Isaac Sim Python environment, with `RUNTIME_CONTRACT` set to the same file:
 
-class PolicyNode(Node):
-    def __init__(self, policy_path, contract_path):
-        super().__init__("capstone_policy")
-        K = json.load(open(contract_path)); self.names = K["joint_names"]
-        self.q0, lim = np.array(K["q0"], np.float32), np.array(K["limits"], np.float32)
-        self.lo, self.hi = lim[:, 0], lim[:, 1]
-        self.policy = torch.jit.load(policy_path, map_location="cpu").eval()
-        self.cube = self.goal = None; self.infer_ms = []; self.reset_state()
-        self.pub = self.create_publisher(JointState, "/capstone/joint_command", 10)
-        self.create_subscription(PoseStamped, "/capstone/cube_pose", self.on_cube, 10)
-        self.create_subscription(PointStamped, "/capstone/goal", self.on_goal, 10)
-        self.create_subscription(JointState, "/capstone/joint_states", self.on_joints, 10)
-
-    def reset_state(self):
-        self.target, self.last_a = self.q0[:7].copy(), np.zeros(7, np.float32)
-
-    def on_cube(self, m): p = m.pose.position; self.cube = np.array([p.x, p.y, p.z], np.float32)
-    def on_goal(self, m): self.goal = np.array([m.point.x, m.point.y, m.point.z], np.float32); self.reset_state()
-
-    def on_joints(self, m):
-        if self.cube is None or self.goal is None:
-            return
-        i = {n: j for j, n in enumerate(m.name)}
-        q = np.array([m.position[i[n]] for n in self.names], np.float32)
-        qd = np.array([m.velocity[i[n]] for n in self.names], np.float32)
-        t = time.perf_counter()
-        with torch.inference_mode():
-            a = self.policy(torch.from_numpy(C.build_obs(q, qd, self.q0, self.cube, self.goal, self.last_a))[None])[0].numpy()
-        self.infer_ms.append((time.perf_counter() - t) * 1e3)
-        a = np.clip(a, -1.0, 1.0)
-        self.target, self.last_a = C.integrate_target(self.target, a, self.lo, self.hi), a
-        cmd = JointState(name=C.ARM_JOINTS + ["panda_finger_joint1"], position=[*map(float, self.target), C.GRIPPER_CLOSED])
-        cmd.header.stamp = m.header.stamp                  # echo → the simulator measures the full round trip
-        self.pub.publish(cmd)
-
-rclpy.init(); rclpy.spin(PolicyNode(sys.argv[1], sys.argv[2]))
+```bash
+: "${RUNTIME_CONTRACT:?Set the matching contract_runtime.json path}"
+python labs/isaac_capstone_bridge.py --contract "$RUNTIME_CONTRACT" \
+  --domain-id 77 --namespace /course_push_trial --headless --lockstep \
+  --output push-lockstep.json
 ```
 
-Run the policy node in a ROS 2-sourced shell: `python3 bridge/policy_node.py <run>/exported/policy.pt <run>/contract_runtime.json`. It needs a venv created with `--system-site-packages` (to see `rclpy`) and CPU PyTorch. Then run the simulator with Isaac Sim's Python (`python.sh` in a workstation install, which auto-selects the bundled Jazzy libraries, or `python` in the pip environment): `sim_bridge.py --contract <run>/contract_runtime.json --headless`, first with `--lockstep`, then without. The two modes answer different questions:
+For a workstation installation, replace `python` with its `python.sh` launcher. Both adapters constrain discovery to localhost and use the specified private namespace; choose a distinct namespace for concurrent experiments. The replay needs only `rclpy` and `std_msgs`; the policy additionally needs PyTorch and the simulator additionally needs the actual pinned Isaac environment and asset access.
 
-* **Lockstep** waits for the command that answers each observation, which removes timing from the experiment. Its success rate against the Lab nominal eval measures **contract and physics differences only**. If its CI does not overlap Lab's, stop and debug the contract (joint names, frames, quaternions, gains, friction) before measuring anything else.
-* **Free-running** (the default) paces physics to the wall clock and applies whatever command has arrived. This is how a real robot behaves. Comparing it to lockstep measures the **cost of real latency**, which you trained for with the action-delay randomization. An achieved RTF below 1, or a non-zero `late_frac`, means the simulator cannot keep up with real time at this load.
+**Lockstep:** physics waits for the reply to the current observation. The 500 ms wall-clock transport timeout is a diagnostic bound, not a 60 Hz control guarantee. A timeout fails the run; it does not silently apply an older reply. Compare exported and training actions on saved identical observations before evaluating rollouts.
 
-Two known simplifications. The goal, cube and joint topics are not ordered relative to each other; a production bridge would carry one observation message per tick. And `/clock` is not published. Add Lecture 08's `ROS2PublishClock` graph if other ROS tools need `use_sim_time`. The latency here is measured on the system clock on purpose: it is wall-clock round trip.
+**Free-running:** omit `--lockstep`. Each request expires after one policy period, and physics advances on an absolute wall-clock schedule. A rejected or missing response leaves the last bounded joint target in place; it does not integrate another delta. Logs separate accepted action age, expiration, deadline misses and success. Holding a target is the defined **simulator** fallback, not proof of a suitable physical emergency response. Inspect cold-start inference separately and warm the policy before a timing comparison.
+
+**Reconcile the physics before interpreting success.** The adapter sets the named USD/variants, masses, solver iterations and reset pose, but it does not automatically reproduce every `FRANKA_PANDA_CFG` actuator/limit/friction override or training cube material. Compare resolved values, including passive mimic joints, max efforts, velocities, friction and depenetration settings, and port the required overrides. The initial-state RNG in the adapter is an example, not a paired match to all Lab evaluation seeds. Feed the same saved scenario table to both environments for paired evaluation. The action-delay buffer and accumulated target make the training task partially observed under its 31-value observation; adding target/history or recurrent state is a separate, documented policy-design experiment requiring retraining.
+
+**Do not use overlapping confidence intervals as a parity test.** Overlap can occur despite meaningful differences, and a mismatch can arise from several causes. First check numerical action parity and frame/ordering contracts. Then define a tolerated regression on matched held-out scenarios before seeing results. The [paired CPU example](labs/simulation_semantics.py) shows why zero regressions in 100 episodes still cannot establish a one-percent upper regression bound at 95% confidence. This statistical gate is evidence about its specified outcome/distribution, not a proof of dynamics equivalence.
 
 **Optional camera variant.** Replace the cube position in the observation with a small RGB or depth camera (`CameraCfg`; in 3.0 `TiledCamera` is a deprecated alias because `Camera` includes the tiled path). Budget it with Lecture 07's per-render-product cost before training, and expect to need a CNN encoder and many more samples.
 
@@ -524,7 +431,7 @@ Two known simplifications. The goal, cube and joint topics are not ordered relat
 
 ## 8. Use it in the real stack
 
-* **Real robot:** the bridge scene is where `franka_ros`/`ros2_control` would go ([Lecture 08](Lecture-08.md), [Advanced ROS](../Advanced%20Robot%20Operating%20System/Lecture-01.md)). The contract file, latency budget and delay randomization carry over unchanged. Friction, mass and actuator dynamics are what sysid ([Lecture 12](Lecture-12.md) §6.2) should pin down first.
+* **Real robot:** the bridge scene is where `franka_ros`/`ros2_control` would go ([Lecture 08](Lecture-08.md), [Advanced ROS](../Advanced%20Robot%20Operating%20System/Lecture-01.md)). The contract is a starting specification; revalidate physical units, limits, controller period, feedback freshness and fallback behavior on the real stack. Friction, mass and actuator dynamics are what sysid ([Lecture 12](Lecture-12.md) §6.2) should pin down first.
 * **Sim-to-sim as a habit:** Isaac Lab's PhysX↔Newton transfer guide uses exactly this contract-first method across physics engines. Running your policy under `physics=newton_mjwarp` is a cheap second rehearsal. It needs the Franka `mujoco` physics variant and joint-ordering settings from that guide.
 * **Rung 2 of the Deep RL ladder:** this task, with its measured env-steps/s, is the simulator rung in [Deep RL for Robot Learning](../Deep%20RL%20for%20Robot%20Learning/README.md).
 
@@ -539,9 +446,9 @@ Two known simplifications. The goal, cube and joint topics are not ordered relat
 | **Step-time breakdown** | Lab 12a method on this task | Physics vs env Python vs update |
 | **Wall-clock to target success, per seed** | Training logs | The number that matters for cost |
 | **Success, nominal and shifted** (Wilson 95%) | Lab 13d | Per seed; robustness drop |
-| **Bridge success: lockstep / free-running** | `sim_bridge.py` | Contract gap / latency cost |
-| **Achieved RTF, `late_frac` (free-running)** | `n_steps · dt / wall`; overrun steps | ≈ 1 and ≈ 0: keeps up with real time |
-| **E2E latency p50 / p99; inference ms** | Echoed stamps; node timer | p99 well below the 16.7 ms policy period |
+| **Bridge success: lockstep / free-running** | `isaac_capstone_bridge.py` | Contract gap / latency cost |
+| **Achieved RTF and deadline misses (free-running)** | `physics_steps · dt / wall_s`; `step_deadline_misses` | Overall RTF includes reset/setup; step misses concern the per-episode schedule |
+| **Accepted action age; inference and holds** | `age_p50_ns`, `age_p99_ns`, `expired_requests_held`; node `inference_ns` | Accepted ages exclude rejected/expired replies, so report hold counts too |
 
 ---
 
@@ -552,7 +459,7 @@ The capstone deliverables are the README's *What you ship*, completed:
 * **`isaac_bench/`** with results for every lab, including `eval_policy.py` and the Lecture 12 breakdown
 * **USD assets** from Lectures 02 and 06 (your imported, validated robot and work cell). Stretch goal: swap them into the capstone scene and requalify the policy.
 * **`capstone/capstone_tasks/push/`**: task, contract, agent config, trained checkpoints and exported `policy.pt` for 3 seeds, learning curves (`results/curves.png`), eval table with CIs, and a video
-* **`capstone/bridge/`**: both scripts and `results/bridge.jsonl` with lockstep and free-running runs
+* **`capstone/bridge/`**: all four local bridge/protocol/helper files and saved `push-lockstep.json` / `push-free-running.json` runs
 * **`PERFORMANCE.md`** and `RUN_MANIFEST.json`:
 
 ```markdown
@@ -561,7 +468,7 @@ The capstone deliverables are the README's *What you ship*, completed:
 ## Step-time breakdown: physics | env Python | policy | PPO update | other   (% of iteration)
 ## Training: wall-clock to target success, seeds 1-3
 ## Evaluation: nominal / shifted, k/n and Wilson 95% CI, per seed; robustness drop
-## Bridge: lockstep vs free-running success (CI), RTF, late_frac, latency p50/p99, inference ms
+## Bridge: lockstep vs free-running success (CI), RTF, step_deadline_misses, expired_requests_held, accepted action age p50/p99, cold/warm inference
 ## On 16 GB / 48 GB: predicted num_envs, camera variant, bridge-while-training, VLA server — and why
 ```
 
@@ -574,7 +481,7 @@ You are done when you can:
 * hand the repo to another engineer who reproduces one training curve and one eval number from the manifest
 * explain each step function of `PushEnv` and justify each reward term and randomization range
 * state the policy contract from memory and show where each item is checked
-* show that lockstep bridge success matches Lab evaluation within confidence intervals, or explain the gap
+* show numerical action parity on known observations, then evaluate a predeclared paired task-regression gate and explain its limits
 * report RTF and p99 latency for the free-running bridge, and say what would break on a real robot first
 
 ---
@@ -594,7 +501,7 @@ You are done when you can:
 
 * Isaac Lab 3.0 — [Creating a direct workflow RL environment](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/how-to/create_direct_rl_env.html) · [Registering an environment](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/how-to/register_rl_env_gym.html) · [Actuators](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/concepts/actuators.html)
 * Isaac Lab 3.0 — [Transfer policies between PhysX and Newton](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/how-to/transfer_policies_between_physx_and_newton.html) (the policy-contract table) · [Policy inference in a USD environment](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/how-to/policy_inference_in_usd.html) · [Reproducibility](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/features/reproducibility.html)
-* Isaac Lab 3.0 — [Run benchmarks](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/developer-tools/benchmarking/run_benchmarks.html) · [Migration guide 2.x → 3.0](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/migration/migrating_to_isaaclab_3-0.html)
+* Isaac Lab 3.0 — [Run benchmarks](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/developer-tools/benchmarking/run_benchmarks.html) · [Migration guide 2.x → 3.0](https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/docs/source/migration/migrating_to_isaaclab_3-0.rst)
 * Isaac Lab source (`release/3.0.0`) — [direct Cartpole task](https://github.com/isaac-sim/IsaacLab/blob/release/3.0.0/source/isaaclab_tasks/isaaclab_tasks/core/cartpole/cartpole_direct_env.py) · [direct Franka cabinet task](https://github.com/isaac-sim/IsaacLab/blob/release/3.0.0/source/isaaclab_tasks/isaaclab_tasks/core/cabinet/cabinet_direct_env.py) · [Franka asset configs](https://github.com/isaac-sim/IsaacLab/blob/release/3.0.0/source/isaaclab_assets/isaaclab_assets/robots/franka.py)
 * Isaac Sim 6.1 — [ROS 2 joint control (Franka)](https://docs.isaacsim.omniverse.nvidia.com/6.1.0/ros2_tutorials/robot_control/tutorial_ros2_manipulation.html) · [ROS 2 bridge in standalone workflow](https://docs.isaacsim.omniverse.nvidia.com/6.1.0/ros2_tutorials/bridge_configuration/tutorial_ros2_python.html) · [`subscriber.py` standalone example](https://github.com/isaac-sim/IsaacSim/blob/v6.1.0/source/standalone_examples/api/isaacsim.ros2.bridge/subscriber.py)
 * Isaac Sim 6.1 — [Experimental `Articulation` source](https://github.com/isaac-sim/IsaacSim/blob/v6.1.0/source/extensions/isaacsim.core.experimental.prims/python/impl/articulation.py) (DOF targets, solver iterations; wxyz poses)

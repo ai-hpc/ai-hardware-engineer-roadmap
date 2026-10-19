@@ -1,0 +1,36 @@
+{
+  "reviewed_at": "2026-10-18",
+  "numerical_environment": {
+    "python": "3.12.3",
+    "numpy": "2.3.5"
+  },
+  "focused_series_tests": 8,
+  "complete_camera_fusion_optional_tests": 19,
+  "python_markdown_snippets_parsed": 47,
+  "copied_classes_match_executed_source": true,
+  "plot_execution": {
+    "numpy": "1.26.4",
+    "matplotlib": "3.6.3",
+    "backend": "Agg",
+    "output": "temporary directory; repository illustrations not overwritten",
+    "executed": [
+      "simulate_tracking",
+      "simulate_2d_tracking",
+      "run_6d_tracking"
+    ],
+    "1d_position_rmse_m_rounded": 1.362,
+    "6d_mean_position_error_m_rounded": 0.828,
+    "6d_mean_velocity_error_m_s_rounded": 0.446
+  },
+  "boundaries": [
+    "seeded simulated data; no physical sensor or robot",
+    "curved motion mismatches constant-velocity model; plots do not prove calibrated coverage",
+    "positive-definite R is this implementation contract; covariance may otherwise be semidefinite"
+  ],
+  "files": {
+    "kalman_1d.py": "b6e93ef684f0505683cdf4d5a641072e6eeede67b66458bce5b12bb57589332d",
+    "kalman_2d.py": "6850881b1d8acaf84d1014a6375df1fd55cd142c2c497ac3b5556c03be637b72",
+    "kalman_6d.py": "9d9e3fcc90300b4ace95756aebfd6ea7f1e50341d8ec18af8af09eb6745a8d35",
+    "../Camera-Time-Fusion-Lab/labs/optional/test_series_covariance.py": "e9c2461baae664304f7deb3792ef558be03b5638da1269da2875149939522eb0"
+  }
+}

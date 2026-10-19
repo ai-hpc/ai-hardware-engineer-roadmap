@@ -29,7 +29,7 @@ These are lower-level storage calculations, not the exact size of a named Qwen c
 
 ## Quality is an experiment
 
-Do not assume softmax smooths away Q/K error: perturbations to attention logits can change the selected context sharply. A high-precision V projection or FFN down projection is a candidate ablation, not a universal prescription. Transformer Engine does not automatically choose a quality-optimal precision for every tensor in an arbitrary model.
+Softmax has a bounded Jacobian for absolute logit perturbations; small changes near ties can still change selected tokens, and large Q/K errors can change context weighting. Do not claim universal exponential amplification or universal error averaging. A high-precision V projection or FFN down projection is a candidate ablation, not a universal prescription. Transformer Engine does not automatically choose a quality-optimal precision for every tensor in an arbitrary model.
 
 Use the same model revision, tokenizer, prompt template, inputs, and decoding protocol for the reference and quantized model. First compare logits or hidden states on fixed inputs. Then compare task metrics, stratified by long context, language, domain, and difficult examples. A low average tensor error can hide a consequential action error.
 
@@ -51,3 +51,19 @@ Create a manifest with: publisher/repository, immutable revision, license, token
 Select one matrix, dequantize a small block according to its documented format, and compare it to the higher-precision source. Test an all-zero block, an outlier, saturation, and values near rounding boundaries. Then load the complete checkpoint and inspect executed kernel names to distinguish native low-precision arithmetic from a higher-precision fallback.
 
 **Deliverable:** a format manifest and quality report. Chapter 3 uses its measured resident weight size. The [DeepSeek checkpoint course](../../../../Track%20G%20-%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/README.md) applies the same identity-first method to its named target; verify availability and metadata there before claiming a particular model/format combination works.
+
+
+## CPU exercise with answer guidance
+
+Run the [existing real PyTorch FP4 calibration lab](../../../../Track%20G%20-%20ML%20Systems%20Engineering/Hardware-Aware%20LLM%20Quantization/CPU-Quantization-Lab.md). It packs codes
+and E4M3 scales, checks zeros/tails/ties, reloads artifacts and evaluates three
+policies on a trained nonlinear network. Explain why output-aware layer calibration
+can improve its local objective yet worsen full-model KL or shifted task behavior.
+The recorded experiment contains that negative result.
+
+Transformer Engine's linked NVFP4 page currently describes **2.20.2 training
+recipes**. Random rotations, stochastic rounding and training transpose handling
+are not automatically required in a PTQ inference artifact. TensorRT's linked
+`latest` page describes **11.4** graph semantics; neither page verifies a
+TensorRT-LLM/vLLM model loader, and TensorRT 11.4 is not the JetPack-supported line.
+The [source record](Source-Evidence.md) keeps these roles and versions separate.

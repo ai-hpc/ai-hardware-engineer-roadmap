@@ -4,6 +4,8 @@ Derive a continuous action generator, then connect its equations to a VLM backbo
 
 **Prerequisites:** Lecture 11; derivatives and numerical integration. **Effort:** setup 45 minutes, lab 4 hours, analysis 2 hours. **Hardware:** CPU for the toy flow; optional GPU for architecture inspection and a pinned pretrained checkpoint. **Stack/roles:** model architecture, training, and accelerator inference; VLA research and inference engineering. **Artifact:** a tested flow sampler plus a tensor and cache contract for a chosen implementation.
 
+**Executable first step:** run the [scalar action-generation lab](Action-Generation-Lab.md). It supplies analytic oracles, actual CPU training, checkpoint reloads, three-seed sampling reports, and failures caused by the wrong condition or flow direction. Complete it before extending the equations to image-conditioned action chunks.
+
 ## Learn a velocity field
 
 Choose a clean action chunk \(A\), independent noise \(Z\sim\mathcal N(0,I)\), and interpolation time \(\tau\in[0,1]\). In this lecture zero means noise and one means data:
@@ -32,6 +34,8 @@ Think of the computation as three interfaces: encode image/language context, com
 Context caching depends on attention structure. If context tokens cannot attend to changing action tokens, their keys and values can be reused through flow integration. If an architecture allows that dependence, caching the same prefix changes the computation. Verify the actual mask and cache policy in the pinned implementation. Do not equate a diagram with a serialized checkpoint contract.
 
 The official openpi repository provides code and model-specific training/inference guidance, but its default branch evolves. Record commit, configuration name, checkpoint revision, normalizer, and preprocessing before reproducing an example. A paper about a later model does not establish that its weights are released in that repository. [Official openpi](https://github.com/Physical-Intelligence/openpi).
+
+**Concrete source reading, checked October 18:** in [openpi `pi0.py` at commit `215abfb`](https://github.com/Physical-Intelligence/openpi/blob/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/models/pi0.py), `compute_loss` uses \(x_t=tZ+(1-t)A\) and target \(Z-A\); `sample_actions` starts at \(t=1\) and uses negative `dt = -1 / num_steps`. It therefore uses the opposite time convention from this lecture, consistently. Prefix keys/values are computed once before the action loop. Trace the attention mask before copying that cache into another architecture. This is source inspection, not a local JAX or checkpoint execution.
 
 ## Worked example: direction and covariance
 

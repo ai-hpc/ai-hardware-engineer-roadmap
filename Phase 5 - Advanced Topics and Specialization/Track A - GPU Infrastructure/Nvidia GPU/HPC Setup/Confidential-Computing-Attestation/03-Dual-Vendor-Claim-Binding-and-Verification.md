@@ -1,99 +1,77 @@
-# 03 — Dual-Vendor Claim Binding & Verification Review
+# 03 — Bind a Session, Then Apply Policy
 
-## 1. The Problem This Solves
+**Learning target:** explain why two authentic reports can still authorize the wrong session. Use the [CPU lab](CPU-Binding-Lab.md) to run these cases.
 
-A verifier for a remote or rented compute job wants two paths:
+## 1. Give each participant a job
 
-```text
-   Slow path:  recipe + dataset ──▶ re-execute from source ──▶ compare to claim   (expensive; requires matching inputs, implementation, and numerical tolerance)
-   Fast path:  claim + attestation bundle ──▶ verify cryptographically             (cheap, only as strong as the attestation)
-```
+The **attester** provides evidence about its environment. A **verifier** appraises evidence against endorsements and reference values. A **relying party** decides whether the result authorizes an action, such as releasing a model key. One service may implement multiple roles, but the trust relationships remain distinct. [RATS architecture](https://www.rfc-editor.org/rfc/rfc9334).
 
-The fast path only works if the claim can't be forged. Define a single digest that commits to everything about the job that matters:
+A signed output hash authenticates a commitment, not the computation that produced it. A measured application may enforce a useful execution protocol, but that assurance depends on the approved code and its TCB. There is no general conversion from “two vendor signatures” to a proof of correct inference or training.
 
-```text
-claim_sha256 = sha256(result_scores ‖ job_metadata ‖ output_manifest)
-```
+## 2. Define an unambiguous transcript
 
-`output_manifest` — a per-file SHA-256 of output artifacts (checkpoints, results) — lets the claim commit to output *identity* without the verifier downloading multi-gigabyte payloads. Files [01](./01-Intel-TDX-Attestation-Chain.md) and [02](./02-NVIDIA-CC-Attestation-Chain.md) each showed how to bind this hash into one hardware vendor's signed report (`REPORTDATA` for Intel TDX, `eat_nonce` for NVIDIA CC) and authenticate that report back to the vendor's root of trust. This file composes both and generalizes the underlying review skill.
+Concatenating variable-length strings is ambiguous: `("ab", "c")` and `("a", "bc")` both produce `abc`. Choose a versioned, deterministic encoding with explicit field structure. Do not interchange raw bytes, hexadecimal text and base64 text.
 
-## 2. Composing the Two Chains
+Our lab's transcript contains:
 
-One `claim_sha256` anchored independently into both hardware roots:
+| Field | Reason |
+|---|---|
+| Protocol version and audience | Prevent use in another protocol or service |
+| Random verifier challenge | Identify a fresh pending request |
+| Issue time and deadline | Bound challenge lifetime |
+| Session public key | Bind the endpoint's possession-proof key; the lab establishes no encrypted channel |
+| Model artifact digest | Bind the intended model/config/tokenizer manifest |
+| Expected GPU identities | Prevent a weaker or incomplete device set |
 
-```text
-                                    claim_sha256
-                        (result_scores ‖ job_metadata ‖ output_manifest)
-                                          │
-                       ┌───────────────────┴───────────────────┐
-                       ▼                                       ▼
-              eat_nonce (NVIDIA CC)                REPORTDATA (Intel TDX, zero-padded)
-                       │                                       │
-        gpu_signature: NRAS JWKS,                  tdx_signature: DCAP —
-        ES384, kid-resolved,                        ECDSA sig, PCK → Intel root CA,
-        iss + exp checked                           QE identity, live TCB status
-                       │                                       │
-                       └───────────────────┬───────────────────┘
-                                            ▼
-                     claim is bound to a genuine GPU AND
-                     a genuine, measured TDX VM — independently
-```
+The lab permits only ASCII strings, booleans, integers, null, lists and string-keyed objects, serialized with sorted keys and fixed JSON separators. This is a **local teaching encoding**, not an implementation of RFC 8785 or a vendor evidence format. Duplicate JSON keys are rejected on load. A production cross-language protocol should use a standardized encoding and cross-implementation test vectors.
 
-A verifier's output for one claim should surface every check as a distinct field — never collapse them into one boolean:
+Let `T` be those encoded bytes. The lab chooses:
 
 ```text
-claim_bound:            true              # claim digest found in eat_nonce
-gpu_signature:           true, 2 tokens    # NVIDIA JWKS, ES384, per-device + platform
-tdx_bound:               true              # claim digest found in REPORTDATA
-tdx_signature:           true, UpToDate    # Intel DCAP / PCS
-output_hash_match:       true              # claim manifest matches submitted output files
+CPU binding = SHA512("course/binding/v1\0" || T)   # 64 bytes
+GPU binding = SHA256("course/binding/v1\0" || T)   # 32 bytes
 ```
 
-Authenticating both reports excludes simply fabricating unsigned JSON. It does **not** imply that an attacker must compromise both vendors: a trusted application that binds attacker-chosen result bytes, replay, or session misbinding can defeat the result claim without forging either signature. Require a fresh verifier challenge, canonical length-delimited claim encoding, a bound session key, and policy-approved workload measurements. The nonce field authenticates supplied bytes, not their computational truth. [NVIDIA attestation scope](https://docs.nvidia.com/attestation/).
+These hashes carry the same transcript through different field-size contracts. The client stores the transcript before requesting evidence and compares the complete expected value; an attester cannot select the challenge after seeing a prior report.
 
-## 3. Binding vs. Authenticity — The Core Review Discipline
+## 3. Freshness is more than an expiry timestamp
 
-Every gap in a real dual-vendor attestation rollout tends to be the same pattern, repeated: **a field got checked before its signature did.** This generalizes past TDX and NVIDIA CC entirely — it's what to look for in *any* attestation code review (an SGX enclave, a TPM-backed boot chain, a different vendor's CC offering):
+Suppose a token is valid from 12:00 until 13:00. It could be replayed thousands of times during that hour. A verifier challenge must be unpredictable, tied to a pending request, short-lived and consumed atomically when authorization succeeds. Concurrent requests and multiple verifier replicas need shared, transactional replay state or an equivalent protocol design.
 
-| Symptom in code | What it actually checks | What it's missing | Concrete forgery |
-|---|---|---|---|
-| `if quote["reportdata"] == claim_hash` | binding only | signature/chain validation | Hand-write JSON with the right bytes in `reportdata`; no real TDX Module ever ran |
-| `if attestation["passed"] == True` | trusting a self-reported flag | who computed `passed` and how | Fabricate the JSON; nothing forces `passed` to reflect a real check |
-| `jwt.decode(token, verify=False)` or checking only `HS256` | JWT well-formedness | the *right kind* of signature (asymmetric, vendor-held key) | Sign your own token with a key you generated; nothing ties it to NVIDIA/Intel |
-| Boolean-only TCB/status output | pass/fail | the actual risk level (advisory IDs, staleness) | Not a forgery, but a validator loses the ability to apply its own policy — silent risk-laundering |
+The CPU lab consumes a challenge only after both signatures, binding, policy and session-key possession pass. It rechecks the challenge and every claim's validity window at that final authorization instant. It uses an in-memory lock to demonstrate one winner under concurrent acceptance. Restarting the process loses this state: the lab is **not** a distributed authorization service.
 
-When reviewing or designing any attestation-gated system, ask the same three questions in order:
+A nonce authenticates a challenge's occurrence in evidence. It does not prove the remote party's wall clock is trustworthy; the relying party uses its own time and explicit tolerated skew. Check collateral freshness and application session lifetime separately.
 
-1. **What value is being bound in?** (a claim hash, a nonce, a public key)
-2. **Who signed the container that value lives in?** (the prover itself, or a hardware vendor's key?)
-3. **Does that signature chain to a root you actually trust, with acceptable revocation/TCB collateral and freshness under your policy?**
+## 4. A common nonce does not prove co-location
 
-If the answer to (2) or (3) is "nothing verifies that," the binding in (1) is decorative — it will pass a review that only reads the binding check and stops.
+An attacker can relay a challenge to a genuine remote CPU and another genuine remote GPU. Both reports can be authentic and contain the same challenge while the attacker's own workload runs elsewhere. Hashing both reports together does not establish a protected physical data path.
 
-## 4. Threat Model — What's Proven, What Remains Trusted
+The approved guest driver/workload must authenticate the GPU endpoint it actually uses, establish the protected session, verify device/fabric membership and bind that identity to application evidence. Platform assignment and fabric attestations must match the supported deployment. Multi-GPU evidence composition is therefore partly a channel/topology problem, not just a JWT problem. [NVIDIA confidential-container architecture](https://docs.nvidia.com/datacenter/cloud-native/confidential-containers/latest/overview.html).
 
-| Threat | Defended by | Residual assumption |
+The lab deliberately cannot test this property. Its GPU identifier is a signed fixture claim, not proof of a local accelerator.
+
+## 5. Separate the checks and retain one final decision
+
+| Check | Failure example | Category |
 |---|---|---|
-| Fabricated claim JSON with no real hardware involved | binding checks alone | **none — this is the gap, not a defense; needs the authenticity checks in files 01 §4 / 02 §4 too** |
-| Forged TD Quote with correct REPORTDATA bytes | DCAP signature + PCK chain ([file 01, §4](./01-Intel-TDX-Attestation-Chain.md#4-dcap-verification-chaining-the-quote-back-to-intels-root-ca)) | Intel's root CA and PCK infrastructure are uncompromised |
-| Forged GPU EAT with correct eat_nonce | NRAS JWKS signature check ([file 02, §4](./02-NVIDIA-CC-Attestation-Chain.md#4-authenticity-nras-signature-jwks-key-resolution)) | NVIDIA's NRAS signing key and JWKS endpoint are uncompromised |
-| Genuine hardware, wrong/tampered software stack | MRTD / RTMR measurement | the verifier's *golden* reference measurement is itself correct and current — a stale or wrong golden value defeats this silently |
-| Genuine attestation, semantically wrong result (bad inputs, wrong parameters, quietly-broken logic) | **nothing here** | out of scope for hardware attestation entirely — this needs re-execution (the slow path) or a proof-of-computation approach (e.g. zk-STARK execution-trace proofs) |
-| Node with a disclosed CPU vulnerability | TCB status field | this is a *reported signal*, not an automatic reject — the validator's policy has to actually consume it |
+| Trusted signature | Attacker generates its own signing key | Authenticity |
+| Version/schema and exact binding | CPU from session A plus GPU from B | Protocol binding |
+| Pending challenge/time/replay | Reuse an accepted bundle | Freshness |
+| Allowed measurement, TCB and debug state | Authentic but disallowed application | Policy |
+| Complete distinct device inventory | Empty, duplicate or missing GPU | Composition policy |
+| Session-key possession | Evidence copied without the matching private key | Channel binding |
+| Authorized artifact lifecycle | Validated weights replaced before use | Application enforcement |
 
-Three honest caveats:
+It is useful to retain a final boolean decision **and** structured reasons, versions and statuses. The mistake is losing the evidence needed to explain or review that decision, not using a boolean anywhere.
 
-- **MRTD is a fingerprint, not an audit.** It proves *which* image booted, bit-for-bit reproducibly. It says nothing about whether that image's code is correct, unless the verifier independently maintains a trusted mapping from "expected job harness" to "expected MRTD value." Attestation without a trustworthy golden-measurement registry just proves "something specific and reproducible ran" — not "the right thing ran."
-- **Hardware attestation and computation-correctness proofs answer different questions.** TDX/NRAS prove *provenance*: genuine hardware, genuine measured stack. They prove nothing about whether the computation itself executed correctly step by step. For large training runs, full computation proofs (zk-STARK / ZKML) remain far more expensive than hardware attestation today — which is exactly why proof-of-training systems lean on the hardware path for their fast verification lane, reserving re-execution or proof-of-computation for spot checks.
-- **"Attested" is not "audited."** A verifier that only checks `tdx_bound` and `gpu_bound` (binding, no signature chain) looks like the full picture in §2 but provides none of its guarantees. This is the failure mode worth remembering above every other one here.
+Authenticating a report before trusting its fields is essential, but many bugs occur afterward: a wrong policy, unbound key, omitted device, stale challenge or malicious approved workload can pass every signature check.
 
-## 5. Verification Review Checklist
+## 6. Exercise with answers
 
-Use this when standing up or reviewing any remote-compute claim verifier, not just this specific TDX + NVIDIA CC pairing:
+A client accepts a model hash from the same untrusted server that supplies the evidence. Is the model independently identified? **No.** The client must pin an artifact/manifest through a trusted release process.
 
-- [ ] Every claimed value has a **binding check** (it appears in a specific field of a hardware report) *and* a separate **authenticity check** (that report's signature chains to a live-verified vendor root) — never one without the other.
-- [ ] TCB/status fields are surfaced as their actual value (`UpToDate` / `OutOfDate` / advisory ID / `Revoked`), not flattened into a single pass/fail before the policy layer sees them.
-- [ ] Any self-signed or symmetric-key-signed token from the same SDK/process generating the evidence is explicitly excluded from anything reported as a "signature verified" result.
-- [ ] Multi-component claims (multi-GPU, multi-node) check **every** component's binding and signature, not one representative sample.
-- [ ] Golden/expected measurement values (MRTD, RTMR, expected MRSIGNER) are sourced from a maintained, trusted registry — not hardcoded once and forgotten as hardware/firmware revisions ship.
-- [ ] The design is explicit about what attestation does **not** prove — computational correctness and data/result quality — and states what mechanism (re-execution, sampling, proof-of-computation) covers that gap, if anything does.
+CPU and GPU fixtures are authentic, same challenge, same model, but the session proof is signed by another key. **Reject possession.** An authentic binding is useful only if the channel endpoint owns the bound key.
+
+Every fixture passes and the signed result says `2 + 2 = 5`. **Signature verification can still pass.** Computation correctness is outside this fixture; a trusted application policy and separate result validation are needed.
+
+Next: [model identity and confidential inference](04-Confidential-Inference-Protocol.md).

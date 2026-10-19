@@ -22,7 +22,7 @@
 
 ## Why This Module Exists
 
-Every AI inference chip — from NVIDIA's H100 to your future custom NPU — exists because **sequential computing hit a wall**. Understanding *why* parallelism is necessary, *how* it evolved, and *how to program it* is the foundation for everything in this roadmap.
+AI workloads expose large amounts of parallel work, while power, memory movement, and response time constrain how efficiently it can run. Understanding *which work is independent*, *how hardware executes it*, and *how to measure the complete application* is the foundation for this module. A robot's small control loop and a server's large training batch may need different execution choices.
 
 If you can't think in parallel, you can't design hardware that runs parallel workloads.
 
@@ -66,31 +66,31 @@ Before diving into code, understand the historical pressure that created the har
 
 ### Step 1: Sequential → Clock Speed Wall
 
-For decades, performance came from clock speed scaling (4.77 MHz in 1980 → 3+ GHz by 2004). Then the **power wall** hit: power scales as `P ∝ V² × f`, and chips couldn't dissipate the heat. Clock speeds plateaued at 3–4 GHz.
+Clock frequency used to provide a large share of performance growth. Power and heat made that route increasingly costly. A simplified dynamic-power model is `P_dynamic ≈ activity × capacitance × V² × f`; leakage and other system power also matter. Frequency still varies across products and workloads, so a fixed 3–4 GHz ceiling is not a useful rule.
 
-**This is why AI chips exist.** If clock speed still scaled freely, you'd just run everything on a faster CPU. The power wall forced the industry into parallelism and specialization.
+Parallelism and specialization help perform more useful work within power and memory limits. They still need enough independent work to offset scheduling, communication, and synchronization costs.
 
-### Step 2: Instruction-Level Parallelism (ILP / SIMD)
+### Step 2: Instruction-Level and Data Parallelism
 
 Multiple things per clock cycle inside a single core:
 
 ```
 Pipelining:   overlap fetch/decode/execute of different instructions
-Superscalar:  issue 4–6 independent instructions per cycle
+Superscalar:  issue multiple independent instructions per cycle
 SIMD:         one instruction processes 4/8/16/32 data elements
 
 Without SIMD:       With SIMD (8-wide AVX2):
 a[0] = b[0] + c[0]  a[0..7] = b[0..7] + c[0..7]   ← ONE instruction
 a[1] = b[1] + c[1]
-...                  8× throughput improvement
+...                  8 FP32 elements per vector instruction
 a[7] = b[7] + c[7]
 ```
 
-This is the first taste of **data parallelism** — the same concept that GPUs take to the extreme.
+Pipelining and superscalar issue exploit instruction-level parallelism. SIMD expresses **data parallelism**. Eight lanes do not guarantee an eightfold speedup: instruction throughput, dependencies, memory bandwidth, and the scalar baseline all matter.
 
 ### Step 3: Multi-Core / Shared Memory
 
-When clock speed stopped scaling, chip designers added cores (2005: 2 cores → 2024: 96 cores). But software must explicitly use multiple cores — a single-threaded program leaves 95 cores idle.
+Multiple cores provide another way to execute independent work. Your application, libraries, or runtime must expose that work; adding cores does not automatically accelerate a serial dependency chain. Other processes may also be using the machine.
 
 ```
 Core 0: Process chunk [0..N/4]
@@ -107,10 +107,10 @@ The challenge: shared memory means **race conditions**, **deadlocks**, and **cac
 
 | | CPU | GPU |
 |---|---|---|
-| Cores | 4–96 (complex) | 1,000–16,000 (simple) |
+| Execution units | CPU cores, often with vector units | Multiprocessors containing arithmetic lanes and specialized units |
 | Optimized for | Latency (one task fast) | Throughput (many tasks at once) |
 | Control strategy | Complex speculation and latency-oriented cores | Many throughput-oriented execution lanes; scheduling and cache design vary |
-| Cache per core | Large (MB) | Small (KB) |
+| Storage | Per-core and shared caches; capacities vary | Registers, shared memory, and caches; capacities vary |
 | Best for | Sequential code, branching | Data-parallel: matrix math, convolution |
 
 Many neural networks spend much of their arithmetic in matrix multiplication and convolution. End-to-end inference also includes memory movement, normalization, attention, sampling or action generation, and host scheduling. GPU speedup depends on shapes, precision, utilization, and power limits; measure it against an optimized CPU baseline at the same quality target.
@@ -119,7 +119,9 @@ Many neural networks spend much of their arithmetic in matrix multiplication and
 
 ## Part 2 — The Five Sub-Tracks
 
-Study these **in order**. Each builds on the previous.
+Start with C++/SIMD, then CPU threads. Choose one GPU or portable-compute branch when you have a compatible device. Learning every vendor API is optional; understanding ownership, synchronization, and measurement transfers between branches.
+
+**CPU-only starting point:** finish the [numbers, shapes, and bytes lab](../Labs/Numbers-Shapes-and-Bytes.md), implement one correct vector loop, and compare it with a threaded version. A serial result, explicit input bounds, and tests for short/uneven lengths come before a speedup plot.
 
 | # | Sub-track | What you learn | Guide |
 |:-:|-----------|---------------|-------|
@@ -143,7 +145,7 @@ Use this completion rubric instead of stopping at "I read the guide."
 | ROCm / HIP | HIP port of a CUDA kernel | correctness + performance delta vs CUDA | portability notes |
 | OpenCL / SYCL | one portable parallel kernel | backend/device comparison | portability tradeoff summary |
 
-If you only complete one artifact in this whole module, make it the CUDA one.
+Choose the artifact that matches your available hardware and next track. A reproducible CPU experiment is a complete starting artifact; CUDA is a useful next step for NVIDIA GPU work.
 
 ---
 
@@ -156,7 +158,7 @@ You are ready to move on when you can do all of the following without guessing:
 - read a profiler output and identify one actionable optimization
 - connect kernel-level behavior to downstream AI workloads such as matmul, attention, or convolution
 
-That is the minimum bar for Phase 3 and Phase 4 to be useful.
+Carry one measured workload into Phase 3 or Phase 4. You can start those phases while gradually deepening the hardware-specific branches here.
 
 ---
 
@@ -189,9 +191,9 @@ CPU vector instructions that process 4–16+ data elements per instruction. The 
 
 > *Scale from one core to many — the CPU parallelism layer.*
 
-**OpenMP** — add `#pragma omp parallel for` to a loop and it distributes across all cores. Zero boilerplate.
+**OpenMP** — `#pragma omp parallel for` can distribute loop iterations among a thread team. You must establish independent iterations or use appropriate reductions/synchronization; team size and affinity are runtime choices.
 
-**oneTBB** — task-based parallelism with work-stealing scheduler. Better for irregular workloads (tree traversals, graph algorithms, nested parallelism).
+**oneTBB** — task-based parallelism with a work-stealing scheduler. It is useful for irregular tasks, nested parallelism, and pipelines. OpenMP also supports tasks; benchmark the implementation and workload before choosing between them.
 
 | | OpenMP | oneTBB |
 |---|---|---|
@@ -215,7 +217,7 @@ CPU vector instructions that process 4–16+ data elements per instruction. The 
 
 > *Thousands of threads, one program — the execution model behind every modern AI workload.*
 
-This is the **most important sub-track** in Phase 1. CUDA programs NVIDIA GPUs, which run the vast majority of AI training and inference.
+Prioritize this sub-track when your goal uses NVIDIA GPUs. For CPU inference, AMD systems, or FPGA work, select the branch that matches your target and retain the same correctness and measurement habits.
 
 ```
 Grid (the entire job)
@@ -248,13 +250,13 @@ Grid (the entire job)
 
 > *AMD's answer to CUDA — write GPU code that runs on both NVIDIA and AMD hardware.*
 
-HIP is 95% identical to CUDA. The critical difference: AMD wavefronts are **64 threads** wide (vs CUDA warps = 32). AMD CDNA GPUs (MI300X) have 192 GB HBM3 at 5.3 TB/s — competitive with H100.
+HIP deliberately resembles CUDA, but a port still needs API, library, synchronization, and performance review. AMD wavefront width depends on the architecture and execution mode; do not hardcode 64 for every AMD GPU. Query the device's `warpSize` and follow the target's documentation. See the [HIP porting guide](https://rocm.docs.amd.com/projects/HIP/en/latest/how-to/hip_porting_guide.html).
 
 | CUDA | HIP | Notes |
 |------|-----|-------|
 | `cudaMalloc()` | `hipMalloc()` | Same signature |
 | `__syncthreads()` | `__syncthreads()` | Identical |
-| Warp (32 threads) | **Wavefront (64 threads)** | Key architectural difference |
+| Warp (32 threads) | Wavefront (target-dependent width) | Audit masks, reductions, and subgroup assumptions |
 | Tensor Cores | **Matrix Cores** | rocWMMA API |
 | cuBLAS / cuDNN | rocBLAS / MIOpen | Different API for DNN |
 | NCCL | **RCCL** | Multi-GPU collectives |
@@ -310,11 +312,11 @@ Everything in this module sits on a spectrum from narrow (1 core, SIMD) to wide 
 ```
 Parallelism level    Mechanism           Hardware            Threads    Sub-track
 ─────────────────────────────────────────────────────────────────────────────────
-Instruction-level    SIMD intrinsics     CPU vector unit     4–16       1
-Thread-level         OpenMP / oneTBB     CPU cores           4–96       2
-Massive (NVIDIA)     CUDA kernels        NVIDIA GPU SMs      10K+       3
-Massive (AMD)        HIP kernels         AMD GPU CUs         10K+       4
-Portable massive     OpenCL / SYCL       Any GPU/FPGA/CPU    10K+       5
+Data-level           SIMD intrinsics     CPU vector unit     lanes      1
+Thread/task-level    OpenMP / oneTBB     CPU cores           team       2
+SIMT                 CUDA kernels       NVIDIA GPU SMs      grid       3
+GPU parallelism      HIP kernels        supported GPUs      grid       4
+Portable compute     OpenCL / SYCL      supported backends  ND-range   5
 ```
 
 The **same optimization principle** applies at every level: **minimize memory traffic, maximize compute reuse** (tiling). This is equally true for AVX2 intrinsics on a CPU, shared memory in a CUDA kernel, BRAM tiling on an FPGA, and scratchpad design in a custom AI chip.

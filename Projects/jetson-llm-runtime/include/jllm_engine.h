@@ -3,6 +3,9 @@
 #pragma once
 
 #include "jllm_memory.h"
+#include "jllm_sampling.h"
+#include "jllm_tokenizer.h"
+#include "jllm_model.h"
 #include "jllm_jetson.h"
 #include "jllm_kernels.h"
 #include <cuda_runtime.h>
@@ -13,40 +16,7 @@
 
 namespace jllm {
 
-// ── Model config (read from GGUF header) ─────────────────────────────────
-
-struct ModelConfig {
-    std::string name;
-    int         n_layers       = 0;
-    int         n_heads        = 0;
-    int         n_kv_heads     = 0;
-    int         head_dim       = 0;
-    int         hidden_dim     = 0;
-    int         intermediate_dim = 0;
-    int         vocab_size     = 0;
-    int         max_seq_len    = 0;
-    float       rope_theta     = 0;
-    int         quant_type     = 0;
-
-    int gqa_group_size() const { return n_kv_heads > 0 ? n_heads / n_kv_heads : 1; }
-    int64_t weight_bytes() const;
-    int64_t kv_per_token_bytes(int kv_type_bytes) const {
-        return 2LL * n_layers * n_kv_heads * head_dim * kv_type_bytes;
-    }
-};
-
 // ── Generation parameters ────────────────────────────────────────────────
-
-struct GenParams {
-    int   max_tokens    = 256;
-    float temperature   = 0.7f;
-    int   top_k         = 40;
-    float top_p         = 0.9f;
-    float repeat_penalty = 1.1f;
-    int   context_limit = 0;
-    bool  use_cuda_graph = true;
-    bool  kv_int8       = true;
-};
 
 using TokenCallback = std::function<void(const char* text, bool is_eos)>;
 
@@ -95,32 +65,8 @@ struct ModelWeights {
     int             n_layers    = 0;
 };
 
-// ── Tokenizer ────────────────────────────────────────────────────────────
-
-struct Tokenizer {
-    std::vector<std::string> vocab;
-    int bos_id = 1;
-    int eos_id = 2;
-
-    bool load_from_gguf(const std::string& path);
-    std::vector<int> encode(const std::string& text) const;
-    std::string decode(int token_id) const;
-    std::string decode(const std::vector<int>& ids) const;
-
-private:
-    std::unordered_map<std::string, int> token_to_id_;
-    std::vector<int> sorted_by_len_;
-    int max_token_len_ = 0;
-};
-
-// ── Sampling ─────────────────────────────────────────────────────────────
-
-int sample_token(float* logits, int vocab_size, const GenParams& params,
-                 const int* recent_tokens = nullptr, int n_recent = 0);
-
 // ── GGUF loaders ─────────────────────────────────────────────────────────
 
-ModelConfig   load_gguf_config(const std::string& path);
 bool          load_gguf_weights(const std::string& path, void** weights, int64_t* size);
 bool          load_and_map_weights(const std::string& path, void** blob, int64_t* blob_size,
                                    ModelWeights* mw, const ModelConfig& cfg);
@@ -161,6 +107,7 @@ private:
 
     int           last_token_ = 0;
     std::vector<int> recent_tokens_;
+    std::vector<float> host_logits_; // allocated before KV admission, reused per token
 
     cudaStream_t    stream_ = nullptr;
     cudaGraph_t     decode_graph_ = nullptr;

@@ -14,6 +14,8 @@
 
 ---
 
+**Start without a board:** [Build a real Thread network on your CPU](labs/CPU-Simulation.md). The pinned OpenThread build runs two real stack instances over simulated radio, checks IPv6/UDP delivery, detects an offline node, and verifies fresh traffic after reattachment.
+
 ## 1. Why OpenThread Matters
 
 OpenThread is Google's open-source implementation of the **Thread** protocol. It is designed for low-power, IPv6-based mesh networking on top of **IEEE 802.15.4**, which makes it a good fit for battery-powered sensors, smart-home endpoints, industrial nodes, and border-router designs.  
@@ -27,7 +29,7 @@ For roadmap learners, OpenThread is valuable because it sits exactly at the boun
 
 Thread is an **IP-based mesh protocol**. At the radio layer it uses IEEE 802.15.4, but at the network layer it is still an IPv6 system, which is why a Thread node can fit into normal IP-based tooling much more naturally than many older embedded fieldbuses.
 
-That distinction is important. BLE is excellent for short-range peripheral links, and Wi-Fi is excellent when you need bandwidth, but Thread is built for **low-power, many-node, always-available networking** where the network can repair itself as routers join or disappear.
+That distinction is important. BLE is excellent for short-range peripheral links, and Wi-Fi is excellent when you need bandwidth, but Thread targets low-power mesh networks that can reorganize as routers join or disappear. Reachability and recovery time still depend on available parents, topology, radio conditions, and configuration; application deadlines require their own checks.
 
 OpenThread's official platform documentation describes the stack as implementing the full Thread networking layers, including **IPv6, 6LoWPAN, IEEE 802.15.4 with MAC security, Mesh Link Establishment, and Mesh Routing**. In practice, that means the stack handles both the radio-facing mechanics and the higher routing behavior that turns many small devices into one stable network.  
 Official source: [OpenThread features](https://openthread.io/)
@@ -114,7 +116,7 @@ ICMPv6 is not optional background noise. It is part of how an IPv6 network remai
 But standard IPv6 Neighbor Discovery relies heavily on multicast, and that is a bad fit for sleepy low-power wireless networks. RFC 6775 exists exactly because unmodified IPv6 Neighbor Discovery is inefficient and sometimes impractical in a 6LoWPAN due to heavy multicast use and non-transitive wireless links.  
 Official source: [RFC 6775](https://www.rfc-editor.org/info/rfc6775)
 
-So in 6LoWPAN systems, ICMPv6 is still present, but the surrounding discovery behavior is adapted for constrained networks. This is why low-power IP networking is more than just "run IPv6 on a small radio" — the control behavior also has to be reshaped for sleepy, lossy, battery-powered nodes.
+RFC 6775 (later extended by RFC 8505) explains one family of constrained-network Neighbor Discovery mechanisms; citing it does not establish that Thread uses that entire protocol unchanged. Thread has its own MLE, address registration, and address-resolution behavior. In 6LoWPAN systems, ICMPv6 is still present, while discovery/control mechanisms depend on the actual network stack. This is why low-power IP networking is more than just "run IPv6 on a small radio" — the control behavior also has to be reshaped for sleepy, lossy, battery-powered nodes.
 
 #### Why these two protocols matter together
 
@@ -216,7 +218,7 @@ This is one of the most important energy-saving ideas in Thread. The network sta
 OpenThread's advanced-feature guide explains this as **indirect transmission**: the parent holds data until the sleepy child asks for it. That same guide also notes that the sleepy end device periodically wakes to poll its parent, and OpenThread uses frame-pending behavior to indicate whether queued data exists.  
 Official source: [OpenThread advanced features](https://openthread.io/guides/porting/implement-advanced-features)
 
-That polling model is the practical answer to the low-power problem. The SED does not burn power listening all the time, and the network does not lose reachability because the parent router serves as the always-on proxy for inbound traffic.
+That polling model is the practical answer to the low-power problem. The SED does not burn power listening all the time, and the parent can buffer inbound data within configured limits. Sleep intervals, child timeout, parent loss, queue limits, and retries still affect reachability and delivery delay.
 
 ### Border Router and Commissioner
 

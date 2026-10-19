@@ -63,9 +63,11 @@ In its most fundamental form, an agent has three components:
 
 </div>
 
-In code (using an agents framework), this is as small as:
+Definition fragment using the OpenAI Agents SDK; define and register `get_weather` before constructing this object:
 
 ```python
+from agents import Agent
+
 weather_agent = Agent(
     name="Weather agent",
     instructions="You are a helpful agent who can talk to users about the weather.",
@@ -113,11 +115,18 @@ Broadly, agents need three types of tools:
 
 ```python
 from agents import Agent, WebSearchTool, function_tool
+from datetime import datetime, timezone
+
+# A process-local teaching sink. It is not a file or a durable database.
+SAVED_RESULTS = []
 
 @function_tool
-def save_results(output):
-    db.insert({"output": output, "timestamp": datetime.time()})
-    return "File saved"
+def save_results(output: str) -> str:
+    if len(output) > 4000:
+        raise ValueError("result too large")
+    SAVED_RESULTS.append({"output": output,
+                          "timestamp": datetime.now(timezone.utc).isoformat()})
+    return "Saved in process memory"
 
 search_agent = Agent(
     name="Search agent",

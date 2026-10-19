@@ -67,7 +67,14 @@ $$
 \big| (\mathcal{T}Q_1)(s,a) - (\mathcal{T}Q_2)(s,a) \big| \le \gamma \, \mathbb{E}_{s'} \Big| \max_{a'} Q_1(s',a') - \max_{a'} Q_2(s',a') \Big| \le \gamma \, \| Q_1 - Q_2 \|_\infty
 $$
 
-The second step uses \(|\max_x f(x) - \max_x g(x)| \le \max_x |f(x) - g(x)|\). So every sweep shrinks the distance to \(Q^*\) by at least a factor of γ, and value iteration converges from any start. The guarantee holds for **tables**. Once a neural network represents Q, each update is "apply \(\mathcal{T}\), then project onto what the network can represent," and that combination is not a contraction in general.
+The second step uses this inequality: changing every function value by at most a given amount changes the maximum by at most that amount.
+
+\[
+\left|\max_x f(x) - \max_x g(x)\right|
+\le \max_x |f(x) - g(x)|.
+\]
+
+So every sweep shrinks the distance to \(Q^*\) by at least a factor of γ, and value iteration converges from any start. The guarantee holds for **tables**. Once a neural network represents Q, each update is "apply \(\mathcal{T}\), then project onto what the network can represent," and that combination is not a contraction in general.
 
 ---
 
@@ -196,10 +203,10 @@ Every one of these spends **more learner compute per env step**, which is the su
 
 ## 6. Robot connection: a 50×7 chunk cannot be enumerated
 
-π0.5 emits a chunk of ~50 seven-dimensional actions, which is 350 continuous numbers. DQN's \(\max_{a'}\) is impossible, and even CEM over \(\mathbb{R}^{350}\) is hopeless. Two routes stay open:
+A configuration predicting 50 seven-dimensional actions has a 350-dimensional chunk; actual VLA configurations differ (`pi05_libero` currently predicts ten actions). Exhaustive continuous-action maximization is unavailable, and generic search becomes costly in high dimensions. Actor and structured sampling approaches offer alternatives; dimension alone does not prove that every CEM-style method is hopeless.
 
 * **Keep an actor.** Train the policy against a critic, as DDPG/SAC do. For a flow-matching VLA, "backprop Q through the action" means backprop through ~10 integration steps of the action expert. That is possible, but expensive and memory-heavy (Lectures 10-11 cover cheaper variants).
-* **Sample-and-rank with a generative proposal.** The VLA is already a very good proposal distribution. Sample \(K\) candidate chunks from π0.5, score them with a critic \(Q(s, a_{t:t+H})\), and execute the best. This is V-GPS (Nakamoto et al. 2024), which re-ranks a generalist policy's actions using a value function learned offline, without touching the policy's weights. Q-chunking (Li et al. 2025) shows the critic side can be learned directly over chunks, with a bonus: backups over a chunk behave like unbiased \(n\)-step backups.
+* **Sample-and-rank with a generative proposal.** The VLA is already a very good proposal distribution. Sample \(K\) candidate chunks from π0.5, score them with a critic \(Q(s, a_{t:t+H})\), and execute the best. This is V-GPS (Nakamoto et al. 2024), which re-ranks a generalist policy's actions using a value function learned offline, without touching the policy's weights. Q-chunking (Li et al. 2025) shows the critic side can be learned directly over chunks, with a chunk-level backup whose meaning depends on the executed duration, within-chunk discounting, termination mask, and behavior policy. A learned bootstrap or off-policy trajectory can still introduce bias; derive the target as in Lecture 13.
 
 Sample-and-rank costs \(K\) policy samples plus \(K\) critic evaluations per decision, which moves the cost back into the regime-C inference bottleneck. And if the improved behavior has to live *in the weights* (a competition that accepts only a checkpoint, for example), the ranked choices must be distilled back into the policy (Lecture 10).
 
@@ -219,9 +226,9 @@ $$
 \text{env-steps/s} \;\lesssim\; \frac{\text{learner-updates/s}}{\text{UTD}}
 $$
 
-One SAC update (two critics + targets + actor + α, each forward and backward) with small MLPs is **launch-bound**. Expect on the order of hundreds to a few thousand updates/s, nearly independent of \(B\) until \(B\) gets large. Measure your own. At UTD = 1, that caps SAC at a few thousand env-steps/s, while the same GPU simulates 10⁵-10⁶ steps/s. **In regime B, off-policy RL leaves the simulator idle almost all the time.** This is why GPU-sim SAC baselines run few environments and UTD below 1, and why PPO with thousands of envs usually wins **wall-clock** in regime B even though it needs many more samples.
+A SAC update with small networks can be dominated by launch overhead, while larger batches/models change the bottleneck. The equation above uses **optimizer updates per newly collected transition** as UTD; some codebases report replayed samples per transition instead, which differs by minibatch size. Record the definition and measure update time. Whether PPO or SAC wins wall-clock depends on sample requirements, simulator/rendering cost, batch size, and learner work.
 
-In regime C the arithmetic flips. One π0.5 chunk costs tens of milliseconds, so the policy term dominates, and a learner update on a small critic is cheap by comparison. Now every transition is expensive and reusing it 10-20 times is nearly free. **Off-policy wins in regime C** (and on real robots), as long as the critic and actor updates themselves do not involve the VLA's backward pass.
+When policy inference is expensive, sample reuse can be valuable. It is not free: actor/critic backward passes, replay storage, stale data, and repeated large-model scoring can dominate. Compare measured time-to-task-success instead of asserting that off-policy methods always win for VLAs or physical robots.
 
 ### 7.1 Replay buffer memory
 

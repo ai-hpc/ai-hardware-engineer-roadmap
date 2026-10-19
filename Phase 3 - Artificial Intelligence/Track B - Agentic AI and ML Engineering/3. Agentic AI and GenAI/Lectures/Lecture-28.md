@@ -4,6 +4,9 @@
 
 ---
 
+**Source scope:** checked against OpenClaw commit `24aac3c15a01feb1946dad5b212282e78dc3941e` (2026-10-18), whose package version is `2026.10.4`. These are source observations, not an executed Gateway deployment. See [source evidence](Lecture-Source-Evidence.md) for exact files and limitations.
+
+
 OpenClaw currently lives mostly in the **Node/TypeScript world**.
 
 That is a pragmatic choice:
@@ -234,7 +237,7 @@ The runtime **survives contact with the operating system**.
 
 ---
 
-## 6. OpenClaw today: Node 24 as stable target
+## 6. OpenClaw runtime requirements: exact versions matter
 
 For OpenClaw-style development today, the stable baseline is:
 
@@ -265,6 +268,9 @@ The better question:
 ```text
 Which runtime properties do agent systems need long-term?
 ```
+
+
+The exact audited `package.json` engine is **`>=24.16.0 <25 || >=26.1.0`** and the package manager is pinned there. Keep this requirement with your lockfile. Examples saying “Node 24” below describe a major-version family, not permission to use every 24.x release. The earlier Bun porting commit discussed above remains a historical design signal, not evidence of the current port completion percentage.
 
 ---
 
@@ -568,7 +574,7 @@ It shows that runtime builders are optimizing for integrated platform experience
 For OpenClaw-style work:
 
 ```text
-Stay on Node 24 for production stability.
+Use a version satisfying the pinned package engine (`>=24.16.0 <25 || >=26.1.0` at the audited revision), then execute compatibility tests.
 Experiment with Bun in narrow paths.
 Use Rust for OS-facing, performance-sensitive, or packaging-critical services.
 Measure before moving anything broad.
@@ -633,7 +639,7 @@ The goal is to make runtime decisions measurable.
 - Bun's Zig-to-Rust work is currently an initial porting plan, not a completed rewrite.
 - The strategic signal is that runtime maintainability and ecosystem scale matter, not only raw speed.
 - Agent workloads stress runtimes through streaming, subprocesses, sessions, tools, file watching, and native helpers.
-- Node 24 remains the stable OpenClaw baseline today.
+- The audited package requires Node `>=24.16.0 <25 || >=26.1.0`; an arbitrary Node 24 installation is not sufficient.
 - Bun is worth testing in narrow CLI/helper/tooling paths.
 - Rust is a strong fit for OS-facing services, sandboxing, PTY/session supervision, and device-local helpers.
 - The winning architecture is likely hybrid: TypeScript for product velocity, Rust/C++ for hard runtime boundaries, and clear RPC contracts between them.

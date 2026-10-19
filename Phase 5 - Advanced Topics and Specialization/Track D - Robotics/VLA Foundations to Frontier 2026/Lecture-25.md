@@ -18,6 +18,8 @@ MEM was announced 2026-03-03 and submitted March 4, with a March 8 revision. It 
 
 π0.7 was announced and submitted 2026-04-16; paper v2 is April 24. Its reported contribution is steerability through varied context: language, behavior metadata, control conventions, and visual subgoals. The authors report compositional and cross-embodiment experiments. These remain upstream claims under their experimental conditions; the inspected openpi inventory does not provide a π0.7 checkpoint. [π0.7 announcement](https://www.pi.website/blog/pi07), [paper](https://arxiv.org/abs/2604.15483v2), [openpi inventory](https://github.com/Physical-Intelligence/openpi).
 
+**October 18 access update:** PI announced a managed fine-tuning and hosted-inference beta on October 13. Beta service access is distinct from downloadable policy weights; participation requires applying. No service was executed in this course review. [Official announcement](https://www.pi.website/blog/api-beta), [dated update](Current-Update-2026-10-18.md).
+
 The accessible paper describes roughly 5B parameters, including a Gemma3 4B backbone, a history encoder, and an 860M flow action expert. Its experiments generate 50-step chunks with five denoising steps, executing a shorter prefix, with asynchronous subgoal and action updates. Some novel tasks use human language coaching; others use a learned high-level policy. Preserve that distinction when interpreting autonomy. [Architecture and runtime sections](https://arxiv.org/html/2604.15483v2).
 
 ## Mental model: conditioning is part of the controller

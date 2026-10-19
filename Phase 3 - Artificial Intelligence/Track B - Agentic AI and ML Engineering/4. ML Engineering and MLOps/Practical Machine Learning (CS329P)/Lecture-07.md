@@ -4,9 +4,9 @@
 
 ---
 
-Almost every introductory ML result quietly assumes your data is **IID** — independent and identically distributed. That assumption is what lets you shuffle rows, carve out a random 20% test set, and trust the resulting accuracy number. The trouble is that most data worth modeling is *not* IID. Stock prices, sensor streams, words in a sentence, clicks in a user session, transactions on a payment network, friendships in a social graph — in every one of these, the value of one observation tells you something about its neighbors. The samples are *dependent*: `p(x, y) ≠ p(x) · p(y)`.
+Almost every introductory ML result quietly assumes your data is **IID** — independent and identically distributed. That assumption is what lets you shuffle rows, carve out a random 20% test set, and trust the resulting accuracy number. The trouble is that most data worth modeling is *not* IID. Stock prices, sensor streams, words in a sentence, clicks in a user session, transactions on a payment network, friendships in a social graph — in every one of these, the value of one observation tells you something about its neighbors. Separate two ideas: features and labels within a row can be dependent even when different rows are IID. Temporal dependence concerns rows such as `Z_t` and `Z_(t+1)`, where `Z_t=(X_t,Y_t)`. Testing `X` against `Y` does not test independence across examples.
 
-Dependence is not a nuisance to be removed — it is usually the entire signal. The reason we can forecast tomorrow from today, autocomplete a sentence, or flag a fraud ring is precisely *because* observations are correlated. The danger is pretending the dependence isn't there. A random train/test split on a time series leaks the future into the past and reports an accuracy you will never see in production. A random split on a social graph puts a user's friends on both sides of the split and lets the model memorize the answer. The model looks great offline and collapses live.
+Dependence is not a nuisance to be removed — it is usually the entire signal. The reason we can forecast tomorrow from today, autocomplete a sentence, or flag a fraud ring is precisely *because* observations are correlated. The danger is pretending the dependence isn't there. A random train/test split on a time series leaks the future into the past and reports an accuracy you will never see in production. For graphs, define whether the task is transductive (a known graph with withheld labels) or inductive (unseen nodes/graphs). Neighbors on both sides are not automatically leakage; using hidden labels or future edges unavailable at prediction time is. The model looks great offline and collapses live.
 
 This lecture covers the two big families of dependent data — **sequences** (a 1-D chain of dependence through time or token position) and **graphs** (arbitrary relational dependence between entities) — plus the tests that tell you whether your data is dependent at all. The recurring theme: once data is non-IID, *both* your evaluation protocol *and* your model architecture have to change. Get the split wrong and no architecture saves you.
 
@@ -62,32 +62,32 @@ The rule of thumb: **split along the axis of dependence.** Time-ordered data spl
 
 You often *suspect* dependence but want to confirm it. Several tests, in rough order of sophistication:
 
-- **Permutation / classifier test.** Take your real paired data `Z = {(x_i, y_i)}`. Build a shuffled copy `Z' = {(x_i, y_π(i))}` where `π` randomly permutes the labels — this destroys any real `x`–`y` relationship while preserving each marginal. Train a classifier to tell `Z` from `Z'`. If it can, the pairing carries information and `x`, `y` are dependent. (Bonus: the pairs the classifier is *most* confident about are your most strongly related ones.) The same `f(x, y)` that scores "is this a real pair" can even be turned into a predictor via `ŷ = argmax_y f(x, y)`.
-- **MMD (Maximum Mean Discrepancy).** Compare the joint expectation `E_{(x,y)}[φ(x)·φ(y)]` against the independent expectation `E_x E_y[φ(x)·φ(y)]` in a kernel feature space. A large gap means dependence. Useful when feature maps don't factorize.
-- **HSIC (Hilbert-Schmidt Independence Criterion).** A kernel covariance operator that vanishes exactly when `x ⊥ y`. It reduces to the clean trace form `tr(H K H L)` with centering matrix `H_ij = δ_ij − 1/m` and kernel matrices `K`, `L` over `x` and `y`. The de-facto modern nonparametric independence test.
+- **Permutation test.** Choose a statistic for the relationship being tested and generate its null distribution using permutations justified by exchangeability. Dependence between `X` and `Y` is a supervised signal; temporal row dependence requires a different construction and often block-aware resampling. A classifier discriminating real versus shuffled pairs needs held-out scoring and careful row grouping; its density-ratio score is not automatically `p(y|x)`.
+- **MMD.** Compare the joint distribution `P(X,Y)` with the product of marginals using a kernel on pairs. The function class and kernel matter; arbitrary differences of scalar feature means do not constitute a general independence test.
+- **HSIC.** With suitable characteristic kernels, the population criterion is zero exactly at independence. One common biased sample form is `trace(K H L H)/n²`, with `H=I−11ᵀ/n`. A sample value alone is not a p-value, and a linear kernel only tests a narrower dependence pattern.
 - **Mutual information.** From information theory, `I(x, y) = H[x] + H[y] − H[(x, y)]` equals the KL divergence between the joint and the product of marginals — it counts the *extra bits* needed to encode `x` and `y` separately rather than jointly. If the data is independent, `I = 0` and no bits can be saved.
 
 ```python
-# Permutation (classifier) independence test — the practical workhorse.
+# Test one relationship: linear association of paired X and y.
+# Assumes exchangeable IID rows under the null; not a time-series split test.
 import numpy as np
-from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.model_selection import cross_val_score
 
-def independence_pvalue(X, y, n_perms=200):
-    real = np.column_stack([X, y])              # genuine (x, y) pairs
-    def auc(Z):                                 # can a classifier spot real vs shuffled?
-        Zp = np.column_stack([X, np.random.permutation(y)])
-        data = np.vstack([Z, Zp])
-        lab  = np.r_[np.ones(len(Z)), np.zeros(len(Zp))]
-        return cross_val_score(GradientBoostingClassifier(), data, lab,
-                               cv=3, scoring="roc_auc").mean()
-    observed = auc(real)
-    null = [auc(np.column_stack([X, np.random.permutation(y)]))   # AUC under H0
-            for _ in range(n_perms)]
-    # p = fraction of null AUCs at least as separable as observed
-    return float((np.sum(np.asarray(null) >= observed) + 1) / (n_perms + 1))
-# p small  -> reject independence -> data is dependent -> do NOT random-split.
+def linear_association_pvalue(X, y, n_perms=200, seed=17):
+    X, y = np.asarray(X, dtype=float), np.asarray(y, dtype=float)
+    if X.ndim != 1 or y.shape != X.shape or len(X) < 3 or n_perms < 1:
+        raise ValueError("aligned one-dimensional arrays and positive permutations required")
+    if not np.isfinite(X).all() or not np.isfinite(y).all() or X.std() == 0 or y.std() == 0:
+        raise ValueError("finite, nonconstant inputs required")
+    observed = abs(np.corrcoef(X, y)[0, 1])
+    rng = np.random.default_rng(seed)
+    null = [abs(np.corrcoef(X, rng.permutation(y))[0, 1]) for _ in range(n_perms)]
+    return (1 + sum(score >= observed for score in null)) / (n_perms + 1)
+
+# A small p-value indicates evidence of this X–y association.
+# It does not imply dependent rows or forbid an IID train/test split.
 ```
+
+**Counterexample to memorize:** draw `X_i` independently, then set `Y_i=2X_i`. Each feature perfectly predicts its label, yet the rows remain independent. Conversely, adjacent robot frames may share weather and sensor bias even if a selected feature has little correlation with the label. Choose the split from the collection process and intended deployment, not from the p-value above.
 
 ---
 
@@ -101,11 +101,11 @@ A sequence is observations `x_1, x_2, …, x_T` where order matters. By the chai
 p(x_1, …, x_T) = p(x_1) · p(x_2 | x_1) · p(x_3 | x_1, x_2) · … · p(x_T | x_1, …, x_{T-1})
 ```
 
-This is the **autoregressive** view: predict each step from everything before it, `x_t ∼ p(x_t | x_<t)`. Because of causality, decomposing *forward* in time is more accurate than the (mathematically valid) backward decomposition — the past genuinely generates the future, not the reverse.
+This is the **autoregressive** view: predict each step from everything before it, `x_t ∼ p(x_t | x_<t)`. Both forward and backward chain factorizations are mathematically exact. Forecasting uses past-to-future inputs because future observations are unavailable at prediction time; a factorization alone neither proves causality nor guarantees better approximation.
 
 Conditioning on the *entire* past is expensive and often unnecessary. Two standard simplifications:
 
-- **Windowing (Markov assumption).** Condition only on the last `τ` steps: `p(x_t | x_{t-τ}, …, x_{t-1})`. Takens' theorem says that, under mild regularity, a finite window of the recent past carries enough information. You then train an ordinary regressor with target `x_t` and features `(x_{t-τ}, …, x_{t-1})`. This relies on **stationarity** — the assumption that the conditional distribution depends on the *values* in the window, not on the absolute time `t`.
+- **Windowing (Markov assumption).** Condition only on the last `τ` steps: `p(x_t | x_{t-τ}, …, x_{t-1})`. A finite window is a modeling assumption. Delay-embedding theorems impose specific dynamical-system and observation assumptions; they do not guarantee a sufficient window for arbitrary noisy sensor or business series. You then train an ordinary regressor with target `x_t` and features `(x_{t-τ}, …, x_{t-1})`. This relies on **stationarity** — the assumption that the conditional distribution depends on the *values* in the window, not on the absolute time `t`.
 - **Latent state.** When a long history matters, summarize it into a hidden state instead of carrying the raw past: `h_t = g(x_{t-1}, h_{t-1})`, `x_t = f(x_{t-1}, h_t)`. The state `h_t` is a learned, fixed-size memory of everything that came before.
 
 ### The model ladder
@@ -169,7 +169,7 @@ Xte, yte = make_windows(test,  tau=24)
 
 ## 3. Graphs
 
-Some dependence simply cannot be flattened into a sequence. A road network, a payment graph, a citation web, a "who-follows-whom" social network — these have arbitrary relational structure. The clean factorizations are graphical models — directed `p(x) = ∏_i p(x_i | x_{π(i)})` or undirected `p(x) = ∏_C ψ_C(x_C)` over cliques — but exact inference on them is often intractable, so modern practice learns vertex representations directly.
+Some dependence simply cannot be flattened into a sequence. A road network, a payment graph, a citation web, a "who-follows-whom" social network — these have arbitrary relational structure. The clean factorizations are graphical models — directed `p(x) = ∏_i p(x_i | x_{π(i)})` or undirected `p(x) = (1/Z) ∏_C ψ_C(x_C)` over cliques, with partition function `Z` — but exact inference on them is often intractable, so modern practice learns vertex representations directly.
 
 ### Graph data
 
@@ -254,3 +254,6 @@ A practical caveat (Dai et al., 2018): backprop through a whole graph is expensi
 June 2026. Model recommendations (Transformers, SSMs/Mamba for long context, GCN/GraphSAGE/GAT, temporal graph nets) reflect the landscape as of this date; the independence and leakage principles are timeless.
 
 *Adapted from [Stanford CS329P](https://c.d2l.ai/stanford-cs329p) — Huang, Li & Smola, CC-BY-SA-4.0.*
+
+
+Reviewed 2026-10-18: distinguished within-row predictive dependence from between-row dependence, corrected the permutation exercise and kernel-estimator scope, and separated forecasting information from causality.

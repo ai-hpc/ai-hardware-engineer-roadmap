@@ -1,256 +1,85 @@
-# Capstone — TurboQuant: Build the Policy Engine
+# Module 13 — Capstone: Build a Quantization Policy Evaluator
 
-**Collection:** [Hardware-Aware LLM Quantization](README.md) | **Previous:** [← Module 12](Lecture-12.md) | **Next:** [Course index](README.md)
+**Collection:** [Hardware-Aware LLM Quantization](README.md) | **Previous:** [Previous lesson](Lecture-12.md) | **Next:** [Next lesson](README.md)
 
----
+Build a small reusable evaluator that can explain why it selected a policy and
+which evidence could invalidate it. The capstone's former “TurboQuant” label has
+been removed to avoid confusing this course project with separately published
+quantization research. It is not an implementation or reproduction of such work.
 
-The twelve modules produced a method. This capstone turns it into a **reusable subsystem another engineer can run on a model you have never seen** — Level 5 on the roadmap's [artifact ladder](../../../Curriculum-Authoring-Guide.md).
+## 1. Choose the scope you can execute
 
-**Case-study baseline:** the community [DSpark NVFP4 model card](https://huggingface.co/gittensor-model-hub/Qwen3.8-27B-DSpark-NVFP4) reports `155.75 tok/s` and acceptance length `2.886`. These are attributed results, not measurements reproduced by this curriculum. Establish your own baseline with a pinned checkpoint, runtime, prompts, and device before setting a target.
+The CPU route uses the trained nonlinear robot-stop classifier and reference
+block-FP4 packer in [CPU Quantization Lab](CPU-Quantization-Lab.md). It demonstrates
+calibration, payload accounting, evaluation and distribution shift with real
+PyTorch. It does not execute NVIDIA FP4 instructions or measure LLM accuracy.
 
----
+The optional GPU route uses a licensed checkpoint and a pinned engine with an
+explicitly supported quantization path. Reproduce a baseline before optimization;
+community model-card performance is an attributed reference, not your baseline.
 
-## 1. Turn arithmetic into testable hypotheses
+## 2. The five-stage artifact
 
-Under the simplified model `speed = base * tau / (1 + K*c)`, inserting `base=81.6`, `tau=2.886`, `speed=155.75`, and `K=3` gives an **effective** `c≈0.171`. A byte ratio `0.85/15.88≈0.054` is much smaller. This discrepancy does not uniquely identify launch overhead: verification cost, cache traffic, compute intensity, batch shape, synchronization, or a mismatched baseline can also explain it.
-
-Substituting `c=0.054` predicts approximately 203 tok/s **only if** the other quantities and model assumptions remain valid. It is a sensitivity calculation, not a discovered 30% speedup.
-
-| Hypothesis | Experiment | Evidence to retain |
-|---|---|---|
-| Drafter is launch-bound | Trace kernel gaps; vary capture/fusion while holding output contract fixed | Draft and verification timings separately |
-| Output projection dominates traffic | Measure its time and bytes; compare a supported quantized variant | Layer error, task quality, total latency |
-| Memory kernels underuse bandwidth | Measure achieved bytes/s for the real shapes | Traffic counters, cache behavior, occupancy |
-| Precision changes acceptance | Paired prompts and draft configuration | Acceptance distribution and accepted tokens/s |
-
-Apply one change at a time, then benchmark the combined configuration. Do not multiply isolated speedups: they may remove the same bottleneck or expose a different one. A well-supported negative result passes this research capstone when it explains why an appealing optimization did not help.
-
-The deliverable is a measured Pareto comparison within declared quality, latency, and memory limits. There is no universal 224 or 280 tok/s requirement, and this exercise does not establish that every sub-4-bit method is slower.
-
----
-
-## 2. System architecture
-
-```text
-   ┌─────────────────────────────────────────────────────────────────────┐
-   │                            TurboQuant                                │
-   ├─────────────────────────────────────────────────────────────────────┤
-   │                                                                      │
-   │   [1] LEDGER          checkpoint ──▶ traffic classes, B_token,      │
-   │       (Module 04)                     predicted ceiling, gap check   │
-   │              │                                                       │
-   │              ▼                                                       │
-   │   [2] PROBE           per-group activation stats  (Module 06)        │
-   │                       per-group ΔKL / Δτ sweep     (Modules 07, 08)  │
-   │                       additivity check             (Module 11 §5)    │
-   │              │                                                       │
-   │              ▼                                                       │
-   │   [3] SOLVER          multiple-choice knapsack over {BF16,FP8,NVFP4} │
-   │       (Module 11)     hardware guard rails         (Module 03)       │
-   │              │        ε sweep → B_token(ε) curve                     │
-   │              ▼                                                       │
-   │   [4] BUILDER         emit the quantized checkpoint + manifest       │
-   │       (Module 05)     AWQ / GPTQ per the error-mode diagnosis        │
-   │              │                                                       │
-   │              ▼                                                       │
-   │   [5] VERIFIER        locked clocks, interleaved, paired  (Mod 12)   │
-   │       (Modules 8,12)  tok/s · τ · α · KL · p99 · agreement           │
-   │                       measured vs PREDICTED ── bug check             │
-   └─────────────────────────────────────────────────────────────────────┘
-```
-
-The contract between stages is what makes it reusable:
-
-```python
-@dataclass
-class Ledger:      # [1] → [3]
-    groups: dict[str, int]          # name → parameter count
-    traffic_class: dict[str, str]   # A_streamed / B_gathered / C_conditional / D_state
-    b_token_GB: float
-    predicted_tps: float
-    measured_tps: float | None
-    gap: float | None               # predicted / measured — >1.2 ⇒ profile, do not quantize
-
-@dataclass
-class Sensitivity: # [2] → [3]
-    d_kl:   dict[tuple[str, str], float]   # (group, format) → ΔKL vs BF16
-    d_tau:  dict[tuple[str, str], float]   # (group, format) → Δ acceptance length
-    additivity_ratio: float                # ~1.0 ⇒ solver assumption holds
-
-@dataclass
-class Allocation:  # [3] → [4]
-    fmt: dict[str, str]
-    predicted_b_token_GB: float
-    predicted_kl: float
-    predicted_tps: float            # [5] MUST check against this
-```
-
----
-
-## 3. Build order
-
-### Phase 1 — Ledger and the gap check *(start here, always)*
-
-Implement [Module 04's](Lecture-04.md) analyzer. Compute `B_token`, predicted ceiling, and the gap.
-
-```text
-   gap = predicted / measured
-
-   ≈ 1.0   →  you are at the bandwidth wall; proceed to Phase 2
-   > 1.2   →  STOP. Profile kernels first (Module 03 §5).
-              For the case study, gap = 1.27 — Stage 1 of the ladder.
-```
-
-**Deliverable:** ledger table, gap, and a written verdict naming your next action.
-
-### Phase 2 — Probe
-
-Run [Module 06's](Lecture-06.md) activation profiler (diagnosis → method selection) and [Module 07's](Lecture-07.md) leave-one-out sweep (per-group ΔKL and Δτ). Check additivity on your five highest-value pairs.
-
-**Deliverable:** the sensitivity table, with Q/K measured at both short and maximum context (the [Module 07 §2](Lecture-07.md) prediction).
-
-### Phase 3 — Solve
-
-Run the [Module 11](Lecture-11.md) solver with your measured values. Enumerate all `3^n` to confirm greedy optimality. Sweep `ε` and plot `B_token(ε)`; mark the knee.
-
-**Deliverable:** allocation, solver trace in GB/nat, `B_token(ε)` curve.
-
-### Phase 4 — Build
-
-Emit the checkpoint with the manifest from [Module 05 §5](Lecture-05.md). **Verify the built artifact's actual `B_token` matches the solver's prediction** — a toolkit that silently ignores a per-group format request is common and will invalidate everything downstream.
-
-**Deliverable:** checkpoint, manifest, predicted-vs-actual `B_token`.
-
-### Phase 5 — Verify
-
-Run [Module 12's](Lecture-12.md) protocol. Locked clocks, interleaved, paired, ≥8,000 draft tokens per configuration, full reporting standard.
-
-**Deliverable:** the ablation table, and the bug check (`measured ≫ predicted` ⇒ bug).
-
----
-
-## 4. The required ablation grid
-
-Not a search — a **grid designed so each row isolates one claim from the course**:
-
-| # | Configuration | Isolates | Predicted from |
+| Stage | Input | Output | Failure to test |
 |---|---|---|---|
-| 0 | shipped baseline | reference | — |
-| 1 | + `lm_head` → FP8 | traffic ≠ size | [Mod 04](Lecture-04.md) |
-| 2 | + `lm_head` → NVFP4 | format ladder | [Mod 02](Lecture-02.md) |
-| 3 | Q, K → FP8 (from NVFP4) | acceptance recovery | [Mod 07](Lecture-07.md), [10](Lecture-10.md) |
-| 4 | embeddings → FP8 | **must be ~0 tok/s** (control) | [Mod 01](Lecture-01.md) |
-| 5 | vision tower evicted | **must be ~0 tok/s, −0.86 GiB** (control) | [Mod 01](Lecture-01.md) |
-| 6 | solver allocation | the thesis | [Mod 11](Lecture-11.md) |
-| 7 | row 6 at 262 K context | long-context inversion | [Mod 09](Lecture-09.md) |
-| 8 | `K` sweep at fixed quantization | `K*` re-tuning | [Mod 10](Lecture-10.md) |
+| Inventory | model/config/shard metadata | exact payloads, assumed traffic, state budget | missing scale tensor, wrong architecture |
+| Calibration | training/calibration IDs and supported policies | candidate scales and reconstruction/output error | zero block, tail padding, held-out leakage |
+| Selection | development results and constraints | feasible allocation with reason | no feasible policy, incompatible kernel |
+| Build | chosen policy | serialized artifact and manifest | scales/layout/reload mismatch |
+| Evaluate | immutable test and shifted inputs | task, fidelity, latency/memory report | changed threshold, stale cache, biased sampling |
 
-**Rows 4 and 5 are the most important rows in the grid.** They are negative controls: the course *predicts* they produce zero throughput change. If they do not, your measurement apparatus is broken and every other row is suspect. A grid without controls is a demo.
+Do not silently change the model or deployment objective between stages. A packed
+CPU reference artifact is its own format, not a TensorRT/SGLang checkpoint.
 
-For each row report: `B_token`, tok/s, predicted tok/s, τ, α, mean KL, p99 KL, top-1 agreement, and the **acceptance tax** from [Module 10](Lecture-10.md).
+## 3. Required CPU ablations
 
----
+1. Untouched trained FP32 reference.
+2. Absmax FP4 reference weights.
+3. Weight-MSE-selected clipping.
+4. Calibration-output-MSE-selected clipping.
+5. A deliberately mismatched input shift, applied after policy selection.
 
-## 5. Success criteria
+Keep the original reference and threshold fixed. Report payload including scales,
+row padding and retained biases/normalization, then task metrics and output error.
+Choose on development/calibration data; the held-out test cannot select a winner.
+A smaller payload with worse missed-stop cost may fail the declared gate.
 
-**Minimum (the course worked):**
+Add the exact categorical speculative-sampling proof from Module 08. State why
+its correctness says nothing about the robot task, and why drafter acceptance
+says nothing by itself about an LLM target's correctness. These are separate
+contracts connected by disciplined evaluation.
 
-- [ ] Ledger reproduces resident bytes to within 1 % and predicts non-speculative tok/s within 10 %.
-- [ ] Negative controls (rows 4, 5) show no throughput change — proving the apparatus.
-- [ ] Solver allocation achieves **≤ the shipped `B_token` at strictly lower KL** ([Module 11](Lecture-11.md)'s result, reproduced on your hardware).
-- [ ] Every claim meets the [Module 12](Lecture-12.md) reporting standard.
+## 4. Optional device extension
 
-**Target (the artifact is portfolio-grade):**
+Confirm support for the model architecture, scale scheme, activation path,
+accumulator, GPU and compiler. Record measured memory rather than assuming the
+serialized artifact equals GPU residency. Begin with a feasible short context;
+calculate long-context state before trying it. For speculation, keep target and
+drafter ledgers separate and measure complete cycle times across K.
 
-- [ ] A paired improvement against the reproduced baseline, or a supported negative result, within quality limits declared before optimization.
-- [ ] The `B_token(ε)` curve with the knee identified and a defended `ε`.
-- [ ] Long-context row at 262 K, with the feasibility analysis from [Module 09](Lecture-09.md).
-- [ ] At least one **documented negative result** with its mechanism explained.
+Choose a bounded ablation grid driven by the baseline. The current case already
+quantizes `lm_head` and removes MTP, so “quantize the BF16 output head” and “remove
+MTP” are historical changes, not new optimizations of today's pinned artifact.
+Embedding/vision changes are useful controls for direct traffic but can affect
+capacity and caching; a nonzero effect does not automatically invalidate the rig.
 
-**Stretch (a real contribution):**
+## 5. Success and handoff
 
-- [ ] A combined optimization with separately measured drafting, verification, and accepted-token costs.
-- [ ] The effective-cost discrepancy explained by trace evidence, including assumptions that failed.
-- [ ] Q/K sensitivity-vs-context curve, testing [Module 07 §2](Lecture-07.md)'s RoPE prediction.
-- [ ] TurboQuant runs end-to-end on a **second, different model** with no code changes.
+The minimum submission contains runnable commands, source/dependency hashes,
+calibration and evaluation IDs, a payload ledger, raw results and a one-page
+interpretation. It passes when:
 
-That last one is what separates a case study from a tool.
+- Exact-format, zero/tail/rounding and reload checks pass.
+- Candidate selection does not read held-out labels or shifted test outcomes.
+- The selected policy is evaluated against explicit task/fidelity constraints.
+- Storage estimates, timing observations and unexecuted device claims are labeled.
+- At least one adverse case or unsupported assumption is explained.
 
----
+There is no required 224/280 token/s target or universal 10% prediction accuracy.
+If every quantizer fails the quality budget, retain the reference and document
+why. For a stronger project, transfer the evaluator to a second architecture,
+change the constraints and explain how the chosen policy changes.
 
-## 6. Deliverables
-
-```text
-   turboquant/
-   ├── README.md                 the finding, up front, in three sentences
-   ├── ledger.py                 [1]  Module 04
-   ├── probe.py                  [2]  Modules 06, 07, 08
-   ├── solver.py                 [3]  Module 11
-   ├── builder.py                [4]  Module 05
-   ├── verify.py                 [5]  Modules 08, 12
-   ├── configs/                  one YAML per ablation row (Module 12 §6 standard)
-   ├── results/
-   │   ├── ledger.md             traffic classes, B_token, gap
-   │   ├── sensitivity.md        per-group ΔKL/Δτ, additivity check
-   │   ├── ablation.csv          the grid, raw
-   │   ├── b_token_vs_eps.png    the ε curve with the knee marked
-   │   └── traces/               Nsight reports for the top kernels
-   └── REPORT.md                 hypotheses, predictions, measurements, negatives
-```
-
-`REPORT.md` is the artifact that gets read. Structure it as:
-
-```text
-   1. The claim, in one sentence, with the number.
-   2. The ledger: where the bytes are and where the headroom was.
-   3. The allocation and why the solver chose it (the GB/nat trace).
-   4. The grid, including the negative controls.
-   5. What did NOT work, and the mechanism.
-   6. The next hypothesis.
-```
-
----
-
-## 7. On negative results
-
-The most valuable finding in the case study is a negative one:
-
-```text
-   Quantizing Q/K:  +1.9 % throughput,  −8.8 % acceptance,
-                    +0.082 TV distance,  84 % acceptance tax.
-                    ⟹ DO NOT SHIP.
-```
-
-Nobody publishes that, which is exactly why so many people rediscover it the expensive way. Your report should contain at least one such result stated as plainly.
-
-The same goes for the two headroom findings this course produced by arithmetic alone — **the 72 %-vs-92 % bandwidth gap** and **the 3.2×-too-expensive draft step**. Neither is a quantization result. Both are worth more throughput than any quantization decision available on this model.
-
-> That is the real lesson of the course: **the byte ledger is a better instrument than the intuition it replaces**, and it earns its keep most often by telling you *not* to quantize.
-
----
-
-## 8. Exit criteria
-
-You have completed this course when you can take an unfamiliar checkpoint on unfamiliar silicon and, in a single afternoon:
-
-1. Produce its byte ledger and predict the batch-1 decode ceiling within 10 %.
-2. Say whether it is bandwidth-bound, and refuse to quantize if it is not.
-3. Name the three highest-value tensors, citing traffic and sensitivity separately.
-4. Name the formats with a native path on that silicon, and the break-even threshold for anything else.
-5. State the behavior budget in KL and acceptance terms **before** running the experiment.
-6. Solve the allocation, build it, and verify the result against the prediction.
-7. Detect the case where your speedup came from a bug.
-
-If you can recite quantization algorithms but cannot say which bytes a token reads, you have vocabulary. **The point of this course is the allocation decision — and the discipline to prove it.**
-
----
-
-## Current as of
-
-* **Timeless:** the five-stage architecture, the build order, the ablation-with-controls design, the exit criteria.
-* **Case-study assumptions:** reported 155.75 tok/s at τ=2.886 and the simplified cost-model calculation are inputs to hypotheses. They are not independently reproduced course measurements, and isolated estimated speedups must not be multiplied into a promised target.
-* **Related:** [AI Inference Engineer 2026 — Part 4](../AI%20Inference%20Engineer%202026/Part%204%20-%20Optimizing%20a%20Real%20Engine/README.md) runs the same discipline over ~96 PRs on an 8× H200 engine, and is the best companion read for this capstone.
-
----
-
-*Course complete. [← Back to the course index](README.md) · [Phase 5 — ML Systems Engineering Guide](../Guide.md)*
+**Final question:** which result would persuade you to reverse your decision?
+A useful answer names a new workload slice, a runtime/kernel measurement, or a
+failed correctness assumption that the current evidence does not cover.

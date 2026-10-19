@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   portable-checks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,13 +19,23 @@ jobs:
           python-version: '3.12'
       - name: Check source Markdown links
         run: python3 scripts/check_links.py
-      - name: Test link checker
-        run: python3 -m unittest discover -s scripts -p 'test_*.py'
-      - name: Test inference lab arithmetic and validation
-        run: python3 -m unittest discover -s 'Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/labs' -p 'test_*.py'
-      - name: Test robotics contracts
-        run: python3 -m unittest discover -s 'Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/labs' -p 'test_*.py'
-      - name: Test VLA grounding, data contracts, timing, and evaluation
-        run: python3 -m unittest discover -s 'Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/labs' -p 'test_*.py'
-      - name: Test VLA accelerator traffic, scheduling, and evaluation
-        run: python3 -m unittest discover -s 'Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/labs' -p 'test_*.py'
+      - name: Install native lab dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes g++ clang lld qemu-user cmake iverilog libtbb-dev ocl-icd-opencl-dev pocl-opencl-icd ffmpeg python3-gi gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 gstreamer1.0-plugins-base device-tree-compiler nodejs
+      - name: Test all portable lab suites
+        # Ubuntu's Python matches the system PyGObject/GStreamer bindings.
+        # Optional frameworks remain explicit skips in the saved result record.
+        run: POCL_MAX_PTHREAD_COUNT=2 /usr/bin/python3 scripts/run_portable_checks.py --json /tmp/portable-checks.json
+
+      - name: Retain executed and skipped check results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: curriculum-cpu-checks
+          path: /tmp/portable-checks.json
+          if-no-files-found: warn
+      - name: Install documentation dependencies
+        run: python3 -m pip install -r requirements-docs.txt
+      - name: Build documentation strictly
+        run: STRICT=1 bash scripts/build_docs_local.sh

@@ -1,12 +1,15 @@
 # Part 4 · Lecture 05 — Fusion and the Activation-Quantization Discipline
 
+**Practice:** [CPU source lab](CPU-Source-Lab.md). Historical GPU results are source reports; use the **Answers** after attempting the self-check.
+
+
 ## Overview
 
-The single largest step in the case study's history was **3.54 → 9.94 tok/s** — a 2.77× improvement, bit-identical, from **five independent defects in one kernel**. Not a new algorithm. Five ways the same GEMV was leaving the machine on the table.
+One early step was **3.54 → 9.94 tok/s** — a **2.81×** improvement from these printed endpoints, bit-identical, from **five independent defects in one kernel**. Not a new algorithm. Five ways the same GEMV was leaving the machine on the table.
 
 This lecture is about that kernel and its neighbours: the quantized projection path that every non-expert matrix multiply in the model goes through, and the discipline of **activation quantization** — deciding once, correctly, where a vector gets encoded to int8 and who is allowed to read it.
 
-It is also where a specific and repeated observation lands. Three separate PRs found a kernel achieving **about 7 GB/s on a 4.8 TB/s part** and concluded, correctly:
+It is also where a specific and repeated observation lands. Three separate PRs found a kernel achieving **about 7 GB/s on a 4.8 TB/s part** and attributed the cost to fixed overhead. The historical wording is:
 
 > *That is not work, it is launch overhead.*
 
@@ -61,7 +64,7 @@ The quantized-activation path was computing its int8 dot product with **32 scala
 
 `__dp4a` performs a 4-element int8 dot-product-accumulate in one instruction. The entire reason to encode activations to int8 is to reach it. A pipeline that quantizes and then does scalar integer multiply-adds has paid the quantization cost and collected none of the benefit.
 
-> **Check that your fast path reaches the instruction it exists for.** Quantization is a means to `dp4a` / IMMA / tensor-core paths. If the profile shows scalar IMAD after a quantize step, the quantization is pure overhead.
+> **Check that your fast path reaches the instruction it exists for.** Quantization is a means to `dp4a` / IMMA / tensor-core paths. Scalar IMAD can still benefit from smaller storage or other effects, but it misses the intended packed dot-product throughput. Inspect generated instructions and measure the entire conversion-plus-consumer path.
 
 ### 2.3 The activation is bigger than the weights
 
@@ -70,10 +73,11 @@ The counterintuitive one, and the reason multi-row exists:
 ```text
    projection with N = 12288 output rows, K = 7168:
 
-   weight traffic       ~94 MB
-   ACTIVATION traffic   ~344 MB     ← re-read once per output row
+   weight load requests       ~94 MB
+   ACTIVATION load requests   ~352 MB decimal (~336 MiB)     ← re-read once per output row
 
-   the activation is 3.7x the weights.
+   the nominal activation load volume is about 3.7x the weights.
+   These are requested bytes, not measured HBM traffic; caches can absorb reuse.
 ```
 
 At batch 1 with one block per output row, each block loads the whole activation. The fix puts **4 rows in a block** and reuses each activation load across them — cutting activation traffic ~4×.
@@ -109,14 +113,14 @@ The safety argument is worth noting because it is a *data-flow* argument, not a 
 
 | context | before | after | speedup |
 |---|--:|--:|--:|
-| 128 | 3.54 | 8.89 | 2.48× |
-| 4k | 3.13 | 8.03 | 2.25× |
-| 32k | 3.57 | 9.77 | 2.72× |
-| **128k** | **3.54** | **9.94** | **2.77×** |
+| 128 | 3.54 | 8.89 | 2.51× |
+| 4k | 3.13 | 8.03 | 2.57× |
+| 32k | 3.57 | 9.77 | 2.74× |
+| **128k** | **3.54** | **9.94** | **2.81×** |
 
 > *"The scored row is the strongest one, which is the point: this is not a short-context win that evaporates where the model is actually used."*
 
-Sweeping context and showing the win *grows* with depth is what distinguishes an optimization from a benchmark artifact. Compare [Lecture 03 §5](Lecture-03.md): a change that helps at 4k and vanishes at 128k has found something about your test, not your engine.
+Sweeping context and showing the win *grows* with depth is what distinguishes an optimization from a benchmark artifact. Compare [Lecture 03 §5](Lecture-03.md): a change that helps at 4k and vanishes at 128k is workload-specific; it can still be valuable when 4k is the deployment workload.
 
 ---
 
@@ -144,7 +148,7 @@ Now the recurring finding, in three PRs, with three sets of numbers.
 
 Two independent measurements agreeing that ~8% of all GPU time went to a kernel running at **0.15% of peak bandwidth.** Quantizing a 28 KB vector is genuinely trivial work — which is exactly why it was invisible. Nobody profiles the cheap op.
 
-> **The diagnostic: divide bytes moved by time taken, and compare to peak.** A kernel achieving a tiny fraction of peak bandwidth on a tiny payload is not doing memory work — it is *being launched*. Its cost is proportional to how many times you call it, and the fix is to call it fewer times, not to make it faster.
+> **The diagnostic: divide bytes moved by time taken, and compare to peak.** A tiny payload at low achieved bandwidth suggests fixed overhead, insufficient parallelism, instruction cost, or memory latency. Kernel duration alone does not measure host launch overhead: inspect the timeline and compare a graph/fused version. Its cost is proportional to how many times you call it, and the fix is to call it fewer times, not to make it faster.
 
 This is [Lecture 03](Lecture-03.md)'s launch-bound diagnosis localized to a single kernel, and it generalizes: **any small helper kernel invoked per-consumer rather than per-value is a launch-count bug wearing a bandwidth costume.**
 
@@ -196,7 +200,7 @@ The successful version changes the *architecture*, not the guard. Three properti
 
 | Property | What it prevents |
 |---|---|
-| **The buffer is a parameter.** `k3_quantize_act_f32` writes it, `k3_proj_q8act_f32` reads it, and the window between them is straight-line code on one stream. | *"There is no invariant for a later change to violate silently."* |
+| **The buffer is a parameter.** `k3_quantize_act_f32` writes it, `k3_proj_q8act_f32` reads it, and the window between them is straight-line code on one stream. | *"The producer/consumer window and stream ordering are visible; later edits must preserve them."* |
 | **`act_q8` is a separate allocation from `proj_q8`.** Every un-hoisted projection still quantizes into `proj_q8`. | Sharing one buffer would let an interleaved call overwrite the hoisted bytes — *"the exact aliasing that broke the cached version."* |
 | **`proj_h` falls back** to the full path whenever the hoist did not apply. | **"A missed hoist is slow, never wrong."** |
 
@@ -206,7 +210,7 @@ And one more, which prevents the two paths from diverging over time: `k3_proj_gg
 
 > *Fusing needs no promise from anyone. The activation cannot go stale between its producer and its consumer **because they are the same launch.** Correctness stops depending on a claim about the surrounding code, which is what made the reuse version unsafe to keep.*
 
-> **The design rule.** When two pieces of code must agree about the contents of shared memory, prefer — in this order: (1) **make them the same launch** so no agreement is needed; (2) **pass the buffer explicitly** so the agreement is visible in the signature; (3) *never* **cache with a guard**, because the guard is a proxy for the invariant and proxies drift. Design so that a failure of the optimization is a *slowdown*, not a wrong answer.
+> **The design rule.** When two pieces of code must agree about the contents of shared memory, prefer — in this order: (1) **make them the same launch** so no agreement is needed; (2) **pass the buffer explicitly** so the agreement is visible in the signature; (3) cache only with a complete validity contract, such as immutable inputs or a content/version identifier, device identity, and explicit lifetime. Pointer identity alone is inadequate. Design so that a failure of the optimization is a *slowdown*, not a wrong answer.
 
 That last clause deserves emphasis. "A missed hoist is slow, never wrong" is a property you *engineer*, by making the fast path an opt-in refinement of a correct path rather than a replacement for it. It is the same shape as [Lecture 04](Lecture-04.md)'s conditional `float4` load falling back to an exact scalar path.
 
@@ -227,7 +231,7 @@ The reasoning:
 ```text
    proj_f32_kernel runs 11,592 times
                  = 161 per token per rank
-                 = 69 × 2  +  24 × 1        ← EXACTLY
+                 = 69 × 2  +  24 × 1        ← source narrative; this equals 162, not 161
 
    ⇒ ssm_f_a and ssm_beta are f32-WEIGHTED and were never
      quantized at all. So on all 69 KDA layers the hoist
@@ -240,11 +244,13 @@ The reasoning:
    +1.8%  →  +4.1%
 ```
 
+The source's printed arithmetic is inconsistent: 69×2+24=162, while it labels the count 161; the leading dense layer may explain a different count, but that must be checked against the actual trace. Also 462−233=229. Retain the methodology but recompute from a raw trace before trusting this attribution.
+
 Two techniques here, both cheap and both underused:
 
 **Predict a countable quantity, not just a speedup.** "This should remove 462 launches per token per rank" is *falsifiable* in a way "this should be faster" is not. When the count came in at 233, there was a specific residual — 229 — to explain.
 
-**Factor the residual against the model's structure.** 161 per token per rank decomposing as exactly `69 × 2 + 24 × 1` is not a coincidence; 69 and 24 are the KDA and MLA layer counts. That factorization *is* the diagnosis: two calls per KDA layer, one per MLA layer, from a path that was never quantized.
+**Compare counts against the model's structure.** The 69 KDA and 24 MLA layers suggest candidate multiplicities, but the printed 161 does not match 69×2+24. Check per-layer traces, the leading dense layer, and warmup/measurement token counts before attributing the residual.
 
 > **Steal this.** Instrument a counter, not just a clock. Then check the counter against the arithmetic of your model — layers, heads, experts, ranks. A launch count that does not factor cleanly into your architecture's dimensions is telling you about a path you have not accounted for. This is the technique that converts "it's a bit faster than I hoped" from a shrug into a bug report.
 
@@ -378,10 +384,22 @@ Pass criterion: one quantized projection change, measured single-binary A/B, wit
 3. You process 4 output rows per block to reuse the activation load. Give the benefit, the cost, and the dispatch condition — with the arithmetic for a projection at N=96 on a 132-SM GPU.
 4. A kernel runs 128 threads where only 4 have work. Why does no test fail, and why has this survived a code review?
 5. A previous engineer cached a quantized activation keyed on its pointer, guarded by "was the scratch last written from this pointer?" It shipped `top1 0.0` at a faster ms/token. Explain the bug and give two architectures that make it impossible.
-6. You predict −462 launches per token per rank and measure −233. The residual factors as `69 × 2 + 24 × 1`. What does that tell you, and how did you know to try that factorization?
+6. You predict −462 launches per token per rank and measure −233. A source labels 161 F32 projections as `69 × 2 + 24 × 1`. Check both that factorization and the residual 462 − 233. What evidence would resolve the discrepancy?
 7. Enabling a new quantized path silently disabled a fusion on 69 layers. Write the `grep` you run after enabling any feature flag, and the comment you leave when writing such a guard.
 8. You fuse four projections into one kernel and it is *slower*. Name the first thing you check and the two numbers you report.
 9. Your bit-identity claim covers load width, launch shape, and block grouping. List three things you must *not* have changed, and say which one is most likely to have moved the bits.
+
+## Answers
+
+1. A 34-byte stride alternates modulo-four alignment, so an arbitrary four-byte dereference is not generally legal. Reconstruct packed words from guaranteed aligned smaller accesses or explicit bytes; inspect compiler output, since alignment alone does not force one particular instruction sequence.
+2. 28,000/4.19 μs ≈ 6.68 GB/s, or 0.139% of 4.8 TB/s (about 0.143% if 28 KiB was intended). It suggests fixed cost or poor parallelism; a timeline is needed to attribute host launch overhead. Test fusion/hoisting and total time.
+3. Up to fourfold activation reuse, but fourfold fewer blocks. N=96 becomes 24 blocks on 132 SMs; use a measured dispatch threshold and account for cache reuse.
+4. Correct zero contributions can hide wasted work. Correctness tests do not establish efficient resource use; record launch shape and useful work per thread.
+5. A reused address can contain new values. Fuse producer/consumers where legal or pass an explicitly scoped/versioned buffer with stream ordering; preserve lifetimes and aliasing rules.
+6. 462−233=229, whereas 69×2+24=162, not 161. The source's printed projection-count narrative is internally inconsistent; inspect raw per-layer counts rather than treating the factorization as an identity.
+7. Search all occurrences of the feature flag with `rg`, then inspect dispatch guards and fallback paths. Document compatibility and test every legal flag combination that changes reachability.
+8. Inspect duplicated serial prologues, grid size, registers/shared memory, and lost occupancy. Report complete-operation time and resource/launch counts, not only the fused kernel time.
+9. Preserve reduction association, intermediate rounding/FMA decisions, and input/output representation. Eliminating a store can change contraction; byte-compare representative finite and exceptional-value fixtures when those are supported.
 
 ---
 

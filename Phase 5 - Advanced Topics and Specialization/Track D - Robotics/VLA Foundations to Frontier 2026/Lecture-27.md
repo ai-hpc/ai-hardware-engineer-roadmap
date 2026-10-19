@@ -70,13 +70,19 @@ if not schema.valid(proposal):
     outcome = "invalid_proposal"
 elif proposal.episode_id != current_episode:
     outcome = "stale_episode"
+elif not proposal.observation_time <= clock.now() < proposal.expires_at:
+    outcome = "future_or_expired_proposal"
 elif not preconditions_hold(proposal, current_scene):
     outcome = "reobserve_or_replan"
 else:
-    result = skills.execute(proposal)
+    # The executor checks epoch, deadline and preconditions again at dispatch.
+    # A queue wait or scene reset after this check must invalidate the proposal.
+    result = skills.execute_with_dispatch_validation(proposal)
     outcome = independent_completion_check(result, current_scene)
 task_memory.record(proposal, outcome)
 ```
+
+All timestamp comparisons above assume a common monotonic clock mapping. Define exact-boundary behavior (`now == expires_at` is expired here) and invalidate an in-flight skill at reset through the controller's supported cancellation path. The [existing offline dispatcher](Dataset-and-Execution-Lab.md) provides runnable reset, late-result, and duplicate-result cases; it is not an implementation of this planner.
 
 For a real API experiment, save the exact public model identifier and dated response metadata. Keep request latency separate from local controller latency. Avoid claiming deterministic reproducibility when a provider can update a service behind a moving identifier.
 

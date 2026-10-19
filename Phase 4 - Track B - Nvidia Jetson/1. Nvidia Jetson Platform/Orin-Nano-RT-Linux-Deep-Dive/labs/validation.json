@@ -1,0 +1,21 @@
+{
+  "reviewed_utc": "2026-10-18T20:42:27.369492+00:00",
+  "host": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "architecture": "x86_64",
+  "compiler": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "command": "cc -std=c11 -O2 -Wall -Wextra -Werror periodic.c -o /tmp/course-periodic",
+  "run_arguments": [
+    "absolute|relative",
+    "100",
+    "2000",
+    "200"
+  ],
+  "source_sha256": "d2737c0e16094e0f906025adc64aa798b15d99be7b8011c4c33ed5328104d62b",
+  "tests_passed": 6,
+  "limitations": [
+    "ordinary shared Linux host",
+    "no scheduler or kernel settings changed",
+    "not Jetson or PREEMPT_RT benchmark",
+    "finite trace does not establish WCET"
+  ]
+}

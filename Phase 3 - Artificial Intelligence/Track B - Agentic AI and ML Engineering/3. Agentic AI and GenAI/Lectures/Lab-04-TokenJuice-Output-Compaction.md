@@ -349,7 +349,7 @@ tokenjuice ls
 Inspect one:
 
 ```bash
-tokenjuice cat <artifact-id>
+tokenjuice cat "${TOKENJUICE_ARTIFACT_ID:?Set TOKENJUICE_ARTIFACT_ID to an existing authorized identifier}"
 ```
 
 Why this matters:

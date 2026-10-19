@@ -1,5 +1,7 @@
 # Course-by-course review — October 14, 2026
 
+**Historical review.** See the [October 18–19 update](../Curriculum-Review.md) for the later teaching, technical and execution work.
+
 This pass reviewed **all 158 course entry pages** in the starting inventory of **598 source Markdown pages**, then corrected selected lectures and examples in depth. Entry pages include phase/track hubs and lab indexes; 158 is not a count of independent lecture series. Every entry now has a concrete connection to the goal of building a VLA-focused physical-AI system and its compiler, accelerator, Linux, and wireless stack.
 
 The [Physical AI Design Studio](../Physical-AI-Design-Studio.md) is the resulting learning path. Its nine gates connect courses through shared contracts, reference vectors, experiments, and system evidence.
@@ -45,4 +47,4 @@ Portable validation covers Markdown targets, documentation build/rendering, exis
 
 **Results:** all 158 inventoried entries changed; local links resolve; the strict MkDocs build passes; all **35 existing portable tests** pass. Additional executed checks cover scalar autograd and finite differences, storage/timing arithmetic, Gemma metadata and NumPy exercises, online-attention numerics, and the repaired OS demo. Browser checks confirm the studio at desktop/tablet/mobile widths, all eight PNG downloads, loaded inline SVGs, and no failed local assets or JavaScript exceptions on the inspected pages. These checks validate the edited teaching surface, not the unexecuted hardware claims above.
 
-See [the prior review](../Curriculum-Review.md) for the October 13 expansion and its validation history. This page records the separate October 14 course-by-course pass.
+See [the prior review](../Curriculum-Review-2026-10-13-and-14.md) for the October 13 expansion and its validation history. This page records the separate October 14 course-by-course pass.

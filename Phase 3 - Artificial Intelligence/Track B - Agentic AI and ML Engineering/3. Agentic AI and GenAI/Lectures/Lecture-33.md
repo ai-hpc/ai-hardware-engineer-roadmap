@@ -109,7 +109,7 @@ It is **not automatically a hard sandbox**.
 That means:
 
 - relative paths may stay inside the workspace
-- absolute paths may still escape unless sandboxing is enabled
+- absolute paths, `..` traversal and symlink resolution can escape unless the actual filesystem/executor boundary prevents it
 
 This is exactly the kind of nuance students miss when they think:
 
@@ -202,7 +202,7 @@ agent B
   -> sessions B
 ```
 
-Now the system is actually structured.
+This prevents accidental state collisions, but does not establish adversarial tenant isolation. Separate trust boundaries need separate credentials and enforced OS/process/filesystem boundaries. A shared administrator can generally alter both agents. Current `agents.entries` configuration and ownership behavior are documented in the [pinned multi-agent source](https://github.com/openclaw/openclaw/blob/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/concepts/multi-agent.md).
 
 ---
 
@@ -308,16 +308,10 @@ Here is a simple OpenClaw-style pattern:
 ```json5
 {
   agents: {
-    list: [
-      {
-        id: "coding",
-        workspace: "~/.openclaw/workspace-coding"
-      },
-      {
-        id: "family",
-        workspace: "~/.openclaw/workspace-family"
-      }
-    ]
+    entries: {
+      coding: { workspace: "~/.openclaw/workspace-coding" },
+      family: { workspace: "~/.openclaw/workspace-family" }
+    }
   }
 }
 ```

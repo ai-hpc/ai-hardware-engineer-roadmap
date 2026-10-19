@@ -1,0 +1,130 @@
+[
+  {
+    "id": "simple",
+    "category": "simple",
+    "turns": [
+      {
+        "prompt": "Add 2 and 3.",
+        "calls": [
+          {
+            "name": "add",
+            "arguments": {
+              "a": 2,
+              "b": 3
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "selection",
+    "category": "multiple",
+    "turns": [
+      {
+        "prompt": "Set the office light to 60 percent.",
+        "calls": [
+          {
+            "name": "set_level",
+            "arguments": {
+              "room": "office",
+              "level": 60
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "parallel",
+    "category": "parallel",
+    "turns": [
+      {
+        "prompt": "Independently add 1+2 and 3+4.",
+        "calls": [
+          {
+            "name": "add",
+            "arguments": {
+              "a": 1,
+              "b": 2
+            }
+          },
+          {
+            "name": "add",
+            "arguments": {
+              "a": 3,
+              "b": 4
+            }
+          }
+        ],
+        "parallel": true
+      }
+    ]
+  },
+  {
+    "id": "mixed",
+    "category": "parallel_multiple",
+    "turns": [
+      {
+        "prompt": "Set the kitchen to 80 percent and independently add 8+9.",
+        "calls": [
+          {
+            "name": "set_level",
+            "arguments": {
+              "room": "kitchen",
+              "level": 80
+            }
+          },
+          {
+            "name": "add",
+            "arguments": {
+              "a": 8,
+              "b": 9
+            }
+          }
+        ],
+        "parallel": true
+      }
+    ]
+  },
+  {
+    "id": "none",
+    "category": "irrelevance",
+    "turns": [
+      {
+        "prompt": "What is a rainbow? No tool is needed.",
+        "calls": []
+      }
+    ]
+  },
+  {
+    "id": "turns",
+    "category": "multi_turn",
+    "turns": [
+      {
+        "prompt": "Set office to 30 percent.",
+        "calls": [
+          {
+            "name": "set_level",
+            "arguments": {
+              "room": "office",
+              "level": 30
+            }
+          }
+        ]
+      },
+      {
+        "prompt": "Now double that level.",
+        "calls": [
+          {
+            "name": "set_level",
+            "arguments": {
+              "room": "office",
+              "level": 60
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

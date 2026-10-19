@@ -89,7 +89,7 @@ This is the KDA recurrence in the order an implementation actually applies it. N
    the two matrices do not commute except in special cases.
 ```
 
-Both expressions look almost identical on the page, and a re-implementation that swaps their order will compile, run, and produce a state matrix that is subtly wrong from the very first token with nonzero decay and a nonzero correction — an error that compounds silently across every subsequent step, because each `S_t` feeds the next. This is precisely why [Module 04](Lecture-04.md) requires validating a chunked implementation against **both output and final state**, not output alone: an order-of-operations bug can leave short-sequence outputs looking nearly correct while the carried state has already diverged.
+Both expressions look almost identical on the page, and a re-implementation that swaps their order will compile, run, and produce a state matrix that is subtly wrong as soon as the carried state, nonuniform decay, and key direction expose the noncommuting terms — an error that compounds silently across every subsequent step, because each `S_t` feeds the next. This is precisely why [Module 04](Lecture-04.md) requires validating a chunked implementation against **both output and final state**, not output alone: an order-of-operations bug can leave short-sequence outputs looking nearly correct while the carried state has already diverged.
 
 ---
 
@@ -135,7 +135,7 @@ Take decay disabled (`D_t = I`, so `S̃_t = S_{t-1}`), a `2×2` state, and:
    │           [ 0    4  ]                                        │
    │                                                                │
    │   The association touched by k_t moved HALFWAY toward the     │
-   │   requested value (4 → nearly the corrected direction, with    │
+   │   requested value ([2,0] → [4,0.5] toward [6,1]), with    │
    │   an off-diagonal term of 0.5 appearing where k_t and e_t      │
    │   interact). The unrelated row (second row) is untouched —     │
    │   k_t = [1, 0] never reads or writes it.                       │
@@ -181,6 +181,8 @@ This is **Stage 2 and the first milestone of the [capstone ladder](Lecture-12.md
 ---
 
 ## Current as of
+
+**Reviewed October 18, 2026.** [Pinned config, upstream code and CPU evidence](CPU-Hybrid-State-Lab.md#sources-and-execution-boundary) identify what was checked. Hardware capacity and throughput remain deployment-specific.
 
 * **Timeless:** the five-step update, its closed-form expansion, the non-commutativity of the decay and correction operators, and the delta-rule motivation (write the error, not the raw value) — this is the KDA recurrence from the underlying delta-rule/KDA formulation, expressed here in an implementation-friendly operation order.
 * **Checkpoint-specific:** 64 heads, head dimension 128 (so a `128×128` state per head) are properties of this checkpoint's configuration.

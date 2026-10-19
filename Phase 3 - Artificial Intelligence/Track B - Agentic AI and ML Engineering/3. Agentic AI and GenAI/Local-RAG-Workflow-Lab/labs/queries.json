@@ -1,0 +1,85 @@
+{
+  "development": [
+    {
+      "id": "dev1",
+      "question": "battery return threshold",
+      "relevant": [
+        "battery-v2"
+      ]
+    },
+    {
+      "id": "dev2",
+      "question": "camera checkerboard squares",
+      "relevant": [
+        "camera"
+      ]
+    },
+    {
+      "id": "dev3",
+      "question": "charging temperature",
+      "relevant": [
+        "charging"
+      ]
+    },
+    {
+      "id": "dev4",
+      "question": "teleport fuel capacity",
+      "relevant": []
+    }
+  ],
+  "test": [
+    {
+      "id": "test1",
+      "question": "battery charge dock",
+      "relevant": [
+        "battery-v2"
+      ]
+    },
+    {
+      "id": "test2",
+      "question": "acquisition callback time",
+      "relevant": [
+        "time"
+      ]
+    },
+    {
+      "id": "test3",
+      "question": "microphone four channels",
+      "relevant": [
+        "audio"
+      ]
+    },
+    {
+      "id": "test4",
+      "question": "warehouse inspection Cedar",
+      "relevant": [
+        "warehouse"
+      ]
+    },
+    {
+      "id": "test5",
+      "question": "duplicate sequence session identifier",
+      "relevant": [
+        "network"
+      ]
+    },
+    {
+      "id": "test6",
+      "question": "VIOLET-ONLY diagnostic",
+      "relevant": []
+    },
+    {
+      "id": "test7",
+      "question": "underwater pressure rating",
+      "relevant": []
+    },
+    {
+      "id": "test8",
+      "question": "camera calibration microphone sample",
+      "relevant": [
+        "camera",
+        "audio"
+      ]
+    }
+  ]
+}

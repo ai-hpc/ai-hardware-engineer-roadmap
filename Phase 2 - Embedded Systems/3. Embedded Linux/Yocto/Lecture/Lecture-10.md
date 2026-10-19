@@ -1,27 +1,48 @@
-# Lecture 10 — Module 8: SDK and application workflow
+# Lecture 10 — Module 8: build applications with the matching SDK
 
-**Course:** [Yocto guide](../Guide.md) | **Phase 2 — Embedded Linux, Yocto**
+**Course:** [Yocto guide](../Guide.md) · **Previous:** [Lecture 09](Lecture-09.md) · **Next:** [Lecture 11](Lecture-11.md)
 
-**Previous:** [Lecture 09](Lecture-09.md) | **Next:** [Lecture 11 — Module 9](Lecture-11.md)
+An SDK gives an application developer the target compiler, headers, libraries, and environment needed to build outside the full image tree. Its sysroot represents the intended target interface; it does not turn a host executable into target code afterward.
 
----
+## Generate an image-specific SDK
 
-## 1. Why the SDK exists
+**Upstream-documented exercise; SDK construction not run here:**
 
-The image build proves the system fits together. The **SDK** gives application developers a cross-toolchain and sysroot-matched headers/libs **without** building the whole world in one tree.
+```bash
+bitbake robot-course-image -c populate_sdk
+ls tmp/deploy/sdk
+```
 
-## 2. Standard pattern
+Choose the generated installer corresponding to this build and record its checksum. Run that **exact filename** with `sh`, choose a dedicated installation directory, and read the printed setup instructions. Avoid a wildcard that accidentally executes several old installers. Source the exact `environment-setup-*` file installed for this SDK in a fresh terminal. [Standard SDK manual](https://docs.yoctoproject.org/5.0.20/sdk-manual/using.html).
 
-- Build `meta-toolchain` or the image-specific SDK target your docs recommend.
-- Install the SDK shell script output into a predictable path.
-- `source` the environment script and build your app with the provided `CC`, `PKG_CONFIG_PATH`, etc.
+```text
+image metadata + package versions
+          ├── target rootfs
+          └── SDK toolchain + target sysroot → application binary
+```
 
-## 3. Lab 8 — Cross-compile "hello"
+Record the image and SDK manifests together. Similar version strings alone do not prove identical ABI or package configuration.
 
-Cross-compile a trivial C program against the **SDK sysroot** and run it on the **target image**.
+## Rebuild the same small application
 
-**Done when:** you trust the SDK version string matches the image you flashed (no silent ABI skew).
+After sourcing the SDK environment, set `APP_SOURCE` to your copied `meta-robot-course/recipes-apps/observation-check/files/observation-check.c` and run:
 
----
+```bash
+APP_SOURCE="$HOME/yocto-course/meta-robot-course/recipes-apps/observation-check/files/observation-check.c"
+${CC} ${CPPFLAGS} ${CFLAGS} ${LDFLAGS} -std=c11 "$APP_SOURCE" -o observation-check-sdk
+file observation-check-sdk
+```
 
-**Previous:** [Lecture 09](Lecture-09.md) | **Next:** [Lecture 11 — Module 9](Lecture-11.md)
+The unquoted expansions for SDK compiler/flags are intentional: the trusted SDK defines a command plus arguments. Do not replace `${CC}` with a guessed cross-compiler name or add host include paths to make a missing target header disappear. This command is an **SDK exercise**; native tests used the host compiler and establish a different execution boundary.
+
+Transfer the binary through your documented QEMU/board workflow and run the same fresh, boundary, stale, and future-timestamp cases from the lab README. The default minimal image does not promise an SSH server, so do not assume `scp` works without adding/configuring one or choosing another transfer method.
+
+## A useful failure case
+
+Compile using your host `cc` in a separate output directory, inspect it with `file`, and compare with the SDK-built artifact. On an x86 host with a QEMU x86 target, architecture alone may match; different libc/loader paths or versions can still make the host binary unsuitable. On different ISAs the mismatch is more obvious. Do not execute untrusted test files or overwrite the packaged target program during this comparison.
+
+**Self-check:** if a library header exists on the host but is absent from the target sysroot, should you add `/usr/include` to the cross-build? **Answer:** no. Fix the target dependency/SDK content, then rebuild the matching SDK or application environment. Host headers can create a misleading successful compile with an invalid target ABI.
+
+**Artifact:** SDK identity, source revision, compilation command, binary metadata, transfer method, and target output. Carry any mismatch into the debugging lesson.
+
+**Previous:** [Lecture 09](Lecture-09.md) · **Next:** [Lecture 11](Lecture-11.md)

@@ -1,0 +1,21 @@
+{
+  "reviewed_utc": "2026-10-18",
+  "program": "ms.tune_tir(affine_tail, target=tvm.target.Target({\"kind\":\"llvm\",\"num-cores\":1}), work_dir=temporary_directory, max_trials_global=4, num_trials_per_iter=4, database=\"memory\", cost_model=\"random\", num_tuning_cores=1, builder=ms.builder.LocalBuilder(max_workers=1), seed=7)",
+  "tvm": "0.27.0.post1",
+  "ffi": "0.1.14.post0",
+  "cloudpickle": "3.1.2",
+  "psutil": "7.2.2",
+  "status": "Completed without a usable tuned schedule",
+  "observed": [
+    "One candidate sent to local builder",
+    "One build error; zero valid candidates sent to runner",
+    "Database length reported 1, but compile_tir queried schedule was None",
+    "No valid timing record or tuning speedup obtained"
+  ],
+  "earlier_probe": {
+    "ffi": "0.1.15",
+    "database": "json",
+    "status": "Process exit 139, diagnostic in tvm::ffi::ToJSONGraph"
+  },
+  "interpretation": "Environment-specific unsuccessful probes, not a universal assertion that MetaSchedule is broken. Compilation/export tests use the pinned requirement set and pass. No tuning success is claimed."
+}

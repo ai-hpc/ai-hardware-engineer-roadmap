@@ -20,7 +20,7 @@
 
 ## Why this is advanced
 
-Modules 1–3 teach you to understand and work with a camera-based, production-deployed ADAS (openpilot). This module goes beyond: multi-sensor perception, BEV architectures, trajectory prediction, HD maps, and simulation — the research and engineering frontier for L3+ autonomy.
+Modules 1–3 establish a geometric/replay baseline, source ownership in openpilot, and checked CPU inference. This module adds multi-sensor perception, BEV representations, trajectory prediction and maps. The named research systems are study examples; using one does not establish an automation level or make a system ready for deployment.
 
 ---
 
@@ -72,7 +72,7 @@ Modules 1–3 teach you to understand and work with a camera-based, production-d
 
 * **3D occupancy prediction:**
     * Voxel-based occupancy (Occ3D, SurroundOcc) as alternative to explicit object detection.
-    * Represent environment as dense 3D grid of occupied/free voxels.
+    * Represent occupancy in a 3D grid, retaining unknown or unobserved space separately from observed free space. Occlusion is not evidence that a voxel is free.
 
 * **Temporal fusion:**
     * Incorporate temporal information using recurrent architectures or long-range temporal attention.
@@ -110,7 +110,7 @@ Modules 1–3 teach you to understand and work with a camera-based, production-d
     * Formats: OpenDRIVE, Lanelet2.
 
 * **Online map building:**
-    * MapTR, BeMapNet: predict HD map from sensor data in real-time.
+    * MapTR, BeMapNet: predict vectorized local map elements from sensor data; measure runtime and coverage on the chosen implementation rather than assuming a complete HD map or a deadline guarantee.
     * Reduces dependence on pre-built maps, supports uncharted areas.
 
 * **Map-based localization:**
@@ -125,7 +125,7 @@ Modules 1–3 teach you to understand and work with a camera-based, production-d
 ## 6. Sensor Simulation and Synthetic Data
 
 * **Synthetic data generation:**
-    * CARLA, SUMO+CARLA, NVIDIA DRIVE Sim for photorealistic training data with ground-truth labels.
+    * CARLA and other sensor simulators can produce images and annotations; SUMO contributes traffic simulation in a coupled setup rather than photorealistic sensor rendering itself. Verify which physical sensor effects the selected simulator actually models.
     * Labels: bounding boxes, semantic masks, depth, radar detections.
 
 * **Sensor model simulation:**

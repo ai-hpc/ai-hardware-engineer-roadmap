@@ -4,11 +4,11 @@
 
 ---
 
-Every model you have trained so far in this course has been, almost certainly, *overparameterized*. The universal approximation theorem says even a single-hidden-layer MLP can approximate any continuous function — yet we routinely train networks with billions of parameters to fit problems whose intrinsic complexity is far smaller. We do this on purpose: a larger model is *easier to optimize* and generalizes better, thanks to the interaction of SGD with the model's structure (the theory here is still under active development). The slack is a training-time gift. At deployment it becomes a bill.
+A model can meet a quality target while exceeding a memory, latency, or energy budget. Compression asks whether a smaller representation or model can preserve enough task quality on the actual deployment workload. The universal approximation theorem is an existence result under assumptions; it does not guarantee easy optimization, good finite-data generalization, or that a particular model has redundant parameters.
 
 CS329P frames deployment as a set of hard budgets, and it is worth quoting them directly because they are the entire reason this lecture exists. In production you face: **Memory** — you often share memory with other processes, so your model does not get the whole machine. **Latency** — some applications require realtime responses (ads ranking, live captioning and translation, self-driving). **Cost** — power machines are more expensive, and you pay for every one you provision. And **Energy** — *both computation and accessing memory* consume significant energy, which is decisive for battery-powered devices. The slide's blunt conclusion: deploying big models is hard, and by far only a little of the time does anyone deploy the full multi-billion-parameter transformer as-is.
 
-**Model compression** is the set of techniques that buy back those budgets: reduce model size and compute cost without (significantly) hurting predictive performance. The three classical levers are **pruning** (set weight elements to 0 so you neither store nor compute them), **quantization** (use fewer bits per weight, e.g. float32 → int8), and **knowledge distillation** (transfer what a big teacher learned into a small student). This is the precise seam where ML engineering hands the model off to hardware: pruning and quantization only pay off if the *silicon* can skip the zeros and run the low-bit math, and that constraint shapes which compression you choose. Treat this lecture as the bridge into Phase 5 — the place where "make the model smaller" becomes "make the chip go faster," and where the [MLSys Deep Dives](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/README.md) course and the [Gemma 4 Edge Deployment](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20C%20-%20Edge%20AI/Gemma%204%20Edge%20Deployment/README.md) material pick up the story at full hardware depth.
+**Model compression** is the set of techniques that buy back those budgets: reduce model size and compute cost without (significantly) hurting predictive performance. The three classical levers are **pruning** (remove weights or structure, then use a representation/kernel that can exploit the change), **quantization** (use fewer bits per weight, e.g. float32 → int8), and **knowledge distillation** (transfer what a big teacher learned into a small student). This is the precise seam where ML engineering hands the model off to hardware: pruning and quantization only pay off if the *silicon* can skip the zeros and run the low-bit math, and that constraint shapes which compression you choose. Treat this lecture as the bridge into Phase 5 — the place where "make the model smaller" becomes "make the chip go faster," and where the [MLSys Deep Dives](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/README.md) course and the [Gemma 4 Edge Deployment](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20C%20-%20Edge%20AI/Gemma%204%20Edge%20Deployment/README.md) material pick up the story at full hardware depth.
 
 ---
 
@@ -42,7 +42,7 @@ That last row is the one hardware engineers must internalize, so it gets its own
 
 > **Hardware lens:** The slide explicitly lists *memory access* alongside computation as an energy cost — and on real silicon, memory access dominates. A 32-bit floating-point multiply-add costs on the order of a picojoule; reading the operands for it from off-chip DRAM costs *hundreds* of picojoules. The arithmetic is nearly free next to the data movement. This single fact reorganizes the whole field: the reason quantization works is not mainly that INT8 math is faster (though it is), it is that an INT8 weight is *4× smaller to move* than an FP32 weight. Compression is, first and foremost, a bandwidth and energy play. Keep that in mind for every technique below.
 
-> **Hardware lens — the roofline preview.** Whether a kernel is *compute-bound* or *memory-bound* decides which compression helps. A large batched matmul on a GPU is compute-bound — pruning/quantizing the math wins. Autoregressive LLM *decode* (one token at a time, batch 1) is **memory-bandwidth-bound**: you re-read the entire weight matrix to produce a single token, the tensor cores sit mostly idle, and time-per-token is set by how fast you can stream weights out of HBM. There, shrinking the *weights* (INT8/INT4) is the only thing that moves latency. The roofline model that makes this rigorous lives in the [MLSys Deep Dives](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/README.md).
+> **Hardware lens — the roofline preview.** Whether a kernel is *compute-bound* or *memory-bound* decides which compression helps. A large batched matmul on a GPU is compute-bound — pruning/quantizing the math wins. Autoregressive LLM *decode* (one token at a time, batch 1) is **memory-bandwidth-bound**: you re-read the entire weight matrix to produce a single token, the tensor cores sit mostly idle, and time-per-token is set by how fast you can stream weights out of HBM. For weight-bandwidth-limited cases, shrinking weights can help. KV-cache traffic, launch overhead, batching, attention, and communication can also limit latency; profile the actual shapes and context length. The roofline model that makes this rigorous lives in the [MLSys Deep Dives](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/README.md).
 
 ---
 
@@ -60,7 +60,7 @@ The high-level algorithm from the slide is short and has stayed essentially unch
    (optionally repeat 2–4 — iterative pruning)
 ```
 
-The fine-tune step is not optional polish; zeroing weights perturbs the function, and a few epochs of retraining let the surviving weights compensate. Three knobs from the slide define a pruning method:
+Zeroing weights perturbs the function. Fine-tuning can recover quality, while some one-shot methods deliberately avoid retraining; evaluate either choice against the same held-out task. Three knobs from the slide define a pruning method:
 
 - **Score** — what makes a weight "important." Simplest is the **absolute value** (magnitude): small weights contribute little, prune them. Richer scores use a weight's contribution to activations or to gradients. You can compare scores **locally** (rank within a layer, prune the bottom k% of each) or **globally** (one threshold across the whole network, letting some layers stay dense and others go very sparse).
 - **Scheduling** — prune **all at once** (one-shot) to a target sparsity, or prune a **fraction iteratively**, retraining between rounds. Iterative is slower but reaches higher sparsity at the same accuracy.
@@ -70,17 +70,17 @@ The fine-tune step is not optional polish; zeroing weights perturbs the function
 
 This distinction is the crux of the whole topic for a hardware engineer, so read the slide's two definitions carefully:
 
-- **Unstructured pruning** sets *individual weights* to 0. It gives you the highest accuracy at a given sparsity, because you remove exactly the least-useful connections. But it "leads to sparse matrices/tensors that are often less efficient to compute" — the zeros are scattered with no pattern.
+- **Unstructured pruning** sets *individual weights* to 0. It offers fine-grained choices, but an importance heuristic does not identify the provably least-useful connections or guarantee the highest accuracy. But it "leads to sparse matrices/tensors that are often less efficient to compute" — the zeros are scattered with no pattern.
 - **Structured pruning** sets a *whole unit / channel / block* to 0 — an entire convolutional filter, a whole row of a weight matrix, an attention head.
 
 ```text
-Unstructured (90% sparse)          Structured (prune whole channels)
+Unstructured (65% sparse)          Structured (prune whole channels)
 weight matrix:                     weight matrix:
   0  .3  0   0  .1                   .3 .2  0  .1  .4    <- kept
  .2  0   0  .4  0                    .1 .5  0  .2  .3    <- kept
   0  0  .5  0   0                     0  0  0   0   0    <- pruned channel
  .1  0   0  0  .2                    .4 .1  0  .3  .2    <- kept
-=> 90% of cells are 0 but           => the zero column is removed entirely;
+=> 65% of cells are 0 but           => the zero column is removed entirely;
    in random positions                 the matrix literally gets smaller
 ```
 
@@ -88,7 +88,7 @@ That picture is the entire reason the next callout exists.
 
 > **Hardware lens — why unstructured sparsity is hard to accelerate.** A dense matmul is the best-case workload for a GPU: perfectly regular, every lane busy, operands streamed in contiguous blocks. Punch 90% of the weights to zero *at random* and you have made it worse, not better — you now store index metadata to say where the survivors are, your memory accesses are gather-scattered instead of contiguous, and the tensor cores (which want dense tiles) cannot use the structure. A 90%-sparse unstructured layer routinely runs *slower* than the dense original on a GPU. The zeros save you nothing unless the hardware can *skip* them, and to skip them efficiently the sparsity must be **structured**. Structured pruning, by contrast, deletes whole rows/channels and yields a genuinely smaller *dense* tensor that every accelerator already runs fast — which is why production CNN compression overwhelmingly uses channel pruning.
 
-> **Hardware lens — 2:4 structured sparsity (the hardware-friendly middle ground).** NVIDIA Ampere (A100, 2020) and every datacenter GPU since added **Sparse Tensor Cores** that accept a specific *fine-grained structured* pattern: **2:4 sparsity** — in every contiguous block of 4 weights, exactly 2 are zero. This is regular enough that the hardware stores only the 2 survivors plus a 2-bit index and feeds them through at roughly **2× throughput**, while being fine-grained enough to keep most of the accuracy of unstructured pruning. It is the compromise the slide's two categories were converging toward: structure the sparsity *just enough* that silicon can exploit it. (`torch.sparse` + cuSPARSELt, or TensorRT, will compress a 2:4 model to actually realize the speedup.)
+> **Hardware lens — 2:4 structured sparsity (the hardware-friendly middle ground).** NVIDIA Ampere (A100, 2020) and every datacenter GPU since added **Sparse Tensor Cores** that accept a specific *fine-grained structured* pattern: **2:4 sparsity** — in each supported group of four along the required matrix dimension, at least two values are zero; the storage representation reserves two retained slots. This is regular enough that a supported compressed layout stores retained values plus metadata and can reach up to **2× dense arithmetic throughput** for supported instructions, while being fine-grained enough to keep most of the accuracy of unstructured pruning. It is the compromise the slide's two categories were converging toward: structure the sparsity *just enough* that silicon can exploit it. This is a kernel throughput ceiling, not an end-to-end speedup promise; check shapes, dtype, alignment, metadata, and actual runtime dispatch.
 
 ### 2.3 Results, and the lottery ticket
 
@@ -106,7 +106,7 @@ The **Lottery Ticket Hypothesis** (Frankle & Carbin) is the research idea lurkin
 
 ### 3.1 Why low bits, and the hardware that rewards them
 
-Quantization uses low-bit numbers to accelerate inference (and sometimes training): less memory, and access to special hardware paths. It does not hurt accuracy much *except* at extremely low bit-widths (1–2 bit), where it can fall off a cliff. The slide motivates it with raw throughput numbers — modern hardware is simply much faster at low-bit ops. On an NVIDIA A100:
+Quantization uses low-bit representations to reduce storage and potentially accelerate supported operations. Accuracy can regress at any bit width depending on ranges, calibration, sensitive layers, and the workload; validate it rather than treating INT8 as lossless. The slide motivates it with raw throughput numbers — modern hardware is simply much faster at low-bit ops. On an NVIDIA A100:
 
 | Data type | A100 throughput | Note |
 |---|---|---|
@@ -117,13 +117,13 @@ Quantization uses low-bit numbers to accelerate inference (and sometimes trainin
 | **INT8** | **624 TOPS** | 2× FP16 |
 | **INT4** | **1248 TOPS** | 2× INT8 |
 
-The pattern: each halving of bit-width roughly doubles arithmetic throughput *and* halves the bytes you move. Two practical rules from the slide: use **floats for training, integers for inference** (gradients need a larger dynamic range than a forward pass does), and **only quantize the heavy layers** — conv and dense — while leaving activations, weight updates, and the like in the default FP32. You quantize where the FLOPs and bytes are, not everywhere.
+These are historical A100 dense theoretical peaks, not measured application rates. They do not establish a universal doubling rule across data types or accelerators; metadata, unpacking, accumulation, and unsupported operators affect real costs. Two practical rules from the slide: use **floats for training, integers for inference** (gradients need a larger dynamic range than a forward pass does), and **only quantize the heavy layers** — conv and dense — while leaving activations, weight updates, and the like in the default FP32. You quantize where the FLOPs and bytes are, not everywhere.
 
 > **Hardware lens — INT8 tensor cores are the workhorse.** That 624-TOPS INT8 number is not a niche path; it is the bread and butter of production inference accelerators. TensorRT, ONNX Runtime, TFLite, and every edge NPU/DSP center on INT8 dense matmul. The 4× memory shrink vs FP32 is what gets a model into a phone's cache or a Jetson's limited DRAM; the 2× compute over FP16 is the bonus. When someone says "we quantized the model for deployment," the unmarked default they mean is INT8.
 
 ### 3.2 Two families: low-bit floats vs integers
 
-**Low-bit floating-point** (FP16, BF16, TF32). Casting FP32 down is "straightforward — trim the fraction/exponent bits." The catch is *exponent* bits, which set the dynamic range. FP16 has *fewer exponent bits* than FP32, so small activations and gradients can underflow to exactly 0. The fix the slide gives is **loss scaling**: train with `λ·loss(ŷ, y)` for a tunable `λ > 0`, which scales activations and gradients up by `λ×` so values near zero survive FP16; you unscale before the optimizer step. BF16 sidesteps this by keeping FP32's exponent range (trading away mantissa precision instead), which is why it became the default training type for large models.
+**Reduced-precision floating point** includes FP16 and BF16; TF32 is an internal multiply format for supported FP32 operations, not a general tensor storage dtype. Conversion needs specified rounding and overflow behavior, not simply bit trimming. The catch is *exponent* bits, which set the dynamic range. FP16 has *fewer exponent bits* than FP32, so small activations and gradients can underflow to exactly 0. The fix the slide gives is **loss scaling**: train with `λ·loss(ŷ, y)` for a tunable `λ > 0`, which scales the loss and backward gradients by `λ×` (not forward activations) so values near zero survive FP16; you unscale before the optimizer step. BF16 sidesteps this by keeping FP32's exponent range (trading away mantissa precision instead), which is why it became the default training type for large models.
 
 **Integer quantization** is the more aggressive, inference-time path. The simplest scheme the slide gives:
 
@@ -140,7 +140,7 @@ clip    : saturate into the integer range, e.g. [-128, 127] for INT8
 Concretely, the affine mapping between a real value `r` and its quantized integer `q` is:
 
 ```text
-q = round(r / scale) + zero_point        (quantize)
+q = clip(round(r / scale) + zero_point, q_min, q_max)  (quantize)
 r ≈ scale · (q − zero_point)             (dequantize)
 
 scale       = (r_max − r_min) / (q_max − q_min)     # FP32, the step size
@@ -154,7 +154,7 @@ zero_point  = integer that the real value 0 maps to # keeps 0 exactly representa
 
 The slide warns: "directly quantizing the trained weights may decrease accuracy." That gives the two regimes:
 
-- **Post-Training Quantization (PTQ)** — take a finished FP32 model and quantize it with no further training. To pick the scales you run a few hundred representative inputs through the model and record the observed ranges — this is **calibration**. Fast (minutes) and data-light, but lossier.
+- **Post-Training Quantization (PTQ)** — take a finished FP32 model and quantize it with no further training. Static activation quantization uses representative **calibration** data to choose ranges; weight-only and dynamic schemes have different requirements. Calibration amount and runtime are workload dependent. Keep calibration separate from final evaluation.
 - **Quantization-Aware Training (QAT)** — the slide's phrasing: "performs clip/round during training, but keeps float32." You simulate the rounding/clipping in the forward pass (a "fake-quant" op) while keeping a full-precision master copy of the weights and letting gradients flow through (via a straight-through estimator). The network *learns to be robust* to its own quantization, recovering most of the lost accuracy at the price of a training run.
 
 ```python
@@ -167,15 +167,15 @@ def fake_quant(x, scale, zero_point, qmin=-128, qmax=127):
     return x + (x_hat - x).detach()
 ```
 
-**Where does accuracy actually get lost?** In the **outliers**. A weight or (more often) activation tensor whose values are mostly small but with a few extreme entries forces `scale` to be large enough to cover the extremes — which crushes the resolution available to the many small values, where most of the signal lives. The few big numbers steal the dynamic range. This single failure mode is what motivates almost every modern advance in the 2026 update below.
+**One source of error is outliers.** Rounding, clipping, accumulation, sensitive operators, and calibration mismatch also matter. A weight or (more often) activation tensor whose values are mostly small but with a few extreme entries forces `scale` to be large enough to cover the extremes — which crushes the resolution available to the many small values, where most of the signal lives. The few big numbers steal the dynamic range. This single failure mode is what motivates almost every modern advance in the 2026 update below.
 
-> **Hardware lens — what "INT8 inference" really costs you to get.** The throughput is free; the *accuracy* is the engineering. Per-tensor scales are cheapest for the kernel but least accurate; **per-channel** (a scale per output channel of a weight matrix) is the standard production trade-off — far better accuracy, still a clean matmul. The hardware multiply-accumulates in INT8 but **accumulates in INT32** to avoid overflow, then requantizes the result back down. Knowing where the accumulator width and the requantize step sit is the difference between a model that hits its accuracy target and one that silently degrades.
+> **Hardware lens — what "INT8 inference" really costs you to get.** Both quality and throughput require engineering and measurement. Per-tensor scales are cheapest for the kernel but least accurate; **per-channel** (a scale per output channel of a weight matrix) is the standard production trade-off — far better accuracy, still a clean matmul. The hardware multiply-accumulates in INT8 but **accumulates in INT32** to avoid overflow, then requantizes the result back down. Knowing where the accumulator width and the requantize step sit is the difference between a model that hits its accuracy target and one that silently degrades.
 
 ---
 
 ## 4. Knowledge distillation — train a small model to imitate a big one
 
-The third lever does not touch the weights of a fixed model; it trains a *different, smaller* model to behave like the big one. The slide's examples span all of ML: Random forest → decision tree; ResNet-152 → ResNet-34; BERT-Base → BERT-mini. The student is "better than training directly" because the teacher tells it *what it learned* in a form easier to fit than the raw data, and effectively augments the data with pseudo-labels.
+The third lever does not touch the weights of a fixed model; it trains a *different, smaller* model to behave like the big one. The slide's examples span all of ML: Random forest → decision tree; ResNet-152 → ResNet-34; BERT-Base → BERT-mini. Teacher outputs can supply useful additional supervision, but the student may inherit teacher errors or underperform direct training. Compare both on independent labels and deployment conditions.
 
 ### 4.1 The function-approximation view (why it can work at all)
 
@@ -194,7 +194,7 @@ Here is the subtle, important point: training the student only on `Dₙ` means w
                                       of surrogate data)
 ```
 
-The reading: more surrogate data (`m`) shrinks the middle term, and a surrogate distribution `q` close to the real `p` shrinks the last. This is *why* distillation generalizes better than training the small model directly — you have escaped the `n`-point sample by augmenting with teacher-labeled data. Concretely you generate `q` by **augmentation**: Gibbs-sampling features for tabular (FAST-DAD), the usual image augmentations, and for text, using a pretrained BERT to fill masked tokens, plus back-translation and mixup.
+This is a schematic teaching bound: its loss bounds, hypothesis-class complexity `V`, sampling assumptions, and constants must be specified before applying it numerically. The reading: more surrogate data (`m`) shrinks the middle term, and a surrogate distribution `q` close to the real `p` shrinks the last. This motivates why distillation **can** generalize better than direct small-model training under suitable teacher and surrogate-data assumptions — you have escaped the `n`-point sample by augmenting with teacher-labeled data. Concretely you generate `q` by **augmentation**: Gibbs-sampling features for tabular (FAST-DAD), the usual image augmentations, and for text, using a pretrained BERT to fill masked tokens, plus back-translation and mixup.
 
 ### 4.2 Soft targets and temperature — the "dark knowledge"
 
@@ -211,11 +211,25 @@ S_T(x)ᵢ  =  ─────────────────────
 A larger `T` flattens the distribution, amplifying the small probabilities on the negative classes so the student can actually see and fit them. The distillation loss the slide gives matches the student's *soft* outputs to the teacher's *and* the student's hard outputs to the true label:
 
 ```text
-  CE( S_T(g(x)), S_T(f(x)) )   +   λ · CE( S₁(g(x)), y )
-  └──── soft term (temperature T) ────┘     └─── normal classification ───┘
+  α T² KL( S_T(f(x)) || S_T(g(x)) ) + (1−α) CE(y, S₁(g(x)))
+  teacher distribution → student distribution       hard-label term
 ```
 
-Two notes the slide adds: as `T → ∞` the soft term approaches `MSE(g(x), f(x))` (matching raw logits), and despite the theory, **`T = 1` often works well** in practice — start simple.
+The `T²` factor compensates the temperature-dependent gradient scale. At high temperature, the scaled loss corresponds to matching **centered** logits under the derivation's assumptions; raw logits are only defined up to a shared additive constant. For example, `[2,0]` and `[12,10]` define identical softmax probabilities but have nonzero raw-logit MSE. Centering gives `[1,−1]` for both. See [Hinton et al.](https://arxiv.org/abs/1503.02531). Choose `T` and `α` on validation data.
+
+```python
+import torch.nn.functional as F
+
+def distillation_loss(student_logits, teacher_logits, labels, temperature=2.0, alpha=0.5):
+    if temperature <= 0 or not 0 <= alpha <= 1:
+        raise ValueError("temperature must be positive; alpha must be in [0,1]")
+    teacher_probs = F.softmax(teacher_logits.detach() / temperature, dim=-1)
+    soft = F.kl_div(F.log_softmax(student_logits / temperature, dim=-1),
+                    teacher_probs, reduction="batchmean") * temperature**2
+    return alpha * soft + (1 - alpha) * F.cross_entropy(student_logits, labels)
+```
+
+This example is for `[batch, classes]`. Token sequences require explicit shifted-token masks and token-count normalization; do not blindly apply `batchmean` to `[batch, time, vocabulary]`.
 
 ### 4.3 Beyond outputs: intermediate representations, and distilling ensembles
 
@@ -232,13 +246,13 @@ The three are **complementary**, not competing: a deployed model is frequently d
 | | **Pruning** | **Quantization** | **Distillation** |
 |---|---|---|---|
 | **What it changes** | Sets weights to 0 (removes connections/channels) | Fewer bits per number (FP32→INT8/4) | Trains a *new, smaller* model to imitate a teacher |
-| **What it saves** | Model size; compute *only if* the sparsity is exploitable | Memory bandwidth + storage (≈4× at INT8) **and** compute | Everything — student is a genuinely smaller dense model |
+| **What it saves** | Model size; compute *only if* the sparsity is exploitable | Lower raw parameter payload; traffic/compute savings depend on format and execution | Everything — student is a genuinely smaller dense model |
 | **Accuracy risk** | Low at moderate sparsity; cliff at high unstructured sparsity | Low at INT8; rises sharply below ~4-bit, driven by outliers | Usually small; student can approach teacher with enough surrogate data |
-| **Hardware support needed** | **Structured / 2:4** sparse tensor cores to get real speedup; unstructured rarely helps on GPU | Low-bit tensor cores (INT8/INT4/FP8) — ubiquitous on modern accelerators | **None special** — output is a standard small dense net, runs anywhere |
-| **When training is required** | Yes — fine-tune after pruning | PTQ: no (just calibration); QAT: yes | Yes — train the student |
+| **Hardware support needed** | Channel removal can use smaller dense kernels; 2:4 and unstructured formats need suitable sparse paths | A supported dtype/layout/kernel on the actual target; backend and operator coverage vary | **None special** — output is a standard small dense net, runs anywhere |
+| **When training is required** | Often fine-tuned; one-shot methods may omit training | PTQ: no optimizer updates (calibration needs vary); QAT: yes | Yes — train the student |
 | **Best when** | Channels are redundant (CNNs); you have 2:4-capable HW | You are memory/bandwidth-bound (LLM decode, edge) | You want a smaller *architecture*, or to collapse an ensemble |
 
-The hardware column is the engineer's decision rule: **distillation and INT8 quantization are portable wins** (any device benefits), while **pruning's payoff is gated on the silicon** — only worth it when you can target structured/2:4 sparsity hardware or a sparse-aware runtime.
+The hardware column is the engineer's decision rule: **distillation and INT8 quantization are candidates to measure**, not automatic wins on every device, while **pruning's payoff is gated on the silicon** — only worth it when you can target structured/2:4 sparsity hardware or a sparse-aware runtime.
 
 ---
 
@@ -248,15 +262,15 @@ The hardware column is the engineer's decision rule: **distillation and INT8 qua
 >
 > **Quantization went sub-INT8 and got outlier-aware.** The slide's "extremely low-bit hurts accuracy" warning was right *for naive PTQ* — the field beat it by handling the outliers from Section 3.3 directly:
 >
-> - **GPTQ** and **AWQ** are *weight-only* INT4 PTQ methods that quantize an LLM to 4 bits with near-FP16 quality. GPTQ uses second-order (Hessian) information to compensate for rounding error layer by layer; AWQ ("activation-aware") scales weight channels by their activation magnitude so the *important* channels keep precision. Both make INT4 a production default for serving 7B–70B models.
+> - **GPTQ** and **AWQ** are *weight-only* INT4 PTQ methods that quantize an LLM to 4 bits with near-FP16 quality. GPTQ uses second-order (Hessian) information to compensate for rounding error layer by layer; AWQ ("activation-aware") scales weight channels by their activation magnitude so the *important* channels keep precision. Their quality and speed depend on model, grouping, calibration, and supported kernels; neither guarantees near-FP16 quality on every workload.
 > - **SmoothQuant** is the direct answer to the activation-outlier problem: it *migrates* the difficulty from activations into weights by a per-channel scaling, so both can be quantized to INT8 — enabling true INT8 *activation* quantization (W8A8), not just weights.
-> - **NF4 + QLoRA** quantizes a frozen base model to a 4-bit "NormalFloat" type and trains tiny LoRA adapters on top, fine-tuning a 65B model on a *single GPU*. This is QAT's spirit (train-aware-of-quantization) made practical at LLM scale.
+> - **NF4 + QLoRA** quantizes a frozen base model to a 4-bit "NormalFloat" type and trains tiny LoRA adapters on top, fine-tuning a 65B model on a *single GPU*. This is parameter-efficient fine-tuning through a frozen quantized base, **not ordinary QAT of the base weights**. The [QLoRA paper](https://arxiv.org/abs/2305.14314) reports the 65B example on a 48 GB GPU; memory depends on sequence length, optimizer, and implementation.
 > - **FP8** is the new training/inference type on **Hopper (H100)** and **Blackwell (B100/B200)** — an 8-bit *float* (E4M3 / E5M2) that keeps a usable exponent range, so it tolerates outliers far better than INT8 for *activations*. Blackwell pushes further to **FP4/MXFP4** microscaling formats. The slide's "low-bit floats are straightforward to cast" intuition scales right down to 8 and 4 bits.
 > - **GGUF + llama.cpp** is how all of this reaches the edge: a file format packing K-quant INT4/INT5 weights that runs LLMs on CPUs, Apple Silicon, and phones — the practical home of "quantize for a battery-powered device."
 >
-> **Distillation went from BERT to GPT-4.** **DistilBERT** (40% smaller, 60% faster, ~97% of BERT) is the canonical realization of Section 4. Today the dominant form is **distilling a giant frontier model into a small one**: prompt a strong teacher (e.g. GPT-4-class) to generate high-quality outputs, then fine-tune a small open student on them — the surrogate-data argument of Section 4.1, where `q` is "whatever the teacher will answer." This is how most capable small open models are made. (Note the licensing and policy constraints on distilling from a closed API — that is now an engineering *and* legal decision.)
+> **Distillation went from BERT to GPT-4.** **DistilBERT** (40% smaller, 60% faster, ~97% of BERT) is the canonical realization of Section 4. Today the dominant form is **distilling a giant frontier model into a small one**: prompt a strong teacher (e.g. GPT-4-class) to generate high-quality outputs, then fine-tune a small open student on them — the surrogate-data argument of Section 4.1, where `q` is "whatever the teacher will answer." This is one training strategy; a model card is needed to establish the data and supervision used by a particular release. (Note the licensing and policy constraints on distilling from a closed API — that is now an engineering *and* legal decision.)
 >
-> **Pruning at LLM scale** stayed hard exactly as Section 2.2 predicted. **SparseGPT** and **Wanda** prune LLMs to ~50% in one shot without retraining; the durable lesson holds — to get *speed* you still need **2:4 structured** sparsity on Ampere+/Hopper, because scattered zeros remain unaccelerable. **Mixture-of-Experts (MoE)** is the architectural cousin: route each token to a few of many expert FFNs, so a model with huge *total* parameters activates only a small *fraction* per token — conditional computation as compression, and the reason several frontier models are far cheaper to serve than their parameter count suggests.
+> **Pruning at LLM scale** stayed hard exactly as Section 2.2 predicted. **SparseGPT** and **Wanda** prune LLMs to ~50% in one shot without retraining; the durable lesson holds — to get *speed* you still need **2:4 structured** sparsity on Ampere+/Hopper, while unstructured acceleration depends on the sparsity pattern, density, and runtime rather than being universally impossible. **Mixture-of-Experts (MoE)** is the architectural cousin: route each token to a few of many expert FFNs, so a model with huge *total* parameters activates only a small *fraction* per token — conditional computation as compression, and the reason several frontier models are far cheaper to serve than their parameter count suggests.
 >
 > Where this goes deep: the [MLSys Deep Dives](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/MLSys%20Deep%20Dives/README.md) course covers INT4/FP8 kernels, paged-KV, and the roofline math; the [Gemma 4 Edge Deployment](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20C%20-%20Edge%20AI/Gemma%204%20Edge%20Deployment/README.md) and [Edge LLM Inference Internals](../../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20C%20-%20Edge%20AI/Edge%20LLM%20Inference%20Internals/Lecture-01.md) material walk GGUF quantization and on-device serving end to end.
 
@@ -279,3 +293,12 @@ They compose, and the *hardware support* a technique needs is the engineer's dec
 June 2026. The classical pruning/quantization/distillation core from Stanford CS329P (2021) is unchanged and foundational; this lecture refreshes the **quantization** material heavily for the LLM era — INT4 weight-only PTQ (GPTQ/AWQ), NF4+QLoRA, FP8/FP4 on Hopper and Blackwell, SmoothQuant for activation outliers, and GGUF/llama.cpp on the edge — plus modern frontier-model distillation and MoE as conditional-computation compression. INT8 remains the unmarked production default; INT4 weight-quantized LLM serving is now mainstream.
 
 *Adapted from [Stanford CS329P](https://c.d2l.ai/stanford-cs329p) — Huang, Li & Smola, CC-BY-SA-4.0.*
+
+
+## Check the compression claim yourself
+
+Start with the [CPU stop-classifier artifact](../../../2.%20Deep%20Learning%20Frameworks/PyTorch/CPU-Robot-Stop-Lab/Guide.md). Its 1282 FP32 parameters need 5128 raw bytes; ideal INT8 parameter payload is 1282 bytes, before scales and metadata. This arithmetic establishes a payload ceiling, not a fourfold speedup. Zeroing half those FP32 values while retaining dense tensors still stores 5128 bytes.
+
+**Independent task:** choose one change, preserve the original feature/normalization contract, evaluate clean and biased inputs using the fixed threshold, and record artifact bytes and actual latency separately. A passing result can report “smaller but slower” with sound evidence. Source/correctness review: 2026-10-18; no GPU compression performance was measured for this lecture.
+
+For current PyTorch optimization routes, use the [torchao quantization overview](https://docs.pytorch.org/ao/stable/contributing/quantization_overview.html). Its distinction between algorithms, tensor layouts, and kernels explains why a supported numerical format alone does not establish an accelerated execution path.

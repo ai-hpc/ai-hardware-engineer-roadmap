@@ -1,88 +1,65 @@
-# 02 — NVIDIA CC Attestation Chain
+# 02 — NVIDIA Evidence and Attestation Results
 
-## 1. CC-On Mode Recap
+**Learning target:** distinguish a GPU's signed evidence from a verifier's signed appraisal, and check an entire device bundle.
 
-The GPUs in this HPC track — H100 ([8x H200 Training & Inference](../8x-H200-Training-Inference/README.md)'s GH100 die, [Blackwell B200](../Blackwell-B200-Qwen-Inference/README.md) — support a **Confidential Computing (CC-On)** mode that extends the CPU-side TEE from [file 01](./01-Intel-TDX-Attestation-Chain.md) all the way onto the accelerator. Three properties make this possible:
+## 1. GPU protection depends on mode and topology
 
-- **Encrypted VRAM and an encrypted bus.** The GPU's DMA engine encrypts data moving between CPU and GPU with AES-GCM-256; the confidential VM and GPU exchange data through encrypted bounce buffers. Plaintext exists only inside the protected silicon.
-- **The operator is locked out.** With CC-On enabled, host-side inspection paths into GPU memory are disabled — a cloud admin with root on the box still cannot read model weights, activations, or training data resident in VRAM.
-- **Measured firmware.** The GPU's firmware and CC state are measured at boot, which is what makes the rest of this file possible: those measurements feed into a signed attestation report.
+Supported confidential GPU configurations restrict host inspection and establish protected data paths between the confidential VM and devices. Do not summarize this as “all VRAM is encrypted” or “plaintext exists only in silicon”; those statements obscure the documented threat boundary and application-controlled plaintext inside the guest.
 
-Blackwell extends this from a single GPU to a pod: multi-GPU confidential computing across NVLink/NVSwitch (so a model sharded across many GPUs — exactly the [Multi-B200 NVL72](../Blackwell-B200-Qwen-Inference/04-Multi-B200-NVL72.md) topology — stays inside one trust domain), plus **Trusted I/O** with end-to-end CPU+GPU attestation built on Intel TDX. NVIDIA ships the open **nvTrust** toolkit to drive this.
+NVIDIA's August 2025 v1.3 white paper distinguishes encrypted CPU/GPU bounce buffers, compatible Blackwell trusted-I/O paths, Hopper Protected PCIe and Blackwell multi-GPU protection. Its Hopper Protected PCIe configuration leaves NVLink traffic unencrypted; its Blackwell multi-GPU configuration encrypts that path and describes up to eight GPUs per CVM. These are specific configurations, not proof that any NVL72 rack forms one confidential domain. Recheck current support for the exact platform. [NVIDIA Secure AI white paper](https://docs.nvidia.com/nvidia-secure-ai-with-blackwell-and-hopper-gpus-whitepaper.pdf).
 
-## 2. The GPU Attestation Report: EAT
+A genuine GPU can be in a mode unsuitable for secrets. Development/debug permissions, firmware/driver compatibility, device assignment and fabric membership are policy inputs. Availability and arbitrary malicious behavior inside the trusted guest remain separate concerns.
 
-A CC-On GPU produces a signed **Entity Attestation Token (EAT)** — a JWT describing its identity, firmware measurements, and CC state. In practice a verification round produces **more than one token**: one per physical GPU device plus one covering the platform as a whole, since a multi-GPU node has multiple pieces of silicon each needing their own measurement.
+## 2. Evidence is different from a result token
 
 ```text
-GPU 0 EAT (JWT)   ─┐
-GPU 1 EAT (JWT)   ─┤── all signed independently by NRAS, verified independently
-Platform EAT (JWT) ─┘
+GPU identity certificate + signed device report + challenge
+             │
+             ▼
+Verifier checks certificates, report signature, nonce,
+reference measurements, revocation and required device state
+             │
+             ▼
+Signed attestation result → relying party applies its policy
 ```
 
-## 3. Binding a Claim: `eat_nonce`
+The GPU does not itself emit an NRAS-signed JWT. NRAS is a remote verifier that appraises device evidence and issues signed results. A local verifier is another valid architecture when the relying party trusts that verifier and authenticates its output appropriately. [NRAS introduction](https://docs.nvidia.com/attestation/cloud-services/latest/nras/nras_introduction.html), [RATS architecture](https://www.rfc-editor.org/rfc/rfc9334).
 
-Just as Intel TDX leaves REPORTDATA free for application data ([file 01, §5](./01-Intel-TDX-Attestation-Chain.md#5-binding-application-data-via-reportdata)), the NVIDIA EAT format has an equivalent slot: `eat_nonce`. Whatever hash the application wants attested goes there before requesting the token:
+The current NRAS detached-EAT format includes an overall JWT and device submodule JWTs. The overall token binds submodules through digests. Validate those digest references and the exact required device inventory; independent valid signatures on an arbitrary collection of tokens are insufficient. An empty list must never pass merely because `all([])` evaluates to true. [NVAT 2.0.0 verification API](https://docs.nvidia.com/attestation/nv-attestation-sdk-cpp/2.0.0/api/group__attestation__result__verification.html).
 
-```text
-application_hash ──▶ eat_nonce field ──▶ GPU attestation request ──▶ signed EAT (JWT)
+## 3. Current tooling and a source-checked command
+
+NVIDIA's Python `nv_attestation_sdk` ended support on **2026-09-15**. NVAT replaces it with C/C++ APIs and `nvattest`; policy handling uses Rego. GPU ready-state management is not automatically performed by the new SDK. [Migration guide](https://docs.nvidia.com/attestation/attestation-client-tools-sdk/latest/migration_guide.html).
+
+For a compatible deployment with NVAT installed, this is a **source-checked template, not a hardware run performed in this course**:
+
+```bash
+# EAT_FILE is the detached-EAT bundle received for this pending request.
+# EXPECTED_NONCE_HEX is stored by the relying party before collection.
+nvattest verify-token \
+  --token-file "$EAT_FILE" \
+  --nras-url https://nras.attestation.nvidia.com \
+  --nonce "$EXPECTED_NONCE_HEX" \
+  --relying-party-policy ./policy.rego \
+  --format json
 ```
 
-A verifier's binding check mirrors the TDX one, and has the exact same limitation:
+You must supply a policy written for your deployment and the returned claims schema; this course does not ship a pretend production policy. Exit status and authenticated claims must both be handled. The CLI and C API support an optional expected nonce: **omitting it disables that request-binding comparison**. The application still owns challenge expiry, audience/session binding and replay state. [Command reference](https://docs.nvidia.com/attestation/nv-attestation-sdk-cpp/2.0.0/sdk-cli/command-reference.html).
 
-```python
-def check_gpu_binding(claim_hash, gpu_eat):
-    return gpu_eat.eat_nonce == claim_hash    # binding only — see file 03 for why this alone is forgeable
-```
+## 4. Trust roots and complete JWT checks
 
-## 4. Authenticity: NRAS Signature + JWKS Key Resolution
+Configure the trusted issuer/JWKS origin in relying-party configuration. An attacker-supplied `iss`, `jku`, URL or public key must not choose the trust root. The current NRAS profile uses ES384; enforce the expected algorithm, key type, issuer, signature and required time claims. Resolve `kid` only within the trusted issuer's keys; key caching/rotation needs bounded refresh and failure behavior.
 
-`eat_bound: true` only proves *some* JWT carries the right nonce — nothing yet says who signed it. The **NVIDIA Remote Attestation Service (NRAS)** closes that gap: a verifier resolves the actual signing key from NVIDIA's published JWKS endpoint and checks the signature against it, not against anything the prover supplied.
+Require the profile's freshness claims and an application maximum age. Clock-skew tolerance is an explicit policy choice. Do not assume a library requires every time claim simply because it validates one when present. In particular, the current EAR verification API validates time claims when supplied but does not require them, and authentication alone does not validate EAR appraisal semantics. [NVAT verification API](https://docs.nvidia.com/attestation/nv-attestation-sdk-cpp/2.0.0/api/group__attestation__result__verification.html).
 
-```text
-   EAT (JWT)
-      │
-      ├─ header.kid ──▶ resolve signing key from NVIDIA's published JWKS endpoint
-      ├─ signature   ──▶ ES384 verify against the resolved key
-      ├─ iss         ──▶ must equal https://nras.attestation.nvidia.com
-      └─ exp         ──▶ not expired
-```
+A local HS256 wrapper signed with an attester-controlled secret does not establish independent trust. But **“overall” does not mean HS256**: the current NRAS overall token is part of its asymmetrically signed result. Nor does “only NVIDIA may sign” describe every valid architecture; an explicitly trusted local appraisal service can sign its own results. Identify the signer, authority and validated claims, not merely the token's label.
 
-```python
-def verify_gpu_token(eat_jwt, jwks):
-    header = jwt.get_unverified_header(eat_jwt)
-    key = jwks.resolve(header["kid"])
-    claims = jwt.decode(eat_jwt, key=key, algorithms=["ES384"])
-    assert claims["iss"] == "https://nras.attestation.nvidia.com"
-    assert claims["exp"] > now()
-    return claims
-```
+## 5. Experimental formats need separate policies
 
-The `kid` (key ID) in the JWT header is what lets the verifier fetch the *correct* key from a JWKS endpoint that rotates keys over time — never hardcode a single expected key; resolve it per-token.
+NVAT 2.0.0 also documents a CoRIM/CMW/EAR workflow as experimental. It has different evidence/result schemas from the legacy TCG RIM detached-EAT path. An unsigned EAR is a test artifact, and an authentic signed EAR may report a warning or rejection. Pin the workflow and apply its result policy; do not feed an EAR into a detached-EAT parser or treat authentication as an affirmative appraisal. [Current workflow reference](https://docs.nvidia.com/attestation/nv-attestation-sdk-cpp/2.0.0/sdk-cli/command-reference.html).
 
-## 5. The Symmetric-Key Self-Attestation Trap
+## Worked review
 
-GPU attestation SDKs commonly hand back an additional convenience field: an "overall" JWT that's **HS256-signed with a key the SDK itself holds**. This is the single most common mistake in GPU-attestation verifier code, because it's also the easiest field to reach for:
+Expected inventory is `{gpu-A, gpu-B}`. Both returned tokens have valid signatures and the current nonce, but both describe `gpu-A`. **Reject:** one device is duplicated and `gpu-B` is missing. If an overall token references a different digest for `gpu-B`, **reject before policy acceptance:** the bundle has been substituted. If every check passes but the application's CPU/GPU channel is not authenticated, **do not infer attachment from nonce equality**; lesson 03 explains why.
 
-```python
-# WRONG — this only proves the SDK agrees with itself
-jwt.decode(overall_token, key=sdk_local_secret, algorithms=["HS256"])
-```
-
-A symmetric key controlled by the same process generating the evidence cannot serve as third-party proof — verifying it just confirms internal consistency, not that NVIDIA's hardware vouches for anything. The only tokens that count as evidence are the **NRAS-signed, ES384, asymmetric** per-device and platform EATs from §4. A correct verifier explicitly excludes the SDK-local HS256 token from anything it reports as a signature check, even though pulling `overall.passed` is the path of least resistance.
-
-## 6. Composed Verifier Sketch
-
-Putting §3–§5 together, a single GPU claim check looks like:
-
-```python
-def verify_gpu_claim(claim_hash, gpu_eat_tokens, jwks):
-    results = []
-    for eat_jwt in gpu_eat_tokens:          # per-device + platform, NRAS-signed only
-        claims = verify_gpu_token(eat_jwt, jwks)          # §4 — authenticity
-        bound = (claims["eat_nonce"] == claim_hash)        # §3 — binding
-        results.append({"bound": bound, "authentic": True})
-    return all(r["bound"] and r["authentic"] for r in results)
-```
-
-Note both checks are required on **every** token, not just one representative token — a multi-GPU claim is only as strong as its weakest verified device.
+Next: [compose evidence around a session](03-Dual-Vendor-Claim-Binding-and-Verification.md).

@@ -1,122 +1,45 @@
-// kv_cache.cpp — Pre-allocated KV cache with GPU/CPU tiering
-//
-// On Jetson unified memory:
-//   cudaMallocHost → pinned DRAM, GPU reads at full bandwidth, CPU can also read
-//   malloc         → pageable DRAM, GPU reads via page faults (slower, but doesn't OOM)
-//
-// Strategy:
-//   - "Fast pool" (cudaMallocHost): recent tokens, GPU reads at ~102 GB/s
-//   - "Overflow pool" (malloc): old tokens, GPU reads via page faults (~50 GB/s)
-//   - When fast pool full: evict oldest to overflow (just a memcpy within same DRAM)
-
+// Contiguous managed-memory KV storage for the experimental attention layout.
+// There is no pageable overflow tier and no measured bandwidth claim.
 #include "jllm_memory.h"
 #include <cuda_runtime.h>
-#include <cstdlib>
-#include <cstring>
+#include <algorithm>
 #include <cstdio>
-
+#include <cstring>
 namespace jllm {
-
 bool KVCachePool::init(const Config& cfg) {
-    cfg_ = cfg;
-
-    int64_t fast_bytes = (int64_t)cfg.n_layers * entry_bytes() * cfg.max_context;
-    int64_t overflow_bytes = (int64_t)cfg.n_layers * entry_bytes() * cfg.overflow_context;
-
-    fprintf(stderr, "[kv_cache] Allocating fast pool: %ld MB (%d tokens)\n",
-            fast_bytes / (1024*1024), cfg.max_context);
-
-    // Fast pool: pinned memory (GPU + CPU accessible, no page faults)
-    cudaError_t err = cudaMallocHost(&gpu_pool_, fast_bytes);
-    if (err != cudaSuccess) {
-        fprintf(stderr, "[kv_cache] FATAL: cudaMallocHost failed: %s\n",
-                cudaGetErrorString(err));
+    destroy();
+    if (cfg.n_layers <= 0 || cfg.n_kv_heads <= 0 || cfg.head_dim <= 0
+        || cfg.max_context <= 0 || cfg.overflow_context != 0 || cfg.kv_type_bytes != 2) {
+        std::fprintf(stderr, "[kv] only positive, contiguous FP16 configurations are supported\n");
         return false;
     }
-    memset(gpu_pool_, 0, fast_bytes);
-
-    // Overflow pool: regular malloc (optional)
-    if (cfg.overflow_context > 0 && overflow_bytes > 0) {
-        fprintf(stderr, "[kv_cache] Allocating overflow pool: %ld MB (%d tokens)\n",
-                overflow_bytes / (1024*1024), cfg.overflow_context);
-        cpu_pool_ = malloc(overflow_bytes);
-        if (!cpu_pool_) {
-            fprintf(stderr, "[kv_cache] WARNING: overflow pool alloc failed, disabling\n");
-            cfg_.overflow_context = 0;
-        } else {
-            memset(cpu_pool_, 0, overflow_bytes);
-        }
+    int64_t bytes = 2;
+    for (int value : {cfg.n_layers, cfg.n_kv_heads, cfg.head_dim, cfg.max_context, cfg.kv_type_bytes}) {
+        if (bytes > std::numeric_limits<int64_t>::max()/value) return false;
+        bytes *= value;
     }
-
-    used_tokens_ = 0;
-    gpu_tokens_ = 0;
+    if (cudaMallocManaged(&gpu_pool_, static_cast<std::size_t>(bytes)) != cudaSuccess) return false;
+    cfg_ = cfg;
+    std::memset(gpu_pool_, 0, static_cast<std::size_t>(bytes));
     return true;
 }
-
 void KVCachePool::destroy() {
-    if (gpu_pool_) { cudaFreeHost(gpu_pool_); gpu_pool_ = nullptr; }
-    if (cpu_pool_) { free(cpu_pool_); cpu_pool_ = nullptr; }
-    used_tokens_ = 0;
-    gpu_tokens_ = 0;
+    if (gpu_pool_) cudaFree(gpu_pool_);
+    gpu_pool_ = nullptr; cpu_pool_ = nullptr;
+    cfg_ = {}; used_tokens_ = 0; gpu_tokens_ = 0;
 }
-
 void* KVCachePool::key_ptr(int layer, int pos) {
-    int64_t eb = entry_bytes() / 2;  // key is half of entry (key + value)
-    if (pos < cfg_.max_context) {
-        return (char*)gpu_pool_ + layer * layer_stride() + pos * eb;
-    } else {
-        int overflow_pos = pos - cfg_.max_context;
-        return (char*)cpu_pool_ + layer * (int64_t)cfg_.overflow_context * eb + overflow_pos * eb;
-    }
+    if (!gpu_pool_ || layer < 0 || layer >= cfg_.n_layers || pos < 0 || pos >= cfg_.max_context)
+        return nullptr;
+    used_tokens_ = std::max(used_tokens_, pos+1); gpu_tokens_ = used_tokens_;
+    return static_cast<char*>(gpu_pool_)+layer*layer_stride()+pos*(entry_bytes()/2);
 }
-
 void* KVCachePool::val_ptr(int layer, int pos) {
-    int64_t eb = entry_bytes() / 2;
-    int64_t key_offset = cfg_.max_context * eb;  // values stored after all keys
-    if (pos < cfg_.max_context) {
-        return (char*)gpu_pool_ + layer * layer_stride() + key_offset + pos * eb;
-    } else {
-        int overflow_pos = pos - cfg_.max_context;
-        int64_t ov_key_offset = cfg_.overflow_context * eb;
-        return (char*)cpu_pool_ + layer * (int64_t)cfg_.overflow_context * eb * 2
-               + ov_key_offset + overflow_pos * eb;
-    }
+    auto* key = static_cast<char*>(key_ptr(layer,pos));
+    return key ? key+cfg_.max_context*(entry_bytes()/2) : nullptr;
 }
-
-int64_t KVCachePool::used_bytes() const {
-    return (int64_t)used_tokens_ * entry_bytes() * cfg_.n_layers;
+int64_t KVCachePool::used_bytes() const { return int64_t(used_tokens_)*entry_bytes()*cfg_.n_layers; }
+int64_t KVCachePool::capacity_bytes() const { return int64_t(cfg_.max_context)*entry_bytes()*cfg_.n_layers; }
+void KVCachePool::evict(int) { std::fprintf(stderr, "[kv] eviction is unsupported; stop at the context bound\n"); }
+void KVCachePool::clear() { used_tokens_ = 0; gpu_tokens_ = 0; }
 }
-
-int64_t KVCachePool::capacity_bytes() const {
-    return (int64_t)(cfg_.max_context + cfg_.overflow_context) * entry_bytes() * cfg_.n_layers;
-}
-
-void KVCachePool::evict(int n_tokens) {
-    if (!cpu_pool_ || n_tokens <= 0) return;
-
-    int64_t eb = entry_bytes();
-    for (int l = 0; l < cfg_.n_layers; l++) {
-        char* src = (char*)gpu_pool_ + l * layer_stride();
-        char* dst = (char*)cpu_pool_ + l * (int64_t)cfg_.overflow_context * eb;
-
-        // Copy oldest n_tokens to overflow
-        memcpy(dst, src, n_tokens * eb);
-
-        // Shift remaining in fast pool
-        int remaining = gpu_tokens_ - n_tokens;
-        if (remaining > 0) {
-            memmove(src, src + n_tokens * eb, remaining * eb);
-        }
-    }
-
-    gpu_tokens_ -= n_tokens;
-    fprintf(stderr, "[kv_cache] Evicted %d tokens to overflow (gpu: %d, total: %d)\n",
-            n_tokens, gpu_tokens_, used_tokens_);
-}
-
-void KVCachePool::clear() {
-    used_tokens_ = 0;
-    gpu_tokens_ = 0;
-}
-
-}  // namespace jllm

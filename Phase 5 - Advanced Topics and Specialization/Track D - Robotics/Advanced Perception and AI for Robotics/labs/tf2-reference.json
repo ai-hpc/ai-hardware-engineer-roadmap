@@ -1,0 +1,19 @@
+{
+  "scope": "actual TF2 buffer library; transforms inserted directly; no middleware transport",
+  "python": "3.12.3",
+  "ros_distro": "jazzy",
+  "checks_passed": 6,
+  "capture_time_translation_x": 0.2,
+  "latest_translation_x": 1.0,
+  "inverse_translation_x": -0.2,
+  "rejected": [
+    "past",
+    "future",
+    "missing_frame"
+  ],
+  "script_sha256": "40245547f22a1e2b251550ab7917321f6585f5aef544df99619a7e559c4a5e3a",
+  "limitations": [
+    "no timestamped sensor driver or clock synchronization",
+    "no tf topic publication, network delay or robot motion"
+  ]
+}

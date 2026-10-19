@@ -16,26 +16,19 @@ Part of [Phase 1 section 4 — C++ and Parallel Computing](../Guide.md).
 
 **Official reference:** [CUDA C++ Programming Guide](https://docs.nvidia.com/cuda/cuda-programming-guide/index.html)
 
+**Compatibility reviewed 2026-10-18:** the current installation documentation is CUDA13.4. Match toolkit, host compiler, operating system, driver, and GPU compute capability using the [installation guide](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html) and [driver compatibility rules](https://docs.nvidia.com/deploy/cuda-compatibility/minor-version-compatibility.html). Record `nvcc --version`, the driver, and exact device model; the CUDA version displayed by `nvidia-smi` is not proof that that toolkit is installed. Older architecture examples below explain concepts, not a promise that every current toolkit still targets every old GPU. This Phase1 review did not execute GPU kernels; use CPU references and preserve actual device test logs when reproducing them.
+
 ---
 
 ## 1. Why GPU? — The Transistor Budget
 
-CPUs dedicate most transistors to control logic and cache (latency minimization). GPUs dedicate most transistors to arithmetic units (throughput maximization).
+CPUs emphasize low-latency execution of general-purpose work; GPUs expose many concurrent threads and high throughput for suitable parallel work. Both have caches, arithmetic units, and control logic. Their exact transistor allocation, bandwidth, core counts, and clock speeds depend on the product; a CPU core and a CUDA arithmetic lane are not equivalent units to count.
 
 ![GPU vs CPU transistor allocation](../../../Assets/images/gpu-vs-cpu-transistors.png)
 
-*Source: NVIDIA CUDA Programming Guide*
+*Conceptual NVIDIA illustration, not a scale drawing or current device specification.*
 
-| | CPU | GPU |
-|--|-----|-----|
-| Core count | 8–128 | 1,000s–10,000s |
-| Clock speed | 3–5 GHz | 1.5–2.5 GHz |
-| Design goal | Low latency (single thread) | High throughput (many threads) |
-| Cache | Large (MB per core) | Small (KB per SM) |
-| Control flow | Complex OOO, branch prediction | Simple, in-order per lane |
-| Memory BW | ~50–200 GB/s | ~900–3,500 GB/s (HBM) |
-
-**The key insight:** GPUs hide memory latency by switching to other warps while waiting, not by predicting and prefetching. This requires thousands of in-flight threads.
+A GPU can issue work from another ready warp while one warp waits for an operand. This requires enough eligible independent work and sufficient resources. Extra threads do not help if all of them wait on the same bottleneck, and GPUs also use caches and architecture-specific prefetch/data-movement mechanisms.
 
 ---
 
@@ -64,7 +57,7 @@ time
 ```
 
 **Key rules:**
-- CPU and GPU have **separate DRAM** — data must be explicitly transferred (unless using Unified Memory)
+- Discrete GPUs commonly have separate device memory; integrated systems such as Jetson share physical DRAM. Addressability, coherence, copies, and synchronization still depend on allocation and platform. Unified Memory is an allocation/access model, not a guarantee of zero transfers.
 - Kernel launches are **asynchronous** — the CPU continues while the GPU works
 - `cudaDeviceSynchronize()` blocks the CPU until all GPU work completes
 
@@ -74,7 +67,7 @@ time
 
 ### 3.1 The Full Chip
 
-A GPU die is organized as a hierarchy:
+The following is a Hopper-oriented schematic. Counts and organization vary by GPU; use device properties and the matching tuning guide for limits:
 
 ```
 GPU Die
@@ -86,7 +79,7 @@ GPU Die
             ├── CUDA Cores (FP32) × 128
             ├── Tensor Cores × 4
             ├── Register File (256 KB)
-            ├── Shared Memory / L1 Cache (up to 228 KB)
+            ├── Combined L1/shared capacity (target-specific)
             └── Load/Store Units, Special Function Units
 ```
 
@@ -96,11 +89,11 @@ GPU Die
 
 ### 3.2 The Streaming Multiprocessor (SM)
 
-The SM is the fundamental execution unit. All threads in one block run on **one SM**. The SM executes warps — groups of 32 threads that run the same instruction in lockstep (SIMT).
+An SM schedules resident thread blocks and warps. Threads in a block execute on one SM, subject to the architecture's scheduling model. A warp contains 32 threads, but independent thread scheduling means shared-memory communication still requires the appropriate explicit synchronization; “same warp” is not a memory-ordering guarantee.
 
 ![H100 SM internal diagram](../../../Assets/images/h100-sm-diagram.png)
 
-*H100 SM: 4 warp schedulers, 128 FP32 CUDA cores, 4 Tensor Cores (4th gen), 256 KB register file, up to 228 KB shared mem / L1. Source: NVIDIA*
+*H100 SM: 4 warp schedulers, 128 FP32 CUDA cores, 4 Tensor Cores (4th gen), 256 KB register file, up to 228 KiB shared memory within a larger combined L1/shared pool. Source: NVIDIA*
 
 **H100 SM components:**
 
@@ -112,7 +105,7 @@ The SM is the fundamental execution unit. All threads in one block run on **one 
 | INT32 units | 64 | Integer arithmetic — runs **simultaneously** with FP32 |
 | Tensor Cores (4th gen) | 4 | Matrix multiply-accumulate (MMA) for ML |
 | Register file | 256 KB | Per-thread fastest storage, compiler-allocated |
-| Shared mem / L1 | 228 KB | Configurable split between the two |
+| Shared memory | Up to 228 KiB on H100 | Per-SM limit; per-block and combined L1 limits differ |
 
 **Execution pipeline — how a kernel actually runs:**
 
@@ -164,18 +157,12 @@ FP32 cores and INT32 units can issue in the same cycle. A common pattern in GPU 
 
 ```
 cycle N:   FP32: result[i] = a[i] * b[i]
-           INT32: next_addr = base + (i+1) * stride   ← free — uses different units
+           INT32: next_addr = base + (i+1) * stride   ← may overlap on supported execution paths
 ```
 
 **Tensor Core operation:**
 
-A Tensor Core computes a 16×16 matrix multiply-accumulate in one instruction:
-
-```
-D = A × B + C     (D, A, B, C are 16×16 tiles)
-```
-
-vs CUDA core equivalent: 16×16×16 = 4,096 multiply-adds → 4,096 separate FP32 instructions. One Tensor Core instruction replaces thousands of scalar ops.
+Matrix instructions perform a structured tile multiply-accumulate collectively across lanes. Supported shapes and dtypes depend on the instruction and target. Count the mathematical MACs in a tile, then separately inspect instruction issue, latency, and throughput. One matrix instruction is not one cycle, and a scalar lane instruction is not a whole-warp operation.
 
 **Register file and occupancy tradeoff:**
 
@@ -186,15 +173,15 @@ Thread uses 32 registers:  256 KB / (32 regs × 4 B) = 2048 threads max → 64 w
 Thread uses 64 registers:  256 KB / (64 regs × 4 B) = 1024 threads max → 32 warps
 Thread uses 128 registers: 256 KB / (128 regs × 4 B) = 512 threads max → 16 warps
 
-Fewer active warps → less latency hiding → lower occupancy → lower throughput
+Fewer resident warps → lower occupancy; throughput impact must be measured
 ```
 
-The compiler minimizes register usage to keep occupancy high. Check with `nvcc --ptxas-options=-v` to see per-kernel register count.
+The compiler balances register allocation and code generation; forcing fewer registers can add spills. Check with `nvcc --ptxas-options=-v` to see per-kernel register count.
 
 **Shared memory / L1 split (Hopper):**
 
 ```
-228 KB total ← configurable at kernel launch
+H100 shared-memory carveout: up to 228 KiB per SM; combined L1/shared pool is larger
 ├── Shared memory: 0 / 8 / 16 / 32 / 64 / 100 / 132 / 164 / 196 / 228 KB
 └── L1 cache:      remainder
 
@@ -202,7 +189,7 @@ More shared memory → better for kernels with thread cooperation (matmul tiling
 More L1            → better for streaming workloads with irregular access
 ```
 
-Set with: `cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, size)`
+Use `cudaFuncAttributePreferredSharedMemoryCarveout` for the shared/L1 preference. `cudaFuncAttributeMaxDynamicSharedMemorySize` is a separate opt-in allocation limit. Check every API result and the target limits.
 
 **Common SM-level bottlenecks:**
 
@@ -214,307 +201,33 @@ Set with: `cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemoryS
 | Bank conflicts | Multiple threads access same shared memory bank | Pad shared arrays or stagger access patterns |
 | Uncoalesced global access | Threads access non-contiguous addresses → multiple transactions | Ensure thread N accesses element N (stride-1 access) |
 
-### 3.3 Warp Scheduler, L0 Cache, and Dual-Issue
+### 3.3 Resident, eligible, and issuing warps
 
-**Warp scheduler internals:**
+A **resident** warp has resources allocated on an SM. An **eligible** warp can issue its next instruction: its required operands, execution resources, and dependencies permit progress. An **issuing** warp is selected for an instruction issue opportunity. These are different counts; “active warps” in occupancy metrics normally means resident work, not just the warp issuing this cycle.
 
-Each of the 4 schedulers owns a subset of the SM's active warps and runs the same decision loop every clock cycle:
+A scoreboard tracks relevant dependencies. In this conceptual sequence, the second operation must wait for the first result, while another independent instruction or warp may progress:
 
-```
-every cycle, for each scheduler:
-  1. scan assigned warps
-  2. filter: keep only warps where all operands are ready (scoreboard check)
-  3. pick one ready warp (typically greedy-then-oldest policy)
-  4. issue up to 2 independent instructions from that warp → dispatch units
+```text
+r4 = r0 * r1      # produces r4
+r5 = r4 + r2      # depends on r4
+r6 = r7 + r8      # independent of that dependency, if scheduling permits
 ```
 
-The **scoreboard** tracks register readiness. When an instruction is issued, its destination registers are marked "pending". Once the result is written back, the registers are cleared. Any warp that tries to read a pending register is stalled and skipped that cycle — no explicit hardware lock needed.
+The number of schedulers, execution-pipeline widths, issue rules, cache organization, and warp-to-scheduler assignment depend on architecture. Do not infer “two instructions per scheduler per cycle” from a generic diagram or claim that adjacent FP32/INT32 instructions in SASS prove same-cycle issue. Use the target's documented throughput and measured profiler counters.
 
-```
-Warp A issues: r4 = r0 * r1   → r4 marked PENDING
-Warp A issues: r5 = r4 + r2   → r4 still PENDING → warp A STALLED
-Scheduler     → skips warp A, picks warp B instead (zero-cost switch)
-...N cycles later...
-r4 result written back → r4 cleared → warp A becomes READY again
-```
+Independent integer address calculations and floating-point arithmetic may overlap on supported execution paths. They still consume issue slots, registers, and execution resources; pointer arithmetic is not free. Instruction-level parallelism can help when sufficient independent work exists, while increasing live values may raise register pressure.
 
-**Warp pool partitioning (H100 example):**
+A fused multiply-add evaluates a product plus addend with one final rounding, according to the selected instruction's semantics. It can differ from separately rounded multiplication and addition. Whether the compiler may contract the expression depends on language and compilation settings; correctness comparisons need an explicit tolerance or exact arithmetic contract.
 
-```
-SM: up to 64 warps active (2048 threads ÷ 32)
-  Scheduler 0 → warps  0–15
-  Scheduler 1 → warps 16–31
-  Scheduler 2 → warps 32–47
-  Scheduler 3 → warps 48–63
-```
+### 3.4 Latency hiding and its limits
 
-Each scheduler is independent — its stalls do not block the other three.
+Latency is the delay until a result becomes available; throughput is the rate of completed or issued work under stated conditions. A memory access can hit a cache or travel farther through the memory system, so there is no fixed cycle cost for every “global load.” CPUs also use out-of-order execution, caches, prefetching, and sometimes hardware threads to overlap independent work. Comparing a GPU warp selection with an operating-system CPU context switch confuses different mechanisms.
 
-**L0 instruction cache:**
+**Teaching example:** suppose a resource permits one relevant instruction issue per cycle, and each independent chain must wait four cycles between dependent issues. Four available independent chains can potentially fill those issue opportunities. This is a simplified reasoning model, not a GPU specification. If every chain waits for the same unavailable data or the issue resource is saturated, adding chains cannot remove that bottleneck.
 
-Between the warp scheduler and the instruction memory sits a tiny per-scheduler L0 cache. It holds decoded instructions for the active warps assigned to that scheduler.
+More resident warps can provide more eligible work. They do not guarantee progress, high utilization, or greater application throughput. Increasing occupancy by shrinking a tile may increase memory traffic; lowering register use may introduce spills. Likewise a kernel at modest occupancy can perform well if each warp has enough useful independent work.
 
-```
-Warp scheduler
-      │
-      ▼
-  L0 cache (hit → ~0 cycles)
-      │ miss
-      ▼
-  L1 instruction cache
-      │ miss
-      ▼
-  L2 → HBM  (expensive)
-```
-
-L0 is rarely discussed but critical: without it, every instruction issue would require an L1 read, capping throughput. In practice, L0 hit rates are very high because GPU code has high instruction reuse (same loop body issued to thousands of warps).
-
-**CUDA core — what it is and isn't:**
-
-A CUDA core is a single-precision ALU. It executes one FP32 operation per cycle for one thread's data:
-
-```
-supported: add, mul, fma(a,b,c) = a×b+c, min, max, comparison
-not its job: memory loads/stores (load-store units), scheduling (warp scheduler), matrix ops (Tensor Cores)
-```
-
-FMA (`fused multiply-add`) is the dominant operation in AI workloads — it performs `a×b+c` in one instruction with a single rounding step, which is both faster and more numerically accurate than separate mul + add.
-
-Threads run in warps of 32. One warp issues one instruction and all 32 threads execute it in parallel across 32 CUDA cores. The SM has 128 cores total, which aligns with the 4 schedulers:
-
-```
-4 schedulers × 1 warp × 32 threads = 128 threads issuing FP32 per cycle
-                                   = 128 CUDA cores fully occupied at peak
-
-instruction: C[i] = A[i] * B[i] + D[i]   (FMA, warp of 32 threads)
-                 │
-    ┌────────────┼─────────────┐
-    T0→core 0   T1→core 1  ...  T31→core 31   ← one warp, 32 cores, same cycle
-```
-
-**Important — resident warps vs active warps:**
-
-```
-Resident warps (H100):  up to 64 per SM  (2048 threads ÷ 32)
-                             ↑
-          all held in registers, ready to schedule at any time
-
-Active warps per cycle:  4  (one per scheduler)
-                             ↑
-          the 4 currently issuing instructions this clock cycle
-
-CUDA cores are NOT statically assigned to warps.
-Any warp can use any cores — the scheduler dynamically routes each cycle.
-```
-
-Think of it as a flow, not a fixed assignment: the 64 resident warps are a pool the scheduler draws from every cycle, routing whichever 4 are ready into the 128 cores. The large resident pool is what enables latency hiding — while 4 warps execute, 60 others are waiting on memory or dependencies, ready to replace any that stall.
-
-**Dual-issue — when two instructions issue in one cycle:**
-
-Each warp scheduler can issue up to 2 instructions per cycle to different execution units. This is **not** two ops on the same unit — it's exploiting independent pipelines simultaneously.
-
-```
-✓  FP32 + INT32       → different pipelines, no conflict
-✓  FP32 + load/store  → different units
-✓  INT32 + Tensor Core→ different units
-
-✗  FP32 + FP32        → same pipeline, serialized
-✗  dependent ops      → second reads register written by first, must wait
-```
-
-Concrete dual-issue example — computing a value while calculating the next index:
-
-```
-cycle N, warp A, instruction slot 1:  r4 = r0 * r1        (FP32 → CUDA cores)
-cycle N, warp A, instruction slot 2:  r5 = r2 + 1         (INT32 → integer units)
-                                            ↑ free — uses a completely separate pipeline
-```
-
-The compiler (NVCC → ptxas) schedules instruction order to maximize dual-issue opportunities. You can inspect the result with `cuobjdump --dump-sass binary.cubin` — back-to-back independent FP32+INT32 pairs indicate successful dual-issue scheduling.
-
-**Instruction-level vs warp-level parallelism:**
-
-```
-warp-level parallelism (TLP):            instruction-level parallelism (ILP):
-  many warps in flight                     independent instructions within one warp
-  hides memory latency                     fills multiple pipelines per cycle
-  requires high occupancy                  requires dependency-free code sequences
-
-  T0 T1 T2 ... T63  ← different warps     x = a*b;   ← FP32
-  all in scheduler                         y = c+d;   ← also FP32 (serialized)
-  switch on stall                          i = n+1;   ← INT32 (can dual-issue with either)
-```
-
-Both matter. TLP is the primary mechanism (latency hiding); ILP squeezes extra throughput when warps are available.
-
-**Cycle-level summary — one SM, one clock:**
-
-```
-clock edge
-    │
-    ├─ Scheduler 0: picks warp A → issues FP32 + INT32 to dispatch units
-    ├─ Scheduler 1: picks warp C → issues FP32 to dispatch units (warp B stalled)
-    ├─ Scheduler 2: picks warp E → issues Tensor Core op
-    └─ Scheduler 3: all warps stalled (memory) → issues nothing this cycle
-
-dispatch units → route to:
-    FP32 cores  (×128) → execute 32-thread FMA
-    INT32 units (×64)  → execute 32-thread add
-    Tensor Core (×4)   → execute 16×16 MMA
-
-register file → results written back → scoreboards updated → stalled warps unblock
-```
-
-Maximum theoretical: 4 schedulers × 2 instructions = **8 instructions issued per clock cycle** on one SM.
-
-### 3.4 Latency Hiding — The Core Magic of GPUs
-
-This is the single most important concept in GPU architecture. Once you see it, everything about SM design, occupancy, and kernel optimization clicks.
-
-**What "latency" means here:**
-
-Every global memory load takes **300–500 cycles** to return. On a CPU, that means 300 cycles of doing nothing — the core stalls. On a GPU, the warp scheduler **instantly switches to another warp** and keeps the hardware busy.
-
-```
-The CPU approach (hide latency with cache):
-
-  Thread requests data → L1 miss → L2 miss → DRAM → 300 cycles stall
-                                                      ↑
-                                              Core does NOTHING for 300 cycles
-                                              (branch predictor + prefetch help, but stalls still happen)
-
-The GPU approach (hide latency with parallelism):
-
-  Warp A requests data → stalls                        ← warp A goes to sleep
-  Warp B runs          → stalls                        ← warp B goes to sleep
-  Warp C runs          → stalls
-  Warp D runs          → computes (no stall!)
-  Warp E runs          → computes
-  ...
-  Warp A's data arrives → warp A runs again            ← warp A wakes up
-
-  SM NEVER IDLES as long as some warp is ready
-```
-
-**Step-by-step timeline — what happens inside one SM:**
-
-```
-64 resident warps, 4 schedulers, global memory latency = 200 cycles
-
-Cycle 1:    Scheduler 0 picks Warp 0  → issues LOAD from global memory
-            Scheduler 1 picks Warp 16 → issues FMA (compute)
-            Scheduler 2 picks Warp 32 → issues FMA (compute)
-            Scheduler 3 picks Warp 48 → issues LOAD from global memory
-
-Cycle 2:    Warp 0 stalled (waiting for memory)
-            Warp 48 stalled (waiting for memory)
-            Scheduler 0 picks Warp 1  → issues FMA       ← instantly switched!
-            Scheduler 3 picks Warp 49 → issues FMA       ← no idle cycle!
-
-Cycle 3:    Scheduler 0 picks Warp 2  → issues FMA
-            ...
-
-Cycle 200:  Warp 0's data arrives from DRAM
-            Warp 0 becomes READY again
-            Next time Scheduler 0 has a free slot → picks Warp 0
-
-Result: 200 cycles of "waiting" consumed ZERO idle cycles
-        because 63 other warps filled the gap
-```
-
-**Why warp switching is free:**
-
-On a CPU, context switching saves/restores registers to memory (~1000 cycles). On a GPU, **every warp's registers are already on-chip** in the 256 KB register file — permanently allocated at kernel launch. Switching warps means the scheduler just picks a different warp ID. No save, no restore, no overhead.
-
-```
-CPU context switch:                    GPU warp switch:
-  Save 16 registers to stack            Do nothing — registers already on-chip
-  Load 16 registers from stack          Scheduler picks different warp ID
-  Flush/refill pipeline                 Next cycle: new warp's instruction issues
-  ~1000 cycles                          ~0 cycles
-```
-
-This is why the register file is 256 KB — it holds ALL warps' registers simultaneously. The trade-off: more registers per thread = fewer warps can fit = less latency hiding.
-
-**The chef analogy:**
-
-```
-CPU = one chef, one dish at a time:
-  Start soup → wait for stock to boil (300 seconds) → chef stands idle
-  Total: 300 seconds of waiting per dish
-
-GPU = one chef, 64 dishes in parallel:
-  Start soup     → put on stove (waiting)
-  Start salad    → chopping (active)
-  Start bread    → kneading (active)
-  Start sauce    → simmering (waiting)
-  Check soup     → stock ready! Continue soup
-  ...
-  Chef is NEVER idle — always has another dish to work on
-
-  64 dishes, each takes 300 seconds of waiting
-  But chef serves all 64 in ~350 total seconds (not 64 × 300 = 19,200)
-```
-
-**When latency hiding fails — and what to do:**
-
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| SM utilization <50% | Too few warps (low occupancy) | Reduce registers/thread, increase block size |
-| All warps stalled simultaneously | Every warp hit the same memory barrier | Restructure access to avoid all-warp synchronization |
-| High occupancy but low throughput | Memory bandwidth saturated (all warps waiting on DRAM) | Reduce memory traffic: tile, quantize, fuse ops |
-| Occupancy limited by shared memory | Each block uses too much shared memory | Reduce tile size, use registers instead where possible |
-| Occupancy limited by registers | Complex kernel needs many registers | Use `__launch_bounds__`, simplify computations, split kernel |
-
-**The occupancy sweet spot:**
-
-```
-Occupancy = active warps / max warps (64 on H100)
-
-  Occupancy   Latency hiding   Performance
-  ─────────────────────────────────────────
-  <25%        Poor              Bad — SM often idle
-  25–50%      Adequate          Good for compute-bound kernels
-  50–75%      Good              Good for most kernels
-  75–100%     Excellent         Best for memory-bound kernels
-
-  Rule of thumb: aim for >50% occupancy as a starting point
-  But: high occupancy ≠ fast kernel (memory-bound kernel at 100% occupancy
-       is still slow if it's hitting bandwidth ceiling)
-```
-
-**Measuring occupancy:**
-
-```bash
-# At compile time: theoretical occupancy
-nvcc --ptxas-options=-v my_kernel.cu
-# Output: "Used 32 registers, 4096 bytes smem" → plug into occupancy calculator
-
-# At runtime: achieved occupancy
-ncu --metrics sm__warps_active.avg.pct_of_peak_sustained_active ./my_program
-# Output: 68.5% → 68.5% of max warps were active on average
-
-# NVIDIA Occupancy Calculator (Excel spreadsheet):
-# Input: registers/thread, shared mem/block, block size
-# Output: theoretical occupancy, limiting factor
-```
-
-**The key mental model:**
-
-```
-GPUs don't make individual operations faster.
-GPUs hide the wait time by doing other work.
-
-1 warp waiting 200 cycles          = 200 wasted cycles
-64 warps, each waiting 200 cycles  = 0 wasted cycles (others fill the gap)
-
-This is why:
-  - GPU needs THOUSANDS of threads (not 4–8 like CPU)
-  - Occupancy matters (more warps = more hiding capacity)
-  - Register usage matters (more regs = fewer warps = less hiding)
-  - Block size matters (more threads per block = more warps)
-  - Memory access pattern matters (coalesced = fewer stalls to hide)
-```
+For a real kernel, record achieved occupancy, eligible-warps/issue observations, memory throughput, stall categories, and elapsed time. Change one candidate resource choice—block size, tile size, or number of buffers—then revalidate output and compare. The occupancy API provides a useful starting configuration, not an optimum proof.
 
 ### 3.5 GPU Architecture Generations
 
@@ -584,7 +297,7 @@ int col = blockIdx.x * blockDim.x + threadIdx.x;
 ```
 Max threads per block:      1024
 Max blocks per grid (x):    2,147,483,647
-Max shared memory per block: 48 KB (default) → 228 KB (Hopper, if requested)
+Max shared memory per block: query device/function; H100 opt-in limit is 227 KiB
 Max registers per thread:   255
 Warp size:                  32  (always)
 ```
@@ -592,11 +305,11 @@ Warp size:                  32  (always)
 **Block size rule of thumb:**
 - Must be a **multiple of 32** (warp size) — avoid partial warps
 - 128, 256, or 512 are common choices
-- Use `cudaOccupancyMaxPotentialBlockSize()` to find the optimal size programmatically
+- Use `cudaOccupancyMaxPotentialBlockSize()` to obtain an occupancy-based starting point, then measure candidate sizes
 
 ### 4.3 Thread Block Clusters (Compute Capability 9.0+ / Hopper)
 
-Hopper adds a new level between grid and block: **clusters** — a group of thread blocks that are guaranteed to run on neighbouring SMs simultaneously and can cooperate directly.
+Hopper adds a new level between grid and block: **clusters** — a group of thread blocks that are guaranteed to run on SMs within one GPC concurrently and can cooperate directly.
 
 ![Grid of clusters](../../../Assets/images/grid-of-clusters.png)
 
@@ -610,7 +323,7 @@ Grid
 ├── Block 1 → SM 71  (no control over placement)
 ├── Block 2 → SM 12
 └── Block 3 → SM 99
-Communication between blocks: global memory only (~400 cycles) ❌
+Communication between independent blocks: use a supported global-memory protocol ❌
 Synchronization between blocks: impossible without kernel relaunch ❌
 ```
 
@@ -633,8 +346,8 @@ Grid
 | Capability | Before clusters | With clusters |
 |-----------|----------------|---------------|
 | Cross-block sync | Impossible | `cluster.sync()` barrier |
-| Cross-block memory | Global memory only (~400 cycles) | **Distributed Shared Memory** (~30 cycles) |
-| Co-scheduling | No guarantee | **Guaranteed on neighbouring SMs** |
+| Cross-block memory | Global-memory communication with explicit ordering | Cluster-scoped distributed shared memory |
+| Co-scheduling | No guarantee | **Co-scheduled within one GPC** |
 
 #### Launching with Clusters
 
@@ -671,73 +384,30 @@ cudaLaunchKernelEx(&config, my_kernel, args...);
 
 #### Distributed Shared Memory (DSM)
 
-This is the most powerful cluster feature. Blocks in a cluster can read/write each other's shared memory directly — no global memory round-trip.
-
-```
-Without DSM:
-  Block 0 (SM 0):  shared mem = 228 KB   ← only Block 0 can access
-  Block 1 (SM 1):  shared mem = 228 KB   ← only Block 1 can access
-  Exchange data:   Block 0 → global mem → Block 1  (400+ cycles)
-
-With DSM (cluster of 4 blocks):
-  Block 0 (SM 0):  shared mem = 228 KB ─┐
-  Block 1 (SM 1):  shared mem = 228 KB  ├─ ALL blocks see ALL 912 KB
-  Block 2 (SM 2):  shared mem = 228 KB  │  via distributed shared memory
-  Block 3 (SM 3):  shared mem = 228 KB ─┘
-  Exchange data:   Block 0 → DSM → Block 1  (~30 cycles via SM-to-SM interconnect)
-```
-
-Effective shared memory per cluster: **4 × 228 KB = 912 KB** — enough to hold much larger tiles.
+A thread block cluster can access the shared-memory allocations of its member blocks. Each allocation still belongs to a block. Remote accesses must occur while the owning block exists, so synchronize before remote use and again before blocks exit or reuse storage.
 
 ```cpp
-__global__ void __cluster_dims__(4, 1, 1) dsm_kernel(float* data) {
-    namespace cg = cooperative_groups;
-    auto cluster = cg::this_cluster();
-
+// Structural sketch: provide includes, TILE_SIZE, load_tile, output, and checks.
+__global__ void __cluster_dims__(4, 1, 1) dsm_kernel(float* data, float* output) {
+    auto cluster = cooperative_groups::this_cluster();
     __shared__ float tile[TILE_SIZE];
-
-    // Each block loads its own tile
     load_tile(tile, data, blockIdx.x);
-
-    cluster.sync();  // ensure all blocks have loaded
-
-    // NOW: Block 0 can read Block 1's shared memory!
-    unsigned int target_block = (cluster.block_rank() + 1) % cluster.num_blocks();
-    float* remote_tile = cluster.map_shared_rank(tile, target_block);
-
-    // remote_tile points to the OTHER block's shared memory
-    // Access it at ~30 cycles (vs ~400 for global memory)
-    float val = remote_tile[threadIdx.x];
+    cluster.sync();
+    unsigned target = (cluster.block_rank() + 1) % cluster.num_blocks();
+    float* remote = cluster.map_shared_rank(tile, target);
+    if (threadIdx.x < TILE_SIZE)
+        output[blockIdx.x * TILE_SIZE + threadIdx.x] = remote[threadIdx.x];
+    cluster.sync();  // no owner exits while another block still reads its tile
 }
 ```
 
-#### DSM Latency Comparison
+Capacity is the sum of **actual legal per-block allocations**, not the advertised maximum shared-memory capacity per SM multiplied blindly by block count. For example, four blocks each allocating 16 KiB expose 64 KiB in total. This does not make every access local or guarantee faster execution than a cache-friendly global-memory alternative.
 
-| Memory | Latency | Bandwidth | Scope |
-|--------|---------|-----------|-------|
-| Registers | 0 cycles | Unlimited | Per-thread |
-| Shared memory (local) | ~5 cycles | ~128 B/cycle/SM | Per-block |
-| **Distributed Shared Memory** | **~30 cycles** | **~32 B/cycle/SM** | **Per-cluster** |
-| L2 cache | ~100 cycles | ~12 TB/s total | All SMs |
-| Global (HBM) | ~400 cycles | ~3.35 TB/s | All SMs |
-
-DSM is ~13× faster than global memory. Not as fast as local shared memory, but fast enough to enable cross-block cooperation without the global memory penalty.
-
-#### Cluster Size Constraints
-
-| Cluster size | Total shared mem | Use case |
-|-------------|-----------------|----------|
-| 1 block (no cluster) | 228 KB | Default, backwards compatible |
-| 2 blocks | 456 KB | Small cross-block cooperation |
-| **4 blocks** | **912 KB** | **Sweet spot for attention tiling** |
-| 8 blocks | 1824 KB | Large tiles, high SM occupancy cost |
-| 16 blocks (max) | 3648 KB | Rare, requires many free SMs |
-
-**Trade-off:** larger clusters reserve more SMs → fewer clusters can run simultaneously → potential occupancy loss. Typically 2–8 blocks per cluster is optimal.
+The portable maximum cluster size is eight where supported; device or MIG constraints can reduce availability. H100 supports a nonportable opt-in size of 16. Use cluster occupancy queries for the actual launch. Larger clusters can reduce concurrent work. No cluster size or fixed DSM/global latency ratio is universally optimal. [Hopper tuning guide](https://docs.nvidia.com/cuda/hopper-tuning-guide/index.html).
 
 ### 4.4 Tiling — The Universal GPU Optimization
 
-Tiling is the single most important optimization pattern in GPU computing. Every high-performance AI kernel (matmul, attention, convolution) is fundamentally a tiled algorithm.
+Tiling is useful when it exposes data reuse or a suitable hardware work shape. It also consumes registers/shared memory and adds boundary and synchronization work. Measure the tradeoff for the operation.
 
 **The core idea:** break a large problem into small tiles that fit in fast on-chip memory (shared memory / registers), compute on each tile, then move to the next.
 
@@ -761,17 +431,17 @@ Tiled matmul: C = A × B,  tile size T = 16
 
 Without tiling:
   Each C[i,j] reads A[i, 0..N] and B[0..N, j] from DRAM
-  Total reads: 2 × N per output element
+  Total logical input loads: 2 × N per output element
   For N=4096: 8192 DRAM reads per element ❌
 
 With tiling:
   Load 16×16 tile of A into shared memory → reused by 16 threads
   Load 16×16 tile of B into shared memory → reused by 16 threads
-  Total DRAM reads per element: 2 × N/T = 2 × 4096/16 = 512
-  That's 16× fewer DRAM reads ✓
+  Logical input loads per output: 2 × N/T = 2 × 4096/16 = 512
+  That's 16× fewer logical input loads ✓
 
-  With T=32:  256× reduction
-  With T=64:  4096× reduction (limited by shared memory size)
+  With T=32:  32× fewer logical input loads than this naive baseline
+  With T=64:  64× fewer logical input loads, if the tile is legal and fits
 ```
 
 **Thread block = tile:**
@@ -795,22 +465,22 @@ This is why block size, shared memory size, and tile size are so tightly coupled
 ```
 Level 0: Register tiling
   Each thread holds a small tile (e.g., 4×4) in registers
-  Fastest: 0 cycles, unlimited bandwidth
+  Finite registers; instruction dependencies and register pressure still cost time
   Used by: CUTLASS, cuBLAS inner loops
 
 Level 1: Shared memory tiling (per block)
-  Thread block loads tile into shared memory (48–228 KB)
-  ~5 cycles, shared among threads in block
+  Thread block loads a tile into shared memory; capacity depends on the target
+  Access cost depends on instructions, conflicts, and architecture
   Used by: standard tiled matmul, FlashAttention
 
 Level 2: Distributed shared memory tiling (per cluster, Hopper)
-  Cluster of blocks shares DSM (up to ~1 MB)
-  ~30 cycles, shared among blocks in cluster
+  Cluster blocks can access distributed shared memory on supported devices
+  Requires the appropriate cluster lifetime and synchronization contract
   Used by: Hopper-optimized FlashAttention, large attention tiles
 
 Level 3: L2 cache tiling
-  Multiple blocks' access patterns designed to hit L2 (40–50 MB)
-  ~100 cycles, shared across all SMs
+  Multiple blocks' access patterns can reuse data through L2
+  Capacity, latency, and contention depend on the device and workload
   Used by: persistent kernels, stream-K GEMM
 ```
 
@@ -841,7 +511,7 @@ Tile: each block computes a TILE_M × TILE_N output tile
   Each iteration: 1 load from DRAM, many multiplies from shared memory.
 ```
 
-**This is exactly what cuBLAS and CUTLASS do** — with additional optimizations: double-buffering (load next tile while computing current), register tiling (each thread handles a 4×4 sub-tile), and Tensor Core wmma instructions.
+Optimized GEMM libraries use architecture-specific schedules, layouts, and instructions. Double buffering, register tiling, and matrix instructions are common choices, but their shapes and interfaces are not fixed to this teaching example.
 
 #### Attention — FlashAttention Tiling
 
@@ -870,7 +540,7 @@ FlashAttention (tiled, never materializes full matrix):
     Write O_tile to global memory
 
   Memory: O(seq) — only tiles in shared memory at any time
-  DRAM traffic: ~4× less than standard attention
+  Traffic reduction depends on sequence length, head dimension, tiling, and baseline
 ```
 
 ```
@@ -944,30 +614,11 @@ Jetson "parallelism":
   Both engines consume bandwidth from the same 51 GB/s pipe
 ```
 
-#### How Clusters Enable Bigger Attention Tiles (Hopper)
+#### Clusters and attention: an implementation question
 
-Standard FlashAttention is limited by one block's shared memory (~228 KB). With clusters:
+Distributed shared memory may enable cross-block cooperation, but a larger aggregate allocation alone does not produce a valid attention kernel. Define which block owns each Q/K/V tile, when transfers complete, where online-softmax state lives, and which barriers protect reuse. Include accumulator and normalization state in the budget. A fourfold tile dimension does not imply fourfold lower traffic or latency.
 
-```
-Standard (1 block, 228 KB shared mem):
-  Q tile: 64 tokens × 128 dims × 2 bytes = 16 KB
-  K tile: 64 tokens × 128 dims × 2 bytes = 16 KB
-  V tile: 64 tokens × 128 dims × 2 bytes = 16 KB
-  Workspace: ~50 KB
-  Total: ~98 KB  (fits in 228 KB ✓)
-
-Cluster of 4 blocks (912 KB distributed shared mem):
-  Q tile: 256 tokens × 128 dims × 2 bytes = 64 KB
-  K tile: 256 tokens × 128 dims × 2 bytes = 64 KB
-  V tile: 256 tokens × 128 dims × 2 bytes = 64 KB
-  Workspace: ~200 KB
-  Total: ~392 KB  (needs cluster DSM ✓)
-
-  Bigger tiles = more data reuse = fewer DRAM reads = faster
-  4× larger tiles → up to 4× less memory traffic
-```
-
-This is why Hopper FlashAttention-3 is significantly faster than Ampere FlashAttention-2 — it's not just faster Tensor Cores, it's **bigger tiles via clusters**.
+Start with a validated supported attention library and measure its complete operation. Treat a cluster-based redesign as an experiment requiring a reference, tail tests, race checks, resource accounting, and profiling.
 
 ### 4.6 The Tiling Mental Model
 
@@ -987,218 +638,27 @@ Each level follows the same principle:
   3. Only go to the next (slower) level when this level is exhausted
 ```
 
-### 4.7 Inside One SM — Tiled Matmul Step by Step
+### 4.7 Work a tiled matmul budget correctly
 
-Everything above is theory. This section zooms into **what actually happens inside a single SM** during a tiled matrix multiplication — cycle by cycle, warp by warp.
+Consider a **teaching schedule**, not an observed cycle trace: one block of 256 threads computes a 128×128 output tile, processing K in chunks of 32. A/B elements are two bytes and accumulators are four bytes.
 
-**Setup:** one thread block computing a 128×128 output tile of C = A × B. K dimension processed in chunks of 32. Block has 256 threads = 8 warps.
+The staged A and B tiles need `128*32*2 + 32*128*2 = 16,384` bytes. The output contains 16,384 accumulators, or 65,536 bytes. If distributed evenly over 256 threads, that is **64 accumulators per thread**, before operands, pointers, and loop state. A claim of 16 accumulators per thread would cover only a quarter of this output tile. The compiler may use registers, spills, or a different mapping; inspect its resource report.
 
-#### Step 1: Block Arrives at the SM
+There are eight warps. An abstract partition into eight 32×64 output regions covers the 128×128 tile. A 64×32 region would also have 2,048 outputs, but the physical arrangement must cover the tile without gaps or overlap. A matrix-instruction implementation uses the documented fragment/lane mapping; it is not necessarily a rectangular private array per thread.
 
-The hardware scheduler assigns the block to an SM. The SM allocates:
+For one K chunk, mathematical work is `128*128*32 = 524,288` MACs. With a convention of two operations per MAC that is 1,048,576 operations. Neither count states how many instructions or cycles execute. A fixed matrix instruction must be counted with its own supported dimensions, precision, and issue behavior.
 
-```
-Resources locked for this block:
-  Registers:     256 threads × 32 regs × 4 bytes = 32 KB  (from 256 KB file)
-  Shared memory: 128×32 + 32×128 = 8K elements × 2 bytes = 16 KB  (from 48 KB)
-  Warp slots:    8 warps                                    (from 48 max)
+A correct staged implementation performs these steps:
 
-Remaining SM capacity: other blocks can co-reside if resources allow
-```
+1. Cooperatively load the A/B tiles with valid bounds; zero-pad the final K chunk if necessary.
+2. Establish completion and block-wide visibility before using shared operands.
+3. Accumulate into the existing C partial sums.
+4. Synchronize before overwriting shared operands still being read.
+5. Repeat over the complete K dimension, then store each valid C element once.
 
-#### Step 2: Threads Grouped into Warps
+For a two-buffer pipeline, A/B staging grows from 16 KiB to 32 KiB. Overlap requires a supported asynchronous copy path and explicit completion tracking. It can hide some latency when computation and transfer durations allow it; it does not guarantee a busy SM or hide every stall. Increased shared memory can also reduce resident blocks.
 
-```
-256 threads → 8 warps:
-  Warp 0: threads   0– 31    Warp 4: threads 128–159
-  Warp 1: threads  32– 63    Warp 5: threads 160–191
-  Warp 2: threads  64– 95    Warp 6: threads 192–223
-  Warp 3: threads  96–127    Warp 7: threads 224–255
-
-4 warp schedulers manage these 8 warps.
-Each cycle, each scheduler picks one ready warp → 4 warps active per cycle.
-```
-
-#### Step 3: Cooperative Tile Loading
-
-Every thread participates in loading the tile — no single thread does all the work:
-
-```
-A tile [128×32] = 4,096 elements   →  256 threads each load 16 elements
-B tile [32×128] = 4,096 elements   →  256 threads each load 16 elements
-
-Memory access pattern (coalesced):
-  Warp 0: loads A[row 0..3,  col 0..31]   32 threads × 4 rows = 128 bytes/thread
-  Warp 1: loads A[row 4..7,  col 0..31]
-  ...
-  Warp 4: loads B[row 0..3,  col 0..127]  (same pattern for B)
-  ...
-
-All loads are coalesced: consecutive threads access consecutive addresses.
-32 threads × 4 bytes = 128 bytes → one memory transaction.
-```
-
-**Why this is fast:** each value is loaded from DRAM once (slow, ~300 cycles), then read from shared memory many times (fast, ~5 cycles). For a 128×128 tile with K=32: each A element is reused 128 times, each B element is reused 128 times.
-
-#### Step 4: Synchronization Barrier
-
-```cpp
-__syncthreads();  // ALL 256 threads must reach here before any proceed
-```
-
-Without this barrier: some warps start computing before the tile is fully loaded → wrong results. The barrier ensures all 8,192 elements are in shared memory before math begins.
-
-#### Step 5: Each Warp Gets a Subtile
-
-The 128×128 output tile is divided among warps:
-
-```
-Output tile [128×128]:
-  ┌────────┬────────┐
-  │ Warp 0 │ Warp 1 │     Each warp computes a 64×32 subtile
-  │ 64×32  │ 64×32  │     (or similar partitioning)
-  ├────────┼────────┤
-  │ Warp 2 │ Warp 3 │     Within each warp:
-  │ 64×32  │ 64×32  │       each thread handles a 4×4 sub-subtile
-  ├────────┼────────┤       in REGISTERS (not shared memory)
-  │ Warp 4 │ Warp 5 │
-  ├────────┼────────┤
-  │ Warp 6 │ Warp 7 │
-  └────────┴────────┘
-```
-
-#### Step 6A: CUDA Core Execution
-
-Each thread performs scalar FMA (fused multiply-add) operations:
-
-```
-Thread's inner loop (K chunk = 32):
-  for k = 0 to 31:
-    acc[0][0] += shared_A[my_row + 0][k] * shared_B[k][my_col + 0]
-    acc[0][1] += shared_A[my_row + 0][k] * shared_B[k][my_col + 1]
-    acc[1][0] += shared_A[my_row + 1][k] * shared_B[k][my_col + 0]
-    acc[1][1] += shared_A[my_row + 1][k] * shared_B[k][my_col + 1]
-
-  acc[4][4] in registers = 16 accumulators per thread
-  32 K iterations × 16 FMAs = 512 FMA ops per thread per K chunk
-  256 threads × 512 = 131,072 FMAs per block per K chunk
-```
-
-All accumulators live in **registers** — the fastest storage. No DRAM writes until the entire K dimension is processed.
-
-#### Step 6B: Tensor Core Execution
-
-Instead of scalar FMAs, a warp issues matrix-multiply-accumulate (MMA) instructions:
-
-```
-Tensor Core MMA instruction:
-  D[16×8] = A[16×8] × B[8×8] + C[16×8]
-
-  One instruction = 16 × 8 × 8 = 1,024 multiply-adds
-  vs CUDA core: 1 FMA per instruction
-
-Each warp issues multiple MMA instructions to cover its subtile:
-  64×32 warp tile / 16×8 MMA tile = 16 MMA instructions per K step
-
-Throughput: 16 × 1,024 = 16,384 ops per warp per K step
-  vs CUDA cores: 32 threads × 1 = 32 ops per cycle
-  → Tensor Cores are ~500× higher throughput per instruction
-```
-
-#### Step 7: Advance Through K Dimension
-
-After finishing one K chunk (32 elements):
-
-```
-K = 0..31:    load A[128×32], B[32×128] → compute → accumulate in registers
-K = 32..63:   load A[128×32], B[32×128] → compute → add to SAME registers
-K = 64..95:   load A[128×32], B[32×128] → compute → add to SAME registers
-...
-K = N-32..N:  final chunk → registers hold complete C[128×128]
-
-Registers accumulate: C[i,j] = Σ_k A[i,k] × B[k,j]
-                       built up across all K chunks
-```
-
-#### Step 8: Final Store
-
-```
-Registers → global memory (DRAM)
-
-256 threads cooperatively write 128×128 = 16,384 elements to C.
-Each thread writes its 4×4 subtile (16 elements).
-Writes are coalesced: consecutive threads write consecutive addresses.
-```
-
-#### What Happens Every Cycle (Zoomed In)
-
-```
-Clock cycle N:
-  Scheduler 0: Warp 2 → issues LOAD from shared memory
-  Scheduler 1: Warp 5 → issues FMA (or Tensor Core MMA)
-  Scheduler 2: Warp 0 → issues LOAD from global memory (prefetch next tile)
-  Scheduler 3: Warp 7 → stalled (waiting for global load) → SKIP
-
-Clock cycle N+1:
-  Scheduler 0: Warp 2 → issues FMA (data arrived from shared mem)
-  Scheduler 1: Warp 5 → issues FMA (next accumulation)
-  Scheduler 2: Warp 1 → issues LOAD from shared memory
-  Scheduler 3: Warp 3 → issues FMA
-
-Latency hiding: while Warp 7 waits for DRAM (300 cycles),
-  warps 0–6 execute ~300 × 4 = 1,200 instructions across the 4 schedulers.
-  SM never idles.
-```
-
-#### Double Buffering — Overlap Load and Compute
-
-Elite kernels (cuBLAS, CUTLASS) load the **next** tile while computing the **current** tile:
-
-```
-Time:   ───────────────────────────────────────────────────────►
-
-Load:   [Tile 0 load]  [Tile 1 load]  [Tile 2 load]  [Tile 3 load]
-                    ↘              ↘              ↘
-Compute:           [Tile 0 compute][Tile 1 compute][Tile 2 compute]
-
-Without double buffering:
-  [Load 0][Compute 0][Load 1][Compute 1][Load 2][Compute 2]
-  ← gaps where SM waits for memory
-
-With double buffering:
-  Load and compute overlap → nearly 100% SM utilization
-```
-
-Requires two shared memory buffers (one being loaded, one being computed on). Uses 2× shared memory but hides all load latency.
-
-#### CUTLASS Tiling Hierarchy
-
-Production GEMM libraries organize tiles in nested levels:
-
-```
-Threadblock tile [128×128×32]       ← one thread block's output + K chunk
-  └── Warp tile [64×64]            ← one warp's output portion
-        └── MMA tile [16×8×8]      ← one Tensor Core instruction
-              └── Thread tile [4×4] ← one thread's register accumulators
-
-Each level maps to a different memory/compute resource:
-  Threadblock tile → shared memory (load from DRAM)
-  Warp tile        → register file (computed in registers)
-  MMA tile         → Tensor Core hardware instruction
-  Thread tile      → individual thread's registers
-```
-
-This nested structure is why CUTLASS code looks complex — but it's just the same tiling idea applied recursively at every level of the hardware hierarchy.
-
-#### Real Bottlenecks in Tiled Matmul
-
-| Bottleneck | Cause | Symptom | Fix |
-|-----------|-------|---------|-----|
-| Bank conflicts | Multiple threads hit same shared memory bank | Shared mem throughput drops 2–32× | Pad: `__shared__ float A[128][33]` (not 32) |
-| Register pressure | Too many accumulators → spill to local memory | `ptxas` reports spills | Reduce thread tile size (4×4 → 2×2) |
-| Low occupancy | Large shared mem + many registers → few blocks per SM | SM utilization < 50% | Reduce tile size or shared mem usage |
-| Uncoalesced global loads | Threads access non-contiguous DRAM addresses | Memory throughput < 50% peak | Ensure thread N loads address N (stride-1) |
-| Shared memory bottleneck | Compute is faster than shared memory can deliver data | Compute units idle | Use register tiling to reuse data from shared mem |
+For CPU-executable practice with exact traffic counts, ragged shapes, and a clearly defined cycle model, use the [tiling and dataflow lab](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Labs/Tiling-and-Dataflow.md). Its systolic model is a different architecture, but the shape, storage, and arithmetic checks transfer directly.
 
 ---
 
@@ -1240,55 +700,28 @@ dim3 grid((W + 15) / 16, (H + 15) / 16);
 matmul<<<grid, block>>>(A, B, C, M, N, K);
 ```
 
-### 5.3 Complete SAXPY Example
+### 5.3 Complete checked SAXPY example
+
+Use the checked-in [saxpy.cu](labs/saxpy.cu). It computes `c[i] = 2*a[i] + b[i]` and compares every element against a host reference. The input values are small integer-valued floats, so exact equality is appropriate for this particular fixture. General floating-point workloads need a justified tolerance.
+
+The program covers lengths 0,1,31,32,33,255,256,257,1025. The empty case returns without allocation/launch; the final partial block uses an `i<n` guard. Every runtime call, the launch status, and the completion boundary are checked. A mismatch exits with failure; it never prints “OK” after a failed value check.
+
+```bash
+# From this CUDA and SIMT directory; choose the architecture of your device.
+nvcc -std=c++17 -O2 -arch=sm_80 labs/saxpy.cu -o /tmp/course-saxpy
+/tmp/course-saxpy
+```
+
+**Executed evidence:** the translation unit was compiled to an object for `sm_80` with nvcc 13.4.92 on 2026-10-18. No GPU was available for execution, so the nine runtime cases are supplied for reproduction, not reported as passed here. The [OpenCL CPU lab](../OpenCL%20and%20SYCL/labs/README.md) provides a heterogeneous kernel that was actually executed on this course-review host.
 
 ```cpp
-#include <cuda_runtime.h>
-#include <cstdio>
-
-// Kernel: c[i] = alpha * a[i] + b[i]
-__global__ void saxpy(float alpha, const float* a, const float* b, float* c, int N) {
+__global__ void saxpy(float alpha, const float* a, const float* b, float* c, int n) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < N)   // bounds check — last block may be partial
-        c[i] = alpha * a[i] + b[i];
-}
-
-int main() {
-    const int N = 1 << 20;
-    const size_t bytes = N * sizeof(float);
-
-    // Allocate host memory
-    float *h_a = new float[N], *h_b = new float[N], *h_c = new float[N];
-    for (int i = 0; i < N; i++) { h_a[i] = 1.0f; h_b[i] = 2.0f; }
-
-    // Allocate device memory
-    float *d_a, *d_b, *d_c;
-    cudaMalloc(&d_a, bytes);
-    cudaMalloc(&d_b, bytes);
-    cudaMalloc(&d_c, bytes);
-
-    // Copy H → D
-    cudaMemcpy(d_a, h_a, bytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_b, h_b, bytes, cudaMemcpyHostToDevice);
-
-    // Launch
-    int block = 256;
-    int grid  = (N + block - 1) / block;
-    saxpy<<<grid, block>>>(2.0f, d_a, d_b, d_c, N);
-
-    // Copy D → H
-    cudaMemcpy(h_c, d_c, bytes, cudaMemcpyDeviceToHost);
-
-    // Verify
-    for (int i = 0; i < N; i++) {
-        if (h_c[i] != 4.0f) { printf("WRONG at %d\n", i); break; }
-    }
-    printf("OK: c[0] = %.1f\n", h_c[0]);   // expected: 4.0
-
-    cudaFree(d_a); cudaFree(d_b); cudaFree(d_c);
-    delete[] h_a; delete[] h_b; delete[] h_c;
+    if (i < n) c[i] = alpha * a[i] + b[i];
 }
 ```
+
+For n=257 and 256 threads/block, the launch needs two blocks. Only thread 0 of the second block computes a valid output. The remaining threads must avoid the memory access; allocating a larger output alone would not make out-of-range input reads valid.
 
 ### 5.4 Error Checking
 
@@ -1313,7 +746,7 @@ CUDA_CHECK(cudaGetLastError());       // check launch error
 CUDA_CHECK(cudaDeviceSynchronize());  // wait + check execution error
 ```
 
-> **Always check errors in development.** Suppress `cudaDeviceSynchronize()` in production (it blocks the CPU) but keep `cudaGetLastError()`.
+> **Check both launch and completion errors.** `cudaGetLastError()` can detect a launch-configuration failure; asynchronous execution failures may surface later. Synchronize at the point where the application actually needs completion, using a stream/event or another appropriate checked completion operation. Removing all completion/error checks is not a production optimization.
 
 ---
 
@@ -1325,18 +758,18 @@ Every variable in CUDA lives in a specific memory space. Understanding this is t
 
 *Source: NVIDIA CUDA Programming Guide*
 
-### 6.1 Memory Space Summary
+### 6.1 Memory space summary
 
-| Memory | Location | Scope | Lifetime | Latency | Bandwidth | Size |
-|--------|----------|-------|----------|---------|-----------|------|
-| **Register** | On-chip (SM) | 1 thread | Kernel | 0 cycles | N/A | 256 KB/SM |
-| **Local** | Off-chip (DRAM) | 1 thread | Kernel | ~600 cycles | ~same as global | Per thread |
-| **Shared** | On-chip (SM) | All threads in block | Kernel | ~20–40 cycles | ~19 TB/s (H100) | Up to 228 KB/SM |
-| **L1 cache** | On-chip (SM) | 1 SM | Automatic | ~20–40 cycles | Same as shared | Part of unified cache |
-| **L2 cache** | On-chip (GPU) | All SMs | Automatic | ~200 cycles | ~TB/s | 50 MB (H100) |
-| **Global** | Off-chip (HBM) | All threads | Application | ~600 cycles | ~3.35 TB/s (H100) | ~80 GB |
-| **Constant** | Off-chip (cached) | All threads (read-only) | Application | ~20 cycles (cached) | — | 64 KB |
-| **Texture** | Off-chip (cached) | All threads (read-only) | Application | ~20 cycles (cached) | — | Up to 2D |
+| Space | Typical visibility and lifetime | What to verify |
+|---|---|---|
+| Registers | Per-thread values while active | Allocation, dependencies, spills, occupancy |
+| Local memory | Per-thread addressable storage | Device-memory traffic despite the word “local” |
+| Shared memory | Block lifetime; cluster access where supported | Capacity, banks, initialization, synchronization |
+| Global memory | Accessible by device threads with valid pointers | Coalescing, caches, bandwidth, ordering |
+| Constant memory | Read-only device symbols/cache path | Access pattern and per-symbol/device limits |
+| L1/L2 caches | Hardware-managed cached data | Target organization and measured hit/miss behavior |
+
+Latency and bandwidth are properties of the target and access pattern. Registers have finite throughput and dependent-instruction latency; there is no universal “zero cycles, unlimited bandwidth” storage level. Separate a capacity specification from a measured latency or achieved bandwidth.
 
 ### 6.2 Register and Local Memory
 
@@ -1352,7 +785,7 @@ __global__ void kernel() {
 
 ### 6.3 Shared Memory
 
-Shared memory is the most important optimization tool in CUDA. All threads in a block share it, it's on-chip, and it's ~30× faster than global memory.
+Shared memory is explicitly managed on-chip storage shared by a block. It can reduce repeated global-memory traffic, but its benefit depends on reuse, bank behavior, synchronization, and occupancy.
 
 ```cpp
 __global__ void use_shared(float* in, float* out, int N) {
@@ -1422,7 +855,7 @@ cudaMallocHost(&h_data, bytes);   // allocate pinned host memory
 // OR: cudaHostAlloc(&h_data, bytes, cudaHostAllocDefault);
 
 // Use exactly like regular memory
-// Transfer speed: ~2× faster than pageable memory
+// Pinned memory enables eligible asynchronous transfer paths; measure throughput.
 
 cudaFreeHost(h_data);
 ```
@@ -1474,102 +907,20 @@ A warp is 32 threads. The SM issues **one instruction** to all 32 lanes simultan
 
 *Active vs inactive lanes in a warp. Inactive lanes (diverged threads) are masked off — they consume time but produce no output. Source: NVIDIA*
 
-### 7.2 Warp Divergence
+### 7.2 Warp divergence and predication
 
-When threads in a warp take **different branches**, they execute both paths serially — inactive lanes are masked off.
-
-```cpp
-__global__ void divergent(float* data, int N) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i % 2 == 0)    // ← half the warp goes here
-        data[i] *= 2.0f;
-    else               // ← other half goes here (serialized!)
-        data[i] += 1.0f;
-}
-
-// Result: warp takes TWO passes — both branches run, half masked each time
-// 2× slower than a non-divergent version
-```
-
-**How the GPU actually handles this — predication and `SEL`:**
-
-CUDA hardware can convert short branches into **predicated instructions**. Instead of branching, the GPU executes both paths and uses a `SEL` (select) instruction to pick the correct result. This is the hardware equivalent of branchless selection — and the compiler does it automatically for simple cases.
-
-**Approach 1 — Ternary operator (recommended):**
-
-This *looks* like branching code, but the compiler generates branchless SASS assembly because the operations are trivial:
+Threads in a warp can take different control-flow paths. The hardware/compiler must preserve each thread's result while scheduling those paths. Divergence cost depends on path length, active-lane patterns, memory behavior, and reconvergence; it is not automatically a twofold slowdown.
 
 ```cpp
-__global__ void branchless_ternary(float* data, int N) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < N) {
-        float val  = data[i];
-        float even = val * 2.0f;      // compute BOTH results
-        float odd  = val + 1.0f;
-        data[i] = (i % 2 == 0) ? even : odd;  // compiler emits SEL, not branch
-    }
-}
+float value = input[i];
+output[i] = value > 0.0f ? value : 0.0f;
 ```
 
-The NVCC compiler sees that both paths are cheap (one multiply, one add) and emits a predicated `SEL` instruction instead of a conditional jump. All 32 threads in the warp execute in lockstep — no divergence.
+A compiler may implement this with a select, predicated instructions, or a branch. A ternary expression does not guarantee a specific instruction. CPU compilers can also produce conditional moves or vector blends, so branchless lowering is not exclusive to GPUs. Inspect generated code and profile before rewriting clear control flow.
 
-**Approach 2 — Arithmetic select (manual branchless):**
+Arithmetic selection such as `mask*a + (1-mask)*b` is not generally equivalent to choosing a or b: `0*NaN` remains NaN, infinities and signed zero can change results, and both branches may perform expensive work or invalid accesses. Preserve the numerical and memory contract.
 
-If you want to guarantee branchless execution regardless of compiler decisions:
-
-```cpp
-__global__ void branchless_arithmetic(float* data, int N) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < N) {
-        float val  = data[i];
-        float even = val * 2.0f;
-        float odd  = val + 1.0f;
-        int is_even = 1 - (i & 1);     // 1 if even, 0 if odd — no branch
-        data[i] = is_even * even + (1 - is_even) * odd;  // pure arithmetic
-    }
-}
-```
-
-Both values are computed, then blended with integer masks — zero branches at any level.
-
-**How CUDA differs from CPU here:**
-
-| | CPU (x86 SIMD) | GPU (CUDA) |
-|---|---|---|
-| Default branch handling | Branch instruction + branch predictor | **Automatic predication** for short branches |
-| Making it branchless | Requires manual SIMD blend intrinsics (`_mm256_blendv_ps`) | Compiler does it automatically for ternary/simple if |
-| When divergence hurts | Branch misprediction penalty (~15 cycles) | Warp serialization (executes both paths, 2× time) |
-| Branchless payoff | Always faster than misprediction | Only faster when both paths are cheap |
-
-**When NOT to use branchless:**
-
-If the two paths are expensive (e.g., complex loops, function calls), computing both paths wastes work. Better to let the warp diverge and only execute the needed path:
-
-```cpp
-// DON'T make this branchless — computing heavy_func for all threads wastes cycles
-if (condition)
-    result = heavy_function_A(x);   // 100+ instructions
-else
-    result = heavy_function_B(x);   // 100+ instructions
-
-// Divergence serializes (2× time) but only does NEEDED work
-// Branchless would do ALL work for ALL threads (2× work × all threads)
-```
-
-**Rule of thumb:** branchless for single-instruction operations (mul, add, max, min). Let the compiler handle ternary operators. Use arithmetic select only if profiling shows the compiler didn't predicate.
-
-**Verify with SASS inspection:**
-
-```bash
-# Compile to SASS and check for branch vs SEL instructions
-nvcc -arch=sm_87 -Xptxas=-v --ptx my_kernel.cu
-cuobjdump --dump-sass my_kernel.o | grep -E "BRA|SEL|@P"
-# SEL = select (branchless)  ✓
-# BRA = branch (divergent)   ✗
-# @P = predicated instruction ✓
-```
-
-**When divergence is unavoidable:** `if (i < N)` bounds checks diverge only the last partial warp — acceptable.
+**Exercise:** if only three lanes need an expensive fallback, should every lane compute both paths? **Answer:** not necessarily. Compare validated implementations; the useful work and memory accesses matter more than removing the word `if`.
 
 ### 7.3 Occupancy — Hiding Latency
 
@@ -1587,7 +938,7 @@ If block size = 1024 → 32 warps/block → 2 blocks = 64 warps = 100% occupancy
 2. **Shared memory per block** — more shared mem = fewer blocks fit
 3. **Max threads per SM** — hard limit
 
-**Find optimal config programmatically:**
+**Find an occupancy-based starting configuration:**
 
 ```cpp
 int block_size, min_grid;
@@ -1605,11 +956,11 @@ printf("Occupancy: %.1f%%\n", occupancy * 100);
 
 ## 8. Memory Coalescing
 
-Global memory is accessed in **128-byte cache line** chunks. If 32 threads in a warp access 32 contiguous floats (128 bytes), that's **one memory transaction**. If they access scattered addresses, that's up to **32 transactions** — 32× slower.
+For the common compute-capability 6.0+ model, count the **32-byte segments** touched by a warp's memory instruction. A full warp reading 32 aligned, consecutive FP32 values needs four segments; shifting the start by one float can require five. Scattered addresses can touch up to 32 segments. Transaction counts do not translate directly into a fixed slowdown because caches, reuse, and other bottlenecks matter. See the [CUDA coalescing guide](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#coalesced-access-to-global-memory).
 
 ![Coalesced memory access](../../../Assets/images/coalesced-memory.png)
 
-*32 threads access 32 consecutive 4-byte floats → 1 transaction (128 bytes). Source: NVIDIA*
+*Consecutive FP32 values occupy 128 useful bytes; the modern segment model counts four aligned 32-byte transactions. Interpret older diagrams using the target's documented transaction granularity.*
 
 ![Uncoalesced memory access](../../../Assets/images/uncoalesced-memory.png)
 
@@ -1628,12 +979,15 @@ __global__ void coalesced(float* a, float* b, float* c, int N) {
 **Strided (bad):**
 
 ```cpp
-// Thread i accesses a[i * stride] — stride = 4 means 1/4 cache lines used
+// Contract: stride > 0, N >= 0; inputs have N elements and c has ceil(N/stride).
+// Thread i accesses a[i * stride].
 __global__ void strided(float* a, float* b, float* c, int stride, int N) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i * stride < N) c[i] = a[i * stride] + b[i * stride];
+    if (i <= (N - 1) / stride && N > 0)
+        c[i] = a[i * stride] + b[i * stride];
 }
-// Each 128-byte load fetches 32 floats, but only uses 1 → 97% wasted bandwidth
+// Aligned stride=4: 32 lanes request 128 bytes across 16 segments (512 bytes).
+// That is 25% requested-byte utilization for this load, before cache reuse.
 ```
 
 **Fix strided access with transpose or SoA layout (see AoS vs SoA in SIMD guide).**
@@ -1737,7 +1091,7 @@ Column access: thread i reads smem[i][col] = smem[i × 32 + col]
   Thread 3 → index 3×32 + 0 = 96  → Bank 96 % 32 = 0  ← SAME BANK!
 
   → 32-way bank conflict! Serialized to 32 sequential accesses.
-  → 32× slower than conflict-free access.
+  → up to 32 distinct-address bank requests serialize in this simplified model; kernel slowdown requires measurement.
 ```
 
 ### 9.3 The +1 Padding Fix — Visually
@@ -1821,7 +1175,7 @@ float val = tile[row][0]; // varying row, column 0
 // Thread 1 → tile[1][0]  = flat index 32  → Bank 0  ← SAME!
 // Thread 2 → tile[2][0]  = flat index 64  → Bank 0  ← SAME!
 // Thread 3 → tile[3][0]  = flat index 96  → Bank 0  ← SAME!
-// ✗ All threads hit Bank 0 → 32-way conflict → serialized → 32× slower
+// ✗ All threads hit Bank 0 → 32-way distinct-address bank conflict in this simplified model
 ```
 
 Column access is like all kids jumping to the same locker pattern: locker 0, 32, 64 → traffic jam.
@@ -1888,14 +1242,13 @@ __global__ void transpose_padded(float* out, const float* in, int W, int H) {
         out[y * H + x] = tile[threadIdx.x][threadIdx.y];   // column read ✓ (padded)
 }
 
-// Performance difference on Orin Nano Super (1024×1024 matrix):
-//   transpose_naive:  ~15 GB/s effective bandwidth
-//   transpose_padded: ~85 GB/s effective bandwidth  (5.6× faster!)
+// No device benchmark is supplied here. Validate square and rectangular tails,
+// then report device, shape, launch, warmup, event timing, and byte convention.
 ```
 
 ### 9.7 Advanced — Shared Memory Swizzling
 
-For production kernels (CUTLASS, cuBLAS), +1 padding wastes memory and misaligns addresses. Instead, they use **swizzling** — XOR the row index into the column address to scatter bank accesses without wasting space.
+Padding changes storage size and alignment. Some optimized kernels use a carefully selected swizzle to map their access pattern to banks while preserving required layouts. An arbitrary XOR is not a universal conflict-free transformation; derive it for the actual instruction, element size, and lane mapping.
 
 ![Shared memory swizzling](https://leimao.github.io/images/blog/2024-05-14-CUDA-Shared-Memory-Swizzling/swizzling.png)
 
@@ -1975,7 +1328,7 @@ __global__ void block_sync_example(float* input, float* output) {
 
 **Without `__syncthreads()`:** thread 0 might read `shared[200]` before thread 200 has written it → garbage result. The barrier guarantees all writes complete before any reads.
 
-**Critical rule — `__syncthreads()` in conditional code is undefined behavior:**
+**Barrier rule:** a conditional block barrier is valid only when its condition is uniform across the block. A divergent subset must not execute a barrier that the other participating threads skip:
 
 ```cpp
 // WRONG: some threads may not reach __syncthreads()
@@ -2109,15 +1462,15 @@ float val = __shfl_xor_sync(0xFFFFFFFF, my_val, lane_mask);
 
 | | Shared memory | Warp shuffle |
 |---|---|---|
-| Latency | ~5 cycles (shared mem read) | ~1 cycle (register crossbar) |
-| Sync needed | Yes (`__syncthreads`) | No (warp is already lockstep) |
-| Memory used | Shared memory (limited, 48 KB) | Registers only (unlimited for this) |
+| Cost | Loads/stores and possible conflicts; measure on the target | Cross-lane instructions and dependencies; measure on the target |
+| Synchronization | Match barrier scope to producer/consumer scope | All named lanes must participate in the corresponding `_sync` operation |
+| Storage | Finite shared-memory allocation | Finite registers; more live values can reduce occupancy or spill |
 | Bank conflicts | Possible | Impossible |
 | Scope | Entire block | Within one warp (32 threads) |
 
 ### 10.6 Warp Reduction — The Classic Pattern
 
-Sum all 32 values in a warp using shuffle-down in 5 steps (log₂(32) = 5):
+Sum all 32 values in a warp using shuffle-down in 5 steps. **Precondition:** all 32 lanes execute every shuffle with the full mask. For a partial data tile, launch a complete warp and supply zero for out-of-range elements; do not return early before the collective. An arbitrary sparse participation mask requires a different reduction algorithm.
 
 ```cpp
 __device__ float warp_reduce_sum(float val) {
@@ -2153,7 +1506,7 @@ No shared memory used. No `__syncthreads()`. Just 5 `__shfl_down_sync` calls.
 
 ### 10.7 Block Reduction — Warp + Shared Memory Hybrid
 
-For reducing across an entire block (256+ threads), combine warp shuffles with shared memory:
+For this example, launch **exactly 256 threads in a one-dimensional block**, and have every thread call the function. Combine eight warp results through shared memory. Only thread 0's return value is the final block sum.
 
 ```cpp
 __device__ float block_reduce_sum(float val) {
@@ -2179,19 +1532,14 @@ __device__ float block_reduce_sum(float val) {
 }
 ```
 
-**Why this is optimal:** only ONE `__syncthreads()` call (after writing to shared memory). The warp-level reductions use zero shared memory and zero barriers. This is the pattern used in cuBLAS, CUTLASS, and FlashAttention.
+This teaching pattern needs one block barrier plus synchronized warp exchanges. It is not a universal optimum. For general shapes and thread counts, prefer a tested library collective such as CUB and compare generated code and runtime on the target.
 
 ### 10.8 Hardware Warp Reductions (Ampere+ / SM 8.0+)
 
 On compute capability 8.0+, the GPU has dedicated reduction hardware:
 
 ```cpp
-// Built-in warp reductions (one instruction, fastest possible)
-float sum = __reduce_add_sync(0xFFFFFFFF, val);
-float max = __reduce_max_sync(0xFFFFFFFF, val);
-float min = __reduce_min_sync(0xFFFFFFFF, val);
-
-// Integer versions
+// Integer reductions; these intrinsics do not accept float values.
 int   isum = __reduce_add_sync(0xFFFFFFFF, ival);
 int   imax = __reduce_max_sync(0xFFFFFFFF, ival);
 
@@ -2200,7 +1548,7 @@ unsigned and_result = __reduce_and_sync(0xFFFFFFFF, uval);
 unsigned or_result  = __reduce_or_sync(0xFFFFFFFF, uval);
 ```
 
-These are single hardware instructions — even faster than the shuffle loop. Use them when available (Orin Nano = SM 8.7 → supported).
+Use the supported signed/unsigned integer overloads and obey the participation mask. Floating-point reductions need a suitable shuffle/library implementation. These intrinsics do not order memory accesses; see [NVIDIA's warp-reduction specification](https://docs.nvidia.com/cuda/archive/13.4.2/cuda-programming-guide/05-appendices/cpp-language-extensions.html#warp-reduce-functions).
 
 ### 10.9 Warp Vote — Collective Boolean Operations
 
@@ -2229,15 +1577,15 @@ int count = __popc(mask);   // population count (count set bits)
 
 | Need | Best primitive | Why |
 |------|---------------|-----|
-| Sum/max/min of 32 values | `__reduce_add_sync` (SM 8.0+) | Single hardware instruction |
-| Sum/max/min on older GPUs | `__shfl_down_sync` loop (5 steps) | Works everywhere |
+| Supported integer sum/max/min | Corresponding `__reduce_*_sync` (SM 8.0+) | Check type and participation contract |
+| Floating-point sum or another target | CUB or a validated shuffle reduction | Match target, types, and active lanes |
 | Exchange with neighbor | `__shfl_xor_sync(mask, val, 1)` | Butterfly pattern |
 | Broadcast one value to all lanes | `__shfl_sync(mask, val, src_lane)` | Read from specific lane |
 | Prefix sum (scan) | `__shfl_up_sync` loop | Build partial sums |
 | Count true conditions | `__ballot_sync` + `__popc` | Bitmask + popcount |
 | Check all/any convergence | `__all_sync` / `__any_sync` | Collective boolean |
 | Block-wide reduction | Warp shuffle + 1 shared mem step | Hybrid (section 10.7) |
-| Cross-block reduction | `atomicAdd` to global | Only option |
+| Cross-block reduction | Library reduction, staged kernels, or appropriate atomics/cooperative launch | Choose supported synchronization and numerical order |
 
 ### 10.11 Atomic Operations
 
@@ -2332,7 +1680,7 @@ Sections 12–19 cover many GPU features. Before diving in, here's how they all 
 ```
 Layer 1: CPU ↔ GPU Scheduling
   ┌─────────────────────────────────────────────────────┐
-  │  CUDA Graphs (§13)         — remove CPU launch overhead      │
+  │  CUDA Graphs (§13)         — reduce CPU submission overhead      │
   │  Streams (§11)             — overlap copy + compute          │
   │  Automatic Scalability (§19) — same code, any GPU size       │
   └─────────────────────────────────────────────────────┘
@@ -2379,7 +1727,7 @@ Layer 4: Hardware Accelerators
 Is your kernel slow?
 │
 ├── Step 1: Is CPU the bottleneck?
-│   └── Yes → CUDA Graphs (§13). Eliminates ~5 µs/launch overhead.
+│   └── Yes → CUDA Graphs (§13). Can reduce repeated submission overhead; measure the actual launch path.
 │        Graphs don't make GPU faster — they make CPU overhead disappear.
 │
 ├── Step 2: Is it memory-bound?
@@ -2397,7 +1745,7 @@ Is your kernel slow?
 │        Sort input data so adjacent threads take same path.
 │
 ├── Step 5: Is compute underutilized?
-│   └── Yes → Tensor Cores (§16). One MMA instruction = 16×16×16 FMAs.
+│   └── Yes → Tensor Cores (§16). Choose a supported matrix instruction and verify dtype/layout/shape.
 │        WMMA fragments must be 16-aligned. Use cuBLAS for automatic TC.
 │
 └── Step 6: Still slow?
@@ -2407,17 +1755,17 @@ Is your kernel slow?
          You cannot exceed the roofline — only approach it.
 ```
 
-**Key insight:** most AI kernels are memory-bound (left of the roofline ridge). This means:
+**Use the measured bottleneck:** some kernels are bandwidth-bound, some compute-bound, and some dominated by launch, dependency, or synchronization costs. Candidate optimizations include:
 - Tiling and data reuse (Layer 2) give the biggest speedups
 - Warp shuffles (Layer 3) save shared memory bandwidth
-- Tensor Cores (Layer 4) only help when you're compute-bound (large batches, prefill)
+- Matrix instructions can reduce compute cost, but overall benefit depends on the remaining bottlenecks
 - CUDA Graphs (Layer 1) help when many small kernels dominate
 
 ---
 
 ## 13. CUDA Graphs
 
-For workloads that repeat the same sequence of kernels and transfers, CUDA graphs eliminate per-launch CPU overhead by capturing and replaying the entire execution graph.
+For workloads that repeat the same sequence of kernels and transfers, CUDA graphs reduce repeated CPU submission overhead by capturing and replaying the entire execution graph.
 
 ```cpp
 // Step 1: capture a sequence of operations
@@ -2448,7 +1796,7 @@ cudaGraphDestroy(graph);
 **When to use graphs:**
 - Same kernel sequence repeated many times (training loops, inference batches)
 - Many small kernels where launch overhead dominates
-- CPU overhead reduction from ~5 µs/launch → ~1 µs/graph replay
+- Measure capture/instantiation, first replay, steady replay, and device completion separately; graph launch still has overhead.
 
 ---
 
@@ -2567,7 +1915,7 @@ Tiled matmul with TILE=16:
 
 ## 16. Tensor Cores
 
-Tensor Cores are dedicated matrix-multiply-accumulate units introduced in Volta (CC 7.0). They operate on small matrix tiles in a single instruction.
+Tensor Cores provide matrix arithmetic introduced with Volta. WMMA is a collective programming interface; one API call is not necessarily one hardware instruction or one cycle.
 
 ```cpp
 #include <mma.h>
@@ -2577,8 +1925,10 @@ using namespace nvcuda::wmma;
 __global__ void tensor_core_matmul(
     const half* A, const half* B, float* C, int M, int N, int K)
 {
+    // Teaching contract: one full warp per block, M/N/K multiples of 16.
+    // A and B are row-major, with valid padded storage/alignment for WMMA.
     fragment<matrix_a, 16, 16, 16, half, row_major> a_frag;
-    fragment<matrix_b, 16, 16, 16, half, col_major> b_frag;
+    fragment<matrix_b, 16, 16, 16, half, row_major> b_frag;
     fragment<accumulator, 16, 16, 16, float>         c_frag;
 
     fill_fragment(c_frag, 0.0f);
@@ -2593,41 +1943,35 @@ __global__ void tensor_core_matmul(
 }
 ```
 
-**Tensor Core throughput vs CUDA Cores (H100 SXM, per SM):**
+**Read performance specifications with their scope attached.** A whole-device advertised FLOP/s value is not a per-SM rate. Record precision, accumulation type, dense versus structured-sparse mode, device variant, and power configuration. Then compare measured useful operations and end-to-end latency for the actual shape.
 
-| Precision | CUDA Cores | Tensor Cores |
-|-----------|-----------|--------------|
-| FP64 | 67 TFLOPS | 134 TFLOPS |
-| TF32 | — | 989 TFLOPS |
-| FP16/BF16 | 134 TFLOPS | 1,979 TFLOPS |
-| FP8 | — | 3,958 TFLOPS |
-| INT8 | 268 TOPS | 3,958 TOPS |
-
-In practice: use `cuBLAS` or `cuDNN` — they use Tensor Cores automatically when shapes are multiples of 16.
+`cuBLAS` and `cuDNN` select algorithms using supported types, layouts, alignment, sizes, and configuration. Multiples of 16 alone do not guarantee Tensor Core use or a faster end-to-end result. Check the selected algorithm and profiler counters rather than assuming dispatch from the matrix dimensions.
 
 ---
 
 ## 17. Dynamic Parallelism
 
-Kernels can launch other kernels from the GPU (no CPU round-trip required):
+Dynamic parallelism lets GPU code launch additional grids. It is an advanced option for runtime-generated work, with launch overhead and no guarantee that parent and child grids execute concurrently.
+
+**Current API boundary:** CDP2 is the default from CUDA 12.0 and is required for compute capability 9.0+. Device-side `cudaDeviceSynchronize()` is unavailable in that model. Follow [NVIDIA's current dynamic-parallelism documentation](https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/dynamic-parallelism.html) for parent/child visibility and tail-launch continuation. Host-side completion checks remain distinct.
 
 ```cpp
-__global__ void child_kernel(float* data, int n) {
+// Conceptual CDP2 launch sketch; not executed in the CPU-only course checks.
+// data points to N allocated floats in global memory; N >= 0.
+__global__ void child_kernel(float* data, int N) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) data[i] *= 2.0f;
+    if (i < N) data[i] *= 2.0f;
 }
 
 __global__ void parent_kernel(float* data, int N) {
-    // Each block launches its own child kernel
-    int chunk = N / gridDim.x;
-    int offset = blockIdx.x * chunk;
-
-    child_kernel<<<1, chunk>>>(data + offset, chunk);
-    cudaDeviceSynchronize();   // wait for children (device-side sync)
+    // Exactly one thread launches the child grid for this example.
+    if (blockIdx.x == 0 && threadIdx.x == 0 && N > 0)
+        child_kernel<<<1 + (N - 1) / 256, 256>>>(data, N);
+    // Do not read child results back in this parent body.
 }
 ```
 
-Requires compute capability 3.5+. Adds latency per launch. Best for irregular recursive problems (trees, AMR meshes).
+Build a complete host harness using the selected toolkit's device-runtime/linking instructions. Validate target support, launch/completion errors, and results. Compare with one direct host-launched child kernel before adding nested launches: for this simple transform, dynamic parallelism adds machinery without removing useful work.
 
 ---
 
@@ -2719,10 +2063,12 @@ Match precision, dense/sparse execution, and memory level on both sides. Dividin
 
 ### Step 4 — Launch Bounds
 
+The second argument guides register allocation; it does not guarantee four blocks actually reside on an SM. Other resources and launch constraints still apply.
+
 ```cpp
 // Tell the compiler max threads per block and min blocks per SM
 // Helps compiler tune register allocation for better occupancy
-__launch_bounds__(256, 4)   // max 256 threads/block, at least 4 blocks/SM
+__launch_bounds__(256, 4)   // max threads; register-allocation target for 4 resident blocks
 __global__ void my_kernel(float* data, int N) { ... }
 ```
 
@@ -2740,18 +2086,7 @@ __global__ void my_kernel(float* data, int N) { ... }
 | Blackwell | 10.x | B100, B200 | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Newer products | Query exact SKU | Consult vendor support table | Verify | Verify | Verify | Verify | Verify |
 
-**SM resource limits (selected):**
-
-| Resource | Volta 7.0 | Ampere 8.0 | Hopper 9.0 |
-|---------|-----------|-----------|-----------|
-| Max warps/SM | 64 | 64 | 64 |
-| Max threads/SM | 2048 | 2048 | 2048 |
-| Max blocks/SM | 32 | 32 | 32 |
-| Registers/SM | 64K | 64K | 64K |
-| Shared mem/SM | 96 KB | 164 KB | 228 KB |
-| L2 cache | 6 MB | 40 MB | 50 MB |
-| CUDA cores/SM | 64 FP64 | 64 FP64 | 64 FP64 |
-| FP32 cores/SM | 64 | 128 | 128 |
+**Resource limits:** query the exact device and consult its tuning guide. For the H100 case, per-SM shared capacity, maximum per-block allocation, and the combined L1/shared pool are different limits. L2 is a whole-device cache; do not list it as a per-SM resource. Likewise distinguish FP32, FP64, and matrix execution resources before comparing architectures. [Hopper resource limits](https://docs.nvidia.com/cuda/hopper-tuning-guide/index.html).
 
 ---
 

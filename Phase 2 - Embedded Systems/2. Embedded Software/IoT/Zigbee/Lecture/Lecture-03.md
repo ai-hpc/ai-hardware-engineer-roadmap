@@ -1,550 +1,77 @@
-# Lecture 3 - The Zigbee stack: ZDO, APS, endpoints, and clusters
+# Lecture 3 - Decode a Zigbee transaction: ZDO, APS, endpoints, and clusters
 
-**Course:** [Zigbee guide](../Guide.md) | **Phase 2 - Embedded Software, IoT**
+**Course:** [Zigbee guide](../Guide.md) | **Previous:** [Roles and formation](Lecture-02.md) | **Next:** [Security and sleepy devices](Lecture-04.md)
 
-**Previous:** [Lecture 02 - Roles, topology, and network formation](Lecture-02.md) | **Next:** [Lecture 04 - Security, commissioning, sleepy devices, and OTA](Lecture-04.md)
+A Zigbee network must deliver a message to the right device, select the right application inside that device, and interpret the command or value consistently. Learn the stack by tracing one temperature report rather than memorizing acronyms in isolation.
 
----
+## The layers answer different questions
 
-## Why this lecture feels hard
+| Layer or concept | Responsibility in this example |
+|---|---|
+| IEEE 802.15.4 PHY/MAC | Radio transmission and link-level framing/access |
+| NWK | Zigbee addressing and multi-hop delivery |
+| APS | Application delivery context: endpoints, profile, cluster, binding and applicable security/acknowledgment |
+| ZDO | Device/service discovery and management, using endpoint 0 |
+| ZCL | Meaning and encoding of attributes and commands within a cluster |
 
-This is the lecture where Zigbee often **stops feeling simple**.
+Application endpoints are logical functions within a node. One physical device can expose several endpoints; changing endpoint does not change which physical radio sent the packet. A network short address can change after rejoining, so a gateway must not treat it as a permanent product identity. See [Silicon Labs' stack overview](https://docs.silabs.com/zigbee/latest/zigbee-fundamentals/05-the-zigbee-stack) and [cluster-library explanation](https://docs.silabs.com/zigbee/latest/zigbee-fundamentals/06-zigbee-cluster-library).
 
-Up to now, the story is easy:
+## Trace the addressing context
 
-- devices join a network
-- some devices route
-- some devices sleep
+For a teaching temperature sensor, assume source endpoint 10, destination endpoint 1, Home Automation profile `0x0104`, and Temperature Measurement cluster `0x0402`. The sensor implements the server side because it holds the measured attribute; the reporting consumer handles the corresponding client behavior. Server/client here describes cluster roles, not which device formed the network.
 
-Then Zigbee starts throwing around words like:
+A decoded record needs all this context. Attribute `0x0000` alone is ambiguous because many clusters define an attribute with that number. A packet analyzer may show an APS acknowledgment before your application validates the value. Neither a radio ACK nor an APS ACK proves that the reading is physically plausible or fresh.
 
-- `NWK`
-- `APS`
-- `ZDO`
-- `ZCL`
-- endpoint
-- cluster
+Discovery typically asks which endpoints exist and obtains their simple descriptors. Binding associates a source endpoint and cluster with a destination address/endpoint or group; it does not create a network route or guarantee that a receiver supports every command. Check response status and the actual destination's descriptor.
 
-and everything starts to sound like spec language.
+## Work through a ZCL report
 
-So this lecture uses one simple analogy all the way through.
+Consider these **synthetic decoded ZCL bytes**, after lower-layer delivery and security processing:
 
-Official reference: [Silicon Labs The Zigbee Stack](https://docs.silabs.com/zigbee/8.2.1/zigbee-fundamentals/05-the-zigbee-stack)
+```text
+18 2a 0a 00 00 29 c4 09
+```
 
----
+They are an application payload exercise, not a complete radio frame or a captured device measurement.
 
-## Imagine a huge house party
+| Bytes | Meaning under this example's context |
+|---|---|
+| `18` | Global ZCL command, not manufacturer-specific, server-to-client, default response disabled |
+| `2a` | Transaction sequence number 42 |
+| `0a` | Report Attributes command |
+| `00 00` | Little-endian attribute ID `0x0000` (MeasuredValue in this cluster) |
+| `29` | ZCL signed 16-bit integer data type |
+| `c4 09` | Little-endian `0x09C4 = 2500`, interpreted here as 25.00 °C |
 
-Imagine you are throwing a huge house party.
+The temperature cluster defines the unit and invalid sentinel, not the `int16` type by itself. In this example `00 80` represents the special invalid value `0x8000`; it must not become a displayed −327.68 °C. Consult the selected stack's [temperature measurement definitions](https://github.com/espressif/esp-zigbee-sdk/blob/main/components/esp-zigbee-lib/include/ezbee/zcl/cluster/temperature_measurement_desc.h) and the applicable ZCL specification when implementing a complete decoder.
 
-Your house is full.
+You can check the arithmetic on any Python 3 interpreter:
 
-Your friends are spread across:
+```python
+payload = bytes.fromhex("18 2a 0a 00 00 29 c4 09")
+assert len(payload) == 8
+assert payload[:1] == b"\x18" and payload[2] == 0x0a
+assert int.from_bytes(payload[3:5], "little") == 0
+assert payload[5] == 0x29
+raw = int.from_bytes(payload[6:8], "little", signed=True)
+value_c = None if raw == -32768 else raw / 100.0
+assert value_c == 25.0
+print(value_c)
+```
 
-- your house
-- the yard
-- the garage
-- your neighbor's house
+This small fixture was executed during the course review. It is intentionally not a general parser: real reports can contain multiple attributes, manufacturer-specific headers, other data types, and variable-length values. A real decoder must check remaining length before every field, reject unsupported encodings explicitly, and avoid reading beyond the received buffer.
 
-Some people help pass messages around.
-Some people just show up, listen, and leave.
-Some people are in charge of the whole event.
+## Commands and observed state
 
-That is a good mental model for Zigbee.
+For the On/Off cluster `0x0006`, an `On` command asks the server to change its state. A read/report of the OnOff attribute describes its logical state. A physical lamp can still fail despite logical state being on; application confirmation should match the product claim.
 
-Now imagine you want one thing to happen:
+For a robot gateway, distinguish “request accepted,” “controller output enabled,” and “physical motion observed.” A model-generated command should pass a typed allowlist, range, current-state and expiry check before an actuator adapter sees it. An application cluster provides interoperability semantics; it does not replace local control constraints.
 
-- you press the wall switch
-- the smart bulb turns on
+## Practice with answers
 
-To make that happen, the system has to answer four questions:
+1. **Replace `c4 09` with `f3 fd`. What is the value?** Signed little-endian `0xFDF3 = −525`, giving −5.25 °C.
+2. **Replace it with `00 80`. What should the UI show?** Invalid/unavailable, preserving diagnostic context rather than a numeric temperature.
+3. **Can transaction sequence 42 prove this is a fresh sensor observation?** No. ZCL transaction sequence is limited protocol bookkeeping, not a source sampling timestamp or globally unique observation identifier.
+4. **Can a short address identify a sensor permanently?** No. Preserve its appropriate stable identity and endpoint mapping across rejoin/address changes.
 
-1. **How do we get the message there?**
-2. **Who exactly should receive it?**
-3. **What does the message mean?**
-4. **Who is in charge, and who is who?**
-
-Those four questions map to:
-
-- `NWK` = how do we get there?
-- `APS` = who exactly should receive it?
-- `ZCL` = what does the message mean?
-- `ZDO` = who are you, and what are the rules?
-
-If you remember only that mapping, the rest of Zigbee becomes much easier to read.
-
----
-
-## The stack in one picture
-
-At a high level:
-
-- **PHY / MAC** come from IEEE 802.15.4
-- **NWK** handles network behavior and routing
-- **APS** handles application-oriented delivery
-- **ZDO** handles device identity, discovery, and management
-- **ZCL** defines common application behavior
-
-![Zigbee architecture showing PHY, MAC, NWK, and application-layer pieces](../../../../../Assets/images/zigbee-architecture-overview.png)
-
-This picture is useful because it shows two important facts:
-
-- `PHY` and `MAC` are the radio foundation from IEEE 802.15.4
-- Zigbee adds higher-level pieces that make devices understandable, not just reachable
-
-Source: [Electrical Technology ZigBee Architecture diagram](https://www.electricaltechnology.org/wp-content/uploads/2017/07/ZigBee-Architecture.png)
-
----
-
-## Meet the Zigbee party crew
-
-### 1. `NWK` - the neighborhood map and hall monitors
-
-`NWK` means **Network Layer**.
-
-At the party, this is:
-
-- the people who know the map
-- the people who know which houses connect to which
-- the people who pass notes through the best route
-
-Their job is:
-
-- know which device is reachable through which router
-- forward the message hop by hop
-- recover if one route stops working
-
-So if a message has to travel like this:
-
-- Switch -> Router A -> Router B -> Bulb
-
-that is `NWK` doing its job.
-
-Simple version:
-
-- `NWK` answers: **how do we get there?**
-
----
-
-### 2. `APS` - the mailroom and the address book
-
-`APS` means **Application Support Sublayer**.
-
-At the party, this is:
-
-- the mailroom staff
-- the people holding the address book
-- the people who make sure the note goes to the right person in the right room
-
-This matters because reaching the right house is not enough.
-
-You also need to reach:
-
-- the right device
-- the right function inside that device
-
-That is why `APS` works closely with:
-
-- endpoints
-- binding
-- delivery behavior
-
-Simple version:
-
-- `APS` answers: **who exactly should receive this?**
-
----
-
-### 3. `ZCL` - the shared party slang
-
-`ZCL` means **Zigbee Cluster Library**.
-
-At the party, this is:
-
-- the shared slang everybody understands
-
-You do not want every brand of bulb and switch speaking a different private language.
-
-You want a common language like:
-
-- `On`
-- `Off`
-- `Toggle`
-- `Move to Level`
-
-That is what `ZCL` gives you.
-
-It defines common behavior so different vendors can still cooperate.
-
-Simple version:
-
-- `ZCL` answers: **what does this message mean?**
-
----
-
-### 4. `ZDO` - the host and the principal
-
-`ZDO` means **Zigbee Device Object**.
-
-At the party, this is:
-
-- the host
-- the principal
-- the person checking the guest list
-- the person introducing people
-- the person deciding who plays which role
-
-`ZDO` handles questions like:
-
-- who are you?
-- are you a Coordinator, Router, or End Device?
-- what endpoints do you have?
-- what kind of device are you?
-- what can you do?
-
-This is management and discovery, not normal user commands.
-
-Simple version:
-
-- `ZDO` answers: **who are you, and what are the rules?**
-
----
-
-## The most important support words
-
-Before the full story, you need three more terms.
-
-### Node
-
-A **node** is the physical device.
-
-Examples:
-
-- one bulb
-- one wall switch
-- one sensor
-
-### Endpoint
-
-An **endpoint** is a logical application instance inside the device.
-
-One physical node can expose:
-
-- one endpoint for lighting
-- another endpoint for sensing
-
-So:
-
-- node = the whole person at the party
-- endpoint = the specific role that person is playing
-
-### Cluster
-
-A **cluster** is a reusable feature block.
-
-Examples:
-
-- `On/Off`
-- `Level Control`
-- `Temperature Measurement`
-
-So:
-
-- endpoint = which application instance
-- cluster = which feature
-
----
-
-## Attributes and commands
-
-Inside a cluster, you usually care about two things:
-
-- **attributes** = state values
-- **commands** = actions
-
-Examples:
-
-- an `On/Off` cluster may support commands like `On`, `Off`, and `Toggle`
-- a temperature cluster may expose an attribute like `Measured Value`
-
-This is the daily Zigbee model:
-
-- read an attribute
-- write an attribute
-- send a command
-
-That is more useful than thinking only:
-
-- send packet
-- receive packet
-
----
-
-## The full party flow
-
-Now let us walk through one simple event:
-
-- you press a Zigbee wall switch
-- a Zigbee bulb turns on
-
-### Step 1: the devices are already at the party
-
-The network already exists.
-
-The Coordinator formed it earlier.
-
-The switch joined.
-
-The bulb joined.
-
-So now everyone is "in the party."
-
-### Step 2: `ZDO` helps everyone understand who is who
-
-Before useful control happens, devices need identity and discovery information.
-
-The system needs to learn things like:
-
-- this is the bulb
-- this is the switch
-- the bulb exposes a lighting endpoint
-- the bulb supports the `On/Off` cluster
-
-This is `ZDO` territory.
-
-It is not saying:
-
-- turn on the light
-
-It is saying:
-
-- who are you and what do you support?
-
-### Step 3: the target endpoint is known
-
-Suppose the bulb exposes:
-
-- endpoint `1` for lighting
-
-Now the system knows not only:
-
-- which node is the bulb
-
-but also:
-
-- which application instance inside the bulb should receive the lighting message
-
-### Step 4: the correct cluster is known
-
-The bulb's endpoint `1` supports:
-
-- `On/Off`
-
-Now the system knows:
-
-- the right node
-- the right endpoint
-- the right cluster
-
-### Step 5: the switch creates a `ZCL` command
-
-The user presses the switch.
-
-The switch creates the standard application command:
-
-- `On`
-
-That is a `ZCL` meaning.
-
-It is not just raw bytes.
-
-It is a standard command with shared meaning.
-
-### Step 6: `APS` addresses it properly
-
-Now `APS` takes over.
-
-`APS` makes sure the command is directed to:
-
-- the correct destination node
-- the correct destination endpoint
-- the correct application target
-
-This is the part that turns:
-
-- "send this somewhere"
-
-into:
-
-- "send this lighting command to the bulb's light-control endpoint"
-
-### Step 7: `NWK` routes it through the mesh
-
-If the bulb is not directly reachable, `NWK` finds the path.
-
-For example:
-
-- Switch -> Router A -> Router B -> Bulb
-
-That is the routing story.
-
-`NWK` does not decide what `On` means.
-
-It only makes sure the message travels across the network.
-
-### Step 8: the bulb understands the command
-
-The bulb receives the message.
-
-Its application side sees:
-
-- endpoint = `1`
-- cluster = `On/Off`
-- command = `On`
-
-Now the bulb turns on.
-
-That whole flow shows the layer split very clearly:
-
-- `ZDO` helped identify devices and capabilities
-- `APS` made sure the message reached the right application target
-- `NWK` got the message there through the mesh
-- `ZCL` gave the command meaning
-
----
-
-## Binding: the saved relationship
-
-**Binding** is like keeping a saved relationship in the party address book.
-
-Instead of asking every time:
-
-- which bulb should this switch control?
-
-the system can remember:
-
-- this switch endpoint is bound to that bulb endpoint
-
-That makes control cleaner and reduces repeated lookup work.
-
-Simple version:
-
-- binding = **remember who talks to whom**
-
----
-
-## Groups: one message for many devices
-
-**Groups** are like a party group chat.
-
-Instead of sending:
-
-- one command to bulb A
-- one command to bulb B
-- one command to bulb C
-
-you can send:
-
-- one command to the "living room lights" group
-
-Then all bulbs in that group respond.
-
-Simple version:
-
-- group = **one message for many devices**
-
----
-
-## Common confusion to avoid
-
-### Confusion 1: `ZDO` and `ZCL` sound similar
-
-They are not doing the same job.
-
-- `ZDO` = identity, discovery, management
-- `ZCL` = commands, attributes, application meaning
-
-One asks:
-
-- who are you?
-
-The other says:
-
-- turn on
-
-### Confusion 2: people skip `APS`
-
-Beginners often think:
-
-- the network sends the message
-- the application receives it
-
-But Zigbee is more structured than that.
-
-`APS` is important because it handles delivery to the correct application target.
-
-### Confusion 3: node and endpoint are not the same
-
-- node = physical device
-- endpoint = logical application inside the device
-
-One physical device can have multiple endpoints.
-
----
-
-## In one nutshell
-
-For Zigbee:
-
-- `NWK` = **how do we get there?**
-- `APS` = **who exactly should receive this?**
-- `ZCL` = **what does the message mean?**
-- `ZDO` = **who are you, and what are the rules?**
-
-That is the whole lecture in one summary.
-
----
-
-## Why embedded engineers should care
-
-In firmware, Zigbee is not just:
-
-- initialize radio
-- join network
-- send bytes
-
-It is more like:
-
-- define endpoints
-- pick clusters
-- expose attributes
-- support commands
-- manage relationships between devices
-
-That is why Zigbee feels more like building a **structured device model** than just pushing bits through a transport.
-
----
-
-## Lab
-
-Use the party analogy on one device:
-
-- smart bulb
-- wall switch
-- temperature sensor
-
-Write down:
-
-1. what the physical node is
-2. what endpoint or endpoints it likely has
-3. which cluster matters most
-4. one attribute or command it likely supports
-5. one thing `ZDO` would help discover about it
-6. one place where `APS` matters
-7. one place where `NWK` matters
-
-If you can explain your device using those seven steps, then the Zigbee stack is starting to become practical instead of abstract.
-
----
-
-**Previous:** [Lecture 02 - Roles, topology, and network formation](Lecture-02.md) | **Next:** [Lecture 04 - Security, commissioning, sleepy devices, and OTA](Lecture-04.md)
+Deliver one annotated transaction with addressing context, decoded fields, unit, validity, and application timestamp assumptions. If using a real packet capture, record the device/stack revisions and redact deployment credentials.

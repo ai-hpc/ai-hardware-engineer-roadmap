@@ -45,6 +45,8 @@ Measure the whole path using trace IDs and a common clock. Stage p99 values cann
 
 ## 4. The deployment experiment
 
+**CPU practice before hardware:** complete the [PyTorch robot-stop lab](../../2.%20Deep%20Learning%20Frameworks/PyTorch/CPU-Robot-Stop-Lab/Guide.md). It trains a real network, selects the checkpoint/threshold using validation data, evaluates held-out episodes and a distance-sensor shift, then saves/reloads/exports and checks output parity. Its `.pt2` artifact is a PyTorch exported program, not a TensorRT engine or a guarantee of support on an embedded target.
+
 1. Preserve a reference model and held-out task/data split.
 2. Measure the reference on the intended target before optimizing.
 3. Change one supported component: precision, model size, layout, or scheduling.
@@ -55,7 +57,15 @@ Carry the report to the Jetson or compiler courses. Use the same recorded inputs
 
 ---
 
-## 5. How this fits the roadmap
+## 5. Worked memory and energy checks
+
+One million FP32 weights require 4,000,000 payload bytes (about 3.81 MiB). INT8 payload is one quarter as large, but scales, unquantized layers, activations, workspace, and buffering remain. If weights occupy 4 MiB and everything else peaks at 20 MiB, reducing weights to 1 MiB changes the total from 24 to 21 MiB: 12.5% less, not 75% less. Measure simultaneous live allocations rather than adding every tensor ever created.
+
+Energy per accepted result is measured joules divided by accepted results over the same interval. A 10 W device taking 20 ms uses 0.2 J during that interval; this simple arithmetic omits idle/transition energy unless the measurement includes it. A low-power device can use more energy per task if it takes much longer.
+
+**Pass:** preserve the same held-out inputs/quality gate, produce one actual baseline measurement, change one supported optimization, and explain quality, memory, timing, and energy separately. State device SKU, software/engine versions, warmup, concurrency, shape, power mode, and measurement boundary. For Jetson use its supported TensorRT release: current TensorRT 11.x desktop/server documentation does not establish JetPack compatibility.
+
+## 6. How this fits the roadmap
 
 | You want… | Start here | Then |
 |-----------|------------|------|

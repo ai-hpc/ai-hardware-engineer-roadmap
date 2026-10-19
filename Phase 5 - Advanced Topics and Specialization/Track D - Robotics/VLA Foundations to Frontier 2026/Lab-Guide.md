@@ -10,9 +10,12 @@ This course provides a **runnable CPU foundation** and separately scoped GPU/sim
 |---|---|---|
 | [vla_lab.py](labs/vla_lab.py) | Generates RGB/language/state/action samples; trains nine attention logits with analytical SGD; evaluates correct, wrong, and absent language conditioning | Learned visual representations, pretrained-model adaptation, physical dynamics, or real-robot control |
 | [contracts.py](labs/contracts.py) | Action denormalization checks, episode-safe chunks/masks, split-group overlap check, delay/expiry arithmetic, paired task bootstrap | A complete dataset validator, ROS scheduler, controller, or comprehensive statistics library |
+| [episode_pipeline.py](labs/episode_pipeline.py) and [supplied episode file](labs/episode-fixture.json) | Causal image/state selection, frame/unit/rate conversion, split/normalizer provenance, masked loss, offline dispatch/reset replay | Actual RLDS/LeRobot loading, learned model behavior, physical controller, or RTC flow inpainting |
 | [test_labs.py](labs/test_labs.py) | Finite-difference gradient, grounding intervention, numerical/input failures, reset boundaries, timing boundaries, and macro weighting tests | GPU performance, simulator correctness, or physical safety |
 
-**Local validation:** the commands below were executed during course authoring on October 13, 2026. No Isaac installation, GPU model training, model API call, or physical robot experiment was run as part of this validation. Python 3.10+ is the teaching baseline; the scripts require no pip installation. The existing CI uses Python 3.12.
+**Local validation:** the original exercises were executed on October 13, 2026 and the expanded 31-test suite was re-executed October 18. No Isaac installation, GPU model training, model API call, or physical robot experiment was run as part of this validation. Python 3.10+ is the teaching baseline; the scripts require no pip installation. The existing CI uses Python 3.12.
+
+The separate [action-generation lab](Action-Generation-Lab.md) adds seven standard-library checks plus six optional PyTorch checks. The discovery command below finds them too: without PyTorch, the six framework tests explicitly skip. The original scripts still require no pip installation.
 
 ## Run from the repository root
 
@@ -95,7 +98,7 @@ The 70 ms case retains indices `[4, 5, 6, 7]` with a 200 ms age bound. Tightenin
 
 All input timestamps must share one monotonically increasing clock and reset epoch. The helper checks numeric ordering, but cannot infer whether clocks are synchronized or epochs match. It omits commands scheduled in the past; it does not decide whether to hold, interpolate, or stop between future starts. Your controller contract must specify that behavior.
 
-**Acceptance:** draw the intended action times and arrival time; correctly explain the retained indices and empty-chunk case. The extension is a discrete-event simulator with out-of-order replies and reset epochs. It is a learner exercise, not a shipped ROS node.
+**Acceptance:** draw the intended action times and arrival time; correctly explain the retained indices and empty-chunk case. The supplied [extended lab](Dataset-and-Execution-Lab.md) implements an offline dispatcher with out-of-order replies and reset epochs. It is not a ROS node.
 
 ## Lab D — Paired evaluation and uncertainty
 
@@ -118,6 +121,10 @@ Macro delta is zero: the task means are +1 and -1. The episode-weighted delta is
 The helper resamples paired **task means**, treating observed within-task rates as fixed. It does not estimate uncertainty from new episodes within each task. Implement hierarchical resampling as an extension and compare repeated synthetic datasets whose generating probabilities you know. More bootstrap draws improve numerical stability, not the amount of empirical information.
 
 **Acceptance:** justify your estimand, preserve pairs, reject duplicates, report per-task denominators, and state the interval's scope. Do not claim noninferiority from a point estimate alone.
+
+## Lab E — A complete recorded-data and dispatch path
+
+Follow [From recorded episodes to timed actions](Dataset-and-Execution-Lab.md). The supplied JSON records and standard-library implementation turn the normalization and scheduling helpers into one traceable pipeline. Work through capture-versus-arrival timing, rate conversion, training-only statistics, terminal masks, result ordering, and reset isolation before attempting a real model adapter. This is an implemented offline lab; extending it to a physical controller remains separate work.
 
 ## GPU route — from public artifact to closed-loop evaluation
 

@@ -1,0 +1,13 @@
+{
+  "reviewed_utc": "2026-10-18T22:19:52.659420+00:00",
+  "sources": [
+    {
+      "source_url": "https://github.com/open-rmf/rmf_traffic/blob/main/README.md",
+      "git_blob_sha": "827d6d8726c3a6d572d32c68d6d63f2e37995180",
+      "immutable_blob_api": "https://api.github.com/repos/open-rmf/rmf_traffic/git/blobs/827d6d8726c3a6d572d32c68d6d63f2e37995180",
+      "download_sha256": "064a5efe882eb5e192e183a8727d5122a267b8a2eb5d90cea59047525fd3a0dd",
+      "bytes": 1027,
+      "status": "retrieved"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+[
+  {
+    "branch": "pre-final",
+    "resolved_revision": "35fd99fb8434ef70ee61372df3face5174bed2c8",
+    "metadata_url": "https://huggingface.co/api/models/gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090/revision/pre-final",
+    "metadata_sha256": "b2d471547f97ac853d2337698c82b3b38f0bf2c0aa500369504b94be9cb5d64b",
+    "last_modified": "2026-09-01T05:04:17.000Z",
+    "meaning": "branch identity only; historical benchmark runtime/workload not independently reproduced"
+  },
+  {
+    "branch": "pre-lmhead4",
+    "resolved_revision": "2ed84505a87c4b65bf959e1601bedbc4b7bbad37",
+    "metadata_url": "https://huggingface.co/api/models/gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090/revision/pre-lmhead4",
+    "metadata_sha256": "35945cf1f3f1e844991e8335e3322eef70d346bbd6e3a24aa85b0c97c7797c7e",
+    "last_modified": "2026-08-19T06:04:18.000Z",
+    "meaning": "branch identity only; historical benchmark runtime/workload not independently reproduced"
+  }
+]

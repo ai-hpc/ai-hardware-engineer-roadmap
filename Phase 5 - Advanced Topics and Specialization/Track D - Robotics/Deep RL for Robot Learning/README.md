@@ -11,11 +11,11 @@
 
 > *Copying gets a robot onto the scoreboard. Practicing with a score gets it to the top.*
 
-This course is the **training half** of Track D's robot-learning story. The [VLA Optimization and Action-Parity Harness](../VLA%20Optimization%20and%20Action-Parity%20Harness/README.md) course takes a pretrained policy and makes it run on real hardware; it explicitly leaves training out of scope. This course fills that gap: how a robot policy gets *good* in the first place — imitation learning, policy gradients, actor-critic, PPO, Q-learning, model-based and offline RL — and how those ideas are applied today to post-train a **flow-matching Vision-Language-Action model** such as π0.5.
+This course is the **training half** of Track D's robot-learning path: imitation learning, policy gradients, actor-critic, PPO, value-based methods, and model-based/offline RL. The companion [VLA action-parity course](../VLA%20Optimization%20and%20Action-Parity%20Harness/README.md) includes an actual trained CPU policy bridge plus separately labeled pretrained-model deployment work. This course's included CPU lab checks return targets and mathematical snippets; simulator trainers and pretrained VLA RL remain implementation exercises unless accompanied by execution evidence.
 
 The lecture sequence follows the topic order of **UC Berkeley CS 185/285, Deep Reinforcement Learning (Spring 2026, Sergey Levine)**, compressed from 25 lectures into 13 plus a capstone, with one production deep dive (06b, RSL-RL). Every lecture is rewritten for this roadmap's standard: build it, measure it, ship an artifact — and always ask where the compute goes.
 
-**Comprehensive VLA companion:** [VLA Foundations to Frontier 2026](../VLA%20Foundations%20to%20Frontier%202026/README.md) provides 32 lectures spanning history, architectures, data, imitation/flow/RL training, evaluation, deployment, and the research frontier verified through October 13, 2026. Use its [CPU labs](../VLA%20Foundations%20to%20Frontier%202026/Lab-Guide.md) and capstones alongside this specialization.
+**Comprehensive VLA companion:** [VLA Foundations to Frontier 2026](../VLA%20Foundations%20to%20Frontier%202026/README.md) provides 32 lectures spanning history, architectures, data, imitation/flow/RL training, evaluation, deployment, and the research frontier reviewed through October 18, 2026. Use its [CPU labs](../VLA%20Foundations%20to%20Frontier%202026/Lab-Guide.md) and capstones alongside this specialization.
 
 **Scope:** algorithms, training systems, and evaluation for robot policies in simulation, with sim-to-real as the frontier. The runtime optimization of a *trained* policy for deployment belongs to the VLA course; general LLM post-training infra belongs to [Track G](../../Track%20G%20-%20ML%20Systems%20Engineering/Guide.md).
 
@@ -32,6 +32,8 @@ The lecture sequence follows the topic order of **UC Berkeley CS 185/285, Deep R
 * Comfortable with probability (expectations, log-likelihood, KL) at the level of an intro ML course.
 
 **Hardware assumed:** one 24-48 GB NVIDIA GPU (RTX 4090 / L40S / A6000 class) for Lectures 01-13. The capstone needs either one 80 GB GPU (LoRA path) or 4-8 × 80 GB (full-parameter path).
+
+**CPU entry exercise:** use [the return-target and PPO lab](CPU-Lab.md) before GPU training. It includes a complete hand calculation, standard-library implementation, 12 tests, and deliberate termination/truncation/reset mistakes. Completing this arithmetic milestone does not require the hardware budget above or claim a trained policy.
 
 **What comes after:** [VLA Optimization and Action-Parity Harness](../VLA%20Optimization%20and%20Action-Parity%20Harness/README.md) — take the policy you trained here and make it meet a real control-loop deadline without losing the success rate you just earned.
 
@@ -61,7 +63,7 @@ The lecture sequence follows the topic order of **UC Berkeley CS 185/285, Deep R
 
 </div>
 
-Each lecture follows the *Why it matters → Mental model → Build it → Use it in the real stack → Measure it → Ship it → Exit criteria* shape from the [Curriculum Authoring Guide](../../../Curriculum-Authoring-Guide.md), with a self-check and a runnable lab.
+Each lecture develops theory, a worked mechanism, an implementation exercise, and evaluation criteria. Start with [CPU-Lab.md](CPU-Lab.md) for included runnable files. Names such as `ppo/`, `vla_rl/`, and `eval_harness/` in the lecture sketches are learner-created packages, not missing downloads. GPU/simulator recipes require their stated adapter, data, model, and hardware work and are not claimed as executed here.
 
 ---
 
@@ -75,7 +77,7 @@ The whole course climbs one ladder of environments, so measurements from early l
 | 2 | GPU-parallel manipulation — [ManiSkill3](https://github.com/haosulab/ManiSkill) `PickCube-v1` / `PushCube-v1` (or [MuJoCo Playground](https://github.com/google-deepmind/mujoco_playground), [Isaac Lab](https://github.com/isaac-sim/IsaacLab) — see the [Isaac Sim and Isaac Lab](../Isaac%20Sim%20and%20Isaac%20Lab/README.md) course) | MLP on state, small CNN on pixels | Learner backward pass, GPU memory | 01-03, 05-07, 09, 10, 12 |
 | 3 | [LIBERO](https://github.com/Lifelong-Robot-Learning/LIBERO) suites (Spatial / Object / Goal / Long), plus perturbed layouts | π0.5 via [openpi](https://github.com/Physical-Intelligence/openpi) | **Policy forward pass** — billions of parameters per action chunk | 03, 10, 11, 13, 14 |
 
-The move from rung 2 to rung 3 changes the bottleneck. On rung 2 a GPU simulator does 10⁵-10⁶ env steps/s and the policy forward pass costs almost nothing. On rung 3 the simulator is cheap and a single action chunk from a multi-billion-parameter VLA costs tens of milliseconds. Algorithms that look equivalent on rung 2 (on-policy vs off-policy, PPO vs GRPO, many epochs vs one) end up with very different wall-clock costs on rung 3. Following that shift is the hardware thread through the whole course.
+The move from small GPU-simulated policies to a large VLA can shift the bottleneck from learning or simulation to policy inference. The result depends on scene complexity, observation rendering, batch size, model, and hardware. Measure environment stepping, inference, learner updates, and synchronization separately; no fixed transitions-per-second range applies across these configurations.
 
 ---
 
@@ -85,7 +87,7 @@ RL is usually taught as math. In practice, the binding constraint on a robot-lea
 
 * **Rollouts are inference at scale.** RL post-training of a VLA spends most of its GPU-hours generating actions, not computing gradients. Every trick from the inference world — batching across parallel envs, CUDA Graphs, reduced flow-matching steps, KV reuse — directly speeds up training.
 * **Sample efficiency and wall-clock efficiency are different metrics.** An off-policy method that needs 10× fewer env steps but 20× more gradient updates per step loses on wall-clock whenever simulation is cheap. Whenever the policy forward pass is expensive, it wins. Which one holds depends on the hardware, not on the algorithm.
-* **Memory sets the algorithm.** A KL leash needs a frozen reference copy of the policy. A critic doubles the parameter count, and PPO keeps old-policy log-probs around. GRPO avoids the critic entirely, and that saving is the reason it was adopted for LLMs.
+* **Memory constrains algorithm choices.** A reference may share an immutable base with adapters; a critic may be a separate network or a smaller shared-feature head. PPO stores old log-probabilities, while GRPO avoids a learned value network. Count the actual weights, optimizer state, activations, and rollout storage before choosing a configuration.
 * **Evaluation is a compute budget.** A credible success-rate claim at ±3% needs on the order of a thousand episodes per suite. That is real GPU time, and it has to be planned.
 
 Every lecture ends with a **Measure it** section that asks for env-steps/s, policy-inferences/s, learner-updates/s, GPU memory, and samples-to-success alongside the usual learning curves.

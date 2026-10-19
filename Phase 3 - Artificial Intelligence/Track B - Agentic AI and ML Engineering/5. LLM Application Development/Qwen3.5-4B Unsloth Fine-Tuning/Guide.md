@@ -26,7 +26,7 @@
 
 ## Course Currency Note
 
-Model IDs, Unsloth support, and memory requirements change quickly. As of May 2026, Unsloth documents `Qwen/Qwen3.5-4B-Base` as part of its Qwen3.5 support and recommends 16-bit LoRA rather than 4-bit QLoRA for this family. Check the current Qwen model card and Unsloth Qwen3.5 guide before copying commands into a real training job.
+Model IDs, Unsloth support, and memory requirements change quickly. Checked 2026-10-18: [Unsloth documents](https://unsloth.ai/docs/models/qwen3.5/fine-tune) `Qwen/Qwen3.5-4B-Base` as part of its Qwen3.5 support and recommends 16-bit LoRA rather than 4-bit QLoRA for this family. The [official base-model metadata](https://huggingface.co/Qwen/Qwen3.5-4B-Base/tree/1001bb4d826a52d1f399e183466143f4da7b741b) was inspected at revision `1001bb4d826a52d1f399e183466143f4da7b741b`: architecture `Qwen3_5ForConditionalGeneration`, model type `qwen3_5`, and a chat template in tokenizer configuration. This is metadata evidence, not a local training result. The GPU recipe below remains unexecuted in the course check; package pinning and a short smoke run are required on the target GPU. The [CPU PyTorch lab](../../../2.%20Deep%20Learning%20Frameworks/PyTorch/CPU-Robot-Stop-Lab/Guide.md) is the executed prerequisite.
 
 ---
 
@@ -92,11 +92,12 @@ Use JSONL with explicit roles:
 {"system":"You are a concise AI hardware engineering assistant.","user":"Explain why Qwen decode is memory-bandwidth bound at batch 1.","assistant":"At batch 1, each generated token streams large weight matrices for GEMV while doing little arithmetic reuse..."}
 ```
 
-Keep a validation file that the trainer never sees:
+Keep validation examples out of optimizer updates, and keep a third untouched test split out of model selection. The trainer may read validation data for evaluation:
 
 ```text
 data/qwen35_train.jsonl
 data/qwen35_valid.jsonl
+data/qwen35_test.jsonl
 ```
 
 ### Chat Template
@@ -159,16 +160,20 @@ Put this output in your final report. Fine-tuning results without package versio
 Use 16-bit LoRA first. Do not start with 4-bit QLoRA unless you have confirmed that your exact Qwen3.5 target and Unsloth version support it well enough for your quality bar.
 
 ```python
+from unsloth import FastLanguageModel  # import before patched training libraries
 import torch
 from datasets import load_dataset
+from huggingface_hub import snapshot_download
 from trl import SFTConfig, SFTTrainer
-from unsloth import FastLanguageModel
 
 MODEL_ID = "Qwen/Qwen3.5-4B-Base"
+MODEL_REVISION = "1001bb4d826a52d1f399e183466143f4da7b741b"
+# Downloads the complete pinned model; allow multi-GB storage.
+model_path = snapshot_download(repo_id=MODEL_ID, revision=MODEL_REVISION)
 MAX_SEQ_LENGTH = 2048
 
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name=MODEL_ID,
+    model_name=model_path,
     max_seq_length=MAX_SEQ_LENGTH,
     dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
     load_in_4bit=False,
@@ -217,21 +222,27 @@ dataset = raw.map(to_text, remove_columns=raw["train"].column_names)
 
 trainer = SFTTrainer(
     model=model,
-    tokenizer=tokenizer,
+    processing_class=tokenizer,
     train_dataset=dataset["train"],
     eval_dataset=dataset["validation"],
-    dataset_text_field="text",
     args=SFTConfig(
         output_dir="runs/qwen35-4b-unsloth-lora",
-        max_seq_length=MAX_SEQ_LENGTH,
+        max_length=MAX_SEQ_LENGTH,
+        dataset_text_field="text",
+        eos_token="<|im_end|>",
         per_device_train_batch_size=1,
         gradient_accumulation_steps=8,
         learning_rate=2e-4,
-        warmup_ratio=0.03,
+        warmup_steps=10,  # reduce for a smoke run shorter than ten optimizer updates
         num_train_epochs=1,
         logging_steps=10,
-        eval_steps=100,
-        save_steps=100,
+        eval_strategy="epoch",
+        save_strategy="epoch",
+        load_best_model_at_end=True,
+        metric_for_best_model="eval_loss",
+        greater_is_better=False,
+        seed=3407,
+        data_seed=3407,
         bf16=torch.cuda.is_bf16_supported(),
         fp16=not torch.cuda.is_bf16_supported(),
         optim="adamw_8bit",
@@ -243,6 +254,10 @@ trainer.train()
 trainer.save_model("artifacts/qwen35-4b-unsloth-lora")
 tokenizer.save_pretrained("artifacts/qwen35-4b-unsloth-lora")
 ```
+
+**Trainer API boundary:** the example uses current [TRL names](https://huggingface.co/docs/trl/sft_trainer): `processing_class`, with `dataset_text_field` and `max_length` inside `SFTConfig`. Some Unsloth snapshots patch older aliases; record the installed signatures instead of mixing snippets from different releases. Evaluation is explicitly enabled at each epoch; `eval_steps` by itself would not enable it.
+
+**Token/loss contract:** this simple `text` dataset trains on the entire serialized sequence, including prompt tokens. It does not claim assistant-only loss. Inspect decoded inputs and labels before training; for assistant-only SFT use a supported conversational template/mask and verify prompt labels are `-100`. The inspected base tokenizer's default EOS is `<|endoftext|>`, while assistant turns end in `<|im_end|>`; configure the training/inference stop token consistently and test one turn without repeated role tags. Reject or account for examples whose answer is removed by truncation.
 
 For a larger run, sweep one variable at a time:
 
@@ -259,7 +274,7 @@ Do not compare runs unless dataset split, seed, sequence length, and eval prompt
 
 ## 4. Evaluate Before You Export
 
-Run the same held-out prompts against:
+After model selection is finished, run the same untouched test prompts against:
 
 1. `Qwen/Qwen3.5-4B-Base`
 2. base model + LoRA adapter

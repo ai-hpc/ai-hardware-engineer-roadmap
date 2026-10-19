@@ -1,0 +1,48 @@
+{
+  "checked_utc_date": "2026-10-18",
+  "release": "7.0.1",
+  "revision": "e889973c84bd10c80c1a70f57ec5b426221f0264",
+  "sources": {
+    "versions": {
+      "url": "https://raw.githubusercontent.com/NVIDIA-TAO/tao-skill-bank/e889973c84bd10c80c1a70f57ec5b426221f0264/versions.yaml",
+      "bytes": 2854,
+      "sha256": "2699786d3d53e07d6f068a468998201367358cf9f8cef8ff93aee3dee9098dfe"
+    },
+    "training": {
+      "url": "https://raw.githubusercontent.com/NVIDIA-TAO/tao-skill-bank/e889973c84bd10c80c1a70f57ec5b426221f0264/skills/models/tao-train-rtdetr/references/skill_info.yaml",
+      "bytes": 7187,
+      "sha256": "fe50ff5618bd09eea5fc1db9f5383dd1c88acf288ae7e985d010f02298f0b916"
+    },
+    "deploy": {
+      "url": "https://raw.githubusercontent.com/NVIDIA-TAO/tao-skill-bank/e889973c84bd10c80c1a70f57ec5b426221f0264/skills/models/tao-train-rtdetr/references/tao-deploy-rtdetr.skill_info.yaml",
+      "bytes": 3322,
+      "sha256": "1cd1771e76934111d4490684f39b323ff797b1669109f27d19a7a601526008fd"
+    },
+    "schema": {
+      "url": "https://raw.githubusercontent.com/NVIDIA-TAO/tao-skill-bank/e889973c84bd10c80c1a70f57ec5b426221f0264/skills/models/tao-train-rtdetr/schemas/train.schema.json",
+      "bytes": 51762,
+      "sha256": "177a23458baea50ccbc910156c202a6c91e656cf828d669a8d260e7d901de346"
+    }
+  },
+  "observations": {
+    "train_backbone": "resnet_50",
+    "train_images": [
+      640,
+      640
+    ],
+    "eval_images": [
+      640,
+      640
+    ],
+    "train_source_type": "list",
+    "validation_source_type": "mapping",
+    "training_and_deploy_commands_separate": true
+  },
+  "not_executed": [
+    "container pull",
+    "TAO training",
+    "TAO export",
+    "TensorRT build",
+    "Jetson inference"
+  ]
+}

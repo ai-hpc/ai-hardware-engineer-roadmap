@@ -1,176 +1,60 @@
-# Module 02 — Long-Context Attention Mechanics
+# Module 02 — Attention, Sequence Parallelism and Context Parallelism
 
-**Parent:** [Long-Context MoE Foundation Training](README.md)
+**Parent:** [Course](README.md) · **Before this:** [memory ledger](01-Long-Context-Bottlenecks.md)
 
-**One-line purpose:** Make long-context attention physically tractable: FlashAttention for the inner kernel, sequence parallelism for the inter-block reduction, context parallelism for splitting one sequence across many GPUs, plus activation recomputation as the last-resort memory tool.
+**Learn:** identify which tensor each technique partitions, then test correctness before interpreting throughput. **Time:** 90 minutes for CPU reasoning; cluster experiments are a separate milestone.
 
-**Prerequisites:** Module 01. FlashAttention course Lectures 1–3.
+## Start with exact attention
 
-**Artifact:** A working benchmark of FlashAttention with context-parallel attention on one 8-GPU node, plus an activation-memory plot across sequence lengths comparing (no CP) vs (CP=2) vs (CP=4) vs (CP=4 + recompute).
+For one query row, attention forms scores, normalizes them with softmax, and computes a weighted sum of values. FlashAttention tiles this calculation and maintains a running maximum, normalization sum and output accumulator. It avoids storing the full score/probability matrices in HBM. It does not make full attention linear in sequence length, and mathematical equivalence does not imply bit-identical floating-point results across schedules.
 
----
+Run the existing [CPU attention lab](../../../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/02%20-%20Kernel%20Engineering/FlashAttention%20Course/CPU-Attention-Lab.md). Its dense oracle, tiled reference, gradients, masks and rectangular-query cases are the prerequisite for distributing attention. A GPU kernel is useful only after those semantics are fixed.
 
-## Why it matters
+With SRAM capacity `M` **in elements**, the original FlashAttention analysis gives an HBM-access term of order `N²*d²/M`, within its stated memory regime, alongside linear input/output terms. This is an I/O model, not total FLOPs or a wall-time prediction. Tile choices, dtype, head width and hardware matter. [Original paper](https://arxiv.org/abs/2205.14135), [FlashAttention-2](https://arxiv.org/abs/2307.08691).
 
-You cannot train a long-context model without three things working together: a kernel that does not materialize `N²` scores, a way to split activations across many GPUs without serializing the math, and a way to spend a little extra compute to fit in HBM when activations are still too big. Each of these is a separate technique with separate failure modes. This module covers all three at the level needed to debug a real training run.
+## Three different partitions
 
----
+| Technique | What it distributes | Consequence |
+|---|---|---|
+| Tensor parallelism, TP | Parts of matrix products/heads | Partial results require collectives; local weight and activation shapes change |
+| Megatron sequence parallelism, SP | Sequence slices of selected activations such as normalization/dropout around TP operations | Removes their replication across TP ranks |
+| Context parallelism, CP | Sequence positions across the network | Attention needs remote keys/values; token-local operations use local positions |
 
-## Mental model
+Megatron SP uses all-gather/reduce-scatter around TP computations. Those replace or restructure communication that a non-SP TP path already performs; saying that SP always adds two entirely new collectives is misleading. SP can reduce saved activations, but its performance and legality depend on the implementation and shape. [Sequence-parallel/recomputation paper](https://arxiv.org/abs/2205.05198).
 
-### Layer 1 — FlashAttention removes the `N²` memory term
+With CP, each query partition visits the needed KV partitions. For a basic ring with `P` ranks, each rank initially owns approximately `N/P` positions. A KV transfer contains roughly `2*(N/P)*hkv*d*b` bytes, and a full sweep visits up to `P−1` remote chunks. This differs from charging a full `N*H` tensor **per round**. Backward, saved state, masking, replication and specific algorithms change the complete ledger. [Megatron CP](https://docs.nvidia.com/megatron-core/developer-guide/latest/user-guide/features/context_parallel.html).
 
-You covered this in detail in the FlashAttention course. The summary for this module:
+Causal attention creates imbalance if one rank gets only early queries and another gets late queries. Balanced chunk assignments, striped layouts or specialized schedules can help. They must retain correct absolute positions and document boundaries. Summing independently normalized chunk outputs is wrong: merge their maxima, normalization sums and weighted accumulators consistently.
 
-- Forward: tile `Q, K, V` so `S = QKᵀ` stays in SRAM; track running `(m, ℓ)` per query row; produce `O` directly.
-- Backward: recompute `S, P` per tile using the saved `LSE`; same `O(N²d²/M)` HBM bound.
-- For long-context training, FlashAttention is mandatory — without it the activation memory of attention alone exceeds your HBM at `N ≥ 16K`.
+Ulysses begins with sequence shards, then uses all-to-all to exchange sequence partitioning for head partitioning during attention, and reverses that exchange afterward. It is not simply “head parallelism instead of sequence parallelism.” Head/KV divisibility and replication rules constrain the usable group size. [DeepSpeed Ulysses](https://www.deepspeed.ai/tutorials/ds-sequence/).
 
-In practice you use `flash_attn_func` for fixed-length batches and `flash_attn_varlen_func` for packed variable-length sequences. Both work with sequence parallelism.
+## Recomputation is a measured trade
 
-### Layer 2 — Sequence parallelism (Megatron-style)
+Checkpointing keeps selected activations and recomputes omitted values during backward. Full-layer recomputation and selective module recomputation save different tensors. Once attention already uses a memory-efficient fused kernel, recomputing its core again may offer less benefit than recomputing FFN activations or model-specific projections. Fixed “20–30% memory savings” and “10–15% overhead” are not universal outcomes. [Bridge recomputation guide](https://docs.nvidia.com/nemo/megatron-bridge/latest/training/activation-recomputation.html).
 
-When you tensor-parallelize a transformer, you split the hidden dimension `H` across TP GPUs. The LayerNorm + dropout + residual paths are **not** tensor-parallelized — by default they replicate computation and activations across TP ranks.
+The inspected Megatron revision is `ce852bfb93f364f64a556602fc71a5d9ed2c377e`, dated October 18, 2026. Its argument validation rejects combining selective granularity with a recompute method such as `block`. These are **configuration fragments**, not complete launch commands:
 
-**Sequence parallel (SP)** changes that: split those `O(N·H)` non-matmul activations along the sequence dimension `N` instead of replicating. Now each TP rank stores `N/TP × H` activations instead of `N × H`. You pay an extra all-gather before column-parallel ops and an extra reduce-scatter after row-parallel ops, but the activation memory savings dominate.
+```text
+# selective attention recomputation
+--recompute-granularity selective
+--recompute-modules core_attn
 
-SP is "free" memory-wise on top of TP. Enable it on any TP run for `N ≥ 8K`.
-
-### Layer 3 — Context parallelism (CP) for splitting one sequence
-
-SP splits non-matmul activations across TP. It does **not** split the attention computation itself — every TP rank still sees the full sequence at the attention layer. For `N` so large that even one head's worth of attention activations does not fit, you need to split the sequence itself across additional GPUs.
-
-That is **context parallel** (CP), sometimes called sequence-dimension model parallelism. Variants:
-
-- **Ring attention**: each CP rank owns a contiguous chunk of the sequence's KV. During attention, KV chunks rotate through ranks like a ring; each rank computes attention between its `Q` chunk and the visiting `KV` chunk; partial results are combined with the FlashAttention online-softmax recurrence.
-- **Striped attention** (a refinement): instead of contiguous chunks, interleave so each rank has a striped subset of positions. Improves load balance under causal masking.
-- **DistFlashAttn / Sequence-Parallel FlashAttention**: similar idea, slightly different scheduling and overlap patterns.
-
-CP combines with FlashAttention: each rank runs the standard FlashAttention forward over its `Q_local` against each visiting `KV_chunk`, then merges via the same `(m, ℓ)` rescale you used in Module 02 of the FlashAttention course. The math is exact.
-
-Communication cost: O(N · H) per round, O(CP_size − 1) rounds per layer. Hidden behind compute if CP_size is small and the chunk is large.
-
-### Layer 4 — Activation recomputation (selective and full)
-
-When you still cannot fit, recompute. Two flavors:
-
-- **Selective recomputation**: store only specific activations (typically attention's `Q, K, V, O, LSE`), recompute the rest in backward. Cheap — costs ~10–20% extra forward FLOPs.
-- **Full recomputation**: store only the layer input; recompute the entire layer forward in backward. Expensive — ~30–40% extra FLOPs.
-
-Megatron supports both via `--recompute-granularity selective|full`. At long context, selective recomputation is usually enough alongside SP+CP.
-
-### When to reach for what
-
-| Symptom | Reach for |
-|--------|-----------|
-| OOM at TP=8, N=8K, no SP | Sequence parallel |
-| OOM at TP=8 + SP, N=64K | Context parallel CP=2 |
-| OOM at TP=8 + SP + CP=2, N=256K | Increase CP, then add selective recomputation |
-| TFLOPs collapse after enabling CP=8 | Communication is unhidden — check overlap settings, increase chunk size |
-
----
-
-## Build it
-
-### 1. FlashAttention on a single 8-GPU node
-
-```bash
-# Megatron-LM example, 8-GPU node, TP=8, no PP, no DP
-torchrun --nproc-per-node=8 pretrain_gpt.py \
-  --num-layers 32 --hidden-size 4096 --num-attention-heads 32 \
-  --seq-length 32768 --max-position-embeddings 32768 \
-  --tensor-model-parallel-size 8 \
-  --use-flash-attn --bf16 \
-  --micro-batch-size 1 --global-batch-size 8 \
-  --train-iters 20 --log-interval 1 \
-  --data-path mock --tokenizer-type Llama3Tokenizer
+# alternatively, full layer recomputation
+--recompute-granularity full
+--recompute-method block
+--recompute-num-layers 1
 ```
 
-Capture the per-iteration time and the per-GPU peak memory. This is your baseline.
+Check the selected recipe/backend's additional restrictions. Keep the [pinned argument and configuration hashes](labs/sources.json); the live documentation and checkout can differ. A fake dataset path `mock` and an unspecified tokenizer do not create an executable training setup.
 
-### 2. Add sequence parallel
+## Design the cluster experiment
 
-```bash
-# Add to the command above
-  --sequence-parallel
-```
+Start from a supported recipe with a working tokenizer and a small valid dataset. Save container digest, repository revision, model dimensions, precision, batch/token counts, packing rules and group membership. Verify a short forward/backward run and checkpoint reload before extending context.
 
-Peak memory should drop ~20–30% at N=32K. Per-iter time should be within noise.
+On eight GPUs, `TP=8,CP=1` and `TP=4,CP=2` are both eight-rank dense model groups when PP and DP are one. The change alters both TP and CP; it is not an isolated CP experiment. Keep global useful tokens and optimizer updates comparable, and explain the changed local matrix shapes.
 
-### 3. Add context parallel
+Record peak allocated/reserved memory per rank, full-step latency, useful tokens per second, numerical/quality checks and communication traces. An OOM is a result; leave its throughput blank. A CP configuration may still OOM, and communication may remain exposed. Do not fill a table with promised improvements.
 
-```bash
-# Reduce TP to 4, add CP=2 — keeps TP×CP=8
-  --tensor-model-parallel-size 4 \
-  --context-parallel-size 2 \
-  --sequence-parallel
-```
+**Self-check:** why can a correct chunked forward still train incorrectly? Backward communication, gradient reductions, masks or dropout/RNG replay may differ. Forward parity is one gate, not the entire training contract.
 
-Push the sequence length further (`--seq-length 131072`). Without CP this would OOM. With CP=2 it should fit. Measure per-iter time and peak memory. Plot vs the no-CP point at the same N (if the no-CP run is now feasible at all).
-
-### 4. Add selective recomputation
-
-```bash
-  --recompute-granularity selective \
-  --recompute-method block
-```
-
-Should buy another 20–30% memory at the cost of ~10–15% extra forward time. Use only when SP+CP is not enough.
-
-### 5. The activation memory curve
-
-For each (N, CP, recompute) combination you tried, record peak GPU memory. Plot:
-
-```
-y = peak memory (GB)
-x = sequence length
-lines = (CP=1 no recompute, CP=1 recompute, CP=4, CP=4 recompute)
-```
-
-You should see the no-CP line going vertical first (OOMs at smaller N), CP=4 staying flat much longer, and recompute pushing both lines down at a fixed N.
-
----
-
-## Use it in the real stack
-
-- **NeMo Megatron Bridge** wraps all of this — its long-context skill page gives recipes for `seq-length × CP × recompute × precision` combinations per model size.
-- **Megatron-LM** is the underlying library with the actual `--context-parallel-size` flag and ring-attention implementation.
-- **DeepSpeed-Ulysses** is an alternative sequence-parallel scheme that splits along the **head** dimension instead of the sequence dimension; lower comm volume for some shapes, different trade-offs at very long context.
-
-The cacheon-sglang-miner project we worked on uses FlashInfer for *inference*-side long context. The training-side version (Megatron CP) is structurally similar but tuned for backward + bigger micro-batches.
-
----
-
-## Measure it
-
-For each configuration in your sweep:
-
-- Per-iter wall-clock (median over the last 10 iterations after 10 warmup).
-- Per-GPU peak HBM allocated.
-- Achieved per-GPU TFLOPS (`model_FLOPs / wall_clock / GPUs`).
-- Communication time as fraction of step time (Megatron logs report this when `--log-throughput` is on).
-
-A healthy long-context run with CP=4 should hold per-GPU TFLOPS within 20% of the CP=1 baseline at the same N. If communication exceeds 30% of step time, your CP chunk size is too small or `NCCL_P2P_LEVEL` / `NCCL_NVLS_ENABLE` is misconfigured.
-
----
-
-## Ship it
-
-Drop into `lcm-course/`:
-
-1. `attention_bench.sh` — your three commands and the resulting timing/memory log.
-2. `activation_memory.csv` and `activation_memory.png` — the curve described above.
-3. `notes_attention.md` — one paragraph each on FlashAttention, SP, CP, selective recompute, plus the OOM table from your runs.
-
-You now have, in concrete numbers, the cost of each long-context lever on your hardware.
-
----
-
-## Related pages
-
-- [Module 01 — Why long context is hard](01-Long-Context-Bottlenecks.md)
-- [Module 03 — Position encoding](03-Position-Encoding.md)
-- [Module 09 — Distributed training infrastructure](09-Distributed-Training-Infrastructure.md)
-- [FlashAttention Course — Lecture 3](../../../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/02%20-%20Kernel%20Engineering/FlashAttention%20Course/Lecture%2003%20-%20FlashAttention-1%20Algorithm.md)
-- Megatron-LM: <https://github.com/NVIDIA/Megatron-LM>
-- Ring Attention paper: <https://arxiv.org/abs/2310.01889>
+[Next: positional encoding](03-Position-Encoding.md)

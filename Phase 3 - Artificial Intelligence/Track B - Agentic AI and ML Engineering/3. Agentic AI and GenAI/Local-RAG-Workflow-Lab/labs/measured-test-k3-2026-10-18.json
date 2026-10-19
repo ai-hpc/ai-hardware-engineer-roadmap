@@ -1,0 +1,125 @@
+{
+  "python": "3.12.3",
+  "sqlite": "3.45.1",
+  "corpus_sha256": "123787dfd4350eecedd6053ad23ae42b373b99f3f8f720703beaf5633bc61315",
+  "source_sha256": "dcbba13c986ce7129efa012bd2090cc62c9ad5247ea3c26978407455e220ff42",
+  "split": "test",
+  "result": {
+    "k": 3,
+    "cases": [
+      {
+        "id": "test1",
+        "question": "battery charge dock",
+        "relevant": [
+          "battery-v2"
+        ],
+        "retrieved": [
+          "battery-v2",
+          "charging",
+          "warehouse"
+        ],
+        "recall": 1.0,
+        "reciprocal_rank": 1.0,
+        "correct_abstention": null
+      },
+      {
+        "id": "test2",
+        "question": "acquisition callback time",
+        "relevant": [
+          "time"
+        ],
+        "retrieved": [
+          "time"
+        ],
+        "recall": 1.0,
+        "reciprocal_rank": 1.0,
+        "correct_abstention": null
+      },
+      {
+        "id": "test3",
+        "question": "microphone four channels",
+        "relevant": [
+          "audio"
+        ],
+        "retrieved": [
+          "audio"
+        ],
+        "recall": 1.0,
+        "reciprocal_rank": 1.0,
+        "correct_abstention": null
+      },
+      {
+        "id": "test4",
+        "question": "warehouse inspection Cedar",
+        "relevant": [
+          "warehouse"
+        ],
+        "retrieved": [
+          "warehouse"
+        ],
+        "recall": 1.0,
+        "reciprocal_rank": 1.0,
+        "correct_abstention": null
+      },
+      {
+        "id": "test5",
+        "question": "duplicate sequence session identifier",
+        "relevant": [
+          "network"
+        ],
+        "retrieved": [
+          "network"
+        ],
+        "recall": 1.0,
+        "reciprocal_rank": 1.0,
+        "correct_abstention": null
+      },
+      {
+        "id": "test6",
+        "question": "VIOLET-ONLY diagnostic",
+        "relevant": [],
+        "retrieved": [
+          "battery-v2",
+          "charging"
+        ],
+        "recall": null,
+        "reciprocal_rank": null,
+        "correct_abstention": false
+      },
+      {
+        "id": "test7",
+        "question": "underwater pressure rating",
+        "relevant": [],
+        "retrieved": [],
+        "recall": null,
+        "reciprocal_rank": null,
+        "correct_abstention": true
+      },
+      {
+        "id": "test8",
+        "question": "camera calibration microphone sample",
+        "relevant": [
+          "camera",
+          "audio"
+        ],
+        "retrieved": [
+          "camera",
+          "audio"
+        ],
+        "recall": 1.0,
+        "reciprocal_rank": 1.0,
+        "correct_abstention": null
+      }
+    ],
+    "answerable_count": 6,
+    "unanswerable_count": 2,
+    "macro_recall": 1.0,
+    "mrr": 1.0,
+    "abstention_accuracy": 0.5
+  },
+  "limitations": [
+    "synthetic fixture; not a generalization benchmark",
+    "no model or embedding inference",
+    "a valid quote does not prove relevance or complete support"
+  ]
+}

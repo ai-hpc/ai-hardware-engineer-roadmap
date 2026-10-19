@@ -2,7 +2,7 @@
 
 ## Overview
 
-Lecture 3 introduced MLIR's architecture: dialects, operations, progressive lowering. This lecture dives into the **specific dialects that matter for AI compilation** — the ones that sit between "this is a matrix multiply" and "emit LLVM IR." These dialects form the **compilation backbone** of projects like IREE (Google's ML compiler), Triton-MLIR, and hardware vendor compilers for NPUs and AI accelerators. The core challenge is: how do you take a high-level tensor operation (like conv2d or attention) and systematically transform it into tiled, vectorized, hardware-mapped code — while making optimal decisions about data layout, memory placement, and parallelism? Each dialect in this lecture provides the vocabulary and transformation rules for one stage of that journey.
+Lecture 3 introduced MLIR's architecture: dialects, operations, progressive lowering. This lecture dives into the **specific dialects that matter for AI compilation** — the ones that sit between "this is a matrix multiply" and "emit LLVM IR." These dialects form the **compilation backbone** of projects like IREE (an open-source ML compiler and runtime), Triton-MLIR, and hardware vendor compilers for NPUs and AI accelerators. The core challenge is: how do you take a high-level tensor operation (like conv2d or attention) and systematically transform it into tiled, vectorized, hardware-mapped code — while making legal and useful decisions about data layout, memory placement, and parallelism? Each dialect in this lecture provides the vocabulary and transformation rules for one stage of that journey.
 
 ---
 
@@ -84,7 +84,7 @@ Linalg provides named ops for common AI workloads:
 
 ### linalg.generic: The Universal Operation
 
-Any operation expressible as a **loop nest with affine access patterns** can be written as `linalg.generic`. This includes matmul, conv, attention, normalization — everything.
+`linalg.generic` represents structured computations with explicit indexing maps, iterator types, and a scalar region. Matmul and many elementwise/reduction operations fit this form. Attention or normalization typically needs several operations and intermediate reductions; arbitrary data-dependent indexing and control flow do not become one generic operation automatically.
 
 ```mlir
 // ReLU: output[i] = max(input[i], 0)
@@ -133,8 +133,8 @@ Any operation expressible as a **loop nest with affine access patterns** can be 
 
 These are the core transformations that convert high-level linalg ops into hardware-optimized code:
 
-**Tiling:**
-```mlir
+**Tiling:** the following is structural pseudocode, not parser-ready MLIR. Tensor results must be carried through `scf.for` iter_args/yields and inserted into the updated output. Tail slices also need smaller sizes when dimensions are not tile multiples.
+```text
 // BEFORE: full 128x256 matmul
 %C = linalg.matmul ins(%A, %B) outs(%C_init)
 
@@ -153,14 +153,14 @@ scf.for %i = 0 to 128 step 32 {
 }
 ```
 
-**Fusion:**
-```mlir
+**Fusion:** structural pseudocode. Apply ReLU after the complete K reduction for each output tile, not to each partial sum.
+```text
 // BEFORE: matmul followed by ReLU — two separate kernels, intermediate buffer
 %mm = linalg.matmul ins(%A, %B) outs(%C_init)
 %relu = linalg.generic {/*relu*/} ins(%mm) outs(%out_init)
 
 // AFTER fusion: ReLU is fused into the matmul's output tile loop
-// No intermediate buffer needed — the relu is applied to each tile as it's computed
+// Fusion may avoid a full intermediate tensor; local accumulators are still needed.
 scf.for %i = ... {
   scf.for %j = ... {
     %mm_tile = linalg.matmul ins(%a_tile, %b_tile) outs(%c_tile)
@@ -192,7 +192,7 @@ scf.for %i = ... {
 
 ### Tensor Dialect
 
-Operates on **immutable tensor values**. No memory allocation, no side effects. Enables functional optimization.
+Tensor values have immutable value semantics: an insertion produces a new tensor value rather than mutating the original SSA value. Actual storage is decided during lowering/bufferization; value semantics do not mean the final program needs no allocation.
 
 ```mlir
 // Extract a subtensor (like NumPy slicing)
@@ -267,7 +267,7 @@ linalg.generic {relu} ins(%buf_C) outs(%buf_C)     // IN-PLACE: reuses %buf_C
 
 ## 3. The Affine Dialect: Polyhedral Optimization
 
-The `affine` dialect represents loop nests where bounds and access patterns are **affine expressions** (linear combinations of loop variables and constants). This enables powerful **polyhedral analysis** — the compiler can reason mathematically about **data dependencies**, loop transformations, and optimal tiling.
+The `affine` dialect represents loop nests where bounds and access patterns are **affine expressions** (linear combinations of loop variables and constants). This enables powerful **polyhedral analysis** — the compiler can reason mathematically about **data dependencies**, loop transformations, and legal scheduling transformations. Profitability still needs a cost model or measurement.
 
 ```mlir
 // Simple affine loop nest for matrix multiply
@@ -332,7 +332,7 @@ mlir-opt --affine-loop-tile --affine-loop-interchange --affine-loop-unroll input
 
 ## 4. The Vector Dialect: Hardware Vector Mapping
 
-The `vector` dialect bridges the gap between abstract loop operations and **hardware SIMD/vector instructions**. It represents **fixed-size, multi-dimensional vector operations** — the abstraction that maps to AVX-512, NEON/SVE, GPU warp operations, or accelerator matrix units.
+The `vector` dialect bridges the gap between abstract loop operations and **hardware SIMD/vector instructions**. It represents fixed-size and scalable vector operations, including multidimensional forms. Mapping those forms to AVX, NEON/SVE, GPU operations, or matrix units requires supported legalization and target lowering.
 
 ```mlir
 // Transfer data from memref to vector (tile load)
@@ -371,16 +371,11 @@ vector.transfer_write %result, %C[%i, %j]
 
 ### Vector to Hardware Mapping
 
-The vector dialect is designed to lower naturally to different hardware:
+The same vector operation can have different legal implementations. A `vector.transfer_read` may require several loads, masks, or layout adjustments. A contraction may become scalar/vector FMAs or a supported matrix instruction. A reduction may preserve order or require explicitly allowed reassociation.
 
-| Vector Operation | x86 AVX-512 | ARM SVE | GPU (CUDA) | Custom Accelerator |
-|---|---|---|---|---|
-| `vector.transfer_read` | `vmovups` | `ld1` | `ld.global` | DMA load |
-| `vector.contract` (matmul) | FMA loop | outer product | `mma.sync` (tensor core) | Systolic MAC |
-| `vector.reduction <add>` | `vhaddps` chain | `faddv` | warp shuffle reduce | Accumulator read |
-| `arith.maximumf` (ReLU) | `vmaxps` | `fmax` | `max.f32` | Activation unit |
+Matching a 16×16×16 shape is not enough to select a tensor-core instruction. Operand and accumulator dtypes, layouts, lane distribution, memory alignment, target generation, synchronization, and the implemented conversion patterns must also match. A custom accelerator needs its own legal lowering or runtime call; MLIR does not supply an arbitrary device instruction merely because its shape looks suitable.
 
-> **Key Insight:** The `vector.contract` operation is the bridge between `linalg.matmul` (abstract) and hardware matrix instructions (concrete). When targeting a GPU, `vector.contract` with tile sizes matching tensor core dimensions (16×16×16) lowers to `mma.sync`. When targeting your custom accelerator, the same operation lowers to your systolic array instruction. The compiler only needs to choose the right tile sizes — the lowering is mechanical.
+**Worked fusion counterexample:** suppose one output has two K-chunk sums, −5 and +3. Correct `ReLU(sum)` is `ReLU(−2)=0`. Applying ReLU after the first chunk gives `ReLU(−5)+3=3`. Fusion must preserve the complete reduction before applying the nonlinear activation.
 
 ---
 
@@ -388,7 +383,8 @@ The vector dialect is designed to lower naturally to different hardware:
 
 The `gpu` dialect provides operations for expressing GPU execution — **thread/block hierarchy, shared memory, barriers** — in a target-independent way.
 
-```mlir
+```text
+// GPU structure sketch: values, dimensions, and address-space details are omitted.
 // Launch a GPU kernel
 gpu.launch blocks(%bx, %by, %bz) in (%gbx = %grid_x, %gby = %grid_y, %gbz = %grid_z)
            threads(%tx, %ty, %tz) in (%tbx = %block_x, %tby = %block_y, %tbz = %block_z) {
@@ -502,11 +498,13 @@ scf.for %i = 0 to 512 step 64 {
 
 1. **Write a linalg.generic:** Express a softmax operation (`exp(x - max(x)) / sum(exp(x - max(x)))`) as a sequence of `linalg.generic` operations. Identify the `indexing_maps` and `iterator_types` for each stage (max reduction, subtract, exp, sum reduction, divide).
 
-2. **Tile and fuse:** Write a `linalg.matmul` followed by a `linalg.generic` (ReLU). Use `mlir-opt --linalg-tile-and-fuse-tensor-ops` to fuse them. Examine the output — verify that the ReLU is inside the tile loops.
+2. **Tile and count:** run the [tiling lab](../Labs/Tiling-and-Dataflow.md) with M=5, N=7, K=3 and tiles 2×4×2. Predict the final tile sizes, traffic, and peak storage. **Answer:** the last M/N/K extents are 1/3/1; total logical traffic is 326 bytes and peak modeled storage is 56 bytes under the stated output-stationary schedule.
 
-3. **Bufferization analysis:** Take the fused matmul+ReLU from exercise 2 and run `--one-shot-bufferize`. Count the number of `memref.alloc` in the output. Is the intermediate buffer between matmul and ReLU eliminated?
+3. **Bufferization analysis:** build a tensor matmul with a zero-filled accumulator. Use the function-boundary and ownership options appropriate to your MLIR version, then inspect allocation, copies, aliases, and deallocation. Counting `memref.alloc` alone is insufficient to prove correct ownership or lower peak live storage. The first executable lab deliberately uses memrefs to isolate lowering from this separate problem.
 
-4. **Vector lowering:** Write a simple `vector.contract` that computes a 4×4 matrix multiply. Lower it with `--convert-vector-to-llvm` and examine the generated LLVM dialect — identify the FMA instructions.
+4. **Actual CPU lowering:** execute `run_mlir_lab.py` and inspect every retained stage. Explain why `--convert-vector-to-llvm` by itself is not a general implementation of a multidimensional `vector.contract`: high-level vector operations may first require decomposition, contraction lowering, transfer lowering, and a target-specific strategy.
+
+5. **Fusion legality:** use the −5/+3 example above to explain why ReLU cannot move inside the K-reduction loop. Then identify which buffers could disappear when a valid final activation is fused with the output tile store.
 
 ---
 
@@ -517,7 +515,7 @@ scf.for %i = 0 to 512 step 64 {
 | `linalg` | Structured representation of tensor ops; enables tiling, fusion, interchange |
 | `tensor` | Immutable tensor values; enables functional optimization, deferred allocation |
 | `memref` | Memory-backed buffers; required for code generation |
-| `affine` | Polyhedral loop analysis; optimal tiling and scheduling |
+| `affine` | Structured dependence analysis and legal loop transformations |
 | `scf` | General structured control flow; loop nests after tiling |
 | `vector` | Fixed-size vector tiles; maps to SIMD, tensor cores, MAC arrays |
 | `gpu` | Thread/block hierarchy; shared memory promotion; barriers |
@@ -530,7 +528,7 @@ The compilation pipeline for any AI workload follows the pattern:
 ## Resources
 
 * **[Linalg Dialect Documentation](https://mlir.llvm.org/docs/Dialects/Linalg/):** Reference for all linalg operations and transformations.
-* **[Linalg on Tensors (MLIR RFC)](https://discourse.llvm.org/t/rfc-linalg-on-tensors/):** Design rationale for tensor-based linalg.
+* **[Structured Linalg operations (MLIR RFC)](https://mlir.llvm.org/docs/Tutorials/transform/Ch0/):** Design rationale for tensor-based linalg.
 * **[One-Shot Bufferize](https://mlir.llvm.org/docs/Bufferization/):** How MLIR converts tensors to memory references.
 * **[Structured Code Generation in MLIR](https://www.youtube.com/watch?v=5gXsRJuN5Hg):** Talk by Nicolas Vasilache on the linalg→vector pipeline.
 * **[IREE Compiler](https://iree.dev/):** Google's production ML compiler built on MLIR — study its pipeline for real-world patterns.

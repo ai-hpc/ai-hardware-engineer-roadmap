@@ -1,0 +1,9 @@
+{
+  "accepted": true,
+  "version": 3,
+  "target": "course-simulator-v1",
+  "sha256": "5540ee9fbcbc6562c0b707bb5aff85f52a2d0f1921a2798b78db46102cf6fb59",
+  "openssl": "OpenSSL 3.0.13 30 Jan 2024 (Library: OpenSSL 3.0.13 30 Jan 2024)",
+  "private_key_retained": false,
+  "boundary": "local signature/hash/policy exercise; no device installation or protected counter"
+}

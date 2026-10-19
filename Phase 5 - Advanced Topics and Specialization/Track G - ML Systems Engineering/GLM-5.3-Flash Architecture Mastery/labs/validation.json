@@ -1,0 +1,34 @@
+{
+  "checked_at": "2026-10-18",
+  "python_version": "3.12.3",
+  "portable_tests": 21,
+  "portable_result": "passed",
+  "framework_result": "passed",
+  "framework_version": "torch 2.14.0+cpu",
+  "upstream_chunk_comparisons": 64,
+  "upstream_pool_visibility_cases": 72,
+  "scope": "CPU mathematical references and extracted hash-pinned upstream fallback functions; not full-model or GPU validation",
+  "sha256": {
+    "hybrid_reference.py": "13832e57d20ee6e1e8b3c138914ad3720ac59af756270c12f5d7be7da088107b",
+    "test_hybrid.py": "abdcb6a3a43afb418c6bf3c260f2266afb23b333ae6ec1e7cbd7b472eae4161a",
+    "compare_transformers.py": "9d5f8be683bb25fdcc3242eab3c48f1fd53d5c3c05a04a62efcc76170265228c",
+    "checkpoint-config.json": "53d1bf0469d8d98b14d3667a101d4b22b815dc26d43cb98acdd46025f7835b75",
+    "sources.json": "c82fce9eacd601bcd92541e464d6310274cab5839d1cd4c27acfca37d350f722",
+    "framework-result.json": "76d77b416f53806a996a0a8f5b0d1fdb5ae86b31dede97aa1cd79513c10484a8",
+    "sample-run.json": "7b21ebb7a89477ac9dd92545a63e0119a4a76cb44a65ec2e8b9696633cf06273",
+    "requirements-torch.txt": "f6c4af8e1729e6f3a046798d8e5d2294abbea3bb22409b5328a36f1e53a12561"
+  },
+  "independent_review_utc": "2026-10-18T22:56:17.078077+00:00",
+  "weighted_and_mixed_pooling": {
+    "nonuniform_hand_example": 1,
+    "mixed_batch_pool_slots": 6,
+    "mixed_batch_multiquery_tails": 9,
+    "includes_all_padding_request": true
+  },
+  "review_fixes": [
+    "Reject ragged/incompatible matrices instead of zip truncation",
+    "Reject invalid MLA query/projection contracts consistently",
+    "Reject nonfinite/invalid Sinkhorn epsilon and overflowing sums",
+    "Check weighted pooling with independent scalar arithmetic and mixed padding including all-padding request"
+  ]
+}

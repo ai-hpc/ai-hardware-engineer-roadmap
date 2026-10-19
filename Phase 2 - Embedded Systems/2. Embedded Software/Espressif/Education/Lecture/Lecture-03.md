@@ -1,150 +1,56 @@
-# Lecture 3 - Getting started with ESP32: chips, boards, flashing, and first examples
+# Lecture 3 - Chips, boards, flashing, and a first ESP-IDF project
 
-**Course:** [Official education path guide](../Guide.md) | **Phase 2 - Embedded Software**
+**Course:** [Education guide](../Guide.md) | **Previous:** [Bytes and budgets](Lecture-02.md) | **Next:** [Choose an AI, power or gateway experiment](Lecture-04.md)
 
-**Previous:** [Lecture 02](Lecture-02.md) | **Next:** [Lecture 04 - Solution tracks: AI, connectivity, peripherals, low power, and gateways](Lecture-04.md)
+A chip is the SoC; a module adds supporting components and RF integration; a development board adds power/debug/connectors. Record all three identities and the board revision. They determine which target to compile and which physical port to use.
 
----
+If you completed the [Arduino bring-up lecture](../../Lecture/Lecture-02.md), keep its boot record. This lesson offers a native ESP-IDF route. The commands are documented practice, not a claim of physical board execution in this revision.
 
-## Why this lecture matters
+## Use the SDK environment that belongs to the example
 
-After basics, Espressif’s official education path moves into **Getting Started with ESP32**.
+The [official version guide](https://docs.espressif.com/projects/esp-idf/en/stable/esp32c6/versions.html) resolved to ESP-IDF 6.1 when reviewed on 2026-10-18. Install a supported release through the [official getting-started guide](https://docs.espressif.com/projects/esp-idf/en/stable/esp32c6/get-started/index.html), then activate that release's environment. An Arduino component or Zigbee SDK example can require a different IDF line; follow its compatibility requirements rather than mixing releases.
 
-That is where learners need to answer:
+After activation:
 
-- what is the difference between a chip, module, and development board?
-- which development environment should I use?
-- what are the first examples I should really run?
+```bash
+idf.py --version
+```
 
----
+Copy `examples/get-started/hello_world` from that installed SDK into a new workspace directory. This keeps generated project files separate from the SDK source. In the copied directory, for an actual C6 target:
 
-## Chip vs module vs development board
+```bash
+idf.py set-target esp32c6
+idf.py build
+idf.py size
+```
 
-This distinction is important and often skipped.
+Save the target, compiler version, build log, ELF/map files, and configuration. A successful cross-build is useful even without hardware. It does not establish working pins, radio, memory options, or power.
 
-### Chip
+When the correct board and port are connected, replace the placeholder in:
 
-The chip is the actual **SoC**.
+```bash
+idf.py -p YOUR_SERIAL_PORT flash monitor
+```
 
-Example:
+Observe the expected hello-world output and the example's documented restart behavior. Do not classify an intentional example restart as a crash without reading its source. Exit the monitor with Ctrl+].
 
-- `ESP32-C6`
-- `ESP32-S3`
+## Understand the files before changing them
 
-### Module
+| File | Question it answers |
+|---|---|
+| Root `CMakeLists.txt` | Which project/build integration is being configured? |
+| Component `CMakeLists.txt` | Which sources and dependencies belong to this component? |
+| `sdkconfig` / defaults | Which concrete options and defaults selected the build? |
+| `idf_component.yml` | Which managed dependencies and version constraints are requested? |
+| `dependencies.lock` | Which managed dependency versions were resolved? |
+| Partition table | Where do application/data/update partitions reside in flash? |
 
-The module packages the chip with things like:
+Changing target can regenerate configuration. Commit source/configuration intentionally and compare the result; do not copy an opaque `sdkconfig` from another chip and assume it is portable.
 
-- flash
-- RF design
-- certification support
+## Bring-up exercise
 
-This is what **many real products** use.
+Change one printed line to include a project revision string. Rebuild and confirm that the new image, not a stale binary, is what boots. Reset twice, reconnect the terminal, and compare logs. Then run one GPIO or peripheral example from the same SDK release with pins verified against the board schematic.
 
-### Development board
+**Answer check:** What does `idf.py size` establish? It summarizes sections of the linked image. It does not measure peak runtime heap, task stack high-water marks, dynamically allocated model activations, or total board power. Gather those separately when the application needs them.
 
-The development board gives you:
-
-- USB
-- easy headers
-- power support
-- a fast start
-
-If you blur these three together, you make **poor hardware decisions** later.
-
-Espressif’s education page explicitly points learners to understanding these differences first.
-
----
-
-## The first hardware concepts that matter
-
-Espressif’s study plan also calls out:
-
-- strapping pins
-- run mode
-- download mode
-
-That matters because "board does not flash" is often **not a software problem**.
-
-It is often:
-
-- wrong boot mode
-- wrong USB/serial assumptions
-- wrong board setup
-
-So even first **bring-up** is still embedded engineering.
-
----
-
-## Choosing the development environment
-
-Espressif’s official education page presents three useful levels:
-
-- **UIFlow**
-  - very low-code
-  - not the main route for this roadmap
-- **Arduino**
-  - good for entry-level and fast practical projects
-- **ESP-IDF**
-  - good for more complex projects and flexible development
-
-That is a healthy official message because it avoids pretending one environment is right for every learner and every product.
-
-For this roadmap:
-
-- use **Arduino** for fast hardware and connected-device starts
-- use **ESP-IDF** when project structure and control start to matter more
-
----
-
-## The first examples that actually matter
-
-Espressif’s education page points learners toward the kinds of examples that make sense:
-
-- `hello_world`
-- `blink`
-- Wi-Fi station
-- peripheral examples
-
-That progression is correct because it moves from:
-
-- compile and flash
-- to GPIO
-- to connectivity
-- to peripherals
-
-This is much better than starting with a **giant showcase demo**.
-
----
-
-## Why the build system matters early
-
-The education page also points learners to:
-
-- partition table
-- `CMakeLists`
-- `sdkconfig`
-- `Kconfig`
-- component manager
-
-That is a major hint from Espressif:
-
-> serious ESP32 work quickly becomes build-system-aware work
-
-So even when you begin with Arduino, you should know that the deeper project model exists.
-
----
-
-## Lab
-
-Write a short plan with:
-
-1. one board you would start with
-2. one framework you would start with
-3. three examples you would run in order
-
-Then explain why that order is better than jumping straight into a complex demo.
-
----
-
-**Previous:** [Lecture 02](Lecture-02.md) | **Next:** [Lecture 04 - Solution tracks: AI, connectivity, peripherals, low power, and gateways](Lecture-04.md)
+The deliverable is a reproducible build plus clearly labeled compile-only or hardware-run evidence, followed by one small board-specific peripheral observation.

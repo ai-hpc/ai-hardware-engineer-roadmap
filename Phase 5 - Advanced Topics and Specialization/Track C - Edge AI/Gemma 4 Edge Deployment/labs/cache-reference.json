@@ -1,0 +1,48 @@
+{
+  "scope": "config snapshots and a hypothetical cache model; no runtime cache measurement",
+  "target": {
+    "architecture": [
+      "Gemma4ForConditionalGeneration"
+    ],
+    "config_sha256": "1b28f3d2c3100f6c594754b81107428bd7b822a7f48272ca681dae9d2ec38330",
+    "text": {
+      "hidden_size": 1536,
+      "num_hidden_layers": 35,
+      "num_key_value_heads": 1,
+      "head_dim": 256,
+      "global_head_dim": 512,
+      "num_kv_shared_layers": 20,
+      "attention_k_eq_v": false
+    },
+    "layer_types": {
+      "sliding_attention": 28,
+      "full_attention": 7
+    }
+  },
+  "assistant": {
+    "architecture": [
+      "Gemma4AssistantForCausalLM"
+    ],
+    "config_sha256": "7f42f559a6a69ffaeaf6b61a1ece3a562a2ed5ad00b8d30f16917ba5ab1bcbe9",
+    "text": {
+      "hidden_size": 256,
+      "num_hidden_layers": 4,
+      "num_key_value_heads": 1,
+      "head_dim": 256,
+      "global_head_dim": 512,
+      "num_kv_shared_layers": 4,
+      "attention_k_eq_v": false
+    },
+    "layer_types": {
+      "sliding_attention": 3,
+      "full_attention": 1
+    }
+  },
+  "hypothetical_cache_MiB": {
+    "256": 8.0,
+    "8192": 76.0,
+    "16384": 140.0
+  },
+  "one_allocation_two_consumers_bytes": 8388608,
+  "assistant_backbone_hidden_size": 1536
+}

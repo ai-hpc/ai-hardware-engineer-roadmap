@@ -4,7 +4,7 @@
 
 Lectures 01-08 drove one scene from your own loop. Isaac Lab inverts that: you describe **one** environment as configuration, and the framework clones it thousands of times on one GPU, steps it in lockstep, and hands batched tensors to an RL library. The point is throughput. A policy that needs 100 million environment steps will not train at one robot per process.
 
-Isaac Lab 3.0 (Early Access, `release/3.0.0`, September 2026, requires Isaac Sim 6.1 and Python 3.12) is also the biggest break the framework has had. Physics is now **multi-backend**: PhysX through Isaac Sim, Newton with MuJoCo-Warp, or the experimental kit-less OvPhysX, chosen at launch with `physics=...`. Install is `uv`-driven. Training goes through one `isaaclab train` command. Data properties return `ProxyArray`. Quaternions flip from wxyz to **xyzw**. Most tutorials and forum answers you will find are 2.x, so this lecture teaches the 3.0 shape and gives you a migration table for reading the old one.
+Isaac Lab 3.0 Early Access introduces a major architecture change. The September EA snapshot uses Python 3.12 and Sim 6.1 for full simulator workflows; kit-less workflows can omit Sim. The moving release branch has since changed dependencies, so use the [exact compatibility record](Compatibility.md). Physics is **multi-backend**: PhysX through Isaac Sim, Newton with MuJoCo-Warp, or kit-less OvPhysX, chosen at launch with `physics=...`. Installation uses `uv`; training has a unified `isaaclab train` command; data properties return `ProxyArray`; quaternions change from wxyz to **xyzw**. This lecture teaches that 3.0 architecture and the migration from 2.x.
 
 By the end you should be able to:
 
@@ -56,14 +56,16 @@ The `release/3.0.0` source tree has these packages under `source/`:
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
-git clone https://github.com/isaac-sim/IsaacLab.git --branch release/3.0.0 && cd IsaacLab
+git clone https://github.com/isaac-sim/IsaacLab.git --branch v3.0.0-EA
+cd IsaacLab
+git checkout --detach ae37b028ea415c91ea2bc32609efcd759ed2b974
 
 uv run isaaclab train --rl_library rsl_rl --task Isaac-Cartpole-Direct physics=newton_mjwarp          # kit-less
 uv run --extra ovphysx isaaclab train --rl_library rsl_rl --task Isaac-Cartpole-Direct physics=ovphysx  # kit-less PhysX
 uv run --extra isaacsim isaaclab train --rl_library rsl_rl --task Isaac-Cartpole-Direct physics=isaacsim_physx
 ```
 
-`uv run` creates and syncs the project environment on every call (Python 3.12, PyTorch CUDA 13.0 wheels in the source checkout). `--extra NAME` goes **before** `isaaclab`. Here is what the extras pull in (`pyproject.toml` at `release/3.0.0`):
+**Upstream source-checked exercise; not executed here.** Preserve this snapshot's lockfile and record the resolved environment. `uv run` synchronizes the project environment; `--extra NAME` goes **before** `isaaclab`. The following full-simulator dependency refers to the EA snapshot, not today's moving release branch. Check each task's `--help` and configuration at your chosen commit before launching a long run.
 
 * `isaacsim` adds `isaacsim[all,extscache]==6.1.0.0` (Kit, RTX, Isaac Sim PhysX)
 * `ovphysx`, `ovrtx` and `ov` add the kit-less Omniverse PhysX and RTX runtimes
@@ -106,7 +108,7 @@ Both Cartpoles in `isaaclab_tasks/core/cartpole/` implement the same MDP (same r
 5. `command_manager.compute(...)`, then `event_manager.apply(mode="interval", ...)`
 6. `observation_manager.compute()`, then return `(obs, reward, terminated, time_out, extras)`
 
-So `step_dt = decimation × sim.dt`. The Cartpole has `sim.dt = 1/120` and `decimation = 2`, so the policy acts at 60 Hz. Direct envs follow the same skeleton, calling your `_pre_physics_step` once, then `_apply_action` every physics substep.
+So `step_dt = decimation × sim.dt`. The Cartpole has `sim.dt = 1/120` and `decimation = 2`, so the policy acts at 60 Hz. Direct envs call `_pre_physics_step` once per policy step. In the ordinary path, `_apply_action` runs per decimation tick; a backend that handles decimation internally calls it once and advances the block itself. Do not rely on Python callback count to infer the number of integrated substeps; check `_physics_handles_decimation` in the pinned source.
 
 ### 2.4 The scene: one env, cloned
 
@@ -116,7 +118,7 @@ So `step_dt = decimation × sim.dt`. The Cartpole has `sim.dt = 1/120` and `deci
 class CartpoleSceneCfg(InteractiveSceneCfg):
     ground = AssetBaseCfg(prim_path="/World/ground", spawn=sim_utils.GroundPlaneCfg(size=(100.0, 100.0)))
     robot: ArticulationCfg = replace(CARTPOLE_CFG, prim_path="{ENV_REGEX_NS}/Robot")
-    distant_light = AssetBaseCfg(prim_path="/World/DistantLight", ...)
+    distant_light = AssetBaseCfg(prim_path="/World/DistantLight", spawn=sim_utils.DistantLightCfg(intensity=3000.0))
 
 scene: CartpoleSceneCfg = CartpoleSceneCfg(num_envs=4096, env_spacing=4.0, clone_in_fabric=True)
 ```
@@ -144,7 +146,7 @@ class CartpolePhysicsCfg(PresetCfg):
     isaacsim_physx: PhysxCfg = PhysxCfg()
     ovphysx: OvPhysxCfg = OvPhysxCfg()
     physx: PhysxAutoCfg = PhysxAutoCfg(isaacsim_physx=isaacsim_physx, ovphysx=ovphysx)
-    newton_mjwarp: NewtonCfg = NewtonCfg(solver_cfg=MJWarpSolverCfg(njmax=5, nconmax=3, ...),
+    newton_mjwarp: NewtonCfg = NewtonCfg(solver_cfg=MJWarpSolverCfg(njmax=5, nconmax=3),
                                          num_substeps=1, use_cuda_graph=True)
     default: NewtonCfg = newton_mjwarp          # Cartpole runs on Newton unless told otherwise
 
@@ -406,9 +408,9 @@ You can move on when you can:
 
 ## References
 
-* Isaac Lab 3.0 installation (uv, extras, kit-less, legacy `isaaclab.sh`) — [docs](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/setup/installation/index.html)
-* Quickstart (commands, RL libraries, backends, visualizers, benchmarks) — [docs](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/setup/quickstart.html)
-* Migrating to 3.0 — [docs](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/migration/migrating_to_isaaclab_3-0.html)
+* Isaac Lab 3.0 installation (uv, extras, kit-less, legacy `isaaclab.sh`) — [docs](https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/docs/source/setup/installation/index.rst)
+* Quickstart (commands, RL libraries, backends, visualizers, benchmarks) — [docs](https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/docs/source/setup/quickstart.rst)
+* Migrating to 3.0 — [docs](https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/docs/source/migration/migrating_to_isaaclab_3-0.rst)
 * Backends and presets — [docs](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/concepts/backends_and_presets.html); physics backends — [docs](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/concepts/physics_backends.html)
 * Task workflows (manager-based vs direct) — [docs](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/concepts/task_workflows.html)
 * Working with `ProxyArray` — [docs](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/how-to/proxy_array.html)

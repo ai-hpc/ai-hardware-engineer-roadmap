@@ -1,0 +1,112 @@
+{
+  "benchmark": "course custom fixtures, not BFCL scores",
+  "cases": [
+    {
+      "id": "simple",
+      "category": "simple",
+      "parsed_and_valid": true,
+      "exact_calls": true,
+      "passed": true,
+      "errors": []
+    },
+    {
+      "id": "selection",
+      "category": "multiple",
+      "parsed_and_valid": true,
+      "exact_calls": true,
+      "passed": true,
+      "errors": []
+    },
+    {
+      "id": "parallel",
+      "category": "parallel",
+      "parsed_and_valid": true,
+      "exact_calls": true,
+      "passed": true,
+      "errors": []
+    },
+    {
+      "id": "mixed",
+      "category": "parallel_multiple",
+      "parsed_and_valid": true,
+      "exact_calls": true,
+      "passed": true,
+      "errors": []
+    },
+    {
+      "id": "none",
+      "category": "irrelevance",
+      "parsed_and_valid": true,
+      "exact_calls": true,
+      "passed": true,
+      "errors": []
+    },
+    {
+      "id": "turns",
+      "category": "multi_turn",
+      "parsed_and_valid": true,
+      "exact_calls": true,
+      "passed": true,
+      "errors": []
+    }
+  ],
+  "categories": {
+    "irrelevance": {
+      "passed": 1,
+      "total": 1,
+      "accuracy": 1.0,
+      "wilson_95_interval": [
+        0.20654329147389294,
+        1
+      ]
+    },
+    "multi_turn": {
+      "passed": 1,
+      "total": 1,
+      "accuracy": 1.0,
+      "wilson_95_interval": [
+        0.20654329147389294,
+        1
+      ]
+    },
+    "multiple": {
+      "passed": 1,
+      "total": 1,
+      "accuracy": 1.0,
+      "wilson_95_interval": [
+        0.20654329147389294,
+        1
+      ]
+    },
+    "parallel": {
+      "passed": 1,
+      "total": 1,
+      "accuracy": 1.0,
+      "wilson_95_interval": [
+        0.20654329147389294,
+        1
+      ]
+    },
+    "parallel_multiple": {
+      "passed": 1,
+      "total": 1,
+      "accuracy": 1.0,
+      "wilson_95_interval": [
+        0.20654329147389294,
+        1
+      ]
+    },
+    "simple": {
+      "passed": 1,
+      "total": 1,
+      "accuracy": 1.0,
+      "wilson_95_interval": [
+        0.20654329147389294,
+        1
+      ]
+    }
+  },
+  "passed": 6,
+  "total": 6,
+  "gate_passed": true
+}

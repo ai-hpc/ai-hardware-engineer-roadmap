@@ -165,7 +165,8 @@ def update(x_pred, P_pred, z, H, R):
 
     # Covariance update
     I = np.eye(2)
-    P_new = (I - K @ H) @ P_pred
+    a = I - K @ H
+    P_new = a @ P_pred @ a.T + (K @ K.T) * R
 
     return x_new, P_new
 ```
@@ -268,7 +269,8 @@ class KalmanFilter2D:
 
         # Covariance update
         I = np.eye(2)
-        self.P = (I - K @ self.H) @ self.P
+        a = I - K @ self.H
+        self.P = a @ self.P @ a.T + (K @ K.T) * self.R
 
         # Save history
         self.history['x'].append(self.x[0, 0])

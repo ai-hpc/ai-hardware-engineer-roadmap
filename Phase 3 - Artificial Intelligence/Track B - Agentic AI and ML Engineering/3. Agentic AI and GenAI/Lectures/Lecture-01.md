@@ -4,7 +4,7 @@
 
 ---
 
-This is the opener for **AI Agent Development 2026**. Before any code, we set the frame: what a "modern AI agent" actually means in 2026, what changed to make agents work now when they mostly didn't in 2023, and why the interesting engineering has moved *out of the model and into the harness around it*.
+This is the opener for **AI Agent Development 2026**. Before any code, we set the frame: what a "modern AI agent" actually means in 2026, how to measure their capabilities, and how the model and its surrounding runtime jointly determine results.
 
 This lecture covers:
 
@@ -27,37 +27,29 @@ The load-bearing word is **independently**. A workflow is a sequence of steps to
 
 ---
 
-## 2. What changed (2023 → 2026)
+## 2. Capabilities are conditional, not a calendar guarantee
 
-Agents were demoed in 2023 and mostly fell over in production. Several independent shifts — not one breakthrough — made them reliable enough to ship. None of these are about a single model release; they're durable changes in the stack.
+Tool loops, multimodal models and contexts larger than 8K already existed in 2023. A year-by-year table that calls all older systems “text only” or all newer systems “reliable” misrepresents that history. Compare the exact system on the task you need:
 
-<div class="lecture-map" markdown>
+| Capability | Evidence to collect | Failure to include in the test |
+|---|---|---|
+| Multi-step tool use | Completion rate with a fixed action budget | Wrong tool, duplicate action, incomplete response |
+| Large context | Accuracy at the relevant evidence positions and lengths | Distractors, missing evidence, excess memory |
+| Multimodal input | Accuracy on the camera/audio conditions you expect | Glare, occlusion, accents, background noise |
+| Durable execution | Recovery after a forced process stop | Repeated external side effects |
+| Affordable operation | Cost and latency per successful task | Retries, cache misses, failed tasks |
 
-| Axis | ~2023 | 2026 |
-|------|-------|------|
-| **Reasoning** | One-pass completion; brittle multi-step | **Reasoning models** that plan, self-check, and recover mid-task |
-| **Interface** | One chat turn in → one answer out | **Run loops** — the model takes many steps until an exit condition |
-| **Tools** | Bespoke, per-app function calling | **Standard tool protocols (MCP)**; computer-use for legacy UIs with no API |
-| **Context** | 4K–8K tokens | **100K–1M tokens** — whole repos, long sessions (at real KV-cache cost) |
-| **Modality** | Text only | **Multimodal** — vision/audio perception as sub-agents |
-| **Deployment** | A hosted chat page | **Persistent, local-first control planes**; on-device / edge |
-| **Economics** | Too expensive for long sessions | Cheap enough for **long-running, tool-rich background work** |
+A model may finish dozens of steps on one benchmark and fail a short task in a different environment. Context capacity is not a promise that all evidence will be used correctly. Cheap tokens do not guarantee cheap successful tasks. The [provider contract lab](Provider-Contract-Lab.md) first tests the deterministic integration layer without making any model-quality claim.
 
-</div>
-
-The combined effect: a model can now stay on a task across **dozens of steps and tool calls**, over a context large enough to hold the real working set, cheaply enough to run continuously. That is the difference between a chat demo and a coding agent that opens a PR.
-
-> **Currency caveat.** Specific model names, context limits, and prices move every few months — this course deliberately teaches the *stable* layer (run loops, tool protocols, sessions, guardrails). Treat any version number you see as a snapshot.
-
----
+See the current [OpenAI agent architecture choices](https://developers.openai.com/api/docs/guides/agents) and [Claude model lifecycle documentation](https://platform.claude.com/docs/en/about-claude/model-deprecations) when selecting an actual API and model.
 
 ## 3. The harness era — where the engineering lives now
 
 Here is the single most important mental shift in this course:
 
-> **The hard part of an agent is not the model — it's the harness around it.**
+> **Evaluate the model and harness together. Both can limit reliability.**
 
-The model gives you reasoning and tool selection. Everything that makes an agent *reliable* is the runtime wrapped around it:
+The model gives you reasoning and tool selection. The runtime contributes the following reliability controls:
 
 * the **run loop** (when to keep going, when to stop, max turns, error handling),
 * **sessions** and durable state (so a crash mid-stream doesn't lose the task),
@@ -118,8 +110,8 @@ The capstone, **genie-claw**, is your own minimal agent harness — a local LLM 
 ## Key takeaways
 
 * A **modern agent independently runs a multi-step workflow** by letting an LLM control tool use within guardrails — not a wrapped completion.
-* Agents work in 2026 because of **converging shifts**: reasoning models, run loops, standard tool protocols (MCP), long context, multimodality, cheap inference, and local-first deployment.
-* The engineering has moved **from the model to the harness**. Reliability, latency, cost, and safety are *harness* properties.
+* Test tool use, long-context quality, multimodal accuracy, recovery and cost on the intended workload; the date alone guarantees none of them.
+* Model capabilities, runtime controls, tools and data jointly determine reliability, latency, cost and safety.
 * This is **systems engineering**; the course builds toward your own harness, **genie-claw**.
 
 ---
@@ -127,8 +119,8 @@ The capstone, **genie-claw**, is your own minimal agent harness — a local LLM 
 ## Self-check
 
 1. Give the one-sentence definition of an agent, and explain why a RAG "chat with your docs" box doesn't qualify.
-2. Name three shifts since 2023 that made agents production-viable, and why each matters.
-3. What does "the hard part is the harness, not the model" mean? List three harness responsibilities.
+2. Choose three capabilities from the table. Name one failure case and one measurable outcome for each.
+3. List three harness responsibilities and one failure that still requires changing the model, prompt or task scope.
 4. Two teams ship agents on the *same* model; one is far more reliable. Where does that difference come from?
 5. Which of the four production axes (reliability / latency / cost / safety) is most often ignored in demos, and what's the consequence?
 

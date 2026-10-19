@@ -30,6 +30,32 @@ If compute falls from an illustrative 20 ms to 12 ms but newly exposed communica
 
 For an 8-rank AllReduce of payload `S`, nccl-tests' normalized bus bandwidth is `(S/t) × 2(7/8)`. Link specifications often aggregate send and receive directions, while a collective's algorithm bandwidth describes useful payload divided by time. Keep the definitions beside the plot. [NCCL bandwidth definitions](https://github.com/NVIDIA/nccl-tests/blob/master/doc/PERFORMANCE.md).
 
+## Worked Qwen placement: why TP=72 is not the answer
+
+For the pinned dense Qwen2.5 model, 64 query heads and 8 KV heads divide evenly
+across TP=8: eight query heads and one KV head per rank, under that partitioning
+scheme. TP=72 cannot evenly divide 64 query heads. The engine may impose further
+matrix, packing and process-group requirements; divisibility is a necessary
+check for this simple partition, not sufficient compatibility evidence.
+
+On a 72-GPU domain, nine TP=8 groups or eighteen TP=4 groups are arithmetic
+candidates. Compare them under the same offered load and total GPU count. TP
+above the KV-head count may replicate KV heads in supported runtimes, so do not
+assume cache bytes keep dividing by TP. This model is dense: enabling expert
+parallelism does not create MoE experts.
+
+**Collective calculation:** if an eight-rank 1 GB AllReduce takes a hypothetical
+2 ms, algorithm bandwidth is 500 GB/s and normalized bus bandwidth is
+`500×2×7/8=875 GB/s`. This does not measure an individual NVLink port. The
+[CPU collectives lab](../NCCL-Deep-Dive/CPU-Collectives-Lab/Guide.md) runs actual
+two-rank Gloo operations and exposes wrong averaging with unequal local batches.
+Its semantics transfer; its localhost timings do not estimate NCCL/NVLink speed.
+
+**Self-check answer:** equal shard count is not equal work. Replicated heads,
+embedding/output tensors, workspace and unequal pipeline stages make the largest
+rank's budget decisive. A larger TP group may fit while slowing each decode step
+because its collectives dominate saved computation.
+
 ## Grace memory is a separate tier
 
 A coherent CPU/GPU address model removes some programming complexity but does not remove transfer cost, placement effects, page behavior, or bandwidth contention. Do not use the bidirectional NVLink-C2C link rating as guaranteed LPDDR read bandwidth. A KV offload experiment must record which pages live where, the migration policy, and observed GPU stalls.

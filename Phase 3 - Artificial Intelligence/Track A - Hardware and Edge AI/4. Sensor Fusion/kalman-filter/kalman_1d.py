@@ -1,6 +1,5 @@
 import os
 import numpy as np
-import matplotlib.pyplot as plt
 
 # Save plots next to this script
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -21,10 +20,15 @@ class KalmanFilter1D:
             P_x0: initial position variance
             P_v0: initial velocity variance
             P_xv0: initial position-velocity covariance (default 0)
-            Q_x: position process noise
-            Q_v: velocity process noise
+            Q_x: fixed per-step position variance (not continuous spectral density)
+            Q_v: fixed per-step velocity variance
             R: measurement noise variance
         """
+        values = np.asarray([x0, v0, P_x0, P_v0, P_xv0, Q_x, Q_v, R], dtype=float)
+        if not np.isfinite(values).all() or min(P_x0, P_v0, Q_x, Q_v) < 0 or R <= 0:
+            raise ValueError("states must be finite; variances nonnegative and R positive")
+        if np.linalg.eigvalsh([[P_x0, P_xv0], [P_xv0, P_v0]]).min() < -1e-12:
+            raise ValueError("initial covariance must be positive semidefinite")
         # State [x, v]
         self.x = x0
         self.v = v0
@@ -44,6 +48,8 @@ class KalmanFilter1D:
 
     def predict(self, dt=1.0):
         """Prediction step (constant velocity model)"""
+        if not np.isscalar(dt) or not np.isfinite(dt) or dt <= 0:
+            raise ValueError("dt must be finite and positive")
         # State: x = x + v*dt, v = v
         self.x = self.x + self.v * dt
 
@@ -61,6 +67,8 @@ class KalmanFilter1D:
 
     def update(self, z):
         """Update step with position measurement z"""
+        if not np.isscalar(z) or not np.isfinite(z):
+            raise ValueError("z must be a finite scalar")
         # Innovation
         y = z - self.x
 
@@ -75,10 +83,13 @@ class KalmanFilter1D:
         self.x = self.x + K_x * y
         self.v = self.v + K_v * y
 
-        # Covariance update: P = (I - K*H)*P
-        self.P_xx = (1 - K_x) * self.P_xx
-        self.P_xv = (1 - K_x) * self.P_xv
-        self.P_vv = self.P_vv - K_v * self.P_xv
+        # Use one unchanged prior covariance for every entry (Joseph form).
+        # Updating P_xv in place before P_vv would silently corrupt the variance.
+        covariance = np.array([[self.P_xx, self.P_xv], [self.P_xv, self.P_vv]])
+        gain = np.array([K_x, K_v])
+        a = np.eye(2) - np.outer(gain, [1., 0.])
+        covariance = a @ covariance @ a.T + np.outer(gain, gain) * self.R
+        self.P_xx, self.P_xv, self.P_vv = covariance[0, 0], covariance[0, 1], covariance[1, 1]
 
         self.history['x'].append(self.x)
         self.history['v'].append(self.v)
@@ -95,6 +106,8 @@ class KalmanFilter1D:
 # Simulation
 def simulate_tracking():
     """Simulate tracking an object with noisy GPS"""
+
+    import matplotlib.pyplot as plt
 
     np.random.seed(42)  # Reproducible results
 
@@ -150,7 +163,7 @@ def simulate_tracking():
     plt.fill_between(times,
                      estimates_array - 2*uncertainties_array,
                      estimates_array + 2*uncertainties_array,
-                     alpha=0.3, color='blue', label='95% Confidence')
+                     alpha=0.3, color='blue', label='Approx. 95% marginal interval (model)')
 
     plt.xlabel('Time (seconds)')
     plt.ylabel('Position (meters)')

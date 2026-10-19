@@ -1,0 +1,37 @@
+{
+  "review_date": "2026-10-18",
+  "host": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3",
+  "tests": {
+    "functional_and_analytical": {
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    "real_mlir": {
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "toolchain": "Ubuntu MLIR/LLVM20.1.2; mlir-opt, mlir-translate, mlir-runner",
+  "execution": "Linalg buffer matmul lowered to LLVM dialect, translated to LLVM IR, JIT-executed on x86_64 CPU; all four output values checked; returned415",
+  "negative_checks": [
+    "incompatible reduction shape rejected by MLIR verifier",
+    "changed A value rejected after actual JIT execution"
+  ],
+  "not_executed": [
+    "accelerator hardware",
+    "synthesis",
+    "physical timing",
+    "TVM integration",
+    "GPU kernels"
+  ],
+  "source_sha256": {
+    "tiling_lab.py": "43b94c575fe447ca57d8f3ab99a3ceaea82958add5acafb34451c52151e9d686",
+    "test_tiling_lab.py": "2f77a218faa499a1c62a7d2af4d3f16d4fa15d1abda2c2b484c78cb7ab7483f9",
+    "matmul.mlir": "e40ad12311b0ddd4a65a34ab3df13663b56f824423443509e3fdc6a09b48bdd1",
+    "run_mlir_lab.py": "f14c331b4c509db55d4f588dfb3aa4f06ae1043f449972cbf3c180120cbad3ec",
+    "test_mlir_lab.py": "416a94652d3bba50699c8f7d26eda3234d93c4e82d17c26be5a34a7bb3e5c283"
+  }
+}

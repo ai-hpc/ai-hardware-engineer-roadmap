@@ -1,0 +1,138 @@
+[
+  {
+    "url": "https://arxiv.org/abs/2210.17323",
+    "status": 200,
+    "final_url": "https://arxiv.org/abs/2210.17323",
+    "bytes_read": 44603,
+    "sha256": "d840ca42e5f79a247194d888c7578ef49224097051f6dace49fdad8378defd26",
+    "truncated": false
+  },
+  {
+    "url": "https://arxiv.org/abs/2211.10438",
+    "status": 200,
+    "final_url": "https://arxiv.org/abs/2211.10438",
+    "bytes_read": 43191,
+    "sha256": "b1c24b1fd5cdef4d3d2eb1a93db65d12b17cd18a23808b132481a5b0c905106b",
+    "truncated": false
+  },
+  {
+    "url": "https://arxiv.org/abs/2211.17192",
+    "status": 200,
+    "final_url": "https://arxiv.org/abs/2211.17192",
+    "bytes_read": 41908,
+    "sha256": "56a42c7b4aa2a6588a28019e969d8baeed734a144bc77126bf7f9440f5f2f687",
+    "truncated": false
+  },
+  {
+    "url": "https://arxiv.org/abs/2306.00978",
+    "status": 200,
+    "final_url": "https://arxiv.org/abs/2306.00978",
+    "bytes_read": 44966,
+    "sha256": "9498fecaa8aa13cdbbdd7b3b1098137c0efaf57efb7d2b47115233fafed8e756",
+    "truncated": false
+  },
+  {
+    "url": "https://arxiv.org/abs/2309.17453",
+    "status": 200,
+    "final_url": "https://arxiv.org/abs/2309.17453",
+    "bytes_read": 43362,
+    "sha256": "a4cdcf25ff1315a20e434bdeda40eb03d93cb649c4ce1834f6f81dadfdfc2275",
+    "truncated": false
+  },
+  {
+    "url": "https://arxiv.org/abs/2402.17762",
+    "status": 200,
+    "final_url": "https://arxiv.org/abs/2402.17762",
+    "bytes_read": 40298,
+    "sha256": "5cc677c0660c04ef903607e505602ac329d7ad765a02bc0ed2d1fc531965c443",
+    "truncated": false
+  },
+  {
+    "url": "https://docs.nvidia.com/cutlass/4.8.0/media/docs/pythonDSL/guides/mma/wmma_programming.html",
+    "status": 200,
+    "final_url": "https://docs.nvidia.com/cutlass/4.8.0/media/docs/pythonDSL/guides/mma/wmma_programming.html",
+    "bytes_read": 180460,
+    "sha256": "e71fe3476f02e77749bbf3c32ab54c64dedb347c79a7e73ec0295b4013ce9a5e",
+    "truncated": false
+  },
+  {
+    "url": "https://docs.nvidia.com/deeplearning/tensorrt/latest/api/migration/tensorrt-10x-to-11x-jetson.html",
+    "status": 200,
+    "final_url": "https://docs.nvidia.com/deeplearning/tensorrt/latest/api/migration/tensorrt-10x-to-11x-jetson.html",
+    "bytes_read": 52762,
+    "sha256": "c65ecf654f27dbacc4118d13b369b3b901a2493f01727046cab595b84b702560",
+    "truncated": false
+  },
+  {
+    "url": "https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/quantized-types-schemes.html",
+    "status": 200,
+    "final_url": "https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/quantized-types-schemes.html",
+    "bytes_read": 45873,
+    "sha256": "fee345929bfad7bb136049c7152ed900510b6ba67a7d5124ead797772455914d",
+    "truncated": false
+  },
+  {
+    "url": "https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/quantized-types-workflows.html",
+    "status": 200,
+    "final_url": "https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/quantized-types-workflows.html",
+    "bytes_read": 53999,
+    "sha256": "7b0a99c95b128dd46e9de180812ed3bb5b8088c592099af887e5947539b853c0",
+    "truncated": false
+  },
+  {
+    "url": "https://docs.nvidia.com/deploy/nvidia-smi/index.html",
+    "status": 200,
+    "final_url": "https://docs.nvidia.com/deploy/nvidia-smi/index.html",
+    "bytes_read": 218860,
+    "sha256": "017647ae72b332a94e01e6d9672d1d82367e56de1d0685132eb91a972035b17e",
+    "truncated": false
+  },
+  {
+    "url": "https://github.com/NVIDIA/cutlass/blob/main/examples/79_blackwell_geforce_gemm/79a_blackwell_geforce_nvfp4_bf16_gemm.cu",
+    "status": 200,
+    "final_url": "https://github.com/NVIDIA/cutlass/blob/main/examples/79_blackwell_geforce_gemm/79a_blackwell_geforce_nvfp4_bf16_gemm.cu",
+    "bytes_read": 497260,
+    "sha256": "e074d90161f2a3196576d7d3970be2a4a1573ead0eaf72a0e43661bf2004b658",
+    "truncated": false
+  },
+  {
+    "url": "https://huggingface.co/Qwen/Qwen3.8-27B/tree/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "status": 200,
+    "final_url": "https://huggingface.co/Qwen/Qwen3.8-27B/tree/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "bytes_read": 496517,
+    "sha256": "38b83d55ab3d89f522ffc64ebf0451de8cbba382e277e2361f4498540324621f",
+    "truncated": false
+  },
+  {
+    "url": "https://huggingface.co/gittensor-model-hub/Qwen3.8-27B-DSpark-NVFP4/blob/eba1ac5a66c74902eaa95a4000a7c5eda96d8e95/README.md",
+    "status": 200,
+    "final_url": "https://huggingface.co/gittensor-model-hub/Qwen3.8-27B-DSpark-NVFP4/blob/eba1ac5a66c74902eaa95a4000a7c5eda96d8e95/README.md",
+    "bytes_read": 150572,
+    "sha256": "f565eb4a80872dde5d99dbcf015703e9fb8dd0ebf7be491d9914a467ced73f6e",
+    "truncated": false
+  },
+  {
+    "url": "https://huggingface.co/gittensor-model-hub/Qwen3.8-27B-DSpark-NVFP4/tree/eba1ac5a66c74902eaa95a4000a7c5eda96d8e95",
+    "status": 200,
+    "final_url": "https://huggingface.co/gittensor-model-hub/Qwen3.8-27B-DSpark-NVFP4/tree/eba1ac5a66c74902eaa95a4000a7c5eda96d8e95",
+    "bytes_read": 151426,
+    "sha256": "441e25212b712babd19e3071ab21ce2d096c88d85bd9acf0158c2ed9f46cb84d",
+    "truncated": false
+  },
+  {
+    "url": "https://huggingface.co/gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090/tree/5b7a687fc8211a5d631c8ca6a593dd37eb26ce33",
+    "status": 200,
+    "final_url": "https://huggingface.co/gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090/tree/5b7a687fc8211a5d631c8ca6a593dd37eb26ce33",
+    "bytes_read": 311708,
+    "sha256": "c5d8563388f6dc333bc52249f2e5f500a2eb3293c12b808eafe3c6b0d7aae1da",
+    "truncated": false
+  },
+  {
+    "url": "https://www.nvidia.com/en-us/geforce/graphics-cards/50-series/",
+    "status": 200,
+    "final_url": "https://www.nvidia.com/en-us/geforce/graphics-cards/50-series/",
+    "bytes_read": 472901,
+    "sha256": "d00dc1d7f0ef181264ec109cb2f986ef7a8ed41421cd04a95bd23b64587ea3a9",
+    "truncated": false
+  }
+]

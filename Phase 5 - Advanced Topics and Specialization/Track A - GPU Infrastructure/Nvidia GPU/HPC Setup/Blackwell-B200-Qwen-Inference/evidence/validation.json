@@ -1,0 +1,24 @@
+{
+  "checked_utc": "2026-10-18T22:59:40.052286+00:00",
+  "cpu_worksheet": "exact Python code block from Chapter 3 executed successfully",
+  "cpu_arithmetic_assertions": [
+    "327680 KV bytes per token",
+    "10 GiB at 32768 tokens",
+    "one full 32K sequence fits the hypothetical budget; two do not",
+    "TP=72 does not divide 64 query heads",
+    "875 GB/s normalized eight-rank AllReduce for synthetic 1 GB / 2 ms"
+  ],
+  "source_urls_checked": 18,
+  "source_failures": [],
+  "source_model_files": 3,
+  "source_software_files": 6,
+  "new_packages_installed": 0,
+  "model_weights_downloaded": false,
+  "gpu_runs": 0,
+  "unexecuted": [
+    "B200 serving startup and quality",
+    "native FP4 kernel execution",
+    "NVLink/NCCL topology performance",
+    "load/recovery service experiments"
+  ]
+}

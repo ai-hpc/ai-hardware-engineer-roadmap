@@ -1,0 +1,46 @@
+{
+  "checked_utc_date": "2026-10-18",
+  "executed_backend": "CPU/Gloo",
+  "framework": "PyTorch 2.14.0+cpu",
+  "python": "3.12.3",
+  "stdlib_tests": 3,
+  "two_process_integration_tests": 3,
+  "two_process_test_seconds": 14.991,
+  "additional_inline_interconnect_smoke": "rank=1 host=srv1017846 value=3.0 expected=3.0\nrank=0 host=srv1017846 value=3.0 expected=3.0",
+  "hardware_unexecuted": [
+    "CUDA",
+    "NCCL",
+    "H200",
+    "L40S",
+    "Blackwell",
+    "RDMA",
+    "Slurm",
+    "NGINX deployment"
+  ],
+  "primary_sources": [
+    {
+      "url": "https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html",
+      "observed_version": "2.32.3"
+    },
+    {
+      "url": "https://docs.nvidia.com/deeplearning/transformer-engine/index.html",
+      "observed_version": "2.20.2"
+    },
+    {
+      "url": "https://docs.pytorch.org/docs/2.14/generated/torch.nn.parallel.DistributedDataParallel.html",
+      "observed_version": "2.14"
+    },
+    {
+      "url": "https://www.nvidia.com/en-us/data-center/h200/",
+      "review": "dense versus supported structured-sparse peaks; per-GPU link scope"
+    },
+    {
+      "url": "https://www.nvidia.com/en-us/data-center/l40s/",
+      "review": "FP8/BF16/TF32, 3 NVENC/3 NVDEC, no NVLink/MIG; published dense BF16 discrepancy retained"
+    },
+    {
+      "url": "https://nvidia.github.io/TensorRT-LLM/latest/legacy/tensorrt-backend-removal.html",
+      "review": "current PyTorch backend; old converter/build path removed"
+    }
+  ]
+}

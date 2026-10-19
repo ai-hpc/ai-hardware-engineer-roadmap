@@ -1,0 +1,92 @@
+{
+  "scope": "actual separate-process TorchScript policy adapter over localhost ROS; known-weight linear fixture",
+  "torch": "2.14.0+cpu",
+  "domain_id": 78,
+  "namespace": "/course_policy_smoke_3b77540447",
+  "checks_passed": 3,
+  "results": [
+    {
+      "episode": 0,
+      "sequence": 0,
+      "action": [
+        0.5,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25
+      ],
+      "target": [
+        0.025,
+        0.0125,
+        0.0125,
+        0.0125,
+        0.0125,
+        0.0125,
+        0.0125
+      ],
+      "roundtrip_ns": 179781841
+    },
+    {
+      "episode": 0,
+      "sequence": 1,
+      "action": [
+        0.9000000357627869,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25
+      ],
+      "target": [
+        0.07000000178813934,
+        0.025,
+        0.025,
+        0.025,
+        0.025,
+        0.025,
+        0.025
+      ],
+      "roundtrip_ns": 1648921
+    },
+    {
+      "episode": 1,
+      "sequence": 0,
+      "action": [
+        0.30000001192092896,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25
+      ],
+      "target": [
+        0.015000000596046448,
+        0.0125,
+        0.0125,
+        0.0125,
+        0.0125,
+        0.0125,
+        0.0125
+      ],
+      "roundtrip_ns": 886627
+    }
+  ],
+  "policy_log": [
+    "{\"episode\": 0, \"sequence\": 0, \"inference_ns\": 30305632, \"inference_through_publish_ns\": 31182088}",
+    "{\"episode\": 0, \"sequence\": 1, \"inference_ns\": 579775, \"inference_through_publish_ns\": 869426}",
+    "{\"episode\": 1, \"sequence\": 0, \"inference_ns\": 111191, \"inference_through_publish_ns\": 350192}"
+  ],
+  "policy_stderr": [
+    "/tmp/course-pytorch-cpu-venv/lib/python3.12/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.",
+    "  warnings.warn("
+  ],
+  "limitations": [
+    "no pretrained model or learned task quality",
+    "no Isaac Sim or robot",
+    "five-second diagnostic TTL; not a control deadline benchmark"
+  ]
+}

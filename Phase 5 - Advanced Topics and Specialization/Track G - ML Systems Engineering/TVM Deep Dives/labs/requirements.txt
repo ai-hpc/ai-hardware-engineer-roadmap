@@ -1,0 +1,5 @@
+apache-tvm==0.27.0.post1
+apache-tvm-ffi==0.1.14.post0
+numpy==2.5.4
+ml_dtypes==0.6.0
+typing_extensions==4.16.0

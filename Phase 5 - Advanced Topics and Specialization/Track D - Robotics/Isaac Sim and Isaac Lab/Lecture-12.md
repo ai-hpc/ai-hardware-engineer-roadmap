@@ -47,7 +47,7 @@ $$
 * \(t_{\text{policy}}\) is the actor forward pass, which is negligible for small MLPs.
 * \(t_{\text{update}}\) is PPO epochs over the rollout. It scales with \(N S\) and network size, not with physics.
 
-Amdahl's law applies: if \(t_{\text{env}}\) is half of \(T_{\text{iter}}\), a solver twice as fast saves only a quarter. **Measure the split before choosing what to optimize.**
+Amdahl's law applies: if environment work occupies half the iteration, halving solver time can save **at most** one quarter, and less when rendering, policy or updates occupy some of the other half. The additive model assumes the stages do not overlap; use critical-path timing when streams or processes overlap. **Measure the split before choosing what to optimize.**
 
 ### 2.1 The profiling toolbox
 
@@ -196,13 +196,13 @@ Domain randomization makes the policy robust to a world you have **not** modeled
 * **DR is nearly free in VRAM.** Per-env parameters are a few floats, and startup randomization runs once. Its real cost is training time.
 * **Multi-GPU duplicates fixed cost.** Every rank pays the Kit/renderer baseline on its own GPU. Scaling helps when per-GPU env memory, not fixed cost, is the limit.
 
-> **8 GB budget.** Everything in this lecture fits on the 4060 except real multi-GPU work. Profile state-only tasks at the `num_envs` you actually train with (from Lecture 10), not the maximum. A profiled run with `nsys` can OOM where the unprofiled one fits, so drop `num_envs` for the capture and say so. Livestream only for debugging. Measure Lab 12b's streaming overhead and do not stream during training. The DR ablation (Lab 12c) uses Cartpole and is cheap. For the scaling table in Lab 12d, rent a single L40S or RTX PRO 6000 by the hour, run the same command, and destroy the instance. Never rent A100/H100 for anything that renders.
+> **8 GB budget.** The full simulator path on a 4060 is below the documented minimum and was not executed here; choose a reduced workload only after a compatibility and capacity check. Profile state-only tasks at the `num_envs` you actually train with (from Lecture 10), not the maximum. A profiled run with `nsys` can OOM where the unprofiled one fits, so drop `num_envs` for the capture and say so. Livestream only for debugging. Measure Lab 12b's streaming overhead and do not stream during training. The DR ablation (Lab 12c) uses Cartpole and is cheap. For the scaling table in Lab 12d, rent a single L40S or RTX PRO 6000 by the hour, run the same command, and destroy the instance. Never rent A100/H100 for anything that renders.
 
 ---
 
 ## 8. Build it
 
-All scripts extend `isaac_bench/` from Lecture 01. Keep a `dmon` log running for every lab:
+All scripts extend `isaac_bench/` from Lecture 01. Create `isaac_bench/logs` and `isaac_bench/results` first (`mkdir -p isaac_bench/logs isaac_bench/results`). Keep a `dmon` log running for every lab:
 
 ```bash
 nvidia-smi dmon -s pucmt -d 1 -o T > isaac_bench/logs/dmon_$(date +%s).log &

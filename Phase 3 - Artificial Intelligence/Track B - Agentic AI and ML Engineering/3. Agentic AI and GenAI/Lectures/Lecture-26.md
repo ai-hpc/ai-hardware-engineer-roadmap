@@ -104,7 +104,7 @@ If your agent gives you none of those today, you have a context-as-memory proble
 
 ## 3. The event schema
 
-A workable starting schema is six event types. Keep them small and stable; you cannot rewrite events later without breaking replay.
+A workable starting schema uses a small set of event types. Keep them small and stable; you cannot rewrite events later without breaking replay.
 
 ```jsonl
 {"ts":"2026-05-05T01:00:00Z","type":"MESSAGE_RECEIVED","id":"evt_001","payload":{"role":"user","text":"summarize this PR"}}
@@ -121,10 +121,10 @@ A workable starting schema is six event types. Keep them small and stable; you c
 Notes on this schema, all of which matter:
 
 - **Append-only.** Once written, an event is never modified.
-- **Monotonic ids.** Either ULIDs or a per-session counter. Required for ordering after a crash.
+- **Committed sequence numbers.** Assign a per-session monotonic sequence inside the authoritative transaction. Ordinary ULIDs are not a total ordering of concurrent commits; use them as identifiers, not a substitute for serialized commit order.
 - **`ts` is wall-clock; ordering is by id.** Wall-clocks lie under load.
 - **Large payloads go to a blob store, not the log.** Tool results, screenshots, audio: store the bytes elsewhere and put a `data_ref` in the event. The log stays small enough to scan and replay.
-- **Two-phase send** for outputs: `GEN_COMPLETE` (model finished) is separate from `GEN_SENT` (user / channel actually received). Without this split you cannot tell, after a crash, whether you owe the user a duplicate or nothing.
+- **Generation versus delivery.** Keep `GEN_COMPLETE` separate from delivery intent/receipt. A local `GEN_SENT` written after a socket flush does not prove the remote user received it. A crash between remote delivery and local recording remains ambiguous unless the receiver supports stable message IDs, acknowledgements and deduplication.
 
 JSONL on disk is fine to start. Move to a database when you need queries across sessions or when scale demands it. The schema does not change; only the storage does.
 
@@ -134,7 +134,9 @@ JSONL on disk is fine to start. Move to a database when you need queries across 
 
 Once events are durable, the harness collapses to a small loop:
 
-```python
+This is **control-flow pseudocode**, not runnable Python or a complete crash-recovery implementation:
+
+```text
 def step(session_id):
     log = session_store.load(session_id)
     if is_terminated(log):
@@ -166,7 +168,7 @@ Things to notice:
 
 - The function takes a session id, not a state object. **Nothing is held in process memory between turns.**
 - Every observable side effect is preceded or followed by an event write.
-- After a crash, this exact code can be re-entered with the same session id and recover.
+- Recovery requires the reconciliation rules below. Simply re-entering this sketch can repeat a model call or side effect after an uncertain outcome.
 
 This is what people mean by "stateless harness over an event log."
 
@@ -197,8 +199,8 @@ The two interesting branches are `TOOL_INVOKED` and `GEN_*`.
 
 If the harness died after writing `TOOL_INVOKED` but before `TOOL_RESULT`, you do not know whether the tool ran. Three correct options, in order of preference:
 
-1. **Idempotent tools.** Every tool call carries a `call_id`. Tool implementation either re-runs safely or detects the duplicate and returns the prior result. This is the only option that scales.
-2. **Compensating action.** If the tool was non-idempotent (sent a message, charged a card), record `TOOL_FAILED_UNCERTAIN` and surface it to the user.
+1. **Idempotent or deduplicated operations.** Use a stable logical action key across retries. The receiving service must atomically record the key/result with the effect, or expose a status lookup that reconciles an uncertain outcome. A call ID alone does not provide exactly-once execution.
+2. **Reconciliation, then possible compensation.** Record `TOOL_FAILED_UNCERTAIN`, query the external system if possible, and surface unresolved status. Merely recording uncertainty is not compensation; a compensating action is a separate authorized effect and may itself fail.
 3. **Refuse to recover automatically.** Mark the session needs-human-attention.
 
 Never silently retry a non-idempotent tool. Once is better than twice.
@@ -257,7 +259,7 @@ Pick one of these and finish it. The point is to feel the architecture, not to b
 
 **Intermediate.** Add streaming. Kill the process between `GEN_START` and `GEN_COMPLETE`. Implement `wake(sessionId)` with the **replace** strategy. Verify the user sees a clean restart of the response, not a half-message.
 
-**Advanced.** Implement tool-call recovery with idempotent tools. The tool's first action is to look up its own `call_id` in a side log; if found, return the prior result without re-running. Kill the process between `TOOL_INVOKED` and `TOOL_RESULT` and confirm the tool runs exactly once.
+**Advanced.** Implement tool-call recovery with idempotent tools. Commit the stable action key, effect and saved result atomically in the receiving database. A separate lookup followed by an unprotected write has a race. Kill the process between `TOOL_INVOKED` and `TOOL_RESULT` and confirm the tool runs exactly once.
 
 ---
 
@@ -272,7 +274,7 @@ Artifact: a session log of one real conversation, plus a one-page write-up answe
 5. Did you handle tool idempotency? How?
 6. Show one timestamped sequence where the harness crashed and `wake(sessionId)` recovered.
 
-A reviewer should be able to take your log, replay it through your `step` function, and reproduce the user's experience byte-for-byte. If they cannot, the harness is still hiding state somewhere.
+A reviewer should be able to fold the committed event log and referenced artifacts into the same application state and recorded transcript. This is **replay of observations**, not rerunning model generation, re-sending messages or repeating physical actions. Exact reproduction requires the original bytes and versions; a new model call need not reproduce them.
 
 ---
 
@@ -291,8 +293,8 @@ Why this lecture lives in a hardware roadmap:
 - Session and context window are different layers. Session is the database; context is a query result.
 - The session is append-only. State is derived, not stored.
 - This is event sourcing applied to cognition. The same engineering discipline that gives you replayable banking systems gives you resumable agents.
-- A workable schema starts at six events: `MESSAGE_RECEIVED`, `LLM_CALLED`, `TOOL_INVOKED`, `TOOL_RESULT`, `GEN_START` / `GEN_CHUNK`, `GEN_COMPLETE`, `GEN_SENT`. Large payloads go to a blob store with a reference in the event.
-- `GEN_COMPLETE` and `GEN_SENT` must be separate events. Without that split, crash recovery cannot tell whether the user already saw the response.
+- A workable schema includes: `MESSAGE_RECEIVED`, `LLM_CALLED`, `TOOL_INVOKED`, `TOOL_RESULT`, `GEN_START` / `GEN_CHUNK`, `GEN_COMPLETE`, `GEN_SENT`. Large payloads go to a blob store with a reference in the event.
+- Separate generation from delivery records; acknowledgements and deduplication are additionally needed to reconcile ambiguous delivery after crashes.
 - The harness becomes a stateless interpreter. Every step loads the log, derives the context, runs the model, and appends new events.
 - `wake(sessionId)` is the universal recovery and resume entry point. Cron, retries, and crash recovery all use it.
 - The "streaming output lost on gateway crash" bug is not a streaming bug. It is a context-as-memory bug. Persist generation as events and the bug disappears.

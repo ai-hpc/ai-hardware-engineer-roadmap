@@ -1,563 +1,117 @@
-# Security and OTA
+# Security and OTA: deploy an authentic, compatible, recoverable robot
 
-<div class="course-identity security-ota" markdown="1">
-<div class="course-identity__icon">SEC</div>
-<div markdown="1">
-<p class="course-identity__eyebrow">Track B6 · Security & OTA</p>
-<p class="course-identity__title">Harden Jetson products with secure boot, signed artifacts, update strategy, and rollback behavior.</p>
-<p class="course-identity__meta">Artifact: secure update plan · Measure: rollback time, integrity checks, failure recovery</p>
-</div>
-</div>
+**Outcome:** build an update acceptance plan that checks the exact artifact, target, version, application behavior and recovery path. **Pace:** five 60–90-minute sessions. The starting exercises run on an ordinary Linux CPU; physical secure-boot provisioning is a later, board-specific milestone.
 
+An update can be authentic but incompatible. It can be compatible but behaviorally poor. It can work once but leave the device unable to recover after a later failure. This module connects those different acceptance questions into one deployment process.
 
-**Phase 4 — Track B — Nvidia Jetson** · Module 6 of 7
+**Version review: 18 October 2026.** Use the [Jetson compatibility matrix](../Compatibility.md) and documentation for the selected BSP. Current R39.2 security instructions use the FSKP flow, including `fskp_fuseburn.py`; an old `odmfuse.sh` recipe is not a current universal command. The R36 security deep dive remains explicitly versioned. No fuses or boot partitions were modified during this course review. [NVIDIA R39.2 secure boot](https://docs.nvidia.com/jetson/archives/r39.2/DeveloperGuide/SD/Security/SecureBoot.html).
 
-> **Focus:** Harden a **Jetson Orin Nano 8GB** product for field deployment: **secure boot** (PKC/SBK fuse programming), **OP-TEE** trusted execution, **disk encryption**, **A/B rootfs redundancy**, and a complete **OTA update pipeline** with rollback, monitoring, and reliability testing.
->
-> **Primary hardware:** Jetson Orin Nano 8GB on custom or dev-kit carrier
+## 1. Write the failure you want to prevent
 
-**Previous:** [5. Application Development](../5.%20Application%20Development/Guide.md) · **Next:** [7. Compliance and Manufacturing](../7.%20Compliance%20and%20Manufacturing/Guide.md)
+For a mobile robot, begin with this small example:
 
----
+| Asset/property | Failure to prevent | Mechanism to investigate |
+| --- | --- | --- |
+| Boot software | Unauthorized early boot image starts | Configured hardware-rooted boot authentication |
+| Model and calibration | Attacker replaces weights or changes units | Authenticated deployment manifest and application checks |
+| Recorded sensor data | Removed storage exposes private recordings | Encryption and an appropriate unlock/recovery policy |
+| Robot commands | Untrusted source issues an actuator request | Identity, authorization, freshness and bounded command interpretation |
+| Availability | Interrupted update leaves neither version usable | Staging, trial selection, bounded retries and tested fallback |
+| Support lifecycle | Vulnerable dependency cannot be located or updated | Artifact inventory, vulnerability handling and update ownership |
 
+State the adversary's capabilities: network access, a user account, root access, physical storage access or debug access. A defense against a stolen powered-off disk does not imply protection against a running compromised kernel.
 
-## 1. Why security and OTA are a single module
+Draw the trust boundaries between update server, transport, local verifier, boot chain, application, model loader and controller. A container shares the host kernel; placing software in a container does not create a hardware trust root or automatically authorize its commands.
 
-Security and OTA are tightly coupled in production Jetson products:
+## 2. Run a real signature check
 
-- **Secure boot** ensures only authorized firmware and kernel run on the device
-- **OTA channels** must be signed so an attacker cannot push malicious updates
-- **Disk encryption** protects data at rest if the device is physically stolen
-- **A/B redundancy** makes OTA safe — a failed update rolls back to the last known-good slot
-- **Fuse programming** is irreversible and must be planned before production flashing
+Start with the [signed-artifact CPU lab](../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Security/labs/README.md). It uses OpenSSL to generate disposable artifact-signing keys, signs a manifest, and tests tampering, wrong target, truncation and rollback policy. The test key is unrelated to Jetson fuse provisioning.
 
-This module brings together material that was previously split across deep-dive sub-guides in Module 1 and organizes it as a **production decision flow**: what to do, in what order, and why.
+The manifest binds target, version, payload size and SHA-256 digest. Verification needs a trusted key, exact signed bytes and a strict parser. Reject a malformed manifest before interpreting it as installation instructions.
 
-> **Deep-dive companions (Module 1):** The sub-guides below contain implementation-level detail that this module references but does not duplicate:
-> - [Orin Nano Security](../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Security/Guide.md) — threat model, attack surfaces, detailed PKC/SBK walkthrough
-> - [Orin Nano OTA Deep Dive](../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-OTA-Deep-Dive/Guide.md) — NVIDIA `nv_update_engine`, slot management internals
-> - [Orin Nano Rootfs and A/B Redundancy](../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Rootfs-and-AB-Redundancy/Guide.md) — partition layout, `nvbootctrl`, slot switching
+A checksum detects a difference from an expected digest. It does not authenticate an artifact when an attacker can replace both artifact and digest. A signature authenticates the covered bytes under a trusted key; it does not decide whether a version is appropriate for this board. TLS authenticates/protects a connection under its endpoint and certificate assumptions; it does not replace a persistent signature on an artifact that will be cached or installed later.
 
----
+**Exercise:** modify one payload byte and keep the manifest unchanged. Then modify the manifest's target without resigning. Explain the different checks that should reject those cases. Finally sign a manifest for the wrong target using a trusted test key: the signature should pass, while target policy rejects installation.
 
-## 2. Threat model for deployed Jetson products
+## 3. Understand the boot-chain boundary
 
-Before hardening, define what you're protecting against:
+NVIDIA distinguishes the fuse-rooted SoC authentication chain ending at the bootloader from UEFI's security-key scheme for its payloads. Therefore a statement such as “secure boot is enabled” needs to identify the configured stage and enforcement evidence. [R39.2 secure boot architecture](https://docs.nvidia.com/jetson/archives/r39.2/DeveloperGuide/SD/Security/SecureBoot.html).
 
-| Threat | Example | Mitigation |
-|--------|---------|------------|
-| **Firmware tampering** | Attacker replaces bootloader via physical access | Secure boot (PKC) — hardware root of trust |
-| **Data theft** | Device stolen, NVMe removed and read | Disk encryption (LUKS + OP-TEE key) |
-| **Unauthorized updates** | Malicious OTA pushed to device | Signed update images + TLS channel |
-| **Network intrusion** | Attacker exploits open port on device | Firewall, minimal services, SSH key-only |
-| **Privilege escalation** | Application container escapes to host | AppArmor/SELinux, minimal rootfs, no root SSH |
-| **Supply chain** | Counterfeit module or tampered firmware image | Fuse-based device identity, signed factory images |
+| Layer | Acceptance evidence |
+| --- | --- |
+| Early boot authentication | Intended key/configuration and rejection of a controlled unauthorized boot artifact |
+| UEFI payload authentication | Enrolled UEFI trust and rejection of a disallowed payload |
+| Kernel/module policy | Exact kernel policy and rejection of a disallowed module |
+| Root filesystem integrity | Trusted verified root and response to modified covered storage |
+| Model/configuration authorization | Signed manifest, compatibility policy and loader checks |
 
----
+A boot-time signature does not continuously validate every writable userspace file. A signed model can still be parsed unsafely or yield inappropriate actions. Each boundary needs its own contract and negative tests.
 
-## 3. Secure boot — PKC and SBK
+Use exact SoC/BSP key formats and fuse specifications. Do not carry a generic RSA-2048 example or a “128-bit SBK” statement into an Orin provisioning plan. Key purposes, supported algorithms, fuse fields and revocation mechanisms differ by platform. The [FSKP documentation](https://docs.nvidia.com/jetson/archives/r39.2/DeveloperGuide/SD/Security/FSKP.html) describes the supported workflow.
 
-### Secure boot chain
+Before irreversible provisioning, produce the board/configuration manifest, key-purpose map, signing procedure, recovery policy and test-unit results. Keep production signing material outside ordinary source/build logs. This course's CPU route produces those reviewable designs; it does not require burning fuses to learn cryptographic or update behavior.
 
-Jetson Orin Nano (T234) supports a **hardware root of trust** using fuses:
+## 4. Separate encryption from runtime isolation
 
-```
-BootROM (silicon)
-  │  Verifies MB1 signature using PKC hash in fuses
-  │
-MB1 (QSPI)
-  │  Verifies MB2 using PKC chain
-  │
-MB2 (QSPI)
-  │  Verifies UEFI, OP-TEE, kernel
-  │
-UEFI → Linux kernel → userspace
+Disk encryption primarily protects data at rest when the attacker lacks unlock material. Once unlocked, authorized normal-world software reads plaintext. A TEE can protect key derivation or key use while intentionally returning a result to a normal-world client.
+
+The documented Jetson disk-unlock flow derives a passphrase through a trusted service and uses a normal-world client with `cryptsetup`. Saying that the unlock result never reaches normal-world memory misdescribes that interface. AES-XTS encryption is also not general authenticated integrity; add an appropriate integrity design when the threat includes storage modification. Work through the [security deep dive](../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Security/Guide.md) and its versioned OP-TEE/disk-encryption sources.
+
+Separate boot signing keys, application-update keys, device identity credentials and data-encryption keys. Their compromise and rotation consequences differ. Define how a replacement board receives authorization and how legitimate data recovery works without placing a universal plaintext recovery secret beside every device.
+
+## 5. Model update states before choosing tooling
+
+Use this state sequence for the teaching exercise:
+
+```text
+received → signature/target/version checked → staged and verified
+→ selected for trial → application checked → confirmed
+                                  ↘ failed or expired → fallback
 ```
 
-### PKC (Public Key Cryptography)
+The [interrupted-update CPU lab](../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-OTA-Deep-Dive/labs/README.md) implements two image slots, real file writes, fsync, rename, metadata publication, bounded trials and confirmation. It terminates child processes at several installation boundaries and reopens state. Its fallback sequence is `2 → 2 → 1` after two unconfirmed trials.
 
-- Generate an RSA-2048 or RSA-3072 key pair
-- Burn the **public key hash** into OTP fuses
-- All firmware images are signed with the private key
-- BootROM verifies the signature chain at every stage
+These tests exercise process interruption while the OS/storage remain powered. They do not establish real power-loss durability of a Jetson, SSD cache or filesystem. Both kinds of evidence matter, and they should not share an unlabeled “power-cut passed” checkbox.
 
-```bash
-# Generate PKC key pair
-openssl genrsa -out pkc.pem 3072
+**Worked policy:** confirmed version 1 is running and candidate version 2 is staged. If the rollback floor advances to 2 before version 2 is accepted, version 1 may become forbidden just when it is needed for recovery. Coordinate the security-floor transition with acceptance and the approved recovery policy. The correct sequence depends on the product's threat model; “always allow old signed images” and “immediately forbid the old image” each have consequences.
 
-# Extract public key
-openssl rsa -in pkc.pem -pubout -out pkc_pub.pem
-```
+## 6. Keep firmware, rootfs and application updates distinct
 
-### SBK (Symmetric Binding Key)
+A deployment manifest should identify the compatible set of boot firmware, kernel/modules, DT, rootfs, application container, model, preprocessing and persistent-data schema. A/B rootfs alone does not atomically switch every component in that set.
 
-- 128-bit AES key burned into OTP fuses
-- Encrypts firmware images in addition to signing them
-- Prevents reading firmware even with physical access to QSPI
-- Combined with PKC: images are encrypted AND signed
+The current bootloader update documentation includes UEFI capsule-based mechanisms. Debian-package updates and image-based OTA have their own supported source/target matrices and layout conditions. Do not use historical `nv_update_engine` examples as a generic R39.2 update recipe, or infer support for a new point release from an older matrix. [Bootloader update/redundancy](https://docs.nvidia.com/jetson/archives/r39.2/DeveloperGuide/SD/Bootloader/UpdateAndRedundancy.html).
 
----
+For rootfs redundancy, inspect the correct slot target and installed services. R39.2 documents a default of three failed boots and retry configuration in the range zero through three. The customer validation hook needs application-specific integration; reaching a login prompt is not a robot health check. The [rootfs lesson](../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Rootfs-and-AB-Redundancy/Guide.md) explains the documented verification flow without inventing a `mark-boot-successful` command. [NVIDIA rootfs documentation](https://docs.nvidia.com/jetson/archives/r39.2/DeveloperGuide/SD/RootFileSystem.html).
 
-## 4. Fuse programming workflow
+Persistent-data migration deserves its own test. If the candidate rewrites a shared database into a format the fallback cannot read, changing slots may restore executable files while leaving the robot unusable. Use compatible readers/writers, a reversible migration, isolated data generations or an explicitly qualified recovery procedure.
 
-**Fuse programming is irreversible.** Once fuses are burned, the device permanently requires signed/encrypted firmware.
+## 7. Define application acceptance with real work
 
-### Lab workflow (test keys)
+A health endpoint that always returns HTTP 200 only establishes that a handler answered. A stronger acceptance check exercises the required dependency and confirms the exact deployment identity.
 
-1. Generate **test** PKC and SBK keys (clearly labeled, stored separately from production keys)
-2. Flash and validate the device works with signed images
-3. Burn fuses on a **test unit only**
-4. Verify the fused device boots with signed images and rejects unsigned images
-5. **Do not** fuse production units until the entire boot/OTA chain is validated
+For a perception/control service, a useful trial check may require a fresh sensor observation, the expected calibration/model identity, a valid model output, bounded processing/queue age, successful controller handshake and a working fallback path. Use a synthetic input only when the acceptance claim explicitly concerns the synthetic path; it cannot prove a physical camera is connected.
 
-### Production workflow
+The [container CPU lab](../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Container-Fleet/labs/README.md) includes actual HTTP health behavior, malformed-input checks and a recorded container run. Connect its service health to the update trial's exact version/boot identity. An old success message from a previous boot must not confirm the new candidate.
 
-1. Generate **production** PKC and SBK keys
-2. Store private key in an HSM (Hardware Security Module) or at minimum an encrypted, access-controlled vault
-3. Integrate key signing into the CI/CD build pipeline
-4. Program fuses as part of factory flashing (see [Module 8 — Compliance and Manufacturing](../7.%20Compliance%20and%20Manufacturing/Guide.md))
+For learned models, retain held-out quality and failure-slice results. The [CPU export/INT8 lab](../5.%20Application%20Development/5.%20ML%20and%20AI/cpu-export-quantization/Guide.md) demonstrates that a technically valid export can have much worse stop-detection recall after poor calibration. Signing that artifact does not repair its behavior.
 
-### Fuse burning command
+## 8. Roll out and learn from failures
 
-```bash
-sudo ./odmfuse.sh -i <board_id> -k pkc.pem -S sbk.key <board_config>
-```
+Promote a candidate through a controlled pilot before broad deployment. Define stop conditions and useful denominators: failures per trial device, accepted useful actions, stale observations, recovery events, and update completion within a stated interval. An offline unit is not automatically a successful update or a confirmed failure; track its unknown state.
 
-### Verifying fuse state
+Retain immutable artifact digests and versioned evaluation records, plus the minimum device evidence needed for support. Record firmware/app/model identities together. Keep credentials and private sensor content out of routine logs unless the product has an explicit authorized need and retention policy.
 
-```bash
-# On target
-cat /sys/devices/platform/tegra-fuse/odm_production_mode
-# 1 = fused (production mode)
-```
+Use the [manufacturing module](../7.%20Compliance%20and%20Manufacturing/Guide.md) to connect deployed devices to their board revision, factory test, calibration and software identity. A new board or sensor revision can invalidate assumptions that a software-only rollout previously satisfied.
 
----
+## 9. Completion task and answer key
 
-## 5. OP-TEE and trusted execution
+Submit one deployment manifest, trust-boundary diagram, key-purpose map, update state machine and failure-injection report. Run the signature and interrupted-update labs; state which hardware milestones remain unexecuted.
 
-OP-TEE provides a **Trusted Execution Environment (TEE)** on the Cortex-A78AE cores:
+- **Signature valid, wrong board:** reject on compatibility policy.
+- **Hash changed, new hash supplied by the same untrusted download:** reject unless authenticated metadata authorizes the exact bytes.
+- **Boot succeeds, camera missing:** fail the application's trial condition if the camera is required.
+- **New model passes clean accuracy but fails a deployment slice:** hold promotion and investigate that slice.
+- **Fallback binary starts but cannot read migrated data:** recovery is incomplete.
+- **Replayed prior-boot health acknowledgement:** reject because it does not establish this trial's health.
 
-- **Secure world** runs OP-TEE OS alongside **normal world** Linux
-- **Trusted Applications (TAs)** execute in the secure world
-- Use cases: key storage, attestation, DRM, secure sensor processing
-
-### Jetson OP-TEE integration
-
-NVIDIA ships OP-TEE as part of the L4T BSP. It is loaded during the boot chain (MB2 loads OP-TEE before UEFI).
-
-| Component | Location |
-|-----------|----------|
-| OP-TEE OS image | `tos-optee_t234.img` in flash partition |
-| Trusted Applications | Built into the OP-TEE image or loaded at runtime |
-| TEE client library | `libteec.so` (in rootfs) |
-| TEE supplicant | `tee-supplicant` daemon |
-
-### Key storage with OP-TEE
-
-Store disk encryption keys in OP-TEE secure storage rather than in plaintext on the filesystem:
-
-1. OP-TEE generates or receives the LUKS key
-2. Key is stored in OP-TEE secure storage (RPMB or encrypted file)
-3. At boot, OP-TEE retrieves the key and passes it to the kernel for LUKS unlock
-4. The key never appears in normal-world memory
-
----
-
-## 6. Disk encryption (LUKS + OP-TEE key storage)
-
-### Why encrypt
-
-Devices deployed in the field can be physically accessed. Without disk encryption, an attacker can:
-
-- Remove the NVMe SSD and read all data on a different machine
-- Extract ML models, credentials, customer data
-- Clone the device by copying the filesystem
-
-### LUKS setup on Jetson
-
-```bash
-# Create encrypted partition
-sudo cryptsetup luksFormat /dev/nvme0n1p1
-
-# Open (unlock) the partition
-sudo cryptsetup open /dev/nvme0n1p1 crypt_root
-
-# Format and mount
-sudo mkfs.ext4 /dev/mapper/crypt_root
-sudo mount /dev/mapper/crypt_root /mnt
-```
-
-### Auto-unlock with OP-TEE
-
-For headless devices, manual passphrase entry is not practical. Use OP-TEE to auto-unlock at boot:
-
-1. Store the LUKS key in OP-TEE secure storage during factory provisioning
-2. At boot, an initrd script calls the OP-TEE client to retrieve the key
-3. The key unlocks the LUKS partition
-4. The key is not accessible from normal-world after boot
-
-### Performance impact
-
-Disk encryption adds CPU overhead for I/O:
-
-| Workload | Without encryption | With LUKS (AES-256-XTS) | Overhead |
-|----------|-------------------|------------------------|----------|
-| Sequential read | ~3.2 GB/s | ~2.4 GB/s | ~25% |
-| Sequential write | ~2.8 GB/s | ~2.1 GB/s | ~25% |
-| Random 4K read | ~180K IOPS | ~140K IOPS | ~22% |
-
-The Cortex-A78AE has ARMv8 crypto extensions, so AES is hardware-accelerated. The overhead is acceptable for most edge AI workloads where the bottleneck is GPU inference, not storage I/O.
-
----
-
-## 7. Runtime hardening
-
-### Service minimization
-
-```bash
-# List all enabled services
-systemctl list-unit-files --state=enabled
-
-# Disable unnecessary services
-sudo systemctl disable bluetooth
-sudo systemctl disable avahi-daemon
-sudo systemctl disable cups
-sudo systemctl mask <service>  # prevent re-enabling
-```
-
-### SSH hardening
-
-```
-# /etc/ssh/sshd_config
-PermitRootLogin no
-PasswordAuthentication no
-PubkeyAuthentication yes
-AllowUsers deploy
-MaxAuthTries 3
-```
-
-### Firewall
-
-```bash
-sudo ufw default deny incoming
-sudo ufw default allow outgoing
-sudo ufw allow ssh
-sudo ufw allow 443/tcp   # OTA update channel
-sudo ufw enable
-```
-
-### AppArmor
-
-JetPack ships with AppArmor support. Create profiles for your application containers and services to restrict file access, network access, and capabilities.
-
-### Debug UART in production
-
-**Disable or restrict** the debug UART on production devices. An exposed UART gives root shell access. Options:
-
-- Remove the debug UART header from the production carrier PCB (recommended)
-- Disable UART console in the kernel command line (`console=` set to `ttyS0` with no getty)
-- Protect with password (less secure, still exposes boot log)
-
----
-
-## 8. A/B rootfs redundancy architecture
-
-A/B rootfs allows safe updates: write the new image to the inactive slot, validate, then switch.
-
-### Partition layout
-
-```
-QSPI NOR (boot):
-  ├─ mb1_a / mb1_b     (A/B bootloader stage 1)
-  ├─ mb2_a / mb2_b     (A/B bootloader stage 2)
-  ├─ uefi_a / uefi_b   (A/B UEFI)
-  ├─ tos_a / tos_b     (A/B OP-TEE)
-  └─ bpmp_a / bpmp_b   (A/B BPMP firmware)
-
-NVMe:
-  ├─ APP_a              (rootfs slot A)
-  ├─ APP_b              (rootfs slot B)
-  └─ DATA               (persistent user data, not duplicated)
-```
-
-### Slot management
-
-```bash
-# Check active slot
-sudo nvbootctrl get-current-slot
-
-# Set next boot slot
-sudo nvbootctrl set-active-boot-slot <0|1>
-
-# Mark current slot as successful (after validation)
-sudo nvbootctrl set-slot-as-successful <0|1>
-```
-
-### Sizing trade-offs
-
-A/B doubles the rootfs storage requirement. For a 4 GB rootfs:
-
-- Single slot: 4 GB
-- A/B: 8 GB + ~1 GB overhead = ~9 GB
-- With persistent data partition: 9 GB + DATA size
-
-Plan NVMe capacity accordingly. A 128 GB NVMe gives ample room; a 32 GB eMMC may be tight.
-
-> **Deep dive:** [Orin Nano Rootfs and A/B Redundancy](../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Rootfs-and-AB-Redundancy/Guide.md)
-
----
-
-## 9. OTA pipeline design
-
-### End-to-end architecture
-
-```
-Build server (CI/CD)
-  │  Build rootfs image, sign with PKC/OTA key
-  │
-Staging server
-  │  Host signed images, manage release channels
-  │  (stable, beta, canary)
-  │
-  ├─ TLS ─────────────────────────────────────────┐
-  │                                                │
-Device agent                                       │
-  │  Poll for updates or receive push notification │
-  │  Download image, verify signature              │
-  │  Write to inactive slot                        │
-  │  Reboot into new slot                          │
-  │  Run validation tests                          │
-  │  Mark slot as successful (or rollback)         │
-  │  Report status back to server                  │
-  └────────────────────────────────────────────────┘
-```
-
-### Release channel strategy
-
-| Channel | Purpose | Rollout |
-|---------|---------|---------|
-| **canary** | Internal testing, nightly builds | 1–5 devices |
-| **beta** | Early adopter or staging fleet | 5–10% of fleet |
-| **stable** | Production | 100% of fleet (phased rollout) |
-
----
-
-## 10. OTA frameworks on Jetson (SWUpdate, Mender, RAUC)
-
-| Framework | Strengths | Jetson integration |
-|-----------|-----------|-------------------|
-| **SWUpdate** | Flexible, scriptable, double-copy and single-copy modes, signed images, Lua handlers | Good — integrates with `nvbootctrl` for slot management |
-| **Mender** | Managed cloud service, device dashboard, fleet management | Good — Mender Hub has Jetson examples |
-| **RAUC** | D-Bus API, slot status tracking, bundle signing | Good — RAUC bundles can be configured for Jetson A/B |
-| **NVIDIA nv_update_engine** | Native Jetson tool, partition-level updates | Built-in but limited fleet management |
-
-### Recommended approach
-
-Use **SWUpdate** or **Mender** as the device-side agent, with **NVIDIA's partition tools** (`nvbootctrl`, `nv_update_engine`) for bootloader and slot operations. This gives you both ecosystem-standard OTA features and Jetson-specific boot integration.
-
----
-
-## 11. Bootloader and firmware OTA
-
-Updating QSPI-resident firmware (MB1, MB2, UEFI, OP-TEE, BPMP, SPE) in the field:
-
-- Use A/B slot support in QSPI — write new firmware to the inactive slot
-- NVIDIA's `nv_update_engine` handles partition-level writes
-- **Risk:** A failed bootloader update can brick the device if not properly A/B managed
-- **Mitigation:** Always update bootloader before rootfs; validate bootloader boots before switching rootfs slot
-
----
-
-## 12. Container-layer OTA
-
-For applications running in Docker containers (as set up in Module 2 — L4T Customization):
-
-- Update container images independently of the rootfs
-- Use a private container registry (Harbor, AWS ECR, or local)
-- Pull new images, stop old container, start new container
-- **Rollback:** Keep the previous image tag; `docker rollback` or restart with old tag
-
-### Layer caching
-
-Docker layer caching reduces download size — only changed layers are pulled. Structure your Dockerfile so that:
-
-1. Base L4T image (large, changes rarely) is the bottom layer
-2. System dependencies (changes occasionally) in middle layers
-3. Application code (changes frequently) in the top layer
-
----
-
-## 13. Delta updates and bandwidth engineering
-
-For devices on cellular or bandwidth-constrained networks:
-
-| Technique | Savings | Complexity |
-|-----------|---------|------------|
-| **Full image** | 0% (baseline) | Low |
-| **bsdiff / zstd delta** | 60–90% | Medium — requires generating deltas per version pair |
-| **casync** (content-addressable chunks) | 70–95% | Medium — chunk store on server, only new chunks downloaded |
-| **Container layer diff** | 80–95% (for app updates) | Low — built into Docker |
-
-### Practical recommendation
-
-- Use **full rootfs images** for the initial fleet (<100 devices) — simpler, less infrastructure
-- Add **delta updates** when bandwidth costs become significant
-- Use **container-layer updates** for application changes (most common update type)
-
----
-
-## 14. Rollback and power-fail safety
-
-### Power-fail during OTA
-
-If power fails during an update:
-
-| Phase | Power-fail result | Recovery |
-|-------|-------------------|----------|
-| Downloading image | Incomplete download | Resume or re-download on next boot |
-| Writing to inactive slot | Partially written slot | Inactive slot is corrupt but **active slot is untouched** — device boots normally |
-| Rebooting into new slot | Boot interrupted | Watchdog or retry counter triggers rollback to previous slot |
-| Validation running | Validation incomplete | Slot not marked as successful — next reboot falls back |
-
-### Watchdog timer
-
-Configure a hardware watchdog to trigger reboot if the system hangs during post-update validation:
-
-```bash
-# Enable watchdog
-echo 1 > /dev/watchdog
-
-# Application must pet the watchdog periodically
-# If it fails to pet within timeout → hardware reset → rollback
-```
-
-### Retry counter
-
-Use a boot counter in `nvbootctrl` or a custom persistent flag:
-
-1. Before switching to new slot, set retry counter = 3
-2. Each boot attempt decrements the counter
-3. If the counter reaches 0 without the slot being marked successful → revert to old slot
-
----
-
-## 15. OTA signing and verification chain
-
-```
-Build server:
-  ├─ Build rootfs image
-  ├─ Compute SHA-256 hash of image
-  ├─ Sign hash with OTA signing key (RSA-3072 or Ed25519)
-  └─ Bundle: image + signature + metadata (version, channel, timestamp)
-
-Device:
-  ├─ Download bundle
-  ├─ Verify signature using embedded OTA public key
-  ├─ Verify hash matches image
-  ├─ Check version > current (prevent downgrade)
-  └─ Apply update
-```
-
-### Key management
-
-- **OTA signing key** is separate from the **secure boot PKC key**
-- Store OTA private key in CI/CD secrets or HSM
-- Embed OTA public key in the rootfs (or in a read-only partition)
-- Rotate OTA keys by shipping the new public key in a signed update before switching
-
----
-
-## 16. Fleet monitoring and telemetry
-
-| Metric | Source | Purpose |
-|--------|--------|---------|
-| **Boot count** | Persistent counter | Detect reboot loops |
-| **Update status** | OTA agent | Track rollout success/failure rate |
-| **Slot status** | `nvbootctrl` | Detect devices stuck on old slot |
-| **Temperature** | `tegrastats` | Detect thermal issues in the field |
-| **Disk usage** | `df` | Prevent devices from running out of space |
-| **Uptime** | `/proc/uptime` | Detect unexpected reboots |
-| **Application health** | Health check endpoint | Detect application-level failures |
-
-### Telemetry stack
-
-- **Device side:** Lightweight agent (custom, or Telegraf/Fluent Bit) reports metrics via MQTT or HTTPS
-- **Server side:** Time-series database (InfluxDB, Prometheus) + dashboard (Grafana)
-- **Alerts:** Set thresholds for reboot loops, update failures, temperature anomalies
-
----
-
-## 17. Reliability testing (HALT/HASS, soak, power-cycle)
-
-Before shipping, validate that the device survives real-world conditions:
-
-### Power-cycle endurance
-
-```bash
-#!/bin/bash
-# Automated power-cycle test (requires controllable power supply or relay)
-for i in $(seq 1 1000); do
-    power_off
-    sleep 5
-    power_on
-    wait_for_boot   # timeout → fail
-    run_smoke_test  # basic peripheral check
-    log_result $i
-done
-```
-
-**Target:** 1000 power cycles with zero boot failures.
-
-### Thermal cycling
-
-| Parameter | Consumer | Industrial |
-|-----------|----------|------------|
-| Temperature range | 0 to +45 C | -20 to +70 C |
-| Ramp rate | 5 C/min | 10 C/min |
-| Soak time at extreme | 15 min | 30 min |
-| Cycles | 100 | 500 |
-
-### Soak testing
-
-- Run the production workload (AI inference + OTA checks + telemetry) continuously for **7–14 days**
-- Monitor for memory leaks, file descriptor leaks, disk space growth, temperature drift
-- Log all metrics and compare day 1 vs day 14
-
-### HALT (Highly Accelerated Life Test)
-
-- Push beyond spec limits (temperature, vibration, voltage) to find design margins
-- Not a pass/fail test — it reveals **where** the design breaks
-- Performed on 5–10 units early in the design cycle
-
----
-
-## 18. Projects
-
-- **Secure boot lab:** Generate test PKC/SBK keys, sign a full JetPack image, flash a dev kit with secure boot enabled, then verify that unsigned images are rejected.
-- **End-to-end OTA pipeline:** Set up SWUpdate on a Jetson Orin Nano with A/B rootfs, a signing server, and a staging server. Push an update, verify rollback on intentional failure.
-- **Power-cycle soak:** Build a test jig with a relay-controlled power supply, run 1000 power-cycle boot tests, log results, and analyze any failures.
-- **Fleet dashboard:** Deploy 3+ Jetson devices, set up MQTT telemetry + Grafana dashboard, monitor boot count, temperature, and OTA status across the fleet.
-
----
-
-## 19. Resources
-
-| Resource | Description |
-|----------|-------------|
-| **NVIDIA Jetson Security Guide** | Official secure boot, fuse programming, encryption documentation |
-| [Orin Nano Security deep dive](../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Security/Guide.md) | Detailed PKC/SBK walkthrough, threat model (Module 1 companion) |
-| [Orin Nano OTA deep dive](../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-OTA-Deep-Dive/Guide.md) | `nv_update_engine`, slot management internals (Module 1 companion) |
-| [Orin Nano Rootfs and A/B Redundancy](../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Rootfs-and-AB-Redundancy/Guide.md) | Partition layout, `nvbootctrl` (Module 1 companion) |
-| **SWUpdate** (sbabic.github.io/swupdate) | Open-source OTA framework |
-| **Mender** (mender.io) | Managed OTA platform with Jetson support |
-| **RAUC** (rauc.io) | Robust Auto-Update Controller |
-| **OP-TEE** (optee.org) | Open-source Trusted Execution Environment |
-
-
-## Integration lab: Can the deployed system recover without accepting an incompatible model?
-
-Treat firmware/BSP, application, model, and persistent schema as a release compatibility set. Verify a signed disposable artifact and simulate a failed application health check after trial update.
-
-**Acceptance evidence:** Record rejection of altered content and a successful compatible rollback. Separate image authenticity, confidentiality, and availability claims in the release dossier.
-
-**Continue:** take this artifact to [7. Compliance and Manufacturing](../7.%20Compliance%20and%20Manufacturing/Guide.md). Explain which assumption from this course the next engineer must preserve.
+A complete submission explains each rejection and demonstrates the corresponding executable check where the teaching environment supports it.

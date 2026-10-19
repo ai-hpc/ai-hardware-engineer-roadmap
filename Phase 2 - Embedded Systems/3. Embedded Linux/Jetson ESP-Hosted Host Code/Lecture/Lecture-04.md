@@ -1,5 +1,7 @@
 # Lecture 4 — How Wi-Fi becomes `wlan0`
 
+**Source boundary — reviewed October 18, 2026:** this is the historical NG fork at `ce36dec9294988e598f04e84c9d28092ca9e9786`. Board observations are attributed to that fork, not rerun here. Complete the [source-reading lab](../Source-Reading-Lab.md); it explains the current migration path and defects in these abbreviated source excerpts. Snippets containing `...` are reading excerpts, not standalone compilable programs.
+
 **Course:** [Jetson ESP-Hosted Host Code guide](../Guide.md) · **Phase 2 — Embedded Linux**
 
 **Previous:** [Lecture 03](Lecture-03.md) · **Next:** [Lecture 05 — How BLE becomes `hci0`](Lecture-05.md)
@@ -123,7 +125,7 @@ That one call is a great Embedded Linux lesson:
 
 That is why `nmcli`, `iw`, and other tools can work.
 
-The call site is small enough to memorize:
+Read this historical call site together with its callee: allocation failure can return `ERR_PTR(-ENOMEM)`, so the plain `if (wdev)` test incorrectly treats that non-null error pointer as success. The [source lab](../Source-Reading-Lab.md) traces this defect:
 
 ```c
 static int esp_add_network_ifaces(struct esp_adapter *adapter)
@@ -233,14 +235,14 @@ That is the **Embedded Linux pattern worth learning**:
 
 `wlan0` appearing means much more than “the SPI bus works.”
 
-It implies:
+At registration time on this source path it indicates progress through these stages; a persistent interface does not prove the transport is still alive:
 
-- the host transport is alive
+- the host transport delivered initialization traffic
 - boot-up event handling completed far enough to initialize upper layers
 - `cfg80211` registration succeeded
 - interface allocation and registration succeeded
 
-That is why the validated Jetson bring-up used `wlan0` as a major milestone.
+That is why the reported legacy Jetson bring-up used `wlan0` as a major milestone.
 
 It is the difference between:
 
@@ -265,7 +267,7 @@ you are indirectly testing:
 - command message flow to the ESP
 - event and response handling back into Linux
 
-So a Wi-Fi scan is not “just a user command.” It is a **full end-to-end test** of:
+A newly requested scan with observed completion exercises part of the path below. A cached NetworkManager list does not prove a fresh exchange, and neither scan result validates association or application traffic:
 
 - Linux subsystem registration
 - transport reliability

@@ -1,0 +1,19 @@
+{
+  "scope": "actual OpenUSD CPU composition; no physics simulation or renderer",
+  "usd_core": "26.8",
+  "opinion_values": {
+    "asset": 2,
+    "local": 3,
+    "session": 4,
+    "reopened_root": 3,
+    "flattened_stage": 4
+  },
+  "unloaded_payload_host_present": true,
+  "local_override_descendant_present_without_payload_type": true,
+  "translation_numbers_after_units_metadata_change": [
+    100.0,
+    0.0,
+    0.0
+  ],
+  "script_sha256": "1eef2fbb46ad10e0f3d1d061e2125d6917d924c62d581464a981e012a5744e1f"
+}

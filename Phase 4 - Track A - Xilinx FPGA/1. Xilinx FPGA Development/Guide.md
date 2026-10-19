@@ -20,6 +20,8 @@
 
 **What comes after:** [Zynq UltraScale+ MPSoC](../2.%20Zynq%20UltraScale%2B%20MPSoC/Guide.md), [Advanced FPGA Design](../3.%20Advanced%20FPGA%20Design/Guide.md), and [High-Level Synthesis](../4.%20High-Level%20Synthesis%20%28HLS%29/Guide.md).
 
+**Start without a board:** the [streaming RTL lab](labs/README.md) provides runnable SystemVerilog, an Icarus simulator runner, and a scoreboard that catches backpressure, reset, and overflow bugs. Complete this simulation artifact before selecting a device. Board validation and timing reports remain separate later milestones.
+
 ---
 
 ## Why This Module Exists
@@ -123,6 +125,8 @@ Implement three modules:
 3. small streaming datapath with valid/ready handshake
 
 For each module, write a self-checking testbench.
+
+Use the [provided streaming stage](labs/README.md) as the worked example for item 3. Predict its five-edge trace, run the normal case, and show that each deliberate mutation fails its intended assertion. Then apply the same accepted-transaction accounting to your transmitter or shifter.
 
 ### Measure It
 

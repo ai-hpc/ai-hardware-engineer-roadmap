@@ -4,7 +4,7 @@
 
 ---
 
-Before studying any mechanism, fix the checkpoint you are actually studying. GLM-5.3-Flash is not GLM-5.3 run with fewer layers, nor a quantized shrink of a larger sibling — Z.ai describes it as a **redesigned architecture** combining linear and sparse attention with manifold-constrained hyper-connections, trained as its own model. Everything downstream in this course depends on the numbers in this module being right, so treat this as ground truth to memorize, not background to skim.
+Before studying any mechanism, fix the checkpoint you are actually studying. GLM-5.3-Flash is not GLM-5.3 run with fewer layers, nor a quantized shrink of a larger sibling — Z.ai describes it as a **redesigned architecture** combining linear and sparse attention with manifold-constrained hyper-connections, trained as its own model. Everything downstream depends on the checkpoint identity. Practice looking up and deriving these dimensions from a pinned config; memorizing a moving model table is not the objective. The [CPU hybrid-state lab](CPU-Hybrid-State-Lab.md) includes a factual config snapshot and checks the layer schedule.
 
 ---
 
@@ -21,6 +21,8 @@ By the end of this module you should be able to:
 ---
 
 ## 1. The published configuration
+
+Checked on October 18, 2026 against the [official config at revision `46a050b`](https://huggingface.co/zai-org/GLM-5.3-Flash/blob/46a050bec13002ad29ee795c16e61cf4fa3c4a9c/config.json). The original release is FP8; the later NVFP4 deployment case study uses a separately converted checkpoint. Keep those identities separate.
 
 ```text
    Model class            Glm5NextForConditionalGeneration
@@ -152,6 +154,8 @@ Build a **checkpoint-to-code tensor map**: for each row of the configuration tab
 ---
 
 ## Current as of
+
+**Reviewed October 18, 2026.** [Pinned config, upstream code and CPU evidence](CPU-Hybrid-State-Lab.md#sources-and-execution-boundary) identify what was checked. Hardware capacity and throughput remain deployment-specific.
 
 * **Checkpoint-specific:** every number in §1 is a property of the released GLM-5.3-Flash configuration, current as of this writing. A future revision can change any of them — re-run §2's derivation against the new config before trusting anything downstream.
 * **Timeless:** the distinction between "co-designed hybrid architecture" and "pruned/distilled variant," and the discipline of separating config facts from derived and deployment-dependent claims.

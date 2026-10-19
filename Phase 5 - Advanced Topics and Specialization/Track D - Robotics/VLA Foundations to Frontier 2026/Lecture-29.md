@@ -17,7 +17,7 @@ h_t=f(h_{t-1},o_t,a_{t-1}),\qquad
 a_t\sim\pi(a\mid o_t,h_t,\ell).
 \]
 
-The hidden state could be a recurrent tensor, retrieved episodes, a structured task record, or selected past frames. Those choices have different update costs, storage needs, and failure modes. Test memory by creating histories that end at the same observation but require different decisions; otherwise a memoryless policy might pass the task.
+The hidden state could be a recurrent tensor, retrieved episodes, a structured task record, or selected past frames. Those choices have different update costs, storage needs, and failure modes. Here `a` must represent the action actually applied, or the history must separately include the requested action, controller override, and execution duration. Updating memory as though a rejected action moved the robot corrupts the next state estimate. Test memory by creating histories that end at the same observation but require different decisions; otherwise a memoryless policy might pass the task.
 
 ## What 2026 adds to this discussion
 
@@ -46,7 +46,7 @@ Model-predictive control can sample action sequences and select
 A^*=\arg\max_A\sum_{j=0}^{H-1}\gamma^j\hat r_{t+j},
 \]
 
-then execute only a prefix before observing again. Here a model explicitly supports search. A joint world-action policy can instead predict future observations and actions together without running that planning algorithm. An auxiliary predictive loss may improve representations even when no future video is generated at inference. Distinguish all three.
+subject to the application's state/action constraints, then execute only a prefix before observing again. A larger predicted reward does not make an infeasible candidate valid. This simple finite-horizon objective omits a terminal value; disclose that truncation or supply a validated terminal cost/value. Here a model explicitly supports search. A joint world-action policy can instead predict future observations and actions together without running that planning algorithm. An auxiliary predictive loss may improve representations even when no future video is generated at inference. Distinguish all three.
 
 Future prediction can exploit shortcuts. A decoder can produce a visually plausible gripper closure while the imagined object ignores friction. A latent predictor can encode the task label without modeling useful consequences. Evaluate counterfactual actions: do different actions lead to appropriately different predicted outcomes? Check temporal consistency and action sensitivity, not just attractive frames.
 
@@ -57,6 +57,8 @@ Latent prediction saves output bandwidth and potentially compute, but it can hid
 Suppose an **illustrative** controller can tolerate a new decision every 100 ms. Observation processing costs 20 ms and final action decoding 15 ms. That leaves 65 ms for memory retrieval, reasoning, or imagination.
 
 Candidate A evaluates four predicted futures at 12 ms each and spends 5 ms scoring them: total \(20+48+5+15=88\) ms. Candidate B uses a 90 ms text-generation step: total 125 ms, exceeding the budget before jitter. Candidate C predicts one latent future in 8 ms: total 43 ms but may provide less useful look-ahead. These are analytical examples, not measurements of named models.
+
+These timings assume the futures are evaluated serially and all stages belong to one decision. Four candidates may batch on suitable hardware, but their wall time must then be measured; multiplying one-candidate latency by four no longer describes that execution. The 100 ms budget must also state whether it starts at sensor capture or at processing arrival.
 
 The deployment choice depends on the success/latency curve, not only budget feasibility. Compare under both equal wall time and each method's best supported configuration. Also report p95: a method averaging 88 ms can still miss most difficult decisions if its tail exceeds the deadline.
 

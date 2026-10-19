@@ -1,0 +1,253 @@
+{
+  "reviewed_at": "2026-10-18T21:49:02.554684+00:00",
+  "scope": "Jetson ML and AI course guides; source/API review separate from CPU execution",
+  "primary_source_url_probes": [
+    {
+      "url": "https://developer.nvidia.com/cuda/gpus",
+      "status": 200
+    },
+    {
+      "url": "https://docs.nvidia.com/deeplearning/tensorrt/10.x.x/inference-library/advanced.html#strongly-typed-networks",
+      "status": 200
+    },
+    {
+      "url": "https://docs.nvidia.com/deeplearning/tensorrt/10.x.x/inference-library/work-quantized-types.html",
+      "status": 200
+    },
+    {
+      "url": "https://docs.nvidia.com/deeplearning/tensorrt/latest/api/migration/tensorrt-10x-to-11x-jetson.html",
+      "status": 200
+    },
+    {
+      "url": "https://docs.nvidia.com/tao/tao-toolkit/7.0.1/text/cv_finetuning/pytorch/object_detection/rt_detr.html",
+      "status": 200
+    },
+    {
+      "url": "https://docs.nvidia.com/tao/tao-toolkit/7.0.1/text/getting_started.html",
+      "status": 200
+    },
+    {
+      "url": "https://docs.nvidia.com/tao/tao-toolkit/7.0.1/text/migration_guides/migrating_to_tao_7.0.html",
+      "status": 200
+    },
+    {
+      "url": "https://docs.nvidia.com/tao/tao-toolkit/7.0.1/text/release_notes.html",
+      "status": 200
+    },
+    {
+      "url": "https://docs.nvidia.com/tao/tao-toolkit/7.0.1/text/tao_deploy/rtdetr.html",
+      "status": 200
+    },
+    {
+      "url": "https://docs.nvidia.com/tao/tao-toolkit/7.0.1/text/tao_quant/limitations.html",
+      "status": 200
+    },
+    {
+      "url": "https://docs.ollama.com/gpu",
+      "status": 200
+    },
+    {
+      "url": "https://docs.opencv.org/4.13.0/d9/d0c/group__calib3d.html",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "url": "https://docs.pytorch.org/docs/stable/onnx.html",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "url": "https://docs.ultralytics.com/datasets/detect/visdrone/",
+      "status": 200
+    },
+    {
+      "url": "https://docs.ultralytics.com/integrations/tensorrt/",
+      "status": 200
+    },
+    {
+      "url": "https://docs.ultralytics.com/models/yolov8/",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/NVIDIA-TAO/tao-skill-bank/blob/e889973c84bd10c80c1a70f57ec5b426221f0264/skills/models/tao-train-rtdetr/references/skill_info.yaml",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/NVIDIA-TAO/tao-skill-bank/blob/e889973c84bd10c80c1a70f57ec5b426221f0264/skills/models/tao-train-rtdetr/references/tao-deploy-rtdetr.skill_info.yaml",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/NVIDIA-TAO/tao-skill-bank/blob/e889973c84bd10c80c1a70f57ec5b426221f0264/skills/models/tao-train-rtdetr/schemas/train.schema.json",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/NVIDIA-TAO/tao-skill-bank/blob/e889973c84bd10c80c1a70f57ec5b426221f0264/versions.yaml",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/NVlabs/vla-perf",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/Physical-Intelligence/openpi",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/VisDrone/VisDrone-Dataset",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/VisDrone/VisDrone2018-DET-toolkit",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/ggml-org/ggml/blob/master/docs/gguf.md",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/ggml-org/llama.cpp.git",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/ggml-org/llama.cpp/blob/ff5a23376725e5a889fa0bfb987b7541dc304da0/docs/build.md",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/ggml-org/llama.cpp/blob/ff5a23376725e5a889fa0bfb987b7541dc304da0/tools/llama-bench/README.md",
+      "error": "HTTP Error 503: Service Unavailable"
+    },
+    {
+      "url": "https://github.com/ggml-org/llama.cpp/blob/ff5a23376725e5a889fa0bfb987b7541dc304da0/tools/server/README.md",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/huggingface/lerobot/blob/146d8474932c8b566717eb2738ba459337ab71c4/src/lerobot/policies/smolvla/configuration_smolvla.py",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/obss/sahi",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/sjtu-medialab/Free-Viewpoint-RGB-D-Video-Dataset",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct/blob/a10cc1512eabd3dde888204e902eca88bddb4951/config.json",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/blog/nxp/bringing-robotics-ai-to-embedded-platforms",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/blog/smolvla",
+      "status": 200
+    },
+    {
+      "url": "https://nvidia.github.io/TensorRT-Edge-LLM/user_guide/examples/vla/index.html",
+      "status": 200
+    },
+    {
+      "url": "https://nvidia.github.io/TensorRT-Edge-LLM/user_guide/examples/vla/pi05.html",
+      "status": 200
+    },
+    {
+      "url": "https://nvidia.github.io/TensorRT-Edge-LLM/user_guide/getting_started/support-matrix.html",
+      "status": 200
+    },
+    {
+      "url": "https://nvidia.github.io/TensorRT-LLM/latest/legacy/tensorrt-backend-removal.html",
+      "status": 200
+    },
+    {
+      "url": "https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#using-cuda-graphs-preview",
+      "status": 200
+    },
+    {
+      "url": "https://onnxruntime.ai/docs/execution-providers/TensorRT-ExecutionProvider.html",
+      "status": 200
+    },
+    {
+      "url": "https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html",
+      "status": 200
+    },
+    {
+      "url": "https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/",
+      "status": 200
+    }
+  ],
+  "probe_limitations": "HEAD 403 for OpenCV/PyTorch and transient GitHub 503 are not missing pages: browsing OpenCV and pinned llama-bench succeeded. PyTorch URL redirects; actual exporter exercised from pinned installed distribution.",
+  "llm_metadata_only": {
+    "repo": "HuggingFaceTB/SmolLM2-360M-Instruct",
+    "revision": "a10cc1512eabd3dde888204e902eca88bddb4951",
+    "config": {
+      "architectures": [
+        "LlamaForCausalLM"
+      ],
+      "attention_bias": false,
+      "attention_dropout": 0.0,
+      "bos_token_id": 1,
+      "eos_token_id": 2,
+      "hidden_act": "silu",
+      "hidden_size": 960,
+      "initializer_range": 0.02,
+      "intermediate_size": 2560,
+      "is_llama_config": true,
+      "max_position_embeddings": 8192,
+      "mlp_bias": false,
+      "model_type": "llama",
+      "num_attention_heads": 15,
+      "num_hidden_layers": 32,
+      "num_key_value_heads": 5,
+      "pad_token_id": 2,
+      "pretraining_tp": 1,
+      "rms_norm_eps": 1e-05,
+      "rope_interleaved": false,
+      "rope_scaling": null,
+      "rope_theta": 100000,
+      "tie_word_embeddings": true,
+      "torch_dtype": "bfloat16",
+      "transformers_version": "4.42.3",
+      "transformers.js_config": {
+        "kv_cache_dtype": {
+          "q4f16": "float16",
+          "fp16": "float16"
+        }
+      },
+      "use_cache": true,
+      "vocab_size": 49152
+    },
+    "license": "apache-2.0"
+  },
+  "llama_cpp_source_revision": "ff5a23376725e5a889fa0bfb987b7541dc304da0",
+  "executed": [
+    "PyTorch CPU training + current dynamo ONNX export",
+    "ONNX Runtime CPU static INT8 QDQ with training-only calibration",
+    "OpenCV CPU synthetic RGB/depth videos, calibration, coordinate projection and timestamp/signal references",
+    "Small-object coordinate and annotation transforms",
+    "COCO metadata contract fixtures",
+    "TAO immutable source metadata inspection only"
+  ],
+  "not_executed": [
+    "Jetson or any GPU inference",
+    "TAO model training/export/deployment",
+    "real detector model accuracy",
+    "VLA policy training or physical robot execution",
+    "physiological measurement",
+    "llama.cpp model generation or benchmarks"
+  ],
+  "guide_sha256": {
+    "Guide.md": "77f01c3955549feee3d97ab9f1ba7e7665d2e5b76fb5ce947f69c5d3cb634a6b",
+    "cpu-export-quantization/Guide.md": "23f514a7fb2d59eb8cc6c58fb4f65c8ec3a07789cf36470e0eda21c4c9159fef",
+    "jetson-llm-runtime/Guide.md": "5fb182876b7df9e163faa7b4fe86560fce979bb577f59ca6ce37478ea77372a7",
+    "small-object-detection-jetson/Guide.md": "4073c05b07e3aa10dafa3525046b454658ed0cd03f9b4f2035ea6be3e246beab",
+    "tao-toolkit/Guide.md": "36dce972df3df3a681b6237af77bb9881e27fc241ca7c41d591bb2c7a116c1af",
+    "non-contact-monitoring-edge/Guide.md": "6b7ad0f920135ee159a931faf368c57edfa2d8b1b8250bfe5a8f3b653fdb3e5a",
+    "llm-optimization-jetson/Guide.md": "05b115c9272fd5f0a165489d1311b873abf37484921c094139bc017646d1f89d",
+    "vla-deploy-jetson/Guide.md": "08cdab3887830c4b6b89dec504019f7dd3ed34cb4e16b7c7d9beb122aff3167f",
+    "non-contact-monitoring-edge/phase1/README.md": "184f3747a1d5ab3c3abf53a60fa168d7b82b56624544750c70694c2d76d181c2"
+  }
+}

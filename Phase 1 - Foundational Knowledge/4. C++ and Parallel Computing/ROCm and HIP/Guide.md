@@ -20,97 +20,29 @@
 
 ---
 
-## What ROCm Is
+## What ROCm and HIP provide
 
-**ROCm** (Radeon Open Compute) is AMD's open-source GPU compute platform. It includes the HIP programming language, kernel driver (`amdgpu`), runtime, compiler (`amd-clang`), math libraries (rocBLAS, MIOpen, rocFFT), and profiling tools (Omniperf, Omnitrace). ROCm is to AMD what CUDA is to NVIDIA.
+ROCm is AMD's GPU software platform: compiler, runtime, libraries, profiling tools, and integration with the kernel driver. HIP is its C++ programming interface. CUDA experience transfers because many concepts and calls correspond, but portable source still needs a supported compiler, target GPU, libraries, and operating system for each backend.
 
-## What HIP Is
+**Compatibility checked 2026-10-18:** AMD's current [ROCm 10.1.0 compatibility matrix](https://rocm.docs.amd.com/en/latest/compatibility/compatibility-matrix.html) lists Instinct, Radeon, and Ryzen configurations. Select your exact model and OS there before installing. The top-level ROCm version and individual component versions need not match. A container supplies user-space software; it still needs a compatible host driver and actual supported GPU.
 
-**HIP** (Heterogeneous-computing Interface for Portability) is a C++ API almost identical to CUDA. HIP code compiles to both AMD GPUs (via ROCm) and NVIDIA GPUs (via CUDA backend). This means you can write one kernel and run it on both vendors.
+Start with a CPU reference and a small ragged vector, then validate a HIP implementation. Only after it matches should you investigate occupancy, matrix instructions, or multiple GPUs. The [OpenCL CPU lab](../OpenCL%20and%20SYCL/labs/README.md) provides an executable heterogeneous-compute exercise if you have no supported GPU.
 
-**Why learn this now (not just in Phase 5A):**
-- AMD Instinct GPUs (MI300X, MI350) are deployed at scale by Microsoft Azure, Meta, Oracle
-- Understanding both ecosystems makes you more valuable for any GPU role
-- HIP is the fastest path from CUDA to portable GPU code
-- Phase 5A (GPU Infrastructure) goes deeper; this sub-track gives you the programming foundation
+## 1. CDNA and RDNA: identify the actual target
 
----
+RDNA is AMD's graphics-oriented family, used in Radeon and some integrated GPUs. CDNA is its data-center compute family, used in recent Instinct accelerators. Both can run AI workloads when the selected device and software combination supports them. Neither family name specifies every memory size, precision, wavefront mode, or supported library.
 
-## 1. CDNA vs RDNA — AMD's Two GPU Architectures
+| Question | Why it changes your program |
+|---|---|
+| What GPU model and `gfx` target am I compiling for? | Selects legal instructions and compiler code generation. |
+| What wavefront width does this target use? | Determines shuffle/reduction participation and mask width. |
+| Which matrix operand/accumulator types are supported? | Determines whether a chosen GEMM path is legal. |
+| How much local memory and how many registers can a workgroup use? | Limits resident workgroups and legal tile sizes. |
+| Is this GPU/OS/framework combination supported? | A generic HIP example does not establish framework availability. |
 
-AMD makes two completely different GPU architectures for different markets. Understanding the difference is essential before writing any AMD GPU code.
+For a concrete historical case, MI300X is a CDNA 3 accelerator with eight compute chiplets (XCDs). AMD documents 38 active CUs per XCD, or 304 CUs total. This explains why work must be distributed across many compute units; it does not predict the latency of one kernel. Use [AMD's MI300 microarchitecture description](https://rocm.docs.amd.com/en/latest/reference/gpu-arch/mi300.html) for that device and the matching architecture document for a different generation.
 
-### RDNA (Radeon DNA) — Gaming and Consumer
-
-RDNA powers Radeon RX consumer GPUs. Optimized for graphics workloads: high clock speeds, rasterization, ray tracing, display output.
-
-- **Products:** Radeon RX 7900 XTX, RX 7800 XT, Steam Deck APU, PlayStation 5, Xbox Series X
-- **Design focus:** High single-thread performance, graphics pipeline, low power
-- **Compute units:** Dual-issue SIMD, 32-wide wavefronts (RDNA 3+ supports wave32 *and* wave64)
-- **Memory:** GDDR6 (up to 24 GB), no HBM
-- **Use case:** Gaming, content creation, lightweight ML inference
-
-### CDNA (Compute DNA) — Data Center and AI
-
-CDNA powers AMD Instinct data-center GPUs. Optimized for matrix math and HPC — no graphics pipeline at all.
-
-- **Products:** MI300X, MI300A, MI250X, MI210
-- **Design focus:** Maximum compute throughput, matrix operations, multi-GPU scaling
-- **Compute units:** 64-wide wavefronts, optimized for FP64/FP32/FP16/INT8 matrix operations
-- **Matrix Cores:** Hardware matrix multiply-accumulate (equivalent to NVIDIA Tensor Cores)
-- **Memory:** HBM3 (up to 192 GB on MI300X with 5.3 TB/s bandwidth)
-- **Interconnect:** Infinity Fabric for GPU-to-GPU (like NVLink)
-- **Use case:** AI training, AI inference, HPC, scientific computing
-
-### CDNA vs RDNA Comparison
-
-| | RDNA (Consumer) | CDNA (Data Center) |
-|---|---|---|
-| **Target** | Gaming, desktop | AI training/inference, HPC |
-| **Products** | Radeon RX 7900 XTX | Instinct MI300X |
-| **Graphics pipeline** | Yes (rasterization, ray tracing) | **No** — compute only |
-| **Wavefront size** | 32 (native) + 64 (compatibility) | **64** (native) |
-| **Matrix Cores** | Limited | Full matrix core array (FP16, BF16, FP8, INT8) |
-| **Memory** | GDDR6 (up to 24 GB) | **HBM3** (up to 192 GB, 5.3 TB/s) |
-| **Multi-GPU** | CrossFire (consumer) | **Infinity Fabric** (data center) |
-| **ECC** | No | Yes |
-| **FP64** | 1/16 rate | **Full rate** (important for scientific computing) |
-| **ROCm support** | Limited | **Full** |
-| **Price** | $500–1,000 | $10,000–25,000 |
-
-**Why this matters for AI hardware engineers:**
-- When you read "AMD GPU for AI," it means **CDNA / Instinct**, not RDNA / Radeon
-- CDNA's matrix cores are AMD's answer to NVIDIA tensor cores — the hardware you'd study (or compete with) in Phase 5F (AI Chip Design)
-- MI300X's chiplet design (8 XCDs on one package) is a reference for advanced packaging (L8)
-
-### MI300X Architecture (CDNA 3 Case Study)
-
-```
-┌─────────────────────────────────────────────────┐
-│              MI300X Package                      │
-│                                                  │
-│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐              │
-│  │ XCD │ │ XCD │ │ XCD │ │ XCD │  ← 8 Compute │
-│  │  0  │ │  1  │ │  2  │ │  3  │    Chiplets   │
-│  └──┬──┘ └──┬──┘ └──┬──┘ └──┬──┘    (CDNA 3)  │
-│     │       │       │       │                    │
-│  ┌──┴───────┴───────┴───────┴──┐                │
-│  │      Infinity Fabric         │                │
-│  │    (inter-chiplet network)   │                │
-│  └──┬───────┬───────┬───────┬──┘                │
-│  ┌──┴──┐ ┌──┴──┐ ┌──┴──┐ ┌──┴──┐              │
-│  │ XCD │ │ XCD │ │ XCD │ │ XCD │               │
-│  │  4  │ │  5  │ │  6  │ │  7  │               │
-│  └─────┘ └─────┘ └─────┘ └─────┘               │
-│                                                  │
-│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐          │
-│  │ HBM3 │ │ HBM3 │ │ HBM3 │ │ HBM3 │  192 GB │
-│  │stack │ │stack │ │stack │ │stack │  5.3TB/s │
-│  └──────┘ └──────┘ └──────┘ └──────┘          │
-└─────────────────────────────────────────────────┘
-```
-
-Each XCD contains 38 Compute Units (CUs), each CU has 64 stream processors + matrix cores. Total: 304 CUs, 19,456 stream processors.
+**Worked portability check:** a 256-thread workgroup contains eight 32-lane waves or four 64-lane waves. The thread count is unchanged. This arithmetic alone says nothing about which GPU hides latency better: register usage, resident workgroups, instruction throughput, and independent work also matter. Measure several legal workgroup sizes rather than automatically doubling the block size on AMD.
 
 ---
 
@@ -275,67 +207,20 @@ make -j$(nproc)
 # Compare output with CUDA version for correctness
 
 # Step 5: Profile and optimize
-rocprof --stats ./my_program
-omniperf analyze -p ./profile_output
+rocprofv3 --kernel-trace --output-format csv -- ./my_program
 ```
 
 ---
 
-## 4. AMD GPU Architecture — CDNA Compute Unit Deep Dive
+## 4. Compute units, local memory, and occupancy
 
-Understanding the CU (Compute Unit) is essential for writing fast HIP kernels — it's AMD's equivalent of NVIDIA's SM.
+A compute unit schedules wavefronts, executes scalar/vector/matrix instructions, and provides registers and local data share (LDS). These resources constrain the number of simultaneously resident workgroups. Think of occupancy as the available pool of work that can hide stalls, not as a score to maximize regardless of useful computation.
 
-```
-┌───────────────────────────────────────────┐
-│           CDNA 3 Compute Unit (CU)        │
-│                                           │
-│  ┌─────────────────────────────────────┐  │
-│  │  4x SIMD Units (16-wide each)      │  │
-│  │  = 64 stream processors total      │  │
-│  │  Execute one wavefront (64 threads) │  │
-│  └─────────────────────────────────────┘  │
-│                                           │
-│  ┌─────────────────────────────────────┐  │
-│  │  Matrix Cores                       │  │
-│  │  FP16, BF16, FP8, INT8 MMA         │  │
-│  │  (like NVIDIA Tensor Cores)         │  │
-│  └─────────────────────────────────────┘  │
-│                                           │
-│  ┌──────────────┐  ┌──────────────────┐  │
-│  │  Scalar Unit │  │  LDS (64 KB)     │  │
-│  │  (control)   │  │  (shared memory) │  │
-│  └──────────────┘  └──────────────────┘  │
-│                                           │
-│  ┌─────────────────────────────────────┐  │
-│  │  Vector Register File               │  │
-│  │  256 KB (vs ~256 KB per SM)         │  │
-│  └─────────────────────────────────────┘  │
-│                                           │
-│  ┌──────────────┐  ┌──────────────────┐  │
-│  │  L1 Cache    │  │  Scheduler       │  │
-│  │  (16 KB)     │  │  (wavefront mgr) │  │
-│  └──────────────┘  └──────────────────┘  │
-└───────────────────────────────────────────┘
-```
+Suppose a teaching device has 64 KiB of usable LDS per CU and a kernel reserves 24 KiB per workgroup. LDS alone permits at most `floor(64/24) = 2` resident workgroups. Registers, thread slots, or architectural limits can lower that count. Reducing the tile to 16 KiB permits four by this *one* limit, but may increase global-memory traffic. These are illustrative capacities, not a specification for every AMD GPU.
 
-### NVIDIA SM vs AMD CU Comparison
+A bank conflict is also a mapping calculation, not a vendor slogan. In a simplified model with 32 banks and 4-byte elements, consecutive lanes accessing `x[2*lane]` touch only 16 banks, so distinct addresses repeat banks. Broadcasts, vector instruction phases, swizzles, and the actual bank organization change the result. Consult the target's LDS documentation before applying padding learned on a different architecture.
 
-| | NVIDIA SM (Hopper) | AMD CU (CDNA 3) |
-|---|---|---|
-| **ALUs per unit** | 128 CUDA cores | 64 stream processors |
-| **Thread group** | Warp (32 threads) | Wavefront (64 threads) |
-| **Shared memory** | 0–228 KB (configurable with L1) | 64 KB LDS (fixed) |
-| **Register file** | 256 KB | 256 KB |
-| **Matrix unit** | Tensor Cores (4th gen) | Matrix Cores |
-| **L1 cache** | Shared with SMEM (configurable) | 16 KB (separate from LDS) |
-| **Max wavefronts/warps** | 64 warps per SM | 32 wavefronts per CU |
-| **Occupancy model** | Warps hide latency | Wavefronts hide latency (fewer but wider) |
-
-### Key Optimization Differences When Porting from CUDA
-
-- **Block size:** On NVIDIA, 256 threads = 8 warps. On AMD, 256 threads = 4 wavefronts. Fewer wavefronts means less latency hiding — consider using 512 or 1024 threads per block on AMD.
-- **LDS vs shared memory:** AMD's LDS is fixed at 64 KB per CU (not configurable). On NVIDIA you can trade shared memory for L1 cache. Plan your tiling accordingly.
-- **Bank conflicts:** 64 LDS banks (vs 32 on NVIDIA). A stride of 2 that's conflict-free on NVIDIA causes 2-way conflicts on AMD.
+For each candidate tile, record workgroup size, registers, LDS bytes, measured time, and validated output. Compare those observations with the profiler's resource and stall counters. A larger block can reduce occupancy if it consumes enough resources to prevent a second block from fitting.
 
 ---
 
@@ -348,7 +233,7 @@ Understanding the CU (Compute Unit) is essential for writing fast HIP kernels �
 │  Libraries: rocBLAS, MIOpen, rocFFT  │
 │             Composable Kernel (CK)   │
 ├──────────────────────────────────────┤
-│  HIP Runtime (hiprt)                 │
+│  HIP Runtime                 │
 ├──────────────────────────────────────┤
 │  ROCm Compiler (amd-clang / hipcc)   │
 │  LLVM AMDGPU backend                 │
@@ -374,25 +259,25 @@ Understanding the CU (Compute Unit) is essential for writing fast HIP kernels �
 | CUTLASS | **Composable Kernel (CK)** | Custom GEMM/attention kernels |
 | Thrust | **rocThrust** | Parallel algorithms (mostly compatible) |
 | CUB | **hipCUB** | Block/warp primitives |
-| Nsight Systems | **Omnitrace** | Timeline profiling |
-| Nsight Compute | **Omniperf** | Kernel-level analysis, roofline |
+| Nsight Systems | **ROCm Systems Profiler** | CPU/GPU timeline analysis |
+| Nsight Compute | **ROCm Compute Profiler** | Kernel counters and roofline analysis |
 
-### Profiling Tools
+### Profiling tools
+
+Use the profiler packaged for your ROCm release. Older material calls ROCm Compute Profiler “Omniperf” and ROCm Systems Profiler “Omnitrace.” Their current names and interfaces are documented separately.
 
 ```bash
-# Timeline profiling (like nsys)
-omnitrace-run -- ./my_hip_program
-
-# Kernel-level roofline analysis (like ncu)
-omniperf profile -n my_run -- ./my_hip_program
-omniperf analyze -p workloads/my_run
+# Documented rocprofv3 command; requires a supported GPU and installed SDK.
+rocprofv3 --kernel-trace --output-format csv -- ./my_hip_program
 ```
+
+This produces dispatch timing records; it does not by itself explain a memory bottleneck. Start with [rocprofv3 tracing](https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/latest/how-to/using-rocprofv3.html), then use [ROCm Compute Profiler](https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/) for hardware counters. Counter collection can replay kernels or perturb timing. Keep correctness checks and an unprofiled timing run alongside the profile. These GPU commands were source-checked, not executed in the CPU course review.
 
 ---
 
 ## 6. HIP Streams and Asynchronous Execution
 
-Just like CUDA streams, HIP streams let you overlap compute, memory transfers, and host work.
+HIP streams express ordering within a stream and allow independent work across streams. Concurrent execution depends on device resources and dependencies. The following sketch omits error handling for readability; use the checked-call pattern from the vector example in a complete program. Host and device buffers must remain valid until the relevant stream finishes.
 
 ```cpp
 hipStream_t s1, s2;
@@ -432,12 +317,12 @@ hipEventElapsedTime(&ms, start, stop);
 printf("Kernel: %.3f ms\n", ms);
 ```
 
-**Pinned (page-locked) memory** — required for async transfers to overlap with compute:
+**Pinned (page-locked) host memory** enables eligible asynchronous transfer paths; it does not guarantee overlap. This allocation sketch frees only after all operations using it have completed:
 
 ```cpp
 float *h_pinned;
 hipHostMalloc(&h_pinned, bytes, hipHostMallocDefault);  // pinned on host
-// hipMemcpyAsync now truly async (DMA engine, no CPU involvement)
+// Enqueue the copy, then wait for its completion before reusing or freeing this buffer.
 hipHostFree(h_pinned);
 ```
 
@@ -456,7 +341,7 @@ hipFree(d_ptr);
 
 ### 7.2 Managed Memory (HMM)
 
-AMD's Heterogeneous Memory Management (HMM) provides CUDA-like managed memory — the runtime migrates pages between host and device automatically:
+`hipMallocManaged` offers a shared virtual allocation. Migration, host/device accessibility, and coherence behavior depend on GPU, OS, driver, and managed-memory capabilities; HMM support is not a universal consequence of using HIP. Check the target before assuming demand paging or concurrent access. This sketch establishes a device-completion boundary before the host reads the result:
 
 ```cpp
 float *managed;
@@ -485,55 +370,22 @@ hipFree(managed);
 |--------|-----------|-------------|-------------|
 | `hipMalloc` + `hipMemcpy` | Measure copy and execution costs | Manual | Explicit ownership and movement |
 | `hipMalloc` + `hipMemcpyAsync` + pinned | Overlap depends on resources/dependencies | Manual | Pipelined independent work |
-| `hipMallocManaged` | Good (page faults) | Automatic | Prototyping, irregular access |
-| `hipHostMalloc` (coherent) | Moderate | Direct access | Small data, host+device shared |
+| `hipMallocManaged` | Depends on migration and access pattern | Shared allocation | Prototyping after checking capabilities |
+| `hipHostMalloc` | Depends on placement and interconnect | Pinned host allocation | Transfers; supported mapped access with explicit ordering |
 
 ---
 
-## 8. Matrix Core Programming (rocWMMA)
+## 8. Matrix instructions and rocWMMA
 
-Matrix Cores are AMD's equivalent of NVIDIA Tensor Cores. The `rocWMMA` library provides a WMMA-style interface similar to NVIDIA's `nvcuda::wmma`.
+rocWMMA provides matrix fragments and collective load, multiply-accumulate, and store operations. A fragment distributes a small matrix across participating lanes; it is not a normal row-major array owned by one thread. Start from a supported sample in the [rocWMMA documentation](https://rocm.docs.amd.com/projects/rocWMMA/en/latest/) for your GPU and release.
 
-```cpp
-#include <rocwmma/rocwmma.hpp>
+The mathematical contract for a single tile is `C[m,n] += sum_k A[m,k] * B[k,n]`. To implement it, specify input and accumulator types, tile dimensions, A/B storage layouts, leading dimensions, and the exact participating wave. For row-major B, element `(k,n)` is at `B[k*ldb+n]`; for column-major B it is at `B[k+n*ldb]`. Changing only the fragment's layout tag while keeping the old pointer arithmetic changes the matrix being read.
 
-using namespace rocwmma;
+A complete GEMM must also initialize accumulators, iterate across all K tiles, handle ragged M/N/K edges, and store each output once. All required lanes must reach collective fragment operations consistently. A kernel containing undefined `blockRow`/`blockCol`, an omitted K loop, or an unsupported fragment specialization is not a runnable general GEMM.
 
-// Matrix dimensions: 16×16 tiles, FP16 input, FP32 accumulate
-constexpr int M = 16, N = 16, K = 16;
+**Exercise:** A is 2×3 and B is 3×2, both row-major. A contains rows `[1,2,3]`, `[4,5,6]`; B contains `[7,8]`, `[9,10]`, `[11,12]`. Compute C before using any matrix library. **Answer:** `[[58,64],[139,154]]`. If a fixed 16×16 hardware tile is used for this example, fill out-of-range operands with zero and store only valid output coordinates. Padding establishes correctness but may waste most of the hardware work.
 
-__global__ void gemm_wmma(half* A, half* B, float* C, int lda, int ldb, int ldc) {
-    // Declare matrix fragments (live in registers)
-    fragment<matrix_a, M, N, K, half, row_major> frag_a;
-    fragment<matrix_b, M, N, K, half, col_major> frag_b;
-    fragment<accumulator, M, N, K, float>         frag_c;
-
-    // Initialize accumulator to zero
-    fill_fragment(frag_c, 0.0f);
-
-    // Load tiles from global memory into fragments
-    load_matrix_sync(frag_a, A + blockRow * M * lda, lda);
-    load_matrix_sync(frag_b, B + blockCol * N, ldb);
-
-    // Matrix multiply-accumulate: C += A × B
-    mma_sync(frag_c, frag_a, frag_b, frag_c);
-
-    // Store result back to global memory
-    store_matrix_sync(C + blockRow * M * ldc + blockCol * N, frag_c, ldc, mem_row_major);
-}
-```
-
-**Supported data types on MI300X:**
-
-| Input type | Accumulate type | Tile size | Throughput |
-|-----------|----------------|-----------|------------|
-| FP16      | FP32           | 16×16×16  | Full rate  |
-| BF16      | FP32           | 16×16×16  | Full rate  |
-| FP8 (E4M3/E5M2) | FP32    | 16×16×32  | 2× FP16   |
-| INT8      | INT32          | 16×16×32  | 2× FP16   |
-| FP64      | FP64           | 16×16×4   | Full rate  |
-
-For production-quality GEMM kernels, use **Composable Kernel (CK)** — AMD's equivalent of CUTLASS. CK provides template-based, auto-tuned matrix multiply and attention kernels that target Matrix Cores.
+For a larger implementation, compare a supported rocBLAS/hipBLASLt or Composable Kernel path before writing your own fragment kernel. Precision support and dense/sparse peak rates belong to a specific device specification; they are not a universal throughput table for every fragment type.
 
 ---
 
@@ -550,12 +402,15 @@ ncclComm_t comms[8];
 int devs[8] = {0, 1, 2, 3, 4, 5, 6, 7};
 ncclCommInitAll(comms, nGPUs, devs);
 
+// Group calls when one host thread drives multiple devices.
+ncclGroupStart();
 // All-reduce: sum gradients across all GPUs
 for (int i = 0; i < nGPUs; i++) {
     hipSetDevice(i);
     ncclAllReduce(send_buf[i], recv_buf[i], count,
                   ncclFloat, ncclSum, comms[i], streams[i]);
 }
+ncclGroupEnd();
 
 // Synchronize all streams
 for (int i = 0; i < nGPUs; i++) {
@@ -564,39 +419,25 @@ for (int i = 0; i < nGPUs; i++) {
 }
 ```
 
-**Multi-GPU topology on MI300X systems:**
+This is an API sketch: allocate buffers and streams on each device, check every HIP/RCCL return code, and destroy communicators and streams after completion. Test two devices and a small known sum before scaling the buffer size.
 
-```
-8× MI300X in OAM form factor:
+Collective performance depends on the actual GPU-to-GPU links, PCIe switches, NUMA placement, message size, algorithm, and concurrent traffic. Aggregate fabric bandwidth is not the bandwidth of one link or the end-to-end all-reduce rate. Record topology and measure application-visible bytes/time with a clearly stated convention.
 
-  GPU 0 ←─ Infinity Fabric ──→ GPU 1
-    │                             │
-    │         ┌───────────┐       │
-    ├─────────┤ xGMI/IF  ├───────┤
-    │         │  switch   │       │
-    ├─────────┤  fabric   ├───────┤
-    │         └───────────┘       │
-  GPU 2 ←─────────────────────→ GPU 3
-    ⋮                             ⋮
-  GPU 6 ←─────────────────────→ GPU 7
+**PyTorch on AMD:** choose a supported framework build from [AMD's PyTorch installation guide](https://rocm.docs.amd.com/projects/ai-ecosystem/en/latest/frameworks/pytorch/install.html). Avoid copying a wheel URL from an older ROCm release into a different stack. After installation, this Python smoke test checks which build is running and a known result:
 
-Each link: ~400 GB/s bidirectional (comparable to NVLink 4.0)
-All-to-all bandwidth: sufficient for 8-way tensor parallelism
-```
-
-**PyTorch on AMD — it just works:**
-
-```bash
-# Install ROCm-enabled PyTorch
-pip install torch --index-url https://download.pytorch.org/whl/rocm6.3
-
-# Same code, different backend
+```python
 import torch
-x = torch.randn(4096, 4096, device='cuda')  # 'cuda' maps to HIP on AMD
-y = torch.mm(x, x)  # calls rocBLAS under the hood
+print("PyTorch:", torch.__version__, "HIP:", torch.version.hip)
+assert torch.version.hip is not None, "This is not a ROCm PyTorch build"
+assert torch.cuda.is_available(), "No accessible supported GPU"
+a = torch.tensor([[1., 2., 3.], [4., 5., 6.]], device="cuda")
+b = torch.tensor([[7., 8.], [9., 10.], [11., 12.]], device="cuda")
+expected = torch.tensor([[58., 64.], [139., 154.]])
+torch.testing.assert_close((a @ b).cpu(), expected)
+print(torch.cuda.get_device_name(0), "matmul passed")
 ```
 
-PyTorch uses HIP as the backend — the `torch.cuda.*` API works identically on AMD GPUs. This is why HIP's CUDA-compatible API design was so important.
+PyTorch retains the `cuda` device spelling for its HIP backend. That API convention does not imply identical availability for every extension, dtype, operator, or profiler. This smoke test has not been run on AMD hardware in this course review.
 
 ---
 
@@ -608,7 +449,7 @@ PyTorch uses HIP as the backend — the `torch.cuda.*` API works identically on 
 | HIP Programming Guide | https://rocm.docs.amd.com/projects/HIP/en/latest/ |
 | HIPIFY | https://rocm.docs.amd.com/projects/HIPIFY/en/latest/ |
 | Composable Kernel (CK) | https://github.com/ROCm/composable_kernel |
-| Omniperf | https://rocm.docs.amd.com/projects/omniperf/en/latest/ |
+| ROCm Compute Profiler | https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/ |
 | AMD Instinct MI300X | https://www.amd.com/en/products/accelerators/instinct/mi300/mi300x.html |
 
 ---
@@ -616,8 +457,8 @@ PyTorch uses HIP as the backend — the `torch.cuda.*` API works identically on 
 ## 11. Projects
 
 1. **HIPIFY your CUDA kernel** — Take your CUDA vector add and matmul from Sub-Track 3. Convert to HIP using `hipify-clang`. Build with `hipcc`. Run on a supported AMD GPU, or use a separately supported HIP-on-CUDA toolchain for NVIDIA. A ROCm container does not emulate AMD hardware. Compare output with a stated numerical tolerance.
-2. **Wavefront vs warp** — Write a parallel reduction kernel. Run on both AMD (wavefront=64) and NVIDIA (warp=32). Measure how the wavefront width difference affects performance and code structure.
-3. **Profile with Omniperf** — Profile your HIP tiled matmul with `omniperf`. Generate a roofline plot. Compare with NVIDIA `ncu` roofline for the same kernel.
+2. **Wavefront vs warp** — Write a parallel reduction kernel. Run on supported AMD and NVIDIA targets, querying and recording each execution width. Measure how the wavefront width difference affects performance and code structure.
+3. **Profile with ROCm Compute Profiler** — Profile your HIP tiled matmul with the profiler supplied for your ROCm release. Generate a roofline plot. Compare with NVIDIA `ncu` roofline for the same kernel.
 4. **rocBLAS vs cuBLAS** — Call rocBLAS `rocblas_sgemm` for matrix multiply. Compare performance and API with cuBLAS `cublasSgemm` for the same matrix sizes.
 5. **HIPIFY a real project** — Pick a small open-source CUDA project (e.g., a convolution kernel or sorting algorithm). Run the full HIPIFY workflow: convert → build → fix errors → validate → profile.
 6. **Stream overlap** — Implement a pipeline that overlaps H2D copy, kernel execution, and D2H copy across 3 streams. Measure throughput improvement over synchronous execution.

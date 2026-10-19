@@ -1,4 +1,6 @@
-# Phase 4 — Track C: DL Inference Optimization (6–12 months)
+# Phase 4 — Track C: DL Inference Optimization { #phase-4-track-c-dl-inference-optimization-612-months }
+
+**Plan around one artifact:** as an optional starting schedule, use one weekly session to work through a compiler example and another to reproduce and test it. Your background, hours available each week, target hardware and project scope determine the duration. Completing a small reference-checked CPU rewrite is an earlier milestone than building a production inference system; the [learning guide](../Learning-Guide.md) helps separate those goals.
 
 <div class="course-identity dl-inference" markdown="1">
 <div class="course-identity__icon">INF</div>
@@ -29,7 +31,7 @@
 
 ## Why this track
 
-Tracks A (FPGA) and B (Jetson) teach you to deploy on specific hardware. This track teaches you *how models become hardware instructions* — the compiler stack that sits between a PyTorch/ONNX graph and the kernel code running on any accelerator — and then how to make that code fast enough to ship. Whether you target GPU, FPGA, or a custom NPU, you need IR design, graph optimization, scheduling, and code generation, followed by the kernel authoring, quantization, and runtime work that turns a compiled graph into a served model. This is also the fastest-growing hiring area in AI infrastructure.
+Tracks A (FPGA) and B (Jetson) teach you to deploy on specific hardware. This track teaches you *how models become hardware instructions* — the compiler stack that sits between a PyTorch/ONNX graph and the kernel code running on any accelerator — and then how to make that code fast enough to ship. Whether you target GPU, FPGA, or a custom NPU, you need IR design, graph optimization, scheduling, and code generation, followed by the kernel authoring, quantization, and runtime work that turns a compiled graph into a served model. The same skills support inference, compiler, runtime, and accelerator engineering roles.
 
 ---
 
@@ -42,6 +44,8 @@ This track has two parts. **Part 1** covers compiler fundamentals (IR, graph opt
 | **Part 1 — Compiler Fundamentals** | How compilers work, from IR to hardware code | §1–§7 below |
 | **Part 2 — DL Inference Optimization** | Applying compiler + kernel skills to real inference | [Part 2 below](#part-2-dl-inference-optimization) (6 units) |
 
+**Start with the [CPU compiler experiment](00%20-%20CPU%20Compiler%20Lab/Guide.md):** derive and test a legal rewrite, run a pinned compiler, and inspect generated CPU code. No GPU is required.
+
 **Recommended order:** Work through Part 1 first (or at least §1–§2 and §5), then Part 2 in order. Part 2 units 01–03 reinforce and deepen Part 1 concepts with GPU-specific practice; units 04–06 add quantization, deployment, and hands-on tinygrad.
 
 ---
@@ -52,21 +56,21 @@ This track has two parts. **Part 1** covers compiler fundamentals (IR, graph opt
 
 * **Computational graphs:**
     * How PyTorch, TensorFlow, and ONNX represent models as directed acyclic graphs (DAGs).
-    * Tracing vs scripting vs export: `torch.export`, `torch.compile`, ONNX export.
+    * `torch.export` captures a whole graph and constraints for downstream processing; `torch.compile` optimizes execution and may graph-break into Python unless configured to reject that. ONNX export is a separate interchange path. TorchScript is legacy material for existing deployments.
     * Graph-level metadata: shapes, dtypes, memory layout (NCHW vs NHWC).
 
 * **Intermediate representations:**
-    * **Graph IR vs linearized IR** — Graph: nodes = ops, edges = tensors. Linearized: list of ops in execution order (tinygrad's approach).
+    * **Graph IR vs linearized IR** — Graph: nodes = ops, edges = values. Lowered kernel IR can be linearized after scheduling and optimization; tinygrad uses UOp graphs at multiple stages.
     * **SSA (Single Static Assignment) form** — Each value defined once; enables clean alias and memory analysis.
     * **ONNX as interchange IR** — Opsets, shape inference, version converters.
 
 * **tinygrad IR study:**
-    * Trace a model from `Tensor` ops to `LazyBuffer` to linearized ops to generated code.
+    * Trace a model from `Tensor` operations to UOp graphs, scheduled kernels, optimized kernel IR, and rendered code. `LazyBuffer` diagrams describe older tinygrad revisions.
     * Understand how tinygrad's IR differs from graph-based IRs (TorchFX, ONNX).
 
 **Projects:**
 * Export a CNN (ResNet-18) to ONNX. Visualize the graph with Netron. Identify redundant ops.
-* Trace a matmul through tinygrad: `Tensor` → `LazyBuffer` → scheduled ops → generated CUDA kernel. Document every IR boundary.
+* Trace a matmul through a pinned tinygrad: `Tensor` → UOp graph → scheduled/optimized kernel → generated CPU or GPU program. Document every IR boundary.
 
 ---
 
@@ -93,7 +97,7 @@ This track has two parts. **Part 1** covers compiler fundamentals (IR, graph opt
     * Calibration: collecting activation ranges to set scale/zero-point.
 
 **Projects:**
-* Implement a Conv+BN+ReLU fusion pass on an ONNX graph using `onnx` + `onnxruntime` Python APIs. Measure kernel count reduction.
+* Implement a Conv+BN+ReLU fusion pass on an ONNX graph using `onnx` + `onnxruntime` Python APIs. Compare outputs first, then measure actual kernel count; a graph rewrite does not guarantee fewer executed kernels.
 * Write a memory planning pass: given an op schedule, compute minimum buffer allocation using liveness intervals.
 
 ---
@@ -126,14 +130,14 @@ This track has two parts. **Part 1** covers compiler fundamentals (IR, graph opt
 
 **Projects:**
 * Write and compile a small function to LLVM IR (`clang -emit-llvm`). Read the IR, identify SSA values, trace through `opt` passes.
-* Write a custom LLVM pass that counts floating-point multiply-accumulate (FMA) operations in a function — a proxy for FLOPS estimation.
+* Write a custom LLVM pass that counts floating-point multiply-accumulate (FMA) operations in a function — a static IR inventory. Dynamic FLOPs also require loop trip counts, execution frequency, vector width, and a stated operation-count convention.
 
 ---
 
 ### 4. MLIR: Multi-Level Intermediate Representation
 
 * **Why MLIR:**
-    * LLVM has one IR level; AI compilers need many. MLIR provides a framework for building *dialects* at every abstraction level.
+    * AI compilation benefits from several abstraction levels; LLVM IR alone does not retain all high-level tensor semantics. MLIR provides a framework for building *dialects* at every abstraction level.
     * Progressive lowering: high-level tensor ops → loop nests → vector instructions → hardware code.
 
 * **Core MLIR concepts:**
@@ -170,10 +174,10 @@ This track has two parts. **Part 1** covers compiler fundamentals (IR, graph opt
 ### 5. ML-to-Hardware Compilation Pipelines
 
 * **TVM:**
-    * **Relay** (graph-level IR) → **TIR** (Tensor IR, loop-level) → target code.
+    * **Relax** graph-level IR → **TensorIR** and scheduling → target code. Relay tutorials remain useful for older releases, but are not interchangeable with the current Relax pipeline.
     * Schedule primitives: `tile`, `vectorize`, `parallel`, `unroll`, `reorder`.
-    * **AutoTVM / AutoScheduler (Ansor):** Search-based tuning for operator schedules.
-    * **BYOC (Bring Your Own Codegen):** Offloading subgraphs to custom accelerators.
+    * **Scheduling and tuning:** use the pinned release's TensorIR/MetaSchedule or DLight path. AutoTVM and Ansor examples describe older workflows; APIs and namespaces differ between releases.
+    * **External code generation:** partition supported regions and invoke an external backend/runtime. Distinguish legacy Relay BYOC examples from current Relax integrations.
 
 * **tinygrad compiler:**
     * Scheduler: how ops are grouped into kernels.
@@ -182,7 +186,7 @@ This track has two parts. **Part 1** covers compiler fundamentals (IR, graph opt
     * Adding a new backend to tinygrad.
 
 * **Production compilers:**
-    * **torch.compile + Inductor:** TorchFX → Triton kernels. How `torch._inductor` schedules and generates code.
+    * **torch.compile + Inductor:** captured FX graphs are lowered using backend- and device-specific code generation and library calls. GPU paths may use Triton; CPU paths may use generated C++ and CPU libraries. An attention operation may call a prebuilt library instead of becoming a new Triton kernel.
     * **XLA (Accelerated Linear Algebra):** Used by JAX and TF. HLO IR → target code (TPU, GPU, CPU).
     * **IREE:** MLIR-based compiler for heterogeneous deployment (CPU, GPU, DSP).
     * **Triton-MLIR:** Python-level kernel writing compiled via MLIR pipeline.
@@ -191,16 +195,16 @@ This track has two parts. **Part 1** covers compiler fundamentals (IR, graph opt
 
 | Pipeline | Input | IR(s) | Scheduling | Target |
 |----------|-------|-------|------------|--------|
-| TVM | ONNX/Relay | Relay → TIR | AutoTVM / Ansor | CUDA, LLVM, custom |
-| tinygrad | tinygrad graph | Linearized ops | BEAM search | CUDA, OpenCL, Metal, LLVM |
-| torch.compile | TorchFX | FX → Inductor IR | Triton codegen | CUDA (Triton), CPU |
-| XLA | HLO | HLO → LLO | XLA scheduler | TPU, GPU, CPU |
+| TVM | Supported frontend / Relax | Relax → TensorIR | Release-specific scheduling, MetaSchedule/DLight | CPU, GPU, custom |
+| tinygrad | Tensor/UOp graph | UOp graphs → scheduled kernels → rendered program | Graph scheduler; optional BEAM kernel search | Supported CPU/GPU backends |
+| torch.compile | Python/PyTorch → FX | Backend-dependent, commonly Inductor | Generated kernels and library selection | Backend-dependent CPU/GPU |
+| XLA | HLO / StableHLO pipelines | Optimized HLO → target-specific lowering | Backend-specific scheduling | TPU, GPU, CPU |
 | IREE | MLIR (tosa/linalg) | linalg → vector → spirv/llvm | Tile + distribute | CPU, GPU, DSP |
 
 **Projects:**
-* Compile a ResNet-18 with TVM for your GPU. Use AutoTVM to tune 3 key ops (conv2d, dense, batch_matmul). Compare latency before/after tuning.
+* Compile a small model with a pinned TVM release for an available CPU or GPU target. Tune one supported operator using that release's documented workflow. Save the Relax module, lowered loops, target, tuning budget, and before/after correctness and timing.
 * Study tinygrad BEAM: run with `BEAM=3` on a small model. Compare kernel count and latency vs `BEAM=0`.
-* Use `torch.compile` on a transformer block. Read the generated Triton kernel for the attention op. Annotate the tiling strategy.
+* Use `torch.compile` on a transformer block. Inspect the generated code and external library calls. If attention dispatches to a library, document that boundary; annotate an actually generated kernel rather than assuming every operation uses Triton.
 
 ---
 
@@ -250,7 +254,7 @@ This track has two parts. **Part 1** covers compiler fundamentals (IR, graph opt
     * Track B (Jetson): your compiler backend targets CUDA, DLA, or TensorRT.
 
 **Projects:**
-* Build a minimal TVM BYOC backend that offloads `nn.dense` to a Python-simulated accelerator. Verify correctness.
+* Build a minimal external-codegen path for a matmul in the pinned TVM release. If following a Relay `nn.dense` BYOC tutorial, use its matching archived release and label it as such. Verify correctness.
 * Add a simple tinygrad backend for a simulated 4×4 systolic array (compute matmul tiles, verify output).
 * (Advanced) Write an MLIR lowering pass from `linalg.matmul` to a custom dialect that emits tiled DMA + compute commands.
 
@@ -264,7 +268,7 @@ This part was previously a Phase 5 specialization track. It now lives here becau
 
 **Role target:** DL Inference Optimization Engineer · **MTS Kernels** (Member of Technical Staff, Kernels)
 
-**Prerequisites for Part 2:** Part 1 (at least §1–§2 and §5), Phase 4 Track B (Jetson, TensorRT, CUDA).
+**Prerequisites for Part 2:** Part 1 (at least §1–§2 and §5), tensor shapes, and numerical validation. CUDA knowledge and compatible hardware are needed for GPU kernel labs; completing the Jetson track is not required for CPU compiler work.
 
 Study the units **in order**. Each folder is one unit; do them one by one.
 
@@ -287,9 +291,9 @@ Before diving into graph optimization, kernels, and compilers, you need the **vo
 
 Production LLM serving relies on:
 
-* **In-flight batching (dynamic request batching)** — Batch requests as they arrive; don't wait for a full batch. Improves throughput without killing latency.
+* **In-flight batching (dynamic request batching)** — Batch requests as they arrive; don't wait for a full batch. Can improve useful throughput; queueing and prefill/decode scheduling still affect latency.
 * **Paged KV-cache** — Attention needs key/value cache per token; long context = huge memory. Paging and reuse make it memory-efficient.
-* **Speculative decoding** — Draft multiple tokens with a small model, verify with the big model; fewer forward passes for the same output.
+* **Speculative decoding** — Draft candidate tokens and verify them with a target model. Correct acceptance/sampling preserves the intended distribution; the speed benefit depends on acceptance rate and draft/verification cost.
 * **EAGLE decoding & multi-token prediction** — Predict several tokens per step to cut latency.
 * **Throughput vs latency** — Batch more → higher throughput, worse latency. You tune batching and scheduling to the SLA.
 
@@ -310,7 +314,7 @@ When the model or batch doesn't fit on one GPU:
 * **Pipeline parallelism** — Different layers on different GPUs; keep the pipeline full.
 * **Expert parallelism (MoE)** — Scale mixture-of-experts by sharding experts.
 
-At scale, **communication and synchronization** dominate. **NCCL** (and alternatives) become the bottleneck. Kernel engineers overlap compute with communication and reduce memory movement; that alone can yield 20–40% speedup (e.g. compute + async sync instead of compute → sync → compute → sync).
+At scale, communication and synchronization can become bottlenecks. Measure the critical path and overlap compute with communication where dependencies allow it. Report the actual improvement for the named topology and workload; there is no guaranteed percentage speedup.
 
 ### Production inference systems
 
@@ -388,7 +392,7 @@ Companies that ask for "Blackwell experience" mean: *can you get the most out of
 | §2 Graph opts | Conv+BN+ReLU fusion pass, memory planner |
 | §3 LLVM | Custom LLVM pass (FMA counter) |
 | §4 MLIR | Toy tutorial + minimal NPU dialect |
-| §5 Pipelines | TVM AutoTVM tuning, BEAM comparison, torch.compile analysis |
+| §5 Pipelines | Release-matched TVM tuning, BEAM comparison, torch.compile analysis |
 | §6 Fusion/tiling | Tiled matmul, fusion heuristic modification |
 | §7 Custom backend | TVM BYOC or tinygrad backend for simulated accelerator |
 
@@ -411,3 +415,14 @@ Carry one workload through graph, kernel, compiler, quantization, and service st
 **Acceptance evidence:** The final bundle contains operator frequencies/shapes, live-memory intervals, measured latency, and a rejected optimization. Use these constraints to size SRAM, DMA, and compute before proposing a chip.
 
 **Continue:** take this artifact to [01 - Graph and Operator Optimization](01%20-%20Graph%20and%20Operator%20Optimization/Guide.md). Explain which assumption from this course the next engineer must preserve.
+
+
+## Compiler API currency and source map
+
+Reviewed **2026-10-18**. Use documentation for the release installed in your experiment; the review date is not a software pin.
+
+- [PyTorch export tutorial](https://docs.pytorch.org/tutorials/intermediate/torch_export_tutorial.html): full-graph export and its constraints differ from compile-time graph breaks. Export is not itself a hardware performance result.
+- [TVM documentation](https://tvm.apache.org/docs/) and [MetaSchedule tutorial](https://tvm.apache.org/docs/deep_dive/tensor_ir/tutorials/meta_schedule.html): current Relax/TensorIR workflows; match package namespaces to a release.
+- [tinygrad directory layout](https://docs.tinygrad.org/developer/layout/): graph scheduling, kernel optimization, rendering, and execution are separate stages.
+- [PyTorch quantization migration](https://docs.pytorch.org/docs/stable/quantization.html): new quantization work is centered in torchao; backend support is format/operator/device specific.
+- [TensorRT-LLM migration](https://nvidia.github.io/TensorRT-LLM/latest/legacy/tensorrt-backend-removal.html): current latest documentation removes the legacy TensorRT engine backend. See the runtime unit before copying old `trtllm-build` commands.

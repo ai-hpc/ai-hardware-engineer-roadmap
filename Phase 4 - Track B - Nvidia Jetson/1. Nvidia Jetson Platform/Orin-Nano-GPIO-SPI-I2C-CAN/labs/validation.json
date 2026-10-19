@@ -1,0 +1,22 @@
+{
+  "checked_on": "2026-10-18",
+  "host": {
+    "os": "Ubuntu 24.04.4 x86_64",
+    "python": "3.12.3",
+    "compiler": "GCC 13.3.0"
+  },
+  "tests_passed": 11,
+  "native_evidence": "compiled actual linux/can.h layout and C/Python bidirectional fixture exchange",
+  "transport_evidence": "actual AF_UNIX SOCK_DGRAM socketpair",
+  "not_run": [
+    "vcan SocketCAN (kernel device type unavailable)",
+    "physical CAN",
+    "GPIO/I2C/SPI/UART/PWM hardware"
+  ],
+  "source_sha256": {
+    "can_abi.c": "e16cdef949ab2a38a00fc218d09456e78a21c5a7c10b2699b440003c19c8b2a4",
+    "sensor_protocol.py": "9014bb08660c3f254a2ec7e92aa37c4ec57a289e600297bc26ff75c696a23f63",
+    "test_sensor_protocol.py": "4225781fa05a3de6b9225a0121ba79e1051c2f1946a3d6e1b168d8c0a76f99cd"
+  },
+  "independent_review": "2026-10-18: all 11 tests rerun, including native C/Python and expanded delta127/128 boundary; at most126 missed frames assumption corrected"
+}

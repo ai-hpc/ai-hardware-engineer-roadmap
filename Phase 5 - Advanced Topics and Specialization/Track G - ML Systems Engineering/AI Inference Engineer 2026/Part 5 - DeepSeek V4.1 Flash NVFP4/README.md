@@ -1,5 +1,7 @@
 # Part 5 — DeepSeek V4.1 Flash NVFP4: inference optimization engineering
 
+**2026-10-18 update:** read the [1017 release evidence and CPU exercise](Release-Update-2026-10-18.md). The ten lectures retain the earlier pinned conversion case; 1017 has new weight hashes and requires its own conversion and runtime validation.
+
 **Outcome:** build an auditable deployment decision for a named checkpoint, then optimize a supported execution path while preserving model quality.
 
 **Prerequisites:** Part 1 (execution, rooflines, precision), Part 3 (MoE and parallelism), and Part 4 Lecture 02 (measurement). You should be able to distinguish checkpoint size from peak GPU memory and TTFT from decode throughput.

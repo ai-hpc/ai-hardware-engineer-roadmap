@@ -17,15 +17,19 @@ Focused mini-courses that sit inside this module:
 - [**IoT**](IoT/Guide.md) for networking stacks like OpenThread and Zigbee
 - [**Espressif**](Espressif/Guide.md) for `arduino-esp32`, ESP32-family workflow, the official Espressif education path, and the bridge toward ESP-IDF
 
+**First, run the native C [framed telemetry lab](labs/Framed-Telemetry.md).** You will compile the actual parser, corrupt packets, split messages at every byte boundary, and test counter wrap with no MCU required. Then carry the same framing contract to UART and radio links.
+
+**Before the board lab:** run [Keep an observation fresh](../Labs/Observation-Freshness.md). Predict what happens when a 100 Hz sensor feeds a worker that can process only 40 observations per second. Its tested queue and fault contracts transfer directly to the producer-consumer project below; the simulation does not measure ISR or RTOS timing.
+
 ---
 
 ## 1. ARM Cortex-M Architecture
 
 ### Cortex-M Core Variants
 
-* **Cortex-M0/M0+, M3, M4, M7, M33/M55:** Understand differences across the family — instruction sets (Thumb, Thumb-2), presence of FPU (M4/M7), DSP extensions (M4/M7), and security extensions (TrustZone-M on M23/M33/M55).
+* **Cortex-M0/M0+, M3, M4, M7, M33/M55:** Understand differences across the family — instruction sets (Thumb, Thumb-2), optional floating-point, DSP/vector features, and the Armv8-M security extension. A core family name does not guarantee that an MCU implements every optional feature. Verify the specific part, compiler target, and enabled coprocessors.
 * **CMSIS (Cortex Microcontroller Software Interface Standard):** Master CMSIS-Core for hardware abstraction, CMSIS-DSP for signal processing, CMSIS-NN for neural network inference on Cortex-M. These libraries are how production embedded and TinyML code targets ARM hardware.
-* **ARM TrustZone-M (Cortex-M33/M55):** Hardware-enforced security partitioning — secure and non-secure worlds, secure boot, trusted execution environments (TEE). Directly relevant to IoT security and edge AI deployment.
+* **Arm TrustZone for Cortex-M:** On implementations that include the security extension, partition secure and non-secure resources. TrustZone supplies isolation mechanisms; authenticated boot, key handling, and the secure application still need implementation and review.
 
 ### Memory System and MPU
 
@@ -37,8 +41,8 @@ Focused mini-courses that sit inside this module:
 ### CPU Internals
 
 * **Instruction set:** Select the compiler target for the exact core. Cortex-M0/M0+ implement the smaller Armv6-M Thumb instruction set, including selected 32-bit instructions; they do not provide the full Armv7-M instruction set of M3/M4. Prefer CMSIS intrinsics for operations such as `__disable_irq()` and `__DSB()`.
-* **Pipeline and Interrupts:** 3-stage pipeline (M0/M3) or 6-stage with branch prediction (M7). Understand how interrupt latency is determined and how `NVIC` (Nested Vectored Interrupt Controller) manages priority and preemption.
-* **Exception Model:** HardFault, MemManage, BusFault, UsageFault — implement fault handlers that capture register state and stack trace to flash for post-mortem debugging.
+* **Pipeline and interrupts:** Measure interrupt entry and service time on the selected MCU. Flash wait states, bus contention, interrupt masking, nesting, and optional floating-point context handling affect latency. `NVIC` priorities determine which pending exception can preempt another; a clock frequency alone cannot establish a response-time bound.
+* **Exception model:** Learn which fault classes the selected core implements. Capture a bounded record of status registers and the exception frame into retained RAM when those addresses are valid. A corrupted stack can make unwinding unsafe, and flash erase/programming inside a fault handler may block or fault again. On the next boot, validate and export the record.
 
 ### RISC-V for Embedded (Comparison Track)
 
@@ -66,12 +70,12 @@ Primary references for the architecture and allocation distinctions: [Arm Cortex
 
 * **Allocation Strategies:** Static allocation (globals, BSS), stack allocation, and when (and when not) to use heap (`malloc`/`free`) in embedded. Understand fragmentation and why many embedded systems avoid dynamic allocation entirely.
 * **Memory Sections:** `.text`, `.data`, `.bss`, `.rodata` — know where code and data live in flash vs. RAM and how the linker script controls this. Critical for Cortex-M startup code and `__attribute__((section(...)))`.
-* **DMA (Direct Memory Access):** Transfer data between peripherals and memory without CPU involvement. Understanding DMA descriptors, cache coherency issues (`__DSB()`, `SCB_CleanDCache()`), and interrupt-based completion is essential for high-throughput I/O.
+* **DMA (Direct Memory Access):** Hardware moves a configured sequence of transfers; the CPU still sets up ownership, handles completion/errors, and consumes results. On non-coherent cached MCUs, follow the vendor's buffer alignment and cache-maintenance rules. A barrier orders accesses but does not clean dirty cache lines. Avoid sharing a cache line between a DMA buffer and unrelated writable data.
 
 ### Bit Manipulation and Register Access
 
 * **CMSIS-style register access:** Use vendor register definitions, `volatile` accesses, and documented masks. Avoid inventing C bitfield layouts for MMIO: allocation order and access width depend on the implementation. Read-modify-write is also incorrect for some write-one-to-clear or side-effect registers.
-* **Bit masking patterns:** `SET_BIT()`, `CLEAR_BIT()`, `READ_BIT()` macros, bit-banding on Cortex-M3/M4. Master these to write ISRs and driver code that is both correct and fast.
+* **Bit masking patterns:** `SET_BIT()`, `CLEAR_BIT()`, `READ_BIT()` macros, bit-banding only where the selected core/SoC implements it. Master these to write ISRs and driver code that is both correct and fast.
 
 ### Interrupt Service Routines (ISRs)
 
@@ -82,10 +86,10 @@ Primary references for the architecture and allocation distinctions: [Arm Cortex
 **Resources:**
 * *"C Programming for Embedded Systems"* — Kirk Zurell.
 * STM32 HAL source code — read the HAL implementation to understand how vendor drivers map to CMSIS register access.
-* ARM Application Notes: AN321 (CMSIS), AN298 (Cortex-M memory system).
+* [CMSIS-Core documentation](https://arm-software.github.io/CMSIS_6/latest/Core/index.html) plus the selected MCU reference manual and vendor cache/DMA application notes.
 
 **Projects:**
-* **Circular buffer + DMA UART:** Implement a lockless circular buffer fed by DMA in UART receive mode. Handle overflow and demonstrate zero-copy receive in an ISR.
+* **Circular buffer + DMA UART:** Start with one producer and one consumer. Record the DMA write position, detect missed wraps/overrun, and release completed spans to a task. A span cannot be reused until processing finishes. First copy into a bounded queue; attempt zero-copy only after proving this ownership rule under delayed consumers.
 * **Custom peripheral driver:** Write a bare-metal driver (no HAL) for a SPI sensor (e.g., IMU) from the datasheet, using CMSIS register access and interrupt-driven completion.
 
 ---
@@ -95,33 +99,45 @@ Primary references for the architecture and allocation distinctions: [Arm Cortex
 ### Core RTOS Concepts
 
 * **Tasks and Scheduling:** Create tasks with `xTaskCreate()`, assign priorities, and understand preemptive scheduling. Know when the scheduler runs (tick ISR, `taskYIELD()`, blocking calls).
-* **Scheduling Algorithms:** Preemptive fixed-priority, time-slicing for equal-priority tasks, and co-operative mode. Understand priority inversion and how to prevent it with priority inheritance mutexes.
+* **Scheduling Algorithms:** Preemptive fixed-priority, time-slicing for equal-priority tasks, and co-operative mode. Understand how mutex priority inheritance reduces some priority inversion. It does not prevent deadlock or prove a latency bound; keep lock hold times bounded and avoid inconsistent lock ordering.
 * **Task States:** Running, Ready, Blocked, Suspended. Trace task state transitions to diagnose scheduling issues.
 
 ### Inter-Task Communication
 
 * **Queues:** `xQueueSend()` / `xQueueReceive()` — the primary IPC mechanism. Use from both task and ISR context (`xQueueSendFromISR()`). Understand blocking with timeouts.
 * **Semaphores and Mutexes:** Binary semaphore for signaling (ISR → task), counting semaphore for resource counting, mutex for mutual exclusion with priority inheritance.
-* **Event Groups:** Synchronize multiple tasks or ISRs with bit-flags. `xEventGroupSetBits()` / `xEventGroupWaitBits()` — useful for state machines and multi-source synchronization.
-* **Stream and Message Buffers:** Efficient byte-stream or framed-message passing between tasks and ISRs, lower overhead than queues for bulk data.
+* **Event groups:** Use bits for conditions, not counted events: setting an already-set bit does not count another occurrence. Use the documented `FromISR` API in an ISR; event-group updates from an ISR are deferred through the timer service task and can fail if its command queue is full.
+* **Stream and message buffers:** Their normal concurrency contract is one writer and one reader, including ISR participants. Multiple producers need explicit serialization or a different primitive. A stream buffer preserves bytes, not application frame boundaries; use the framing lab to recover complete packets.
 
 ### Memory Management
 
 * **Heap schemes (heap_1 through heap_5):** Choose the right allocator — heap_1 (no free), heap_4 (first-fit with adjacent-free-block coalescing), heap_5 (non-contiguous regions). Monitor `xPortGetFreeHeapSize()` and `uxTaskGetStackHighWaterMark()`.
 * **Static allocation:** Use `xTaskCreateStatic()` / `xQueueCreateStatic()` to place TCBs and stacks in statically-defined arrays — avoids dynamic allocation for those RTOS objects. Application libraries may still allocate; choose an allocation policy from the product requirements and verify the whole program.
 
+### Worked timing and ownership example
+
+A sensor produces one 32-byte record every 10 ms. A UART configured for 115200 baud, 8-N-1 sends ten wire bits per byte. With the framing lab's eight bytes of overhead, one record takes `40 × 10 / 115200 = 3.47 ms` on the wire, before scheduler and driver delays. The nominal bandwidth fits; that does not prove the consumer meets its deadline. A 50 ms logging pause produces five new records. Decide whether to buffer, backpressure, or discard stale telemetry, and count every discard.
+
+Use this ownership chain: ISR acknowledges the peripheral and reports a completed buffer index; the receive task validates framing/CRC; a processing task consumes a copied record or an explicitly loaned buffer; only its owner returns that buffer to the free pool. A queue containing pointers copies the pointers, not the payload they reference.
+
+For a single-core fixed-priority example, suppose sampling needs 1 ms every 10 ms, control needs 2 ms every 10 ms, and reporting needs 3 ms every 20 ms. Their utilization is `0.1 + 0.2 + 0.15 = 0.45`. This leaves nominal CPU time, but priority, release jitter, ISR interference, and blocking still matter. Do not infer guaranteed deadlines from utilization alone. First collect execution-time and blocking bounds; then apply an appropriate schedulability analysis.
+
+**Two port traps:** Cortex-M interrupt priority numbers run in the opposite direction to FreeRTOS task priorities. An ISR calling kernel APIs must satisfy the port's `configMAX_SYSCALL_INTERRUPT_PRIORITY` rules and use `FromISR` operations. Also, base FreeRTOS task stack depth is in `StackType_t` elements, whereas ESP-IDF specifies task stack size in bytes. Read the selected port's API before copying a stack constant.
+
+References: [FreeRTOS Cortex-M interrupt rules](https://www.freertos.org/Documentation/02-Kernel/03-Supported-devices/04-Demos/ARM-Cortex/RTOS-Cortex-M3-M4), [stream-buffer API contract](https://github.com/FreeRTOS/FreeRTOS-Kernel/blob/main/include/stream_buffer.h), and [ESP-IDF FreeRTOS differences](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/freertos_idf.html).
+
 ### Configuration and Debugging
 
 * **FreeRTOSConfig.h:** Tune `configTICK_RATE_HZ`, `configMAX_PRIORITIES`, `configTOTAL_HEAP_SIZE`, `configUSE_TRACE_FACILITY`. Every option has a cost — understand the trade-offs.
 * **Runtime stats:** Enable `configGENERATE_RUN_TIME_STATS` to measure per-task CPU time. Use `vTaskList()` / `vTaskGetRunTimeStats()` for a text-format system snapshot.
 * **FreeRTOS+Trace (Tracealyzer):** Instrument your application with Percepio Tracealyzer or Segger SystemView to visualize task switching, queue operations, and interrupt latency in a timeline.
-* **Stack overflow hooks:** Enable `configCHECK_FOR_STACK_OVERFLOW` (method 1 or 2) and implement `vApplicationStackOverflowHook()` to catch overflows at runtime.
+* **Stack overflow hooks:** Enable `configCHECK_FOR_STACK_OVERFLOW` (method 1 or 2) and implement `vApplicationStackOverflowHook()` as runtime diagnostics. These checks are not a proof that every stack corruption will be detected before damage.
 
 **Resources:**
 * *"Using the FreeRTOS Real Time Kernel: A Practical Guide"* — Richard Barry. The canonical reference.
 * *"Mastering the FreeRTOS Real Time Kernel"* — Dr. Richard Barry (FreeRTOS official book, free PDF).
 * FreeRTOS official documentation: freertos.org — kernel reference, porting guide, API docs.
-* Percepio Tracealyzer / Segger SystemView — free tiers available for tracing.
+* Percepio Tracealyzer / Segger SystemView — check the supported target, trace transport, and current license terms.
 
 **Projects:**
 * **Producer-consumer pipeline:** Two tasks communicating via queue — one reads a sensor over SPI, another processes and formats output over UART. Validate with Tracealyzer that no deadlock or starvation occurs.
@@ -135,13 +151,13 @@ Primary references for the architecture and allocation distinctions: [Arm Cortex
 ### Protocol Specifications
 
 * **Timing and Modes (CPOL/CPHA):** Understand the 4 SPI modes in detail — clock polarity (CPOL) and phase (CPHA) — and trace timing diagrams for each. Know which mode a specific sensor uses before writing a driver.
-* **Data Framing:** Byte-oriented, word-oriented, and variable-length transfers. Endianness (MSB-first vs. LSB-first), chip select (CS) management, and bus sharing in multi-device configurations.
+* **Data framing:** Separate bit order (MSB-first/LSB-first within a word) from byte order (endianness of a multi-byte value). Match CPOL/CPHA, word width, byte layout, and chip-select timing to the device datasheet. A correct bit order does not imply a correct 16-bit sensor value.
 * **SPI Device Addressing:** CS line per device vs. daisy-chaining. Understand glitch-free CS assertion and timing constraints from device datasheets.
 
 ### Driver Implementation
 
 * **Bare-metal SPI driver:** Configure SPI peripheral registers (CR1/CR2, DR, SR on STM32), poll or use interrupts for TX/RX completion. Write a generic `spi_transfer(uint8_t *tx, uint8_t *rx, size_t len)` API.
-* **DMA-driven SPI:** Use DMA for both TX and RX to achieve maximum throughput without blocking the CPU. Handle cache coherency and ensure DMA complete callback wakes the waiting task.
+* **DMA-driven SPI:** Arrange TX and RX together for full-duplex clocks, including dummy TX bytes when receiving. DMA completion can mean the last word entered a peripheral FIFO, not that its final bit left the pin. Wait for the documented peripheral end-of-transfer/busy condition before releasing CS or reusing a buffer.
 * **Linux SPI driver (spidev):** Write a userspace driver using `/dev/spidev*` for development and prototyping. Understand when to move to a kernel driver for production.
 
 ### FPGA Implementation
@@ -165,7 +181,7 @@ Primary references for the architecture and allocation distinctions: [Arm Cortex
 ### Driver Implementation
 
 * **Interrupt-driven UART with circular buffer:** TX and RX paths each backed by a circular buffer. ISR fills/drains the buffer; application reads/writes without blocking.
-* **DMA UART receive:** Use DMA in circular mode for RX to capture incoming bytes without per-byte interrupts. Use half-complete and complete DMA callbacks plus idle-line detection to handle variable-length frames.
+* **DMA UART receive:** Use DMA in circular mode for RX to capture incoming bytes without per-byte interrupts. Use half-complete and complete DMA callbacks plus idle-line detection to find newly received spans. An idle event is not a universal application-packet boundary; preserve protocol framing and detect overwritten spans.
 * **UART with FreeRTOS:** Protect the TX buffer with a mutex, signal received frames via queue or stream buffer to a processing task. Demonstrate zero-copy receive with direct-to-task DMA.
 
 **Projects:**
@@ -180,14 +196,14 @@ Primary references for the architecture and allocation distinctions: [Arm Cortex
 ### Protocol Specifications
 
 * **Bus mechanics:** START/STOP conditions, ACK/NACK, 7-bit and 10-bit addressing, clock stretching. Understand how clock stretching can cause timeout issues with strict masters.
-* **Multi-master and multi-slave:** Arbitration loss detection, bus error handling. Know how to avoid bus lockup (stuck SDA) and implement recovery (9-clock pulse procedure).
+* **Multiple controllers/targets:** Handle arbitration loss and bus errors. If SDA is stuck low while SCL can be released, the I2C specification describes up to nine recovery clocks. SCL stuck low or a target that does not release SDA may require a hardware reset or power cycle. Bound recovery and avoid interfering with another active controller.
 * **Speed grades:** Standard (100 kHz), Fast (400 kHz), Fast-Plus (1 MHz), High-Speed (3.4 MHz). Understand pull-up resistor sizing vs. capacitance vs. speed.
 
 ### Driver Implementation
 
-* **Interrupt + DMA I2C driver:** Avoid polling — use interrupt-based or DMA-based transfers with a FreeRTOS semaphore to block the calling task until completion.
-* **I2C device scanning and probing:** Implement a bus scan to enumerate device addresses. Use for board bring-up and diagnostics.
-* **Error handling and recovery:** Implement bus timeout detection and software reset. Handle NACK on address (device not present) and NACK on data (overrun) gracefully.
+* **I2C driver:** Begin with a bounded polling transfer to simplify bring-up. Move to interrupts or DMA when latency/CPU measurements justify it. Every wait has a timeout; the completion result distinguishes success, address NACK, arbitration loss, and bus error.
+* **I2C probing:** Start with the expected device address and a documented identity-register read. A blind scan is not harmless for every device: address-only transfers, reserved addresses, and register writes may have side effects. Confirm whether an API expects a 7-bit address or an already-shifted address byte.
+* **Error handling and recovery:** Log the transfer phase and status. An address NACK may mean absent, unpowered, or temporarily busy; a data NACK is device/protocol specific, not necessarily overrun. The controller normally NACKs the last byte of a read to finish it.
 
 **Projects:**
 * **Multi-sensor I2C hub:** Interface with 3+ sensors (e.g., BME280 environment, MPU-6050 IMU, VL53L0X ToF distance) on the same I2C bus. Implement a FreeRTOS task per sensor with priority-based polling.
@@ -200,9 +216,9 @@ Primary references for the architecture and allocation distinctions: [Arm Cortex
 ### Protocol Specifications
 
 * **Frame types:** Data frame, remote frame, error frame, overload frame. Understand the CAN frame fields: SOF, arbitration ID (11-bit standard / 29-bit extended), DLC, data (0–8 bytes), CRC, ACK.
-* **Bus arbitration:** Non-destructive bitwise arbitration — lower ID wins. Understand dominant/recessive bit levels and why CAN is robust to node failures.
+* **Bus arbitration:** Non-destructive bitwise arbitration — lower ID wins. Understand dominant/recessive bit levels and fault confinement. A stuck physical line or transceiver can still disrupt the bus; protocol error handling does not eliminate every hardware fault.
 * **Error handling:** CAN error counters (TEC/REC), error states (error-active, error-passive, bus-off), and automatic retransmission. Know when and how to recover from bus-off.
-* **CAN FD:** Extended payload (up to 64 bytes), higher bit rate in the data phase (up to 8 Mbps). Understand the flexible data-rate frame format and controller requirements (FDCAN peripheral on STM32G0/H7).
+* **CAN FD:** Up to 64 data bytes and an optional faster data phase. The usable bit rates depend on controller/transceiver limits, cable length, topology, and timing configuration; 8 Mbit/s is not a universal protocol guarantee. CAN FD has no remote frames. Check the exact MCU part, since not every member of a product family has FDCAN.
 
 ### Higher-Layer Protocols
 
@@ -219,14 +235,14 @@ Primary references for the architecture and allocation distinctions: [Arm Cortex
 **Resources:**
 * *"Controller Area Network Projects"* — Wilfried Voss. Practical CAN protocol guide.
 * *"A Comprehensible Guide to J1939"* — Wilfried Voss.
-* CANopen specification (CiA 301) — free download from CAN in Automation.
+* CANopen specifications and application notes from CAN in Automation; check the access terms for the required document.
 * STM32 CAN/FDCAN reference manual + application notes (AN5348 FDCAN).
 
 **Projects:**
 * **CAN network with two nodes:** Two microcontrollers on a CAN bus exchanging sensor data (e.g., IMU + temperature). Implement proper termination, filter configuration, and error-frame detection.
 * **OBD-II reader (J1979):** Send OBD-II PIDs over CAN to a vehicle (or simulator) and parse responses for engine RPM, vehicle speed, coolant temperature.
 * **CANopen slave node:** Implement a minimal CANopen slave — heartbeat, NMT state machine, and at least one TPDO mapping sensor data. Use an open-source stack (e.g., CANopenNode).
-* **ISO-TP layer:** Implement ISO 15765-2 segmented transfer to send/receive payloads up to 4095 bytes over CAN. Validate with a UDS diagnostic request (SID 0x22 ReadDataByIdentifier).
+* **ISO-TP layer:** Begin with the classic 12-bit length format (up to 4095 bytes) and bounded reassembly. Later ISO-TP formats support larger lengths, so negotiate/document the supported format rather than treating 4095 as a universal maximum. Validate sequence, flow-control limits, timeout, and buffer exhaustion against a simulator.
 
 ---
 
@@ -242,12 +258,12 @@ Primary references for the architecture and allocation distinctions: [Arm Cortex
 
 * **Bootloader design:** Understand MCUboot — image slots (primary, secondary), signature verification (RSA/ECDSA), and the swap/overwrite update mechanism. Know how to chain from ROM bootloader → MCUboot → application.
 * **A/B or slot-based updates:** Write the inactive slot, authenticate the image, request a test boot, and confirm only after health checks. Rollback and power-loss behavior depend on the bootloader’s configured strategy; two slots alone do not make the entire update atomic.
-* **OTA transport:** BLE DFU (Nordic NRF5 SDK / Zephyr), MQTT/HTTP over Wi-Fi, cellular (LwM2M/CoAP). Implement delta updates (BSDiff) to reduce payload size.
+* **OTA transport:** BLE DFU (for example, nRF Connect SDK / Zephyr), MQTT/HTTP over Wi-Fi, cellular (LwM2M/CoAP). Implement delta updates (BSDiff) to reduce payload size.
 
 **Resources:**
-* MCUboot documentation (mcuboot.com) — supports Zephyr, nRF Connect SDK, Mbed OS.
+* [MCUboot documentation](https://docs.mcuboot.com/) — start with the integration for your supported RTOS and MCU.
 * *"Embedded Software Primer"* — David Simon.
-* Mender.io — open-source OTA framework for both Linux and MCU targets.
+* Mender — an OTA platform whose supported client, device integration, licensing, and update-module requirements must be checked for the chosen target; do not assume a Linux client runs on a bare MCU.
 
 **Projects:**
 * **Secure bootloader:** MCUboot-compatible bootloader for Cortex-M4 with RSA-2048 signature verification and A/B image slots.

@@ -1,0 +1,22 @@
+/dts-v1/;
+
+/ {
+    compatible = "course,simulated-board";
+    #address-cells = <1>;
+    #size-cells = <1>;
+
+    i2c0: i2c@1000 {
+        compatible = "course,simulated-i2c";
+        reg = <0x1000 0x100>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+        status = "disabled";
+
+        sensor0: sensor@48 {
+            compatible = "course,synthetic-sensor";
+            reg = <0x48>;
+            status = "disabled";
+            sample-rate-hz = <100>;
+        };
+    };
+};

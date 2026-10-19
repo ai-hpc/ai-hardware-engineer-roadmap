@@ -74,7 +74,7 @@ Compare what a fully-expanded BF16 cache would need against what the shared late
 
 ## 3. The algebra that avoids re-expanding history
 
-The memory win in §2 would be worthless if computing attention still required materializing every historical token's full-size `k_{t,h}` and `v_{t,h}` from the cached latents at every step — you'd be trading a smaller cache for a larger recompute. MLA avoids this with an algebraic reshuffling.
+Materializing historical keys and values preserves the persistent-cache saving, but adds projection work and temporary storage. The pinned Transformers CPU reference does expand them. An optimized absorbed path can avoid that expansion using the algebra below. Which path is faster depends on shape, backend, precision and batching; the [lab](CPU-Hybrid-State-Lab.md) checks equivalence before any performance claim.
 
 **For the score.** A query-key dot product against a cached historical token `j`:
 
@@ -197,6 +197,8 @@ This is **Stage 4 of the [capstone ladder](Lecture-12.md)**: build an **MLA equi
 ---
 
 ## Current as of
+
+**Reviewed October 18, 2026.** [Pinned config, upstream code and CPU evidence](CPU-Hybrid-State-Lab.md#sources-and-execution-boundary) identify what was checked. Hardware capacity and throughput remain deployment-specific.
 
 * **Timeless:** the latent-caching idea and the score/value absorption algebra — this is the joint low-rank compression and "absorb the up-projection into the query/output" technique from the DeepSeek-MLA line of work, applied here to this checkpoint's specific dimensions.
 * **Checkpoint-specific:** KV latent width 512, 64 main heads, 256-dim main K/Q/V heads, NoPE on the main path — verify against the actual checkpoint config before reusing these constants.

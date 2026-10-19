@@ -1,0 +1,50 @@
+{
+  "checked_on": "2026-10-18",
+  "scope": "actual BitBake metadata parse and evaluated image environment; no target compile, image build, flash, or boot",
+  "host": {
+    "os": "Ubuntu 24.04.4 x86_64",
+    "python": "3.12.3",
+    "bitbake": "2.8.1"
+  },
+  "poky": {
+    "tag": "yocto-5.0.20",
+    "commit": "64e69ed23703f6358ec431d3f5f1f8483f974cae"
+  },
+  "meta_tegra": {
+    "branch": "scarthgap",
+    "commit": "6d7cc8f27e8b3bda2abfa68b2fcfe8d6ecf10464"
+  },
+  "parse": {
+    "recipes": 1105,
+    "targets": 2137,
+    "skipped": 64,
+    "masked": 0,
+    "errors": 0
+  },
+  "effective_image_values": {
+    "MACHINE": "jetson-orin-nano-devkit",
+    "TARGET_ARCH": "aarch64",
+    "IMAGE_INSTALL": "packagegroup-core-boot  observation-check",
+    "IMAGE_FSTYPES": " tegraflash",
+    "TNSPEC_BOOTDEV_DEFAULT": "mmcblk0p1",
+    "PARTITION_LAYOUT_TEMPLATE_DEFAULT": "flash_t234_qspi_sd.xml"
+  },
+  "layer_sha256": {
+    "README.md": "2e1e7c20b151bcd75ebcddaf25d236335957b868dca5443177e4603ed0a07bd6",
+    "conf/layer.conf": "31aa6b1c60ec7af1ed042d06eee37b94f4b455edbcd5b28df7e424a7c2218a85",
+    "recipes-apps/observation-check/files/LICENSE": "f299df5bc330439bfc955963c958595083121e292ad7a73f07d92260d38fb871",
+    "recipes-apps/observation-check/files/observation-check.c": "180d4503ce4592866ac2ff85d750eaadb4dc518b7873875f195f3eeeeecc74cf",
+    "recipes-apps/observation-check/observation-check_1.0.bb": "f6229e041645d9eecbd84fb2b092d48412f63957f8224d345e5118b5639b491b",
+    "recipes-core/images/robot-course-image.bb": "8c5f78a8463295db0f8e8a2ae84fccc43df9238c6d9d93cdadd07f7d04443b81"
+  },
+  "configuration_sha256": {
+    "local.conf": "8a11e5396e2c7f3a32b5fce9699b042b995b2f160c250a0052cbc9762ecb4dc2",
+    "bblayers.conf": "8858ae2266a5aa3c32bd8ebb1573d012a128b8c55ba30bc417f92e19c6ae4eb5"
+  },
+  "parse_log": [
+    "Loading cache...done.",
+    "Loaded 0 entries from dependency cache.",
+    "Parsing recipes...done.",
+    "Parsing of 1105 .bb files complete (0 cached, 1105 parsed). 2137 targets, 64 skipped, 0 masked, 0 errors."
+  ]
+}

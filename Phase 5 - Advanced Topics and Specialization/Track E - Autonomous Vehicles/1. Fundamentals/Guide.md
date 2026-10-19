@@ -1,141 +1,86 @@
-# Module 1 — Autonomous Driving Fundamentals
+# Module 1 — Understand a vehicle before choosing its AI
 
-<div class="course-identity auto-course" style="--course-accent: #db2777; --course-accent-rgb: 219, 39, 119;" markdown="1">
-<div class="course-identity__icon">MADF</div>
-<div markdown="1">
-<p class="course-identity__eyebrow">Deep Dive · Specialization</p>
-<p class="course-identity__title">Specialized course identity for Module 1 — Autonomous Driving Fundamentals.</p>
-<p class="course-identity__meta">Artifact: specialization case study · Measure: performance, reliability, role fit</p>
-</div>
-</div>
+**Before:** Python, vectors, trigonometry and [robotics foundations](../../Track%20D%20-%20Robotics/Robotics%20Foundations/README.md). **First milestone:** 3–5 hours including the CPU lab. **Later depth:** perception, planning and dynamic vehicle models each need separate projects. A GPU is optional for the first milestone.
 
+A driving system needs estimates of the world, predictions of how it may change, a feasible trajectory, and commands that the actuators can follow. A visually plausible lane overlay does not prove any of the later steps. We will start with a known geometric state, make a small controller work, then expose the timing and model-contract failures that a learned perception system introduces.
 
-**Parent:** [Phase 5 — Autonomous Driving](../Guide.md)
+## 1. Define the quantities before the algorithm
 
-**Time:** 3–4 months
+Use a ground-fixed planar world and a rear-axle vehicle reference. In the vehicle frame x points forward and y left. The state is `(x, y, yaw, speed)` in metres, radians and metres/second. A road-wheel steering angle is `delta`; wheelbase is `L`. Steering-wheel angle, commanded motor torque, curvature and normalized simulator steering are different quantities.
 
-**Prerequisites:** Phase 3 (Computer Vision, Sensor Fusion), Phase 1 §4 (C++/CUDA).
+| Boundary | Example output | Required interpretation |
+|---|---|---|
+| Perception | A lane curve, object box, or depth estimate | Coordinate frame, calibration, capture time, uncertainty |
+| Prediction | Several possible future trajectories | Time samples, probabilities, agent identity |
+| Planning | A selected time-parameterized path | Collision checks, limits, start time, feasibility |
+| Control | Steering/acceleration requests | Units, saturation, rate limits, update age |
+| Vehicle interface | Platform-specific actuator commands | Encoding, actuator dynamics, independent limits |
 
----
+A path is geometry; a trajectory also specifies when positions are reached. A collision-free geometric path can still require impossible steering, acceleration or stopping behavior.
 
-## Why this comes first
+## 2. Work the bicycle model
 
-Before studying openpilot's codebase or advanced research, you need the foundational vocabulary: how autonomous vehicles perceive, plan, and control. This module covers the algorithms and theory that every ADAS engineer uses daily.
+At low slip, the rear-axle kinematic bicycle gives:
 
----
+```text
+x_dot = v cos(yaw)
+y_dot = v sin(yaw)
+yaw_dot = v tan(delta) / L
+v_dot = acceleration
+curvature = tan(delta) / L
+```
 
-## 1. Computer Vision for Driving
+At `L=2.8 m`, `v=5 m/s` and `delta=atan(2.8/10)≈0.273 rad`, the turn radius is 10 m and yaw rate is 0.5 rad/s. Approximate lateral acceleration is `v²/radius=2.5 m/s²`. Doubling speed while keeping steering produces four times the lateral acceleration. Geometric steering alone does not enforce tire-force limits.
 
-* **Lane detection:**
-    * Traditional: Hough transform, sliding window, IPM (inverse perspective mapping).
-    * Deep learning: LaneNet, SCNN, U-Net for lane segmentation.
-    * Output: polylines or polynomial coefficients for lane boundaries.
+The [CPU implementation](labs/vehicle_lab.py) integrates a held-angle arc and held acceleration, with no reversing. It has no slip, tire relaxation, load transfer, road bank or actuator lag. A dynamic bicycle model instead includes lateral velocity/yaw dynamics and tire forces. Use one when the experiment requires those effects; adding parameters without identification does not make the model accurate.
 
-* **Object detection:**
-    * 2D: YOLO family, CenterNet, FCOS — bounding boxes for vehicles, pedestrians, cyclists.
-    * 3D: PointPillars, SECOND (LiDAR); FCOS3D (monocular); DETR3D (multi-camera).
-    * Bird's Eye View (BEV): lifting 2D camera features to BEV space for unified 3D detection.
+**Check:** with zero steering, initial speed 2 m/s, acceleration 1 m/s² and duration 2 s, displacement is 6 m and final speed 4 m/s. With braking −4 m/s² from 2 m/s, the vehicle stops after 0.5 s and 0.5 m; it must not continue backwards for the remainder of the step.
 
-* **Semantic segmentation:**
-    * Drivable area, lane markings, curbs, obstacles.
-    * Models: DeepLab, SegFormer, lightweight edge variants.
-    * Panoptic segmentation: combining semantic + instance for complete scene understanding.
+## 3. Derive pure pursuit with a signed example
 
-* **Depth estimation:**
-    * Monocular depth (MiDaS, DepthAnything) — useful when no LiDAR is available.
-    * Stereo matching: classic block matching, deep stereo (AANet, RAFT-Stereo).
+Transform a lookahead target into the rear-axle frame, obtaining forward distance `x_t>0` and left distance `y_t`. The circle through that point tangent to the vehicle's heading has:
 
-**Projects:**
-* Implement lane detection on a dashcam video using both Hough transform and a U-Net. Compare robustness in curves, shadows, and night.
-* Train a YOLO model on KITTI or nuScenes for 2D vehicle detection. Measure mAP and inference FPS on Jetson.
+```text
+curvature = 2*y_t / (x_t² + y_t²)
+delta = atan(L * curvature)
+```
 
----
+For `(x_t,y_t)=(4,2)` m and `L=2.8`, curvature is 0.2/m and steering is `atan(0.56)≈0.510 rad` before saturation. A target to the right has negative `y_t` and produces negative steering. A point behind the vehicle is outside this forward-tracking exercise's contract.
 
-## 2. Planning and Decision Making
+A longer lookahead often smooths response but can cut corners; a shorter one responds more strongly and can oscillate with delay. Neither setting supplies obstacle avoidance. The original [pure-pursuit report](https://www.ri.cmu.edu/publications/implementation-of-the-pure-pursuit-path-tracking-algorithm/) explains the geometric construction.
 
-* **Behavior planning:**
-    * High-level decisions: lane keep, lane change, merge, turn, stop.
-    * Finite state machines (FSM) and behavior trees.
-    * Rule-based vs. learning-based behavior planning.
+For the lab's straight lane, use a world target 8 m forward on `y=0`, then transform it with the current yaw. Limit the requested road-wheel angle and its rate. The speed loop requests `a=clamp(v_target-v, -3, 2)` in this chosen fixture. It is proportional speed tracking, not a full adaptive-cruise controller.
 
-* **Motion planning:**
-    * Path planning: A*, RRT, RRT*, hybrid A* (for non-holonomic vehicles).
-    * Trajectory optimization: minimize jerk/acceleration while avoiding collisions.
-    * Frenet frame: decompose planning into longitudinal (speed) and lateral (lane offset) components.
-    * Lattice planners: discretize trajectory space, evaluate candidates against cost functions.
+## 4. Account for stopping and observation age
 
-* **Prediction:**
-    * Constant velocity / constant turn-rate models (baseline).
-    * Learning-based: TNT, LaneGCN, MTR — multi-modal trajectory prediction.
-    * Interaction-aware: graph neural networks for modeling agent-agent interactions.
-    * Map-conditioned: use lane geometry and traffic rules to constrain predictions.
+Under constant speed during delay `tau`, followed by constant braking magnitude `b>0` on level ground:
 
-**Projects:**
-* Implement RRT* for path planning in a 2D grid with obstacles. Extend to a bicycle model for non-holonomic constraints.
-* Build a simple behavior FSM: CRUISE → FOLLOW → LANE_CHANGE → STOP. Test in CARLA with traffic.
+```text
+stopping distance = v*tau + v²/(2*b)
+```
 
----
+At 10 m/s, 0.1 s delay and 4 m/s² braking, this is **13.5 m**, including 1 m traveled during the delay. The formula excludes brake buildup, grade, friction variation and moving obstacles. It is a useful lower-complexity calculation, not a stopping guarantee.
 
-## 3. Control Theory for Autonomous Vehicles
+A constant-velocity time-to-collision baseline for bumper gap `g` is `g/(v_ego-v_lead)` only when the closing speed is positive. At 20 m gap and speeds 10 versus 6 m/s, TTC is 5 s. No positive closing speed means no finite collision time under that model; it does not mean the situation is safe under future braking or turns.
 
-* **Vehicle dynamics:**
-    * Bicycle model: front/rear axle, slip angle, yaw rate.
-    * Tire models: linear cornering stiffness, Pacejka magic formula (overview).
-    * Vehicle state estimation: combine IMU + wheel odometry + GPS for localization.
+Keep capture time, inference completion, publication and application time separate. A fresh publication can contain an old image. At a 20 Hz model rate, an observation arrives every 50 ms in the ideal schedule; a 100 Hz controller may reuse it across several updates. Neither rate alone is an acquisition-to-actuation bound.
 
-* **Lateral control:**
-    * **Stanley controller:** cross-track error + heading error, a useful geometric baseline from early autonomous-driving research; inspect the selected openpilot release for its actual lateral controller.
-    * **Pure pursuit:** geometric path following using a lookahead point.
-    * **MPC (Model Predictive Control):** optimize a sequence of steering commands over a horizon, subject to dynamics constraints.
+Run the [worked CPU lab](Lab-Guide.md), then the optional [CARLA frame synchronization lab](CARLA-Lab.md). The latter explicitly converts simulator coordinates and distinguishes normalized `steer` from wheel radians.
 
-* **Longitudinal control:**
-    * PID for speed tracking (adaptive cruise control).
-    * MPC for combined speed + following distance.
-    * Jerk-limited profiles for passenger comfort.
+## 5. Add perception only after the state contract works
 
-* **Combined lateral + longitudinal:**
-    * LQR (Linear Quadratic Regulator) for path tracking with speed control.
-    * Cascaded MPC: separate lateral/longitudinal MPC with coordination.
+Begin with a metric baseline and a fixed split. For lane estimation, annotate the representation: image pixels, ground-plane points or polynomial coefficients in metres. An inverse-perspective transform assumes a calibrated camera and a road surface model; hills violate the flat-ground assumption. Monocular depth outputs may need a metric-scale calibration and can be ambiguous.
 
-**Projects:**
-* Implement a Stanley controller for lane following in CARLA. Tune gains for different speeds.
-* Implement PID-based ACC (Adaptive Cruise Control): maintain target speed, slow for lead vehicle, stop-and-go. Test in CARLA.
-* (Advanced) Implement a simple MPC for combined lateral + longitudinal control. Compare smoothness and tracking error vs Stanley + PID.
+Compare a classical lane detector with a learned segmentation model on whole held-out drives, not neighboring video frames randomly divided between train and test. Report lateral error at named lookahead distances, missing-lane frequency and acquisition age. A segmentation IoU or detector mAP does not directly measure whether a controller can follow the road.
 
----
+For obstacles, retain track identity, frame, covariance or another calibrated uncertainty representation, and time. Predict a constant-velocity baseline before a learned multimodal predictor. Score displacement error and missed modes separately. The average of “pass left” and “pass right” trajectories can pass through the obstacle; a mean prediction need not be a feasible behavior.
 
-## Resources
+## 6. Progress from paths to feasible trajectories
 
-| Resource | Why |
-|----------|-----|
-| [CARLA Simulator](https://carla.org/) | Test all algorithms in simulation before touching real hardware |
-| *Autonomous Driving in the Real World* (Shaoshan Liu et al.) | Comprehensive AV textbook |
-| [Apollo Auto](https://github.com/ApolloAuto/apollo) | Reference full-stack AV for architectural comparison |
-| [KITTI](http://www.cvlibs.net/datasets/kitti/) / [nuScenes](https://www.nuscenes.org/) | Benchmark datasets |
-| Phase 3 — Computer Vision, Sensor Fusion | Prerequisite modules in this roadmap |
+A*/RRT can establish a geometric route under their chosen state space and collision model. Vehicle steering constraints need a suitable state representation and motion primitives, such as a lattice or hybrid search. Then assign timing and check steering, speed, acceleration, curvature and collision along the swept footprint between samples.
 
----
+For MPC, define the state, control, dynamics, horizon, objective and constraints before selecting a solver. A failed optimization needs an explicit outcome; returning zero steering without reasoning is not a generic solution. Study the [executed LQR/MPC and trajectory lessons](../../Track%20D%20-%20Robotics/Robot%20Dynamics%20and%20Task%20Execution/README.md) for worked feasibility counterexamples.
 
-## Next
+**Independent transfer:** replace the straight target with a gentle arc. Establish the expected curvature and steering analytically, then test low speed, higher speed and observation delay. Report tracking, steering-rate saturation and lateral acceleration. Keep the tire model's validity as an explicit limitation.
 
-→ **[Module 2 — openpilot Reference Stack](../2.%20openpilot%20Reference%20Stack/Guide.md)** — Study a real, production-deployed ADAS end-to-end.
-
-## Worked bridge: a delayed measurement becomes a control error
-
-At a simulated 10 m/s, an extra 100 ms of observation age corresponds to 1 m of forward travel before the controller uses the observation. This is a kinematic illustration, not a complete stopping-distance model. A faster detector can still make the system worse if batching increases that age.
-
-In one CARLA scenario, log sensor time, inference completion, controller update, and applied command time on a common clock. Add a known delay and compare cross-track error, missed deadlines, and minimum separation against the original run. Keep the route, seed, speed, and controller gains fixed. Carry the timestamped trace into [Module 2](../2.%20openpilot%20Reference%20Stack/Guide.md) and identify where an equivalent delay could enter a real process boundary.
-
-## Practice and assessment
-
-**Entry diagnostic (prerequisite check):** Trace perception, prediction, planning, and control with frames and timestamps. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
-
-1. **Baseline lab:** Evaluate a small recorded or simulated driving scenario against a simple baseline.
-2. **Guided variation:** Perturb timing or sensor availability and inspect failure handling in replay/simulation.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
-
-**Evidence to submit:** Task/trajectory error, latency, collision/constraint outcomes in simulation, and scenario coverage. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+**Ready for Module 2:** explain the first steering sign, reproduce both delay runs, distinguish a successful fallback from successful lane following, and interpret a model output's shape/units. Continue with [openpilot source ownership](../2.%20openpilot%20Reference%20Stack/Guide.md).

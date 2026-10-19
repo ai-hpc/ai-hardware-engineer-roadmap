@@ -1,13 +1,10 @@
-// attention.cu — Flash Attention decode (single query) for Orin SM 8.7
-//
-// BUG #6 FIX: proper per-dimension accumulator using shared memory output buffer
-// instead of broken acc[d % 4]. Each thread handles head_dim / blockDim.x dimensions.
-//
-// One block per query head. Tiles KV in chunks of 64.
-// Online softmax: never materializes full seq×seq attention matrix.
-// Supports GQA and INT8 KV cache.
+// Single-query tiled online attention. Compiled for SM 8.7; no throughput claim.
+// One block per query head, token-major K/V, FP32 dot/softmax accumulation.
+// Optional INT8 kernel input requires explicit fixed per-K/V-head scales; the
+// Engine's appendable cache remains FP16-only (no calibrated INT8 storage).
 
 #include "jllm_kernels.h"
+#include "jllm_attention_layout.h"
 #include <cuda_fp16.h>
 #include <cfloat>
 
@@ -30,6 +27,7 @@ __global__ void flash_attention_decode_kernel(
     const int head = blockIdx.x;
     const int kv_head = head / (n_heads / n_kv_heads);  // GQA
     const int tid = threadIdx.x;
+    __shared__ float warp_values[ATTN_BLOCK / 32];
 
     // Shared memory layout:
     //   s_scores[ATTN_TILE_KV]     — attention scores for current KV tile
@@ -63,11 +61,11 @@ __global__ void flash_attention_decode_kernel(
                 float k_val;
                 if (kv_int8) {
                     const int8_t* ki = (const int8_t*)k_cache;
-                    float ks = kv_scales ? kv_scales[kv_head] : 1.0f;
-                    k_val = ki[(int64_t)kv_head * seq_len * head_dim + kv_pos * head_dim + d] * ks;
+                    float ks = kv_scales[kv_head];
+                    k_val = ki[kv_element_offset(kv_pos, kv_head, d, n_kv_heads, head_dim)] * ks;
                 } else {
                     const half* kf = (const half*)k_cache;
-                    k_val = __half2float(kf[(int64_t)kv_head * seq_len * head_dim + kv_pos * head_dim + d]);
+                    k_val = __half2float(kf[kv_element_offset(kv_pos, kv_head, d, n_kv_heads, head_dim)]);
                 }
                 dot += q_val * k_val;
             }
@@ -85,12 +83,14 @@ __global__ void flash_attention_decode_kernel(
         for (int off = 16; off > 0; off >>= 1)
             tile_max = fmaxf(tile_max, __shfl_xor_sync(0xFFFFFFFF, tile_max, off));
 
-        __shared__ float smax;
-        if (tid == 0) smax = -FLT_MAX;
+        if (tid % 32 == 0) warp_values[tid / 32] = tile_max;
         __syncthreads();
-        if (tid % 32 == 0) atomicMax((int*)&smax, __float_as_int(tile_max));
-        __syncthreads();
-        tile_max = smax;
+        // IEEE-754 negative floats do not have signed-integer max ordering.
+        // All threads read the same four warp maxima using floating comparison.
+        tile_max = -FLT_MAX;
+        for (int warp = 0; warp < ATTN_BLOCK / 32; ++warp)
+            tile_max = fmaxf(tile_max, warp_values[warp]);
+        __syncthreads(); // no warp may overwrite the reduction workspace early
 
         // Correction factor for running max update
         float old_max = running_max;
@@ -116,12 +116,13 @@ __global__ void flash_attention_decode_kernel(
         for (int off = 16; off > 0; off >>= 1)
             tile_sum += __shfl_xor_sync(0xFFFFFFFF, tile_sum, off);
 
-        __shared__ float ssum;
-        if (tid == 0) ssum = 0.0f;
+        if (tid % 32 == 0) warp_values[tid / 32] = tile_sum;
         __syncthreads();
-        if (tid % 32 == 0) atomicAdd(&ssum, tile_sum);
+        float block_sum = 0.0f;
+        for (int warp = 0; warp < ATTN_BLOCK / 32; ++warp)
+            block_sum += warp_values[warp];
         __syncthreads();
-        running_sum += ssum;
+        running_sum += block_sum;
 
         // ── Step 3: Accumulate P × V (BUG #6 FIX — per-dimension) ──
         // Each thread handles its slice of head_dim
@@ -132,11 +133,11 @@ __global__ void flash_attention_decode_kernel(
                 float v_val;
                 if (kv_int8) {
                     const int8_t* vi = (const int8_t*)v_cache;
-                    float vs = kv_scales ? kv_scales[n_kv_heads + kv_head] : 1.0f;
-                    v_val = vi[(int64_t)kv_head * seq_len * head_dim + kv_pos * head_dim + d] * vs;
+                    float vs = kv_scales[n_kv_heads + kv_head];
+                    v_val = vi[kv_element_offset(kv_pos, kv_head, d, n_kv_heads, head_dim)] * vs;
                 } else {
                     const half* vf = (const half*)v_cache;
-                    v_val = __half2float(vf[(int64_t)kv_head * seq_len * head_dim + kv_pos * head_dim + d]);
+                    v_val = __half2float(vf[kv_element_offset(kv_pos, kv_head, d, n_kv_heads, head_dim)]);
                 }
                 val += s_scores[t] * v_val;
             }
@@ -152,11 +153,15 @@ __global__ void flash_attention_decode_kernel(
     }
 }
 
-void flash_attention_decode(
+cudaError_t flash_attention_decode(
     half* output, const half* q, const void* k_cache, const void* v_cache,
     int n_heads, int n_kv_heads, int head_dim, int seq_len,
     float scale, bool kv_int8, const float* kv_scales, cudaStream_t stream)
 {
+    if (!output || !q || !k_cache || !v_cache
+        || !attention_shape_valid(n_heads, n_kv_heads, head_dim, seq_len, scale)
+        || (kv_int8 && !kv_scales))
+        return cudaErrorInvalidValue;
     // Shared memory: scores[TILE_KV] + output[head_dim]
     int smem = (ATTN_TILE_KV + head_dim) * sizeof(float);
 
@@ -164,6 +169,7 @@ void flash_attention_decode(
         output, q, k_cache, v_cache,
         n_heads, n_kv_heads, head_dim, seq_len,
         scale, kv_int8, kv_scales);
+    return cudaGetLastError(); // launch status only; execution is asynchronous
 }
 
 }  // namespace jllm

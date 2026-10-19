@@ -1,0 +1,42 @@
+{
+  "torch_version": "2.14.0+cpu",
+  "device": "cpu",
+  "upstream_source": {
+    "url": "https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/glm5_next/modeling_glm5_next.py",
+    "sha256": "78e23c624010751f1578254145f313db2f3266579a0f9a396a3ff6cb5779f43d",
+    "local_snapshot": null
+  },
+  "chunk_comparisons": 64,
+  "sequence_lengths": [
+    1,
+    3,
+    4,
+    5,
+    7,
+    8,
+    9,
+    65
+  ],
+  "pool_visibility_and_tail_comparisons": 72,
+  "weighted_and_mixed_pooling": {
+    "nonuniform_hand_example": 1,
+    "mixed_batch_pool_slots": 6,
+    "mixed_batch_multiquery_tails": 9,
+    "includes_all_padding_request": true
+  },
+  "chunk_sizes": [
+    1,
+    4,
+    8,
+    64
+  ],
+  "normalization_modes": [
+    false,
+    true
+  ],
+  "max_chunk_output_absolute_error": 2.980232238769531e-07,
+  "max_chunk_final_state_absolute_error": 2.980232238769531e-07,
+  "max_scalar_output_absolute_error": 2.0717726612051734e-07,
+  "max_continuation_output_absolute_error": 1.7881393432617188e-07,
+  "scope": "Six extracted upstream mathematical CPU fallback functions/methods; no model weights, full layer, CUDA/FLA kernel, packed documents, or deployment."
+}

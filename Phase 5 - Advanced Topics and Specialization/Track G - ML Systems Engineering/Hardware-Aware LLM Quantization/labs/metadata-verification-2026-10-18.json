@@ -1,0 +1,74 @@
+[
+  {
+    "model": "gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090",
+    "path": "README.md",
+    "expected_sha256": "25b2f1c644cb051a0eaaa302074c25b397b6f70581cde33ce2c319b1c5f45655",
+    "mode": "online",
+    "http_status": 200,
+    "bytes": 28646,
+    "actual_sha256": "25b2f1c644cb051a0eaaa302074c25b397b6f70581cde33ce2c319b1c5f45655"
+  },
+  {
+    "model": "gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090",
+    "path": "config.json",
+    "expected_sha256": "62dad33f5c64fedc1826a39f248d91b3ab4734ebdcd0a9981b548073e996d0b2",
+    "mode": "online",
+    "http_status": 200,
+    "bytes": 13167,
+    "actual_sha256": "62dad33f5c64fedc1826a39f248d91b3ab4734ebdcd0a9981b548073e996d0b2"
+  },
+  {
+    "model": "gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090",
+    "path": "model.safetensors.index.json",
+    "expected_sha256": "28b9c74b60f4e75914845e119e5b6d0f74574373e8d0f99f8af227583cbbf78c",
+    "mode": "online",
+    "http_status": 200,
+    "bytes": 236508,
+    "actual_sha256": "28b9c74b60f4e75914845e119e5b6d0f74574373e8d0f99f8af227583cbbf78c"
+  },
+  {
+    "model": "gittensor-model-hub/Qwen3.8-27B-DSpark-NVFP4",
+    "path": "README.md",
+    "expected_sha256": "627ec88ab4f0b3a87f2574136b83c19c2dd43a0f77a2186401835eb35522ad18",
+    "mode": "online",
+    "http_status": 200,
+    "bytes": 10793,
+    "actual_sha256": "627ec88ab4f0b3a87f2574136b83c19c2dd43a0f77a2186401835eb35522ad18"
+  },
+  {
+    "model": "gittensor-model-hub/Qwen3.8-27B-DSpark-NVFP4",
+    "path": "config.json",
+    "expected_sha256": "82fd961b632c629736902d9d4fdd3258dee1080f557cf86298cac063a514a0cf",
+    "mode": "online",
+    "http_status": 200,
+    "bytes": 2828,
+    "actual_sha256": "82fd961b632c629736902d9d4fdd3258dee1080f557cf86298cac063a514a0cf"
+  },
+  {
+    "model": "Qwen/Qwen3.8-27B",
+    "path": "README.md",
+    "expected_sha256": "57e4bdb258ee1a7d2635c5174ebd4e56abe392505cdb5f8bbb356b0dc4293641",
+    "mode": "online",
+    "http_status": 200,
+    "bytes": 65012,
+    "actual_sha256": "57e4bdb258ee1a7d2635c5174ebd4e56abe392505cdb5f8bbb356b0dc4293641"
+  },
+  {
+    "model": "Qwen/Qwen3.8-27B",
+    "path": "config.json",
+    "expected_sha256": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+    "mode": "online",
+    "http_status": 200,
+    "bytes": 4312,
+    "actual_sha256": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab"
+  },
+  {
+    "model": "Qwen/Qwen3.8-27B",
+    "path": "model.safetensors.index.json",
+    "expected_sha256": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+    "mode": "online",
+    "http_status": 200,
+    "bytes": 112216,
+    "actual_sha256": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df"
+  }
+]

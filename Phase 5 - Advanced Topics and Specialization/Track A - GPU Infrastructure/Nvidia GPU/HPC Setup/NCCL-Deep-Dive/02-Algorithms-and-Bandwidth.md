@@ -1,323 +1,72 @@
-# 02 — NCCL Algorithms & How It Achieves 900 GB/s
+# 02 — Collective algorithms and honest bandwidth accounting
 
-## 1. The Core Problem: AllReduce Algorithms
+**Outcome:** calculate collective bytes and explain why a normalized benchmark number differs from a link specification. Prerequisite: [collective semantics](01-Fundamentals.md). Start with the [CPU collectives lab](CPU-Collectives-Lab/Guide.md) if ranks are unfamiliar. Source review: 2026-10-18; no H200 benchmark was run for this lesson.
 
-There are multiple ways to implement AllReduce across N GPUs. NCCL picks the best one based on topology and message size. Understanding them explains **why NCCL performance varies** with GPU count and buffer size.
+## A rank is a participant, not necessarily a machine
 
----
+For an elementwise SUM AllReduce, every rank starts with its own array and finishes with the sum of all arrays. Three inputs `[1,2]`, `[10,20]`, `[100,200]` produce `[111,222]` at all three ranks. SUM does **not** divide by the rank count. A training framework may subsequently average gradients.
 
-## 2. Ring AllReduce
+AllGather concatenates contributions; ReduceScatter reduces and distributes disjoint pieces of the result. Agree on rank order, element type, sizes, operation, and communicator before discussing speed.
 
-The most bandwidth-efficient algorithm for large messages. Used by NCCL on NVLink systems for messages > ~1 MB.
+## Ring: reduce pieces, then distribute them
 
-### Step-by-Step with 4 GPUs, tensor [A, B, C, D]
+Split each rank's S-byte array into N equal chunks. During reduce-scatter, each round sends one chunk to the next rank and adds a received contribution. After N−1 rounds, every rank owns one completely reduced chunk. During all-gather, N−1 further rounds distribute those finished chunks. Each rank sends `2(N−1)S/N` bytes in this idealized ring.
 
-**Phase 1: Reduce-Scatter (N-1 steps)**
+For two ranks holding `[1,2]` and `[10,20]`: after reduce-scatter, rank 0 can own `[11]`, rank 1 `[22]`; after all-gather both own `[11,22]`. This small example makes the reduction and replication distinct.
 
-Each GPU holds one chunk. In each step, each GPU sends its current chunk to the next GPU and receives the next chunk.
+The factor `(N−1)/N` describes data movement. It is **not** a utilization guarantee. Launch overhead, memory traffic, routing, contention and protocol costs remain.
 
-```
-Initial state:
-  GPU0: [A0, B0, C0, D0]
-  GPU1: [A1, B1, C1, D1]
-  GPU2: [A2, B2, C2, D2]
-  GPU3: [A3, B3, C3, D3]
+## Trees and hardware reductions
 
-Step 1 (each GPU sends chunk i to GPU i+1, receives chunk i-1):
-  GPU0: sends D0 → GPU1, receives C3 from GPU3 → computes [C2+C3]
-  GPU1: sends A1 → GPU2, receives D0 from GPU0 → computes [D0+D1]
-  GPU2: sends B2 → GPU3, receives A1 from GPU1 → computes [A1+A2]
-  GPU3: sends C3 → GPU0, receives B2 from GPU2 → computes [B2+B3]
+A tree reduces toward a root and broadcasts the reduced result back. Its dependency depth grows roughly as log₂N, whereas a simple ring has N−1 stages per phase. NCCL's double-tree approach splits the payload across complementary trees to distribute the forwarding load; it does not mean “reduce-scatter on tree A, all-gather on tree B.” Neither tree structure guarantees 100% bandwidth.
 
-Step 2:
-  GPU0: [B1+B2+B3], GPU1: [C2+C3+C0], ...
+NCCL also has algorithms for compatible NVLink reduction hardware and network plugins. Algorithm selection depends on operation, sizes, topology, NCCL version and enabled features. There is no universal “larger than 1 MB means Ring” rule. Keep defaults for a baseline; isolate an override only when testing a hypothesis. [NVIDIA's double-tree explanation](https://developer.nvidia.com/blog/massively-scale-deep-learning-training-nccl-2-4/), [NCCL configuration](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html).
 
-After N-1=3 steps:
-  GPU0 has fully reduced chunk D: [D0+D1+D2+D3]
-  GPU1 has fully reduced chunk A: [A0+A1+A2+A3]
-  GPU2 has fully reduced chunk B: [B0+B1+B2+B3]
-  GPU3 has fully reduced chunk C: [C0+C1+C2+C3]
-```
+## Units before conclusions
 
-**Phase 2: AllGather (N-1 steps)**
+Use decimal `GB/s = 10⁹ bytes/s`. `1 GiB = 2³⁰ bytes`. A network advertised as 400 Gb/s has a 50 GB/s line-rate ceiling **per direction**, before overhead. H200 SXM advertises 900 GB/s aggregate bidirectional NVLink bandwidth **per GPU**; that is about 450 GB/s in each direction, shared across its links. It is not 900 GB/s separately to each of seven peers. NVSwitch provides switched connectivity; it does not create seven independent per-GPU bandwidth budgets. [H200 specifications](https://www.nvidia.com/en-us/data-center/h200/).
 
-Each GPU distributes its fully-reduced chunk to all others.
+For `nccl-tests`, with elapsed time t and size S as defined for that operation:
 
-```
-Step 1:
-  GPU0 sends [D_sum] → GPU1
-  GPU1 sends [A_sum] → GPU2
-  GPU2 sends [B_sum] → GPU3
-  GPU3 sends [C_sum] → GPU0
-
-After N-1=3 steps: all GPUs have all chunks
-  GPU0: [A_sum, B_sum, C_sum, D_sum]  ✓
-  GPU1: [A_sum, B_sum, C_sum, D_sum]  ✓
-  ...
-```
-
-### Ring AllReduce Bandwidth Analysis
-
-```
-Data sent per GPU per step: S/N  (S = tensor size, N = GPU count)
-Number of steps: 2(N-1)
-Total data sent per GPU: 2(N-1) × S/N ≈ 2S (for large N)
-
-Bus bandwidth used: S × 2(N-1)/N / time
-Fraction of peak bandwidth used: (N-1)/N → approaches 1.0 as N grows
-
-For 8 GPUs: (8-1)/8 = 87.5% of peak NVLink bandwidth
-For 16 GPUs: 93.75% of peak
-
-This is why Ring AllReduce is "bandwidth optimal" — it uses nearly all available bandwidth regardless of GPU count.
-```
-
----
-
-## 3. Tree AllReduce
-
-Better for **small messages** or when latency matters more than bandwidth. NVSwitch clusters often use this.
-
-```
-Reduce phase (gather to root):
-       GPU0  (root)
-      /    \
-   GPU1    GPU2
-   /  \
-GPU3  GPU4
-
-Step 1: GPU3→GPU1, GPU4→GPU1, GPU2→GPU0 (all parallel)
-Step 2: GPU1→GPU0
-
-AllGather phase (reverse direction):
-Step 1: GPU0→GPU1, GPU0→GPU2
-Step 2: GPU1→GPU3, GPU1→GPU4
-```
-
-**Latency:** O(log N) steps vs O(N) for Ring.
-**Bandwidth:** Less efficient than Ring for large messages — data must pass through intermediate nodes.
-
-NCCL switches between Ring and Tree based on message size automatically.
-
----
-
-## 4. Double Binary Tree (NCCL's Default for NVSwitch)
-
-NCCL uses **two overlapping binary trees** that share the reduction work. This achieves full bandwidth utilization with O(log N) latency — combining the best of both worlds.
-
-```
-Tree A (left-leaning):
-    0
-   / \
-  1   2
- / \
-3   4
-
-Tree B (right-leaning, complement):
-    4
-   / \
-  3   0
-     / \
-    2   1
-
-Reduce-Scatter uses Tree A, AllGather uses Tree B.
-Every link is used in both trees → 100% bandwidth utilization
-Every GPU participates equally → no root bottleneck
-```
-
-This is why NCCL 2.x on NVSwitch systems is so efficient.
-
----
-
-## 5. How NCCL Achieves 900 GB/s on 8x H200
-
-H200 NVLink 4.0 specs:
-- 18 NVLink 4.0 lanes per GPU
-- 50 GB/s bidirectional per lane
-- Total: 900 GB/s bidirectional per GPU
-
-### Why Full Bandwidth Is Achievable
-
-**Full NVSwitch mesh topology:**
-
-```
-Every GPU has a direct NVLink path to every other GPU (no hops).
-
-GPU0 ←→ GPU1: 900 GB/s direct
-GPU0 ←→ GPU2: 900 GB/s direct
-GPU0 ←→ GPU7: 900 GB/s direct
-```
-
-With Ring AllReduce across 8 GPUs:
-- Each GPU sends/receives S/8 per step
-- 2(N-1) = 14 steps total
-- Each step uses the full NVLink bandwidth between adjacent ring GPUs
-
-**Measured bus bandwidth formula:**
-```
-bus_bandwidth = algbw × (2 × (N-1) / N)
-
-where algbw = (message_size / time_taken)
-
-For N=8: bus_bw = algbw × (14/8) = algbw × 1.75
-```
-
-**Measured with nccl-tests:**
-
-```bash
-./build/all_reduce_perf -b 1G -e 8G -f 2 -g 8
-
-# Output columns:
-# size   algbw(GB/s)   busbw(GB/s)
-# 1 GB   257 GB/s      449 GB/s
-# 4 GB   280 GB/s      490 GB/s
-# 8 GB   291 GB/s      509 GB/s  ← approaches 512 GB/s = 900 GB/s × 8/8 × 0.57
-
-# Why not 900 GB/s?
-# Bus bandwidth per GPU (900 GB/s) is bidirectional peak
-# AllReduce uses each link for both send+receive simultaneously
-# 509 GB/s busbw ≈ 57% of 900 GB/s (bidirectional divided by 2 for half-duplex accounting)
-# Full-duplex: 509 × 2 = 1018 GB/s ≈ ~900 GB/s per GPU ✓
-```
-
----
-
-## 6. Bandwidth Roofline for AllReduce
-
-```
-AllReduce communication time = (2 × S × (N-1)) / (N × BW)
-
-where:
-  S  = tensor size in bytes
-  N  = number of GPUs
-  BW = per-GPU NVLink bandwidth (one direction)
-
-For H200 (BW = 450 GB/s unidirectional per GPU):
-  8 GPUs, 1 GB gradient:
-  Time = (2 × 1 GB × 7) / (8 × 450 GB/s)
-       = 14 / 3600
-       = 3.9 ms
-
-  This matches measured values (~4 ms for 1 GB on 8x H200).
-```
-
----
-
-## 7. Algorithm Selection in NCCL
-
-NCCL picks the algorithm based on message size and topology:
-
-```
-Message size:
-  < 1 KB:     NCCL uses simple P2P (direct GPU-to-GPU send/recv)
-  1 KB - 1 MB: Tree algorithm (lower latency for small messages)
-  > 1 MB:     Ring algorithm (maximum bandwidth for large messages)
-
-Topology:
-  NVSwitch (full mesh): Double Binary Tree preferred
-  PCIe ring: Ring AllReduce preferred
-  Multi-node: Hierarchical (NVLink intra-node, IB inter-node)
-```
-
-Override manually:
-
-```bash
-export NCCL_ALGO=Ring         # force Ring AllReduce
-export NCCL_ALGO=Tree         # force Tree AllReduce
-export NCCL_PROTO=Simple      # protocol: Simple / LL / LL128
-```
-
----
-
-## 8. Protocols: Simple, LL, LL128
-
-NCCL uses three protocols optimized for different scenarios:
-
-| Protocol | Optimized For | Mechanism |
+| Operation | Algorithm bandwidth | Bus bandwidth normalization |
 |---|---|---|
-| **LL (Low Latency)** | Small messages, latency | Packs data + flag in 8-byte chunks, polling |
-| **LL128** | Medium messages | 128-byte chunks, better bandwidth |
-| **Simple** | Large messages, bandwidth | Standard DMA transfers, best bandwidth |
+| AllReduce | S/t | algbw × 2(N−1)/N |
+| AllGather | S/t, S = total output across contributions | algbw × (N−1)/N |
+| ReduceScatter | S/t, S = total input array per rank | algbw × (N−1)/N |
+
+Bus bandwidth is an operation-normalized metric, not a direct count from physical link counters. Its point-to-point accounting model needs additional care with in-network reductions, concurrent paths and shared NICs. Compare like operations, rank counts and hardware conventions. [Official nccl-tests accounting](https://github.com/NVIDIA/nccl-tests/blob/master/doc/PERFORMANCE.md).
+
+**Worked example, invented timing for arithmetic only:** 8 ranks, S=1,000,000,000 bytes, t=4 ms gives `algbw=250 GB/s`, `busbw=437.5 GB/s`. For a simplified ring with 450 GB/s available one-way bandwidth and no overhead, `t ≥ 1.75×1e9/450e9 = 3.889 ms`. This bound does not predict what a real server will measure.
+
+## A reproducible hardware measurement
+
+These commands require a compatible CUDA/NCCL installation and eight allocated GPUs. They were source-reviewed, not run here. Record the repository SHA with the output; use an approved revision in a reproducible environment.
 
 ```bash
-# NCCL auto-selects based on message size
-# Force protocol manually:
-export NCCL_PROTO=Simple      # best for training (large gradients)
-export NCCL_PROTO=LL          # best for inference token sync (small, latency-sensitive)
-```
-
----
-
-## 9. Measuring Your Actual NCCL Bandwidth
-
-```bash
-# Install nccl-tests
 git clone https://github.com/NVIDIA/nccl-tests
 cd nccl-tests
+git rev-parse HEAD
 make -j MPI=0 CUDA_HOME=/usr/local/cuda NCCL_HOME=/usr
-
-# AllReduce bandwidth sweep (1 MB to 8 GB)
-./build/all_reduce_perf \
-    -b 1M -e 8G -f 2 \
-    -g 8 \                   # 8 GPUs
-    -n 20 \                  # 20 iterations
-    -w 5                     # 5 warmup iterations
-
-# AllGather (important for FSDP parameter gathering)
-./build/all_gather_perf -b 1M -e 8G -f 2 -g 8
-
-# ReduceScatter (important for ZeRO gradient sharding)
-./build/reduce_scatter_perf -b 1M -e 8G -f 2 -g 8
-
-# Broadcast (model weight distribution)
-./build/broadcast_perf -b 1M -e 8G -f 2 -g 8
+./build/all_reduce_perf -b 1M -e 256M -f 2 -g 8 -n 20 -w 5
+./build/all_gather_perf -b 1M -e 256M -f 2 -g 8 -n 20 -w 5
+./build/reduce_scatter_perf -b 1M -e 256M -f 2 -g 8 -n 20 -w 5
 ```
 
-**Interpreting output:**
+Start small because several input/output/validation buffers may coexist. Inspect output column units; use raw bytes and timing when checking arithmetic. Require zero `#wrong` before interpreting performance. Save in-place and out-of-place results separately. Record clocks, power limit, temperature, topology, runtime versions and concurrent jobs. There is no universal passing GB/s threshold.
 
-```
-#                                                              out-of-place                       in-place
-#       size         count    type   redop    root     time   algbw    busbw #wrong     time   algbw    busbw #wrong
-#        (B)    (elements)                             (us)  (GB/s)   (GB/s)            (us)  (GB/s)   (GB/s)
-   1048576       262144   float     sum      -1    382.1     2.75     4.81      0    381.5     2.75     4.81      0
-  67108864     16777216   float     sum      -1   2431.6    27.60    48.30      0   2426.5    27.66    48.41      0
- 536870912    134217728   float     sum      -1  14985.5   358.28   626.98      0  14894.2   360.47   630.82      0
+## Compute and communication must use the same workload
 
-# algbw: algorithm bandwidth = size / time
-# busbw: bus bandwidth = algbw × 2(N-1)/N  ← the number to compare against NVLink spec
-# Target busbw for 8x H200: > 450 GB/s for large messages
-```
+For a dense 70-billion-parameter transformer processing **8,192 global tokens**, the approximate `6PT` training estimate is `3.44064×10¹⁵ FLOPs`. At 989.5 TFLOP/s dense BF16 per H200 SXM, an impossible-perfect single-GPU compute lower bound is **3.477 seconds**, or **0.435 seconds** evenly divided across eight GPUs. Actual throughput is lower; attention costs, recomputation, optimizer work and parallelization change the model. The dense peak must not be replaced with the 1,979 TFLOP/s structured-sparse figure.
 
----
+A separate hypothetical AllReduce of 140 GB per rank over an ideal eight-rank 450 GB/s ring costs `1.75×140/450 = 0.544 seconds`. That does not describe a feasible unsharded 70B training deployment on one 141 GB GPU: weights alone approach capacity, before gradients and optimizer states. Use this example to check units, then derive the actual sharded communication schedule.
 
-## 10. Gradient Communication as a Bottleneck
+ZeRO-3 reduces persistent memory by sharding parameters, gradients and optimizer state. It adds parameter gathers and does not reduce all communication to S/N. Overlap can hide only communication whose data dependencies permit concurrent work. A rough `max(compute,communication)` bound assumes perfect overlap; it is not an achieved step time.
 
-```
-Training step time = compute_time + communication_time
+## Check your understanding
 
-Without overlap:
-  Total = T_compute + T_comm
+1. Why is 900/25 an unfair NVLink-to-HDR comparison? **Answer:** the numerator is bidirectional aggregate and the denominator one-direction line rate; match direction and scope first (450/25=18), then account for shared links and overhead.
+2. Does busbw=437.5 GB/s prove every NVLink transfers at that rate? **Answer:** no; it is a normalized collective result.
+3. If all-gather contributes 8 bytes from each of 2 ranks, what S belongs in the table? **Answer:** 16 bytes, the complete output.
+4. Which measurement distinguishes overhead from bandwidth? **Answer:** sweep message size; a near-constant small-message time suggests overhead, while a large-message time proportional to bytes suggests a bandwidth limit.
 
-With overlap (async AllReduce during backward):
-  Total = max(T_compute, T_comm) + T_serial_overhead
-
-Overlap efficiency = T_comm / T_compute
-  If T_comm < T_compute: communication is completely hidden (ideal)
-  If T_comm > T_compute: communication is the bottleneck
-
-For H200 (1979 TFLOPS BF16) training 70B model, batch=4, seq=2048:
-  T_compute ≈ 6 × 70B params × 4 × 2048 tokens / 1979 TFLOPS ≈ ~1.7 ms/step
-  T_comm (gradient AllReduce, 140 GB BF16): 140e9 / (450e9 × 7/8) = ~355 ms/step
-
-  → Communication dominates massively!
-  → This is why ZeRO-3 is necessary: it replaces AllReduce with ReduceScatter (only S/N data)
-```
-
----
-
-## References
-
-- [Bandwidth-Optimal AllReduce (Baidu paper)](https://arxiv.org/abs/1802.05799)
-- [NCCL Algorithm Documentation](https://github.com/NVIDIA/nccl/blob/master/src/graph/algo.cc)
-- [NVLink 4.0 Technical Brief](https://www.nvidia.com/en-us/data-center/nvlink/)
-- [nccl-tests Repository](https://github.com/NVIDIA/nccl-tests)
+Submit one hand calculation, a CPU correctness report, and—when hardware is available—a raw sweep with a falsifiable explanation for one change in slope.

@@ -1,71 +1,67 @@
-# Phase 1: Camera Calibration and Real-Time Object Detection with Depth
+# CPU RGB/depth exercise and synthetic signal checks
 
-Pipeline for the non-contact monitoring project using **camera01** from the [Free-Viewpoint RGB-D Video Dataset](https://medialab.sjtu.edu.cn/post/free-viewpoint-rgb-d-video-dataset/) (SJTU).
+[Project concepts](../Guide.md) · [Camera/time fusion lab](../../../../../Phase%203%20-%20Artificial%20Intelligence/Track%20A%20-%20Hardware%20and%20Edge%20AI/4.%20Sensor%20Fusion/Camera-Time-Fusion-Lab/Guide.md)
 
-## What it does
+This folder loads calibration, decodes a documented disparity representation, runs OpenCV's classical face/person detectors, and displays or saves paired RGB/depth frames. It also provides a small spectral-peak reference. The tests create their own tiny synthetic videos; they require no external dataset, GPU or camera.
 
-- **Camera calibration:** Loads intrinsics (and extrinsics) from `Camera Parameters/paras.txt` for camera01 (index 0).
-- **Depth:** Converts grayscale depth frames to metric depth (meters) using the dataset formula.
-- **Detection:** Runs face (Haar) and person (HOG) detection on the RGB stream via OpenCV (no extra model files).
-- **Depth per ROI:** For each detection bounding box, computes median depth and overlays it on the image.
+## 1. Use the tested environment
 
-## Setup
+The executed CPU stack is Python 3.12, NumPy 2.3.5 and OpenCV headless 4.13.0.92. Reuse the exact hash-locked environment from the [camera lab](../../../../../Phase%203%20-%20Artificial%20Intelligence/Track%20A%20-%20Hardware%20and%20Edge%20AI/4.%20Sensor%20Fusion/Camera-Time-Fusion-Lab/Guide.md). Headless OpenCV supports the test/video-file path but not `imshow`. The local [requirements file](requirements.txt) pins an interactive desktop alternative; that GUI package was not used in the retained headless test run. Install only one OpenCV wheel variant in an environment.
 
-```bash
-cd "Phase 4 - Track B - Nvidia Jetson/5. Edge AI Optimization/non-contact-monitoring-edge"
-pip install -r phase1/requirements.txt
-```
-
-Ensure the dataset is present:
-
-- `Free-Viewpoint-RGB-D-Video-Dataset-main/camera01-rgb.mp4`
-- `Free-Viewpoint-RGB-D-Video-Dataset-main/camera01-depth.mp4`
-- `Free-Viewpoint-RGB-D-Video-Dataset-main/Camera Parameters/paras.txt`
-
-## Run
-
-From the `non-contact-monitoring-edge` directory:
+From the repository root, with that environment's Python:
 
 ```bash
-python phase1/run_pipeline.py
+/tmp/course-perception-cpu-venv/bin/python -m unittest discover -s \
+  'Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/non-contact-monitoring-edge/phase1/labs/optional' -v
 ```
 
-Or from `phase1`:
+If you created a differently named virtual environment, substitute its interpreter. **Actual result on 18 October 2026: 10 tests passed.** They exercise byte/normalized depth, ROI clipping and nonfinite values, camera-centre projection, malformed calibration, the actual CPU detectors on a blank image, a headless CLI run on lossless FFV1 video, pair mismatches, a known tone and an alias.
+
+The synthetic video fixture intentionally has no people or faces; zero detections validates a blank-input path, not detection recall. Its `camera02` pair and two calibration records catch the previous bug where selecting another camera still opened camera01 video.
+
+## 2. Optional external-video path
+
+Obtain the paired RGB/depth files and calibration from the [upstream dataset](https://github.com/sjtu-medialab/Free-Viewpoint-RGB-D-Video-Dataset), respecting the terms supplied with your copy. The course did not download or execute those full videos. Expected structure:
+
+```text
+my_dataset/
+  Camera Parameters/paras.txt
+  camera01-rgb.mp4
+  camera01-depth.mp4
+```
+
+Run up to 30 frames without a display:
 
 ```bash
-cd phase1
-python run_pipeline.py --dataset-dir ../Free-Viewpoint-RGB-D-Video-Dataset-main
+/tmp/course-perception-cpu-venv/bin/python \
+  'Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/non-contact-monitoring-edge/phase1/run_pipeline.py' \
+  --dataset-dir /absolute/path/to/my_dataset --camera-index 0 \
+  --no-display --no-person --max-frames 30 --report /tmp/rgb-depth-report.json
 ```
 
-### Options
+`--camera-index 0` selects the first calibration block and `camera01`; index 1 selects the second block and `camera02`. Confirm that this mapping matches your dataset copy. `--suffix avi` supports the lossless synthetic test videos. `--out /tmp/overlay.mp4` optionally writes an annotated visualization; it is not a new quantitative depth file.
 
-| Option | Description |
-|--------|-------------|
-| `--dataset-dir PATH` | Root of the dataset (default: `../Free-Viewpoint-RGB-D-Video-Dataset-main`) |
-| `--camera-index N` | Camera index in paras.txt (0 = camera01) |
-| `--no-person` | Only run face detection (faster) |
-| `--no-display` | No GUI (e.g. headless); still processes and prints progress |
-| `--out PATH` | Write output video (e.g. `phase1_out.mp4`) |
-| `--max-frames N` | Process at most N frames (0 = all) |
+Depth is labeled **dataset units** unless you supply a positive, externally verified `--units-to-meters` scale. For a separately documented centimetre dataset, that factor would be 0.01; do not infer that unit merely from the number 40. Pairing assumes corresponding frame indices. Matching FPS/size and equal stream lengths are checked, but capture synchronization remains an external assumption.
 
-## Module overview
+Haar detection does not return calibrated probabilities here, so its score is `None`. HOG returns an uncalibrated SVM detector score, which is preserved rather than clipped to [0,1]. Face and person boxes represent different semantic objects and are not suppressed against each other.
 
-| Module | Role |
-|--------|------|
-| `calibration.py` | Parse `paras.txt`, expose K, R, t; world-to-image projection. |
-| `depth_utils.py` | Grayscale → metric depth; median depth in a bounding box. |
-| `detection.py` | Face (Haar) and person (HOG) detectors; composite that avoids duplicate person/face boxes. |
-| `run_pipeline.py` | Main: load calibration, read RGB + depth, detect, compute depth per box, visualize. |
+## 3. Run the known-tone exercise
 
-## Citation
+From this `phase1` directory:
 
-When using the dataset, cite: Guo S, Zhou K, Hu J, et al. A new free viewpoint video dataset and DIBR benchmark. *Proceedings of the 13th ACM Multimedia Systems Conference*. 2022: 265–271.
+```python
+import numpy as np
+from signal_reference import peak_in_band
 
+t = np.arange(400) / 20.0
+y = 2.0 + np.sin(2*np.pi*1.2*t) + 0.1*np.sin(2*np.pi*4.0*t)
+print(peak_in_band(t, y))
+```
 
-## Integration lab: Is the first milestone a reproducible sensing baseline?
+Expected peak: **1.2 Hz**, sample rate **20 Hz**, bin spacing **0.05 Hz**. Now use 200 samples at 10 Hz with an 8 Hz sine wave; the detected peak is **2 Hz**. Explain why no later bandpass filter can identify which source frequency produced those samples.
 
-Freeze one short capture/replay sequence with annotation timestamps and sensor settings. Run the phase-one pipeline from a clean environment; retain raw outputs before tuning.
+Change one timestamp by 20 ms and rerun. The function rejects the now-irregular sampling instead of treating it as uniform. Restore timestamps before comparing window lengths.
 
-**Acceptance evidence:** A peer must reproduce the event timeline and identify one intentionally missing interval. Hand the dataset manifest and error cases to later fusion/model work.
+## 4. Completion artifact
 
-**Continue:** take this artifact to [non-contact-monitoring-edge](../Guide.md). Explain which assumption from this course the next engineer must preserve.
+Save the test output, one synthetic signal report, and a diagram showing `Xc=R(Xw-C)` versus OpenCV's `Xc=RXw+t`. Explain how to reject a point behind the camera and why a box's median depth can include background. Live RGB/thermal calibration, radiometric measurement and physiological validation remain separate work.

@@ -1,0 +1,23 @@
+{
+  "verified_utc": "2026-10-18T22:19:32.364285+00:00",
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3",
+  "portable_command": "python3 -m unittest discover -s labs -p 'test_*.py' -v",
+  "portable_tests_passed": 11,
+  "portable_output": "test_actual_localhost_tcp_exchange (test_modbus_read.ModbusReadTests.test_actual_localhost_tcp_exchange) ... ok\ntest_address_space_boundary_is_enforced_by_server (test_modbus_read.ModbusReadTests.test_address_space_boundary_is_enforced_by_server) ... ok\ntest_all_truncations_fail (test_modbus_read.ModbusReadTests.test_all_truncations_fail) ... ok\ntest_every_short_read_boundary_and_coalesced_frames (test_modbus_read.ModbusReadTests.test_every_short_read_boundary_and_coalesced_frames) ... ok\ntest_exception_is_not_successful_empty_data (test_modbus_read.ModbusReadTests.test_exception_is_not_successful_empty_data) ... ok\ntest_fixture_refuses_unsupported_function_and_bad_quantity (test_modbus_read.ModbusReadTests.test_fixture_refuses_unsupported_function_and_bad_quantity) ... ok\ntest_independent_golden_request_and_response (test_modbus_read.ModbusReadTests.test_independent_golden_request_and_response) ... ok\ntest_invalid_protocol_and_length_fail_before_payload (test_modbus_read.ModbusReadTests.test_invalid_protocol_and_length_fail_before_payload) ... ok\ntest_read_limits_and_type_boundaries (test_modbus_read.ModbusReadTests.test_read_limits_and_type_boundaries) ... ok\ntest_transaction_and_unit_must_match (test_modbus_read.ModbusReadTests.test_transaction_and_unit_must_match) ... ok\ntest_wrong_function_byte_count_and_data_size_rejected (test_modbus_read.ModbusReadTests.test_wrong_function_byte_count_and_data_size_rejected) ... ok\n\n----------------------------------------------------------------------\nRan 11 tests in 0.137s\n\nOK\n",
+  "reference_output": "modbus-reference.json",
+  "additional_executed_records": [
+    "pymodbus-reference.json"
+  ],
+  "scope": "Synthetic teaching input. Native records distinguish actual library/middleware/TCP execution from model-only checks. No physical robot or sensor execution.",
+  "sha256": {
+    "Integration-Lab.md": "941d6c6783af2fe5f3d302321b91ca339b9f426d091416a8656ee2fc49268c91",
+    "Lecture-01.md": "67264eab038383d2843d456c98b99c9b1308e46f6471ccc329a0db0420395edb",
+    "labs/modbus-reference.json": "fa133f7aed2165fedb2a9b87d25ba1e665fa329f55f1726c297de0fc6e57dac3",
+    "labs/modbus_read.py": "dd16da87e1a507046ca0f47fbfc0672830872ace2c47a95500d24d3edf51cc15",
+    "labs/pymodbus-reference.json": "5a64e2b6235dced8ae3f56099c369f1d78d72602390eb9775ef010839d07c5d5",
+    "labs/pymodbus_client.py": "b744314e76f2812a7ee3ea0a14fda54074cc29bdd72294b2bc1c5c0f7810c357",
+    "labs/source-review-2026-10-18.json": "f2f4602aefd28e7d6b0b32d1273e5100bafcd8defdf3f889d425ba99fc431bc4",
+    "labs/test_modbus_read.py": "87bb5ab3a47ee7b948a724602ae34f3cc5539e0325330f9fdae4fdaa4c40ad15"
+  }
+}

@@ -1,169 +1,58 @@
-# HTTP Server
+# Serving exercise: an endpoint name is not an API contract
 
-## Overview
+`src/server/http_server.cpp` is an experimental source-audit example. It is not a validated API-compatible server, and this checkout cannot generate with ordinary pretrained tokenizers. No server deployment or client-compatibility test was executed in the review.
 
-OpenAI-compatible REST API using raw POSIX sockets — no external dependencies. Sequential request handling (one inference at a time, appropriate for single-GPU Jetson).
+## 1. Trace one request
 
-### Source: `src/server/http_server.cpp`, `src/main_server.cpp`
+A complete service has several boundaries: socket bytes, HTTP framing, JSON schema, model/chat formatting, admission, execution and response serialization. Each needs explicit accepted inputs and errors.
 
-## Starting the Server
+The current source handles one client at a time, reads once into an 8 KiB buffer, searches strings for the last `content` field and returns a response in a fixed buffer. This makes the code short enough to study, but does not implement a robust HTTP or JSON parser.
 
-```bash
-./build/jetson-llm-server -m models/model.gguf -p 8080
+| Source behavior | Why it matters |
+|---|---|
+| One socket read | TCP may split headers or bodies across reads |
+| String search for `content` | Escapes, nested objects and message roles are not parsed correctly |
+| TODO for generation parameters | Requested temperature/max_tokens are not honored |
+| One write per buffer | A write can be partial or interrupted |
+| Fixed response buffer | A long completion can be truncated into invalid JSON |
+| Static `status: ok` | Does not prove model readiness or successful recent inference |
+| Bind to all interfaces | Local experiments may become reachable beyond the intended client |
 
-# Options:
-#   -m PATH      GGUF model (required)
-#   -p PORT      HTTP port (default: 8080)
-#   -c INT       Context length (0 = auto)
-#   --fp16-kv    Use FP16 KV cache (default: INT8)
-```
+These observations come from the checked-in source, not a claim that the interface was exercised successfully.
 
-## Endpoints
+## 2. Understand stream framing
 
-### GET /health
+Imagine the bytes `Content-Length: 12` arrive in three fragments. A valid stream parser must retain partial input, find the complete header boundary, validate the length and read exactly the declared body under a deadline and size limit. A second request arriving in the same read must not be mistaken for body data.
 
-Returns Jetson-specific system health.
+TCP preserves byte order; it does not preserve application message boundaries. Similarly, writing a header and body requires progress tracking until all bytes are sent or an error/deadline occurs.
 
-```bash
-curl http://jetson:8080/health
-```
+Before connecting inference, test a small local transport fixture with fragmented writes, early EOF, delayed body bytes, oversized input and a client disconnect. A parser must reject ambiguous framing consistently, rather than guessing which length field to trust.
 
-Response:
-```json
-{
-  "status": "ok",
-  "model": "TinyLlama-1.1B-Chat-v1.0",
-  "memory": {
-    "total_mb": 7633,
-    "free_mb": 4200,
-    "model_mb": 669,
-    "kv_mb": 45
-  },
-  "thermal": {
-    "gpu_c": 48.5,
-    "cpu_c": 47.0,
-    "throttling": false
-  },
-  "power": {
-    "mode": "25W",
-    "gpu_mhz": 1300
-  },
-  "gpu_util_pct": 75
-}
-```
+## 3. Define a small honest schema
 
-### GET /v1/models
+For a teaching service, a narrow versioned schema is easier to validate than claiming compatibility with a large external API. Specify required fields, types, limits, defaults and unsupported options. Use a JSON library that handles escaping and Unicode, then validate the decoded structure.
 
-Lists loaded model (OpenAI-compatible).
+Example requirements for a future implementation:
 
-```bash
-curl http://jetson:8080/v1/models
-```
+- A request ID is distinct from model identity and cache identity.
+- Prompt and output budgets are bounded before allocation.
+- Unsupported streaming or tool options return an explicit error.
+- Temperature and sampling fields reach the actual validated sampler.
+- A cancellation stops work and releases request-owned state.
+- A repeated request starts with the intended cache/reset policy.
 
-Response:
-```json
-{
-  "data": [
-    {
-      "id": "TinyLlama-1.1B-Chat-v1.0",
-      "object": "model"
-    }
-  ]
-}
-```
+These are acceptance criteria, not implemented features of the existing source.
 
-### POST /v1/chat/completions
+## 4. Separate liveness, readiness and progress
 
-OpenAI-compatible chat completion.
+Liveness asks whether the process can respond. Readiness asks whether the selected model/runtime can accept the defined workload. Progress asks whether an accepted request is advancing within its deadline. A single `ok` string cannot answer all three.
 
-```bash
-curl http://jetson:8080/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "messages": [
-      {"role": "user", "content": "What is 2+2?"}
-    ],
-    "max_tokens": 64
-  }'
-```
+Sequential execution is a reasonable first design if its queue and admission policy are explicit. An unlimited queue converts overload into stale requests. For a robot, an answer produced after its observation has expired can be unusable even when inference succeeds.
 
-Response:
-```json
-{
-  "id": "jllm-1712345678",
-  "object": "chat.completion",
-  "model": "TinyLlama-1.1B-Chat-v1.0",
-  "choices": [
-    {
-      "index": 0,
-      "message": {
-        "role": "assistant",
-        "content": "2+2 equals 4."
-      },
-      "finish_reason": "stop"
-    }
-  ],
-  "usage": {
-    "prompt_tokens": 5,
-    "completion_tokens": 8,
-    "total_tokens": 13
-  },
-  "jetson": {
-    "decode_tok_s": 28.4,
-    "peak_mem_mb": 1823,
-    "peak_temp_c": 48.2
-  }
-}
-```
+Measure arrival time, processing start, first output and completion with a monotonic clock. Keep request cancellation, queue capacity and observation freshness visible to the caller.
 
-Note: the `jetson` field is a non-standard extension with Jetson-specific performance metrics.
+## 5. Completion criteria
 
-## Client Examples
+Choose a maintained HTTP/JSON stack, pin its version, and keep inference behind a small tested handler. Verify fragmented input, invalid JSON, unsupported fields, limits, disconnects, cancellation, readiness transitions and repeated requests with an actual localhost client. Only then test the declared client/API surface.
 
-### Python
-
-```python
-import requests
-
-r = requests.post("http://jetson:8080/v1/chat/completions", json={
-    "messages": [{"role": "user", "content": "Hello"}],
-    "max_tokens": 64
-})
-print(r.json()["choices"][0]["message"]["content"])
-```
-
-### OpenAI SDK (compatible)
-
-```python
-from openai import OpenAI
-
-client = OpenAI(base_url="http://jetson:8080/v1", api_key="unused")
-response = client.chat.completions.create(
-    model="tinyllama",
-    messages=[{"role": "user", "content": "Hello"}],
-    max_tokens=64
-)
-print(response.choices[0].message.content)
-```
-
-### curl (monitoring)
-
-```bash
-# Health check every 5 seconds
-watch -n5 'curl -s http://jetson:8080/health | python3 -m json.tool'
-```
-
-## Implementation Notes
-
-- **Single-threaded request handling** — one inference at a time. Jetson has one GPU; concurrent inference would compete for memory and bandwidth.
-- **Raw POSIX sockets** — no external HTTP library dependency. Handles the happy path for OpenAI-compatible clients.
-- **JSON output** — hand-built with `snprintf` (no JSON library dependency). Strings are escaped for quotes, backslashes, and control characters.
-- **CORS headers** — `Access-Control-Allow-Origin: *` enabled for browser clients.
-- **Sequential** — `accept()` → `handle_client()` → `close()` → `accept()`. No threading.
-
-## Future Enhancements
-
-- Streaming SSE (Server-Sent Events) for token-by-token output
-- Request timeout handling
-- Connection keep-alive
-- Request queue with busy response (503) when already inferring
+The [CPU lab](../labs/README.md) supplies validated parsing and sampling components to study now. The [testing guide](../TESTING.md) and [milestones](../ROADMAP.md) explain what remains before model serving. Naming a route `/v1/chat/completions` does not supply those missing contracts.

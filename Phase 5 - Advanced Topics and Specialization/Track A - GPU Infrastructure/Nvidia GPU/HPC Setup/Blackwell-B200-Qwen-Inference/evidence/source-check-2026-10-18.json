@@ -1,0 +1,146 @@
+[
+  {
+    "url": "https://docs.nvidia.com/cuda/parallel-thread-execution/",
+    "status": 200,
+    "final_url": "https://docs.nvidia.com/cuda/parallel-thread-execution/",
+    "sha256": "cc81627c45a00c50bb75ca89ed3965e4ae0fc822629ab84fdd650b593a6813e1",
+    "bytes_read": 2000001,
+    "truncated": true
+  },
+  {
+    "url": "https://docs.nvidia.com/cutlass/4.8.0/media/docs/cpp/blackwell_functionality.html",
+    "status": 200,
+    "final_url": "https://docs.nvidia.com/cutlass/4.8.0/media/docs/cpp/blackwell_functionality.html",
+    "sha256": "297dbfc377a33147b10cb10c42570304e27bcdb3acdb958693b937d07cfb298f",
+    "bytes_read": 203420,
+    "truncated": false
+  },
+  {
+    "url": "https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/quantized-types-schemes.html",
+    "status": 200,
+    "final_url": "https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/quantized-types-schemes.html",
+    "sha256": "fee345929bfad7bb136049c7152ed900510b6ba67a7d5124ead797772455914d",
+    "bytes_read": 45873,
+    "truncated": false
+  },
+  {
+    "url": "https://docs.nvidia.com/deeplearning/transformer-engine/features/low_precision_training/nvfp4/nvfp4.html",
+    "status": 200,
+    "final_url": "https://docs.nvidia.com/deeplearning/transformer-engine/features/low_precision_training/nvfp4/nvfp4.html",
+    "sha256": "2592a33dbd7ac545244ef08e93e93e0b2154cab7535428f3bbe28ffa2771b420",
+    "bytes_read": 99711,
+    "truncated": false
+  },
+  {
+    "url": "https://docs.nvidia.com/dgx/dgxb200-user-guide/introduction-to-dgxb200.html",
+    "status": 200,
+    "final_url": "https://docs.nvidia.com/dgx/dgxb200-user-guide/introduction-to-dgxb200.html",
+    "sha256": "f8b37516dc1291d8703c5fca1e16ecdec6639dc0c3a221ca9b44dda93be45367",
+    "bytes_read": 47625,
+    "truncated": false
+  },
+  {
+    "url": "https://docs.nvidia.com/multi-node-nvlink-systems/multi-node-tuning-guide/overview.html",
+    "status": 200,
+    "final_url": "https://docs.nvidia.com/multi-node-nvlink-systems/multi-node-tuning-guide/overview.html",
+    "sha256": "cd070efc1b0b64131ea7be6121fdcef19d11dc6c97ef49fc37e9af97ab62c15e",
+    "bytes_read": 26710,
+    "truncated": false
+  },
+  {
+    "url": "https://docs.vllm.ai/en/stable/cli/serve/",
+    "status": 200,
+    "final_url": "https://docs.vllm.ai/en/stable/cli/serve/",
+    "sha256": "8fbc34f69b7219415a1ccd509db755b5619640ab74d1b2fcddb60bdf9e2a47ed",
+    "bytes_read": 392523,
+    "truncated": false
+  },
+  {
+    "url": "https://github.com/NVIDIA/Model-Optimizer/tree/main/examples/hf_ptq",
+    "status": 200,
+    "final_url": "https://github.com/NVIDIA/Model-Optimizer/tree/main/examples/hf_ptq",
+    "sha256": "29e0a424f37ff6e08046c6018d92f35a01019daf66bffebb662fe1f02b595f09",
+    "bytes_read": 551575,
+    "truncated": false
+  },
+  {
+    "url": "https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/features/quantization.md",
+    "status": 200,
+    "final_url": "https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/features/quantization.md",
+    "sha256": "cd5d2b1838cc36ea7f1939201307c6a8bf6605118b9bee476d0c0aa6811c332d",
+    "bytes_read": 316282,
+    "truncated": false
+  },
+  {
+    "url": "https://github.com/NVIDIA/cutlass/blob/098de2a652cf8f00fd70b2df54051c7eccbb855a/examples/72_blackwell_narrow_precision_gemm/72a_blackwell_nvfp4_bf16_gemm.cu",
+    "status": 200,
+    "final_url": "https://github.com/NVIDIA/cutlass/blob/098de2a652cf8f00fd70b2df54051c7eccbb855a/examples/72_blackwell_narrow_precision_gemm/72a_blackwell_nvfp4_bf16_gemm.cu",
+    "sha256": "b565fd40ad2d74e37714848a58c8cff8a7f46ae211369521e12d1dc381ab3f4e",
+    "bytes_read": 494725,
+    "truncated": false
+  },
+  {
+    "url": "https://github.com/NVIDIA/nccl-tests/blob/master/doc/PERFORMANCE.md",
+    "status": 200,
+    "final_url": "https://github.com/NVIDIA/nccl-tests/blob/master/doc/PERFORMANCE.md",
+    "sha256": "ef5f7dbb25d4915700c7159996c57b0130ee8f48935c2e37cd055c97d497033f",
+    "bytes_read": 262350,
+    "truncated": false
+  },
+  {
+    "url": "https://github.com/vllm-project/vllm/blob/5df63a7203cdb9328d824a27b682e77c7b9928be/docs/design/cuda_graphs.md",
+    "status": 200,
+    "final_url": "https://github.com/vllm-project/vllm/blob/5df63a7203cdb9328d824a27b682e77c7b9928be/docs/design/cuda_graphs.md",
+    "sha256": "94d54a297b5784887feff61969d54ee01e90601f538f213eae8fe0a88d2c1c5a",
+    "bytes_read": 363316,
+    "truncated": false
+  },
+  {
+    "url": "https://github.com/vllm-project/vllm/blob/5df63a7203cdb9328d824a27b682e77c7b9928be/vllm/engine/arg_utils.py",
+    "status": 200,
+    "final_url": "https://github.com/vllm-project/vllm/blob/5df63a7203cdb9328d824a27b682e77c7b9928be/vllm/engine/arg_utils.py",
+    "sha256": "504de4885676ad1b2fe6c70ec57ac4ddcd3b0fe2bab7752f02f88234a94d3858",
+    "bytes_read": 1141793,
+    "truncated": false
+  },
+  {
+    "url": "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct/blob/495f39366efef23836d0cfae4fbe635880d2be31/config.json",
+    "status": 200,
+    "final_url": "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct/blob/495f39366efef23836d0cfae4fbe635880d2be31/config.json",
+    "sha256": "558f585c721f85163c8e4e854456580b23a977eae6ece08c72d504e705d6f85e",
+    "bytes_read": 166739,
+    "truncated": false
+  },
+  {
+    "url": "https://nvidia.github.io/TensorRT-LLM/examples/llm_quantization.html",
+    "status": 200,
+    "final_url": "https://nvidia.github.io/TensorRT-LLM/examples/llm_quantization.html",
+    "sha256": "84bfc6265b3f3c96c37394deaceaa735ef9fab92e02c1a22de25f06e5f278301",
+    "bytes_read": 44075,
+    "truncated": false
+  },
+  {
+    "url": "https://triton-lang.org/main/getting-started/tutorials/10-block-scaled-matmul.html",
+    "status": 200,
+    "final_url": "https://triton-lang.org/main/getting-started/tutorials/10-block-scaled-matmul.html",
+    "sha256": "160e38c6f549cac2b52020c22e74f90f3c79e306c2d20f9af72e81c27e262e5a",
+    "bytes_read": 193652,
+    "truncated": false
+  },
+  {
+    "url": "https://triton-lang.org/main/python-api/generated/triton.language.dot_scaled.html",
+    "status": 200,
+    "final_url": "https://triton-lang.org/main/python-api/generated/triton.language.dot_scaled.html",
+    "sha256": "a167fc35b98ee4cdf0df76f667449b39b48b9155a3b8111d1594c29ece2c2ed2",
+    "bytes_read": 15998,
+    "truncated": false
+  },
+  {
+    "url": "https://www.nvidia.com/en-us/data-center/gb200-nvl72/",
+    "status": 200,
+    "final_url": "https://www.nvidia.com/en-us/data-center/gb200-nvl72/",
+    "sha256": "a290e67e56706f1c6ec4f0d436e136108c56e04da3c84ac0ca78365a1ffaee90",
+    "bytes_read": 311454,
+    "truncated": false
+  }
+]

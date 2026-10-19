@@ -4,6 +4,9 @@
 
 ---
 
+**Source scope:** checked against OpenClaw commit `24aac3c15a01feb1946dad5b212282e78dc3941e` (2026-10-18), whose package version is `2026.10.4`. These are source observations, not an executed Gateway deployment. See [source evidence](Lecture-Source-Evidence.md) for exact files and limitations.
+
+
 ## Why this lecture exists
 
 Cron looks simple from the outside:
@@ -148,6 +151,8 @@ Invalid or surprising schedules should be **caught early**, before the job becom
 ---
 
 ## 3. What OpenClaw cron adds
+
+Current docs call this surface `openclaw automations`; `openclaw cron` remains a supported alias, so the commands below retain that spelling. Mutations (`add`, `edit`, `remove`, `run`) require `operator.admin`. Command-payload jobs execute directly in the Gateway process, not through an agent's `tools.exec`; model-tool exec approvals are not a sandbox for scheduled command payloads.
 
 OpenClaw cron runs inside the Gateway process.
 
@@ -353,35 +358,30 @@ Otherwise cron turns into:
 
 > the system did nothing, and no one knows why
 
-OpenClaw resolves failure notifications in this order:
+At the audited revision, failure routing uses per-job `failureAlert` route fields, then the job's `delivery.failureDestination` layered over global `cron.failureAlert` destination fields, then an applicable primary route. The global `cron.failureDestination` block was retired in 2026.8.1; migration merges it into `cron.failureAlert`.
 
-1. job-specific `delivery.failureDestination`
-2. global `cron.failureDestination`
-3. the job's primary announce target, when the job already uses announce delivery
-
-This gives you a safe default:
-
-if a scheduled report normally posts to a chat, failures can fall back to the same target unless you configure a more specific destination.
-
-Configuration shape:
+Conceptual current global destination configuration:
 
 ```json5
 {
   cron: {
-    failureDestination: {
+    failureAlert: {
+      enabled: true,
+      after: 2,
+      cooldownMs: 3600000,
       mode: "announce",
-      channel: "last",
-      to: "channel:C1234567890"
+      channel: "slack",
+      to: "channel:YOUR_AUTHORIZED_CHANNEL"
     }
   }
 }
 ```
 
-This is **operational design**, not UI polish.
+Check the actual job and resolved route before enabling a schedule. Execution failure and delivery failure are separate outcomes: a completed task can fail to deliver. The current delivery diagnostics must be inspected, not inferred from assistant prose. The CLI guide documents policy inheritance, one-shot exceptions and cooldown behavior.
 
-For autonomous scheduled jobs, failure delivery is a **control-plane requirement**.
+`--no-deliver` disables automatic results/notifications. It does **not** remove the agent's `message` tool when a route exists. Remove or constrain that capability separately when a job must not send messages.
 
----
+Sources: [pinned automation CLI](https://github.com/openclaw/openclaw/blob/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/cli/cron.md).
 
 ## 9. Retry behavior
 
@@ -468,8 +468,8 @@ Useful commands:
 
 ```bash
 openclaw cron list
-openclaw cron show <job-id>
-openclaw cron runs --id <job-id> --limit 50
+openclaw cron show "${OPENCLAW_JOB_ID:?Set OPENCLAW_JOB_ID to an existing authorized identifier}"
+openclaw cron runs --id "${OPENCLAW_JOB_ID:?Set OPENCLAW_JOB_ID to an existing authorized identifier}" --limit 50
 ```
 
 Run history includes delivery diagnostics such as:
@@ -480,27 +480,11 @@ Run history includes delivery diagnostics such as:
 - fallback use
 - delivered/not delivered status
 
-Retention controls:
+Current storage is the shared SQLite state database. Legacy `jobs.json` and per-run JSONL storage were retired; do not edit them as if they were live state. The audited CLI guide specifies an intermediate 2026.9.7 migration for old file stores before upgrading, and current Doctor reports that requirement rather than silently importing all old files.
 
-```json5
-{
-  cron: {
-    sessionRetention: "24h",
-    runLog: {
-      maxBytes: "2mb",
-      keepLines: 2000
-    }
-  }
-}
-```
+`cron.sessionRetention` controls completed isolated sessions (24 hours by default). Current run-history retention is 7 days for terminal runs, 24 hours for lost rows, with a 2,000-row ceiling per job/history class. These are source-version defaults, not a universal configuration contract. The old `runLog.maxBytes/keepLines` JSONL example does not describe current storage.
 
-This matters because isolated cron jobs create sessions and transcripts. Without retention, automation creates **state forever**.
-
-The production pattern is:
-
-> keep enough history to debug, prune enough history to avoid state growth
-
----
+**Exercise:** distinguish four records: accepted but queued, executed and succeeded, succeeded with failed delivery, and never dispatched because the Gateway exited. A successful enqueue response proves only admission; inspect the returned run ID and durable outcome.
 
 ## 12. Manual execution
 
@@ -509,7 +493,7 @@ Cron jobs should be testable without waiting for the next scheduled time.
 OpenClaw supports:
 
 ```bash
-openclaw cron run <job-id>
+openclaw cron run "${OPENCLAW_JOB_ID:?Set OPENCLAW_JOB_ID to an existing authorized identifier}"
 ```
 
 This force-runs by default and returns once the run is queued.
@@ -523,13 +507,13 @@ Successful responses include:
 Then inspect:
 
 ```bash
-openclaw cron runs --id <job-id> --limit 50
+openclaw cron runs --id "${OPENCLAW_JOB_ID:?Set OPENCLAW_JOB_ID to an existing authorized identifier}" --limit 50
 ```
 
 Use:
 
 ```bash
-openclaw cron run <job-id> --due
+openclaw cron run "${OPENCLAW_JOB_ID:?Set OPENCLAW_JOB_ID to an existing authorized identifier}" --due
 ```
 
 when you want "run only if currently due" behavior.
@@ -566,8 +550,8 @@ openclaw status
 openclaw gateway status
 openclaw cron status
 openclaw cron list
-openclaw cron show <job-id>
-openclaw cron runs --id <job-id> --limit 20
+openclaw cron show "${OPENCLAW_JOB_ID:?Set OPENCLAW_JOB_ID to an existing authorized identifier}"
+openclaw cron runs --id "${OPENCLAW_JOB_ID:?Set OPENCLAW_JOB_ID to an existing authorized identifier}" --limit 20
 openclaw system heartbeat last
 openclaw logs --follow
 openclaw doctor

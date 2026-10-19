@@ -1,10 +1,12 @@
 # AI Agent Development 2026 — Lecture Index
 
+**Start with an executed local exercise:** [retrieval, workflow recovery and API contracts](../Local-RAG-Workflow-Lab/Guide.md), then return to the lectures for the concepts. No model account is required for that baseline.
+
 A hands-on lecture series building from the modern agent harness, through fundamentals and the core parts of an agent, to a real harness case study (OpenClaw) and a capstone build (**genie-claw**).
 
 > This is the **flat, numbered index** of all lectures. For the recommended **theory-first reading order** grouped into modules, see the **[course Guide](../Guide.md)**.
 
-> **★ Companion deep-dive:** [**MCP for AI Agents**](../MCP%20for%20AI%20Agents/README.md) — an 8-lecture course on the **Model Context Protocol**, the open standard agents use to reach tools and data. It builds directly on [Tool Use & Function Calling](Lecture-08.md): architecture and the six primitives, building and securing real servers, OAuth 2.1 for remote deployment, and the production stack — current to the 2025-11-25 spec and the 2026 release candidate.
+> **★ Companion deep-dive:** [**MCP for AI Agents**](../MCP%20for%20AI%20Agents/README.md) — an 8-lecture course on the **Model Context Protocol**, the open standard agents use to reach tools and data. It builds directly on [Tool Use & Function Calling](Lecture-08.md): architecture and the six primitives, building and securing real servers, OAuth 2.1 for remote deployment, and the production stack — with a current 2026-07-28 request lesson and explicitly labelled older compatibility examples.
 
 ## How to Read This Course in 2026
 
@@ -80,7 +82,7 @@ The lectures are numbered 01–42 in the recommended reading order (Lecture 42 i
 |---|-------|-------|
 | [Lab 01](Lab-01-Research-Agent.md) | Research Agent with Tool Use | Web search + code execution + citations |
 | [Lab 02](Lab-02-Multi-Agent-Pipeline.md) | Multi-Agent Code Review | Planner → Coder → Reviewer → Summarizer |
-| [Lab 03](Lab-03-Production-RAG.md) | Production RAG System | Ingestion pipeline + hybrid search + RAGAS eval |
+| [Lab 03](Lab-03-Production-RAG.md) | RAG integration prototype | Ingestion pipeline + hybrid search + RAGAS eval |
 | [Lab 04](Lab-04-TokenJuice-Output-Compaction.md) | TokenJuice Output Compaction | Deterministic terminal-output reduction, raw bypasses, artifact recovery, project reducers |
 | [Lab 05](Lab-05-OpenMeow-App-SDK-Dogfood.md) | OpenMeow App SDK Dogfood on macOS | Test the OpenClaw App SDK with OpenCoven's OpenMeow adapter, fixtures, UI reducers, live Gateway smoke tests, and optional Coven sessions |
 | [Lab 06](Lab-06-Genie-Claw-Capstone.md) | **Capstone: Build genie-claw** | Your own minimal agent harness — run loop, tools, durable sessions, guardrails, human-in-the-loop, wired to a local LLM runtime |
@@ -100,6 +102,8 @@ pip install anthropic openai pydantic fastapi uvicorn \
 ```
 
 Install only the packages needed for the lecture you are running. For production work, pin versions in `requirements.txt` or `pyproject.toml` and review provider migration notes before upgrading SDKs.
+
+Start executable provider integration with the [CPU provider contract lab](Provider-Contract-Lab.md): it uses actual pinned SDKs and local HTTP fixtures, needs no API account, and tests malformed/partial responses. Read [source and execution evidence](Lecture-Source-Evidence.md) before treating a source-checked deployment snippet as a measured result.
 
 Code snippets use placeholder model IDs such as `your-agent-model-id`, `your-fast-model-id`, and `your-embedding-model-id`. Replace them with current model IDs from your provider before running the examples.
 

@@ -24,108 +24,101 @@ Your kernels and optimizations only matter if they run correctly in a runtime an
 
 ## 1. Runtimes
 
-* **TensorRT** — Engine build, plugins, dynamic shapes, DLA. How your kernels and graph optimizations show up in the engine.
+* **TensorRT** — Engine build, plugins, and dynamic shapes. Hardware features such as DLA are release/platform specific; do not infer support from a generic TensorRT label.
 * **ONNX Runtime** — Execution providers (CUDA, TensorRT, OpenVINO). Graph optimizations and provider selection.
 * **Triton Inference Server** — Batching, model concurrency, metrics. Serving multiple models and dynamic batching.
 
 ---
 
-## 2. TensorRT-LLM — Production LLM Inference
+## 2. LLM runtimes: choose a release and a workload
 
-[**TensorRT-LLM**](https://github.com/NVIDIA/TensorRT-LLM) is NVIDIA's open-source library purpose-built for LLM inference on NVIDIA GPUs. It extends TensorRT with LLM-specific optimizations that general-purpose runtimes cannot match. If you deploy large language models on NVIDIA hardware, this is the production path.
+[TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) and
+[vLLM](https://github.com/vllm-project/vllm) provide scheduling, cache management,
+and model execution for autoregressive workloads. Neither has a universal
+performance advantage. Compare the same checkpoint revision, tokenizer,
+precision/quality gate, input/output length distribution, arrival trace,
+hardware, and latency objective.
 
-### Why TensorRT-LLM exists
+### TensorRT product and platform versions
 
-Standard TensorRT handles vision and small models well, but LLMs have unique challenges:
-- **KV-cache management** — grows linearly with context length, must be paged and reused across requests.
-- **Autoregressive decoding** — each token depends on all previous tokens; batching is complex.
-- **Multi-GPU serving** — models that don't fit on one GPU need tensor/pipeline parallelism.
-- **Mixed workloads** — prefill (compute-bound) and decode (memory-bound) phases have opposite bottlenecks.
+As checked 2026-10-18, the TensorRT `latest` guide is **11.4**, with strongly typed networks by default. It does **not** support JetPack; Jetson requires a supported 10.x stack and matching archived documentation. DLA availability is a separate release/platform question. Do not copy 10.x precision flags/build APIs into 11.x examples or use 11.x support tables to certify a JetPack deployment. See [official Jetson migration guidance](https://docs.nvidia.com/deeplearning/tensorrt/latest/api/migration/tensorrt-10x-to-11x-jetson.html) and [10.x Python documentation](https://docs.nvidia.com/deeplearning/tensorrt/10.x.x/inference-library/python-api-docs.html).
 
-TensorRT-LLM solves all of these with a Python API that compiles LLMs into optimized TensorRT engines with LLM-specific runtime features.
+### Current and historical TensorRT-LLM paths
 
-### Core features
+**Currency review: 2026-10-18.** NVIDIA's current `latest` documentation,
+[updated 2026-10-09 at source commit `cc63e66`](https://nvidia.github.io/TensorRT-LLM/latest/legacy/tensorrt-backend-removal.html),
+documents removal of its legacy TensorRT engine backend and directs users to the
+PyTorch-backed LLM API. It also removes the old per-model conversion and
+`trtllm-build` workflow. This is a claim about that documentation snapshot;
+check the release/container you actually install. An older Jetson or archived
+server recipe may deliberately target an earlier supported stack.
 
-* **In-flight batching (continuous batching):**
-    * Batch requests as they arrive — don't wait for a full batch. New requests join while others are mid-generation.
-    * Maximizes GPU utilization by mixing prefill and decode phases across requests.
+TensorRT itself remains a separate inference product. Do not infer the
+TensorRT-LLM execution backend from the product name, or mix old engine-build
+instructions with a newer checkpoint-loading runtime.
 
-* **Paged KV-cache:**
-    * Inspired by vLLM's PagedAttention — allocates KV-cache in fixed-size blocks, not contiguous per-sequence.
-    * Eliminates memory fragmentation; enables serving more concurrent sequences.
+**Upstream-documented shape, not locally executed GPU code:**
 
-* **Quantization:**
-    * FP8 (Hopper+), INT8 (SmoothQuant), INT4 (AWQ, GPTQ) — all with fused dequantize in GEMM kernels.
-    * FP4 on Blackwell for maximum throughput.
+```python
+from tensorrt_llm import LLM, SamplingParams
 
-* **Tensor parallelism and pipeline parallelism:**
-    * Split model across GPUs: tensor parallel (split within layers) or pipeline parallel (split across layers).
-    * NCCL-based communication, overlapped with compute.
-
-* **Speculative decoding:**
-    * Draft model generates candidate tokens; main model verifies in one forward pass.
-    * Reduces time-to-first-token and overall latency.
-
-* **Custom Hopper/Blackwell kernels:**
-    * CUTLASS-based GEMM kernels optimized for each GPU generation.
-    * Warp specialization, persistent kernels, Transformer Engine integration.
-
-* **CUDA Graphs:**
-    * Captures the decode loop as a CUDA graph — eliminates per-token kernel launch overhead.
-
-### Build and deploy workflow
-
-```bash
-# Install
-pip install tensorrt-llm
-
-# Step 1: Convert model checkpoint to TRT-LLM format
-python convert_checkpoint.py \
-    --model_dir ./llama-3-8b \
-    --output_dir ./trt_ckpt \
-    --dtype float16 \
-    --tp_size 2           # tensor parallel across 2 GPUs
-
-# Step 2: Build TRT-LLM engine
-trtllm-build \
-    --checkpoint_dir ./trt_ckpt \
-    --output_dir ./trt_engine \
-    --gemm_plugin float16 \
-    --max_batch_size 64 \
-    --max_input_len 2048 \
-    --max_seq_len 4096 \
-    --paged_kv_cache enable \
-    --use_fused_mlp enable
-
-# Step 3: Run inference
-python run.py \
-    --engine_dir ./trt_engine \
-    --tokenizer_dir ./llama-3-8b \
-    --input_text "Explain how a systolic array works"
-
-# Step 4: Serve with Triton Inference Server
-# TRT-LLM integrates with Triton via the TRT-LLM backend
-# → in-flight batching, streaming, multi-model serving
+# Replace with a locally downloaded, revision-pinned supported checkpoint.
+llm = LLM(model="/absolute/path/to/pinned-checkpoint")
+outputs = llm.generate(["Explain a matrix multiply."], SamplingParams(max_tokens=32))
+for result in outputs:
+    print(result.outputs[0].text)
 ```
 
-### TensorRT-LLM vs vLLM
+Use the release's [quick start](https://nvidia.github.io/TensorRT-LLM/latest/quick-start-guide.html)
+and hardware/model support documentation to prepare the environment. Record
+container digest, checkpoint hash/revision, runtime version, and command. The
+[CPU compiler lab](../00%20-%20CPU%20Compiler%20Lab/Guide.md) is the executed local
+route; it does not validate either GPU LLM runtime.
 
-| | TensorRT-LLM | vLLM |
+### What the runtime must manage
+
+| Mechanism | What it changes | What to measure |
 |---|---|---|
-| **Approach** | Compile model to optimized engine (ahead-of-time) | JIT with PyTorch + custom CUDA kernels |
-| **Performance** | Highest throughput on NVIDIA GPUs (custom Hopper/Blackwell kernels) | Very good; slightly lower peak but faster iteration |
-| **Quantization** | FP8, INT8, INT4, FP4 with fused kernels | GPTQ, AWQ, FP8 via external libraries |
-| **Multi-GPU** | TP + PP via NCCL | TP via NCCL |
-| **Setup complexity** | Higher — build step required | Lower — load and serve |
-| **Model support** | Major LLMs (Llama, Mistral, GPT, Falcon, etc.) | Broader model support via HuggingFace |
-| **Hardware** | NVIDIA only | NVIDIA + AMD (ROCm) |
-| **Best for** | Maximum throughput in production on NVIDIA | Rapid prototyping, AMD support, flexibility |
+| Continuous batching | Adds/removes sequences while other requests run | Useful throughput, queue time, TTFT, inter-token latency |
+| Paged KV storage | Allocates state in blocks and can reduce wasted capacity | Allocated/used bytes, fragmentation, cache reuse rules |
+| Quantized execution | Changes representations and kernel choices | Quality, actual arithmetic path, scale/metadata overhead |
+| Tensor/pipeline/expert parallelism | Distributes tensors, layers, or experts | Communication critical path, memory, per-device useful throughput |
+| Speculative decoding | Drafts candidates and verifies them with the target | Acceptance rate, decode latency, draft cost, sampling correctness |
+| CUDA Graph replay | Reuses captured launch structures on compatible paths | Host overhead, capture limits, static-shape/memory constraints |
 
-### Key concepts to internalize
+Paging does not eliminate all fragmentation. Speculation does not promise
+better time-to-first-token, and capture does not eliminate all execution or
+host overhead. Measure the mechanism you enabled. vLLM also supports multiple
+parallelism strategies; consult its [parallelism documentation](https://docs.vllm.ai/en/latest/serving/parallelism_scaling/)
+rather than treating it as tensor-parallel-only.
 
-* **Prefill vs decode phases** — Prefill processes the entire prompt in one pass (compute-bound, high arithmetic intensity). Decode generates one token at a time (memory-bound, low arithmetic intensity). TRT-LLM optimizes both with different kernel strategies.
-* **KV-cache sizing** — For a 7B model at FP16 with 4096 context: ~2 GB KV-cache per sequence. With paged KV-cache, 80 GB H100 can serve ~30 concurrent sequences. Understanding this math is essential.
-* **Engine build trade-offs** — `max_batch_size`, `max_input_len`, `max_seq_len` are baked into the engine. Larger = more memory reserved, fewer concurrent engines. Size for your actual workload.
+### Worked KV-cache estimate
+
+For a conventional full-attention decoder with cached keys and values:
+
+```text
+KV payload bytes = 2 × layers × cached_tokens × KV_heads × head_dim × bytes_per_element
+```
+
+With 32 layers, 4,096 cached tokens, 8 KV heads, head dimension 128, and FP16
+(2 bytes), this is `536,870,912 bytes = 512 MiB` per sequence. Changing only the
+KV-head count to 32 produces `2 GiB`. Parameter count alone cannot distinguish
+these cases. Multi-query/grouped-query attention, sliding windows, latent
+attention, cache quantization, and runtime sharding require their actual state
+layout rather than blindly applying this formula.
+
+This is payload arithmetic, not peak device allocation. Subtract model weights,
+activations/workspaces, runtime buffers, graph reservations, and fragmentation
+from device capacity before estimating concurrency, then measure actual use.
+A nominal 80 GB device does not imply a fixed number of concurrent “7B” requests.
+
+### Prefill and decode are hypotheses to profile
+
+Long-prompt prefill often offers greater arithmetic intensity; small-batch
+decode often exposes weight/cache bandwidth and launch overhead. Batch size,
+attention structure, sequence lengths, precision, and device can change the
+bottleneck. Record the measured roofline/trace evidence instead of labeling
+all prefill compute-bound and all decode memory-bound.
 
 ---
 
@@ -140,7 +133,7 @@ python run.py \
 
 ## Resources
 
-* [TensorRT Best Practices](https://docs.nvidia.com/deeplearning/tensorrt/best-practices/)
+* [TensorRT Best Practices](https://docs.nvidia.com/deeplearning/tensorrt/latest/performance/best-practices.html)
 * [TensorRT-LLM GitHub](https://github.com/NVIDIA/TensorRT-LLM) — Source, examples, model support matrix.
 * [TensorRT-LLM Documentation](https://nvidia.github.io/TensorRT-LLM/) — Build, deploy, and optimize guides.
 * [vLLM](https://github.com/vllm-project/vllm) — Alternative LLM serving engine for comparison.
@@ -154,9 +147,9 @@ python run.py \
 1. **Runtime comparison** — Deploy the same model with ONNX Runtime and TensorRT (same hardware). Compare latency and throughput; document configuration and measurement method.
 2. **Triton server** — Set up a minimal Triton server with dynamic batching. Measure QPS vs batch size and document how batching affects latency and throughput.
 3. **Benchmark report** — For one model and one runtime, produce a one-page benchmark report: latency (p50/p99), throughput, memory, and exact environment (GPU, driver, runtime version).
-4. **TensorRT-LLM engine build** — Build a TensorRT-LLM engine for Llama-3-8B with FP16 and INT8 quantization. Measure tokens/s, TTFT, and memory usage. Compare with vLLM on the same hardware.
-5. **Multi-GPU LLM serving** — Deploy a 70B model across 2+ GPUs with tensor parallelism using TensorRT-LLM. Measure scaling efficiency (tokens/s per GPU) vs single-GPU with a smaller model.
-6. **TRT-LLM + Triton** — Deploy TensorRT-LLM engine behind Triton Inference Server with in-flight batching enabled. Load test with concurrent clients and measure p50/p99 latency under load.
+4. **LLM runtime comparison** — Load one supported, revision-pinned checkpoint in the selected TensorRT-LLM release and vLLM. Match precision and quality first; measure useful tokens/s, TTFT, inter-token latency, memory, and errors under the same arrival trace. Use engine builds only for an explicitly archived release that supports that workflow.
+5. **Multi-GPU LLM serving** — Measure a model that fits in both compared configurations, keeping model and workload fixed while changing GPU count. A comparison against a smaller model is a different workload, not a scaling-efficiency measurement.
+6. **Serving integration** — Use a server integration supported by the exact selected runtime release. Load test concurrent clients, cancellation, and overload; do not assume an archived Triton engine backend accepts a newer runtime artifact.
 
 ---
 

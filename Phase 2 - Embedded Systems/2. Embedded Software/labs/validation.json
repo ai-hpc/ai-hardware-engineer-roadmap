@@ -1,0 +1,34 @@
+{
+  "review_date": "2026-10-18",
+  "host": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "compiler": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "tests": {
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0
+  },
+  "executed": [
+    "native C11 optimized executable",
+    "AddressSanitizer and UndefinedBehaviorSanitizer",
+    "CRC bypass mutant rejected",
+    "future timestamp mutant rejected"
+  ],
+  "coverage": [
+    "99 payload patterns and every possible byte split",
+    "CRC check vector and corrupt CRC",
+    "invalid version and malformed COBS",
+    "overflow discard and delimiter recovery",
+    "16-bit sequence wrap and 32-bit clock wrap"
+  ],
+  "not_executed": [
+    "MCU board",
+    "UART peripheral or DMA",
+    "FreeRTOS scheduling"
+  ],
+  "source_sha256": {
+    "telemetry_frame.h": "a9cf83b2dace9e60d2a92b23741c80e2236fcf6f27aa372dfdf0455a9375f862",
+    "telemetry_frame.c": "0c591f43bfcdd2b3e46cccd65bc975ffd41e5aa1ecd45abd1ddf2fd15e28bfcd",
+    "telemetry_frame_test.c": "0c997d211a8f66f833fd1dc233982d74eaaa5027a146678eb3dcfea9a68b7dce",
+    "test_telemetry_frame.py": "b77c2030b5de379edc1607bf6e0a741f55517a2014249133a1ed3434c051fed4"
+  }
+}

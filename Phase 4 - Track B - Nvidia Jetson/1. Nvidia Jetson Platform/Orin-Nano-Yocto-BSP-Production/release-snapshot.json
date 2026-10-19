@@ -1,0 +1,80 @@
+{
+  "checked_on": "2026-10-18",
+  "evidence_kind": "retrieved immutable upstream metadata; not image or hardware validation",
+  "meta_tegra": [
+    {
+      "branch_at_review": "wrynose",
+      "commit": "feab7664000f313f655d20d2f39c04432214dc25",
+      "repository": "https://github.com/OE4T/meta-tegra",
+      "files": {
+        "README.md": {
+          "url": "https://raw.githubusercontent.com/OE4T/meta-tegra/feab7664000f313f655d20d2f39c04432214dc25/README.md",
+          "sha256": "1692b8470184e3b50bd643e161481a3e6d1df9a9455e875106c193cf059141cf"
+        },
+        "conf/layer.conf": {
+          "url": "https://raw.githubusercontent.com/OE4T/meta-tegra/feab7664000f313f655d20d2f39c04432214dc25/conf/layer.conf",
+          "sha256": "7f9a1a95208242db66abeb02ff065ad9efbfbba0ad53bca0fff507773f7f1960"
+        },
+        "conf/machine/jetson-orin-nano-devkit.conf": {
+          "url": "https://raw.githubusercontent.com/OE4T/meta-tegra/feab7664000f313f655d20d2f39c04432214dc25/conf/machine/jetson-orin-nano-devkit.conf",
+          "sha256": "d3a66a427d90d915668296263b05c2a71ccff004a1a4dd32b4d6d38e8c733ecf"
+        }
+      },
+      "release_lines": [
+        "Jetson Linux release: R39.2.1",
+        "JetPack release:      7.2.1",
+        "branch: wrynose",
+        "LAYERSERIES_COMPAT: wrynose"
+      ]
+    },
+    {
+      "branch_at_review": "scarthgap",
+      "commit": "6d7cc8f27e8b3bda2abfa68b2fcfe8d6ecf10464",
+      "repository": "https://github.com/OE4T/meta-tegra",
+      "files": {
+        "README.md": {
+          "url": "https://raw.githubusercontent.com/OE4T/meta-tegra/6d7cc8f27e8b3bda2abfa68b2fcfe8d6ecf10464/README.md",
+          "sha256": "5a7b17d92e77df143cf415f81c9ae49d6bcc3dedec0258bd45822ce4908a892b"
+        },
+        "conf/layer.conf": {
+          "url": "https://raw.githubusercontent.com/OE4T/meta-tegra/6d7cc8f27e8b3bda2abfa68b2fcfe8d6ecf10464/conf/layer.conf",
+          "sha256": "a669bfb73d38aef10bb10a5922ae702d98aa9a500ba804626a1b78db233467f2"
+        },
+        "conf/machine/jetson-orin-nano-devkit.conf": {
+          "url": "https://raw.githubusercontent.com/OE4T/meta-tegra/6d7cc8f27e8b3bda2abfa68b2fcfe8d6ecf10464/conf/machine/jetson-orin-nano-devkit.conf",
+          "sha256": "bc8645d21248bd78919f6850ef1c3f75dd3c9b241ac53d287b786112f8477998"
+        }
+      },
+      "release_lines": [
+        "Jetson Linux release: R36.5.2",
+        "JetPack release:      6.2.3",
+        "branch: scarthgap"
+      ]
+    },
+    {
+      "branch_at_review": "master",
+      "commit": "95e8a869123c42f1207cc12914f9c65ce2e50fa0",
+      "repository": "https://github.com/OE4T/meta-tegra",
+      "files": {
+        "README.md": {
+          "url": "https://raw.githubusercontent.com/OE4T/meta-tegra/95e8a869123c42f1207cc12914f9c65ce2e50fa0/README.md",
+          "sha256": "cfe6e37249596e7471e4dc0a15be5654d49f7f0764daa462c0856764e90b2215"
+        },
+        "conf/layer.conf": {
+          "url": "https://raw.githubusercontent.com/OE4T/meta-tegra/95e8a869123c42f1207cc12914f9c65ce2e50fa0/conf/layer.conf",
+          "sha256": "6dae7de0aa142858071cdffb120f436a0aa3bd7f738b6ec7ec31301c138c3488"
+        },
+        "conf/machine/jetson-orin-nano-devkit.conf": {
+          "url": "https://raw.githubusercontent.com/OE4T/meta-tegra/95e8a869123c42f1207cc12914f9c65ce2e50fa0/conf/machine/jetson-orin-nano-devkit.conf",
+          "sha256": "d3a66a427d90d915668296263b05c2a71ccff004a1a4dd32b4d6d38e8c733ecf"
+        }
+      },
+      "release_lines": [
+        "Jetson Linux release: R39.2.1",
+        "JetPack release:      7.2.1",
+        "branch: master",
+        "LAYERSERIES_COMPAT: blacksail"
+      ]
+    }
+  ]
+}

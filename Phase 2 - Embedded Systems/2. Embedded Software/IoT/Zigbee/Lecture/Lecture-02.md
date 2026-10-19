@@ -136,6 +136,16 @@ That is why roles belong in Embedded Software, not only in networking diagrams.
 
 ---
 
+## Work a parent-loss experiment
+
+Draw a coordinator C, routers R1 and R2, and sleepy end device S attached to R1. Record S's parent, stable identity, current short address, last valid application report, and configured polling/child timeout. Removing R1 does not permit S to route through arbitrary neighbors while asleep: it must detect loss and complete the appropriate recovery/rejoin behavior.
+
+Observe three times separately: loss is detected, network attachment is restored, and a fresh application report is accepted. A role/state line alone proves none of the latter application semantics. Also confirm the actual initial topology; putting four boards on a desk does not guarantee that packets traversed R1.
+
+The coordinator forms a centralized network, but it is not necessarily on every data path. Loss of a coordinator/trust center has different consequences for existing routing, new joins, key management, and host applications. Avoid the blanket claim that every packet stops immediately or that all services necessarily continue.
+
+**Exercise answer:** A battery sensor that must sleep should normally be an end device, with an available powered parent. A powered router can extend connectivity, but only measurements/topology evidence establish the improvement. Choose poll/recovery parameters from the application's freshness and energy budgets.
+
 ## Lab
 
 Draw a small 6-device Zigbee network and label:

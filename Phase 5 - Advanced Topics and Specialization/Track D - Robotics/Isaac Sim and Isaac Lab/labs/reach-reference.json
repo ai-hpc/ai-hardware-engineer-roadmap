@@ -1,0 +1,20 @@
+{
+  "scope": "actual CPU PyTorch execution of lecture class methods; fake scene and kinematics callback",
+  "torch": "2.14.0+cpu",
+  "observation_width": 27,
+  "checks_passed": 6,
+  "checks": [
+    "soft joint-limit clipping",
+    "timeout at 240 transitions",
+    "previous action in observation",
+    "known reward .99/60",
+    "selected reset only",
+    "kinematics refresh requested"
+  ],
+  "task_code_sha256": "33f59525cb54b55cebe9ed59210de1aae476dccad8d44147e9be2cea58116fa5",
+  "limitations": [
+    "constructor/asset loading not executed",
+    "no Isaac data views or forward kinematics",
+    "real reset sensor freshness requires simulator execution"
+  ]
+}

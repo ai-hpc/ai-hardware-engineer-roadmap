@@ -1,285 +1,106 @@
-# Module 07 — Layer Sensitivity: Why Q/K Break While O and MLP Survive
+# Module 07 — Layer Sensitivity: Measure the Operator and the Task
 
-**Collection:** [Hardware-Aware LLM Quantization](README.md) | **Previous:** [← Module 06](Lecture-06.md) | **Next:** [Module 08 →](Lecture-08.md)
+**Collection:** [Hardware-Aware LLM Quantization](README.md) | **Previous:** [Previous lesson](Lecture-06.md) | **Next:** [Next lesson](Lecture-08.md)
 
----
+The question is whether a quantized component changes an important output, not
+whether its histogram looks unusual. Q/K, MLP, output heads and recurrent gates
+can each be sensitive. There is no model-independent ranking that lets us skip
+measurement.
 
-Every practitioner eventually discovers the same empirical rule: **quantize the MLP and output projection freely; touch Q and K at your peril.** It is usually passed on as folklore, sometimes with a hand-wave about activation outliers.
+## 1. What a linear layer does to weight error
 
-The hand-wave is wrong, and knowing why it is wrong is worth real throughput. The mechanism is not in the *distribution* of Q/K values — it is in the **operator that consumes them**. Quantization error into a linear operator averages down. Quantization error into a softmax gets **exponentiated**.
-
-This module derives that, connects it to the measured case-study result, and gives you a protocol for measuring sensitivity directly instead of guessing it from statistics.
-
----
-
-## Learning objectives
-
-By the end of this module you should be able to:
-
-1. Derive why per-element quantization error *averages down* through a linear projection but *amplifies* through attention.
-2. Quantify the attention-weight distortion produced by a given relative error on Q/K.
-3. Explain why GQA makes K the worst traffic-to-damage ratio in the entire model.
-4. Explain why **sensitivity is not predicted by outlier magnitude**, and what that implies for method selection.
-5. Run a leave-one-out sensitivity sweep and turn it into a precision-allocation table.
-
----
-
-## 1. The two fates of a quantization error
-
-Both paths start identically: a weight tensor is quantized, producing per-element relative error `η ≈ 0.10` for NVFP4 ([Module 02 §5](Lecture-02.md)).
-
-### Path A — through a linear projection (O, MLP, V)
-
-The output is a dot product of length `K`. Errors are approximately zero-mean and independent, so they add in quadrature while the signal adds linearly:
+For a row vector `x`, weights `W`, and quantization error `E`,
 
 ```text
-   relative output error  ≈  η / √K
+y = x W;       y_quant - y = x E
+||x E||₂ ≤ ||x||₂ ||E||₂
 ```
 
-| Layer | `K` | Output error from η = 0.10 |
-|---|---:|---:|
-| O projection | 8192 | **0.11 %** |
-| MLP down projection | 13,870 | **0.09 %** |
+If scalar errors are independent, zero mean, variance `sigma²`, then for one output
+`Var(delta_y)=sigma² sum_i x_i²`. A `1/sqrt(K)` **relative** error improvement needs
+a signal that grows coherently with K. It is not a general property of dot products.
+For `x=(1,1)` and `w=(1,-1)`, the output is zero: tiny error can have unbounded
+relative size. Residual additions can attenuate or compound perturbations.
 
-Then the result is **added into the residual stream**, which by mid-network has accumulated a large norm. An additive perturbation of 0.1 % on one contribution to a large running sum is diluted further still.
+**Worked example:** two equal-size weight errors are `E₁=(0.1,0)` and `E₂=(0,0.1)`.
+For deployment input `x=(100,1)`, their output errors are 10 and 0.1. Equal weight
+MSE does not imply equal layer-output MSE. This is why calibration activations matter.
+
+## 2. Attention scores and softmax
+
+For `s_i=qᵀk_i/sqrt(d)`, perturbed vectors give the exact score change:
 
 ```text
-   x  ←  x  +  f(x) + δ            δ/|x| ≪ 0.1 %
-         └── large ──┘  └ tiny ┘
-
-   LINEAR · ADDITIVE · DILUTED BY THE RESIDUAL · AVERAGES OVER K TERMS
+delta_s_i = (delta_qᵀ k_i + qᵀ delta_k_i + delta_qᵀ delta_k_i) / sqrt(d)
 ```
 
-**This is why MLP and O projections tolerate 4-bit quantization well.** It is not that their weights are special. It is that four separate mechanisms all work in your favour.
-
-### Path B — through attention scores (Q, K)
-
-Now the same error enters a dot product that is then **exponentiated**.
-
-```text
-   s_i  =  (q · k_i) / √d_head              attention logit
-   p    =  softmax(s)                       attention weights
-```
-
-Perturb `q → q + δ` and `k_i → k_i + ε_i`:
-
-```text
-   Δs_i  =  (δ · k_i  +  q · ε_i) / √d_head
-```
-
-Here is the critical step. For `q, k` with iid components, both `q·k` and `δ·k` scale as `σ²√d`, so the *relative* logit error is `≈ η√2` — **the √K averaging benefit does not appear**, because the error is relative to a quantity that is itself a dot product of the same length. The averaging that saved Path A cancels out.
-
-So the **absolute** logit error is:
-
-```text
-   Δs  ≈  η · √2 · |s|
-```
-
-And softmax turns absolute logit differences into **multiplicative** weight ratios:
-
-```text
-   p_i / p_j  =  exp(s_i − s_j)      ⟹      a shift Δs changes the ratio by  exp(Δs)
-```
-
-| η | typical \|logit\| | Δs | **attention weight distorted by** |
-|---:|---:|---:|---:|
-| 0.05 | 5 | 0.35 | **×1.42** |
-| 0.05 | 10 | 0.71 | **×2.03** |
-| 0.05 | 20 | 1.41 | **×4.11** |
-| 0.10 | 10 | 1.41 | **×4.11** |
-| 0.10 | 20 | 2.83 | **×16.9** |
-
-```text
-   PATH A  (O, MLP)          PATH B  (Q, K)
-   ─────────────────         ─────────────────────────
-   error / √K                error × exp(·)
-   0.10 → 0.001              0.10 → attention mass moves by 2–17×
-   AVERAGES DOWN             AMPLIFIES
-```
-
-**That is the whole answer.** Three orders of magnitude separate the two fates, and the cause is the operator, not the data.
-
-Two corollaries worth internalizing:
-
-* **Sensitivity grows with logit magnitude**, which grows with `d_head` and over the course of training. Bigger, better-trained models are *more* Q/K-sensitive, not less.
-* **V is on Path A, not Path B.** V is consumed by a weighted sum, not a softmax. `V` quantizes like `O` — freely. When people say "attention is sensitive" they mean Q and K specifically; lumping V in with them costs you traffic for no reason.
-
----
-
-## 2. RoPE turns magnitude error into phase error
-
-Rotary position embedding rotates `(q_{2j}, q_{2j+1})` pairs by angle `m·θ_j` at position `m`. The attention logit becomes a sum over pairs of
-
-```text
-   r_q,j · r_k,j · cos( (m − n)·θ_j  +  φ_j )
-```
-
-where `r` are pair magnitudes and `φ` the relative phase. Quantization perturbs the Cartesian components, which perturbs **both** the magnitude and the **angle** of each pair:
-
-```text
-   (x, y) ──quantize──▶ (x + δ, y)          angular error  Δφ ≈ δ / r
-                                             ▲
-                    small-magnitude pairs suffer LARGE angular error
-```
-
-Attention reads the phase. So NVFP4's per-block scaling interacts with RoPE in a specific way: a 16-element block spans 8 rotary pairs, and the block scale is set by the largest of them — so low-magnitude pairs inside a high-magnitude block get both coarse magnitude resolution *and* large angular error.
-
-This yields a **testable prediction**:
-
-> Q/K quantization damage should **grow with context length**, because the `(m−n)·θ_j` term makes attention more phase-sensitive at large relative positions.
-
-Do not take that on faith — §5's protocol includes the sweep that checks it. If your model is destined for 262 K context ([Module 09](Lecture-09.md)), a Q/K sensitivity measured at 4 K is not the number that governs deployment.
-
----
-
-## 3. GQA makes K uniquely bad
-
-Now add the traffic side. For the case-study geometry (`d_model = 8192`, 48 layers, 8 KV heads × 128, `d_ff ≈ 13,870`):
-
-| Tensor | Params/layer | Share of body | Traffic | **Share of `B_token`** |
-|---|---:|---:|---:|---:|
-| MLP (3 mats) | 340.9 M | 69.3 % | 9.20 GB | **57.96 %** |
-| Q | 67.1 M | 13.6 % | 1.81 GB | **11.41 %** |
-| O | 67.1 M | 13.6 % | 1.81 GB | **11.41 %** |
-| **K + V** | **16.8 M** | **3.4 %** | **0.45 GB** | **2.85 %** |
-
-With grouped-query attention, `K` and `V` are shared across `G = n_q / n_kv = 8` query heads. So:
-
-```text
-   K is the SMALLEST tensor group in the model  (2.85 % of B_token, and V is half of that)
-   K feeds 8 query heads                        (one error → 8 corrupted attention distributions)
-   K enters via Path B                          (exponential amplification)
-```
-
-```text
-                 traffic saved          behavioral damage
-   MLP    ████████████████████████       ▏
-   O      ████▌                          ▏
-   Q      ████▌                          ████████
-   K      ▊                              ████████████████████
-   V      ▊                              ▏
-```
-
-**K has the worst reward/risk ratio of any tensor in the model, by a wide margin.** Quantizing K to 4 bits buys you under 1.5 % of your byte budget and pays for it with amplified, GQA-multiplied attention distortion. This is not a close call.
-
----
-
-## 4. The measured case study
-
-The prediction meets the data:
-
-```text
-   MLP + O quantized          147.87 tok/s     acceptance 2.792
-   MLP + O + QKV quantized    150.73 tok/s     acceptance 2.546
-                              ──────────       ────────────────
-                              +1.9 % speed     −8.8 % acceptance
-```
-
-Both numbers match theory:
-
-* **Speed: +1.9 %.** Q + K + V together are 14.3 % of `B_token`; converting them from an already-compressed baseline yields a small single-digit gain. The table in §3 bounds the possible win, and the measurement lands inside it.
-* **Behavior: −8.8 % acceptance.** Path B amplification, multiplied by GQA sharing. Acceptance length is a direct read on how much the target distribution moved ([Module 08](Lecture-08.md)) — and it moved a lot.
-
-**The trade is 1.9 % throughput for 8.8 % acceptance, and it is a bad one.** Worse than it looks, in fact: [Module 10](Lecture-10.md) shows that acceptance feeds back into throughput, so part of that 1.9 % is given straight back.
-
-The correct configuration keeps **MLP + O + V** in NVFP4 and leaves **Q + K** wide. Cost: ~11 % of `B_token` left uncompressed. Benefit: the entire acceptance regression avoided.
-
----
-
-## 5. Sensitivity ≠ outlier magnitude
-
-Here is the finding that resolves the confusion, and it is the most important practical point in the module. **The Q/K degradation is not explained by activation-outlier statistics.** You can profile Q/K with [Module 06's](Lecture-06.md) tooling and find unremarkable channel and token ratios — and they will still be the most damaging tensors to quantize.
-
-The reason is that these measure different things:
-
-```text
-   outlier statistics    ──▶  predict QUANTIZATION ERROR      (how wrong the tensor becomes)
-   sensitivity           ──▶  error  ×  DOWNSTREAM AMPLIFICATION
-                                        └── the operator's doing, invisible to any
-                                            statistic computed on the tensor itself
-```
-
-```text
-   sensitivity_i  =  quantization_error_i   ×   amplification_i
-                     └── measurable from ──┘    └── a property of the OPERATOR,
-                         the tensor alone            not of the tensor ──┘
-```
-
-Q/K sit at modest error and enormous amplification. Embeddings sit at high error and near-zero amplification (a gather feeds a residual stream). **Neither is predicted by looking at the tensor.**
-
-> **The practical rule: never infer sensitivity from weight or activation statistics. Measure it end-to-end.** Statistics tell you which *method* to use ([Module 05](Lecture-05.md)); only an ablation tells you which *tensors* to quantize.
-
-### The measurement protocol
-
-```python
-# Leave-one-out: quantize everything EXCEPT the group under test.
-# The DELTA against all-quantized is that group's contribution to the damage.
-GROUPS = ["mlp", "o_proj", "q_proj", "k_proj", "v_proj", "lm_head", "embed"]
-
-baseline_all = evaluate(quantize(model, groups=GROUPS))     # everything quantized
-results = {}
-for g in GROUPS:
-    held_out = [x for x in GROUPS if x != g]
-    m = quantize(model, groups=held_out)
-    results[g] = {
-        "kl_vs_fp16":   mean_kl(m, reference),          # Module 08
-        "acceptance":   acceptance_length(m, drafter),  # Module 08 / 10
-        "traffic_saved": traffic_of(g),                 # Module 04
-        "recovery":     baseline_all.kl - mean_kl(m, reference),
-    }
-```
-
-Then rank by the ratio that actually matters:
-
-```text
-                       traffic_saved_i
-   value_i  =  ────────────────────────────
-                 KL_increase_i  +  ϵ
-```
-
-A representative outcome — **your model's numbers will differ, which is the point of measuring**:
-
-| Group | Traffic saved | ΔKL | Δacceptance | Value | Verdict |
-|---|---:|---:|---:|---:|---|
-| MLP | 57.96 % | low | small | **highest** | quantize |
-| O | 11.41 % | low | small | high | quantize |
-| V | ~1.4 % | low | small | moderate | quantize |
-| lm_head | 16.0 % | low–moderate | small | high | quantize (FP8 first) |
-| Q | 11.41 % | **high** | **large** | low | **keep wide** |
-| K | ~1.4 % | **highest** | **largest** | **lowest** | **keep wide** |
-| Embeddings | ~0 % | low | none | **zero** | pointless either way |
-
-That table is the direct input to [Module 11](Lecture-11.md)'s allocation solver.
-
----
-
-## Checkpoint
-
-You should now be able to:
-
-1. Derive `η/√K` for Path A and `exp(η√2·|s|)` for Path B, and explain why the averaging benefit vanishes in the second.
-2. Compute the attention-weight distortion for a given η and logit magnitude.
-3. Explain why V quantizes like O rather than like K.
-4. Explain why GQA makes K the worst reward/risk tensor in the model.
-5. State why outlier statistics do not predict sensitivity, and what they *are* good for.
-6. Design a leave-one-out sweep and rank groups by traffic-per-unit-KL.
-
----
-
-## Ship it
-
-Produce a **sensitivity table** for your model: every tensor group, its traffic share from [Module 04's](Lecture-04.md) ledger, its ΔKL and Δacceptance from a leave-one-out sweep, and the resulting value ratio. Add the context-length sweep from §2 — measure Q/K sensitivity at 4 K and at your maximum context and report whether the predicted growth appears.
-
-Then state your allocation and, more importantly, **the two groups you decided not to quantize and why.**
-
----
-
-## Current as of
-
-* **Timeless:** the Path A / Path B derivation, the softmax amplification bound, the GQA sharing argument, sensitivity ≠ outlier magnitude.
-* **Case-study pins:** the 147.87/2.792 vs 150.73/2.546 comparison; the per-tensor traffic shares are derived from the [Module 04](Lecture-04.md) reconstruction with an assumed 48-layer geometry — recompute for your own config rather than reusing the percentages.
-* **Open/testable:** the prediction that Q/K sensitivity grows with context length follows from the RoPE phase argument and should be verified per model, not assumed.
-
----
-
-**Next:** [Module 08 — Behavior Preservation →](Lecture-08.md)
+Dropping the last term is a first-order approximation. Score changes depend on
+norms, alignment and correlations, not only on the quantizer bit-width.
+
+Softmax does **not** exponentially amplify every small absolute logit error.
+Its Jacobian is `J=diag(p)-ppᵀ`; the absolute row sum is `2p_i(1-p_i)≤1/2`.
+Consequently `||softmax(s+e)-softmax(s)||∞ ≤ 0.5 ||e||∞`. Adding the same constant
+to all logits changes no probabilities. Relative changes in tiny probabilities
+can be large, and a small change near a tie can change argmax; these are different
+statements from unbounded absolute amplification.
+
+**Worked example:** logits `(0,0)` give probabilities `(0.5,0.5)`. Changing them to
+`(0.01,-0.01)` gives about `(0.505,0.495)`. Argmax changes under a tie rule while
+absolute probability error remains small. Value magnitude matters too:
+`delta_output = delta_P V + P delta_V + delta_P delta_V`.
+
+## 3. RoPE and context length
+
+An exact RoPE rotation is orthogonal: `||R(position)e||₂=||e||₂`. Quantizing Q/K
+weights does not by itself introduce a frequency error that grows linearly with
+position. A numerical error in frequency/position computation is a **separate**
+mechanism. Do not infer monotonic quantization damage from position alone.
+
+Long-context evaluation is still necessary: it changes keys, attention patterns,
+retrieval difficulty, cache precision, distributions and implementation paths.
+Compare short/long matched tasks and actual position handling. For hybrid models,
+measure recurrent state and gates as well as the full-attention projections.
+
+## 4. Read the case-study ablation correctly
+
+The pinned **DSpark drafter** card compares keeping its Q/K/V wide with quantizing
+them. It reports a decrease in mean acceptance from 2.792 to 2.546 and a throughput
+increase from 147.87 to 150.73 tok/s for that ablation. These are upstream results,
+not locally reproduced measurements. The target remains the target; this is an
+ablation of **proposal quality/cost**. [Source and revision](Source-Evidence.md).
+
+Under exact speculative sampling, a worse drafter changes efficiency while the
+output distribution remains the selected target distribution. These results do
+not show that the target lost language quality, that Q/K are universally worst,
+or that its weight traffic dropped 10.5%. The two models must have separate ledgers.
+
+## 5. A sensitivity experiment you can defend
+
+1. Freeze train/calibration/development/test splits, reference revision, tokenizer,
+   preprocessing, sampling transform and metrics.
+2. Quantize one group at a time; measure layer-output error on calibration data and
+   model/task metrics on development data. Keep the untouched reference immutable.
+3. Include groups that exist in this model: MLP, full-attention Q/K/V/O, hybrid
+   recurrent gates, embeddings and output head. Do not invent missing layers.
+4. Test the strongest candidate pairs jointly. Their errors need not add.
+5. Choose a policy on development data; evaluate held-out and shifted data once.
+6. If optimizing the drafter, freeze the target and measure draft/verify time,
+   emitted tokens per cycle, and task outputs using correct target sampling.
+
+The [CPU lab](CPU-Quantization-Lab.md) compares weight reconstruction error with
+output-aware clipping on a trained nonlinear classifier. It teaches selection
+and failure analysis; its sensitivity ordering is not an LLM benchmark.
+
+## Self-check and answers
+
+- **Does a larger matrix guarantee smaller relative output error?** No; cancellation
+  and correlated error defeat the averaging argument.
+- **Can two quantizers have equal weight MSE and different output error?** Yes;
+  calibration input covariance weights different error directions differently.
+- **Does lower drafter acceptance mean worse final answers?** Not for a correct
+  exact sampler with the same target; it affects speed.
+- **Can a low-outlier layer be sensitive?** Yes; logits near decision boundaries,
+  recurrence and downstream operators can make small error consequential.
+
+**Deliverable:** a per-group sensitivity table, one joint-error test, and an explicit
+separation between target fidelity, task quality and drafter agreement.

@@ -1,0 +1,62 @@
+{
+  "checked_utc": "2026-10-18",
+  "model": "Qwen/Qwen2.5-72B-Instruct",
+  "revision": "495f39366efef23836d0cfae4fbe635880d2be31",
+  "configuration": {
+    "architectures": [
+      "Qwen2ForCausalLM"
+    ],
+    "attention_dropout": 0.0,
+    "bos_token_id": 151643,
+    "eos_token_id": 151645,
+    "hidden_act": "silu",
+    "hidden_size": 8192,
+    "initializer_range": 0.02,
+    "intermediate_size": 29568,
+    "max_position_embeddings": 32768,
+    "max_window_layers": 70,
+    "model_type": "qwen2",
+    "num_attention_heads": 64,
+    "num_hidden_layers": 80,
+    "num_key_value_heads": 8,
+    "rms_norm_eps": 1e-06,
+    "rope_theta": 1000000.0,
+    "sliding_window": 131072,
+    "tie_word_embeddings": false,
+    "torch_dtype": "bfloat16",
+    "transformers_version": "4.43.1",
+    "use_cache": true,
+    "use_sliding_window": false,
+    "vocab_size": 152064
+  },
+  "index_summary": {
+    "total_tensor_bytes": 145412407296,
+    "shard_count": 37
+  },
+  "files": [
+    {
+      "path": "config.json",
+      "url": "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct/resolve/495f39366efef23836d0cfae4fbe635880d2be31/config.json",
+      "sha256": "14ca217334fe0fd10148413592d68c99eeb33431ed89c1afa130fee560be2a29",
+      "bytes": 663
+    },
+    {
+      "path": "model.safetensors.index.json",
+      "url": "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct/resolve/495f39366efef23836d0cfae4fbe635880d2be31/model.safetensors.index.json",
+      "sha256": "6c1d85cad4513d35273d05a4c7206c04b4c8aea0ebd35ef2b26cb88ec56dfe66",
+      "bytes": 79025
+    },
+    {
+      "path": "README.md",
+      "url": "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct/resolve/495f39366efef23836d0cfae4fbe635880d2be31/README.md",
+      "sha256": "62d6f2176c0925b7c7e5ec6c5ee06cad83868bb21a8e25d58283e3d7707d3f79",
+      "bytes": 6259
+    }
+  ],
+  "license_metadata": {
+    "license": "other",
+    "license_name": "qwen",
+    "license_url": "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct/blob/495f39366efef23836d0cfae4fbe635880d2be31/LICENSE"
+  },
+  "boundary": "metadata inspected only; weights/tokenizer/model not downloaded or executed"
+}

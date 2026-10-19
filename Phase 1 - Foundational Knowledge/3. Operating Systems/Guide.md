@@ -18,14 +18,16 @@ The repository contains 26 original roadmap lectures plus eight optional consoli
 
 | Lectures | Question to answer | Artifact carried into the next group |
 |---|---|---|
-| 1–5: kernel, processes, interrupts, syscalls, boot | How does an application request a device operation? | Annotated boot log and one userspace → kernel → IRQ trace |
+| 1–5: kernel, processes, interrupts, syscalls, boot | How does an application request a device operation? | Annotated boot handoff diagram; an actual boot/IRQ trace when a target is available |
 | 6–11: scheduling and synchronization | Why did a ready task miss its deadline? | Periodic-worker trace with execution, waiting, and contention separated |
 | 12–16: virtual memory, allocation, DMA, NUMA | Which address and ownership domain contains each buffer? | Buffer table: CPU virtual address, DMA address, lifetime, synchronization |
 | 17–20: drivers and I/O | How is work submitted, completed, and reclaimed? | Device probe map and completion timeline |
 | 21–24: storage, OTA, containers, deployed systems | What survives restart, isolation, and resource pressure? | Recoverable image/service configuration and failure log |
-| 25–26: Yocto and eBPF integration | Can another engineer reproduce and diagnose the system? | Pinned image inputs plus a trace explaining a latency outlier |
+| 25–26: Yocto and eBPF integration | Can another engineer reproduce and diagnose the system? | Pinned metadata inputs and a compiled tracer; runtime tracing is a separate milestone |
 
-Use [rt-demo](Lectures/demos/rt-demo/README.md) after L9. Start without elevated scheduling privileges; compare load conditions before changing policy. A good latency histogram is evidence for the tested workload, not proof of a hard real-time bound. Record kernel version/configuration because implementation details and available tracing features vary.
+Use [rt-demo](Lectures/demos/rt-demo/README.md) after L9 and the [native bounded SPSC queue](labs/SPSC-Queue.md) with L10. The queue tests full/empty/wrap behavior, actual threaded transfer, lifetime checks, and an intentional overwrite defect. Start without elevated scheduling privileges; compare load conditions before changing policy. A good latency histogram is evidence for the tested workload, not proof of a hard real-time bound. Record kernel version/configuration because implementation details and available tracing features vary.
+
+The [BPF build lab](labs/BPF-Build-Lab.md) adds an optional native-tool milestone after L26: compile a real object/skeleton/reader, inspect its sections, and test input rejection without attaching to the kernel. It complements the executed SPSC and timer exercises. Follow the [review/evidence matrix](Review-Matrix.md) to see which concepts have native checks and which still need target hardware or privileged runtime validation.
 
 <a id="lecture-index"></a>
 ## Lecture index

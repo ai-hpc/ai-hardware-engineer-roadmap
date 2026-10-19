@@ -1,0 +1,743 @@
+{
+  "reviewed_at_utc": "2026-10-18T22:35:16.879328+00:00",
+  "scope": "Native CPU teaching components, compile-only experimental CUDA sources; no pretrained model generation",
+  "host": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "compiler": "GCC 13.3.0",
+  "python": "3.12.3",
+  "native_release": {
+    "ctest_entries": 6,
+    "passed": 6,
+    "native_integration_methods": 18,
+    "log": "[ 42%] Built target test_sampling\n[ 46%] Building CXX object CMakeFiles/test_memory_contracts.dir/tests/test_memory_contracts.cpp.o\n[ 50%] Built target test_tokenizer\n[ 53%] Building CXX object CMakeFiles/test_allocator_contracts.dir/tests/test_allocator_contracts.cpp.o\n[ 57%] Linking CXX executable test_memory_contracts\n[ 61%] Building CXX object CMakeFiles/test_allocator_contracts.dir/src/memory/pool.cpp.o\n[ 61%] Built target test_memory_contracts\n[ 65%] Building CXX object CMakeFiles/test_allocator_contracts.dir/src/memory/kv_cache.cpp.o\n[ 69%] Building CXX object CMakeFiles/test_attention_reference.dir/tests/test_attention_reference.cpp.o\n[ 73%] Linking CXX executable test_allocator_contracts\n[ 73%] Built target test_allocator_contracts\n[ 76%] Building CXX object CMakeFiles/test_decode_scratch.dir/tests/test_decode_scratch.cpp.o\n[ 80%] Building CXX object CMakeFiles/test_decode_scratch.dir/src/memory/pool.cpp.o\n[ 84%] Linking CXX executable test_decode_scratch\n[ 84%] Built target test_decode_scratch\n[ 88%] Linking CXX executable benchmark_cpu\n[ 92%] Built target benchmark_cpu\n[ 96%] Building CXX object CMakeFiles/test_attention_reference.dir/src/memory/kv_cache.cpp.o\n[100%] Linking CXX executable test_attention_reference\n[100%] Built target test_attention_reference\nInternal ctest changing into directory: /tmp/course-runtime-attention-build\nTest project /tmp/course-runtime-attention-build\n    Start 1: sampling\n1/6 Test #1: sampling .........................   Passed    0.01 sec\n    Start 2: memory_contracts\n2/6 Test #2: memory_contracts .................   Passed    0.01 sec\n    Start 3: allocator_cpu_shim\n3/6 Test #3: allocator_cpu_shim ...............   Passed    0.01 sec\n    Start 4: attention_cpu_oracle\n4/6 Test #4: attention_cpu_oracle .............   Passed    0.01 sec\n    Start 5: decode_scratch_cpu_contract\n5/6 Test #5: decode_scratch_cpu_contract ......   Passed    0.01 sec\n    Start 6: gguf_tokenizer_contracts\n6/6 Test #6: gguf_tokenizer_contracts .........   Passed    3.24 sec\n\n100% tests passed, 0 tests failed out of 6\n\nTotal Test time (real) =   3.33 sec\n"
+  },
+  "native_sanitizers": {
+    "asan": true,
+    "ubsan": true,
+    "ctest_entries": 6,
+    "passed": 6,
+    "log": "[ 34%] Built target test_sampling\n[ 38%] Built target gguf-inspect\n[ 42%] Linking CXX executable test_tokenizer\n[ 46%] Building CXX object CMakeFiles/test_memory_contracts.dir/tests/test_memory_contracts.cpp.o\n[ 50%] Built target test_tokenizer\n[ 53%] Building CXX object CMakeFiles/test_allocator_contracts.dir/tests/test_allocator_contracts.cpp.o\n[ 57%] Linking CXX executable test_memory_contracts\n[ 57%] Built target test_memory_contracts\n[ 61%] Building CXX object CMakeFiles/test_attention_reference.dir/tests/test_attention_reference.cpp.o\n[ 65%] Building CXX object CMakeFiles/test_allocator_contracts.dir/src/memory/pool.cpp.o\n[ 69%] Building CXX object CMakeFiles/test_allocator_contracts.dir/src/memory/kv_cache.cpp.o\n[ 73%] Linking CXX executable test_allocator_contracts\n[ 76%] Building CXX object CMakeFiles/test_attention_reference.dir/src/memory/kv_cache.cpp.o\n[ 76%] Built target test_allocator_contracts\n[ 80%] Building CXX object CMakeFiles/test_decode_scratch.dir/tests/test_decode_scratch.cpp.o\n[ 84%] Linking CXX executable test_attention_reference\n[ 84%] Built target test_attention_reference\n[ 88%] Building CXX object CMakeFiles/test_decode_scratch.dir/src/memory/pool.cpp.o\n[ 92%] Linking CXX executable benchmark_cpu\n[ 96%] Linking CXX executable test_decode_scratch\n[ 96%] Built target test_decode_scratch\n[100%] Built target benchmark_cpu\nInternal ctest changing into directory: /tmp/course-runtime-cpu-sanitize\nTest project /tmp/course-runtime-cpu-sanitize\n    Start 1: sampling\n1/6 Test #1: sampling .........................   Passed    0.26 sec\n    Start 2: memory_contracts\n2/6 Test #2: memory_contracts .................   Passed    0.04 sec\n    Start 3: allocator_cpu_shim\n3/6 Test #3: allocator_cpu_shim ...............   Passed    0.05 sec\n    Start 4: attention_cpu_oracle\n4/6 Test #4: attention_cpu_oracle .............   Passed    0.18 sec\n    Start 5: decode_scratch_cpu_contract\n5/6 Test #5: decode_scratch_cpu_contract ......   Passed    0.03 sec\n    Start 6: gguf_tokenizer_contracts\n6/6 Test #6: gguf_tokenizer_contracts .........   Passed   13.50 sec\n\n100% tests passed, 0 tests failed out of 6\n\nTotal Test time (real) =  14.10 sec\n"
+  },
+  "cuda_compile": {
+    "compiler": "NVIDIA CUDA nvcc 13.4.92",
+    "architecture": "sm_87",
+    "host_architecture": "x86_64",
+    "translation_units": [
+      {
+        "source": "src/benchmark_cpu.cpp",
+        "sha256": "f0e9ffc0c52beff54eb02c12079196c6982d88cb1722d418c087c3ddd8c08668",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/benchmark_cpu.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_benchmark_cpu.cpp.o"
+        ],
+        "object_sha256": "efe64ad5e65d966b80757419f797f08f86c8db55b2a46e5ed6cbd7b844b59139"
+      },
+      {
+        "source": "src/engine/decode.cu",
+        "sha256": "66b72705ea0958b69f5df9cba57167e6ae9308a1941904070b4935a1ea3b3840",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/engine/decode.cu",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_engine_decode.cu.o"
+        ],
+        "object_sha256": "59199374079048cca5ac4b0e46f4e756fdd96a6e87d40b40814ed000a06b8677"
+      },
+      {
+        "source": "src/engine/gguf.cpp",
+        "sha256": "06bdb09e35f65843b84d2935383d166466e7af45cdbe050c42451602cfd44a85",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/engine/gguf.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_engine_gguf.cpp.o"
+        ],
+        "object_sha256": "05cc20e3a8974e17421fcab0242318cf0d1e3f298727e67b7b128047a63795af"
+      },
+      {
+        "source": "src/engine/model.cpp",
+        "sha256": "b16214d9a609cc2aeabd67ff25a1a31f29054048ed30283c678ec9e32987d8c1",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/engine/model.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_engine_model.cpp.o"
+        ],
+        "object_sha256": "b29b713b786bd64295461219693619d9ea9fe6b58ec4c49a04fb11e05c952c62"
+      },
+      {
+        "source": "src/engine/model_config.cpp",
+        "sha256": "339175292a18861cb4d60aba5fedc60637207f6ff5d1fb63be1be093124dc121",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/engine/model_config.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_engine_model_config.cpp.o"
+        ],
+        "object_sha256": "2bc9830a04425846f195830df05b453ad6f5af13537215faab4215917de75815"
+      },
+      {
+        "source": "src/engine/sample.cpp",
+        "sha256": "46f7355f64cb9c0989fdd834de869f14979218989cdfcb39c92ca84e1a4f5943",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/engine/sample.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_engine_sample.cpp.o"
+        ],
+        "object_sha256": "e3260b6eed668ad25986ce60e1de0b09fb9259173434e5003404566b284539be"
+      },
+      {
+        "source": "src/engine/tokenizer.cpp",
+        "sha256": "6b1f77eb5d2a531a628f837e5e0d4ec0f61b54ec11d556948e3be7b2e712efc5",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/engine/tokenizer.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_engine_tokenizer.cpp.o"
+        ],
+        "object_sha256": "36042b1ed44d44ca35ad223b92ef8d308ef0d78ba3ae783687710d350edb58b3"
+      },
+      {
+        "source": "src/gguf_inspect.cpp",
+        "sha256": "2729d3ceff82b46c94327213f55e8052485e236a0fdaaa606111ea8f5242c22d",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/gguf_inspect.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_gguf_inspect.cpp.o"
+        ],
+        "object_sha256": "c478d5f17ea0e3faba8013efef22abff29fc5d274c3aa36a69554269f46681fa"
+      },
+      {
+        "source": "src/jetson/power.cpp",
+        "sha256": "f5bee99bb7fe23e7b4fd65bdfa260f33f897cb733df4fdc9a4d78688fd37384e",
+        "status": 0,
+        "compiler_output": "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/power.cpp: In function \u2018int jllm::read_sysfs_int(const char*)\u2019:\n/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/power.cpp:14:11: warning: ignoring return value of \u2018int fscanf(FILE*, const char*, ...)\u2019 declared with attribute \u2018warn_unused_result\u2019 [-Wunused-result]\n   14 |     fscanf(f, \"%d\", &val);\n      |     ~~~~~~^~~~~~~~~~~~~~~\n/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/power.cpp: In function \u2018void jllm::lock_clocks()\u2019:\n/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/power.cpp:70:11: warning: ignoring return value of \u2018int system(const char*)\u2019 declared with attribute \u2018warn_unused_result\u2019 [-Wunused-result]\n   70 |     system(\"jetson_clocks 2>/dev/null\");\n      |     ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/power.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_jetson_power.cpp.o"
+        ],
+        "object_sha256": "3545dcadb9364ef7d2d350fcafbca2a80523b172aef98fa721a152db9c5116b3"
+      },
+      {
+        "source": "src/jetson/sysinfo.cpp",
+        "sha256": "ee941104b29a4d9d5a0ac502298ffa65f273546aba026615ac000d5e5963fddd",
+        "status": 0,
+        "compiler_output": "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/sysinfo.cpp: In function \u2018jllm::JetsonInfo jllm::probe_jetson()\u2019:\n/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/sysinfo.cpp:58:15: warning: ignoring return value of \u2018int fscanf(FILE*, const char*, ...)\u2019 declared with attribute \u2018warn_unused_result\u2019 [-Wunused-result]\n   58 |         fscanf(f, \"%ld\", &kb);\n      |         ~~~~~~^~~~~~~~~~~~~~~\n/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/sysinfo.cpp: In function \u2018jllm::LiveStats jllm::read_live_stats()\u2019:\n/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/sysinfo.cpp:99:20: warning: ignoring return value of \u2018int fscanf(FILE*, const char*, ...)\u2019 declared with attribute \u2018warn_unused_result\u2019 [-Wunused-result]\n   99 |     if (f) { fscanf(f, \"%d\", &s.gpu_util_pct); fclose(f); }\n      |              ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~\n/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/sysinfo.cpp:103:31: warning: ignoring return value of \u2018int fscanf(FILE*, const char*, ...)\u2019 declared with attribute \u2018warn_unused_result\u2019 [-Wunused-result]\n  103 |     if (f) { long freq; fscanf(f, \"%ld\", &freq); s.gpu_freq_mhz = freq / 1000000; fclose(f); }\n      |                         ~~~~~~^~~~~~~~~~~~~~~~~\n",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/sysinfo.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_jetson_sysinfo.cpp.o"
+        ],
+        "object_sha256": "8fe14aad31ad3a57b63b02a00eabd6bd3cb0c607817bbb0c0b088aa5325ef9e9"
+      },
+      {
+        "source": "src/jetson/thermal.cpp",
+        "sha256": "8b899e555265a3588a60ca2d242f4afe1dc903a4e33bb18460cb34564220ea54",
+        "status": 0,
+        "compiler_output": "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/thermal.cpp: In function \u2018jllm::ThermalState jllm::read_thermal()\u2019:\n/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/thermal.cpp:56:31: warning: ignoring return value of \u2018int fscanf(FILE*, const char*, ...)\u2019 declared with attribute \u2018warn_unused_result\u2019 [-Wunused-result]\n   56 |         if (f) { int t; fscanf(f, \"%d\", &t); ts.cpu_temp_c = t / 1000.0f; fclose(f); }\n      |                         ~~~~~~^~~~~~~~~~~~~\n/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/thermal.cpp: In function \u2018float jllm::read_thermal_zone(const char*)\u2019:\n/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/thermal.cpp:24:14: warning: ignoring return value of \u2018char* fgets(char*, int, FILE*)\u2019 declared with attribute \u2018warn_unused_result\u2019 [-Wunused-result]\n   24 |         fgets(type, sizeof(type), f);\n      |         ~~~~~^~~~~~~~~~~~~~~~~~~~~~~\n/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/thermal.cpp:36:23: warning: ignoring return value of \u2018int fscanf(FILE*, const char*, ...)\u2019 declared with attribute \u2018warn_unused_result\u2019 [-Wunused-result]\n   36 |                 fscanf(f, \"%d\", &temp);\n      |                 ~~~~~~^~~~~~~~~~~~~~~~\n/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/thermal.cpp:19:68: warning: \u2018%s\u2019 directive output may be truncated writing up to 255 bytes into a region of size 227 [-Wformat-truncation=]\n   19 |         snprintf(path, sizeof(path), \"/sys/devices/virtual/thermal/%s/type\", entry->d_name);\n      |                                                                    ^~\nIn file included from /usr/include/stdio.h:980,\n                 from /usr/include/c++/13/cstdio:42,\n                 from /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/thermal.cpp:4:\nIn function \u2018int snprintf(char*, size_t, const char*, ...)\u2019,\n    inlined from \u2018float jllm::read_thermal_zone(const char*)\u2019 at /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/thermal.cpp:19:17:\n/usr/include/x86_64-linux-gnu/bits/stdio2.h:54:35: note: \u2018__builtin___snprintf_chk\u2019 output between 35 and 290 bytes into a destination of size 256\n   54 |   return __builtin___snprintf_chk (__s, __n, __USE_FORTIFY_LEVEL - 1,\n      |          ~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n   55 |                                    __glibc_objsize (__s), __fmt,\n      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n   56 |                                    __va_arg_pack ());\n      |                                    ~~~~~~~~~~~~~~~~~\n/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/thermal.cpp: In function \u2018float jllm::read_thermal_zone(const char*)\u2019:\n/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/thermal.cpp:32:72: warning: \u2018%s\u2019 directive output may be truncated writing up to 255 bytes into a region of size 227 [-Wformat-truncation=]\n   32 |             snprintf(path, sizeof(path), \"/sys/devices/virtual/thermal/%s/temp\", entry->d_name);\n      |                                                                        ^~\nIn function \u2018int snprintf(char*, size_t, const char*, ...)\u2019,\n    inlined from \u2018float jllm::read_thermal_zone(const char*)\u2019 at /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/thermal.cpp:32:21:\n/usr/include/x86_64-linux-gnu/bits/stdio2.h:54:35: note: \u2018__builtin___snprintf_chk\u2019 output between 35 and 290 bytes into a destination of size 256\n   54 |   return __builtin___snprintf_chk (__s, __n, __USE_FORTIFY_LEVEL - 1,\n      |          ~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n   55 |                                    __glibc_objsize (__s), __fmt,\n      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n   56 |                                    __va_arg_pack ());\n      |                                    ~~~~~~~~~~~~~~~~~\n",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/jetson/thermal.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_jetson_thermal.cpp.o"
+        ],
+        "object_sha256": "2a79ade57db3457521a84c5ba44fc641b1a913998131198063d7a9d249e016f0"
+      },
+      {
+        "source": "src/kernels/attention.cu",
+        "sha256": "dc5be779763b9cb04acba6a5196214fa885ab8a314d4fd9317f02b97602bd378",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/kernels/attention.cu",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_kernels_attention.cu.o"
+        ],
+        "object_sha256": "4490dd9be20fed767f282d1b7e5bd8732aabad4304dfef88f1d17bd15f17fb07"
+      },
+      {
+        "source": "src/kernels/convert.cu",
+        "sha256": "2642527fdd486b7e03c069a620ae710afb277c0f9383e8a3b550ad5979d84046",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/kernels/convert.cu",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_kernels_convert.cu.o"
+        ],
+        "object_sha256": "3a1bb6f0b74a9a06e75cc82101dce8d991eb1dcb3ddcb85101b228ba06f33dcd"
+      },
+      {
+        "source": "src/kernels/fused_norm.cu",
+        "sha256": "18a88c644331da9206a49c523da822a804cd6721d0566d8e0ac41f6167a34c50",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/kernels/fused_norm.cu",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_kernels_fused_norm.cu.o"
+        ],
+        "object_sha256": "18da81c9ad07640db1c18a05a1e4a5e3344f9de4caa1e6c3700b1985a7afa949"
+      },
+      {
+        "source": "src/kernels/gemv_q4.cu",
+        "sha256": "592d06f6881db1da654cc6cba5871f53b5f13b5301dea8ba54f30b6d5af8e3ee",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/kernels/gemv_q4.cu",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_kernels_gemv_q4.cu.o"
+        ],
+        "object_sha256": "d40a1e0e330a8082b4a42f79e604fb05c650407e414c3002b0db0595957952f8"
+      },
+      {
+        "source": "src/kernels/rope.cu",
+        "sha256": "6d3182b03115805fcdf19524ac842be5c23682161806c31c613268931cac411d",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/kernels/rope.cu",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_kernels_rope.cu.o"
+        ],
+        "object_sha256": "aefaa37d3f4a2c8f51fdda6268fa45ba7e655d92e7a71bd28f22e743ae1d0dbc"
+      },
+      {
+        "source": "src/kernels/softmax.cu",
+        "sha256": "47348e88da25b0b44865568d84437ea5cd50662ad8cd4dcd97344f11d5020918",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/kernels/softmax.cu",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_kernels_softmax.cu.o"
+        ],
+        "object_sha256": "0ffb35e9aea7c81e974bff974666c91af5444dde1f16930dcab62875a245f092"
+      },
+      {
+        "source": "src/main.cpp",
+        "sha256": "95726b4b5867f377bcd644a578c922f10fc095ff37e4979e7171c3cf0b6a498b",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/main.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_main.cpp.o"
+        ],
+        "object_sha256": "7e3bc3869d0173fb0465d2f13d8a4bcc7a2ceb8ad898308a9ec70ff0843afdcc"
+      },
+      {
+        "source": "src/main_server.cpp",
+        "sha256": "532855123347cf655b2e31a534b52ff6c4397343530a572352f7f2096a228edc",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/main_server.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_main_server.cpp.o"
+        ],
+        "object_sha256": "2e3cae24b906ae13892e5bde90fbbd16b8bd5fe85f6861441fe550741897d0ce"
+      },
+      {
+        "source": "src/memory/budget.cpp",
+        "sha256": "7576e6857bb1fbc1a594356698161897d2ac64816fe6f674bae0afc08ef75e32",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/memory/budget.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_memory_budget.cpp.o"
+        ],
+        "object_sha256": "550eec733a10df6dd8ba750785a45ad0b172f921d5ec8beff053082b746ac964"
+      },
+      {
+        "source": "src/memory/kv_cache.cpp",
+        "sha256": "076932548a7221272d1cbf70389741ecacc3a6eeee6a527e2c9d0a3aba74db84",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/memory/kv_cache.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_memory_kv_cache.cpp.o"
+        ],
+        "object_sha256": "c1d3c92858e4b8c1a86feb0f74bc666ead5985dc9b06a86f5dbdc270b0dbd08b"
+      },
+      {
+        "source": "src/memory/pool.cpp",
+        "sha256": "40c372511517635e3195935dfad85007a4d051f1cc05891b3b0e447d8c24acee",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/memory/pool.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_memory_pool.cpp.o"
+        ],
+        "object_sha256": "7f2556b5475fcc3cde2dbab9fce59b85fa93609a4cc4b695e28fdd3a85445573"
+      },
+      {
+        "source": "src/server/http_server.cpp",
+        "sha256": "f4ff663bb80b77bb1b84bf96bac3acd3ad0eb8504a450fa398850d104c04c1c0",
+        "status": 0,
+        "compiler_output": "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/server/http_server.cpp: In function \u2018void jllm::send_response(int, int, const std::string&, const std::string&)\u2019:\n/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/server/http_server.cpp:77:10: warning: ignoring return value of \u2018ssize_t write(int, const void*, size_t)\u2019 declared with attribute \u2018warn_unused_result\u2019 [-Wunused-result]\n   77 |     write(client, header, strlen(header));\n      |     ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/server/http_server.cpp:78:10: warning: ignoring return value of \u2018ssize_t write(int, const void*, size_t)\u2019 declared with attribute \u2018warn_unused_result\u2019 [-Wunused-result]\n   78 |     write(client, body.data(), body.size());\n      |     ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/src/server/http_server.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/src_server_http_server.cpp.o"
+        ],
+        "object_sha256": "62c7615f716c190fe310106e6dee4a8c794e3b3ead534920a97d25c3a3ad9854"
+      },
+      {
+        "source": "tests/test_attention.cu",
+        "sha256": "3728442945ff09037328b110086d3d81abf26a24b8b35a98499e0e0808314c4c",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/tests/test_attention.cu",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/tests_test_attention.cu.o"
+        ],
+        "object_sha256": "dcef059cf501c3ab98d87ea4b60fc137c4e2c41655e800acb61d74db7360498f"
+      },
+      {
+        "source": "tests/test_attention_reference.cpp",
+        "sha256": "bb8adb5753160ce006019090eb50311fa4d1b504cfa17b3aba46990252f9c449",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/tests/test_attention_reference.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/tests_test_attention_reference.cpp.o"
+        ],
+        "object_sha256": "9d16923f8d1a0d934c9841d3efd202911ac3443aaaa64eb7b196033ed456b602"
+      },
+      {
+        "source": "tests/test_kernels.cu",
+        "sha256": "6388bb06d830b4f4ff0bbdc58a14b954bd372887d24b139f654b111a5d0726b3",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/tests/test_kernels.cu",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/tests_test_kernels.cu.o"
+        ],
+        "object_sha256": "e0a84cfca59b84456f247732ba40665d69692b712480111d5d86bbfe742a8f2f"
+      },
+      {
+        "source": "tests/test_memory.cpp",
+        "sha256": "2d2723923a8bd7e76f937368e925c0edfd398eaef605d94dadce571c3595cedd",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/tests/test_memory.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/tests_test_memory.cpp.o"
+        ],
+        "object_sha256": "861d71df373c2a8a593c13d7e17f108453d8ef2429b841f3896b1569b9609261"
+      },
+      {
+        "source": "tests/test_memory_contracts.cpp",
+        "sha256": "4a7e46629b25d90a8bb97d26cff3eed5b417a11c84dc2b1f3c93044fdb586eb3",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/tests/test_memory_contracts.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/tests_test_memory_contracts.cpp.o"
+        ],
+        "object_sha256": "83aae41f755144632a2dee09597b014dbee07ca49768a4dea5e0efe85f3865fd"
+      },
+      {
+        "source": "tests/test_model_load.cpp",
+        "sha256": "6f4a6bd0050ad9070bd8b32bc90b54a95ee59da6e53f7872be5b6dabd0a4b24b",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-UNDEBUG",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/tests/test_model_load.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/tests_test_model_load.cpp.o"
+        ],
+        "object_sha256": "54cfd488c6337b30e5e248f32eda0f49d40b7489012020a127cd3cc176ac12b4"
+      },
+      {
+        "source": "tests/test_sampling.cpp",
+        "sha256": "699f3c3c1ac585e546f89a6d750c925cc447e7acb1f7e8fdc42eaf67d3994522",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/tests/test_sampling.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/tests_test_sampling.cpp.o"
+        ],
+        "object_sha256": "8310d17353ba60bcd50ec8e0d1e7e7df8af34644179c738368c3d5335d81a3c1"
+      },
+      {
+        "source": "tests/test_tokenizer.cpp",
+        "sha256": "c6b9364cf64c7c79a2568d3ce79c5373dc6e7f3007da25f05d8be835e4e36d31",
+        "status": 0,
+        "compiler_output": "",
+        "command": [
+          "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+          "-std=c++17",
+          "-arch=sm_87",
+          "-O2",
+          "-I",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/include",
+          "-c",
+          "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Projects/jetson-llm-runtime/tests/test_tokenizer.cpp",
+          "-o",
+          "/tmp/course-runtime-reviewed-objects/tests_test_tokenizer.cpp.o"
+        ],
+        "object_sha256": "df7b00efdf3de93b1e5c1256a1728f96a42dc48171160412ce7e0cf68968724d"
+      }
+    ],
+    "scope": "31 objects compiled individually for sm_87; CPU-only allocator/scratch-shim test sources built by native CMake. No aarch64 link or GPU execution."
+  },
+  "script_checks": {
+    "bash_syntax": "all four scripts passed",
+    "invalid_invocations": "test_plan extra argument, bench missing build and profile missing command each returned2",
+    "native_workflow": "test_plan and bench executed successfully"
+  },
+  "fixture": {
+    "bytes": 832,
+    "sha256": "bbd15e7b1c04b8d10962a1b94d16652972c92bf6c5586a831777f0ace46913a7",
+    "trained_weights": false
+  },
+  "not_executed": [
+    "Jetson/aarch64 build/link",
+    "CUDA kernel execution",
+    "pretrained tokenizer/model parity",
+    "Nsight trace capture",
+    "physical power/thermal measurement",
+    "server deployment or stress"
+  ],
+  "sources": {
+    "docs/README.md": "845dee665ff9b1bea1b854120bae2efa6f5d86ce147dcdbb7359bb769928b932",
+    "docs/architecture.md": "16e94c6ace7ad56ba2176cfdfebbd08cb9c17f04925ca63bfc4f1b0fec135cf1",
+    "docs/build.md": "9abd373fcc53c18988a360ab032c0d675a08c224cdc66264cecf9b0a28bcb386",
+    "docs/engine.md": "1fbdf8f1175d547097f91d45e48b0f5c77554db47c9b225c6380c9bc5f0863fb",
+    "docs/gguf.md": "a351a7beb9e8607697372ccda42168005a81c657075f021cb12f611657fdf727",
+    "docs/jetson-hal.md": "6efb96aff7167baa4c22b60ebf830bf7edd1117d8685fb32b2e20c11af4508b5",
+    "docs/kernels.md": "64b549f164fc115a03e423067b99a5034c81132f278fdb2d963efee33fec06e0",
+    "docs/memory.md": "17e5510564a652591dd9af24d385e1db4d5890b28b59fb12a8c4c0e825b6fb03",
+    "docs/performance.md": "33314dab498dcb3f18d0730e81984ad44154da456bb037540ca435f724085ed6",
+    "docs/server.md": "d9abd05dc3cf77c9ab422b1c3685342609f7203b088631e2fa5fc9fd64f18009",
+    "docs/testing.md": "010e3d90eebf049b26ed18d6de64f019b651214e5a8ce3cb9b05aaa325aaa49d",
+    "include/jllm.h": "4b3330dfd5da2413b8cf41005455f78ccfcd318d441948fe7487c78790e33ff2",
+    "include/jllm_attention_layout.h": "cb1baed0b3b880a19c4ce5368bb93978a759e46ea5818fabf24573927858e81b",
+    "include/jllm_decode_memory.h": "556870316384d0130f6ba869575d8a6609f232dc2db9eeb48ffc0ced014876ee",
+    "include/jllm_engine.h": "1a74180603dfb88b6c73fc8e3e234fb0c8a65f0885d14e3b223e9bb0556e2ac0",
+    "include/jllm_gguf.h": "886b550f5ca929132ed5cd81b6ccad47ebe17fef922e84f7bbdfe9c99b63b857",
+    "include/jllm_jetson.h": "d18fec7b39424079bdb93ff9e18c2d0ef1d860f532ec1d6ca418e008d92ad1d5",
+    "include/jllm_kernels.h": "c9a10918a269597a2e16ec1aadf84fa6cc26cbfec2c62dc2d5648db14b3dd5f3",
+    "include/jllm_memory.h": "8062da6d7bb5ba0f0140562242132fc14eb6389e15fb4f7f17464126b2704c9f",
+    "include/jllm_model.h": "e0c6a76191ca8147f02a0bdabc3e9d69a6c353bdb16c7bf955c57152ca7b686f",
+    "include/jllm_sampling.h": "3dfa4f2e9d151d93ea2d6586feba8a29d4ae3bd8ac1c08bc25d5fed95244eb27",
+    "include/jllm_tokenizer.h": "3f27d6cbf5b3780ab048d7ac61ea48a0590dfa7e1a4d1e5525f20163a2d98fa0",
+    "labs/Attention-Layout-Lab.md": "e747dc958a48a715d4183ef6d0c1eb23d4c033f57fd12d238e6dbb739a1c4a1d",
+    "labs/README.md": "c4a2052075fe02e22753ce0b7f06b6f62379dfb90023fe54244a9fc5a4b6bb5e",
+    "labs/benchmark_cpu.py": "3cd9d57ad75cb1d011bbef3f1223da7bc192e298849038c7094c96a3f0635451",
+    "labs/make_fixture.py": "fd7c0564211a3e02478099d7e9209490ea28f98ce062887a05de6b596fce7744",
+    "labs/test_attention_contracts.py": "7fe11739c06f919869f0f5124f7902ebbe740a2aec745495e7504026a2e28c32",
+    "labs/test_cpu_runtime.py": "1fbc8cd85ad6af2ac806060eeabdd556a9272515b83c5edcdf9fd1a7fa057cd5",
+    "scripts/bench.sh": "e79913a5c8d250fd8fb7d3a2f32a33d91e8067f3970cdacbe9edffd9c5ff6f7f",
+    "scripts/profile.sh": "8cb78dd248402c8528b9496cc716da4aa46b3513cb2ef92b970bfc5f14d739ad",
+    "scripts/setup_jetson.sh": "2bb75f16a28b773774ae263c713c63a6b7bd5ed4b2cc5b6f62ceef2473393159",
+    "scripts/test_plan.sh": "2462fea71986a944219b06173150d3f8d42c24b0e8084e298ac73de80149e8f0",
+    "src/benchmark_cpu.cpp": "f0e9ffc0c52beff54eb02c12079196c6982d88cb1722d418c087c3ddd8c08668",
+    "src/engine/decode.cu": "66b72705ea0958b69f5df9cba57167e6ae9308a1941904070b4935a1ea3b3840",
+    "src/engine/gguf.cpp": "06bdb09e35f65843b84d2935383d166466e7af45cdbe050c42451602cfd44a85",
+    "src/engine/model.cpp": "b16214d9a609cc2aeabd67ff25a1a31f29054048ed30283c678ec9e32987d8c1",
+    "src/engine/model_config.cpp": "339175292a18861cb4d60aba5fedc60637207f6ff5d1fb63be1be093124dc121",
+    "src/engine/sample.cpp": "46f7355f64cb9c0989fdd834de869f14979218989cdfcb39c92ca84e1a4f5943",
+    "src/engine/tokenizer.cpp": "6b1f77eb5d2a531a628f837e5e0d4ec0f61b54ec11d556948e3be7b2e712efc5",
+    "src/gguf_inspect.cpp": "2729d3ceff82b46c94327213f55e8052485e236a0fdaaa606111ea8f5242c22d",
+    "src/jetson/power.cpp": "f5bee99bb7fe23e7b4fd65bdfa260f33f897cb733df4fdc9a4d78688fd37384e",
+    "src/jetson/sysinfo.cpp": "ee941104b29a4d9d5a0ac502298ffa65f273546aba026615ac000d5e5963fddd",
+    "src/jetson/thermal.cpp": "8b899e555265a3588a60ca2d242f4afe1dc903a4e33bb18460cb34564220ea54",
+    "src/kernels/attention.cu": "dc5be779763b9cb04acba6a5196214fa885ab8a314d4fd9317f02b97602bd378",
+    "src/kernels/convert.cu": "2642527fdd486b7e03c069a620ae710afb277c0f9383e8a3b550ad5979d84046",
+    "src/kernels/fused_norm.cu": "18a88c644331da9206a49c523da822a804cd6721d0566d8e0ac41f6167a34c50",
+    "src/kernels/gemv_q4.cu": "592d06f6881db1da654cc6cba5871f53b5f13b5301dea8ba54f30b6d5af8e3ee",
+    "src/kernels/rope.cu": "6d3182b03115805fcdf19524ac842be5c23682161806c31c613268931cac411d",
+    "src/kernels/softmax.cu": "47348e88da25b0b44865568d84437ea5cd50662ad8cd4dcd97344f11d5020918",
+    "src/main.cpp": "95726b4b5867f377bcd644a578c922f10fc095ff37e4979e7171c3cf0b6a498b",
+    "src/main_server.cpp": "532855123347cf655b2e31a534b52ff6c4397343530a572352f7f2096a228edc",
+    "src/memory/budget.cpp": "7576e6857bb1fbc1a594356698161897d2ac64816fe6f674bae0afc08ef75e32",
+    "src/memory/kv_cache.cpp": "076932548a7221272d1cbf70389741ecacc3a6eeee6a527e2c9d0a3aba74db84",
+    "src/memory/pool.cpp": "40c372511517635e3195935dfad85007a4d051f1cc05891b3b0e447d8c24acee",
+    "src/server/http_server.cpp": "f4ff663bb80b77bb1b84bf96bac3acd3ad0eb8504a450fa398850d104c04c1c0",
+    "tests/attention_reference.h": "e5036fd0ca2a1c317fd7cb8845eee50ec5d96bcbb82123724886c097491c3b32",
+    "tests/cuda_stub/cuda_runtime.h": "9ffe706aaba431a92a1953da79bafe5a80aa022bac0839de1bc5dd87ec4656a3",
+    "tests/test_allocator_contracts.cpp": "4f609228dfcf10a19f8795e6c38b1e7034b82242b910249f34752335ef3e01f1",
+    "tests/test_attention.cu": "3728442945ff09037328b110086d3d81abf26a24b8b35a98499e0e0808314c4c",
+    "tests/test_attention_reference.cpp": "bb8adb5753160ce006019090eb50311fa4d1b504cfa17b3aba46990252f9c449",
+    "tests/test_decode_scratch.cpp": "82cd28a3b108776154c7aab60305940ac1cf09b8eaabb693329640430e1fa9f7",
+    "tests/test_kernels.cu": "6388bb06d830b4f4ff0bbdc58a14b954bd372887d24b139f654b111a5d0726b3",
+    "tests/test_memory.cpp": "2d2723923a8bd7e76f937368e925c0edfd398eaef605d94dadce571c3595cedd",
+    "tests/test_memory_contracts.cpp": "4a7e46629b25d90a8bb97d26cff3eed5b417a11c84dc2b1f3c93044fdb586eb3",
+    "tests/test_model_load.cpp": "6f4a6bd0050ad9070bd8b32bc90b54a95ee59da6e53f7872be5b6dabd0a4b24b",
+    "tests/test_sampling.cpp": "699f3c3c1ac585e546f89a6d750c925cc447e7acb1f7e8fdc42eaf67d3994522",
+    "tests/test_tokenizer.cpp": "c6b9364cf64c7c79a2568d3ce79c5373dc6e7f3007da25f05d8be835e4e36d31",
+    "CMakeLists.txt": "5424e0bc71e144993f133e95090575b8b5a2bd2fcb63162ba6575c61c1dbcb50",
+    "TESTING.md": "0ac2407e2634f79432726d2d54f4d3b9722c4d0c58bd2a2f6a39fe2f968500d6"
+  },
+  "allocator_shim": "Actual pool.cpp and kv_cache.cpp compiled against private host-memory CUDA API shim; exercises ownership/indexing/failure paths, no CUDA runtime or GPU execution.",
+  "independent_review": [
+    "signed-overflow and negative reserve handling",
+    "UTF-8/key grammar/tensor-name/alignment bounds",
+    "scratch overflow diagnostic",
+    "noncopyable owned allocations and failure cleanup",
+    "token-major KV reader/writer contract",
+    "negative attention score reduction and explicit INT8 scales",
+    "peak reusable scratch with checked arithmetic and allocation",
+    "host/device scratch reserved before KV admission",
+    "configured final RMS epsilon and even-head RoPE mapper restriction"
+  ],
+  "attention_and_scratch_evidence": "attention-validation.json",
+  "manual_model_test_no_device_check": {
+    "scope": "x86-64 binary linked; only absent-device path executed, no model file read",
+    "command": [
+      "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+      "-arch=sm_87",
+      "/tmp/course-runtime-reviewed-objects/tests_test_model_load.cpp.o",
+      "/tmp/course-runtime-reviewed-objects/src_engine_model.cpp.o",
+      "/tmp/course-runtime-reviewed-objects/src_engine_gguf.cpp.o",
+      "/tmp/course-runtime-reviewed-objects/src_engine_model_config.cpp.o",
+      "/tmp/course-runtime-reviewed-objects/src_engine_tokenizer.cpp.o",
+      "/tmp/course-runtime-reviewed-objects/src_memory_budget.cpp.o",
+      "/tmp/course-runtime-reviewed-objects/src_jetson_sysinfo.cpp.o",
+      "/tmp/course-runtime-reviewed-objects/src_jetson_power.cpp.o",
+      "/tmp/course-runtime-reviewed-objects/src_jetson_thermal.cpp.o",
+      "-o",
+      "/tmp/course-model-load-review"
+    ],
+    "link_exit_code": 0,
+    "execution_exit_code": 77,
+    "stdout": "",
+    "stderr": "SKIP: model mapping requires a usable CUDA device/driver; not executed\n",
+    "binary_sha256": "ee18758dae6b64d8f9f29f3068f3679ceb130c1b374696bab107e1f9fb044e86"
+  }
+}

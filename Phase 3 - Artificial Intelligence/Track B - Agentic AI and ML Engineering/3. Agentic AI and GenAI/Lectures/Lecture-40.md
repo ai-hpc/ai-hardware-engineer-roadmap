@@ -22,17 +22,9 @@ Which test proves the control still works?
 
 OpenClaw's trust site provides a useful case study because it maps agent threats onto **MITRE ATLAS tactics**.
 
-The published draft model lists:
+The [pinned draft threat model](https://github.com/openclaw/openclaw/blob/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/security/THREAT-MODEL-ATLAS.md) organizes attack paths and candidate controls. A historical count of 37 threats is not a completeness measure, a certification or proof that the listed controls are enabled.
 
-```text
-37 total threats
-6 critical risks
-16 high risks
-12 medium risks
-3 low risks
-```
-
-The point is not the exact number.
+Start with the current deployment assumptions. OpenClaw's documented Gateway trust boundary covers a trusted operator or mutually trusting team; separate sessions and workspaces do not turn it into a hardened service for mutually hostile tenants. Model-generated risk reviews and malware scanning can also depend on operator configuration and API keys. Test the deployed configuration.
 
 The point is the **method**:
 

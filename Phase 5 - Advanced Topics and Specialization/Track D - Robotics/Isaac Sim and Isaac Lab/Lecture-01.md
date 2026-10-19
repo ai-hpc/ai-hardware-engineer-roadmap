@@ -4,7 +4,7 @@
 
 Isaac Sim looks like a 3D editor with a play button. Underneath it is a stack of four GPU-hungry systems glued together by a scene description format, and nearly every problem you will hit later — a robot that explodes, a camera that eats gigabytes of VRAM, a training loop that runs at 10% of the speed it should — comes from not knowing which layer you are talking to.
 
-This lecture builds that map, installs Isaac Sim 6.1 on an **8 GB RTX 4060**, and runs a first standalone simulation that you **measure**: physics time per step, frame time with rendering, and VRAM. Those three numbers are the baseline every later lecture compares against.
+This lecture builds that map, installs the named Isaac Sim 6.1 baseline on a compatible RTX system, and provides a first standalone simulation to **measure**: physics time per step, frame time with rendering, and VRAM. Those three numbers are the baseline every later lecture compares against.
 
 By the end you should be able to:
 
@@ -127,7 +127,7 @@ A standalone simulation loop does this every `simulation_app.update()`:
 | Render products (each camera) | Count × resolution × annotators | The biggest lever in Lectures 07 and 10 |
 | PyTorch caching allocator | Policy, batch, replay buffers | `torch.cuda.memory_summary()`; free what you do not need |
 
-> **8 GB budget.** On a 4060, close the browser and other GPU apps before measuring, run labs headless unless you need to look, and treat the GUI as a debugging tool rather than the default. Physics-only scenes with thousands of simple bodies fit; the first things to overflow are many RTX cameras and large textured environments (Lecture 07). If your fixed cost from Lab 1a leaves only a few GB, plan to run camera-heavy labs on a cloud L40S or RTX PRO 6000 and keep the 4060 for physics and policy work.
+> **8 GB budget.** On a 4060, close the browser and other GPU apps before measuring, run labs headless unless you need to look, and treat the GUI as a debugging tool rather than the default. Physics-only scene capacity must be measured; the first things to overflow are many RTX cameras and large textured environments (Lecture 07). If your fixed cost from Lab 1a leaves only a few GB, plan to run camera-heavy labs on a cloud L40S or RTX PRO 6000 and keep the 4060 for physics and policy work.
 
 Rule for this course: **measure the baseline before adding anything.** If the empty app already takes a large part of your card, every later VRAM-per-env number has to fit in what is left.
 
@@ -135,7 +135,7 @@ Rule for this course: **measure the baseline before adding anything.** If the em
 
 ## 4. Install Isaac Sim 6.1 on an RTX 4060
 
-NVIDIA's minimum for 6.1 is an RTX 4080 with 16 GB. An 8 GB 4060 is below that: it runs, but the renderer, large scenes, and many cameras will hit the ceiling. That is acceptable for learning, as long as you know it.
+NVIDIA's published minimum for 6.1 is an RTX 4080 with 16 GB. An 8 GB 4060 is below that minimum; startup and useful operation are not guaranteed. Complete the [CPU simulation lab](Simulation-CPU-Lab.md) first if suitable hardware is unavailable. This repository did not execute the full Isaac Sim examples.
 
 **Prerequisites.** Ubuntu 22.04 or 24.04 (x86_64), GLIBC 2.35+, a recent NVIDIA driver (the 6.1 docs list 595.58.03 as the tested Linux driver), 32 GB RAM recommended, 50 GB+ free SSD.
 
@@ -144,13 +144,14 @@ NVIDIA's minimum for 6.1 is an RTX 4080 with 16 GB. An 8 GB 4060 is below that: 
 python3.12 -m venv ~/env_isaacsim && source ~/env_isaacsim/bin/activate
 pip install --upgrade pip
 
-# 2. PyTorch first (CUDA 12.8 wheels; cu130 also works with a new enough driver)
+# 2. PyTorch first: preserve this baseline's documented CUDA wheel family
 pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cu128
 
 # 3. Isaac Sim 6.1 from NVIDIA's index (large download)
 pip install "isaacsim[all,extscache]==6.1.0.0" --extra-index-url https://pypi.nvidia.com
 
-# 4. Accept the Omniverse EULA non-interactively
+# 4. Read the linked NVIDIA license terms and accept them only if you agree.
+# For an installation whose terms you have accepted:
 export OMNI_KIT_ACCEPT_EULA=YES
 
 # 5. Check your system against the requirements

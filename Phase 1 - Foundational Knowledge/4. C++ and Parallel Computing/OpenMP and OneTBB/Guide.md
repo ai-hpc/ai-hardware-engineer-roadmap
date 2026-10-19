@@ -22,37 +22,37 @@ This guide covers two parts. Section 1 is a progressive tour of OpenMP — from 
 
 ### 1.0 Mental Model: Fork-Join
 
-OpenMP uses the **fork-join model**. Your program starts with a single *master* thread. When it reaches a parallel region, it **forks** into a team of worker threads. All threads execute the region concurrently, then **join** back into one at an implicit barrier at the end.
+OpenMP uses the **fork-join model**. Your program starts with a single initial thread. When it reaches a parallel region, it **forks** into a team of worker threads. The encountering thread becomes the team's primary thread (thread zero); team threads execute the region and synchronize at its end. The encountering thread then continues. Physical simultaneous execution depends on available CPU resources.
 
 ```
  serial          parallel region              serial
 ─────────── ╔══════════════════════════╗ ───────────────►
             ║  #pragma omp parallel    ║
-   master ──╫──► thread 0  (work) ────╫──► master
+   primary ──╫──► thread 0  (work) ────╫──► primary
             ╠──► thread 1  (work) ────╣
             ╠──► thread 2  (work) ────╣
             ╚──► thread 3  (work) ────╝
                                   ▲
                          implicit barrier:
                     all threads must arrive
-                    before master continues
+                    before primary continues
 ```
 
 You can have **multiple parallel regions** in one program. Each fork creates the thread team; each join dissolves it (or returns threads to a pool for reuse).
 
 ```
-master ──── [serial] ──── fork ──── [parallel] ──── join ──── [serial] ──── fork ──── [parallel] ──── join ────►
+primary ──── [serial] ──── fork ──── [parallel] ──── join ──── [serial] ──── fork ──── [parallel] ──── join ────►
 ```
 
 **Three things OpenMP manages for you automatically:**
 
 | What | How OpenMP handles it |
 |------|-----------------------|
-| Thread creation | Thread pool — threads are reused, not recreated each region |
+| Thread creation | Implementation-managed team; runtimes commonly reuse worker threads |
 | Work distribution | Divides loop iterations across threads (`schedule` clause controls how) |
 | Synchronization | Implicit barrier at the end of every parallel region |
 
-**Compile:** `g++ -O2 -std=c++17 -fopenmp fib_benchmark.cpp -ltbb -o fib_benchmark`
+**Compile a standalone OpenMP file:** `g++ -O2 -std=c++17 -fopenmp example.cpp -o /tmp/example`. The Fibonacci comparison additionally needs `-ltbb`; see section 1.16. Most short blocks below are function-body fragments and use application functions such as `compute`; they are not complete translation units. [openmp_patterns.cpp](openmp_patterns.cpp) supplies actual checked examples for these concepts.
 
 ---
 
@@ -69,15 +69,15 @@ std::vector<float> a(N), b(N), c(N);
 for (int i = 0; i < N; i++)
     c[i] = a[i] + b[i];
 
-// Parallel: 8 threads each do ~125,000 iterations
-#pragma omp parallel for
+// Request 8 threads and explicitly choose static scheduling.
+#pragma omp parallel for num_threads(8) schedule(static)
 for (int i = 0; i < N; i++)
     c[i] = a[i] + b[i];
 ```
 
 That's it. One line added. The compiler splits `[0, N)` into chunks, assigns each chunk to a thread, and inserts a barrier at the end.
 
-**What each thread sees:**
+**Illustration if the actual team has eight threads:**
 
 ```
 Thread 0:  i = 0 … 124,999
@@ -87,7 +87,7 @@ Thread 2:  i = 250,000 … 374,999
 Thread 7:  i = 875,000 … 999,999
 ```
 
-This is safe here because each `i` writes to a different `c[i]`. No two threads touch the same memory.
+This is safe because each iteration writes a distinct `c[i]`, and `a`/`b` are read-only and do not alias the output. Threads may read shared input and touch the same cache line; sharing a cache line can affect performance without creating a data race. A thread-count request can be constrained by runtime settings; query the actual team instead of assuming eight.
 
 ---
 
@@ -96,13 +96,13 @@ This is safe here because each `i` writes to a different `c[i]`. No two threads 
 **Wrong — data race:**
 
 ```cpp
-int sum = 0;
+double sum = 0.0;
 
 #pragma omp parallel for
 for (int i = 0; i < N; i++)
     sum += a[i];   // ← RACE: multiple threads read-modify-write sum simultaneously
 
-// sum is wrong. Possibly different on every run.
+// Undefined behavior: the output may change, or may accidentally look correct.
 ```
 
 **Why it breaks:**
@@ -119,7 +119,7 @@ One update is lost. This is a classic **read-modify-write race**.
 **Fix: `reduction` clause**
 
 ```cpp
-int sum = 0;
+double sum = 0.0;
 
 #pragma omp parallel for reduction(+:sum)
 for (int i = 0; i < N; i++)
@@ -127,15 +127,15 @@ for (int i = 0; i < N; i++)
                    // all private sums are added together at the end
 ```
 
-Each thread gets its own private copy of `sum` (initialized to 0). After the loop, OpenMP adds all private copies into the original `sum`. No race. Section 2.5 covers all supported reduction operators and custom reductions.
+Each thread gets its own private copy of `sum` (initialized to 0). After the loop, OpenMP adds all private copies into the original `sum`. No race. Section 1.5 covers common operators and custom reductions. Floating-point addition can regroup, so a correct reduction need not be bit-identical to serial addition.
 
 ---
 
 ### 1.3 Data Sharing Clauses
 
-Every variable referenced inside a parallel region is either **shared** (one copy, all threads see it) or **private** (each thread has its own copy). OpenMP's default: variables declared outside the region are shared.
+Every variable referenced inside a parallel region is either **shared** (one copy, all threads see it) or **private** (each thread has its own copy). For a `parallel` region, outer ordinary variables are usually shared; loop indices and local automatic variables have predetermined rules, and explicit tasks have additional implicit firstprivate rules. Use `default(none)` to require explicit decisions where applicable. Sharing an object does not make concurrent mutation safe.
 
-**No** — `private` and `firstprivate` are mutually exclusive for the same variable. A variable can only appear in one clause. They are alternatives that differ only in initialization:
+`private` and `firstprivate` are alternatives for a given variable on this construct; do not list it in both. `firstprivate` adds initialization from the original:
 
 ```cpp
 int x = 10;
@@ -152,12 +152,12 @@ for (int i = 0; i < N; i++) {
 // Use when: you read x before assigning it (need the original value)
 #pragma omp parallel for firstprivate(x)
 for (int i = 0; i < N; i++) {
-    a[i] = x + i;    // x is read first → needs the initial value 10 → must use firstprivate
-    x = compute(i);  // then overwritten — fine, it's private
+    a[i] = x + i;    // x is read first → uses the initial value 10 supplied by firstprivate
+    // Leave x unchanged so every iteration uses the original offset.
 }
 ```
 
-**Rule:** use `private` when you always write before read. Use `firstprivate` when you need the original value inside the loop.
+**Rule:** initialize scratch before reading it. `firstprivate` initializes each implicit task's copy once, **not once per iteration**. If you increment it, later iterations on that thread see the increment. A copied pointer still points to the same allocation; it does not copy or protect its pointee. [Firstprivate semantics](https://www.openmp.org/spec-html/5.2/openmpsu38.html).
 
 #### When `private` is the right choice
 
@@ -175,7 +175,7 @@ for (int i = 0; i < N; i++) {
     col = i % COLS;                       // written first
     tmp = heavy_compute(matrix[row][col]); // written first
     snprintf(buf, sizeof(buf), "(%d,%d)=%.2f", row, col, tmp);  // written first
-    store_result(i, buf, tmp);
+    store_result(i, buf, tmp);  // must copy buf before returning; do not retain this pointer
 }
 ```
 
@@ -200,13 +200,13 @@ for (int i = 0; i < N; i++) {
 }
 ```
 
-> **Prefer Version A** when possible — declare scratch variables inside the loop body. Use `private` only when you *must* declare the variable outside (e.g., fixed-size arrays, C99 VLAs, or compatibility constraints).
+> **Prefer Version A** when possible — declare scratch variables inside the loop body. Use a clause when you deliberately need an outer declaration. Fixed-size arrays can also be local; variable-length arrays are not standard C++17. For class types, privatization invokes the applicable constructors rather than universally leaving the entire object uninitialized.
 
 ---
 
 #### `lastprivate` — Getting the Value from the Last Iteration
 
-`lastprivate` is private during the loop, but after the loop ends, the value from the **sequentially last iteration** (highest `i`) is copied back to the original variable.
+`lastprivate` is private during the loop, but after the loop ends, the value from the **sequentially last iteration** (for this increasing loop, `i=N-1`) is copied back to the original variable.
 
 **The problem it solves:** after a parallel loop, you sometimes need to know what a variable held in the final iteration — as if the loop ran serially.
 
@@ -254,31 +254,18 @@ Thread 3 processes i = 750..999:   ← sequentially last range
 After join: x = 1.0, sin_x = sin(1.0) — as if the loop ran serially
 ```
 
-> **`lastprivate` copies from the thread that handled the highest `i`**, not the thread that finished last in wall-clock time. The result is deterministic regardless of scheduling.
+> **`lastprivate` copies the sequentially last iteration's value**, not whichever thread finished last. That is the lowest index for a decreasing loop. Assign the variable on that last iteration; ordinary `lastprivate` does not search backward for the last assignment. It does not repair a loop-carried recurrence. [Lastprivate semantics](https://www.openmp.org/spec-html/5.2/openmpsu39.html).
 
 **Common real use cases:**
 
 | Pattern | Why `lastprivate` |
 |---------|------------------|
-| Running total / recurrence after a sweep | Need final accumulated value |
-| Finding the last element matching a condition | Carry the match out of the loop |
+| Independently computed endpoint | Need the final iteration's value |
+| Last matching index | Prefer a `max` reduction on matching indices; ordinary `lastprivate` is insufficient |
 | Mesh traversal — record position of last node processed | Node index/coords after full sweep |
 | Numerical integration — endpoint value needed post-loop | Value of integrand at upper bound |
 
-**`lastprivate` + `firstprivate` on the same variable** — this *is* legal (they are not the same clause):
-
-```cpp
-double x = 0.5;   // starting x
-
-// firstprivate: each thread starts with x = 0.5
-// lastprivate:  after loop, x = value from last iteration
-#pragma omp parallel for firstprivate(x) lastprivate(x)
-for (int i = 0; i < N; i++) {
-    x = x * 0.99 + i * dx;   // reads x (needs firstprivate) and updates it
-    output[i] = x;
-}
-// x here = value of x after i = N-1, with each thread having started at 0.5
-```
+**`firstprivate` and `lastprivate` may coexist**, but this does not reproduce a serial recurrence. For example, initialize `x=0`, then run four `x += 1` iterations with two threads and `schedule(static,2)`: each private copy ends at 2, so the copied-back result is 2; serial execution gives 4. For a total use a reduction. For a true prefix recurrence, derive a scan/parallel algorithm or keep the dependence serial. The checked source demonstrates this counterexample without a race.
 
 ---
 
@@ -287,9 +274,9 @@ for (int i = 0; i < N; i++) {
 | Clause | Initialized? | Written back after loop? | Use when |
 |--------|:-----------:|:------------------------:|---------|
 | `shared(var)` | — (one copy) | — (always live) | Read-only inside loop, or safely written with sync |
-| `private(var)` | **No** | No | Scratch — always written before read |
+| `private(var)` | C++ default initialization | No | Scratch — always written before read |
 | `firstprivate(var)` | **Yes** (from original) | No | Needs original value inside loop |
-| `lastprivate(var)` | No | **Yes** (from last `i`) | Need loop's final value after it ends |
+| `lastprivate(var)` | C++ default initialization | **Yes** (from last `i`) | Need loop's final value after it ends |
 | `firstprivate` + `lastprivate` | **Yes** | **Yes** | Needs original value AND final value |
 | `reduction(op:var)` | Yes (identity) | Yes (combined) | Accumulate across all iterations |
 
@@ -302,15 +289,15 @@ for (int i = 0; i < N; i++) {
 OpenMP divides loop iterations among threads according to a *schedule*. The right schedule depends on whether iterations take equal time or vary widely.
 
 ```cpp
-// Static (default): divide evenly before the loop starts
-// Thread 0 gets [0, N/P), thread 1 gets [N/P, 2N/P), ...
+// Static: divide into approximately equal chunks before execution
+// Exact chunk sizes without an explicit chunk are not fully prescribed.
 // Best when: each iteration costs the same amount of time
 #pragma omp parallel for schedule(static)
 for (int i = 0; i < N; i++) { /* uniform work */ }
 
 // Static with chunk: interleave chunks of k iterations
 // Thread 0 gets 0-7, 32-39, 64-71, ...   (chunk=8, 4 threads)
-// Helps with cache locality in some patterns
+// Check locality/false sharing; round-robin chunks may hurt contiguous writes.
 #pragma omp parallel for schedule(static, 8)
 for (int i = 0; i < N; i++) { /* */ }
 
@@ -322,7 +309,7 @@ for (int i = 0; i < N; i++) { /* variable-cost work */ }
 
 // Guided: starts with large chunks, shrinks over time
 // Reduces scheduling overhead while handling tail imbalance
-// Best when: later iterations are lighter than earlier ones
+// Can help irregular work; early heavy chunks may still cause imbalance.
 #pragma omp parallel for schedule(guided)
 for (int i = 0; i < N; i++) { /* */ }
 
@@ -331,6 +318,8 @@ for (int i = 0; i < N; i++) { /* */ }
 #pragma omp parallel for schedule(runtime)
 for (int i = 0; i < N; i++) { /* */ }
 ```
+
+Omitting `schedule` leaves the choice implementation-defined. Guided scheduling responds to remaining iteration count, not measured iteration cost. Treat these as starting hypotheses and measure. [Implementation-defined schedule behavior](https://www.openmp.org/spec-html/5.2/openmpap1.html).
 
 **When to pick which:**
 
@@ -345,10 +334,14 @@ Tuning at runtime without recompile?   → runtime
 
 ### 1.5 Reductions
 
-Building on the `reduction(+:sum)` clause introduced in section 2.2, here are all supported operators and how to define custom reductions:
+Building on the `reduction(+:sum)` clause introduced in section 1.2, here are common operators and how to define custom reductions:
 
 ```cpp
-int sum = 0, product = 1, max_val = INT_MIN;
+// A bounded integer example; arbitrary products can overflow even with reduction.
+std::vector<int> a{1, 2, 3, 4}, b{1, 2, 1, 2};
+const int N = static_cast<int>(a.size());
+long long sum = 0, product = 1;
+int max_val = std::numeric_limits<int>::lowest();
 
 #pragma omp parallel for reduction(+:sum) reduction(*:product) reduction(max:max_val)
 for (int i = 0; i < N; i++) {
@@ -358,9 +351,9 @@ for (int i = 0; i < N; i++) {
 }
 ```
 
-Built-in operators: `+`, `*`, `-`, `&`, `|`, `^`, `&&`, `||`, `min`, `max`.
+Common C++ reduction identifiers include `+`, `*`, `&`, `|`, `^`, `&&`, `||`, `min`, `max`. Include `<algorithm>`, `<limits>` and `<vector>` for this fragment. The original value also participates in the final combination; a nonzero initial sum is included once.
 
-**Custom reduction (C++ only, OpenMP 4.0+):**
+**Custom reduction (C++ example, OpenMP 4.0+; also available in C and Fortran):**
 
 ```cpp
 struct Vec3 { float x, y, z; };
@@ -368,9 +361,9 @@ struct Vec3 { float x, y, z; };
 // Declare how to combine two partial results (omp_out += omp_in)
 // and what value each thread's private copy starts at.
 #pragma omp declare reduction(vec_add : Vec3 : \
-    omp_out.x += omp_in.x; \
-    omp_out.y += omp_in.y; \
-    omp_out.z += omp_in.z) \
+    (omp_out.x += omp_in.x, \
+     omp_out.y += omp_in.y, \
+     omp_out.z += omp_in.z)) \
     initializer(omp_priv = Vec3{0, 0, 0})
 
 Vec3 total{0, 0, 0};
@@ -386,6 +379,8 @@ for (int i = 0; i < N; i++) {
 ```
 
 ---
+
+The combiner is an expression; the commas above form one C++ comma expression. Separate semicolon statements inside that syntax do not compile. [Declare-reduction syntax](https://www.openmp.org/spec-html/5.2/openmpsu55.html).
 
 ### 1.6 Collapse — Parallelizing Nested Loops
 
@@ -407,13 +402,13 @@ for (int i = 0; i < 4; i++)
         A[i][j] = B[i][j] * C[i][j];
 ```
 
-> Use `collapse` when the outer loop count is small relative to the thread count.
+> Try `collapse` when the outer loop count is small, but first verify independence across the combined iteration space. It does not remove dependencies or guarantee useful speedup; loop-nest restrictions and cache locality still matter.
 
 ---
 
 ### 1.7 SIMD — Vectorization Hints
 
-SIMD (Single Instruction, Multiple Data) processes multiple array elements in one CPU instruction. This is the same principle behind GPU SIMT — learning it here prepares you for CUDA's warp-level execution.
+SIMD (Single Instruction, Multiple Data) processes multiple array elements with a vector instruction. It introduces data-parallel thinking useful for CUDA, while CPU vector lanes and GPU SIMT threads remain distinct execution models.
 
 ```cpp
 // Ask the compiler to vectorize (SIMD) one loop on a single thread
@@ -433,7 +428,7 @@ for (int i = 0; i < N; i++)
     sum += a[i];
 ```
 
-The `simd` pragma is a hint. The compiler still decides if vectorization is safe. Add `-fopt-info-vec` to see what was vectorized.
+The directive permits concurrent SIMD execution under OpenMP semantics; it is not a guarantee that the compiler will prove arbitrary code safe or emit a chosen vector width. Keep iterations independent in these examples, express reductions correctly, and honor any `aligned`/`safelen` promises you add. Use GCC `-fopt-info-vec` to inspect emitted vectorization, then validate results. CPU SIMD lanes and GPU SIMT threads have different programming and scheduling models. [OpenMP SIMD semantics](https://www.openmp.org/spec-html/5.2/openmpse60.html).
 
 ---
 
@@ -452,28 +447,31 @@ for (int i = 0; i < N; i++) {
     }
 }
 
-// atomic: faster for single memory operations (uses hardware atomics)
+// atomic: protect a supported access; mapping and cost depend on the target
 int counter = 0;
 #pragma omp parallel for
 for (int i = 0; i < N; i++) {
     #pragma omp atomic
-    counter++;           // ← hardware atomic, no mutex overhead
+    counter++;           // all accesses to this shared counter must be compatible
 }
 
 // atomic with operation
 #pragma omp atomic update
 total += a[i];
 
+int val;
 #pragma omp atomic read
-int val = shared_var;
+val = shared_var;
 
 #pragma omp atomic write
 shared_var = computed;
 ```
 
+Protecting an atomic counter does not by itself publish unrelated payload memory. Use the relevant barrier or a correctly derived acquire/release protocol. All accesses to a protected object must follow a compatible synchronization scheme.
+
 **Critical vs Atomic:**
-- `#pragma omp critical` — mutex, any code block, higher overhead
-- `#pragma omp atomic` — hardware instruction, single read/write/update only, much faster
+- `#pragma omp critical` — mutual exclusion for a structured block; contention can serialize work.
+- `#pragma omp atomic` — protects supported read/write/update/capture/compare forms. The compiler may use hardware instructions or runtime support. Measure cost; frequent updates to one shared cache line can remain a bottleneck.
 
 ---
 
@@ -493,7 +491,7 @@ With nowait:
 T0: [████ loop ████][next loop immediately]
 T1: [████████████████ loop ████████████][next loop]
 T2: [██ loop ██][next loop immediately]
-     only safe when the two loops are data-independent
+     this example requires data-independent producer loops
 ```
 
 ```cpp
@@ -508,17 +506,18 @@ T2: [██ loop ██][next loop immediately]
         b[i] = compute_b(i);        // writes only b[] — independent of a[]
 
     #pragma omp barrier             // explicit sync: a[] and b[] both fully written
-    use(a, b);                      // safe to read both here
+    #pragma omp single
+    use(a, b);                      // one consumer after all producers finish
 }
 ```
 
-**When `nowait` is safe:** the next work unit reads from a completely different data set than the loop just completed. If there is any dependency, keep the implicit barrier.
+**Beginner rule:** remove a barrier only when later work does not require unfinished writes. Separate arrays are insufficient if helper functions share hidden state. All team threads must encounter worksharing constructs/barriers in a valid order. The barrier above makes both arrays ready; `single` separately ensures the consumer runs once. More advanced same-thread scheduling proofs can permit some dependent loops, but require stronger conditions than this example.
 
 ---
 
 ### 1.10 Sections — Fixed Concurrent Operations
 
-`sections` is for a **small, known-at-compile-time** set of independent operations — not a loop. Each `section` block runs on one thread; all blocks run concurrently.
+`sections` is for a **small, known-at-compile-time** set of independent operations — not a loop. Each section executes once by one team thread. Assignment is unspecified; one thread can execute several sections, so overlap is permitted rather than guaranteed.
 
 ```
 #pragma omp parallel sections
@@ -534,13 +533,13 @@ T2: [██ loop ██][next loop immediately]
 #pragma omp parallel sections
 {
     #pragma omp section
-    load_data();        // thread 0
+    load_data();        // any team thread
 
     #pragma omp section
-    init_config();      // thread 1
+    init_config();      // any team thread
 
     #pragma omp section
-    warmup();           // thread 2
+    warmup();           // must not depend on unfinished load/init
 }
 // all three finished here
 ```
@@ -551,7 +550,7 @@ T2: [██ loop ██][next loop immediately]
 |--|-----------|---------|
 | Number of units | Fixed at compile time | Dynamic, recursive |
 | Use case | Load + init + warmup | Tree traversal, Fibonacci |
-| Overhead | Very low | Higher (task queue) |
+| Overhead | Measure for the work size | Measure task creation and scheduling costs |
 
 Use `sections` when you can count the operations by hand. Use `tasks` (next section) when the work fans out recursively or the count isn't known until runtime.
 
@@ -559,7 +558,7 @@ Use `sections` when you can count the operations by hand. Use `tasks` (next sect
 
 ### 1.11 Tasks — Recursive and Irregular Work
 
-Tasks decouple **work creation** from **work execution**. One thread creates tasks and puts them in a queue; any thread in the team picks them up and executes them.
+Tasks decouple **work creation** from **work execution**. Any encountering thread may generate a task. The runtime can execute it immediately or defer it to an eligible team thread; one universal queue or execution order is not prescribed.
 
 ```
 single thread creates tasks:          thread pool executes them:
@@ -576,10 +575,10 @@ int sum_tree(Node* node) {
     if (!node) return 0;
     int left_sum = 0, right_sum = 0;
 
-    #pragma omp task shared(left_sum)
+    #pragma omp task shared(left_sum) firstprivate(node)
     left_sum = sum_tree(node->left);
 
-    #pragma omp task shared(right_sum)
+    #pragma omp task shared(right_sum) firstprivate(node)
     right_sum = sum_tree(node->right);
 
     #pragma omp taskwait        // wait for both before combining
@@ -593,53 +592,57 @@ int result;
 result = sum_tree(root);
 ```
 
-> **Common mistake:** putting `#pragma omp parallel` inside the recursive function. That creates a new thread team on every recursive call — thousands of nested thread pools, massive overhead, and likely wrong results.
+> Keep the tree alive and immutable until all tasks finish. `firstprivate(node)` copies the pointer, not the tree. Each recursive call waits before its stack-local results go out of scope. A nested `parallel` in each call can serialize when nesting is disabled or create excessive teams when enabled; it does not inherently make correct arithmetic wrong.
 
 **Fibonacci with cutoff:**
 
 ```cpp
-int fib(int n) {
-    if (n < 2)  return n;
-    if (n < 25) return fib(n-1) + fib(n-2);  // serial below cutoff
-
-    int x, y;
+long long fib_serial(int n) {
+    if (n < 2) return n;
+    return fib_serial(n-1) + fib_serial(n-2);
+}
+long long fib(int n) {  // exercise inputs: 0 <= n <= 42
+    if (n < 20) return fib_serial(n);
+    long long x, y;
     #pragma omp task shared(x) firstprivate(n)
     x = fib(n - 1);
-
     #pragma omp task shared(y) firstprivate(n)
     y = fib(n - 2);
-
     #pragma omp taskwait
     return x + y;
 }
 
-int result;
+// Inside main:
+long long result = 0;
 #pragma omp parallel
-#pragma omp single
-result = fib(50);
+{
+    #pragma omp single
+    result = fib(30);  // 832040; use the bounded benchmark CLI in section 1.16
+}
+
 ```
 
 **Why each clause matters:**
 
 | Clause | What it does |
 |--------|-------------|
-| `shared(x)` | All threads see the same `x` — task writes its result there |
-| `firstprivate(n)` | Each task gets its own copy of `n` at creation time — required for correctness in recursion |
-| `taskwait` | Suspends the current task until all child tasks finish |
-| `single` | Only one thread spawns tasks; the rest execute them. Without it, every thread would spawn the full tree → exponential task explosion |
+| `shared(x)` | The child writes its parent call's stack variable; the parent keeps it alive until `taskwait` |
+| `firstprivate(n)` | Explicit snapshot at task creation; this local argument would normally already be implicitly firstprivate |
+| `taskwait` | Waits for previously generated direct children; each child here recursively waits for its own children |
+| `single` | Starts one root invocation. Descendant tasks may be generated by other threads. Without it, each team thread duplicates the full computation and races on `result` |
 
 **How the recursion tree maps to tasks — `fib(6)` example:**
 
-`fib(6)` produces 25 nodes total. Each internal node above the cutoff becomes a task; leaves (`fib(0)`, `fib(1)`) return immediately.
+For visualization only, reduce the cutoff to **2**. Then `fib(6)` has 25 function invocations, with 24 child tasks plus the root call. With the actual cutoff 20, `fib(6)` runs serially. The thread labels below depict one possible schedule, not a guarantee.
 
 ```
 fib(6)                                ← T0 spawns fib(5) and fib(4), then taskwait
 ├─ fib(5)                             ← T1 picks up, spawns fib(4) and fib(3)
 │  ├─ fib(4)                          ← T2 picks up, spawns fib(3) and fib(2)
 │  │  ├─ fib(3)                       ← T3 picks up, spawns fib(2) and fib(1)
-│  │  │  ├─ fib(2) → fib(1)+fib(0)   ← returns 1 immediately (leaf)
+│  │  │  ├─ fib(2) → fib(1)+fib(0)   ← spawns two leaves, then returns 1
 │  │  │  └─ fib(1)                    ← returns 1 immediately (leaf)
-│  │  └─ fib(2) → fib(1)+fib(0)      ← returns 1 immediately (leaf)
+│  │  └─ fib(2) → fib(1)+fib(0)      ← spawns two leaves, then returns 1
 │  └─ fib(3)
 │     ├─ fib(2) → fib(1)+fib(0)
 │     └─ fib(1)
@@ -664,9 +667,9 @@ T3: [fib(3): spawn fib(2),fib(1)] [return 1+0+1=2]          [fib(3)→return 2]
   and queued                    as soon as they're idle
 ```
 
-**Key insight — `single` does not bottleneck:**  T0 spawns only the top two tasks (`fib(n-1)` and `fib(n-2)`), then immediately hits `taskwait` and is available to execute other tasks. By the time T0 is done spawning, T1–T3 are already recursively creating and consuming the subtrees. No thread ever sits idle as long as the queue has work.
+At `taskwait`, the executing thread can run eligible tasks while its current task is suspended. Scheduling restrictions, task granularity, imbalance and CPU availability can still leave workers idle. A single producer can become a bottleneck in other workloads; no runtime promises full utilization. [Taskwait semantics](https://www.openmp.org/spec-html/5.2/openmpse93.html).
 
-For `fib(50)` with cutoff=25, the recursion produces ~fib(25) ≈ 75,000 tasks above the cutoff — more than enough to keep any number of cores busy.
+Count tasks before benchmarking: `T(n)=0` below cutoff `c`, and `T(n)=2+T(n−1)+T(n−2)` otherwise. For `n=30,c=20`, this creates **464 tasks**. The checked source verifies this count against actual task generation. A larger task count can increase overhead; it does not imply speedup. The old `int fib(50)` example also overflowed a 32-bit signed result; `fib(50)=12,586,269,025` does not fit.
 
 ---
 
@@ -676,8 +679,8 @@ For `fib(50)` with cutoff=25, the recursion produces ~fib(25) ≈ 75,000 tasks a
 // Query runtime info
 int n_threads = omp_get_num_threads();   // inside parallel region
 int thread_id = omp_get_thread_num();    // 0 to n_threads-1
-int max_threads = omp_get_max_threads(); // outside parallel region
-int n_procs = omp_get_num_procs();       // hardware thread count
+int max_threads = omp_get_max_threads(); // default upper-bound request for a later region
+int n_procs = omp_get_num_procs();       // processors available to the device/runtime
 
 // Set thread count
 omp_set_num_threads(8);
@@ -685,17 +688,17 @@ omp_set_num_threads(8);
 // Timing
 double t0 = omp_get_wtime();
 // ... work ...
-double elapsed = omp_get_wtime() - t0;
+double elapsed = omp_get_wtime() - t0; // take both timestamps on the same thread
 ```
 
 **Environment variables (set before running):**
 
 ```bash
-OMP_NUM_THREADS=8             # number of threads
-OMP_SCHEDULE="dynamic,64"     # schedule for 'runtime' clauses
-OMP_PROC_BIND=close           # bind threads to nearby hardware (NUMA)
-OMP_PLACES=cores              # binding granularity: threads, cores, sockets
-GOMP_SPINCOUNT=100000         # how long to spin before sleeping (GNU)
+export OMP_NUM_THREADS=8      # request; actual team can be smaller
+export OMP_SCHEDULE="dynamic,64"  # only affects schedule(runtime)
+export OMP_PROC_BIND=close    # placement relative to the primary thread's place
+export OMP_PLACES=cores       # abstract places; topology is implementation-dependent
+export GOMP_SPINCOUNT=100000  # GNU-specific spin iterations, not microseconds
 ```
 
 ---
@@ -703,12 +706,11 @@ GOMP_SPINCOUNT=100000         # how long to spin before sleeping (GNU)
 ### 1.13 Nested Parallelism
 
 ```cpp
-omp_set_nested(1);  // enable nested parallel regions
-
 void outer_task() {
+    omp_set_max_active_levels(2);  // allow at most two active nested levels
     #pragma omp parallel for num_threads(4)
     for (int i = 0; i < 4; i++) {
-        // Inner parallel region: each of 4 threads spawns 2 more
+        // Each outer thread requests an inner team of 2 INCLUDING itself.
         #pragma omp parallel for num_threads(2)
         for (int j = 0; j < N; j++)
             compute(i, j);
@@ -716,7 +718,7 @@ void outer_task() {
 }
 ```
 
-> Nested parallelism often over-subscribes cores. Usually better to `collapse(2)` instead.
+> `omp_set_nested` is deprecated; use `omp_set_max_active_levels` or `OMP_MAX_ACTIVE_LEVELS`. With all requests honored, this example can have eight inner workers total, not twelve: each inner primary is an existing outer thread. Runtime/thread limits may serialize or reduce teams. Independent nested loops often fit one team with `collapse(2)`; nested tasks can also reuse the existing team. [Runtime control and deprecation](https://www.openmp.org/spec-html/5.0/openmpsu119.html).
 
 ---
 
@@ -740,161 +742,63 @@ void outer_task() {
 |--|--------|--------|
 | API style | Compiler directives (`#pragma`) | C++ templates and lambdas |
 | Learning curve | Lower — one pragma per feature | Higher — need to know template types |
-| Granularity | Loop-level | Task-level |
+| Granularity | Loops, explicit tasks, task dependencies, SIMD | Parallel algorithms, explicit tasks, flow graphs |
 | Load balancing | Static/dynamic/guided schedules | Work-stealing (automatic, adaptive) |
-| Flow graphs | No | Yes (`flow_graph`) |
-| Per-thread storage | `threadprivate` / `private` clause | `enumerable_thread_specific` |
-| Nested parallelism | Manual | Built-in |
-| SIMD hints | `#pragma omp simd` | Must use manual intrinsics |
+| Dependency graphs | Task `depend` clauses; no identical node-container API | Explicit `flow_graph` node/message API |
+| Private storage | `private` belongs to construct/task data environments; `threadprivate` persists per thread under specified conditions | `enumerable_thread_specific` is associated with accessing threads |
+| Nested parallelism | Nested regions/tasks with runtime controls | Nested algorithms sharing scheduler resources |
+| SIMD | OpenMP SIMD directives | Compiler vectorization, supported SIMD directives, or intrinsics inside task bodies |
 | Best for | Existing loops, Fortran interop, scientific HPC | New C++ code, complex graphs, irregular tasks |
 
-**Resources:** [OpenMP specifications](https://www.openmp.org/specifications/) · [OpenMP API Reference Card (PDF)](https://www.openmp.org/wp-content/uploads/OpenMP-4.5-1115-CPP-web.pdf)
+**Resources:** [OpenMP specifications](https://www.openmp.org/specifications/) · [OpenMP 5.2 reference guide (PDF)](https://www.openmp.org/wp-content/uploads/OpenMPRefGuide-5.2-Web-2024.pdf)
 
-The table above highlights where oneTBB offers capabilities OpenMP lacks — especially work-stealing, flow graphs, and concurrent containers. The next section covers oneTBB's API in the same progressive style, starting from simple loops and building toward complex graph-based patterns.
+The table compares programming interfaces. OpenMP runtimes can also use work stealing for tasks; the OpenMP specification does not mandate one universal scheduler. oneTBB adds its own flow-node and concurrent-container APIs. The next section covers oneTBB's API in the same progressive style, starting from simple loops and building toward complex graph-based patterns.
 
 ---
 
-### 1.16 Benchmark — Serial vs OpenMP vs oneTBB
+### Practice: run the OpenMP contracts
 
-The Fibonacci example from section 2.11 is a useful benchmark because the call tree is pure recursive work with no I/O or system calls — the only variable is scheduling overhead and parallelism.
-
-**Full benchmark (`fib_benchmark.cpp`):**
-
-```cpp
-// fib_benchmark.cpp — serial / OpenMP tasks / oneTBB parallel_invoke
-// Compile: g++ -O2 -std=c++17 -fopenmp fib_benchmark.cpp -ltbb -o fib_benchmark
-
-#include <chrono>
-#include <iostream>
-#include <omp.h>
-#include "oneapi/tbb/parallel_invoke.h"
-
-using Clock = std::chrono::high_resolution_clock;
-using Ms    = std::chrono::duration<double, std::milli>;
-
-// Below this depth, run sequentially — avoids task overhead on trivial work
-static constexpr int CUTOFF = 20;
-
-// ── 1. Serial ─────────────────────────────────────────────────────────────────
-long long fib_serial(int n) {
-    if (n < 2) return n;
-    return fib_serial(n - 1) + fib_serial(n - 2);
-}
-
-// ── 2. OpenMP tasks ───────────────────────────────────────────────────────────
-long long fib_omp(int n) {
-    if (n < CUTOFF) return fib_serial(n);   // switch to serial below cutoff
-    long long x, y;
-    #pragma omp task shared(x) firstprivate(n)
-    x = fib_omp(n - 1);
-    #pragma omp task shared(y) firstprivate(n)
-    y = fib_omp(n - 2);
-    #pragma omp taskwait
-    return x + y;
-}
-
-// ── 3. oneTBB parallel_invoke ─────────────────────────────────────────────────
-long long fib_tbb(int n) {
-    if (n < CUTOFF) return fib_serial(n);
-    long long x, y;
-    tbb::parallel_invoke(
-        [&]{ x = fib_tbb(n - 1); },
-        [&]{ y = fib_tbb(n - 2); }
-    );
-    return x + y;
-}
-
-// ── Timing helper ─────────────────────────────────────────────────────────────
-template<typename Fn>
-double time_ms(Fn&& fn) {
-    auto t0 = Clock::now();
-    fn();
-    return Ms(Clock::now() - t0).count();
-}
-
-int main() {
-    const int N = 42;
-    long long r_serial, r_omp, r_tbb;
-
-    // warm up (first call pays library init cost)
-    fib_serial(30);
-
-    double t_serial = time_ms([&]{ r_serial = fib_serial(N); });
-
-    double t_omp = time_ms([&]{
-        #pragma omp parallel
-        #pragma omp single
-        r_omp = fib_omp(N);
-    });
-
-    double t_tbb = time_ms([&]{ r_tbb = fib_tbb(N); });
-
-    const int threads = omp_get_max_threads();
-    std::printf("fib(%d) = %lld   [threads available: %d]\n\n", N, r_serial, threads);
-    std::printf("%-12s %8.1f ms  (baseline)\n",   "serial",  t_serial);
-    std::printf("%-12s %8.1f ms  (%.2fx speedup)\n", "openmp", t_omp, t_serial / t_omp);
-    std::printf("%-12s %8.1f ms  (%.2fx speedup)\n", "onetbb", t_tbb, t_serial / t_tbb);
-
-    if (r_serial != r_omp || r_serial != r_tbb)
-        std::fprintf(stderr, "ERROR: results differ!\n");
-    return 0;
-}
-```
-
-**Compile and run:**
+From this directory:
 
 ```bash
-# Install dependencies (Ubuntu/Debian)
-sudo apt install g++ libomp-dev libtbb-dev
-
-# Compile
-g++ -O2 -std=c++17 -fopenmp fib_benchmark.cpp -ltbb -o fib_benchmark
-
-# Run
-./fib_benchmark
+g++ -O2 -std=c++17 -fopenmp -Wall -Wextra -Werror openmp_patterns.cpp -o /tmp/openmp_patterns
+/tmp/openmp_patterns
 ```
 
-**Measured output (4-core machine, fib(50), CUTOFF=25):**
+**Executed:** GCC 13.3, CPU, October 18, 2026, with observed teams 1, 2 and 4; the same executable also passed UndefinedBehaviorSanitizer. The source checks private-value lifetime, decreasing-loop `lastprivate`, custom reduction with a nonzero original value, one consumer after two `nowait` producers, SIMD reduction, collapsed iteration coverage, and recursive task results/counts. The two-thread recurrence counterexample returns 2 while serial returns 4. It reports if the runtime instead serializes that case. The [execution record](labs/openmp-validation.json) retains the compiler command, outputs and source hash.
 
-```
-fib(50) = 12586269025   [threads available: 4, cutoff: 25]
+**Predict first:** does changing the task cutoff change Fibonacci's result? **No; it changes task generation and performance.** Does `firstprivate(pointer)` create a separate array? **No; it copies the address.** Does reaching `single` synchronize unfinished producers? **No; the explicit barrier before the consumer is necessary here.**
 
-serial        31887.7 ms  (baseline)
-openmp        14057.1 ms  (2.27x speedup)
-onetbb         9616.4 ms  (3.32x speedup)
-```
+---
 
-**Why the speedup is sub-linear:**
+### 1.16 Run a task-granularity experiment
 
-The theoretical maximum with `T` threads is `T×` speedup. In practice:
+The checked-in [fib_benchmark.cpp](fib_benchmark.cpp) compares recursive Fibonacci using serial calls, OpenMP tasks, and `oneTBB::parallel_invoke`. This deliberately redundant recursion makes task overhead visible. For computing Fibonacci itself, its iterative reference is the better algorithm; parallelizing an exponential algorithm does not make it a good production choice.
 
-| Source of loss | OpenMP | oneTBB |
-|----------------|--------|--------|
-| Task creation overhead | Higher (pragma dispatch) | Lower (inline lambda) |
-| Load balancing | Victim-push scheduling | Work-stealing (adaptive) |
-| Cache thrash from stealing | Moderate | Low (LIFO own / FIFO steal) |
-| Cutoff tuning | Manual | Manual |
-
-oneTBB's work-stealing scheduler adapts better when branches complete at different rates, which is why it typically edges out OpenMP on irregular recursion.
-
-**CUTOFF sensitivity** — measured on a 4-core machine with fib(50):
+**Build from this directory** with a C++17 compiler, OpenMP support, and oneTBB development headers/library. On Ubuntu with GCC the packages are `g++` and `libtbb-dev`; GCC's `-fopenmp` selects its OpenMP runtime, so LLVM's `libomp-dev` is not an extra requirement for this command.
 
 ```bash
-for c in 20 25 30 35 40; do
-  g++ -O2 -std=c++17 -fopenmp -DCUTOFF_VAL=$c fib_benchmark.cpp -ltbb -o fib_b$c
-  echo "=== CUTOFF=$c ===" && ./fib_b$c
+g++ -O2 -std=c++17 -fopenmp -Wall -Wextra fib_benchmark.cpp -ltbb -o /tmp/fib_benchmark
+/tmp/fib_benchmark --self-test
+/tmp/fib_benchmark 30 2 20 3
+```
+
+The positional arguments are `n`, parallelism budget, task cutoff, and repetition count. A lower cutoff creates more tasks. A higher cutoff leaves more work serial. There is no universally best value; vary one input at a time and keep the same thread budget for both runtimes. The executable sets the OpenMP team request and oneTBB concurrency limit, prints the observed OpenMP team, warms all three implementations, checks every result against an iterative reference, and reports median elapsed time using `steady_clock`.
+
+**Executed 2026-10-18:** GCC 13.3, oneTBB 2021.11.0, Ubuntu 24.04 x86-64. All 27 self-test input/cutoff combinations passed for each implementation. One shared-host run with `n=30`, budget 2, cutoff 20, and 3 repetitions produced median times 1.293 ms serial, 1.193 ms OpenMP, and 2.128 ms oneTBB. These small, noisy observations demonstrate the reporting workflow; they are not a performance ranking. Record CPU, affinity, load, compiler/library versions, and command with your own results.
+
+```bash
+# Keep work and thread budget fixed while varying task granularity.
+for cutoff in 10 15 20 25 30; do
+  /tmp/fib_benchmark 30 2 "$cutoff" 5
 done
 ```
 
-| CUTOFF | Tasks spawned | OpenMP speedup | oneTBB speedup |
-|--------|--------------|----------------|----------------|
-| 20 | ~830 K | 1.15x | 2.42x |
-| 25 | ~26 K | **2.27x** | **3.32x** |
-| 30 | ~830 | 1.93x | 3.01x |
-| 35 | ~26 | 2.32x | 2.79x |
-| 40 | ~1 | 1.83x | 2.78x |
+**Explain the result:** task creation, scheduler choices, imbalance, shared resources, and problem size all affect speedup. OpenMP does not prescribe one universal task scheduler, and an inline lambda does not imply lower runtime overhead. Inspect work distribution instead of attributing every difference to a library name.
 
-CUTOFF=25 is the sweet spot: enough tasks to keep all threads busy, few enough that scheduling overhead doesn't dominate. OpenMP is more sensitive to CUTOFF than oneTBB because work-stealing adapts automatically to load imbalance.
+**Check:** is `speedup < 1` a failed correctness test? **Answer:** no; the implementation may be correct but slower for that workload. Is the same numerical result enough to compare performance? **Answer:** no; match algorithm/work, thread limits, inputs, warmup, and measurement boundaries.
+
+Run the supplied regression suite from this directory with `python3 -m unittest discover -s labs -v`. It compiles the actual source files and checks numerical/reference results, invalid arguments, bounded pipeline progress, and frame identity. Missing development tools are reported as a skip, not a successful experiment.
 
 ---
 
@@ -919,9 +823,9 @@ Step 3: Thread 3 is idle → STEALS task X from Thread 2
 
 **Why steal from the left?**
 - Owner pops from the **right** (LIFO) — processes its own tasks in stack order, cache-friendly
-- Stealer pops from the **left** (FIFO) — takes the biggest, oldest tasks, maximizing stolen work size
+- A stealer takes an older ready task from the opposite end. In recursive workloads it may expose a larger subtree; task age does not guarantee task size.
 
-**Result:** Threads never sit idle as long as any thread has work. No need to manually tune thread counts for imbalanced workloads.
+**Result:** ready work can move to otherwise idle workers. Dependencies, blocking calls, limited ready parallelism, task overhead, concurrency limits, and shared-memory bottlenecks can still leave workers idle. Measure task size and the concurrency budget. [oneTBB scheduler model](https://uxlfoundation.github.io/oneTBB/main/tbb_userguide/How_Task_Scheduler_Works.html)
 
 **Install:**
 
@@ -929,9 +833,13 @@ Step 3: Thread 3 is idle → STEALS task X from Thread 2
 # Ubuntu/Debian
 sudo apt install libtbb-dev
 
-# CMake integration
+```
+
+In `CMakeLists.txt`, after defining `my_target`:
+
+```cmake
 find_package(TBB REQUIRED)
-target_link_libraries(my_target TBB::tbb)
+target_link_libraries(my_target PRIVATE TBB::tbb)
 ```
 
 **Header:**
@@ -950,8 +858,8 @@ The fundamental building block. Splits a range into chunks and executes each chu
 **Simple 1D integer form:**
 
 ```cpp
-int N = 1'000'000;
-float a[N], b[N], c[N];
+const int N = 1'000'000;
+std::vector<float> a(N), b(N), c(N);  // include <vector>; avoid large stack arrays
 
 // Compact form — runtime picks chunk size automatically
 parallel_for(0, N, [&](int i) {
@@ -962,7 +870,7 @@ parallel_for(0, N, [&](int i) {
 **`blocked_range` form — gives you the subrange, loop inside:**
 
 ```cpp
-// Better: lets you write inner loops with fewer lambda calls
+// Chunk form: lets you control setup and the inner loop
 parallel_for(blocked_range<int>(0, N),
     [&](const blocked_range<int>& r) {
         for (int i = r.begin(); i < r.end(); i++) {
@@ -975,7 +883,7 @@ parallel_for(blocked_range<int>(0, N),
 `blocked_range<T>(begin, end)` is the half-open interval `[begin, end)`. The lambda receives a subrange `r` — call `.begin()` and `.end()` to iterate it.
 
 **Why `blocked_range` over compact form?**
-- Avoids per-element lambda call overhead
+- Exposes a chunk-level loop; compilers can inline either form, so measure any performance difference
 - Lets you initialize buffers once per chunk (instead of per element)
 - Required for custom chunk-level logic (SIMD, temp allocation)
 
@@ -1013,8 +921,9 @@ The third optional argument controls how work is divided:
 parallel_for(blocked_range<int>(0, N), body);
 
 // affinity_partitioner: remembers affinity hints to encourage cache reuse
-// Declare static so it persists between calls
-static affinity_partitioner ap;
+// Keep this object alive across sequential repetitions of this loop.
+// Give concurrent invocations separate partitioner objects.
+affinity_partitioner ap;
 parallel_for(blocked_range<int>(0, N), body, ap);
 
 // simple_partitioner: splits until ranges are no larger than grainsize
@@ -1034,7 +943,7 @@ parallel_for(blocked_range<int>(0, N), body, static_partitioner());
 
 The [oneTBB partitioner specification](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/v1.1-rev-1/elements/onetbb/source/algorithms/partitioners/static_partitioner) describes affinity as a scheduler hint. Numerical reproducibility is a separate property of the reduction order.
 
-**Grainsize tuning:** Each chunk should take ≥ ~100,000 clock cycles (~50 µs at 2 GHz). Too-small chunks = scheduling overhead dominates. Rule: if loop body takes 10 ns, grainsize of 10,000+ is reasonable.
+**Grainsize tuning:** Small chunks can spend more time scheduling than computing; large chunks can reduce load balance. The historical 100,000-cycle heuristic is a starting point, not an API requirement. Measure several grain sizes with your workload, thread budget, and compiler, and compare against a serial baseline.
 
 #### Complete Example 1 — Squaring an Array
 
@@ -1065,7 +974,7 @@ int main() {
 }
 ```
 
-**What the runtime does:**
+**One possible partitioning (not a thread-assignment guarantee):**
 
 ```
 N = 1,000,000   threads = 8
@@ -1118,24 +1027,24 @@ int main() {
 }
 ```
 
-**Why `blocked_range2d` beats two nested `parallel_for` calls:**
+**Why consider `blocked_range2d`:**
 
 ```
 blocked_range2d splits the grid into rectangular tiles:
 
   ┌───────┬───────┬───────┐
-  │ T0    │ T1    │ T2    │   Each tile = contiguous memory block
+  │ T0    │ T1    │ T2    │   Each tile = several contiguous row segments
   │       │       │       │   → good L1/L2 cache reuse within tile
   ├───────┼───────┼───────┤
   │ T3    │ T4    │ T5    │
   │       │       │       │
   └───────┴───────┴───────┘
 
-Two nested parallel_for → each row is a separate task → too many tiny tasks
-blocked_range2d    → each tile is one task → right granularity
+Nested parallel_for → exposes nested work; measure its granularity and overhead
+blocked_range2d    → exposes rectangular ranges; tune grain sizes for the workload
 ```
 
-The `tile.rows()` and `tile.cols()` accessors give you the subrange for this tile. Always use flat `vector<T>` with `[y * W + x]` indexing — `vector<vector<T>>` breaks spatial locality.
+The `tile.rows()` and `tile.cols()` accessors give you the subrange for this tile. Flat `vector<T>` with `[y * W + x]` indexing gives contiguous row-major storage. A partial-width tile spans separate row segments, not one contiguous allocation. A vector of vectors allocates rows separately; use it when that layout is appropriate. Neither layout nor a range type guarantees a speedup.
 
 ---
 
@@ -1181,40 +1090,43 @@ float dot = parallel_reduce(
 );
 ```
 
-**Find minimum with index:**
+**Find minimum with index (finite input values):**
 
 ```cpp
 struct MinResult { float val; int idx; };
-
+auto better = [](MinResult a, MinResult b) {
+    if (a.idx < 0) return b;
+    if (b.idx < 0) return a;
+    if (a.val != b.val) return a.val < b.val ? a : b;
+    return a.idx < b.idx ? a : b;  // deterministic lowest-index tie break
+};
 auto result = parallel_reduce(
-    blocked_range<int>(0, N),
-    MinResult{FLT_MAX, -1},
+    blocked_range<int>(0, N), MinResult{0.0f, -1},
     [&](const blocked_range<int>& r, MinResult curr) {
-        for (int i = r.begin(); i < r.end(); i++)
-            if (a[i] < curr.val) curr = {a[i], i};
+        for (int i = r.begin(); i < r.end(); ++i)
+            curr = better(curr, MinResult{a[i], i});
         return curr;
-    },
-    [](MinResult a, MinResult b) {
-        return a.val < b.val ? a : b;
-    }
-);
+    }, better);
+// Empty input gives idx == -1. Define a separate NaN policy if inputs allow NaN.
 ```
 
 > **Common mistake:** Do not reset the accumulator to zero inside the body — `init` carries prior partial results. Resetting it discards prior work.
 
-**Deterministic reduce** — same result every run regardless of scheduling:
+**Deterministic reduce** — a deterministic reduction tree for a fixed range and partitioner:
 
 ```cpp
 float result = parallel_deterministic_reduce(
-    blocked_range<int>(0, N, 1000),  // explicit grainsize required
+    blocked_range<int>(0, N, 1000),  // explicit grainsize chosen for this example
     0.0f,
     [&](const blocked_range<int>& r, float init) {
-        return std::accumulate(&a[r.begin()], &a[r.end()], init);
+        return std::accumulate(a.data() + r.begin(), a.data() + r.end(), init);
     },
     std::plus<float>{}
 );
-// Floating-point result identical on every run
+// Reproducible for fixed inputs, deterministic body, build, and FP environment
 ```
+
+The tree does not guarantee identical bits across compiler flags, architectures, floating-point modes, or a body that itself performs nondeterministic work. See the [deterministic-reduction contract](https://uxlfoundation.github.io/oneTBB/main/reference/source/algorithms/functions/parallel_deterministic_reduce_func.html).
 
 #### Complete Example 3 — Mean Squared Error (MSE)
 
@@ -1232,56 +1144,56 @@ int main() {
     std::vector<float> pred(N), target(N);
     for (int i = 0; i < N; ++i) {
         pred[i]   = static_cast<float>(i % 100) / 100.0f;        // [0.00, 0.99]
-        target[i] = static_cast<float>((i + 1) % 100) / 100.0f;  // [0.01, 1.00]
+        target[i] = static_cast<float>((i + 1) % 100) / 100.0f;  // [0.01, ..., 0.99, 0.00]
     }
 
     // parallel_reduce arguments:
     //   1. range    — what to iterate over
-    //   2. identity — each thread's partial sum starts at 0
+    //   2. identity — a new partial sum starts at 0
     //   3. body     — reduce a subrange into a partial sum
     //   4. combine  — merge two partial sums into one
-    float sum_sq = oneapi::tbb::parallel_reduce(
+    double sum_sq = oneapi::tbb::parallel_reduce(
         oneapi::tbb::blocked_range<int>(0, N),
 
-        0.0f,   // identity
+        0.0,   // double accumulator reduces rounding in a long sum
 
-        [&](const oneapi::tbb::blocked_range<int>& r, float init) {
+        [&](const oneapi::tbb::blocked_range<int>& r, double init) {
             for (int i = r.begin(); i < r.end(); ++i) {
-                float diff = pred[i] - target[i];
+                double diff = static_cast<double>(pred[i]) - target[i];
                 init += diff * diff;
             }
             return init;
         },
 
-        std::plus<float>{}   // combine
+        std::plus<double>{}  // combine
     );
 
-    float mse = sum_sq / N;
-    std::cout << "MSE = " << mse << "\n";   // ~0.003267
+    double mse = sum_sq / N;
+    std::cout << "MSE = " << mse << "\n";   // approximately 0.0099
 }
 ```
 
 **How TBB splits and joins the work:**
 
 ```
-           parallel_reduce(blocked_range(0, 10M), 0.0f, body, combine)
+           parallel_reduce(blocked_range(0, 10M), 0.0, body, combine)
                               [0 … 10,000,000)
                              /                \
                             /                  \
                 [0 … 5,000,000)          [5,000,000 … 10M)
                /               \         /               \
        [0…2.5M)           [2.5M…5M)  [5M…7.5M)     [7.5M…10M)
-       sum=8,167.5        sum=8,167.5 sum=8,167.5   sum=8,167.5
+       sum=24,750        sum=24,750 sum=24,750   sum=24,750
               \               /         \               /
            combine(a,b) = a+b           combine(a,b) = a+b
-               sum=16,335.0                 sum=16,335.0
+               sum=49,500                   sum=49,500
                           \                 /
                            combine(a,b) = a+b
-                               sum=32,670.0
-                           MSE = 32,670.0 / 10M ≈ 0.003267
+                               sum=99,000
+                           MSE = 99,000 / 10M = 0.0099
 ```
 
-Each leaf calls `body(subrange, 0.0f)` — the identity `0.0f` means every thread's partial sum starts at zero. After all leaves finish, TBB walks back up the tree calling `combine` to sum the partial results.
+The diagram is an illustrative four-leaf tree; the scheduler may split differently. In every 100 inputs, 99 differences have magnitude 0.01 and one has magnitude 0.99, so the exact decimal MSE is `(99 × 0.01² + 0.99²) / 100 = 0.0099`. Binary floating-point inputs give a nearby result. The reduction identity initializes new partial sums; a body can receive an accumulated partial, so it must preserve its `init` argument.
 
 ---
 
@@ -1310,7 +1222,7 @@ Pass 2 — "final scan" (is_final = true):
 Combine: TBB calls combine(6, 9) = 15 to pass carry-in to Chunk B
 ```
 
-The body lambda runs **twice per chunk** — once without writing (building partial sums), once with the correct carry-in (filling output). The `is_final` flag tells the body which pass it is.
+A body can run in a preliminary or final scan. The implementation may omit preliminary work when it already knows the prefix; do not assume exactly two calls per chunk or attach unrelated side effects to invocation counts. Write output only when `is_final` is true. [Scan contract](https://uxlfoundation.github.io/oneTBB/main/reference/source/algorithms/functions/parallel_scan_func.html)
 
 ```cpp
 #include "oneapi/tbb/parallel_scan.h"
@@ -1336,7 +1248,7 @@ tbb::parallel_scan(
 **Inclusive vs exclusive scan:**
 
 ```
-inclusive (what parallel_scan computes by default):
+inclusive (the body above adds before writing):
   input:  [ 1,  2,  3,  4,  5 ]
   output: [ 1,  3,  6, 10, 15 ]   out[i] includes in[i]
 
@@ -1345,7 +1257,7 @@ exclusive (shifted by one, out[0] = identity):
   output: [ 0,  1,  3,  6, 10 ]   out[i] excludes in[i]
 ```
 
-Exclusive scan: delay the write by one position — accumulate first, then write the value *before* adding the current element:
+Exclusive scan: write the carry value **before** adding the current element. The body chooses inclusive or exclusive behavior:
 
 ```cpp
 tbb::parallel_scan(
@@ -1406,7 +1318,9 @@ tbb::parallel_scan(
 tbb::parallel_for(0, N, [&](int i) {
     if (flags[i]) output[indices[i]] = input[i];
 });
-// output = [1, 2, 3, 4]
+const int kept = indices.back() + flags.back();  // this example has N > 0
+output.resize(kept);
+// output = [1, 2, 3, 4]; without resize, the vector still has N elements
 ```
 
 **Prefix max — running maximum:**
@@ -1485,7 +1399,7 @@ parallel_sort(records.begin(), records.end(),
 );
 ```
 
-Uses a parallel quicksort variant with work-stealing. Typically 4–6× faster than `std::sort` on 8+ cores for large N.
+Compare `parallel_sort` with `std::sort` using the same data and comparator. Size, value distribution, comparator cost, memory behavior, and thread budget determine the crossover; no fixed speedup applies.
 
 > **Note:** `parallel_sort` is **not stable** (equal elements may reorder). Use `std::stable_sort` for stable ordering (no TBB parallel version exists for stable sort).
 
@@ -1505,7 +1419,7 @@ parallel_for_each(items.begin(), items.end(),
 );
 ```
 
-**Dynamic work addition with feeder** — BFS / tree traversal:
+**Dynamic work addition with feeder** — unordered tree traversal:
 
 ```cpp
 parallel_for_each(roots.begin(), roots.end(),
@@ -1515,10 +1429,12 @@ parallel_for_each(roots.begin(), roots.end(),
             f.add(child);             // adds work dynamically to the pool
     }
 );
-// Runs until all nodes processed, including dynamically added ones
+// Runs until all submitted work completes, including dynamically added items
 ```
 
 ---
+
+The feeder does not provide breadth-first level ordering or a shortest-path guarantee. This example assumes disjoint acyclic trees, live node storage, and a thread-safe `process`. A general graph needs a synchronized visited/claim policy to handle repeated nodes and cycles. Do not structurally modify the seed container while the algorithm is iterating it.
 
 ### 2.6 `parallel_pipeline` — Assembly Line
 
@@ -1554,86 +1470,74 @@ The read and write stages are **serial** (one item at a time — file I/O or ord
 | `serial_out_of_order` | Not preserved | 1 at a time | Single-threaded setup/teardown |
 | `parallel` | Not preserved | Multiple threads | CPU-bound, independent items |
 
-**Structure:**
+**Structure (application sketch):**
+
+Define `InputData`, `OutputData`, and the three application functions below. `read_next()` returns an owning shared pointer or an empty pointer at end of input; `transform()` returns an owning output pointer. Ownership survives transfer between filters and is released when each message is no longer needed.
 
 ```cpp
-#include "oneapi/tbb/pipeline.h"
+#include <oneapi/tbb/parallel_pipeline.h>
+#include <memory>
 
-const int max_tokens = 16;   // max items in-flight simultaneously
+using Input = std::shared_ptr<const InputData>;
+using Output = std::shared_ptr<OutputData>;
+const int max_tokens = 16;
 
 parallel_pipeline(max_tokens,
-    make_filter<void, InputData*>(            // void input = "source" stage
-        filter_mode::serial_in_order,
-        [&](flow_control& fc) -> InputData* {
-            InputData* data = read_next();
-            if (!data) { fc.stop(); return nullptr; }  // signal end of stream
+    make_filter<void, Input>(filter_mode::serial_in_order,
+        [&](flow_control& fc) -> Input {
+            Input data = read_next();
+            if (!data) fc.stop();
             return data;
         }
     ) &
-    make_filter<InputData*, OutputData*>(
-        filter_mode::parallel,
-        [](InputData* in) -> OutputData* {
-            return transform(in);             // runs on multiple threads
-        }
+    make_filter<Input, Output>(filter_mode::parallel,
+        [](Input in) -> Output { return transform(*in); }
     ) &
-    make_filter<OutputData*, void>(           // void output = "sink" stage
-        filter_mode::serial_in_order,
-        [&](OutputData* out) {
-            write_result(out);
-            delete out;
-        }
+    make_filter<Output, void>(filter_mode::serial_in_order,
+        [&](Output out) { write_result(*out); }
     )
 );
 ```
 
-**Concrete example — batch inference pipeline:**
+**Batch inference architecture:**
 
-A common CPU inference pattern: load batches from disk, normalize, run model, write predictions. I/O and inference can overlap:
+The following body needs application implementations of `load_batch_from_disk`, `run_inference`, and `write_predictions`. These names do not invoke an actual model in the course verifier; its harness uses deterministic synthetic values. Parallel inference is appropriate only if the model/runtime context supports concurrent calls or each task has independent context. A serial I/O stage is a choice for this example, not a rule that disks only support sequential access.
 
 ```cpp
 struct Batch { std::vector<float> data; int id; };
-
+using BatchPtr = std::shared_ptr<Batch>;
 int batch_id = 0;
 const int TOTAL = 100;
 
 parallel_pipeline(/*max_tokens=*/8,
-    // Stage 1: load next batch from disk (serial — disk reads are sequential)
-    make_filter<void, Batch*>(
-        filter_mode::serial_in_order,
-        [&](flow_control& fc) -> Batch* {
-            if (batch_id >= TOTAL) { fc.stop(); return nullptr; }
-            auto* b = new Batch();
-            b->id   = batch_id++;
-            b->data = load_batch_from_disk(b->id);   // blocking I/O
+    make_filter<void, BatchPtr>(filter_mode::serial_in_order,
+        [&](flow_control& fc) -> BatchPtr {
+            if (batch_id >= TOTAL) { fc.stop(); return {}; }
+            auto b = std::make_shared<Batch>();
+            b->id = batch_id++;
+            b->data = load_batch_from_disk(b->id);
             return b;
         }
     ) &
-    // Stage 2: normalize pixels [0,255] → [0,1] (parallel — independent batches)
-    make_filter<Batch*, Batch*>(
-        filter_mode::parallel,
-        [](Batch* b) -> Batch* {
+    make_filter<BatchPtr, BatchPtr>(filter_mode::parallel,
+        [](BatchPtr b) {
             for (float& v : b->data) v /= 255.0f;
             return b;
         }
     ) &
-    // Stage 3: run model inference (parallel — batches are independent)
-    make_filter<Batch*, Batch*>(
-        filter_mode::parallel,
-        [](Batch* b) -> Batch* {
+    make_filter<BatchPtr, BatchPtr>(filter_mode::parallel,
+        [](BatchPtr b) {
             run_inference(b->data);
             return b;
         }
     ) &
-    // Stage 4: write predictions in order (serial — output file needs order)
-    make_filter<Batch*, void>(
-        filter_mode::serial_in_order,
-        [&](Batch* b) {
-            write_predictions(b->id, b->data);
-            delete b;
-        }
+    make_filter<BatchPtr, void>(filter_mode::serial_in_order,
+        [&](BatchPtr b) { write_predictions(b->id, b->data); }
     )
 );
 ```
+
+The message owns its buffer through the final stage. Smart pointers prevent the raw-pointer leaks in a cancellation/exception path, but they do not undo completed output writes. Define whether partial files/results are valid before retrying a failed pipeline. Blocking disk work also occupies a participating thread; use an asynchronous I/O design when that becomes the measured bottleneck.
 
 **`max_tokens` and the throughput law:**
 
@@ -1651,8 +1555,7 @@ max_tokens too large:
                  ↑ 100 batches buffered in memory → OOM risk
 ```
 
-> **Throughput = `max_tokens / latency_of_slowest_serial_stage`.**
-> If your serial read stage takes 10 ms and you set `max_tokens = 8`, you can sustain 800 items/second through the pipeline regardless of how fast the parallel stage is. Doubling `max_tokens` doubles throughput — until the parallel stage becomes the bottleneck.
+> **A serial-stage bound:** a stage taking 10 ms per item can process at most 100 items/s, even with eight live tokens. More tokens allow stages to overlap; they do not parallelize a serial stage. A useful ideal bound is `throughput <= min(each stage's service capacity, max_tokens / end-to-end latency)`, with consistent units. Scheduler overhead and shared-resource contention can reduce the achieved rate further.
 
 ---
 
@@ -1677,7 +1580,7 @@ parallel_invoke(
     []{ sort_left_half(); },
     []{ sort_right_half(); }
 );
-// Both guaranteed done here
+// Both completed after a normal return (see cancellation/exception rules below)
 
 // Any fixed number of callables
 parallel_invoke(
@@ -1721,30 +1624,32 @@ tg2.wait();
 | | `parallel_invoke` | `task_group` |
 |--|-------------------|-------------|
 | Number of tasks | Fixed at compile time | Dynamic, determined at runtime |
-| Recursive tasks | No | Yes — tasks can call `tg.run()` |
+| Recursive tasks | Yes — a callable can recursively invoke another fixed group | Yes — tasks can add work with `tg.run()` |
 | Syntax | One call, all lambdas inline | `run()` / `wait()` separate |
-| Overhead | Slightly lower | Slightly higher (queue management) |
+| Overhead | Depends on task size and nesting; measure | Depends on task size and nesting; measure |
 | Use case | Merge sort split, dual data load | Tree traversal, work queue, graph |
 
 **When to use which:**
 - Know the exact tasks upfront? → `parallel_invoke`
 - Tasks discovered at runtime or spawn subtasks? → `task_group`
-- Recursive tree/graph traversal? → `task_group` (or oneTBB flow graph for DAGs)
+- Binary recursive split? → `parallel_invoke` is suitable (see merge sort in §2.17). Dynamically discovered children? → `task_group`; explicit dependencies? → a flow graph.
+
+During a scheduler wait, the calling thread may execute available tasks. A wait is a completion boundary, not a promise that the OS thread remains idle.
 
 ---
 
 ### 2.8 Per-Thread Storage — `enumerable_thread_specific`
 
-When multiple threads update the same data structure (histogram, accumulator, buffer), you have three options:
+When multiple threads update the same data structure (histogram, accumulator, buffer), compare these choices:
 
 | Approach | Mechanism | Problem |
 |----------|-----------|---------|
 | Shared variable | Nothing | Data race — undefined behavior |
-| Mutex | `std::mutex` + lock | Serializes threads — kills parallelism |
-| `atomic` | Hardware instruction | Only works for a single integer/float, not a vector |
-| **ETS** | **Per-thread copy** | **No contention at all — each thread owns its data** |
+| Mutex | `std::mutex` + lock | Conflicting updates serialize; keep the protected work short |
+| `atomic` | Atomic access to a supported type | Does not make a whole multi-element algorithm atomic; lock-free support depends on type/platform |
+| **ETS** | **Per-thread copy** | **Avoids shared histogram updates; pays for lookup, storage, allocation, and merging** |
 
-ETS gives every thread its own private copy. Threads never touch each other's data during the parallel phase. At the end, you iterate over all copies and merge them once.
+ETS provides a thread-local value on demand. This histogram example only updates the calling thread's copy, then merges after parallel work completes. Thread-local is not task-local: nested scheduler waits may execute other work on the same thread and reuse that value; see §2.16 before retaining task-specific state across a nested call.
 
 ```
 parallel phase:                          merge phase:
@@ -1752,7 +1657,7 @@ parallel phase:                          merge phase:
   T1 → local_hist[1] ──────────────────►     +=
   T2 → local_hist[2] ──────────────────►     +=
   T3 → local_hist[3] ──────────────────►     +=
-  (zero contention)                     (single-threaded, once)
+  (no shared-bin updates)               (single-threaded, once)
 ```
 
 **Histogram — wrong vs right:**
@@ -1846,7 +1751,7 @@ Use `combinable` when you just want a thread-local accumulator. Use `enumerable_
 
 ### 2.10 Flow Graph — Data Flow and Dependence Graphs
 
-For expressing complex parallel patterns as a graph of nodes and edges. The runtime automatically runs nodes when their inputs are ready — no manual synchronization needed.
+For expressing parallel patterns as a graph of nodes and edges. Edges provide the declared message/dependency relationships. Shared mutable state outside those relationships still needs ownership, atomics, or locks; a graph is not a general race-prevention mechanism.
 
 ```
 Node   = a worker (function, buffer, join, split, ...)
@@ -1888,9 +1793,10 @@ function_node<int, int> cube  (g, unlimited, [](int x) { return x * x * x; });
 // join_node: wait for one input per port, emit as tuple
 join_node<std::tuple<int,int>> join(g);
 
-function_node<std::tuple<int,int>, void> printer(g, 1,
+function_node<std::tuple<int,int>, continue_msg> printer(g, 1,
     [](const std::tuple<int,int>& t) {
         printf("square=%d  cube=%d\n", std::get<0>(t), std::get<1>(t));
+        return continue_msg{};
     }
 );
 
@@ -1906,9 +1812,11 @@ cube.try_put(5);
 g.wait_for_all();  // always wait before graph goes out of scope
 ```
 
+Terminal `function_node` bodies above return `continue_msg`, a small completion message; `function_node<..., void>` is not a valid replacement. The `void` source/sink types in `parallel_pipeline` belong to a different API. See the [function-node contract](https://uxlfoundation.github.io/oneTBB/main/reference/source/flow_graph/function_node_cls.html).
+
 **ML example — parallel feature extraction with fan-out/join:**
 
-Extract three independent features from each input frame, then combine and score:
+This architecture sketch assumes unique frame IDs and application-provided extraction/scoring functions. Extract three features independently, then join matching IDs. Add a limiter before broadcast for a bounded streaming application; the executable example below shows the full ownership and completion path:
 
 ```
                     ┌─────────────────┐
@@ -1930,7 +1838,8 @@ Extract three independent features from each input frame, then combine and score
 ```
 
 ```cpp
-struct Frame  { std::vector<float> data; };
+struct Frame  { int id; std::vector<float> data; };
+struct Feature { int frame_id; std::vector<float> data; };
 struct Score  { float value; };
 
 graph g;
@@ -1938,22 +1847,23 @@ graph g;
 // Fan-out: send each frame to all three extractors simultaneously
 broadcast_node<Frame> broadcast(g);
 
-function_node<Frame, std::vector<float>> hog(g, unlimited,
-    [](const Frame& f) { return extract_hog(f); });
-function_node<Frame, std::vector<float>> lbp(g, unlimited,
-    [](const Frame& f) { return extract_lbp(f); });
-function_node<Frame, std::vector<float>> dct(g, unlimited,
-    [](const Frame& f) { return extract_dct(f); });
+function_node<Frame, Feature> hog(g, unlimited,
+    [](const Frame& f) { return Feature{f.id, extract_hog(f)}; });
+function_node<Frame, Feature> lbp(g, unlimited,
+    [](const Frame& f) { return Feature{f.id, extract_lbp(f)}; });
+function_node<Frame, Feature> dct(g, unlimited,
+    [](const Frame& f) { return Feature{f.id, extract_dct(f)}; });
 
 // Fan-in: wait for all three features before scoring
-using FeatureTuple = std::tuple<std::vector<float>,
-                                std::vector<float>,
-                                std::vector<float>>;
-join_node<FeatureTuple> join(g);
+using FeatureTuple = std::tuple<Feature, Feature, Feature>;
+join_node<FeatureTuple, key_matching<int>> join(g,
+    [](const Feature& f) { return f.frame_id; },
+    [](const Feature& f) { return f.frame_id; },
+    [](const Feature& f) { return f.frame_id; });
 
 function_node<FeatureTuple, Score> scorer(g, unlimited,
     [](const FeatureTuple& t) {
-        return score(std::get<0>(t), std::get<1>(t), std::get<2>(t));
+        return score(std::get<0>(t).data, std::get<1>(t).data, std::get<2>(t).data);
     }
 );
 
@@ -1978,7 +1888,7 @@ g.wait_for_all();
 | Node | Description |
 |------|-------------|
 | `function_node<In, Out>` | Transforms `In` → `Out`, configurable concurrency |
-| `source_node<Out>` *(deprecated)*<br>`input_node<Out>` | Generates tokens from a function; starts the graph |
+| `input_node<Out>` | Generates messages after `activate()`; replaces the removed legacy `source_node` API |
 | `broadcast_node<T>` | Fans out: sends one input to ALL successors |
 | `join_node<tuple<...>>` | Fans in: waits for one from each port, emits tuple |
 | `split_node<tuple<...>>` | Splits tuple: sends element N to port N |
@@ -1995,8 +1905,12 @@ g.wait_for_all();
 
 ```cpp
 broadcast_node<int> broadcaster(g);
-function_node<int, void> worker_a(g, unlimited, [](int x){ do_a(x); });
-function_node<int, void> worker_b(g, unlimited, [](int x){ do_b(x); });
+function_node<int, continue_msg> worker_a(g, unlimited, [](int x){
+    do_a(x); return continue_msg{};
+});
+function_node<int, continue_msg> worker_b(g, unlimited, [](int x){
+    do_b(x); return continue_msg{};
+});
 
 make_edge(broadcaster, worker_a);
 make_edge(broadcaster, worker_b);  // same input goes to both
@@ -2018,8 +1932,9 @@ function_node<Frame, Frame> processor(g, unlimited, [](Frame f) {
     return f;
 });
 
-function_node<Frame, void> writer(g, serial, [](const Frame& f) {
+function_node<Frame, continue_msg> writer(g, serial, [](const Frame& f) {
     write_in_order(f);          // receives frames in sequence order
+    return continue_msg{};
 });
 
 make_edge(processor, reorder);
@@ -2034,7 +1949,7 @@ limiter_node<int> limiter(g, 8);   // max 8 messages in flight
 
 make_edge(producer, limiter);
 make_edge(limiter, slow_consumer);
-make_edge(slow_consumer, limiter.decrement); // signal when done → unlocks limiter
+make_edge(slow_consumer, limiter.decrementer()); // signal when done → unlocks limiter
 ```
 
 #### Conditional Routing with `indexer_node`
@@ -2043,12 +1958,13 @@ make_edge(slow_consumer, limiter.decrement); // signal when done → unlocks lim
 using IndexerType = indexer_node<int, float>;   // accepts int OR float
 
 IndexerType idx(g);
-function_node<IndexerType::output_type, void> router(g, unlimited,
+function_node<IndexerType::output_type, continue_msg> router(g, unlimited,
     [](const IndexerType::output_type& msg) {
         if (msg.tag() == 0)       // int arrived
             handle_int(cast_to<int>(msg));
         else                       // float arrived
             handle_float(cast_to<float>(msg));
+        return continue_msg{};
     }
 );
 
@@ -2057,152 +1973,39 @@ input_port<0>(idx).try_put(42);     // send int
 input_port<1>(idx).try_put(3.14f);  // send float
 ```
 
-#### Starter Template — Linear Video Pipeline
+#### Worked program: preserve frame identity through parallel branches
 
-A minimal but complete linear pipeline: source → limiter → preprocess → inference → postprocess → sequencer → output. Copy `video_pipeline_template.cpp`, replace the four stub functions, and it's ready to run.
+The runnable [video_pipeline_template.cpp](video_pipeline_template.cpp) generates synthetic 64-element frames, computes their sum and maximum in separate branches, combines the results, and restores output order. It is an executable concurrency example, with no camera, trained model, or GPU inference.
 
+```text
+source -> limiter -> accounting -> broadcast -> sum branch --+
+                                           -> max branch --+-> keyed join
+output <- sequencer <- combine <----------------------------+
+  |
+  +-> limiter.decrementer()   (one completed logical frame releases one slot)
 ```
-input_node → limiter → preprocess → inference → postprocess → sequencer → output
-                ▲                                                               │
-                └───────────────────── decrement ◄──────────────────────────────┘
-```
-
-Limiter is placed **before** preprocessing so no more than `MAX_INFLIGHT` frames ever enter the pipeline. The `decrement` edge feeds back from the output stage to release one slot each time a frame completes.
 
 ```bash
-g++ -O2 -std=c++17 video_pipeline_template.cpp -ltbb -o video_pipeline
-./video_pipeline
+g++ -O2 -std=c++17 -pthread -Wall -Wextra video_pipeline_template.cpp -ltbb -o /tmp/video_pipeline
+/tmp/video_pipeline --self-test
+/tmp/video_pipeline 20 4 2
 ```
 
----
+Arguments are frame count, maximum accepted in-flight frames, and thread budget. The source allocates each frame when requested; a shared pointer to immutable pixel storage avoids copying pixel buffers for each branch. The limiter goes **before** branching and expensive work. Its threshold bounds accepted logical frames, not all resident memory: the input node can cache one pending item, and graph metadata and references still take space.
 
-#### Complete Example — Real-Time Video Inference Pipeline
+**Why join by key?** Suppose branch A completes frame IDs `[0,1]` and branch B completes `[1,0]`. A default queueing join pairs the first arrival on each port: `(0,1)` and `(1,0)`. Neither pair describes one frame. Use `join_node<Features, key_matching<int>>` with `frame.id` extractors. A sequencer after the join cannot repair already mismatched inputs. The self-test submits exactly this reversed order and confirms both that key matching preserves identity and that the FIFO-join counterexample creates two mismatches. See the [oneTBB join policies](https://uxlfoundation.github.io/oneTBB/main/reference/source/flow_graph/join_node_policies.html).
 
-A practical AI video pipeline: read frames, preprocess in parallel, run inference, reorder to original sequence, limit memory, display.
+**Why release at output?** Returning the limiter token only after the serial output checks the result bounds all accepted work through completion. Releasing it after preprocessing would permit later stages to accumulate more frames. The API is `limiter.decrementer()`, as documented in the [limiter reference](https://uxlfoundation.github.io/oneTBB/main/reference/source/flow_graph/limiter_node_cls.html).
 
-```
-  input_node ──► broadcast ──► preprocess (parallel) ──► join ──► inference
-                                                                       │
-  display ◄── limiter ◄── sequencer ◄── postprocess ◄─────────────────┘
-```
+The program checks every output ID, synthetic numerical result, peak logical occupancy, and final count. Executed cases cover 0, 1, 17, and 100 frames with limits 1 and 4; the regression suite also checks progress with one worker. Increasing the limit can improve overlap, but cannot make a permanently slow serial sink run faster.
 
-```cpp
-#include "oneapi/tbb/flow_graph.h"
-#include <cstdio>
-#include <tuple>
-#include <vector>
-using namespace oneapi::tbb::flow;
-
-struct Frame {
-    int           id;             // sequence number for reordering
-    std::vector<float> pixels;   // raw pixel data
-};
-
-struct Detection {
-    int   frame_id;
-    float confidence;
-    int   class_id;
-};
-
-// ── Simulated pipeline functions ─────────────────────────────────────────────
-Frame      read_frame(int id)          { return {id, std::vector<float>(224*224*3, 0.5f)}; }
-Frame      resize_normalize(Frame f)   { /* resize to 224×224, normalize [0,1] */ return f; }
-Frame      color_convert(Frame f)      { /* BGR → RGB */ return f; }
-Detection  run_inference(std::tuple<Frame,Frame> t) {
-    // both preprocessed versions available — use whichever suits your model
-    const Frame& f = std::get<0>(t);
-    return {f.id, 0.95f, 1};
-}
-Detection  draw_boxes(Detection d)     { printf("frame %d  class=%d  conf=%.2f\n",
-                                                d.frame_id, d.class_id, d.confidence);
-                                         return d; }
-void       display_or_save(Detection d){ /* write to screen or file */ }
-
-int main() {
-    const int TOTAL_FRAMES = 20;
-    const int MAX_INFLIGHT  = 8;   // limiter: max frames queued at once
-
-    graph g;
-
-    // ── Stage 1: source — emit frames one at a time ───────────────────────────
-    int frame_counter = 0;
-    input_node<Frame> source(g, [&](oneapi::tbb::flow_control& fc) -> Frame {
-        if (frame_counter >= TOTAL_FRAMES) { fc.stop(); return {}; }
-        return read_frame(frame_counter++);
-    });
-
-    // ── Stage 2: broadcast — send each frame to both preprocess branches ──────
-    broadcast_node<Frame> broadcast(g);
-
-    // ── Stage 3: parallel preprocess branches ────────────────────────────────
-    function_node<Frame, Frame> preprocess_a(g, unlimited, resize_normalize);
-    function_node<Frame, Frame> preprocess_b(g, unlimited, color_convert);
-
-    // ── Stage 4: join — wait for both preprocessed versions ──────────────────
-    join_node<std::tuple<Frame, Frame>> join(g);
-
-    // ── Stage 5: inference — CPU/GPU model (parallel across frames) ──────────
-    function_node<std::tuple<Frame,Frame>, Detection> inference(g, unlimited, run_inference);
-
-    // ── Stage 6: postprocess — draw bounding boxes ───────────────────────────
-    function_node<Detection, Detection> postprocess(g, unlimited, draw_boxes);
-
-    // ── Stage 7: sequencer — restore original frame order ────────────────────
-    sequencer_node<Detection> sequencer(g,
-        [](const Detection& d) -> size_t { return d.frame_id; }
-    );
-
-    // ── Stage 8: limiter — bound memory: max MAX_INFLIGHT frames in-flight ───
-    limiter_node<Detection> limiter(g, MAX_INFLIGHT);
-
-    // ── Stage 9: sink — display or write to file ──────────────────────────────
-    function_node<Detection, continue_msg> sink(g, serial,
-        [&](const Detection& d) -> continue_msg {
-            display_or_save(d);
-            return {};
-        }
-    );
-
-    // ── Wire the graph ────────────────────────────────────────────────────────
-    make_edge(source,        broadcast);
-    make_edge(broadcast,     preprocess_a);
-    make_edge(broadcast,     preprocess_b);
-    make_edge(preprocess_a,  input_port<0>(join));
-    make_edge(preprocess_b,  input_port<1>(join));
-    make_edge(join,          inference);
-    make_edge(inference,     postprocess);
-    make_edge(postprocess,   sequencer);
-    make_edge(sequencer,     limiter);
-    make_edge(limiter,       sink);
-    make_edge(sink,          limiter.decrement);  // release token when frame is done
-
-    // ── Run ───────────────────────────────────────────────────────────────────
-    source.activate();     // start emitting frames
-    g.wait_for_all();      // block until all frames are processed
-}
-```
-
-**Why each node is necessary:**
-
-| Node | Role | Why it's needed |
-|------|------|----------------|
-| `input_node` | Reads frames | Serial I/O source |
-| `broadcast_node` | Fan-out | Sends same frame to both preprocess branches |
-| `preprocess_a/b` | Parallel | Resize and color convert run simultaneously |
-| `join_node` | Fan-in | Inference needs both versions before starting |
-| `inference` | Parallel | Different frames infer independently |
-| `postprocess` | Parallel | Draw boxes — independent per frame |
-| `sequencer_node` | Reorder | Parallel inference may finish out of order |
-| `limiter_node` | Backpressure | Prevents 1000 frames buffering in RAM while display is slow |
-| `sink` | Output | Serial write to screen/file |
-
-> **Always call `g.wait_for_all()`** before the graph object is destroyed. Destroying a live graph is undefined behavior.
+**Robotics extension:** carry capture time and reset epoch with each frame. Decide whether the output requires every frame in order or the freshest result. A strict sequencer can hold later results behind one delayed item; a freshness policy must explicitly account for dropped IDs so it does not wait forever for an item intentionally removed.
 
 ---
 
 ### 2.11 Concurrent Containers
 
-**The problem:** standard containers (`std::vector`, `std::map`, `std::queue`) have no internal locking. If two threads write at the same time, you get data corruption, crashes, or silently wrong results.
+**The problem:** operations that mutate shared container structure, such as concurrent `push_back`, require synchronization. Concurrent reads are different, and threads can modify distinct existing elements of many standard containers (except packed `vector<bool>` elements) when no structural modification or conflicting access occurs. State the exact access pattern before choosing a concurrent container.
 
 ```
 std::vector<int> v;                // NOT thread-safe
@@ -2216,12 +2019,12 @@ The naive fix — wrapping everything in a `std::mutex` — works but serialises
 ```
 std::vector + one global mutex     tbb::concurrent_vector
   Thread 0 writes → LOCK            Thread 0 writes ──┐
-  Thread 1 waits...                  Thread 1 writes ──┤ all at once
+  Thread 1 waits...                  Thread 1 writes ──┤ concurrent operations
   Thread 2 waits...                  Thread 2 writes ──┘
   (serialised)                       (concurrent, safe)
 ```
 
-> Only use concurrent containers when multiple threads genuinely need to share the same container. If each thread works on its own data, a plain `std::vector` per thread (or `enumerable_thread_specific`) is faster.
+> Only use concurrent containers when multiple threads genuinely need to share the same container. If each thread works on its own data, consider a plain `std::vector` per thread (or `enumerable_thread_specific`), and measure allocation and merge costs.
 
 #### `concurrent_vector`
 
@@ -2239,11 +2042,11 @@ tbb::parallel_for(0, N, [&](int i) {
 // results holds all passing items; order is non-deterministic
 ```
 
-When to use: collecting results from a parallel filter where you don't know how many items will pass.
+When to use: collecting results from a parallel filter where you don't know how many items will pass. Concurrent growth does not publish a ready-to-read payload: `size()` may include elements still under construction. Wait for producers to finish, as this `parallel_for` does, or provide explicit per-element publication. Elements need not be contiguous; growth does not make concurrent clear/destruction safe. [Vector growth and readiness](https://uxlfoundation.github.io/oneTBB/main/tbb_userguide/concurrent_vector_ug.html)
 
 #### `concurrent_queue` / `concurrent_bounded_queue`
 
-Classic producer-consumer queue. `try_pop` is non-blocking (returns false if empty); `pop` on `concurrent_bounded_queue` blocks until an item arrives.
+Classic producer-consumer queue. `try_pop` returns false rather than waiting for an item when empty; this is not a blanket lock-free or wait-free progress guarantee. `pop` on `concurrent_bounded_queue` waits for an item.
 
 ```cpp
 #include "oneapi/tbb/concurrent_queue.h"
@@ -2260,16 +2063,17 @@ if (q.try_pop(item))
     process(item);   // got one
 
 // Bounded variant — adds backpressure (push blocks when full)
-tbb::concurrent_bounded_queue<WorkItem> bounded(100);
+tbb::concurrent_bounded_queue<WorkItem> bounded;
+bounded.set_capacity(100);
 bounded.push(item);   // blocks if 100 items already queued
 bounded.pop(item);    // blocks if queue is empty
 ```
 
-When to use: streaming pipelines where producers and consumers run at different rates.
+When to use: producers and consumers with independently available execution capacity. Blocking every oneTBB participant on an empty queue while its producers remain queued can prevent progress. Prefer the flow graph above for scheduler-managed dependencies, or use independently managed I/O threads with an explicit shutdown policy.
 
 #### `concurrent_hash_map`
 
-High-concurrency key-value store. Uses per-bucket locking — only the bucket being written is locked, so unrelated keys never contend.
+A concurrent key-value container with accessors that protect element access. Keep accessor lifetimes short. Different keys can still contend through hash buckets, resizing, allocation, or shared resources; the API does not guarantee independent timing. [Accessor contract](https://uxlfoundation.github.io/oneTBB/main/tbb_userguide/concurrent_hash_map.html)
 
 ```cpp
 #include "oneapi/tbb/concurrent_hash_map.h"
@@ -2278,8 +2082,8 @@ tbb::concurrent_hash_map<std::string, int> freq;
 
 tbb::parallel_for_each(words.begin(), words.end(), [&](const std::string& w) {
     tbb::concurrent_hash_map<std::string, int>::accessor acc;  // write lock
-    freq.insert(acc, w);   // locks only the bucket for key w
-    acc->second++;         // safe: this thread owns the bucket
+    freq.insert(acc, w);   // acquires exclusive access to this element
+    acc->second++;         // protected for the lifetime of this accessor
 });                        // accessor destructor releases the lock
 
 // Read-only (shared lock — many readers can hold this simultaneously)
@@ -2292,16 +2096,17 @@ if (freq.find(cacc, "hello"))
 
 #### `concurrent_unordered_map`
 
-Simpler API — drop-in for `std::unordered_map`, no accessor needed. Individual insertions and lookups are thread-safe, but iteration while modifying is not.
+A familiar unordered-map interface with concurrent insertion, lookup, and supported traversal. It is not a blanket thread-safe replacement for every `std::unordered_map` operation: erasure/clear have separate concurrency restrictions, and mutating a mapped value still needs synchronization. Concurrent traversal is not a snapshot and need not observe every simultaneous insertion. [Operation-specific contract](https://uxlfoundation.github.io/oneTBB/main/reference/source/containers/concurrent_unordered_map_cls.html)
 
 ```cpp
 #include "oneapi/tbb/concurrent_unordered_map.h"
 
-tbb::concurrent_unordered_map<int, int> m;
+tbb::concurrent_unordered_map<int, long long> m;
 
 tbb::parallel_for(0, N, [&](int i) {
-    m.insert({i, i * i});    // safe
-    // m[i] = i * i;         // also safe for insert; avoid for update
+    m.insert({i, 1LL * i * i});  // promote before multiplication to avoid int overflow
+    // operator[] can insert, but its returned value is not locked.
+    // Concurrent assignments to the same key still race.
 });
 ```
 
@@ -2334,278 +2139,153 @@ pq.try_pop(top);   // top = 20 (max-heap by default)
 
 ### 2.12 Scalable Memory Allocator
 
-Standard `malloc`/`free` have a single global lock — a bottleneck when many threads allocate simultaneously. TBB's allocator uses per-thread memory pools:
+Allocation behavior depends on the allocator, workload, and platform. Modern system allocators can already use multiple arenas and thread caches; there is no universal single global `malloc` lock. oneTBB provides a scalable allocator to benchmark when allocation contention matters. The [glibc allocator tunables](https://sourceware.org/glibc/manual/latest/html_node/Memory-Allocation-Tunables.html) document arenas and per-thread caches for one common system allocator.
+
+This complete example uses the explicit scalable allocator for a container and correctly pairs the C allocation API:
 
 ```cpp
-#include "oneapi/tbb/scalable_allocator.h"
+#include <oneapi/tbb/scalable_allocator.h>
+#include <iostream>
+#include <new>
+#include <vector>
 
-// Use tbb_allocator with STL containers
-std::vector<float, tbb::tbb_allocator<float>> vec(N);
-
-// Use scalable_malloc directly (drop-in for malloc)
-float* buf = (float*)scalable_malloc(N * sizeof(float));
-scalable_free(buf);
-
-// Replace all allocations globally (link with -ltbbmalloc_proxy)
-// Or: set LD_PRELOAD=libtbbmalloc_proxy.so before running
+int main() {
+    constexpr std::size_t N = 1024;
+    std::vector<float, oneapi::tbb::scalable_allocator<float>> vec(N, 1.0f);
+    float* buf = static_cast<float*>(scalable_malloc(N * sizeof(float)));
+    if (!buf) throw std::bad_alloc{};
+    buf[0] = vec[0];
+    std::cout << "allocated value=" << buf[0] << "\n";
+    scalable_free(buf);  // do not mix this with free/delete
+}
 ```
 
-Most impactful when many threads frequently allocate/free small objects (task objects, intermediate buffers in a pipeline).
+Compile with `g++ -std=c++17 allocator_example.cpp -ltbbmalloc -o /tmp/allocator_example`. By comparison, `oneapi::tbb::tbb_allocator<T>` requires `<oneapi/tbb/tbb_allocator.h>` and can fall back to `std::malloc` if the scalable library is unavailable; it does not prove which allocator was used. See the [allocator contract](https://uxlfoundation.github.io/oneTBB/main/reference/source/memory_allocation/tbb_allocator_cls.html).
+
+Global replacement through `tbbmalloc_proxy` is a separate, platform-specific deployment choice. Compare latency, allocation volume, memory use, and the serial baseline before changing a process-wide allocator.
 
 ---
 
-### 2.13 `task_arena` — Control Thread Pool
+### 2.13 `task_arena` — Bound participation in an execution region
 
-By default, TBB creates one global thread pool that uses all hardware threads. Every `parallel_for`, `parallel_reduce`, etc. draws from that pool. `task_arena` lets you create a **separate, bounded execution zone** with its own concurrency limit and optionally pinned to specific NUMA nodes.
-
-```
-Default (global arena):          With task_arena:
-  All 16 hardware threads          arena(4) → max 4 threads
-  shared by everything             Work inside it can't steal
-  ← any parallel_for steals        from the global pool
-     from any other
-```
-
-**`task_arena` does NOT create new OS threads.** TBB's worker threads can participate in multiple arenas. What the arena controls is how many of them are *allowed in* at once.
-
-#### Basic usage — limit parallelism
+An arena defines a scheduler region with a concurrency limit. Worker threads can serve different arenas; an arena does not reserve a private set of CPU cores, dedicated memory bandwidth, or a fixed number of permanently owned OS threads.
 
 ```cpp
-#include "oneapi/tbb/task_arena.h"
-#include "oneapi/tbb/parallel_for.h"
+#include <oneapi/tbb/task_arena.h>
+#include <oneapi/tbb/parallel_for.h>
 
-tbb::task_arena arena(2);   // at most 2 threads
-
+oneapi::tbb::task_arena arena(2);
 arena.execute([&] {
-    tbb::parallel_for(0, 1000, [](int i) {
-        // runs with at most 2 threads regardless of core count
-        do_work(i);
+    oneapi::tbb::parallel_for(0, 1000, [&](int i) {
+        do_work(i);  // application function; define it for your workload
     });
 });
 ```
 
-Useful when your program shares the CPU with a GPU or another process and you want to leave headroom.
+This limits arena participation; it does not imply the OS schedules both participants continuously. Separate arenas help control subsystem concurrency and nested scheduling. They still share CPU caches, worker supply, memory controllers, and other process resources.
 
-#### Two independent subsystems
+NUMA constraints can select an available NUMA node, but node IDs must come from the host's topology. CPU placement does not migrate already allocated data or guarantee local memory: allocation/first-touch policy and page placement need separate checks. A single-participant arena can simplify debugging, but it does not make random inputs, external I/O, unordered iteration, or the rest of the process deterministic.
 
-```cpp
-tbb::task_arena physics(4);   // physics simulation: 4 threads
-tbb::task_arena render(4);    // rendering: 4 threads
+**Exercise:** compare the existing Fibonacci benchmark with one and two participants. Explain why equal concurrency settings do not prove equal affinity or useful work per thread.
 
-// Launch both concurrently — they draw from separate thread budgets
-// No work-stealing between them
-std::thread t1([&]{ physics.execute([&]{ parallel_for(0, N, sim_body);    }); });
-std::thread t2([&]{ render.execute( [&]{ parallel_for(0, M, render_body); }); });
-t1.join(); t2.join();
-```
+### 2.14 `global_control` — Control oneTBB worker participation
 
-Without arenas, TBB's global pool would intermix work from both subsystems — threads doing physics could be stolen away to help with rendering mid-frame. Arenas prevent that.
-
-#### NUMA-aware pinning (multi-socket servers)
+`global_control` applies while its object exists and combines with other active controls. For `max_allowed_parallelism`, the smallest active value takes effect. Destroying one object restores the policy determined by the remaining controls, not necessarily unrestricted execution.
 
 ```cpp
-tbb::task_arena numa_arena(
-    tbb::task_arena::constraints{}
-        .set_numa_id(1)            // bind to NUMA socket 1
-        .set_max_concurrency(8)    // use up to 8 threads from that socket
-);
-
-numa_arena.execute([&]{
-    parallel_for(0, N, body);     // threads stay on socket 1's cores
-});
-// Data allocated on socket 1 memory is accessed locally → lower latency
-```
-
-#### When to use `task_arena`
-
-| Scenario | Why `task_arena` helps |
-|----------|----------------------|
-| CPU + GPU running simultaneously | Limit CPU threads so GPU isn't starved for PCIe bandwidth |
-| UI application with background processing | Prevent background `parallel_for` from consuming all cores |
-| Multiple independent subsystems | Isolate them so one can't steal from the other |
-| NUMA system (multi-socket server) | Pin arenas to sockets to keep data access local |
-| Debugging: make parallel code deterministic | `task_arena(1)` forces single-thread execution |
-
----
-
-### 2.14 `global_control` — Runtime Configuration
-
-`task_arena` limits threads *locally* (inside one block). `global_control` sets a **program-wide policy** that applies to every TBB algorithm everywhere — including third-party libraries that use TBB internally.
-
-```
-task_arena(4).execute(...)      global_control(max_allowed_parallelism, 4)
-  Only this block uses 4         Every parallel_for, parallel_reduce,
-  Everything else: unlimited     pipeline, etc. in the entire process: ≤ 4
-```
-
-Uses RAII — settings revert automatically when the object goes out of scope:
-
-```cpp
-#include "oneapi/tbb/global_control.h"
+#include <oneapi/tbb/global_control.h>
 
 {
-    tbb::global_control ctrl(
-        tbb::global_control::max_allowed_parallelism, 4
-    );
-    // ── all TBB work inside this scope uses at most 4 threads ──
-    tbb::parallel_for(0, N, body_a);   // ≤ 4 threads
-    some_library_call();               // if it uses TBB: also ≤ 4 threads
-}
-// ── ctrl destroyed → limit lifted, TBB uses all cores again ──
-tbb::parallel_for(0, N, body_b);       // full thread count again
-```
-
-**Set thread stack size** — useful when tasks recurse deeply or allocate large local arrays:
-
-```cpp
-tbb::global_control stack_ctrl(
-    tbb::global_control::thread_stack_size,
-    8 * 1024 * 1024   // 8 MB per worker thread (default is typically 1–4 MB)
-);
-```
-
-Each thread has a fixed stack. Deep recursion or large stack-allocated buffers silently overflow the default. Increase it before the first TBB task is created.
-
-**`task_arena` vs `global_control`:**
-
-| | `task_arena` | `global_control` |
-|--|--|--|
-| Scope | One `execute()` block | Entire process |
-| Thread limit | Per isolated region | All TBB algorithms |
-| Work-stealing isolation | Yes | No |
-| Typical use | Independent subsystems, NUMA pinning | Embedding TBB in a GUI/server, global throttling |
-
----
-
-### 2.15 Exception Handling and Cancellation
-
-In normal single-threaded C++, an exception unwinds the call stack to the nearest `catch`. In a parallel loop, each iteration runs in a different thread with its own stack — there is no shared call stack to unwind.
-
-TBB bridges this: when a worker thread throws, TBB catches it internally, cancels remaining *pending* iterations, then re-throws the exception on the calling thread once the loop completes.
-
-```
-Thread 0: iteration  0 → OK
-Thread 1: iteration  5 → throws std::runtime_error("bad input")
-                         ↑ TBB catches it
-Thread 2: iteration 10 → OK (already running → finishes normally)
-Pending iterations 11–N → CANCELLED (never start)
-                         ↓ TBB re-throws on calling thread
-Main thread: catch block runs
-```
-
-```cpp
-try {
-    tbb::parallel_for(0, N, [](int i) {
-        if (bad_condition(i))
-            throw std::runtime_error("bad input");
-    });
-} catch (const std::exception& e) {
-    // Caught here on the calling thread
-    // Already-running iterations completed; pending ones were skipped
-    std::cerr << e.what() << "\n";
+    oneapi::tbb::global_control budget(
+        oneapi::tbb::global_control::max_allowed_parallelism, 4);
+    oneapi::tbb::parallel_for(0, N, body);
 }
 ```
 
-> Already-running iterations always finish. Only *pending* (not-yet-started) tasks are cancelled. You cannot abort a task mid-execution.
+The worker limit is the selected value minus one. This does not count every application thread entering oneTBB. A selected value of 1 disables ordinary worker participation, but an explicit `task_arena::enqueue` has a documented exception allowing a worker to execute enqueued work. Thus even value 1 is not a mutex for two application threads. This is not a process-wide cap on `std::thread`, OpenMP, network workers, or all threads inside third-party libraries. It also cannot reserve PCIe bandwidth for a GPU. [Global-control reference](https://uxlfoundation.github.io/oneTBB/main/reference/source/task_scheduler/scheduling_controls/global_control_cls.html)
 
-**Explicit cancellation without exceptions** — use `task_group_context` when you want to cancel from another thread or condition (e.g., a timeout, a "stop" button):
+`thread_stack_size` controls oneTBB worker stack configuration subject to platform/runtime requirements. It does not enlarge the application's main-thread stack. Prefer bounded recursion and heap storage for large buffers; do not rely on stack overflow producing a clear diagnostic.
+
+### 2.15 Exceptions and cooperative cancellation
+
+A body can request cancellation of its task-group context. The scheduler avoids further eligible work in that context as cancellation propagates; tasks already executing are not forcibly interrupted. A long-running body can inspect the cancellation state and return early. Cancellation is not a transaction: completed writes are not rolled back, and partially produced output needs an explicit validity rule. [Cancellation behavior](https://uxlfoundation.github.io/oneTBB/main/tbb_userguide/Cancellation_Without_An_Exception.html)
 
 ```cpp
-tbb::task_group_context ctx;
-
-// Start the parallel loop in one thread
-tbb::parallel_for(
-    tbb::blocked_range<int>(0, N),
-    body,
-    tbb::auto_partitioner(),
-    ctx          // ← attach context
-);
-
-// From another thread (e.g., a watchdog or UI thread):
-ctx.cancel_group_execution();
-// → pending tasks stop being scheduled
-// → running tasks finish naturally
-// → parallel_for returns without throwing
+oneapi::tbb::task_group_context context;
+oneapi::tbb::parallel_for(
+    oneapi::tbb::blocked_range<int>(0, N),
+    [&](const oneapi::tbb::blocked_range<int>& range) {
+        for (int i = range.begin(); i != range.end(); ++i) {
+            if (context.is_group_execution_cancelled()) return;
+            if (bad_input(i)) {
+                context.cancel_group_execution();
+                return;
+            }
+            process(i);
+        }
+    }, oneapi::tbb::auto_partitioner{}, context);
 ```
 
-**Cancellation flow:**
+This is an application-body sketch: define `N`, `bad_input`, and `process`, and include the corresponding oneTBB headers. Do not assume the first reported bad index is the smallest index; execution order is not serial. A worker exception requests cancellation and is propagated to the caller after associated work is resolved. Throwing bodies unwind; other running bodies may finish, cooperate with cancellation, or throw themselves. “Every already-running iteration completes successfully” is therefore not a valid guarantee.
 
-```
-cancel_group_execution() called
-          │
-          ▼
-Pending tasks   → skip (never execute)
-Running tasks   → run to completion (cannot be interrupted)
-parallel_for()  → returns normally (no exception thrown)
-```
+**Check:** why is setting a stop flag insufficient to free a shared buffer immediately? Other bodies may still be using it. Wait for completion and apply the ownership contract before reclamation.
 
-| Mechanism | Triggers how | Running tasks | Pending tasks | Throws? |
-|-----------|-------------|---------------|---------------|---------|
-| Worker throws exception | Exception in body | Finish | Cancelled | Yes, on caller |
-| `ctx.cancel_group_execution()` | External call | Finish | Cancelled | No |
+### 2.16 Work isolation is a scheduling rule, not a lock
 
----
+A thread waiting for nested parallel work can execute another outer task. That reentrancy can change thread-local state even without a data race between two OS threads. `this_task_arena::isolate` restricts **the calling thread's task selection** while it runs the supplied region. Other workers can still help execute that region. It does not grant exclusive access to memory or force a deterministic task order. [Work-isolation guide](https://uxlfoundation.github.io/oneTBB/main/tbb_userguide/work_isolation.html)
 
-### 2.16 Work Isolation
-
-TBB's work-stealing scheduler is aggressive: when a thread finishes a task and is waiting on an inner `parallel_for`, it doesn't idle — it looks for *any* available task in the pool, including tasks from the outer loop. This is great for throughput but dangerous when inner and outer tasks share data.
-
-```
-WITHOUT isolate:
-  Outer task i=0 launches inner parallel_for (10 tasks)
-  Outer task i=0's thread waits → steals outer task i=3
-  Now i=0's thread is running i=3 while i=0's inner tasks run on other threads
-  If inner tasks read/write data[i=0...] and outer task i=3 does too → race
-
-WITH isolate:
-  Outer task i=0 launches inner parallel_for inside isolate()
-  Inner tasks are visible ONLY to threads already inside the isolate block
-  Outer threads cannot steal them → no interleaving → safe
-```
-
-**When you need isolation — three questions:**
-
-1. Does the inner loop write to data that outer tasks also touch?
-2. Is that data not protected by a lock?
-3. Are outer and inner tasks running at the same time?
-
-If all three: use `isolate`.
+For example, these nested writes use disjoint elements. They do not need isolation to become race-free:
 
 ```cpp
 #include <oneapi/tbb/parallel_for.h>
-#include <oneapi/tbb/this_task_arena.h>
+#include <vector>
 
 std::vector<int> data(100, 0);
-
-tbb::parallel_for(0, 10, [&](int i) {
-    // outer task owns data[i*10 ... i*10+9]
-    // inner tasks write into exactly that range
-    // → must not be stolen by another outer task's thread
-
-    tbb::this_task_arena::isolate([&] {
-        tbb::parallel_for(0, 10, [&](int j) {
-            data[i*10 + j] += 1;   // safe: isolated from other outer tasks
-        });
+oneapi::tbb::parallel_for(0, 10, [&](int row) {
+    oneapi::tbb::parallel_for(0, 10, [&](int column) {
+        data[row * 10 + column] = row + column;
     });
 });
 ```
 
-**Without `isolate`:** Thread running outer `i=2` could steal inner tasks belonging to outer `i=7`, then write into `data[20..29]` while `i=2`'s thread is somewhere else writing into `data[20..29]` — data race.
+A stolen task keeps its captured arguments; stealing work for row 7 does not magically change its index to row 2. The ownership proof comes from unique `(row, column)` pairs and waiting for the nested call, not from which worker executes each pair.
 
-**With `isolate`:** Inner tasks of `i=2` stay inside the isolate block. Only the thread that entered the block (and any helpers *it* spawns internally) can run those inner tasks.
+When thread-local state really must survive a nested wait, isolate that nested region and inspect its reentrancy assumptions:
 
-**When NOT to isolate:**
+```cpp
+#include <oneapi/tbb/task_arena.h>  // declares this_task_arena::isolate
 
-If the inner loop works on independent data (no sharing with outer tasks), isolation only hurts performance — it prevents free threads from helping with the inner work. Leave it out.
+oneapi::tbb::this_task_arena::isolate([&] {
+    oneapi::tbb::parallel_for(0, count, independent_body);
+});
+```
 
-| Situation | Use `isolate`? | Reason |
-|-----------|---------------|--------|
-| Inner tasks write to shared outer data | Yes | Prevent data race |
-| Inner tasks read-only from shared data | Usually no | Reads are safe to steal |
-| Inner tasks work on fully independent data | No | Let threads steal freely — faster |
-| Need deterministic per-outer-task execution order | Yes | Isolate forces strict containment |
+If two tasks write the same non-atomic value concurrently, adding separate `isolate` calls does not repair the race. Change ownership or use synchronization. The [API reference](https://uxlfoundation.github.io/oneTBB/main/reference/source/task_scheduler/task_arena/this_task_arena_ns.html) defines the calling-thread scope; it supplies no mutual-exclusion or transaction guarantee.
+
+The supplied [concurrency contract example](concurrency_contracts.cpp) checks bounded-queue capacity, concurrent element updates, disjoint nested writes, cancellation state, and two overlapping isolated regions. Its overlap check uses synchronization to avoid a data race: it demonstrates that isolation itself is not a mutex.
 
 ---
+
+### Run the concurrency contracts
+
+From this guide's directory, with the same oneTBB development files as the Fibonacci lab:
+
+```bash
+g++ -std=c++17 -O2 -Wall -Wextra -Werror -pthread concurrency_contracts.cpp -ltbb -o /tmp/concurrency_contracts
+/tmp/concurrency_contracts --self-test
+```
+
+The six checks execute on the CPU and retain independent expected results. The isolation check starts two application threads and waits for both isolated regions to overlap, with shared observations protected by a mutex/condition variable. It deliberately avoids an undefined data race. The queue check verifies `try_push` capacity and FIFO; it does not measure blocking fairness. The cancellation check uses one participating application thread to make the cooperative boundary inspectable.
+
+The [recorded validation](labs/concurrency-validation.json) includes GCC 13.3, oneTBB 2021.11.0 and a separate AddressSanitizer/UndefinedBehaviorSanitizer run. Those sanitizers are not a proof of race freedom. Predict which checks would fail if isolation were mistakenly treated as mutual exclusion, or if cancellation were assumed to undo an already committed write.
+
+The independent [native guide verifier](labs/verify_guide_examples.py) extracts twelve code blocks from this guide and compiles them, supplying explicit inputs where a fragment needs a harness. It checks the MSE arithmetic, minimum tie/empty cases, inclusive/exclusive scans, compaction size, graph messages, ordered pipeline output, allocation, and basic elementwise loops. Run it from this directory after installing oneTBB development files:
+
+```bash
+python3 labs/verify_guide_examples.py --single-cpu
+```
+
+`--single-cpu` adds a Linux `taskset` progress check; omit it on other platforms. For development files outside system paths, pass `--include-dir PATH --library-dir PATH`. It creates temporary build files and installs nothing. [Independent review evidence](labs/concurrency-review.json) records the actual compiler output and results; it does not claim every application sketch in this guide is standalone or that sanitizer checks prove race freedom.
 
 ### 2.17 Pattern Cheat Sheet
 
@@ -2668,23 +2348,17 @@ parallel_pipeline(max_tokens, input_filter & transform_filter & output_filter);
 
 ### 2.18 Connection to GPU Programming
 
-oneTBB patterns map directly to GPU frameworks:
+The decomposition questions carry over, but the APIs and execution guarantees differ:
 
-| oneTBB concept | GPU equivalent |
-|---------------|---------------|
-| `parallel_for` over `blocked_range` | CUDA kernel launch over thread grid |
-| Work-stealing scheduler | Warp scheduler (hardware) |
-| `affinity_partitioner` | L2 cache locality hints in CUDA |
-| `enumerable_thread_specific` | Per-warp shared memory allocation |
-| `combinable<T>` | `atomicAdd` into shared mem, then reduce |
-| `concurrent_queue` | CUDA stream (async task queue) |
-| `parallel_pipeline` | CUDA multi-stream pipeline |
-| `flow_graph` nodes | CUDA graph nodes (`cudaGraph`) |
-| `task_group` | CUDA dynamic parallelism |
-| `task_arena` | CUDA stream priority + stream isolation |
-| Scalable allocator | `cudaMallocAsync` (stream-ordered pool) |
+| Design question | CPU oneTBB example | GPU distinction to learn |
+|-----------------|--------------------|--------------------------|
+| Which outputs are independent? | `parallel_for` over disjoint elements | A CUDA kernel maps work to threads, blocks, and a grid; its SIMT and memory-access rules are different |
+| Where should partial results live? | Thread-local histogram followed by merge | Registers, block shared memory, and global memory have different visibility and synchronization requirements |
+| What depends on what? | Flow-graph messages and joins | CUDA streams/events/graphs describe device work ordering; a stream is not a concurrent application-data queue |
+| How much work can overlap? | Arena concurrency and live pipeline tokens | Stream priority does not reserve cores or provide memory isolation; resource use and dependencies limit overlap |
+| Who owns a buffer, and when can it be reused? | C++ lifetime plus completed tasks | Host/device visibility and asynchronous completion must be established before reuse or reclamation |
 
-Learning oneTBB's task decomposition makes CUDA's thread/block/grid hierarchy intuitive — they solve the same problem at different scales.
+A work-stealing CPU scheduler is not a hardware warp scheduler. `enumerable_thread_specific` is not GPU shared memory, and an arena is not a CUDA stream. Carry the ownership and dependency proofs forward, then learn the device-specific contract in the [CUDA Programming Guide](https://docs.nvidia.com/cuda/cuda-programming-guide/index.html). These analogies make no claim of GPU execution or performance.
 
 ---
 
@@ -2692,8 +2366,8 @@ Learning oneTBB's task decomposition makes CUDA's thread/block/grid hierarchy in
 
 | Resource | What it covers |
 |----------|---------------|
-| [oneTBB Developer Guide](https://uxlfoundation.github.io/oneTBB/main/tbb_userguide/) | Full tutorial: parallel_for, reduce, pipeline, flow graph, design patterns |
-| [oneTBB API Reference](https://uxlfoundation.github.io/oneTBB/main/tbb_userguide/reference.html) | Complete API |
+| [oneTBB Developer Guide](https://uxlfoundation.github.io/oneTBB/main/tbb_userguide/title.html) | Full tutorial: parallel_for, reduce, pipeline, flow graph, design patterns |
+| [oneTBB API Reference](https://uxlfoundation.github.io/oneTBB/main/reference/source/index.html) | Complete API |
 | [Intel oneTBB Get Started](https://www.intel.com/content/www/us/en/docs/onetbb/get-started-guide/2022-2/overview.html) | Installation, CMake, first steps |
 | [OpenMP specifications](https://www.openmp.org/specifications/) | Official OpenMP standard |
 | [OpenMP API Quick Reference Card](https://www.openmp.org/wp-content/uploads/OpenMP-4.5-1115-CPP-web.pdf) | All clauses at a glance |

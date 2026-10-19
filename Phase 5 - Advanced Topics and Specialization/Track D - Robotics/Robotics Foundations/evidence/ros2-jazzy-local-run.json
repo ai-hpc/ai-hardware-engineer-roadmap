@@ -1,0 +1,57 @@
+{
+  "execution_status": "measured local ROS 2 transport and TF; synthetic input",
+  "date_utc": "2026-10-18T20:04:49Z",
+  "python": "3.12.3",
+  "ros_distro": "jazzy",
+  "rmw": "rmw_fastrtps_cpp",
+  "domain_id": 71,
+  "discovery_range": "LOCALHOST",
+  "namespace": "/robotics_lesson_89fbdfb079",
+  "max_age_s": 0.5,
+  "clock": "same-host system clock",
+  "package_versions": [
+    "ros-jazzy-geometry-msgs\t5.3.6-1noble.20260126.173651",
+    "ros-jazzy-rclpy\t7.1.9-1noble.20260126.174822",
+    "ros-jazzy-rmw-fastrtps-cpp\t8.4.3-1noble.20260126.173317",
+    "ros-jazzy-tf2-ros\t0.36.19-1noble.20260126.180125"
+  ],
+  "checks_passed": 4,
+  "results": [
+    {
+      "case": "fresh",
+      "age_s": 0.000614644,
+      "input_frame": "robotics_lesson_89fbdfb079_sensor",
+      "outcome": "accepted",
+      "output_frame": "robotics_lesson_89fbdfb079_world",
+      "point_world_m": [
+        1.0000000000000002,
+        3.2,
+        0.0
+      ]
+    },
+    {
+      "case": "stale",
+      "age_s": 2.000362793,
+      "input_frame": "robotics_lesson_89fbdfb079_sensor",
+      "outcome": "reject_stale"
+    },
+    {
+      "case": "future",
+      "age_s": -1.999732097,
+      "input_frame": "robotics_lesson_89fbdfb079_sensor",
+      "outcome": "reject_future"
+    },
+    {
+      "case": "wrong_frame",
+      "age_s": 0.000373472,
+      "input_frame": "robotics_lesson_89fbdfb079_unknown",
+      "outcome": "reject_frame"
+    }
+  ],
+  "limitations": [
+    "two nodes in one process on one host",
+    "static transform; no moving frame or sim clock",
+    "four samples are a correctness check, not a latency benchmark",
+    "no robot, actuator, simulator, or physical safety validation"
+  ]
+}

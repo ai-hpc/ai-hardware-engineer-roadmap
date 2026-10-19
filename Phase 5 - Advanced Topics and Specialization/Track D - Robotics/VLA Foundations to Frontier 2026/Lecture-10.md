@@ -37,11 +37,23 @@ where \(V_t\) contains only valid, already available predictions. Define weight 
 
 Never use nonzero action values as the validity mask: zero is a valid motor command. Preserve generation time, observation timestamp, target control time, and chunk identity. Discard chunks from an old episode after reset. Averages are meaningful only when all predictions share the same coordinate frame, units, and action semantics. Averaging discrete gripper modes or rotations requires a separate rule.
 
+## Check the actual ACT source convention
+
+The source inspection on October 18 pins ACT to commit `742c753c0d4a5d87076c8f69e5628c79a8cc5488`; the [source manifest](labs/act-source-evidence.json) records three file hashes. No upstream ACT training or robot rollout was executed.
+
+The pinned evaluation code stores chunks by generation timestep, selects overlapping predictions in that row order, then applies exponentially decreasing weights from index zero. Thus **older retained predictions receive greater weight** in this implementation. The recent-favoring age formula above is a deliberately different scheduler, not a reproduction of that default. The same source infers population from every action coordinate being nonzero: an otherwise valid vector containing one zero is excluded. Preserve that behavior when explaining the historical implementation, but use explicit Boolean validity in a new controller. [Pinned evaluator](https://github.com/tonyzhaozh/act/blob/742c753c0d4a5d87076c8f69e5628c79a8cc5488/imitate_episodes.py#L249-L259)
+
+The deployed decoder supplies a **zero latent**, whereas the training encoder samples a latent using the demonstrated future. Sampling a random prior at inference is an experiment, not the pinned default. This distinction also means the scalar multimodal generators in the next lab are not implementations of ACT. [Pinned latent path](https://github.com/tonyzhaozh/act/blob/742c753c0d4a5d87076c8f69e5628c79a8cc5488/detr/models/detr_vae.py#L98-L115)
+
+The policy multiplies reconstruction errors by the nonpadding mask, then averages over the full padded tensor. It does not divide by the number of valid coordinates. With one valid scalar error of 1 and three padded entries, that reduction is 0.25; a valid-count-normalized reduction is 1. This changes the reconstruction scale relative to the KL term when padding fractions differ. State which reduction you reproduce before comparing losses or changing the KL coefficient. [Pinned loss](https://github.com/tonyzhaozh/act/blob/742c753c0d4a5d87076c8f69e5628c79a8cc5488/policy.py#L24-L34)
+
 ## Worked example: smoothness can create delay
 
 Suppose three available predictions for one joint target are 0.20, 0.24, and 0.32 radians, ordered oldest to newest. A uniform average is approximately 0.253 radians. Recent-favoring weights \((1,2,4)\) produce approximately 0.280 radians. Both reduce the jump to the newest prediction. If the newest prediction reflects a newly visible obstacle, smoothing also delays the response.
 
 For an illustrative 50 Hz actuator stream and \(K=5\), replanning occurs nominally every 100 ms. A measured inference latency of 70 ms could fit that interval, but a 140 ms tail event cannot. A scheduler needs a declared fallback when a replacement chunk misses its deadline. The policy invocation rate, action streaming rate, and physical servo rate should appear as separate columns in your report.
+
+Start with the already executable [dataset and execution lab](Dataset-and-Execution-Lab.md) for delayed arrivals, zeros, and reset epochs, then the [trained policy in a timed loop](../../../Phase%203%20-%20Artificial%20Intelligence/0.%20AI%20and%20Robot%20Learning%20Foundations/Lab-02-Timed-Robot-Loop.md) for the effect of queue policy on a learned controller. These validate scheduling mechanisms; neither implements ACT.
 
 ## Build a chunk scheduler before training a transformer
 

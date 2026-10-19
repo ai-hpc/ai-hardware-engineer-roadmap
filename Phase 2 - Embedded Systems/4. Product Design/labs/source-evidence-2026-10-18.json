@@ -1,0 +1,20 @@
+{
+  "checked_utc": "2026-10-18T22:28:40.759424+00:00",
+  "method": "Primary-source HTTP GET snapshot; source content reviewed independently. Source availability does not validate hardware.",
+  "sources": [
+    {
+      "url": "https://www.apple.com/newsroom/2018/01/homepod-arrives-february-9-available-to-order-this-friday/",
+      "resolved_url": "https://www.apple.com/newsroom/2018/01/homepod-arrives-february-9-available-to-order-this-friday/",
+      "status": 200,
+      "bytes": 157311,
+      "sha256": "58857212a423cafe15c6f351dea3177226ab05af1720e360ed387e081327039c"
+    },
+    {
+      "url": "https://www.apple.com/newsroom/2023/01/apple-introduces-the-new-homepod-with-breakthrough-sound-and-intelligence/",
+      "resolved_url": "https://www.apple.com/newsroom/2023/01/apple-introduces-the-new-homepod-with-breakthrough-sound-and-intelligence/",
+      "status": 200,
+      "bytes": 199188,
+      "sha256": "ee61d873aa9212c8820314d7ce393a7917c9df565207683f9dd8a00df6ec4aeb"
+    }
+  ]
+}

@@ -32,7 +32,7 @@ That is why the modern recipe from Lecture 01 puts imitation **before** RL:
 
 Two engineering facts make BC the default first step:
 
-1. **It is supervised learning.** No reward, no critic, no rollouts during training. Every trick from supervised deep learning (large batches, mixed precision, data loaders, LoRA) transfers unchanged.
+1. **It is supervised learning.** No reward, no critic, no rollouts during training. Supervised-learning tools apply, but sequence/episode splits, observation-action timing, normalization, and deployment feedback must be validated for robot data.
 2. **Its failure mode is predictable.** BC fails when the policy reaches states the demos never covered. Once you know that, you know where to spend data.
 
 **Robot connection.** A π0.5 checkpoint fine-tuned on LIBERO demonstrations is a BC policy. Robustness tests that move objects to new positions are exactly the "states the demos never covered" problem. Much of the headroom left on top of a strong LIBERO checkpoint is distribution shift, not missing skill.
@@ -59,7 +59,7 @@ so maximum likelihood **is** mean-squared-error regression. Keep that equivalenc
 
 ### 2.2 Covariate shift
 
-The training inputs come from the expert's state distribution \(p_{\pi^*}(o)\). At test time the inputs come from the learner's own distribution \(p_{\pi_\theta}(o)\). Supervised learning guarantees small error only on the training distribution:
+The training inputs come from the expert's state distribution \(p_{\pi^*}(o)\). At test time the inputs come from the learner's own distribution \(p_{\pi_\theta}(o)\). A small supervised training loss alone guarantees neither generalization nor closed-loop performance; evaluation must consider the distribution shift:
 
 $$
 \mathbb{E}_{o \sim p_{\pi^*}} \big[ \ell(\pi_\theta, o) \big] \text{ small} \;\;\not\Rightarrow\;\; \mathbb{E}_{o \sim p_{\pi_\theta}} \big[ \ell(\pi_\theta, o) \big] \text{ small}.

@@ -1,0 +1,16 @@
+{
+  "checked_on": "2026-10-18",
+  "evidence_kind": "actual x86_64 kernel-module build; NOT loaded, no Jetson build or device access",
+  "kernel_headers": "6.8.0-147-generic",
+  "build_flags": "W=1 modules",
+  "module_size_bytes": 295136,
+  "module_sha256": "51ed80682d95b793dedbfa4842b2a24ec6cc5d5f4ff6bc16d78874cb0995e406",
+  "source_sha256": {
+    "course_module.c": "09f9f5bc8365e1919393eeeab870da7860db63f749aad19c184a8e12b451fb42",
+    "Makefile": "093d712b1dfee93d47c20a5ef9f211dfddca6cfa576af5215a5be969577f8a61"
+  },
+  "build_notes": [
+    "Compiler command name differed from kernel build name (gcc-13 vs x86_64-linux-gnu-gcc-13); both reported GCC 13.3.0.",
+    "BTF generation skipped because vmlinux was unavailable; module build completed."
+  ]
+}

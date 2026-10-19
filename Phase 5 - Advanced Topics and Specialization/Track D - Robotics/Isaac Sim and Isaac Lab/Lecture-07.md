@@ -59,6 +59,8 @@ Isaac Sim 6.0 deprecated `isaacsim.sensors.camera`, `isaacsim.sensors.rtx` (the 
 | `Contact` / `ContactSensor` | same | Contact-pad style force on a rigid body (PhysX or Newton, via the tensor API) | `get_data()` → `in_contact`, `force`, … |
 | Physics raycast | same | Explicit per-ray origins/directions, optional time offsets (solid-state, rotating, beam curtain) | hits, distances |
 
+**6.2 boundary:** sensor getters now return owned snapshots, and Newton model rebuilds invalidate tensor views; see [the upgrade record](Compatibility.md#current-release-and-upgrade-checks). A 6.1 aliasing or caching assumption must be retested after upgrading.
+
 CameraSensor annotators in v6.1.0: `rgb`, `rgba`, `distance_to_camera`, `distance_to_image_plane`, `normals`, `motion_vectors`, `pointcloud`, `semantic_segmentation`, `instance_segmentation`, `instance_id_segmentation`, `bounding_box_2d_tight`, `bounding_box_2d_loose`, `bounding_box_3d`. The tiled sensor supports the per-pixel ones only, with no bounding boxes or point cloud. `get_data()` returns a Warp array on the GPU, or `None` while the annotator warms up. `get_data(a, out=prealloc)` fills your own buffer. `.numpy()` is an explicit device→host copy. In NVIDIA's device-check example, `rgb` is `(H, W, 3) uint8` and `distance_to_image_plane` is `(H, W, 1) float32`.
 
 > **You will see this in older code.** 5.x scripts use `from isaacsim.sensors.camera import Camera` with `camera.get_rgba()`, `CameraView` for batched cameras, `LidarRtx`, and `IMUSensor` from `isaacsim.sensors.physics`. ROS 2 helper nodes there use `frameSkipCount`. All of these are deprecated in 6.0, and `tick_rate` replaces `frameSkipCount`.
@@ -246,6 +248,8 @@ for res in "128 128" "256 256" "480 640"; do
 done
 ```
 
+The fetch loop repeatedly reads the most recent sensor output without advancing the simulation. Its `fetch_ms` is getter/copy overhead, **not** fresh-sample throughput. For a sensor-rate result, log distinct sensor timestamps or frame IDs while stepping; a non-`None` buffer alone does not establish freshness. Synchronize the relevant device stream around asynchronous GPU timing, and preserve a snapshot if later frames can overwrite a view.
+
 Then fit the §5 model. Regress `vram_cams_mib - vram_scene_mib` on `n` and `n·H·W` separately for tiled and untiled runs. The slope on `n` estimates \( V_{\text{rp}} \), and the slope on pixels estimates \( \beta + \sum b_a \). Expect the untiled `n` slope to be much larger than the tiled one. If it is not, check that you are reading the tiled sensor with `tiled=False` and that warm-up finished (`get_data` returned non-`None`).
 
 ### Lab 7b — RTX lidar: points per scan and frame-time spikes
@@ -279,6 +283,11 @@ p.add_argument("--wh", type=int, nargs=2, default=[640, 480])      # Replicator:
 p.add_argument("--subframes", type=int, default=-1)                # -1 = default; >0 renders extra subframes
 p.add_argument("--out", default="sdg_lab/_out")
 args = p.parse_args()
+if args.frames <= 0 or min(args.wh) <= 0:
+    p.error("frames and image dimensions must be positive")
+if os.path.exists(args.out) and os.listdir(args.out):
+    p.error("use a new empty output directory so existing files do not corrupt byte accounting")
+os.makedirs(args.out, exist_ok=True)
 
 from isaacsim import SimulationApp
 simulation_app = SimulationApp({"headless": True})

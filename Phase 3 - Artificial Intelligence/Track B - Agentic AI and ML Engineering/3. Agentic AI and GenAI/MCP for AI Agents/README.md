@@ -1,19 +1,21 @@
 # MCP for AI Agents — The Model Context Protocol in Depth
 
+**Executed current Python path:** [Lecture 05](Lecture-05.md) uses official SDK 2.3.0 `MCPServer`, four actual client tests and a stdio subprocess. It is distinct from earlier wire-compatibility examples.
+
 <div class="course-identity" style="--course-accent: #ea580c; --course-accent-rgb: 234, 88, 12;" markdown="1">
 <div class="course-identity__icon">MCP</div>
 <div markdown="1">
 <p class="course-identity__eyebrow">Phase 3 · Agentic AI · Special Course</p>
-<p class="course-identity__title">The open protocol that connects agents to the world — architecture, the six primitives, building and securing real servers, OAuth 2.1 for remote deployment, and the production stack, current to the 2025-11-25 spec and the 2026 release candidate.</p>
-<p class="course-identity__meta">Artifact: a tested, authenticated, hardened MCP server with tools, resources, and prompts · Measure: spec-compliant lifecycle, passing MCP Inspector, scoped auth, and a clean security review</p>
+<p class="course-identity__title">The open protocol that connects agents to the world — architecture, the core features and historical reverse primitives, building and securing real servers, OAuth 2.1 for remote deployment, and the production stack, current 2026-07-28 requests with explicitly labelled 2025-11-25 compatibility lessons.</p>
+<p class="course-identity__meta">Core artifact: a tested local server and failure transcript · Extension: remote authorization and deployment evidence</p>
 </div>
 </div>
 
 > *Function calling lets one model use one set of tools you wired in by hand. MCP turns "tools" into a protocol — so any agent can talk to any tool, any data source, any system, through one standard interface. It is the integration layer the agent era was missing.*
 
-When Anthropic open-sourced the **Model Context Protocol** in November 2024, the agent ecosystem had an M×N problem: every host (Claude, Cursor, an internal agent) needed a bespoke integration for every tool (GitHub, Postgres, your filesystem, a SaaS API). MCP collapses that to **M + N** — write a tool server *once* against the protocol, and every MCP-capable host can use it; build a host *once*, and it speaks to the whole ecosystem. By early 2026 that bet had paid off comprehensively: OpenAI, Google DeepMind, and Microsoft all adopted MCP, the official `mcp` package crossed **~97M monthly downloads**, and the public registry passed **2,000 community servers**. MCP is now the default way agents reach the world, and "can it speak MCP?" is a question you will answer on the job.
+When Anthropic open-sourced the **Model Context Protocol** in November 2024, the agent ecosystem had an M×N problem: every host (Claude, Cursor, an internal agent) needed a bespoke integration for every tool (GitHub, Postgres, your filesystem, a SaaS API). MCP collapses that to **M + N** — write a tool server *once* against the protocol, and every MCP-capable host can use it; build a host *once*, and it speaks to the whole ecosystem. Interoperability still requires compatible revisions, capabilities, schemas, and authorization; implementing the same protocol name does not make every host/server pairing work.
 
-This course is the engineer's manual for that protocol. Not a tour of one SDK call — a ground-up build of the mental model (host / client / server, the six primitives, the lifecycle), then the hands-on skills (write a server with FastMCP, test it with Inspector, deploy it over Streamable HTTP with OAuth 2.1), then the part that gets skipped and gets people breached (the MCP attack surface and how to shut it down), and finally the production stack (gateways, the registry, tool-context budgets, and evaluation with MCPMark).
+This course is the engineer's manual for that protocol. Not a tour of one SDK call — a ground-up build of the mental model (host / client / server, the core features and historical reverse primitives, the lifecycle), then the hands-on skills (write a server with the official SDK 2.3.0, exercise an actual stdio client, then study a separate Streamable HTTP and OAuth deployment), then the part that gets skipped and gets people breached (the MCP attack surface and how to shut it down), and finally the production stack (gateways, the registry, tool-context budgets, and evaluation with MCPMark).
 
 **Layer mapping:** the **tool-protocol layer** of the agent stack — the standard interface between the [agent runtime](../Lectures/Lecture-02.md) and every external system it touches. It sits directly on top of [Tool Use & Function Calling](../Lectures/Lecture-08.md) and underneath everything an agent actually *does*.
 
@@ -23,7 +25,9 @@ This course is the engineer's manual for that protocol. Not a tour of one SDK ca
 
 * [AI Agent Development 2026 — Lecture 08 (Tool Use & Function Calling)](../Lectures/Lecture-08.md) and [Lecture 09 (Structured Tools Beat Computer Use)](../Lectures/Lecture-09.md) — MCP is the *protocolization* of exactly those ideas.
 * [Lecture 02 (What Is an AI Agent Harness?)](../Lectures/Lecture-02.md) — the host/runtime MCP plugs into.
-* Comfort with Python (the server lectures use the official SDK / FastMCP), JSON, and basic HTTP. OAuth familiarity helps for Lecture 06 but is taught from scratch.
+* Comfort with Python (the server lectures use official SDK 2.3.0 `MCPServer` in the executed lesson), JSON, and basic HTTP. OAuth familiarity helps for Lecture 06 but is taught from scratch.
+
+**Start here:** [Current protocol: worked request, result, and failures](Protocol-2026-07-28.md). Lectures 01–04 and 06–08 retain explicitly dated compatibility examples; Lecture 05 is the executed current Python SDK path.
 
 **Pairs with:** the agent-security lectures ([24 — Runtime Discipline](../Lectures/Lecture-24.md), [40 — OpenClaw Threat Model / MITRE ATLAS](../Lectures/Lecture-40.md)) and the [MCPMark benchmark in Lecture 23 §8](../Lectures/Lecture-23.md) — which this course's evaluation lecture builds on.
 
@@ -31,7 +35,7 @@ This course is the engineer's manual for that protocol. Not a tour of one SDK ca
 
 ## Why this course is structured the way it is
 
-MCP looks simple — "expose a tool, the agent calls it" — and that simplicity hides three things that bite in production: the protocol has **six primitives, not one** (and two of them run *backwards*, server→client); remote servers need **real authorization**, not an API key in an env var; and the protocol's openness is also its **attack surface**. The eight lectures climb that exact gradient:
+MCP looks simple — "expose a tool, the agent calls it" — and that simplicity hides three things that bite in production: the protocol has several feature families (and older revisions use reverse requests that the current revision expresses through result/retry interactions); remote servers need **an authorization design appropriate to the selected protocol profile**; storing a credential in an environment variable does not establish caller identity, scopes or audience; and the protocol's openness is also its **attack surface**. The eight lectures climb that exact gradient:
 
 ```text
    understand it          build it              ship it safely
@@ -56,7 +60,7 @@ You leave understanding the protocol well enough to *read the spec*, build a ser
 | [02](Lecture-02.md) | **Architecture & Lifecycle — Host, Client, Server** — the three roles, capability negotiation, the initialize → operate → shutdown lifecycle, and JSON-RPC message types | the shape of a connection |
 | [03](Lecture-03.md) | **Core Primitives — Tools, Resources, Prompts** — the model-/app-/user-controlled trichotomy, JSON-Schema tool definitions, URI-addressed resources, and prompt templates | what a server exposes |
 | [04](Lecture-04.md) | **Reverse Primitives — Sampling, Roots, Elicitation** — the server→client direction: borrowing the host's LLM, filesystem boundaries, and asking the user for input mid-task | what makes MCP bidirectional |
-| [05](Lecture-05.md) | **Building an MCP Server (FastMCP)** — the official Python SDK end to end: tools, resources, prompts, context, lifespan, structured output; testing with MCP Inspector | hands on the keyboard |
+| [05](Lecture-05.md) | **Building an MCP Server (SDK 2.3.0)** — validated schemas, structured results, resources and prompts, actual in-memory and stdio tests; distinguish standalone FastMCP | hands on the keyboard |
 | [06](Lecture-06.md) | **Transports, Remote Servers & OAuth 2.1** — stdio vs Streamable HTTP, sessions, the SSE deprecation, and authorization (client / resource server / auth server, RFC 9728) | from localhost to the internet |
 | [07](Lecture-07.md) | **MCP Security — The Agent Attack Surface** — tool poisoning, prompt injection via tool results, the confused deputy, token passthrough, the lethal trifecta, and the defenses | the part that gets skipped |
 | [08](Lecture-08.md) | **Production MCP — Gateways, Registry, Eval & Capstone** — composition and gateways, the registry, tool-context budgets, observability, MCPMark evaluation, and the 2026 roadmap | shipping at scale |
@@ -69,8 +73,8 @@ You leave understanding the protocol well enough to *read the spec*, build a ser
 
 By the end you should be able to:
 
-* Explain the **host / client / server** architecture and the full **initialize → operate → shutdown** lifecycle, and read a raw JSON-RPC MCP exchange.
-* Use all **six primitives** correctly — Tools, Resources, Prompts (server→client) and Sampling, Roots, Elicitation (the reverse direction) — and say which actor controls each.
+* Explain **host / client / server**, current per-request versioning, and the older initialization lifecycle; identify which contract a raw exchange uses.
+* Use tools/resources/prompts and elicitation under the selected revision; explain why deprecated roots/sampling examples are compatibility material.
 * **Build, test, and package** a real MCP server with the official Python SDK / FastMCP, validated against the MCP Inspector.
 * Deploy a **remote server over Streamable HTTP** with spec-compliant **OAuth 2.1** authorization (resource-server metadata, scoped tokens, the auth/resource server split).
 * Identify and mitigate the **MCP attack surface** — tool poisoning, prompt injection via tool results, confused-deputy, token passthrough, supply-chain — and pass a basic security review.
@@ -82,22 +86,24 @@ By the end you should be able to:
 
 MCP is young and moving fast — pin your facts to a spec date:
 
-* This course tracks the **2025-11-25** stable revision and flags what the **2026-07-28 release candidate** changes (a stateless core, **MCP Apps** for server-rendered UIs, a **Tasks** extension for long-running work, and tighter OAuth/OIDC alignment).
+* The official current revision is **2026-07-28**, verified 2026-10-18. Start with the linked current lesson; `2025-11-25` wire examples are historical compatibility study. Roots, Sampling, and Logging are deprecated; the old six-primitives grouping is not a recommendation to add all six today.
 * Transports: **stdio** and **Streamable HTTP** are current; the legacy **HTTP+SSE** transport is **deprecated** (since 2025-03-26) — every lecture uses the current transport and names the deprecated one only to warn you off it.
-* SDK surfaces (FastMCP, the official `mcp` package heading to a v2) change release-to-release; treat code as a snapshot and verify against the installed version. Every lecture closes with a **`## Current as of`** note.
+* SDK surfaces change release-to-release. The official `mcp` SDK and the standalone `fastmcp` distribution are separate projects. Use the lock and tested API in Lecture 05; read dated compatibility examples under their stated revision.
 
 ---
 
 ## Exit Criteria
 
-You are done with this course when you can stand up a **production-grade MCP server** end to end:
+The **core learning path** is complete when you can:
 
-* Expose tools, resources, and prompts with correct schemas, and demonstrate it green in MCP Inspector.
-* Serve it remotely over Streamable HTTP behind OAuth 2.1 with scoped, audience-bound tokens.
-* Walk an auditor through its threat model — tool poisoning, injection-via-results, confused deputy, token passthrough — and the control that stops each.
-* Register it, put it behind a gateway with other servers without blowing the tool-context budget, and report an MCPMark-style evaluation of an agent driving it.
+1. Run the four tests in Lecture 05, retain the output and explain the stdio transport boundary.
+2. Predict the result of a negative input, an unknown tool and an untrusted prompt argument.
+3. Explain why schema validation, tool execution and caller authorization are different checks.
+4. Identify the protocol revision and SDK version in a new example before combining it with this server.
 
-If you can call one tool but can't defend the server or deploy it for someone else to trust, you have a demo. The point of this course is the server other people can safely depend on.
+The **deployment extension** adds an authenticated remote transport, scoped audience-bound tokens, cancellation and retry tests, and a documented threat model. Add gateway, registry or benchmark work only when that deployment needs it. The course's local tests do not claim that HTTP authorization, Inspector, a public registry or a production service has been executed.
+
+A useful diagnostic: an MCP result contains a command to unlock a robot's motors. Is that authorization? **No.** It is tool-result data. A separate trusted application policy must authorize any operation, and physical control still belongs behind the robot's safety constraints.
 
 ---
 

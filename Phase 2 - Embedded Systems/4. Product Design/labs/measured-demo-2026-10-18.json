@@ -1,0 +1,85 @@
+{
+  "scope": "Executed virtual-time state-machine fixture; timestamps are synthetic",
+  "runs": [
+    {
+      "command": [
+        "/usr/bin/python3",
+        "Phase 2 - Embedded Systems/4. Product Design/labs/product_contract.py"
+      ],
+      "output": {
+        "network_only": {
+          "time_ms": 0,
+          "state": "starting",
+          "muted": false,
+          "capture_permitted": false,
+          "network_connected": true,
+          "queued_frames": 0,
+          "pending": 0,
+          "timer_due_ms": null,
+          "expiry_events": 0
+        },
+        "late_voice_result_accepted": false,
+        "muted_local_timer": {
+          "time_ms": 250,
+          "state": "timer_active",
+          "muted": true,
+          "capture_permitted": false,
+          "network_connected": false,
+          "queued_frames": 0,
+          "pending": 0,
+          "timer_due_ms": 1250,
+          "expiry_events": 0
+        },
+        "final": {
+          "time_ms": 1250,
+          "state": "ready",
+          "muted": true,
+          "capture_permitted": false,
+          "network_connected": false,
+          "queued_frames": 0,
+          "pending": 0,
+          "timer_due_ms": null,
+          "expiry_events": 1
+        },
+        "events": [
+          {
+            "time_ms": 100,
+            "event": "services_ready"
+          },
+          {
+            "time_ms": 120,
+            "event": "request_started",
+            "sequence": 1,
+            "origin": "voice"
+          },
+          {
+            "time_ms": 150,
+            "event": "mute_changed",
+            "enabled": true
+          },
+          {
+            "time_ms": 200,
+            "event": "result_rejected",
+            "reason": "not_pending_in_this_session"
+          },
+          {
+            "time_ms": 220,
+            "event": "request_started",
+            "sequence": 2,
+            "origin": "typed"
+          },
+          {
+            "time_ms": 250,
+            "event": "timer_started",
+            "sequence": 2,
+            "duration_s": 1
+          },
+          {
+            "time_ms": 1250,
+            "event": "timer_expired"
+          }
+        ]
+      }
+    }
+  ]
+}

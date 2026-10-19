@@ -15,6 +15,8 @@
 ---
 
 
+**First experiment:** [Camera geometry and timestamped fusion on CPU](../4.%20Sensor%20Fusion/Camera-Time-Fusion-Lab/Guide.md). Recover a known position with actual OpenCV, then expose a wrong-scale calibration that still has a small pixel residual. The longer detector/annotation examples below require their own datasets and optional dependencies; they are not reported as executed GPU deployments.
+
 ## 1. What is Computer Vision?
 
 Computer vision gives machines the ability to interpret and understand visual information from the world — images, videos, depth maps, point clouds.
@@ -65,7 +67,7 @@ Challenges:
 
 Beginners think: "the camera gives an image." Reality: the camera gives raw physics — the ISP builds the image.
 
-Every image a neural network processes was manufactured by an Image Signal Processor. The sensor does not output RGB. It outputs a Bayer mosaic of single-channel photon counts at 10/12/14-bit depth. The ISP pipeline transforms this raw physics into a stable, color-correct image. Every stage exists for a physical reason, and every stage can break your model if done wrong.
+Every image a neural network processes was manufactured by an Image Signal Processor. Many colour camera sensors output a Bayer mosaic of digitized charge measurements, often at 10/12/14-bit depth. Other sensors use monochrome, alternative colour-filter layouts, stacked colour, or already processed outputs. The ISP pipeline transforms this raw physics into a stable, color-correct image. Every stage exists for a physical reason, and every stage can break your model if done wrong.
 
 This is core knowledge for ADAS, embedded vision, Jetson, and camera systems.
 
@@ -120,26 +122,26 @@ Why this design?
 
 - Hardware simplicity — one filter per photodiode, no beam splitters
 - Smaller bandwidth — 1 channel per pixel instead of 3
-- Standard across the industry — Bayer pattern invented 1976, still universal
+- Standard across the industry — Bayer pattern introduced in 1976 and widely used; not universal
 
 The problem:
 
-- This is NOT a usable image
-- A neural network cannot ingest raw Bayer directly (wrong structure, single-channel)
-- Every downstream stage exists to turn this into something usable
+- Raw Bayer is a usable measurement with a specific layout and noise model.
+- A network can be trained on raw Bayer or packed Bayer channels; a network trained for RGB requires the matching conversion.
+- The ISP prepares the representation expected by display, codec, or model consumers.
 
 ```
 CCD vs CMOS:
 
   CCD  — Charge Coupled Device
          Shifts charge row-by-row to a single ADC at the edge
-         Global shutter (all pixels exposed simultaneously — no rolling artifacts)
+         Readout/exposure design determines shutter behavior; do not infer it solely from CCD versus CMOS
          Higher power, mostly legacy (replaced by CMOS)
 
   CMOS — Complementary Metal-Oxide-Semiconductor
-         Each pixel has its own amplifier + ADC (column-parallel readout)
-         Rolling shutter (rows read sequentially — fast motion causes skew)
-         Lower power, faster, dominant in ALL modern cameras
+         Pixel amplifiers with design-dependent shared/column-parallel ADCs
+         Rolling or global shutter depending on the sensor; rolling exposure can cause motion skew
+         Lower power, faster, widely used in modern cameras
 
 ADAS reference sensors:
   AR0233AT (ON Semi)    — 2.1 MP, HDR, automotive qualified, RGGB
@@ -152,7 +154,7 @@ ADAS reference sensors:
 
 #### Stage 2: Linearization
 
-Sensors are non-linear devices. The raw pixel value coming out of the ADC is NOT proportional to the number of photons that hit the pixel.
+Over a useful unsaturated operating range, many raw sensors are approximately linear after black-level correction. Response correction handles measured nonlinearity or companded/HDR encodings; it is not evidence that every raw sensor has a strongly nonlinear response. Saturation cannot be undone by a calibration curve.
 
 ```
 Why non-linear?
@@ -256,11 +258,11 @@ Before demosaic:                  After demosaic:
 
 How interpolation works (simplified — bilinear):
 
-  To estimate the missing Red value at a Green pixel:
-    R_estimated = average of neighboring R pixels (above, below, left, right)
-
-  To estimate the missing Blue value at a Green pixel:
-    B_estimated = average of neighboring B pixels (diagonal neighbors)
+  At a Green pixel, one missing colour is interpolated from the two
+  horizontal neighbours and the other from the two vertical neighbours;
+  which colour uses which direction depends on the Bayer row.
+  At a Red/Blue site, the opposite colour uses diagonal neighbours,
+  while missing Green uses adjacent axial neighbours.
 ```
 
 Demosaicing algorithms range in quality:
@@ -291,7 +293,7 @@ ADAS tradeoff:
              — no CPU/GPU cycles consumed, runs at sensor speed
 
 Hardware ISP demosaicers:
-  NVIDIA Jetson:    built into VI/ISP unit (not user-configurable)
+  NVIDIA Jetson:    dedicated ISP; supported tuning depends on sensor, BSP, and camera stack
   Qualcomm Spectra: multi-pass with chroma correction
   ARM Mali-C71:     proprietary edge-directed algorithm
 ```
@@ -1145,11 +1147,14 @@ ADAS typically needs:
 
 ### 4.4 Instance Segmentation with Mask R-CNN (PyTorch)
 
+For a current promptable branch, study the official [SAM 3 repository](https://github.com/facebookresearch/sam3), including its checkpoint access, license, supported prompts, and resource requirements (checked 2026-10-18). The SAM 1/Mask R-CNN examples here remain architecture references; promptable masks are not automatically reliable object identities or calibrated robot geometry.
+
 ```python
 import torchvision
 import torch
 
-model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)
+weights = torchvision.models.detection.MaskRCNN_ResNet50_FPN_Weights.DEFAULT
+model = torchvision.models.detection.maskrcnn_resnet50_fpn(weights=weights)
 model.eval()
 
 from torchvision.transforms.functional import to_tensor
@@ -1173,11 +1178,11 @@ for i, score in enumerate(predictions['scores']):
 ### 5.1 Detection Paradigms
 
 ```
-Two-stage (high accuracy, slower):
+Two-stage (proposal stage followed by classification/refinement):
   Region proposals → classify each proposal
   Examples: Faster R-CNN, Mask R-CNN
 
-One-stage (real-time, slightly lower accuracy):
+One-stage (dense predictions without a separate proposal stage):
   Grid/anchor predictions in single pass
   Examples: YOLO, SSD, RetinaNet, FCOS
 
@@ -1188,8 +1193,10 @@ Anchor-free (modern, simpler):
 
 ### 5.2 YOLO — You Only Look Once
 
+**Model currency, checked 2026-10-18:** Ultralytics now documents [YOLO26](https://docs.ultralytics.com/models/yolo26/). The YOLOv8 examples below teach a recognizable historical workflow; they are not a claim that v8 is the latest model. Compare supported exports, dataset performance, runtime/operator support, and model/package licenses before selecting a newer family. A newer name alone does not establish better accuracy or latency on your task.
+
 ```python
-# YOLOv8 — Ultralytics (easiest modern YOLO)
+# YOLOv8 — retained historical checkpoint example; pin package and weight revision.
 # pip install ultralytics
 
 from ultralytics import YOLO
@@ -1202,7 +1209,7 @@ results = model('image.jpg', conf=0.4, iou=0.45)
 
 for r in results:
     for box in r.boxes:
-        xyxy  = box.xyxy[0].numpy()   # [x1, y1, x2, y2]
+        xyxy  = box.xyxy[0].cpu().numpy()   # [x1, y1, x2, y2]
         conf  = float(box.conf)
         cls   = int(box.cls)
         label = model.names[cls]
@@ -1243,12 +1250,14 @@ names:
 
 ### 5.4 Detection Metrics
 
+Detection matching is class/IoU/score-policy dependent and one-to-one within each evaluated frame. Multiple boxes on one object are not multiple true positives. For COCO-style AP, retain confidence-ranked detections across recall thresholds; a single confusion matrix at one threshold is not AP. Report empty-scene false positives and small/occluded-object slices separately.
+
 | Metric | Definition |
 |--------|-----------|
 | **IoU** | Intersection over Union — box overlap quality |
 | **Precision** | TP / (TP + FP) — of all detections, how many are correct |
 | **Recall** | TP / (TP + FN) — of all GT objects, how many were found |
-| **AP** | Area under Precision-Recall curve (per class) |
+| **AP** | Evaluator-specific interpolated precision over recall (per class) |
 | **mAP@50** | Mean AP at IoU threshold 0.5 |
 | **mAP@50:95** | Mean AP averaged over IoU 0.5–0.95 (COCO standard) |
 
@@ -1269,6 +1278,7 @@ print(metrics.box.mr)       # mean recall
 
 ```python
 # Create tracker — options: CSRT (accurate), KCF (fast), MIL
+# CSRT requires a compatible opencv-contrib build; the headless core lab does not include it.
 tracker = cv2.TrackerCSRT_create()
 
 # Initialize with first frame + bounding box
@@ -1278,6 +1288,8 @@ tracker.init(frame, bbox)
 
 while True:
     ret, frame = cap.read()
+    if not ret:
+        break
     ok, bbox = tracker.update(frame)
     if ok:
         x, y, w, h = [int(v) for v in bbox]
@@ -1289,7 +1301,7 @@ while True:
 
 ### 6.2 ByteTrack — Multi-Object Tracking
 
-ByteTrack is the current standard for real-time MOT (pairs with any detector).
+ByteTrack is a widely studied tracking-by-detection approach. Its adapter must preserve the chosen detector's boxes, class IDs, confidence scores, and timestamps; performance depends on these inputs.
 
 ```bash
 pip install lap  # linear assignment
@@ -1366,6 +1378,9 @@ criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
 objp = np.zeros((CHECKERBOARD[0] * CHECKERBOARD[1], 3), np.float32)
 objp[:, :2] = np.mgrid[0:CHECKERBOARD[0], 0:CHECKERBOARD[1]].T.reshape(-1, 2)
+square_size_m = 0.025  # measure YOUR target; translations use this unit
+objp *= square_size_m
+# calibration_images must contain diverse views at one image resolution.
 
 objpoints, imgpoints = [], []
 for fname in calibration_images:
@@ -1377,6 +1392,8 @@ for fname in calibration_images:
         objpoints.append(objp)
         imgpoints.append(corners2)
 
+if len(objpoints) < 3:
+    raise ValueError("Need multiple successful, diverse calibration views")
 ret, K, dist, rvecs, tvecs = cv2.calibrateCamera(
     objpoints, imgpoints, gray.shape[::-1], None, None
 )
@@ -1414,9 +1431,14 @@ stereo = cv2.StereoSGBM_create(
 disparity = stereo.compute(left_rect, right_rect).astype(np.float32) / 16.0
 
 # Convert disparity to depth
-# depth = (baseline × focal_length) / disparity
-baseline = np.linalg.norm(T)          # meters between cameras
-depth = (baseline * K1[0, 0]) / (disparity + 1e-6)
+# For horizontal rectification with equal rectified principal points:
+# Z = f_rectified * baseline / disparity, only for valid positive disparity.
+baseline = np.linalg.norm(T)  # metres only if calibration target was in metres
+depth = np.full_like(disparity, np.nan)
+valid = disparity > 0
+depth[valid] = (baseline * P1[0, 0]) / disparity[valid]
+# A tiny epsilon does not make zero/invalid disparity a valid depth.
+# Use Q for the general rectified geometry, including principal-point offsets.
 
 # Or use the Q matrix from stereoRectify
 points_3D = cv2.reprojectImageTo3D(disparity, Q)  # (H, W, 3) XYZ per pixel
@@ -1425,7 +1447,7 @@ points_3D = cv2.reprojectImageTo3D(disparity, Q)  # (H, W, 3) XYZ per pixel
 ### 7.3 Pose Estimation (solvePnP)
 
 ```python
-# Given 3D object points and their 2D image projections, find camera pose
+# Given matching 3D object points and 2D pixels, find object-to-camera pose
 # object_points: (N, 3) float32 — 3D coordinates in object frame
 # image_points:  (N, 2) float32 — corresponding 2D pixel coordinates
 
@@ -1435,8 +1457,12 @@ success, rvec, tvec = cv2.solvePnP(
 )
 
 # rvec: rotation vector (Rodrigues format) → convert to matrix
+if not success:
+    raise ValueError("PnP failed; do not consume this pose")
 R, _ = cv2.Rodrigues(rvec)   # 3×3 rotation matrix
-# tvec: translation vector (camera-to-object)
+# X_camera = R @ X_object + tvec; tvec is object origin in camera coordinates.
+# Camera position in object coordinates requires the inverse:
+camera_position_in_object = -R.T @ tvec
 
 # Project 3D points back to image
 projected, _ = cv2.projectPoints(object_points, rvec, tvec, K, dist)
@@ -2782,7 +2808,8 @@ for ann in coco['annotations']:
     x, y, w, h = ann['bbox']   # COCO bbox: x_min, y_min, width, height
     area = ann['area']
     segmentation = ann.get('segmentation', [])   # list of polygon vertex lists
-    is_crowd = ann.get('iscrowd', 0)             # 1=RLE mask, 0=polygon
+    is_crowd = ann.get('iscrowd', 0)             # crowd-region semantics; inspect segmentation type separately
+    # RLE can also represent non-crowd masks; iscrowd is not a general encoding tag.
 
     print(f"{img_name}: {class_name} at [{x:.0f},{y:.0f},{x+w:.0f},{y+h:.0f}]")
 ```
@@ -2801,12 +2828,12 @@ from collections import Counter
 with open('annotations.json') as f:
     coco = json.load(f)
 
-boxes_per_image = Counter()
+boxes_per_image = Counter({img['id']: 0 for img in coco['images']})
 for ann in coco['annotations']:
     boxes_per_image[ann['image_id']] += 1
 
 # Flag images with too few or too many boxes
-avg = sum(boxes_per_image.values()) / len(boxes_per_image)
+avg = sum(boxes_per_image.values()) / max(1, len(boxes_per_image))
 for img_id, count in boxes_per_image.items():
     if count < avg * 0.2 or count > avg * 3:
         img = next(i for i in coco['images'] if i['id'] == img_id)
@@ -2814,6 +2841,8 @@ for img_id, count in boxes_per_image.items():
 ```
 
 #### Dataset Splitting
+
+For robot/video datasets, split by recording, scene, robot, subject, or collection session before augmentation. Adjacent frames from one clip must not land in both training and test sets. The helper below is only for already independent images; use the episode split in the [PyTorch robot lab](../../2.%20Deep%20Learning%20Frameworks/PyTorch/CPU-Robot-Stop-Lab/Guide.md) for grouped data.
 
 ```python
 import random
@@ -2825,8 +2854,10 @@ def split_dataset(image_dir: str, label_dir: str,
     """Split YOLO-format dataset into train/val/test."""
     images = list(Path(image_dir).glob('*.jpg')) + \
              list(Path(image_dir).glob('*.png'))
-    random.seed(seed)
-    random.shuffle(images)
+    if not (train > 0 and val >= 0 and test >= 0 and abs(train+val+test-1) < 1e-9):
+        raise ValueError("Split fractions must be nonnegative and sum to one")
+    images.sort()
+    random.Random(seed).shuffle(images)
 
     n = len(images)
     splits = {
@@ -2995,10 +3026,10 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
 train_transform = A.Compose([
-    A.RandomResizedCrop(640, 640, scale=(0.5, 1.0)),
+    A.RandomResizedCrop(size=(640, 640), scale=(0.5, 1.0)),
     A.HorizontalFlip(p=0.5),
     A.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1, p=0.8),
-    A.GaussNoise(var_limit=(10, 50), p=0.3),
+    A.GaussNoise(std_range=(0.012, 0.028), p=0.3),  # normalized std; Albumentations 2.x
     A.MotionBlur(blur_limit=5, p=0.2),
     A.RandomRain(p=0.1),
     A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
@@ -3019,9 +3050,9 @@ Build a warehouse safety detector (person, forklift, hard hat) end-to-end.
 2. Annotate with X-AnyLabeling (YOLOv8 pre-label → human correction)
 3. Export as YOLO format, split 70/20/10
 4. Fine-tune YOLOv8n for 100 epochs
-5. Evaluate: target mAP@50 > 85%
+5. Evaluate held-out sequences: report mAP@50:95 plus critical-class recall and failures
 6. Export to TensorRT INT8 for Jetson
-7. Run at 30+ FPS on Jetson Orin Nano with ROS2 publisher
+7. Measure achieved end-to-end latency, throughput, memory, and misses on the exact target
 
 Deliverable: GitHub repo + annotated dataset on Roboflow Universe
 ```
@@ -3065,7 +3096,7 @@ results = model('video.mp4', stream=True)
 
 for r in results:
     if r.keypoints is not None:
-        kpts = r.keypoints.xy.numpy()   # (N_persons, 17, 2)
+        kpts = r.keypoints.xy.cpu().numpy()   # (N_persons, 17, 2)
         # kpts[0, 0] = nose, [0, 5] = left shoulder, [0, 11] = left hip
         for person_kpts in kpts:
             nose = person_kpts[0]
@@ -3170,3 +3201,5 @@ class PointNet(nn.Module):
 **Build and challenge:** Compare the reference preprocessing with one optimized implementation. Inject RGB/BGR reversal and wrong normalization; distinguish input-pipeline faults from model faults.
 
 **Pass forward:** A preprocessing manifest and golden images feeding the policy observation adapter. Continue with [the connected course](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/VLA%20Foundations%20to%20Frontier%202026/README.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).
+
+**Geometry/API references checked 2026-10-18:** [OpenCV projection and calibration](https://docs.opencv.org/4.13.0/d9/d0c/group__calib3d.html), [PnP transform direction](https://docs.opencv.org/4.x/d5/d1f/calib3d_solvePnP.html), [Albumentations 2.0 release changes](https://github.com/albumentations-team/albumentations/releases/tag/2.0.0). Camera geometry is executed in the linked CPU lab; optional detector/GPU integrations require separate versioned validation.

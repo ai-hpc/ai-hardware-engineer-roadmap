@@ -18,6 +18,8 @@
 
 **Prerequisites:** [Phase 1 — Digital Foundations](../Phase%201%20-%20Foundational%20Knowledge/Guide.md)
 
+**First lab, before buying hardware:** [Keep an observation fresh](Labs/Observation-Freshness.md). A Python-only sensor/worker simulation teaches queues, deadlines, reset epochs, units, and coordinate-frame checks. It supplies the explicit input/output contract that the firmware and Linux modules later implement on a target.
+
 **What comes after:** [Phase 3 — Artificial Intelligence](../Phase%203%20-%20Artificial%20Intelligence/Guide.md), then one of the Phase 4 tracks: [Xilinx FPGA](../Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md), [NVIDIA Jetson](../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md), or [ML Compiler](../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md)
 
 ---

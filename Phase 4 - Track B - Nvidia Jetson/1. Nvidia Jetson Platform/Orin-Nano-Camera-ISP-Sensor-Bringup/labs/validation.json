@@ -1,0 +1,15 @@
+{
+  "reviewed_utc": "2026-10-18T21:19:36.294924+00:00",
+  "tests_passed": 11,
+  "python": "3.12.3",
+  "exhaustive_values": 1024,
+  "positions_per_value": 4,
+  "source_sha256": {
+    "test_raw_camera.py": "2dd48a147aa11b59aaf2d2d18a69d8f1507bba98c3ec75296c57be46ce494425",
+    "raw_camera.py": "a345b2d53325b6874bb48d2223bd2100f1aa92ed8f24dc7aca93229e159c7a72"
+  },
+  "limits": [
+    "CPU byte-format and hypothetical sensor-timing model",
+    "no physical sensor, driver, ISP, or Jetson execution"
+  ]
+}

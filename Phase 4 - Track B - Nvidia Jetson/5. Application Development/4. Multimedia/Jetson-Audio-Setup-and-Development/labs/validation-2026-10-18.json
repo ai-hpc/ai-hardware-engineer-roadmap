@@ -1,0 +1,23 @@
+{
+  "date_utc": "2026-10-18T22:07:31.821955+00:00",
+  "python": "3.12.3",
+  "portable_tests": 3,
+  "optional_tests": 6,
+  "result": "passed",
+  "scope": "actual NumPy 2.3.5 CPU FIR, PCM and WAV plus portable timing/accounting",
+  "commands": [
+    "python3 -m unittest discover -s 'Phase 4 - Track B - Nvidia Jetson/5. Application Development/4. Multimedia/Jetson-Audio-Setup-and-Development/labs' -p 'test_*.py' -v",
+    "/tmp/course-perception-cpu-venv/bin/python -m unittest discover -s 'Phase 4 - Track B - Nvidia Jetson/5. Application Development/4. Multimedia/Jetson-Audio-Setup-and-Development/labs/optional' -v"
+  ],
+  "source_sha256": {
+    "audio_lab.py": "cfd9dbb00c69a3faf83ec79386708c1000ac8718a6d9ec4b70c7c4e05293526e",
+    "audio_contracts.py": "ebfdae0358f40dc0399a272bfe7c8808c41b89040b1ed361c1b50c7b509eb8c4",
+    "test_audio_contracts.py": "4bcf30891be83e0a8fb21e15601e125a652001e7e80b92b797644333d5abf3f6",
+    "optional/test_audio_lab.py": "4849f3212da7465f776f49b07e2c8237036c208e5cd442b36b333ae2f85023fa"
+  },
+  "unexecuted": [
+    "Jetson hardware and BSP configuration",
+    "ESP firmware builds or flashing",
+    "physical radio/audio tests"
+  ]
+}

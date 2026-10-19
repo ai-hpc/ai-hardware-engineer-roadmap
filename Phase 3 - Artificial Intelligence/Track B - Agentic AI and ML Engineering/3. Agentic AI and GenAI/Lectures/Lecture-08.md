@@ -1,387 +1,79 @@
-# Lecture 08 — Tool Use & Function Calling
+# Lecture 08 — Tool Calls Are a Protocol
 
 **Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 07](Lecture-07.md) | **Next:** [Lecture 09](Lecture-09.md)
 
----
+**Outcome:** implement a bounded client-tool loop, preserve call identifiers and distinguish a model request from an authorized action. The [provider contract lab](Provider-Contract-Lab.md) executes both Anthropic and OpenAI SDKs against local fixtures with no paid requests.
 
-## Learning Objectives
+## 1. The model requests; your application executes
 
-- Define tools with precise schemas that minimize hallucination
-- Implement the tool-use loop correctly (the core of every agent)
-- Handle tool errors gracefully
-- Use parallel tool calls to reduce latency
-- Understand safety boundaries for dangerous tools
+For a client-defined function, the model emits a name, arguments and call identifier. Your application validates and authorizes the request, runs the handler, and sends a correlated result. Hosted/server tools have a different execution owner; do not dispatch every returned content block as a local function.
 
----
+| Integration | Tool request | Tool result |
+|---|---|---|
+| Claude Messages | `tool_use` content block | `tool_result` block in a **user** message, with matching `tool_use_id` |
+| OpenAI Responses | `function_call` output item | `function_call_output` input item with matching `call_id` |
+| OpenAI Chat Completions | Assistant `tool_calls` | `role: tool` message with `tool_call_id` |
 
-## 1. What Is Tool Use?
+These shapes are not interchangeable. Preserve all required assistant output items, including reasoning/continuation items where the model requires them. [Claude tool-call handling](https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls), [OpenAI function calling](https://developers.openai.com/api/docs/guides/function-calling).
 
-**Tool use** lets the LLM call external functions — search the web, run code, query a database, control a browser. The model doesn't execute code; it outputs a **structured JSON call** that your application executes.
+## 2. Start with a small, truthful tool
 
-```
-User message
-     ↓
-  [LLM] → stop_reason: "tool_use" → tool call JSON
-     ↓
-Your code executes the tool
-     ↓
-Tool result sent back to LLM as "tool" role message
-     ↓
-  [LLM] → stop_reason: "end_turn" → final answer
-```
+The lab exposes `add_integers(a, b)` for bounded integer arithmetic. It really computes the sum and has no filesystem or network access. It does not pretend to run a GPU profiler.
 
----
-
-## 2. Defining Tools
-
-**Tool schemas** are the most important thing to get right. Vague descriptions cause wrong calls; wrong input types cause parse errors.
-
-```python
-import anthropic
-
-tools = [
-    {
-        "name": "get_gpu_specs",
-        "description": (
-            "Retrieve detailed specifications for an NVIDIA or AMD GPU by model name. "
-            "Returns memory, bandwidth, compute, and TDP. "
-            "Use this when the user asks about specific GPU hardware capabilities."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "model": {
-                    "type": "string",
-                    "description": "GPU model name, e.g. 'H100 SXM5', 'A100 PCIe 80GB', 'RX 7900 XTX'"
-                },
-                "metric": {
-                    "type": "string",
-                    "enum": ["memory", "bandwidth", "compute", "tdp", "all"],
-                    "description": "Which specification to retrieve. Use 'all' if unsure."
-                }
-            },
-            "required": ["model"]
-        }
-    },
-    {
-        "name": "run_cuda_profiler",
-        "description": (
-            "Run Nsight Systems profiler on a CUDA kernel file and return performance metrics. "
-            "Use this to identify bottlenecks: memory bound vs compute bound."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "kernel_path": {
-                    "type": "string",
-                    "description": "Absolute path to the .cu file"
-                },
-                "num_iterations": {
-                    "type": "integer",
-                    "description": "Number of profiling iterations (default: 100)",
-                    "default": 100
-                }
-            },
-            "required": ["kernel_path"]
-        }
-    }
-]
-```
-
-**Schema writing rules:**
-
-| Rule | Why |
-|------|-----|
-| Description explains *when* to call, not just *what* it does | Model decides whether to call based on this |
-| Use `enum` for constrained string values | Eliminates typos and invalid inputs |
-| Mark truly optional fields with `default`, don't put in `required` | Prevents unnecessary calls |
-| Keep parameter names short and clear | Model generates parameter names verbatim |
-
----
-
-## 3. The Tool-Use Loop
-
-```python
-import anthropic
-import json
-from typing import Any
-
-client = anthropic.Anthropic()
-
-# Mock tool implementations
-def get_gpu_specs(model: str, metric: str = "all") -> dict:
-    specs_db = {
-        "H100 SXM5": {"memory": "80GB HBM3", "bandwidth": "3.35 TB/s",
-                       "compute": "989 TFLOPS FP16", "tdp": "700W"},
-        "A100 PCIe 80GB": {"memory": "80GB HBM2e", "bandwidth": "1.935 TB/s",
-                            "compute": "312 TFLOPS FP16", "tdp": "300W"},
-    }
-    data = specs_db.get(model, {"error": f"GPU '{model}' not found in database"})
-    if metric == "all" or "error" in data:
-        return data
-    return {metric: data.get(metric, "unknown")}
-
-def run_cuda_profiler(kernel_path: str, num_iterations: int = 100) -> dict:
-    # In production, actually run nsys/ncu here
-    return {
-        "kernel": kernel_path,
-        "avg_duration_ms": 2.34,
-        "memory_throughput_pct": 78.5,
-        "compute_throughput_pct": 31.2,
-        "bottleneck": "memory_bound",
-        "recommendation": "Improve memory access coalescing"
-    }
-
-TOOL_MAP = {
-    "get_gpu_specs": get_gpu_specs,
-    "run_cuda_profiler": run_cuda_profiler,
+```json
+{
+  "type": "object",
+  "properties": {
+    "a": {"type": "integer"},
+    "b": {"type": "integer"}
+  },
+  "required": ["a", "b"],
+  "additionalProperties": false
 }
-
-def run_agent(user_message: str) -> str:
-    """Core agent loop with tool use."""
-    messages = [{"role": "user", "content": user_message}]
-
-    while True:
-        response = client.messages.create(
-            model="your-agent-model-id",
-            max_tokens=2048,
-            tools=tools,
-            messages=messages
-        )
-
-        # Append assistant response to message history
-        messages.append({"role": "assistant", "content": response.content})
-
-        if response.stop_reason == "end_turn":
-            # Extract final text response
-            for block in response.content:
-                if hasattr(block, "text"):
-                    return block.text
-
-        elif response.stop_reason == "tool_use":
-            # Process all tool calls in this response
-            tool_results = []
-
-            for block in response.content:
-                if block.type == "tool_use":
-                    tool_name = block.name
-                    tool_input = block.input
-
-                    # Execute the tool
-                    if tool_name in TOOL_MAP:
-                        result = TOOL_MAP[tool_name](**tool_input)
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": json.dumps(result)
-                        })
-                    else:
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": f"Error: tool '{tool_name}' not found",
-                            "is_error": True
-                        })
-
-            # Send tool results back to model
-            messages.append({"role": "user", "content": tool_results})
-
-        else:
-            break  # Unexpected stop reason
-
-    return "Agent completed without response."
-
-
-# Test it
-answer = run_agent(
-    "Compare the H100 SXM5 and A100 PCIe 80GB memory bandwidth. "
-    "Which is better for memory-bound kernels?"
-)
-print(answer)
 ```
 
----
+JSON Schema describes accepted inputs, while the executor enforces strict types, numeric bounds and its allowlist. A `default` annotation does not guarantee that a validator inserts a missing value. Schema validation is not authorization. Strict generation options also have provider/model-specific schema requirements. [Claude strict tool use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/strict-tool-use).
 
-## 4. Parallel Tool Calls
+If you later add profiling, run an actual compiled executable under the correct profiler. Nsight Systems collects timelines; Nsight Compute collects detailed kernel metrics. A `.cu` path alone is not a runnable profiling command. Retain raw reports and distinguish a measurement from a fixture or estimate.
 
-When multiple independent tools are needed, Claude can call them **simultaneously** — reducing **round-trips**.
+## 3. The bounded loop
 
-```python
-# Claude may return multiple tool_use blocks in one response
-# Your loop must handle ALL of them before sending results back
+Read the executable [provider_loops.py](labs/provider_loops.py) alongside the lab. It follows this sequence:
 
-for block in response.content:
-    if block.type == "tool_use":
-        # This may execute multiple times per response
-        result = TOOL_MAP[block.name](**block.input)
-        tool_results.append({
-            "type": "tool_result",
-            "tool_use_id": block.id,
-            "content": json.dumps(result)
-        })
+1. Call the selected SDK with a defined turn limit and explicit model identifier.
+2. Inspect completion/stop status before acting. A truncated tool request is not authorization.
+3. Preserve the assistant turn/output items.
+4. Extract every client-function call and check the batch against a total call budget.
+5. Validate arguments and dispatch only an allowed handler.
+6. Return one result per identifier, including typed errors, using that provider's message format.
+7. Continue until a completed final response or a bounded failure.
 
-# Send ALL results in one message — critical!
-messages.append({"role": "user", "content": tool_results})
-```
+`end_turn` can contain multiple text blocks; join the appropriate blocks rather than assuming `content[0].text`. Other stop reasons, such as refusal, token exhaustion or a server-tool pause, need explicit branches. This minimal client-function lab rejects unsupported continuations instead of reporting a false successful completion. Its SDK transport tests do not evaluate a real model's ability to choose a tool.
 
-**With Python `asyncio` for true parallel execution:**
+## 4. Multiple calls and parallelism
 
-```python
-import asyncio
-import anthropic
+A model may request several independent calls in one turn. With Claude, return the corresponding results together immediately after the assistant tool-use message; result blocks precede any additional text. Browser/computer toolsets have additional correlation fields; the minimal lab supports only its named client function. [Claude tool-call handling](https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls).
 
-async def execute_tool_async(tool_name: str, tool_input: dict, tool_id: str) -> dict:
-    # Run tool in thread pool (for blocking I/O tools)
-    loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(None, lambda: TOOL_MAP[tool_name](**tool_input))
-    return {
-        "type": "tool_result",
-        "tool_use_id": tool_id,
-        "content": json.dumps(result)
-    }
+Multiple calls in a response do not automatically execute concurrently. Your scheduler decides. Parallelize independent reads when resource limits permit; serialize dependent operations and shared-state mutations. If two independent tools take 100 ms and 300 ms, ideal concurrent execution approaches 300 ms plus overhead, versus roughly 400 ms sequentially. There is no universal 3–5× improvement.
 
-async def process_tool_calls(tool_blocks: list) -> list:
-    tasks = [
-        execute_tool_async(b.name, b.input, b.id)
-        for b in tool_blocks if b.type == "tool_use"
-    ]
-    return await asyncio.gather(*tasks)
-```
+## 5. Errors, retries and side effects
 
-> **Pro tip:** For I/O-heavy tools (HTTP requests, database queries), parallel async execution can cut multi-tool latency by 3–5×.
+An error result tells the model what failed; it does not guarantee recovery. Use a bounded retry policy for transient failures and distinguish invalid arguments, denied permission, missing resources and infrastructure failure. Do not return credentials or full exception internals in a tool result.
 
----
+A network timeout after an external write is **ambiguous**: the server may have committed it. Persist an idempotency key and reconcile status before retrying. A call identifier correlates a conversation; it is not automatically a durable business idempotency key. The lab's in-memory duplicate-ID detection demonstrates one protocol failure, not exactly-once execution across process crashes.
 
-## 5. Error Handling
+## 6. Authorization belongs in the executor
 
-Agents must **handle tool failures gracefully** — the LLM can recover if you give it good error messages.
+Authorize the concrete operation for the authenticated user, resource and current policy. Any human review must approve the exact proposed arguments and become invalid if they change. Existing user authorization can cover routine reversible operations; a prompt rule demanding confirmation for everything is not a useful substitute for a permission model.
 
-```python
-def safe_tool_call(tool_name: str, tool_input: dict, tool_id: str) -> dict:
-    """Execute a tool with error handling."""
-    try:
-        result = TOOL_MAP[tool_name](**tool_input)
-        return {
-            "type": "tool_result",
-            "tool_use_id": tool_id,
-            "content": json.dumps(result)
-        }
-    except KeyError as e:
-        return {
-            "type": "tool_result",
-            "tool_use_id": tool_id,
-            "content": f"Missing required parameter: {e}",
-            "is_error": True
-        }
-    except Exception as e:
-        return {
-            "type": "tool_result",
-            "tool_use_id": tool_id,
-            "content": f"Tool execution failed: {type(e).__name__}: {e}",
-            "is_error": True
-        }
-```
+Do not expose `eval`, `exec`, unrestricted shell commands or arbitrary URLs as if removing Python builtins made a sandbox. A real execution environment needs isolation, bounded resources, credential/egress controls and a defined output contract. This lab intentionally uses a fixed arithmetic handler.
 
-**When `is_error: True` is set**, Claude will typically:
-1. Acknowledge the error
-2. Try a different approach (different parameters, different tool)
-3. Ask the user for clarification if stuck
+## 7. Check yourself
 
----
+- Two tools were requested, but only one result was returned. **The protocol is incomplete; preserve both identifiers and results.**
+- The model requests an unknown tool. **Return a bounded error; do not dynamically import or execute the name.**
+- A tool's JSON contains duplicate `a` keys. **Reject ambiguity before execution.**
+- A model keeps requesting tools forever. **The turn/call limit stops the run and records incomplete status.**
+- A trace shows syntactically correct tool calls. **That proves neither authorization nor task success; inspect effects and the final task-specific criterion.**
 
-## 6. Tool Safety Patterns
-
-Some tools are **dangerous** (delete files, send emails, execute shell commands). Add **confirmation gates**.
-
-```python
-DANGEROUS_TOOLS = {"delete_file", "send_email", "execute_shell", "git_push"}
-
-def run_agent_with_confirmation(user_message: str) -> str:
-    messages = [{"role": "user", "content": user_message}]
-
-    while True:
-        response = client.messages.create(
-            model="your-agent-model-id",
-            max_tokens=2048,
-            tools=all_tools,
-            messages=messages
-        )
-
-        messages.append({"role": "assistant", "content": response.content})
-
-        if response.stop_reason == "end_turn":
-            return next(b.text for b in response.content if hasattr(b, "text"))
-
-        elif response.stop_reason == "tool_use":
-            tool_results = []
-
-            for block in response.content:
-                if block.type != "tool_use":
-                    continue
-
-                # Human-in-the-loop for dangerous operations
-                if block.name in DANGEROUS_TOOLS:
-                    print(f"\n⚠️  Agent wants to call: {block.name}")
-                    print(f"   Input: {json.dumps(block.input, indent=2)}")
-                    confirm = input("   Allow? (y/n): ").strip().lower()
-
-                    if confirm != "y":
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": "User denied this action.",
-                            "is_error": True
-                        })
-                        continue
-
-                result = safe_tool_call(block.name, block.input, block.id)
-                tool_results.append(result)
-
-            messages.append({"role": "user", "content": tool_results})
-```
-
----
-
-## 7. Tool Use with `tool_choice`
-
-Force or restrict which tools the model uses:
-
-```python
-# Force the model to use a specific tool
-response = client.messages.create(
-    model="your-agent-model-id",
-    max_tokens=512,
-    tools=tools,
-    tool_choice={"type": "tool", "name": "get_gpu_specs"},  # must call this
-    messages=[{"role": "user", "content": "Tell me about the H100."}]
-)
-
-# Allow any tool (default)
-tool_choice={"type": "auto"}
-
-# Prevent any tool use
-tool_choice={"type": "none"}
-```
-
----
-
-## Key Takeaways
-
-1. The tool loop: call API → check `stop_reason` → execute tools → append results → repeat
-2. Send **all** tool results in one message — never split them
-3. Use `is_error: True` for failures; the model will try to recover
-4. Parallel tool calls are automatic — your code must handle multiple blocks per response
-5. Gate dangerous operations with human-in-the-loop confirmation
-6. `tool_choice` forces or prevents tool use — useful for structured extraction workflows
-
----
-
-## Exercises
-
-1. Build a weather + calculator dual-tool agent. Test it with a query that requires both tools in one response.
-2. Add retry logic to `safe_tool_call` — retry up to 3 times with exponential backoff on network errors.
-3. Implement a `max_tool_calls` safety limit that stops the agent after N tool calls to prevent infinite loops.
-
----
-
-**Previous:** [Lecture 07](Lecture-07.md) | **Next:** [Lecture 09](Lecture-09.md)
+Next: [interface selection and the scoped Reflex benchmark](Lecture-09.md).

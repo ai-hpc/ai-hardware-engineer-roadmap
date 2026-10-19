@@ -12,7 +12,9 @@ Distinguish task termination from a time-limit truncation. The learning wrapper'
 
 For N environments, reset a strict subset such as {1, 3}. Check that only those environments' state, episode counters, command histories, recurrent state, and delayed-action buffers change. Setting every environment's last action to zero is a subtle cross-environment leak.
 
-At reset boundaries, identify whether returned observations belong to the final state or the next episode. Do not pair a final reward with an initial observation and silently treat it as one uninterrupted trajectory.
+At reset boundaries, identify whether returned observations belong to the final state or the next episode. Do not pair a final reward with an initial observation and silently treat it as one uninterrupted trajectory. In the reviewed EA `DirectRLEnv`, `compute_final_obs=True` captures `extras["final_obs"]` before resetting completed rows. Consume it only under the current done mask: a retained extras entry is not a fresh terminal state for every row. Confirm how the chosen RL wrapper uses truncation and final observations.
+
+The corrected [reach task](Lecture-10.md#43-the-environment-method-by-method) exposes previous action because its action-change reward depends on it, clamps targets to joint limits, clears only reset rows and requests a kinematics refresh. Its [actual CPU tensor check](labs/reach_tensor_cpu.py) tests those methods with a fake scene; the first real post-reset body/sensor pose remains a required simulator check.
 
 ## Work a reward example
 

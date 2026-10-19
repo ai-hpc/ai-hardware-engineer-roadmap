@@ -11,6 +11,8 @@
 
 <div class="home-rail" markdown="1">
 
+**New to robotics or AI? [Start with a small robot experiment on your laptop](Start-Here.md).** Follow ten guided sessions through motion, control, AI training, evaluation, perception, and planning before choosing a specialization.
+
 ## Explore the curriculum
 
 Six phases toward one goal: a complete physical-AI chip and its software stack.
@@ -66,6 +68,8 @@ You can enter through software, robotics, or hardware. Choose one working artifa
 ## Learn by building and testing
 
 Follow the [**Physical AI Design Studio**](Physical-AI-Design-Studio.md) to connect the courses through one project: task contract → VLA reference → robot simulation → measured inference → compiler → accelerator → Linux → wireless → system evidence. Each gate names the courses to study, the artifact to build, and the check needed before proceeding. Includes original diagrams with downloadable PNGs.
+
+The [October 18–19 curriculum review](Curriculum-Review.md) links the revised lessons and their execution evidence. For a connected AI/robotics experiment, [train a small CPU policy](Phase%203%20-%20Artificial%20Intelligence/0.%20AI%20and%20Robot%20Learning%20Foundations/Lab-01-CPU-Policy.md), then run it in a [timed robot loop](Phase%203%20-%20Artificial%20Intelligence/0.%20AI%20and%20Robot%20Learning%20Foundations/Lab-02-Timed-Robot-Loop.md).
 
 Start with [How to learn this roadmap](Learning-Guide.md): entry diagnostics, a repeatable lesson cycle, hardware access options, and a shared completion rubric. Each course's practice section asks you to predict a result, build a baseline, test a variation, and explain the evidence.
 
@@ -281,7 +285,7 @@ Each artifact is a brick in the chip you're going to design.
 Before you start, decide three things:
 
 1. **Where you're entering the stack.** (See "Who This Is For" above.)
-2. **What hardware you can actually use.** Jetson Orin Nano is the cheapest end-to-end inference target; an RTX or rented L40S/H100 covers most of the datacenter path; a Xilinx Zynq dev board covers FPGA; an ESP32 + sensor breakout covers embedded.
+2. **What hardware you can actually use.** Start with the CPU exercises. For device work, choose hardware supported by the specific lab: a Jetson board for edge deployment, a compatible GPU for profiling or simulation, a Zynq development board for FPGA integration, or an ESP32 plus sensor for embedded interfaces. Check the lab's memory, software and equipment requirements before buying or renting anything.
 3. **How you'll track outputs.** A notebook, a benchmarks repo, a project log — any system you actually use.
 
 ---
@@ -323,7 +327,7 @@ These projects exist for you to study, not just read about:
 
 | Project | Why it's here |
 |---------|---------------|
-| [**jetson-llm-runtime**](Projects/jetson-llm-runtime/README.md) &nbsp;·&nbsp; [`GeniePod/genie-ai-runtime` v1.0.0](https://github.com/GeniePod/genie-ai-runtime) | Custom Jetson LLM inference runtime — every GEMV/GEMM kernel, KV cache, paged-attention path, build flow. The scaffold in this folder graduated into the production runtime at `GeniePod/genie-ai-runtime`: 38 tok/s prefill, +115 % vs `llama-bench` on Orin Nano Super 8 GB, tensor-core MMQ, persistent KV, INT8 KV default, OpenAI-shape HTTP server. The inference pillar in code. |
+| [**jetson-llm-runtime**](Projects/jetson-llm-runtime/README.md) | Experimental teaching runtime with executed CPU exercises for sampling, bounded GGUF parsing, model configuration and a deliberately small tokenizer. CUDA kernels and the engine remain source-audit exercises; this checkout has no validated pretrained-model generation or Jetson performance result. The linked upstream implementation is separate and does not validate this code. |
 | [**llm-inference-viz**](https://github.com/ai-hpc/llm-inference-viz) | Interactive 3D visualization of dense decoder-only LLM inference — walk the forward pass, watch each stage land memory- vs compute-bound on an H200 roofline, and shard the model across GPUs with tensor parallelism. The inference mental model, made visible; companion to the AI Inference Engineer 2026 course. |
 | [**jetson-esp-hosted**](https://github.com/ai-hpc/jetson-esp-hosted) | Jetson-validated ESP-Hosted fork for SPI/Wi-Fi/BLE bring-up. The embedded pillar in code. |
 | [**tinygrad**](https://github.com/tinygrad/tinygrad) | ~10 K-line ML framework. The cleanest place to read framework → compiler → kernel → backend in one repo. |
@@ -333,7 +337,7 @@ These projects exist for you to study, not just read about:
 
 ## Target Roles This Enables
 
-The roadmap is full-stack on purpose, but it produces several well-paid specialist roles along the way:
+The roadmap develops skills used in several specialist roles. Use the projects to demonstrate the responsibilities relevant to your target role:
 
 | Role | Key Phases |
 |------|-----------|
@@ -349,7 +353,7 @@ The roadmap is full-stack on purpose, but it produces several well-paid speciali
 | **AI Accelerator Architect** | 1 + 4A + 5F |
 | **Physical AI SoC Architect** | Full path — VLA workload, custom accelerator/compiler, embedded Linux, integrated wireless, and robot/drone interfaces |
 
-→ See [**Roles & Market Analysis**](Roles%20and%20Market%20Analysis.md) for salary data, 23 sub-roles, remote percentages, and hiring signals.
+→ See [**Roles & Market Analysis**](Roles%20and%20Market%20Analysis.md) for role responsibilities, prerequisite paths, portfolio evidence, and ways to check current openings.
 
 ---
 

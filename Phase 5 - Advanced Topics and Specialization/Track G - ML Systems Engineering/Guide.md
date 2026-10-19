@@ -1,5 +1,16 @@
 # Phase 5 — Track G: ML Systems Engineering
 
+## First useful results on a CPU
+
+If this is your first systems course, take these three small steps before the large-model case studies:
+
+1. Complete the [quality-metrics lab](Logprobs,%20Perplexity%20and%20KL%20Divergence/Lab-01-Masked-Quality-Metrics.md): count scored tokens correctly and distinguish data NLL from teacher KL (45–70 minutes).
+2. Compare the [pinned original/1017 release metadata](AI%20Inference%20Engineer%202026/Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/Release-Update-2026-10-18.md): equal tensor shapes can hide completely changed weights (35–50 minutes).
+3. Run the [CPU compiler lab](../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/00%20-%20CPU%20Compiler%20Lab/Guide.md), then enter TVM or the inference-runtime lessons with a reference and correctness gate already in hand.
+
+Save each result and explain one deliberate failure. These are analysis/numerical milestones; multi-GPU deployment and measured serving performance require their own hardware experiments.
+
+
 <div class="course-identity mlsys" markdown="1">
 <div class="course-identity__icon">SYS</div>
 <div markdown="1">

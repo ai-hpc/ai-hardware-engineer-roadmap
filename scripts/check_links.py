@@ -8,6 +8,7 @@ under ROOT and resolves each relative link target against the filesystem.
 Anchors and external schemes are ignored. Exits non-zero if anything is broken,
 so it can be used as a CI gate.
 """
+import argparse
 import os
 import re
 import subprocess
@@ -83,8 +84,14 @@ def broken_links(root):
     return broken
 
 
-def main():
-    root = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else ".")
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("root", nargs="?", default=".",
+                        help="existing directory to inspect (default: current directory)")
+    args = parser.parse_args(argv)
+    root = os.path.abspath(args.root)
+    if not os.path.isdir(root):
+        parser.error(f"root must be an existing directory: {root}")
     broken = broken_links(root)
     for entry in sorted(broken):
         print(entry)

@@ -1,93 +1,58 @@
-"""
-Phase 1 camera calibration for Free-Viewpoint RGB-D Video Dataset (camera01).
-Loads intrinsics and extrinsics from Camera Parameters/paras.txt.
-"""
+"""Read the dataset's explicit camera-centre convention, failing on bad data."""
 from pathlib import Path
 import numpy as np
 
 
-def load_paras_txt(paras_path: Path) -> list[dict]:
-    """
-    Parse paras.txt (5 lines per camera).
-    Returns list of dicts: resolution (w, h), K_matrix (fx, fy, cx, cy),
-    R_matrix (3x3), world_position (3,).
-    """
-    path = Path(paras_path)
-    text = path.read_text()
-    cameras = []
-    lines = text.strip().splitlines()
-    i = 0
-    while i < len(lines):
-        if not lines[i].strip().startswith("camera_id"):
-            i += 1
-            continue
-        # camera_id N
-        cam_id = int(lines[i].split()[1])
-        i += 1
-        if i >= len(lines):
-            break
-        # resolution W H
-        res = lines[i].split()
-        w, h = int(res[1]), int(res[2])
-        i += 1
-        if i >= len(lines):
-            break
-        # K_matrix fx fy cx cy
-        k_vals = [float(x) for x in lines[i].split()[1:5]]
-        fx, fy, cx, cy = k_vals
-        i += 1
-        if i >= len(lines):
-            break
-        # R_matrix 9 values row-major
-        r_vals = [float(x) for x in lines[i].split()[1:10]]
-        R = np.array(r_vals, dtype=np.float64).reshape(3, 3)
-        i += 1
-        if i >= len(lines):
-            break
-        # world_position tx ty tz
-        t_vals = [float(x) for x in lines[i].split()[1:4]]
-        t = np.array(t_vals, dtype=np.float64)
-        i += 1
-
-        K = np.array([
-            [fx, 0, cx],
-            [0, fy, cy],
-            [0, 0, 1],
-        ], dtype=np.float64)
-        cameras.append({
-            "camera_id": cam_id,
-            "width": w,
-            "height": h,
-            "K": K,
-            "R": R,
-            "t": t,
-        })
+def load_paras_txt(paras_path):
+    lines = [s.split() for s in Path(paras_path).read_text().splitlines() if s.strip()]
+    if not lines or len(lines) % 5:
+        raise ValueError("expected complete five-line camera records")
+    labels = (("camera_id", 2), ("resolution", 3), ("K_matrix", 5), ("R_matrix", 10), ("world_position", 4))
+    cameras, ids = [], set()
+    for start in range(0, len(lines), 5):
+        block = lines[start:start+5]
+        if any(row[0] != key or len(row) != size for row, (key, size) in zip(block, labels)):
+            raise ValueError("invalid calibration record fields")
+        cid = int(block[0][1]); w, h = map(int, block[1][1:])
+        fx, fy, cx, cy = map(float, block[2][1:])
+        R = np.asarray(block[3][1:], dtype=float).reshape(3, 3)
+        centre = np.asarray(block[4][1:], dtype=float)
+        if cid in ids or w <= 0 or h <= 0 or fx <= 0 or fy <= 0:
+            raise ValueError("duplicate camera or invalid dimensions/focal length")
+        if not np.isfinite([fx, fy, cx, cy]).all() or not np.isfinite(R).all() or not np.isfinite(centre).all():
+            raise ValueError("nonfinite calibration")
+        if not np.allclose(R.T @ R, np.eye(3), atol=1e-5) or not np.isclose(np.linalg.det(R), 1, atol=1e-5):
+            raise ValueError("R must be a proper rotation")
+        ids.add(cid)
+        cameras.append({"camera_id": cid, "width": w, "height": h,
+                        "K": np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1.]]), "R": R, "t": centre})
     return cameras
 
 
-def get_camera(cameras: list[dict], camera_index: int = 0) -> dict:
-    """Get camera dict for given index (0 = camera01)."""
-    if camera_index < 0 or camera_index >= len(cameras):
-        raise IndexError(f"camera_index must be 0..{len(cameras) - 1}")
+def get_camera(cameras, camera_index=0):
+    if not 0 <= camera_index < len(cameras):
+        raise IndexError("camera index outside calibration records")
     return cameras[camera_index]
 
 
-def get_intrinsics(camera: dict) -> tuple[np.ndarray, int, int]:
-    """Return (K 3x3, width, height)."""
+def get_intrinsics(camera):
     return camera["K"], camera["width"], camera["height"]
 
 
-def project_world_to_image(K: np.ndarray, R: np.ndarray, t: np.ndarray, point_3d: np.ndarray) -> np.ndarray:
+def project_world_to_image(K, R, t, point_3d):
+    """Xc=R@(Xw-C); t is camera centre C, not OpenCV translation -R@C.
+
+    Inputs are distortion-free. Reject points at/behind the camera instead
+    of hiding the invalid projection with an epsilon denominator.
     """
-    Project world point Xw to image: Xp = K @ (R @ (Xw - t)).
-    point_3d: (3,) or (N, 3). Returns (2,) or (N, 2) pixel coords.
-    """
-    p = np.asarray(point_3d, dtype=np.float64)
-    if p.ndim == 1:
-        p = p.reshape(1, 3)
-    # Xc = R @ (Xw - t)
-    Xc = (R @ (p - t).T).T  # (N, 3)
-    # Xp = K @ Xc
-    Xp = (K @ Xc.T).T  # (N, 3)
-    uv = Xp[:, :2] / (Xp[:, 2:3] + 1e-10)
-    return uv if uv.shape[0] > 1 else uv.ravel()
+    p = np.asarray(point_3d, dtype=float)
+    single = p.ndim == 1
+    p = np.atleast_2d(p)
+    if p.ndim != 2 or p.shape[1] != 3 or not np.isfinite(p).all():
+        raise ValueError("expected finite [3] or [N,3] points")
+    Xc = (np.asarray(R) @ (p - np.asarray(t)).T).T
+    if np.any(Xc[:, 2] <= 0):
+        raise ValueError("point at/behind camera plane")
+    Xp = (np.asarray(K) @ Xc.T).T
+    uv = Xp[:, :2] / Xp[:, 2:3]
+    return uv[0] if single else uv

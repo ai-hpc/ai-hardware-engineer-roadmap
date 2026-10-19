@@ -94,7 +94,7 @@ With tracking:
 Detectors are noisy — the bounding box for a car jitters frame-to-frame even if the car moves smoothly. The Kalman filter:
 - **Predicts** where an object should be (based on physics model)
 - **Corrects** the prediction with noisy measurements
-- Maintains a **smooth, optimal estimate** of true position and velocity
+- Maintains an estimate and covariance under its declared motion/measurement assumptions; detector bias, occlusion, and wrong associations can violate them
 
 ### State Vector
 
@@ -205,34 +205,19 @@ Step 5: Otherwise: find minimum uncovered element,
         subtract from uncovered, add to double-covered, repeat from 3
 ```
 
-In practice, use `scipy.optimize.linear_sum_assignment` — it implements this efficiently.
+In practice, `scipy.optimize.linear_sum_assignment` solves the assignment problem using a modified Jonker–Volgenant algorithm, rather than the textbook Hungarian steps above. The optimum is for your supplied cost/constraints; it does not establish physical identity. [SciPy documentation](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.linear_sum_assignment.html).
 
-### Example: Why Greedy Fails
+### Example: why a local choice can fail
 
+```text
+       D1   D2
+T1      1    2
+T2      2  100
 ```
-Cost matrix:                  Greedy:          Hungarian:
-      D1   D2                 T1→D1 (1)  ✓    T1→D2 (4)
-T1  [  1    4  ]              T2→D2 (2)  ✓    T2→D1 (3)
-T2  [  3    2  ]              Total: 3         Total: 7  ← WAIT
 
-Hmm, greedy wins here. But:
+Choosing the lowest-cost pair first gives T1→D1 and then T2→D2, total 101. Joint assignment chooses T1→D2 and T2→D1, total 4. Always add the actual matrix entries; the solver cannot return a higher total than a feasible greedy assignment when both solve the same unrestricted objective.
 
-      D1   D2
-T1  [  1   10  ]              Greedy: T1→D1(1) → T2→D2(10)  Total: 11
-T2  [  2    3  ]              Hungarian: T1→D2(10)? No...
-                               T1→D1(1), T2→D2(3)  Total: 4  ← Hungarian wins!
-
-Real failure case (3×3):
-      D1   D2   D3
-T1  [  1    2    3 ]
-T2  [  4    5    6 ]          Greedy: T1→D1(1), T2→D2(5), T3→D3(9)  = 15
-T3  [  7    8    9 ]          Hungarian: same result here
-
-      D1   D2   D3
-T1  [  4    1    3 ]
-T2  [  2    0    5 ]          Greedy: T2→D2(0), T1→D1(4), T3→D3(9)  = 13
-T3  [  3    2    2 ]          Hungarian: T1→D2(1), T2→D1(2), T3→D3(2) = 5 ✓
-```
+**Gating counterexample:** costs `[[0.1,0.2],[0.2,0.21]]`, maximum allowed cost 0.2. Unrestricted assignment chooses the diagonal (0.31), then post-filtering removes the second match. Gating first allows both off-diagonal matches (0.4). The helper below supports explicit unmatched choices and forbids invalid pairs before optimization.
 
 ---
 
@@ -477,14 +462,15 @@ class KalmanFilter:
         S = self.H @ self.P @ self.H.T + self.R
 
         # Kalman gain: K = P * H^T * S^{-1}
-        K = self.P @ self.H.T @ np.linalg.inv(S)
+        K = np.linalg.solve(S, self.H @ self.P).T
 
         # State update: x = x + K * y
         self.x = self.x + K @ y
 
         # Covariance update: P = (I - K * H) * P
         I = np.eye(self.dim_x)
-        self.P = (I - K @ self.H) @ self.P
+        A = I - K @ self.H
+        self.P = A @ self.P @ A.T + K @ self.R @ K.T
 ```
 
 ### track.py
@@ -512,7 +498,7 @@ class Track:
     """
     _next_id = 1
 
-    def __init__(self, detection, min_hits=3):
+    def __init__(self, detection, min_hits=3, class_id=-1):
         """
         detection: [cx, cy, s, r]  (center_x, center_y, area, aspect_ratio)
         """
@@ -522,7 +508,8 @@ class Track:
         self.track_id   = Track._next_id
         Track._next_id += 1
 
-        self.state      = TrackState.TENTATIVE
+        self.state      = TrackState.CONFIRMED if min_hits <= 1 else TrackState.TENTATIVE
+        self.class_id   = int(class_id)
         self.hits       = 1          # total detection count
         self.hit_streak = 1          # consecutive hits
         self.age        = 1          # total frames alive
@@ -572,6 +559,7 @@ class Track:
         """Convert state [cx, cy, s, r] → [x1, y1, x2, y2]."""
         cx, cy, s, r = self.get_state()
         s = max(s, 1e-6)
+        r = max(r, 1e-6)
         w = np.sqrt(s * r)
         h = s / w
         return np.array([cx - w/2, cy - h/2, cx + w/2, cy + h/2])
@@ -585,6 +573,26 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 from track import Track, TrackState
 
+def gated_assignment(cost, valid):
+    """Maximum-cardinality valid matching, then minimum cost; unmatched is explicit."""
+    cost, valid = np.asarray(cost, dtype=float), np.asarray(valid, dtype=bool)
+    if cost.shape != valid.shape or cost.ndim != 2 or np.any(cost[valid] < 0):
+        raise ValueError("Need matching matrices and nonnegative valid costs")
+    if not np.all(np.isfinite(cost[valid])):
+        raise ValueError("Valid costs must be finite")
+    n, m = cost.shape
+    if n == 0 or m == 0:
+        return [], list(range(n)), list(range(m))
+    penalty = (n + m + 1) * max(1., float(cost[valid].max()) if valid.any() else 1.)
+    augmented = np.full((n + m, n + m), np.inf)
+    augmented[:n, :m] = np.where(valid, cost, np.inf)
+    augmented[np.arange(n), m + np.arange(n)] = penalty
+    augmented[n + np.arange(m), np.arange(m)] = penalty
+    augmented[n:, m:] = 0.
+    rows, cols = linear_sum_assignment(augmented)
+    matches = [(int(r), int(c)) for r, c in zip(rows, cols) if r < n and c < m]
+    return matches, [r for r in range(n) if all(r != a for a, _ in matches)], [c for c in range(m) if all(c != b for _, b in matches)]
+
 def box_to_obs(box_xyxy):
     """Convert [x1,y1,x2,y2] → [cx, cy, s, r] for Kalman filter."""
     x1, y1, x2, y2 = box_xyxy
@@ -592,6 +600,8 @@ def box_to_obs(box_xyxy):
     cy = (y1 + y2) / 2.0
     w  = x2 - x1
     h  = y2 - y1
+    if w <= 0 or h <= 0 or not np.all(np.isfinite(box_xyxy)):
+        raise ValueError("Expected finite positive-area xyxy box")
     s  = w * h          # area
     r  = w / float(h)   # aspect ratio
     return np.array([cx, cy, s, r])
@@ -658,6 +668,7 @@ class Tracker:
             # Convert back to xyxy for IoU cost
             cx, cy, s, r = pred
             s = max(s, 1.0)
+            r = max(r, 1e-6)
             w = np.sqrt(s * r)
             h = s / w
             predicted_boxes.append([cx-w/2, cy-h/2, cx+w/2, cy+h/2])
@@ -667,20 +678,13 @@ class Tracker:
             det_boxes = detections[:, :4]   # [M, 4]
             cost = iou_cost_matrix(predicted_boxes, det_boxes)
 
-            # ── Step 3: Hungarian assignment ───────────────────────────
-            row_ind, col_ind = linear_sum_assignment(cost)
-
-            # ── Step 4: Filter out low-IoU assignments ─────────────────
-            matched_tracks, matched_dets = [], []
-            unmatched_tracks = list(range(len(self.tracks)))
-            unmatched_dets   = list(range(len(detections)))
-
-            for r, c in zip(row_ind, col_ind):
-                if cost[r, c] < (1.0 - self.iou_threshold):
-                    matched_tracks.append(r)
-                    matched_dets.append(c)
-                    if r in unmatched_tracks: unmatched_tracks.remove(r)
-                    if c in unmatched_dets:   unmatched_dets.remove(c)
+            # Gate geometry and class before assignment; dummy nodes allow unmatched items.
+            valid = cost <= (1.0 - self.iou_threshold)
+            classes = np.array([t.class_id for t in self.tracks])
+            valid &= classes[:, None] == detections[None, :, 5].astype(int)
+            matches, unmatched_tracks, unmatched_dets = gated_assignment(cost, valid)
+            matched_tracks = [r for r, _ in matches]
+            matched_dets = [c for _, c in matches]
         else:
             matched_tracks, matched_dets = [], []
             unmatched_tracks = list(range(len(self.tracks)))
@@ -698,7 +702,7 @@ class Tracker:
         # ── Step 7: Create new tracks for unmatched detections ─────────
         for d_idx in unmatched_dets:
             obs = box_to_obs(detections[d_idx, :4])
-            new_track = Track(obs, min_hits=self.min_hits)
+            new_track = Track(obs, min_hits=self.min_hits, class_id=detections[d_idx, 5])
             self.tracks.append(new_track)
 
         # ── Step 8: Delete dead tracks ─────────────────────────────────
@@ -706,19 +710,12 @@ class Tracker:
                        if not t.is_deleted
                        and t.time_since_update <= self.max_age]
 
-        # ── Step 9: Collect confirmed track outputs ────────────────────
+        # Return only currently observed confirmed tracks; predicted-only tracks remain internal.
         outputs = []
         for track in self.tracks:
-            if track.is_confirmed:
+            if track.is_confirmed and track.time_since_update == 0:
                 box = track.get_box_xyxy()
-                outputs.append([
-                    box[0], box[1], box[2], box[3],
-                    track.track_id,
-                    detections[matched_dets[matched_tracks.index(
-                        self.tracks.index(track))], 5]
-                    if self.tracks.index(track) in matched_tracks else -1
-                ])
-
+                outputs.append([*box, track.track_id, track.class_id])
         return outputs
 ```
 
@@ -987,7 +984,7 @@ class KalmanFilter3D:
         z = np.array(detection).reshape(self.dim_z, 1)
         y = z - self.H @ self.x
         S = self.H @ self.P @ self.H.T + self.R
-        K = self.P @ self.H.T @ np.linalg.inv(S)
+        K = np.linalg.solve(S, self.H @ self.P).T
         self.x = self.x + K @ y
         self.P = (np.eye(self.dim_x) - K @ self.H) @ self.P
 ```
@@ -1018,6 +1015,7 @@ MAX_3D_DIST = 5.0   # meters — objects must be within 5m of prediction
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 from kalman_filter_3d import KalmanFilter3D
+from tracker import gated_assignment
 
 class Track3D:
     _next_id = 1
@@ -1033,7 +1031,7 @@ class Track3D:
         self.hit_streak = 1
         self.time_since_update = 0
         self.min_hits = min_hits
-        self.confirmed = False
+        self.confirmed = min_hits <= 1
         self.trace = [detection[:3].copy()]   # xyz history
 
     def predict(self):
@@ -1075,19 +1073,11 @@ class Tracker3D:
             det_states  = [d['box'] for d in detections]
             cost = bev_distance_cost(pred_states, det_states)
 
-            # Hungarian assignment
-            row_ind, col_ind = linear_sum_assignment(cost)
-
-            matched_t, matched_d = [], []
-            unmatched_t = list(range(len(self.tracks)))
-            unmatched_d = list(range(len(detections)))
-
-            for r, c in zip(row_ind, col_ind):
-                if cost[r, c] < self.max_dist:
-                    matched_t.append(r)
-                    matched_d.append(c)
-                    unmatched_t.remove(r)
-                    unmatched_d.remove(c)
+            valid = cost <= self.max_dist
+            valid &= np.array([t.class_id for t in self.tracks])[:, None] == np.array([d['class'] for d in detections])[None, :]
+            matches, unmatched_t, unmatched_d = gated_assignment(cost, valid)
+            matched_t = [r for r, _ in matches]
+            matched_d = [c for _, c in matches]
         else:
             matched_t, matched_d = [], []
             unmatched_t = list(range(len(self.tracks)))
@@ -1115,7 +1105,7 @@ class Tracker3D:
         # Return confirmed tracks
         results = []
         for t in self.tracks:
-            if t.confirmed:
+            if t.confirmed and t.time_since_update == 0:
                 state = t.get_state()
                 results.append({
                     'id':      t.track_id,
@@ -1298,7 +1288,7 @@ MOTA = 1 - (FP + FN + IDSW) / GT
 FP   : False Positives — tracker outputs a box where no object is
 FN   : False Negatives — tracker misses a real object
 IDSW : ID Switches     — tracker assigns wrong ID to a correctly detected object
-GT   : total ground-truth object count
+GT   : total annotated object instances across evaluated frames (not unique identities)
 
 Range: (-∞, 1.0]  — can be negative with many errors
 Higher = better
@@ -1309,9 +1299,8 @@ Higher = better
 ```
 IDF1 = 2 * IDTP / (2 * IDTP + IDFP + IDFN)
 
-IDTP : ID True Positives  — correct detections with correct ID
-IDFP : ID False Positives — detections with wrong ID
-IDFN : ID False Negatives — missed detections
+IDTP/IDFP/IDFN come from the evaluator's global trajectory identity matching,
+not merely per-frame equality of arbitrary numeric ID labels.
 
 Measures: how consistently the correct ID is maintained
 Range: [0, 1]
@@ -1320,12 +1309,13 @@ Range: [0, 1]
 ### HOTA (Higher Order Tracking Accuracy) — Preferred Modern Metric
 
 ```
-HOTA = √(DetA × AssA)
+At each localization threshold α: HOTA_α = √(DetA_α × AssA_α)
+Reported HOTA averages HOTA_α over the evaluator's threshold set.
 
 DetA : Detection Accuracy    — how well objects are detected
 AssA : Association Accuracy  — how consistently IDs are maintained
 
-HOTA balances detection and association quality equally.
+The threshold-specific geometric mean combines detection and association quality. Averaging DetA and AssA first and taking one square root is generally different from the specified HOTA aggregation.
 Range: [0, 1]
 ```
 
@@ -1350,11 +1340,11 @@ evaluator.evaluate([dataset], metrics)
 
 ## 12. Advanced Trackers Overview
 
-The Kalman + Hungarian tracker is the **baseline** (SORT tracker). Modern approaches improve on it:
+This is a SORT-inspired teaching baseline, not an exact reproduction of the published implementation. More advanced trackers change motion, association, and appearance modeling; compare them on an unchanged detector and split.
 
 ### SORT (Simple Online and Realtime Tracking)
 
-This guide's implementation. Fast, simple, good for offline use.
+A compact online tracking-by-detection approach; this guide illustrates its structure.
 - **Pro:** fast, understandable, easy to tune
 - **Con:** many ID switches during occlusion, no appearance features
 
@@ -1380,18 +1370,21 @@ Stage 1: associate confirmed tracks with HIGH conf detections (IoU)
 Stage 2: associate remaining tracks with LOW conf detections
          (catches occluded objects that detector is uncertain about)
 
-Pro: best MOTA on MOT17, very fast (no appearance model)
+Pro: uses low-score detections to recover missed associations without a separate appearance encoder
 Con: slightly more FP from low-confidence detections
 ```
 
 ### OC-SORT (Observation-Centric SORT)
 
-Fixes SORT's drift during occlusion by re-initializing velocity from observations rather than propagating stale KF state. Drop-in improvement over SORT.
+Fixes SORT's drift during occlusion by re-initializing velocity from observations rather than propagating stale KF state. Evaluate the benefit for your detector, motion, and occlusion patterns.
 
-### Tracker Comparison on MOT17
+### Compare trackers without inventing a common benchmark
 
-| Tracker     | HOTA  | MOTA  | IDF1  | FPS    |
-|-------------|-------|-------|-------|--------|
+The former mixed table combined metrics and FPS without a reproducible shared detector, split, or device. Run each candidate with identical detections, timestamps, score thresholds, frame rate, and evaluation settings. Record detector time separately from association time; report HOTA, MOTA, IDF1, identity switches, and missed tracks using the same TrackEval revision. No tracker is established here as the best choice for every Orin Nano workload.
+
+**Worked metric:** with 100 ground-truth frame instances, 10 misses, 5 false positives, and 2 identity switches, MOTA is `1−17/100=0.83`. A small number of unique objects does not replace the denominator of 100.
+
+-------------|-------|-------|-------|--------|
 | SORT        | 55.1  | 74.6  | 61.4  | 143    |
 | DeepSORT    | 61.2  | 75.4  | 71.8  | 40     |
 | ByteTrack   | 63.1  | 80.3  | 77.3  | 30     |
@@ -1466,3 +1459,17 @@ Deploy YOLO TensorRT + Kalman-Hungarian tracker on Orin Nano 8GB. Measure:
 **Build and challenge:** Hold detector outputs fixed while changing assignment gating. Create a crossing/occlusion sequence; measure identity switches and track recovery rather than only detector mAP.
 
 **Pass forward:** Timestamped tracks with lifecycle rules and identity metrics. Continue with [the connected course](../Guide.md) and keep the artifact in the [Physical AI Design Studio](../../../../Physical-AI-Design-Studio.md).
+
+## Validation and deployment boundary (2026-10-18)
+
+The 2D tracking code was extracted from its Markdown files and exercised on CPU for birth/confirmation, gated assignment, class preservation after deletion, stale-track expiry, and invalid boxes. This validates those logic paths, not detector accuracy or ROS/GPU performance. The illustrated KF uses a fixed frame interval and heuristic image-space covariance. Before variable-rate robot use, derive `F(dt)`/`Q(dt)`, propagate actual timestamps, model camera/ego motion where needed, and expose predicted-only track age instead of pretending it is a new detection.
+
+Use the [camera/time lab](../Camera-Time-Fusion-Lab/Guide.md) to learn timestamp and uncertainty semantics. For metrics use [TrackEval's HOTA implementation](https://github.com/JonathonLuiten/TrackEval/blob/master/trackeval/metrics/hota.py) and the benchmark-specific ignored-region/class/matching protocol. Source checks are not completed hardware integration tests.
+
+The four reproducible guide-code tests are in `labs/optional/test_markdown_tracker.py`. Run from the repository root in an environment containing NumPy and SciPy:
+
+```bash
+python3 -m unittest discover -s "Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/multi-object-tracking/labs/optional" -v
+```
+
+Executed with Python 3.12.3, NumPy 1.26.4, SciPy 1.11.4. These tests extract the actual Markdown modules into a temporary directory, so they fail if the teaching snippets regress. They are separate from the standard-library course suites. A new platform/environment should record its own resolved package versions.

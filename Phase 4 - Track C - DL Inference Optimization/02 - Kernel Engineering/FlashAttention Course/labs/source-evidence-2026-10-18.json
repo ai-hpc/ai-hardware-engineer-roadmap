@@ -1,0 +1,263 @@
+{
+  "checked_utc": "2026-10-18T22:37:48.777833+00:00",
+  "repository_snapshot": {
+    "repository": "Dao-AILab/flash-attention",
+    "revision": "965c9212e6be33c821ee9f2b461564c5c91a2503",
+    "commit_utc": "2026-10-16T23:43:47Z",
+    "files": [
+      {
+        "path": "README.md",
+        "url": "https://raw.githubusercontent.com/Dao-AILab/flash-attention/965c9212e6be33c821ee9f2b461564c5c91a2503/README.md",
+        "sha256": "0dbaba56da1c8372d460956e2609bfb89acf8f3aadd65d132b1697d221069619",
+        "bytes": 25270
+      },
+      {
+        "path": "flash_attn/flash_attn_interface.py",
+        "url": "https://raw.githubusercontent.com/Dao-AILab/flash-attention/965c9212e6be33c821ee9f2b461564c5c91a2503/flash_attn/flash_attn_interface.py",
+        "sha256": "b34bea722e031533e917e527d317f55ba75095657a139c0cf0335520a7b39bb9",
+        "bytes": 62242
+      },
+      {
+        "path": "csrc/flash_attn/flash_api.cpp",
+        "url": "https://raw.githubusercontent.com/Dao-AILab/flash-attention/965c9212e6be33c821ee9f2b461564c5c91a2503/csrc/flash_attn/flash_api.cpp",
+        "sha256": "5326e3b3d6f42230479430d406359b92bdd7ab77c8d49884b46e288160b59bbc",
+        "bytes": 74437
+      },
+      {
+        "path": "csrc/flash_attn/src/flash_fwd_launch_template.h",
+        "url": "https://raw.githubusercontent.com/Dao-AILab/flash-attention/965c9212e6be33c821ee9f2b461564c5c91a2503/csrc/flash_attn/src/flash_fwd_launch_template.h",
+        "sha256": "ff0695a64800db7ba75056170ec68417bb4d03d915c1016df03eee0ef2fd703d",
+        "bytes": 21248
+      },
+      {
+        "path": "csrc/flash_attn/src/softmax.h",
+        "url": "https://raw.githubusercontent.com/Dao-AILab/flash-attention/965c9212e6be33c821ee9f2b461564c5c91a2503/csrc/flash_attn/src/softmax.h",
+        "sha256": "77e70b8d0dbe72f459ced29199a554a0d1e0559cad2370a2e5b5f1fa5faf73f1",
+        "bytes": 9464
+      },
+      {
+        "path": "hopper/README.md",
+        "url": "https://raw.githubusercontent.com/Dao-AILab/flash-attention/965c9212e6be33c821ee9f2b461564c5c91a2503/hopper/README.md",
+        "error": "HTTP Error 404: Not Found"
+      },
+      {
+        "path": "hopper/flash_attn_interface.py",
+        "url": "https://raw.githubusercontent.com/Dao-AILab/flash-attention/965c9212e6be33c821ee9f2b461564c5c91a2503/hopper/flash_attn_interface.py",
+        "sha256": "887eb85ea5380707a78cd15dc04169e654f4dee58f9bddab49a2ce71f1680e35",
+        "bytes": 41901
+      },
+      {
+        "path": "flash_attn/cute/README.md",
+        "url": "https://raw.githubusercontent.com/Dao-AILab/flash-attention/965c9212e6be33c821ee9f2b461564c5c91a2503/flash_attn/cute/README.md",
+        "sha256": "69e70ec669e9a5e1b843e5b8e5e8ec1366c67e70098b84ee0d79b612cb9bad1d",
+        "bytes": 688
+      },
+      {
+        "path": "flash_attn/cute/interface.py",
+        "url": "https://raw.githubusercontent.com/Dao-AILab/flash-attention/965c9212e6be33c821ee9f2b461564c5c91a2503/flash_attn/cute/interface.py",
+        "sha256": "7665cf3a133d115da79e55b489615ea549b96b3333dc6972d76138d124cd6e1d",
+        "bytes": 201480
+      },
+      {
+        "path": "benchmarks/benchmark_flash_attention.py",
+        "url": "https://raw.githubusercontent.com/Dao-AILab/flash-attention/965c9212e6be33c821ee9f2b461564c5c91a2503/benchmarks/benchmark_flash_attention.py",
+        "sha256": "1e463f0875b843ac3ad0f33178ffa894190f3829f3a8542fde811af86ebb7298",
+        "bytes": 8118
+      },
+      {
+        "path": "setup.py",
+        "url": "https://raw.githubusercontent.com/Dao-AILab/flash-attention/965c9212e6be33c821ee9f2b461564c5c91a2503/setup.py",
+        "sha256": "c71c6ff06167c9a2d6e0ac7c65f9d03c0335baff681b9d5c0e6f1bfad8a34642",
+        "bytes": 38998
+      }
+    ]
+  },
+  "package_metadata_only": {
+    "flash-attn": {
+      "url": "https://pypi.org/pypi/flash-attn/json",
+      "version": "2.8.3.post2",
+      "requires_python": ">=3.9",
+      "requires_dist": [
+        "torch",
+        "einops"
+      ],
+      "release_files": [
+        {
+          "filename": "flash_attn-2.8.3.post2.tar.gz",
+          "upload_time_iso_8601": "2026-10-14T01:37:12.132859Z",
+          "sha256": "d0f9f0b08a986cdeadbffcf5ec8b3a8f514366c68ad1853d3ab061bc83cc340b"
+        }
+      ]
+    },
+    "flash-attn-3": {
+      "url": "https://pypi.org/pypi/flash-attn-3/json",
+      "version": "0.0.0",
+      "requires_python": ">=3.8",
+      "requires_dist": [
+        "torch",
+        "einops",
+        "packaging",
+        "ninja"
+      ],
+      "release_files": [
+        {
+          "filename": "flash_attn_3-0.0.0-py3-none-any.whl",
+          "upload_time_iso_8601": "2026-01-09T10:34:35.664731Z",
+          "sha256": "4c129ba895be99f1408edba32808fee818978a933b4180a8aaf451c17609ffdd"
+        }
+      ]
+    },
+    "flash-attn-4": {
+      "url": "https://pypi.org/pypi/flash-attn-4/json",
+      "version": "4.0.0b35",
+      "requires_python": ">=3.10",
+      "requires_dist": [
+        "nvidia-cutlass-dsl>=4.6.2",
+        "torch",
+        "einops",
+        "typing_extensions",
+        "apache-tvm-ffi<0.2,>=0.1.11",
+        "torch-c-dlpack-ext",
+        "quack-kernels>=0.5.3",
+        "nvidia-cutlass-dsl[cu13]>=4.6.2; extra == \"cu13\"",
+        "pytest; extra == \"dev\"",
+        "pytest-xdist; extra == \"dev\"",
+        "ruff; extra == \"dev\""
+      ],
+      "release_files": [
+        {
+          "filename": "flash_attn_4-4.0.0b35-py3-none-any.whl",
+          "upload_time_iso_8601": "2026-10-14T08:21:12.586501Z",
+          "sha256": "6df9a60fab0ca55c3f9c35244e794411afeff565100955e40db6c73e72848f94"
+        },
+        {
+          "filename": "flash_attn_4-4.0.0b35.tar.gz",
+          "upload_time_iso_8601": "2026-10-14T08:21:14.391647Z",
+          "sha256": "45c48469c851c54052f0004c9679b19ea7d70423960788a5be570a75f189e0ab"
+        }
+      ]
+    }
+  },
+  "documentation_sources": [
+    {
+      "url": "https://arxiv.org/html/2205.14135v2",
+      "resolved_url": "https://arxiv.org/html/2205.14135v2",
+      "status": 200,
+      "bytes": 923037,
+      "sha256": "702e33952c037462551e0f8f7ae15292f024ec194e449d4f7f40c8b95a646a85"
+    },
+    {
+      "url": "https://arxiv.org/html/2205.14135v2#S3.SS2",
+      "resolved_url": "https://arxiv.org/html/2205.14135v2",
+      "status": 200,
+      "bytes": 923037,
+      "sha256": "702e33952c037462551e0f8f7ae15292f024ec194e449d4f7f40c8b95a646a85"
+    },
+    {
+      "url": "https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html",
+      "resolved_url": "https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html",
+      "status": 200,
+      "bytes": 433259,
+      "sha256": "2436305e8417a3350177f03f7591da94bd9c1e479d6fa193fdb552d1d76bd075"
+    },
+    {
+      "url": "https://docs.nvidia.com/cuda/hopper-tuning-guide/index.html",
+      "resolved_url": "https://docs.nvidia.com/cuda/hopper-tuning-guide/index.html",
+      "status": 200,
+      "bytes": 34695,
+      "sha256": "5201e5f17c41cd8f86bcc486a42e5f97b7f86dff2c196895f5db5de39d89120f"
+    },
+    {
+      "url": "https://docs.nvidia.com/cuda/parallel-thread-execution/",
+      "resolved_url": "https://docs.nvidia.com/cuda/parallel-thread-execution/",
+      "status": 200,
+      "bytes": 3928317,
+      "sha256": "f1e14ad07468e26bf3724e41be86f3a68ab7914bcf0fc9824a6ad31a1eb2ec26"
+    },
+    {
+      "url": "https://docs.pytorch.org/docs/stable/generated/torch.nn.attention.sdpa_kernel.html",
+      "resolved_url": "https://docs.pytorch.org/docs/stable/generated/torch.nn.attention.sdpa_kernel.html",
+      "status": 200,
+      "bytes": 1831,
+      "sha256": "dd06bf5473a1427d67eb86a4ed532c29cdd9a498d3079890070fb28d99d00221"
+    },
+    {
+      "url": "https://docs.pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention",
+      "resolved_url": "https://docs.pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention",
+      "status": 200,
+      "bytes": 1921,
+      "sha256": "b421a1f9032786635fd9938ebd8d540660ffa32408403c7753b0b9944444c9d0"
+    },
+    {
+      "url": "https://github.com/Dao-AILab/flash-attention/blob/965c9212e6be33c821ee9f2b461564c5c91a2503/README.md",
+      "resolved_url": "https://github.com/Dao-AILab/flash-attention/blob/965c9212e6be33c821ee9f2b461564c5c91a2503/README.md",
+      "status": 200,
+      "bytes": 459853,
+      "sha256": "a1fdb821b3ea12c4440045f3a4a98dcb413a509a3b11753f9a936cf4eea388dd"
+    },
+    {
+      "url": "https://github.com/Dao-AILab/flash-attention/blob/965c9212e6be33c821ee9f2b461564c5c91a2503/benchmarks/benchmark_flash_attention.py",
+      "resolved_url": "https://github.com/Dao-AILab/flash-attention/blob/965c9212e6be33c821ee9f2b461564c5c91a2503/benchmarks/benchmark_flash_attention.py",
+      "status": 200,
+      "bytes": 345722,
+      "sha256": "14bf5424a593e810294e6e7105b82de91c3c9e90ff8acf31d344eeb3485d4c83"
+    },
+    {
+      "url": "https://github.com/Dao-AILab/flash-attention/blob/965c9212e6be33c821ee9f2b461564c5c91a2503/csrc/flash_attn/flash_api.cpp",
+      "resolved_url": "https://github.com/Dao-AILab/flash-attention/blob/965c9212e6be33c821ee9f2b461564c5c91a2503/csrc/flash_attn/flash_api.cpp",
+      "status": 200,
+      "bytes": 822043,
+      "sha256": "6859b374129e0ba0f55df61403ca130e645ca1fb4009af45b9a9dde4c806860a"
+    },
+    {
+      "url": "https://github.com/Dao-AILab/flash-attention/blob/965c9212e6be33c821ee9f2b461564c5c91a2503/csrc/flash_attn/src/flash_fwd_launch_template.h",
+      "resolved_url": "https://github.com/Dao-AILab/flash-attention/blob/965c9212e6be33c821ee9f2b461564c5c91a2503/csrc/flash_attn/src/flash_fwd_launch_template.h",
+      "status": 200,
+      "bytes": 439663,
+      "sha256": "2bf0131595630b1203dd8fe3c521b25de64b654c46e48a38b905c365c8e28cdf"
+    },
+    {
+      "url": "https://github.com/Dao-AILab/flash-attention/blob/965c9212e6be33c821ee9f2b461564c5c91a2503/flash_attn/flash_attn_interface.py",
+      "resolved_url": "https://github.com/Dao-AILab/flash-attention/blob/965c9212e6be33c821ee9f2b461564c5c91a2503/flash_attn/flash_attn_interface.py",
+      "status": 200,
+      "bytes": 894180,
+      "sha256": "73e18ed2e2a31be3ec336580a295f71318504efa24afe4844c51bd41cb839460"
+    },
+    {
+      "url": "https://github.com/Dao-AILab/flash-attention/tree/965c9212e6be33c821ee9f2b461564c5c91a2503",
+      "resolved_url": "https://github.com/Dao-AILab/flash-attention/tree/965c9212e6be33c821ee9f2b461564c5c91a2503",
+      "status": 200,
+      "bytes": 485040,
+      "sha256": "7084502b29f904cd6d3ba2402117f154a454e9181cd1c94e5e4657abcd18fa39"
+    },
+    {
+      "url": "https://pypi.org/pypi/flash-attn-4/json",
+      "resolved_url": "https://pypi.org/pypi/flash-attn-4/json",
+      "status": 200,
+      "bytes": 55879,
+      "sha256": "fb3796352c1688eb2413bb9c8e45c241e2884215ad88ea21a8d5e864338eaf92"
+    },
+    {
+      "url": "https://tridao.me/blog/2026/flash4/",
+      "resolved_url": "https://tridao.me/blog/2026/flash4/",
+      "status": 200,
+      "bytes": 35954,
+      "sha256": "5ab9fe868ce7b5f22f299ed716bd9682f9f928e7e86d593b953bdd03e3fd174a"
+    },
+    {
+      "url": "https://tridao.me/publications/flash2/flash2.pdf",
+      "resolved_url": "https://tridao.me/publications/flash2/flash2.pdf",
+      "status": 200,
+      "bytes": 1510707,
+      "sha256": "02c3545f727bf902c76c59bbf011c7c7388aea218194f90bfc46f41cf584b627"
+    },
+    {
+      "url": "https://tridao.me/publications/flash3/flash3.pdf",
+      "resolved_url": "https://tridao.me/publications/flash3/flash3.pdf",
+      "status": 200,
+      "bytes": 909666,
+      "sha256": "5d1d550eae942e67f60960b5660bbd49e9a37914ae962957528e96cc94f4a36a"
+    }
+  ],
+  "method": "Primary-source reading plus HTTP GET/hash snapshot; downloaded source files and package metadata only, no FlashAttention distribution build or model weight download."
+}

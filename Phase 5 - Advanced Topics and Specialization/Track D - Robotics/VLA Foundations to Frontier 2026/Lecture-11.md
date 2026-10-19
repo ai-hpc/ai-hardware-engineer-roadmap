@@ -47,7 +47,16 @@ A useful cost model is \(T=T_{encode}+N T_{denoise}+T_{decode}\). It is an appro
 
 ## Worked example and target checks
 
-Take an illustrative scalar target \(A_0=0.6\), \(\bar\alpha_k=0.25\), and sampled noise \(\epsilon=-1\). Then \(A_k=0.5(0.6)+\sqrt{0.75}(-1)\approx-0.566\). The epsilon target is \(-1\), not \(0.6\). Recovering the clean action from perfect noise prediction gives
+Take an illustrative scalar target \(A_0=0.6\), \(\bar\alpha_k=0.25\), and sampled noise \(\epsilon=-1\). The noised action is
+
+\[
+\begin{aligned}
+A_k &= 0.5(0.6)+\sqrt{0.75}(-1) \\
+    &\approx -0.566.
+\end{aligned}
+\]
+
+The epsilon target is \(-1\), not \(0.6\). Recovering the clean action from perfect noise prediction gives
 
 $$
 \hat A_0=\frac{A_k-\sqrt{1-\bar\alpha_k}\hat\epsilon}{\sqrt{\bar\alpha_k}}=0.6.
@@ -55,9 +64,11 @@ $$
 
 As \(\bar\alpha_k\) approaches zero, this expression amplifies epsilon-prediction errors. This is one reason training objectives, numerical precision, and timestep selection matter. It is also a good unit-level check: a sign error or wrong square root causes failure even with an oracle denoiser.
 
+**Executable first step:** run the [scalar action-generation lab](Action-Generation-Lab.md). It supplies analytic oracles, actual CPU training, checkpoint reloads, three-seed sampling reports, and failures caused by the wrong condition or flow direction. Complete it before extending the equations to image-conditioned action chunks.
+
 ## Build a distribution experiment
 
-**Exercise / pseudocode.** Start with synthetic conditional action data: instruction `left` selects a Gaussian around \(-1\); `right` selects one around \(+1\); `either` uses both. Use a bounded action representation and disclose the distribution parameters as synthetic fixture values.
+**Exercise / pseudocode.** Start with synthetic conditional action data: instruction `left` selects a Gaussian around \(-1\); `right` selects one around \(+1\); `either` uses both. Disclose the distribution parameters as synthetic fixture values. Gaussian samples are unbounded; any clipping or physical action limits require their own explicit contract.
 
 1. Implement the forward corruption equation and verify empirical mean and variance using many samples. Check the scalar reconstruction above with an oracle epsilon.
 2. Train a small conditional MLP using timestep embeddings. Reserve fresh random seeds for validation. Record loss by noise level, not just aggregate loss.

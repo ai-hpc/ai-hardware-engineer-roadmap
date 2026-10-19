@@ -17,9 +17,13 @@ v[k+1] = a * v[k] + (1-a) * u[k]
 a = exp(-dt / tau)
 ```
 
-This is an illustrative discrete model, not a universal robot actuator. Fit tau from held-out response data and inspect residuals. A consistent lag may indicate delay rather than a larger time constant; design an input that distinguishes them.
+This is an illustrative discrete model, not a universal robot actuator. Fit tau on identification data, then inspect residuals on separate held-out responses. A consistent lag may indicate delay rather than a larger time constant; design an input that distinguishes them.
 
 If delay is modeled as an integer number of policy steps, changing policy dt changes its physical duration. Keep delay in seconds in the contract and document rounding when converting to steps.
+
+## Execute a known-answer identification
+
+Run `python3 labs/simulation_semantics.py`. The fixed fixture has dt=0.02 s, tau=0.08 s and a two-step delay. Fitting all candidate delays recovers tau≈0.0799867 s and delay=0.04 s. Forcing delay zero instead yields tau≈0.988 s and a large residual: a slow fitted actuator can conceal missing transport delay. Validation uses a new sinusoidal command without refitting. The [worked derivation and variation](Simulation-CPU-Lab.md#4-identify-delay-separately-from-a-slow-actuator) include the unidentifiable zero-input case and limitations of noisy least squares.
 
 ## Lab
 

@@ -50,8 +50,8 @@ Those are product-design questions, but they are also embedded-system questions 
 ## What you will learn
 
 - Why product design belongs inside embedded engineering, not outside it.
-- What the first-wave smart-speaker market got right and wrong.
-- What the HomePod 2018 launch taught about hardware strength versus assistant weakness.
+- How to separate documented product features, design hypotheses, and user evidence.
+- How to use the HomePod 2018 launch as a dated primary-source case study.
 - What later HomePod / 2023-era platform lessons taught about room role, setup, and household workflows.
 - How to translate those lessons into a local-first AI smart-speaker design.
 - How to think about trust, microphones, speakers, compute placement, setup, and ecosystem boundaries as one product system.
@@ -65,11 +65,15 @@ Each lecture is a separate file under **[Lecture/](Lecture/README.md)**. Work in
 | # | Topic | Lecture |
 |---|-------|---------|
 | 1 | Why product design belongs in embedded systems | [Lecture-01.md](Lecture/Lecture-01.md) |
-| 2 | HomePod 2018 lessons: great sound is not enough | [Lecture-02.md](Lecture/Lecture-02.md) |
+| 2 | HomePod 2018: specifications and testable product hypotheses | [Lecture-02.md](Lecture/Lecture-02.md) |
 | 3 | Later HomePod / 2023-era platform lessons | [Lecture-03.md](Lecture/Lecture-03.md) |
 | 4 | AI smart speaker design studio | [Lecture-04.md](Lecture/Lecture-04.md) |
 
 ---
+
+## Execute one product contract
+
+After Lecture 04, run the [CPU product-state lab](CPU-Product-Contract-Lab.md). Its local timer, software mute, delayed result, cancellation and prior-boot cases turn the brief into an executable interaction. Eight standard-library tests and a recorded transcript are provided. Virtual time tests event rules; they do not measure physical response latency.
 
 ## Recommended study pattern
 

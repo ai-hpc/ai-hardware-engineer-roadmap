@@ -31,6 +31,8 @@ If Engram or experts are offloaded, record useful bytes, actual transferred byte
 
 **Reduced exercise:** use an invented token-to-expert assignment matrix to calculate rank imbalance and compare two placements. It teaches the scheduling model but cannot validate interconnect performance.
 
+For an executable follow-up, the [CPU MoE training and dispatch lab](../../../Track%20A%20-%20GPU%20Infrastructure/Nvidia%20GPU/HPC%20Setup/Long-Context-MoE-Foundation-Training/CPU-Training-Lab.md) runs actual two-process dispatch and combination against a single-process reference. Include its empty-source and idle-expert cases: zero useful work does not remove a rank's collective obligations. This tiny network teaches routing and communication correctness; it is not a DeepSeek loader or a measurement of a GPU fabric.
+
 ## Self-check
 
 - Can more GPUs increase latency? Yes: smaller local work and extra synchronization/traffic may outweigh saved compute.

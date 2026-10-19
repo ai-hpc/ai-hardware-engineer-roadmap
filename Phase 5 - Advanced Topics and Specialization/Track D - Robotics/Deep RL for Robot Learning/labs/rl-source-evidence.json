@@ -1,0 +1,75 @@
+{
+  "checked_date": "2026-10-18",
+  "scope": "Primary source inspection; no upstream simulator/VLA training executed",
+  "pinned_code": [
+    {
+      "repo": "moojink/openvla-oft",
+      "commit": "e4287e94541f459edc4feabc4e181f537cd569a8",
+      "file": "README.md",
+      "url": "https://raw.githubusercontent.com/moojink/openvla-oft/e4287e94541f459edc4feabc4e181f537cd569a8/README.md",
+      "sha256": "46edf12db33742c6b303135cccc925e1499de2fd30a38bf731ea2a133dc38ae3"
+    },
+    {
+      "repo": "PRIME-RL/SimpleVLA-RL",
+      "commit": "7c51662df27b586f9e8a1ab35fcf849f2b8852f9",
+      "file": "README.md",
+      "url": "https://raw.githubusercontent.com/PRIME-RL/SimpleVLA-RL/7c51662df27b586f9e8a1ab35fcf849f2b8852f9/README.md",
+      "sha256": "683404be7b360c65e24964ba2cbeb3312724600815ff586abf836fa1de24d4d8"
+    },
+    {
+      "repo": "huggingface/trl",
+      "commit": "6d6901c5e3963108076131ac4979d344566b13a2",
+      "file": "trl/trainer/grpo_config.py",
+      "url": "https://raw.githubusercontent.com/huggingface/trl/6d6901c5e3963108076131ac4979d344566b13a2/trl/trainer/grpo_config.py",
+      "sha256": "fa6d620785f63f6e8c6e42ec41f38faf249198f0eb182bf0808dde8cd76a6819"
+    },
+    {
+      "repo": "haosulab/ManiSkill",
+      "commit": "62ff3a5896b4d5b4cf0ac4c8d79afe600c9404a3",
+      "file": "examples/baselines/ppo/ppo.py",
+      "url": "https://raw.githubusercontent.com/haosulab/ManiSkill/62ff3a5896b4d5b4cf0ac4c8d79afe600c9404a3/examples/baselines/ppo/ppo.py",
+      "sha256": "3fa4818861d428480244aae889bc679b2c8e89b59d6289014003c266a84dbab0"
+    },
+    {
+      "repo": "Physical-Intelligence/openpi",
+      "commit": "215abfb217dbac7d5f1273282331b9b1866c0479",
+      "file": "examples/libero/main.py",
+      "url": "https://raw.githubusercontent.com/Physical-Intelligence/openpi/215abfb217dbac7d5f1273282331b9b1866c0479/examples/libero/main.py",
+      "sha256": "d53748c95804ada559e3ca867305b8f755d8651c4c7f4e2723ef80aea55a3943"
+    },
+    {
+      "repo": "Physical-Intelligence/openpi",
+      "commit": "215abfb217dbac7d5f1273282331b9b1866c0479",
+      "file": "src/openpi/training/config.py",
+      "url": "https://raw.githubusercontent.com/Physical-Intelligence/openpi/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/training/config.py",
+      "sha256": "c34231f888dba5dc981d808765b3d98775ab845b04313bf53fcecd567c520b0d"
+    }
+  ],
+  "mathematical_primary_sources": [
+    {
+      "topic": "PPO",
+      "url": "https://arxiv.org/abs/1707.06347"
+    },
+    {
+      "topic": "TRPO bounds",
+      "url": "https://arxiv.org/abs/1502.05477"
+    },
+    {
+      "topic": "GAE",
+      "url": "https://arxiv.org/abs/1506.02438"
+    },
+    {
+      "topic": "DAgger assumptions",
+      "url": "https://proceedings.mlr.press/v15/ross11a.html"
+    },
+    {
+      "topic": "GRPO",
+      "url": "https://arxiv.org/abs/2402.03300"
+    },
+    {
+      "topic": "RLOO",
+      "url": "https://arxiv.org/abs/2402.14740"
+    }
+  ],
+  "scipy_extra_lock_source": "https://pypi.org/pypi/scipy/1.18.1/json"
+}

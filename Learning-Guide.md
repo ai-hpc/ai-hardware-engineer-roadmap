@@ -1,16 +1,22 @@
 # How to learn this roadmap
 
+**New to robotics or AI?** Begin with [Start here](Start-Here.md): a first-hour experiment and ten guided sessions with worked answers. Return to this page when choosing a longer route.
+
+Use the [beginner reading aid](Beginner-Reading-Aid.md) for unfamiliar notation
+or vocabulary. You can finish the first cart and policy experiments before
+learning the advanced hardware terms in the route table below.
+
 Choose one engineering outcome, diagnose the missing prerequisites, and build a small experiment before expanding it. The phase numbers describe dependencies; they are not a requirement to finish every course. Time estimates are planning aids, not mastery tests.
 
 The shared destination is a [custom physical-AI SoC](README.md#the-goal) built around advanced VLA workloads: a dedicated accelerator and AI compiler, embedded Linux, wireless, and interfaces for robots and drones. Treat each course artifact as evidence for a subsystem of that platform. The [SoC capstone](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Guide.md#physical-ai-soc-capstone) joins the model, compiler, hardware, and application work.
 
 ## Choose a route and a first deliverable
 
-For a connected project across these routes, use the [Physical AI Design Studio](Physical-AI-Design-Studio.md). Its nine gates reuse the same task, reference vectors, numerical contracts, and evidence from model selection through SoC integration. Each course now identifies a specific artifact to pass to the next layer.
+For a connected project across these routes, use the [Physical AI Design Studio](Physical-AI-Design-Studio.md). Its nine gates reuse the same task, reference vectors, numerical contracts, and evidence from model selection through SoC integration. Use each gate to identify the specific artifact needed by the next layer.
 
 | Route | Start | First deliverable | Then |
 |---|---|---|---|
-| Inference optimization | [Phase 4C](Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md) | Correctness-checked operator benchmark with a profiler trace | [Inference course](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/README.md), then its DeepSeek V4.1 Flash NVFP4 part |
+| Inference optimization | [Phase 4C](Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md) | CPU reference and operator benchmark; add a target profiler trace when available | [Inference course](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/README.md), then its DeepSeek V4.1 Flash NVFP4 part |
 | Robotics and robot learning | [Robotics](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Guide.md) | A simulated robot with validated frames, units, reset behavior, and timing | [Isaac Sim / Isaac Lab](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Isaac%20Sim%20and%20Isaac%20Lab/README.md), then held-out policy evaluation |
 | Embedded and edge systems | [Phase 2](Phase%202%20-%20Embedded%20Systems/Guide.md) | A timestamped sensor-to-application pipeline with recovery from a fault | [Jetson](Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md), then a thermal and latency budget |
 | FPGA and accelerator design | [Phase 1](Phase%201%20-%20Foundational%20Knowledge/Guide.md) | Tested RTL with a timing constraint and a waveform explaining a failure | [FPGA](Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md), then [chip design](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Guide.md) |
@@ -26,7 +32,7 @@ Try the entry task for your next course without following its solution. If you c
 | Systems | Explain why asynchronous GPU work cannot be timed by timing only the launch | [Parallel computing](Phase%201%20-%20Foundational%20Knowledge/4.%20C%2B%2B%20and%20Parallel%20Computing/Guide.md) |
 | Architecture | Estimate bytes moved and operations for a matrix-vector product; state your cache assumption | [Computer architecture](Phase%201%20-%20Foundational%20Knowledge/2.%20Computer%20Architecture%20and%20Hardware/Guide.md) |
 | ML | Trace tensor shapes through a forward pass and explain how to hold evaluation data out | [Neural networks](Phase%203%20-%20Artificial%20Intelligence/1.%20Neural%20Networks/Guide.md) |
-| Robotics | Draw world, base, and camera frames and distinguish physics dt from policy period | [Robotics foundation](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Advanced%20Robot%20Operating%20System/Lecture-01.md) |
+| Robotics | Draw world, base, and camera frames and distinguish physics dt from policy period | [Robotics foundation](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Robotics%20Foundations/README.md) |
 | Measurement | Name the baseline, one variable you will change, and an outcome that would disprove your prediction | The experiment record below |
 
 ## A repeatable lesson cycle
@@ -81,6 +87,12 @@ failure cases and explanation:
 limitations, next experiment, reproduction instructions:
 execution status: measured | analytical | fixture | not run
 ```
+
+These status words can describe different parts of one experiment. For example:
+“Training and evaluation executed on CPU; observations and dynamics are a
+synthetic fixture; the 120 ms inference delay is imposed; physical robot and GPU
+timing are not run.” A fixture can execute real arithmetic. Name both **what ran**
+and **where its inputs came from**, rather than choosing a label that hides one.
 
 Report units and distributions. GPU kernel time, server queue time, and end-to-end latency answer different questions. Separate cold starts from steady state. For robotics, separate transitions per second, physics steps per second, and simulated time divided by wall time. Never average percentiles from separate runs and call that the combined percentile.
 

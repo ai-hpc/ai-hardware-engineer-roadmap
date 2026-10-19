@@ -8,8 +8,8 @@ import cv2
 import numpy as np
 from pathlib import Path
 
-# (x1, y1, x2, y2), label, confidence
-Detection = tuple[tuple[int, int, int, int], str, float]
+# (x1, y1, x2, y2), label, raw score (not calibrated probability)
+Detection = tuple[tuple[int, int, int, int], str, float | None]
 
 
 def _find_opencv_data() -> Path | None:
@@ -53,7 +53,7 @@ class FaceDetector:
         out: list[Detection] = []
         for (x, y, w, h) in rects:
             bbox = (int(x), int(y), int(x + w), int(y + h))
-            out.append((bbox, "face", 1.0))
+            out.append((bbox, "face", None))
         return out
 
 
@@ -68,6 +68,8 @@ class PersonDetector:
 
     def detect(self, frame: np.ndarray) -> list[Detection]:
         """Return list of (bbox, label, confidence)."""
+        if frame.shape[0] < 128 or frame.shape[1] < 64:
+            return []
         rects, weights = self._hog.detectMultiScale(
             frame,
             hitThreshold=self.hit_threshold,
@@ -75,55 +77,21 @@ class PersonDetector:
         )
         out: list[Detection] = []
         for i, (x, y, w, h) in enumerate(rects):
-            conf = float(weights[i].ravel()[0]) if weights is not None and len(weights) > i else 0.0
+            conf = float(np.asarray(weights).reshape(-1)[i]) if weights is not None and len(weights) > i else None
             bbox = (int(x), int(y), int(x + w), int(y + h))
-            out.append((bbox, "person", max(0.0, min(1.0, conf))))
+            out.append((bbox, "person", conf))
         return out
 
 
 class CompositeDetector:
-    """Run face and optionally person detection; optionally suppress person boxes that overlap faces."""
-
-    def __init__(self, detect_face: bool = True, detect_person: bool = True, min_face_confidence: float = 0.0):
-        self.detect_face = detect_face
-        self.detect_person = detect_person
-        self.min_face_confidence = min_face_confidence
+    """Keep face and person hypotheses; their boxes represent different objects."""
+    def __init__(self, detect_face=True, detect_person=True):
         self._face = FaceDetector() if detect_face else None
         self._person = PersonDetector() if detect_person else None
 
-    def detect(self, frame: np.ndarray) -> list[Detection]:
-        results: list[Detection] = []
-        if self._face:
-            results.extend(self._face.detect(frame))
-        if self._person:
-            persons = self._person.detect(frame)
-            if self._face and results:
-                # Drop person boxes that heavily overlap a face (avoid duplicate face region)
-                face_boxes = [r[0] for r in results if r[1] == "face"]
-                for bbox, label, conf in persons:
-                    if not _overlaps_any(bbox, face_boxes, iou_threshold=0.3):
-                        results.append((bbox, label, conf))
-            else:
-                results.extend(persons)
+    def detect(self, frame):
+        results = []
+        for detector in (self._face, self._person):
+            if detector is not None:
+                results.extend(detector.detect(frame))
         return results
-
-
-def _overlaps_any(bbox: tuple[int, int, int, int], boxes: list[tuple[int, int, int, int]], iou_threshold: float) -> bool:
-    for b in boxes:
-        if _iou(bbox, b) >= iou_threshold:
-            return True
-    return False
-
-
-def _iou(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> float:
-    x1 = max(a[0], b[0])
-    y1 = max(a[1], b[1])
-    x2 = min(a[2], b[2])
-    y2 = min(a[3], b[3])
-    if x2 <= x1 or y2 <= y1:
-        return 0.0
-    inter = (x2 - x1) * (y2 - y1)
-    area_a = (a[2] - a[0]) * (a[3] - a[1])
-    area_b = (b[2] - b[0]) * (b[3] - b[1])
-    union = area_a + area_b - inter
-    return inter / union if union > 0 else 0.0

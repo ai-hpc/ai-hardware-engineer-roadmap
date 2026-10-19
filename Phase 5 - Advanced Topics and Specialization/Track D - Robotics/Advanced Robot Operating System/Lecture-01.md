@@ -1,5 +1,12 @@
 # Lecture 1: Advanced Robot Operating System (ROS / ROS 2)
 
+**Prerequisites:** complete the [Robotics Foundations diagnostic and labs](../Robotics%20Foundations/README.md), especially frames, timestamps, feedback, and planning. This lecture integrates those ideas. **Layer mapping:** robot application, middleware/runtime, and embedded interfaces. **Artifact:** a reproducible ROS graph with a known transform, timing record, and a detected integration fault. **Next:** industrial deployment or perception below.
+
+**Practice alongside this survey:** the [QoS and backlog integration lab](Integration-Lab.md)
+contains a worked queue model, four actual ROS publisher/subscriber compatibility
+cases, and two late-subscriber experiments. It names the executed Jazzy baseline
+and the current distribution choices; use one coherent package set.
+
 ## Overview
 
 This lecture treats **ROS 2** as the integration layer between **sensors**, **estimators**, **planners**, and **actuators** on real robots. Unlike a shallow tutorial that only publishes strings on a topic, the goal here is a **systems** view: you can explain why Nav2 drops commands when TF is wrong, why a bag replay desynchronizes without matching QoS, and how manipulation and navigation coexist in one compute graph.
@@ -28,7 +35,7 @@ Structured courses that align with this lecture (full catalog: [The Construct �
 
 **Official references (bookmark these):**
 
-* [ROS 2 documentation](https://docs.ros.org/) (pick your distro: Humble / Jazzy / Rolling).
+* [ROS 2 documentation](https://docs.ros.org/) (select a named distribution compatible with your OS and packages; the linked foundation exercise uses Jazzy).
 * [Navigation2](https://navigation.ros.org/)
 * [MoveIt 2](https://moveit.picknik.ai/)
 * [ros2_control](https://control.ros.org/)
@@ -39,7 +46,7 @@ Structured courses that align with this lecture (full catalog: [The Construct �
 
 ### 1.1 Mental model
 
-ROS 2 replaces the ROS 1 master with **DDS** (Data Distribution Service). Every node discovers peers on the network; **topics** are multicast-friendly streams; **services** are RPC; **actions** are long-running goals with feedback (used heavily by Nav2 and MoveIt 2).
+ROS 2 uses a middleware abstraction rather than the ROS 1 master. In the DDS-based setup used in this lesson, participants discover peers under the configured network and middleware rules. **Topics** carry typed streams; **services** handle request/response; **actions** support long-running goals with feedback, cancellation, and results. Discovery does not make frame, unit, or timing contracts agree automatically.
 
 ```mermaid
 flowchart LR
@@ -51,31 +58,40 @@ flowchart LR
   subgraph state
     TF[tf2 / robot_state_publisher]
     EKF[robot_localization]
+    J[URDF and joint states]
   end
   subgraph nav[Nav2]
     BT[Behavior tree]
     PP[Planner]
     MP[Controller]
+    CM[Costmaps]
   end
-  L --> TF
-  C --> TF
+  L --> CM
+  C --> P[Perception]
   I --> EKF
+  O[Wheel odometry] --> EKF
+  J --> TF
   EKF --> TF
-  TF --> PP
+  TF --> CM
+  CM --> PP
+  CM --> MP
+  BT --> PP
+  BT --> MP
   PP --> MP
+  MP --> D[Base controller / driver]
 ```
 
 ### 1.2 QoS: why your bag “almost” works
 
-**Quality of Service** profiles control reliability, history, and deadline. Common mistake: recording a topic with **best-effort** sensors and replaying with **reliable** subscribers, or the reverse—then messages silently drop or stall.
+**Quality of Service** profiles control policies including reliability, history, durability, and deadline. Compatibility is directional: a **best-effort publisher cannot satisfy a reliable subscriber**, but a **reliable publisher can satisfy a best-effort subscriber**. All other required policies must also be compatible. An incompatible pair may exchange no messages; this differs from occasional loss on a compatible best-effort connection. [ROS 2 Jazzy QoS source](https://github.com/ros2/ros2_documentation/blob/jazzy/source/Concepts/Intermediate/About-Quality-of-Service-Settings.rst)
 
 | Traffic type | Typical reliability | Notes |
 |--------------|---------------------|--------|
 | Camera / LiDAR at high rate | Often **best effort** | Lossy OK; reduce backlog |
-| Command / goal | **Reliable** | Must arrive |
+| Command / goal | Often **reliable**, according to the interface | Retries do not guarantee freshness or a control deadline; define expiry and timeout behavior |
 | TF (if using `/tf` heavily) | Match publisher | Mismatches cause missing transforms |
 
-**Practical rule:** For debugging, align **publisher and subscriber QoS**; use `ros2 topic info -v` to inspect endpoints.
+**Practical rule:** Inspect both endpoints with `ros2 topic info /topic_name --verbose`; check offered/requested compatibility and backlog. A bag recording/replay also needs its own QoS configuration checked against the live endpoints. Matching topic names and types is insufficient.
 
 ### 1.3 Lifecycle nodes
 
@@ -85,23 +101,31 @@ Many Nav2 and ros2_control components are **managed nodes** (unconfigured → in
 
 Single-threaded executors are simpler; **multi-threaded** executors help when callbacks must not block each other (e.g. heavy perception). Cost: you must reason about **locks** and **callback re-entrancy**. For learning, start single-threaded; add threads when profiling shows starvation.
 
+Adding executor threads alone may change nothing: callbacks in one node's default
+**mutually exclusive callback group** still cannot overlap. Separate groups or
+reentrant groups permit concurrency, which then requires appropriate shared-state
+ownership. A synchronous service wait can deadlock if the response callback needs
+the group currently held by the waiting callback. Prefer an asynchronous flow
+and measure the actual critical path. [Jazzy callback-group guide](https://github.com/ros2/ros2_documentation/blob/jazzy/source/How-To-Guides/Using-callback-groups.rst)
+
 ---
 
 ## 2. TF2: the spine of robotics integration
 
-**TF2** maintains a **time-varying tree** of coordinate frames: `map` → `odom` → `base_link` → `sensor_frame` → `tool0`. Nav2 expects consistent **map–odom–base_link** semantics; manipulation expects **base_link–arm–gripper**.
+**TF2** maintains a **time-varying tree** of coordinate frames. A typical mobile manipulator has `map` → `odom` → `base_link`, then separate camera and arm/tool branches under the base. A tool is not normally a child of a fixed camera. Nav2 depends on consistent **map–odom–base_link** semantics; manipulation depends on the arm and tool transforms too.
 
 **Common failures**
 
 * **Missing transform:** Usually forgotten `static_transform_publisher`, wrong timestamp, or sensor publishing in the wrong frame.
-* **Extrapolation into the future:** `tf2` buffers are finite; if your sensor time is wrong (sim clock vs wall clock), lookups fail.
+* **Extrapolation into the future:** The requested time is newer than the latest available transform; investigate publisher lag, clock mismatch, and timestamp assignment.
+* **Extrapolation into the past:** The requested time precedes the retained history; investigate old queued observations or insufficient history. Increasing buffer length does not cure a clock mismatch.
 
 **Debugging commands**
 
 * `ros2 run tf2_tools view_frames` (generate PDF of the tree).
 * `ros2 topic echo /tf --once` combined with `tf2_monitor`.
 
-**Study focus:** Be able to explain, in one sentence, what each of `map`, `odom`, and `base_link` means and why **odom drifts** but **map** (after localization) does not.
+**Study focus:** `odom` provides a continuous local reference that can drift; `map` provides a globally corrected reference whose estimate can jump during localization corrections. Neither guarantees zero physical error. `base_link` is attached to the robot body. [ROS REP-105 source](https://github.com/ros-infrastructure/rep/blob/master/rep-0105.rst)
 
 ---
 
@@ -133,6 +157,12 @@ Inflation layers turn obstacles into **gradients** so the robot does not graze c
 
 **Global planner** examples: NavFn, Smac Planner (grid-based, often better in structured spaces). **Controller** follows the local costmap and produces `cmd_vel`. When the robot oscillates or stops, split the issue: **global path** vs **local tracking**.
 
+Check the installed `cmd_vel` interface with `ros2 topic info /cmd_vel --verbose`
+and inspect the matching message definition. A topic name alone does not tell
+you whether the configured endpoints use `Twist` or `TwistStamped`, which frame
+they expect, or how an old command expires. A timestamped message still needs a
+consumer that validates the timestamp against the intended clock.
+
 ### 4.3 Recovery
 
 Recoveries exist because **local minima** happen in real buildings. Learn to read **Nav2 logs** to see which recovery fired and why.
@@ -146,18 +176,36 @@ You rarely “use SLAM” as a black box without choosing a **map representation
 | Package | Typical use | Notes |
 |---------|-------------|--------|
 | **SLAM Toolbox** | 2D LiDAR, lifelong mapping | Popular on mobile bases |
-| **Cartographer** | 2D/3D, submaps | Tuning can be involved |
+| **Cartographer** | 2D/3D, submaps | Upstream is no longer actively maintained; assess the particular ROS fork and release before adopting it |
 | **RTAB-Map** | RGB-D, stereo, LiDAR | Strong when cameras are primary |
 
-**Localization without mapping:** Once a map exists, **AMCL** (or equivalent) localizes the robot in the map. Nav2 expects a consistent **map → odom** transform from localization fused with odometry.
+The [Cartographer repository](https://github.com/cartographer-project/cartographer)
+explicitly describes its maintenance status. An existing tutorial or binary
+package does not by itself imply ongoing feature development or compatibility
+with a new ROS distribution.
+
+**Localization without mapping:** Once a map exists, **AMCL** (or an appropriate alternative) estimates the robot pose in that map. Combined with the odometry pose, localization can provide **map → odom** while the local estimator provides **odom → base_link**. Give each transform one authoritative publisher; do not publish conflicting estimates on the same edge.
 
 ---
 
 ## 6. Sensor fusion: `robot_localization`
 
-`robot_localization` implements **EKF/UKF** to fuse **wheel odometry**, **IMU**, **GPS** (outdoor), and optional visual odometry into a smooth `odom` → `base_link` estimate. You configure **which sensors update which state components** (e.g. IMU for orientation, wheels for x,y).
+`robot_localization` implements **EKF/UKF** to fuse configured odometry, pose,
+velocity, and IMU measurements. Choose the state components each sensor actually
+observes and supply covariance in the required frame. Raw `NavSatFix` is not a
+Cartesian EKF input: `navsat_transform_node` combines geographic position,
+heading, and a world-frame odometry reference to produce compatible odometry.
+[Geographic transform documentation](https://github.com/cra-ros-pkg/robot_localization/blob/rolling-devel/doc/navsat_transform_node.rst)
 
-**Why it matters:** Raw wheel encoders slip; IMU drifts; fusion gives Nav2 a **stable velocity and heading** for control.
+For example, wheel-derived position and wheel-derived velocity may come from the
+same encoder samples. Treating both as independent measurements can count the
+same evidence twice. A local continuous estimator and a globally corrected
+estimator also serve different frame roles: keep jumps from global corrections
+out of the continuous `odom` trajectory and give each TF edge one owner.
+
+**Why it matters:** complementary measurements can reduce some errors, while
+slip, IMU bias, wrong covariance, or duplicated information can still corrupt
+the fused state. Inspect innovations and compare with independent evidence.
 
 ---
 
@@ -165,13 +213,18 @@ You rarely “use SLAM” as a black box without choosing a **map representation
 
 **ros2_control** separates **hardware interfaces** (read joints / write efforts) from **controllers** (PID, trajectory following). MoveIt 2 typically sends **trajectories** to a trajectory controller; mobile bases use **diff_drive** or similar.
 
+Work through [torque and actuator limits](../Robot%20Dynamics%20and%20Task%20Execution/Lecture-01-Dynamics.md)
+before interpreting a successful command submission as physically achievable
+motion. The interface can expose position, velocity, or effort commands according
+to the hardware and controller configuration.
+
 Conceptual pipeline:
 
 ```text
-MoveIt 2 → trajectory_msgs/JointTrajectory → trajectory_controller → hardware_interface → driver
+MoveIt 2 → FollowJointTrajectory action → joint trajectory controller → hardware interface → driver
 ```
 
-You do not need to write a custom hardware interface on day one, but you **do** need to know which **controller is active** and which **joint names** match the URDF.
+The action carries a joint trajectory and provides execution feedback/result semantics. Some controllers also expose a trajectory topic; check the installed configuration. You do not need to write a custom hardware interface on day one, but you **do** need to know which **controller is active**, which **joint names** match the URDF, and whether commands represent positions, velocities, or efforts. [MoveIt controller configuration](https://moveit.picknik.ai/main/doc/examples/controller_configuration/controller_configuration_tutorial.html), [Jazzy joint trajectory controller](https://control.ros.org/jazzy/doc/ros2_controllers/joint_trajectory_controller/doc/userdoc.html)
 
 ---
 
@@ -182,6 +235,11 @@ You do not need to write a custom hardware interface on day one, but you **do** 
 * **Planning scene:** Mesh and primitive obstacles; often updated from depth or table plane segmentation.
 * **Planning groups:** Arm vs gripper; **end-effector** poses are planned in Cartesian or joint space.
 * **Pipeline integration:** Pick-and-place is **state machine** glue: locate object → plan approach → grasp → retreat → place.
+
+Check the timed and interpolated motion after planning, including attached-object
+geometry. Then evaluate the object, not only the tool pose: the
+[grasp/task-success exercise](../Robot%20Dynamics%20and%20Task%20Execution/Lecture-04-Grasp-and-Task-Success.md)
+shows two identical hand motions with different pick outcomes.
 
 ---
 
@@ -198,6 +256,14 @@ You do not need to write a custom hardware interface on day one, but you **do** 
 2. Name two reasons Nav2 would publish **zero velocity** despite a valid goal.
 3. Why might **increasing LiDAR rate** make TF lookups fail if timestamps are inconsistent?
 4. What does **`robot_localization`** improve compared to raw wheel odometry alone?
+
+**Answer guidance:** (1) `map → odom` applies global localization corrections; `odom → base_link` tracks continuous local motion. (2) An inactive controller or a blocked/invalid local costmap can prevent motion; inspect lifecycle and planner/controller feedback separately. (3) A higher rate does not fix clock inconsistency and may increase queued work; compare capture timestamps with transform availability. (4) A configured filter can combine complementary measurements and track uncertainty, but bad covariances, duplicated information, or wrong frames can make the fused result worse.
+
+## 11. Build and measure the first integration
+
+Start with the [known-transform ROS exercise](../Robotics%20Foundations/Lecture-06.md#optional-ros-exercise-inspect-a-known-transform). It names its teaching distribution and separates upstream-checked commands from local execution. Save the composed transform, endpoint QoS, and actual package versions. Then use a simulator or recorded sensor stream to connect one estimator and one consumer; capture source timestamps, receive timestamps, and the frame required at lookup time.
+
+Inject one stale observation and show that the consumer rejects it or enters its documented fallback. Collect message-age distribution, missing-transform count, and missed update deadlines. Repeat on identical input after fixing the fault. Finish with the graph, configuration, raw trace, fault explanation, and reproduction commands. Merely seeing nodes in `rqt_graph` is not the completion criterion.
 
 ---
 

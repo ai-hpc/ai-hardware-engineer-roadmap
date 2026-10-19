@@ -16,6 +16,8 @@
 
 **Prerequisites:** Basic C programming (from Phase 1 §3 OS work). Familiarity with pointers, arrays, functions.
 
+**First pass (60–90 minutes):** read RAII, move semantics, lambdas, and the scalar/vector example. Then run the [native SIMD lab](labs/README.md): it tests real vector instructions, awkward array lengths, lane ordering and floating-point rounding. Treat the remaining sections as a reference, not a list to memorize. The first useful deliverable is a preprocessing function that agrees with its scalar reference and handles every input length.
+
 ---
 
 ## Why Modern C++ First
@@ -23,9 +25,9 @@
 Every parallel computing technology in this curriculum — SIMD intrinsics, OpenMP, oneTBB, CUDA, HIP, SYCL — is built on C++. But not the C++ of the 1990s. Modern C++ (C++11 through C++17) introduced features specifically designed for performance, safety, and parallel programming:
 
 - **Lambdas** → used in oneTBB, SYCL, modern CUDA, parallel STL
-- **Move semantics** → zero-copy data transfer, critical for GPU memory
+- **Move semantics** → transfer ownership of a resource; moving a handle does not move bytes between CPU and GPU
 - **Templates** → generic CUDA kernels, CUTLASS, CuTe
-- **Parallel STL** → built-in SIMD + threading with one line of code
+- **Parallel STL** → execution policies that permit parallel or unsequenced work when the implementation can use it
 - **`constexpr`** → compile-time computation for HPC optimization
 
 Learn these features now. You'll use every single one in Sub-Tracks 2–5.
@@ -492,6 +494,7 @@ No copy. No new allocation. The lambda took the backpack — the original holder
 ```cpp
 #include <thread>
 #include <memory>
+#include <iostream>
 
 int main() {
     auto buf = std::make_unique<int[]>(1000);  // 4 KB buffer
@@ -506,7 +509,7 @@ int main() {
 }
 ```
 
-The thread lambda owns `buf` exclusively. No data race. No need for a mutex. When the thread finishes, the lambda destructs and `unique_ptr` frees the memory automatically.
+In this example only the worker accesses the allocation, so its buffer writes need no mutex. Moving a `unique_ptr` transfers ownership; it does not invalidate raw pointers or references previously made to that allocation. Such aliases can still cause a data race. Joining also ensures the worker has finished before `main` continues.
 
 **Moving other moveable types:**
 
@@ -716,7 +719,7 @@ for (auto& v : data)
 
 Each element carries its own type tag, so parallel threads never confuse `int` and `float` even when accessing adjacent elements.
 
-**Why it matters for HPC:** Compiler IR nodes, kernel dispatch tables, and mixed-precision computation graphs (FP32/FP16/INT8 hybrid inference) all need to store heterogeneous types safely. `std::variant` + `std::visit` replaces the old `void*`-with-a-type-enum pattern with zero undefined behavior.
+**Why it matters for HPC:** Compiler IR nodes, kernel dispatch tables, and mixed-precision computation graphs need to represent different types. `std::variant` + `std::visit` makes the active alternative explicit and avoids manual unchecked casts. Your visitor still needs valid lifetimes, bounds, and synchronization.
 
 ---
 
@@ -907,9 +910,9 @@ std::sort(std::execution::par_unseq, data.begin(), data.end());
 | Policy | Behavior | When to use |
 |--------|----------|-------------|
 | `seq` | Sequential | Small data, debugging |
-| `par` | Multi-threaded | Large data, independent elements |
-| `par_unseq` | Multi-threaded + SIMD | Maximum throughput, no dependencies |
-| `unseq` (C++20) | SIMD only (single thread) | Vectorizable, single core |
+| `par` | Permits parallel calls; may execute sequentially | Independent work, sufficient work per call |
+| `par_unseq` | Permits parallel and unsequenced calls; does not force SIMD | Independent, vectorization-safe work |
+| `unseq` (C++20) | Permits unsequenced calls in the calling thread | Vectorization-safe work |
 
 #### Parallel transform, reduce, for_each
 
@@ -936,16 +939,16 @@ std::for_each(std::execution::par_unseq, data.begin(), data.end(),
 | | Manual loop | STL + lambda | Parallel STL |
 |--|------------|--------------|--------------|
 | Code length | Long | Short | Short |
-| Index bug risk | Medium | None | None |
-| Parallelism | Manual (`std::thread`) | Manual | Automatic |
-| SIMD | Compiler may vectorize | Compiler may vectorize | `par_unseq` forces it |
+| Bounds responsibility | Validate indices | Validate iterator ranges and destination size | Same range requirements plus concurrent access rules |
+| Parallelism | Explicitly arranged | Usually sequential | Permitted by execution policy and implementation |
+| SIMD | Compiler may vectorize | Compiler may vectorize | Permitted by policy, never guaranteed |
 | Debugging | Hard | Easy | Harder (non-deterministic) |
 
-> **`par_unseq` requirements:** Loop body must have **no data races** AND **no loop-carried dependencies** (`a[i]` must not read `a[i-1]`). Violating either produces undefined behavior — not a compile error, not even consistent wrong results.
+> **`par_unseq` requirements:** Avoid data races, order dependencies, and vectorization-unsafe operations. In particular, a mutex inside a callback can deadlock when callbacks interleave on one thread; protecting a shared update with a lock does not make it suitable for `par_unseq`. A read from another element is not itself forbidden if that element is immutable; conflicting reads/writes and ordering assumptions are the problem. See the [C++ execution-policy rules](https://eel.is/c++draft/algorithms.parallel.exec).
 
-> **Warning — not always faster:** Parallel STL has overhead (thread pool spin-up, synchronization). For small arrays (< ~100K elements), `seq` is often faster. In HPC and production ML systems, teams frequently prefer **OpenMP** or **oneTBB** for more predictable, tunable, and debuggable parallelism. Benchmark before committing to `par` or `par_unseq`.
+> **Measure the crossover:** Scheduling and synchronization have costs. There is no universal element-count threshold: operation cost, data size, runtime backend, and machine all matter. Compare sequential, `par`, and `par_unseq` across the sizes your application actually uses.
 
-**Compiler support:** GCC 9+ (with `-ltbb`), MSVC 2017+, Intel DPC++. Clang support is improving.
+**Toolchain check:** implementation depends on the compiler **and standard library/backend**, not the language version alone. Check the selected library's documentation and linkage requirements. Compilation does not demonstrate that multiple threads or SIMD instructions were used. Floating-point `std::reduce` can regroup additions, including with `seq`; compare within a justified tolerance when order matters.
 
 ---
 
@@ -1028,7 +1031,7 @@ void process(T value) {
 | **`constexpr`** | CUDA, HLS, HPC libraries | Compile-time tile sizes, buffer dimensions |
 | **`auto`** | Everywhere | Complex return types, template deduction |
 | **Smart pointers** | Resource management | RAII wrappers for GPU memory, file handles |
-| **Parallel STL** | CPU parallelism | One-line SIMD + threading |
+| **Parallel STL** | CPU parallelism | Express permitted execution; measure whether the implementation parallelizes |
 | **`std::thread`/`mutex`** | Manual threading | Foundation for OpenMP, oneTBB internals |
 | **`std::atomic`** | Lock-free algorithms | Counters, flags in multi-threaded code |
 | **Structured bindings** | Data processing | Clean iteration over results, tuples |
@@ -1061,7 +1064,7 @@ Take the simplest possible operation: `c[i] = a[i] + b[i]`. Here is how you expr
 ```
 Scalar (1 element at a time):
   c[0] = a[0] + b[0]
-  c[1] = a[1] + b[1]   ← you write a loop, CPU executes one add per cycle
+  c[1] = a[1] + b[1]   ← source expresses one element per iteration
   c[2] = a[2] + b[2]
   ...
 
@@ -1071,24 +1074,26 @@ CPU SIMD / AVX (8 elements at a time):
 
 GPU warp / CUDA (32 elements at a time):
   each thread handles one i      ← you write kernel for one element,
-  32 threads run in lock-step       GPU runs 32 threads simultaneously (one warp)
+  threads are grouped in warps      scheduling and active lanes depend on execution
   c[0..31] = a[0..31] + b[0..31]
 
 GPU grid (thousands at a time):
-  all threads launch at once     ← GPU runs thousands of warps across SM clusters
+  blocks are scheduled over time ← residency is limited by hardware resources
 ```
 
 ```cpp
 // ── Scalar ──────────────────────────────────────────────────────
 for (int i = 0; i < n; i++)
-    c[i] = a[i] + b[i];            // 1 add/cycle
+    c[i] = a[i] + b[i];            // compiler may also vectorize this loop
 
 // ── CPU SIMD (AVX) ───────────────────────────────────────────────
-for (int i = 0; i < n; i += 8) {
+int i = 0;
+for (; i <= n - 8; i += 8) {       // n >= 0; process only complete vectors
     __m256 va = _mm256_loadu_ps(&a[i]);
     __m256 vb = _mm256_loadu_ps(&b[i]);
-    _mm256_storeu_ps(&c[i], _mm256_add_ps(va, vb));  // 8 adds/cycle
+    _mm256_storeu_ps(&c[i], _mm256_add_ps(va, vb));  // 8 elements/instruction
 }
+for (; i < n; ++i) c[i] = a[i] + b[i];  // short arrays and final partial vector
 
 // ── GPU (CUDA) ───────────────────────────────────────────────────
 __global__ void add(float* a, float* b, float* c, int n) {
@@ -1103,10 +1108,10 @@ __global__ void add(float* a, float* b, float* c, int n) {
 |--|--------|---------------|-----------------|
 | Width | 1 element | 8 floats | 32 threads |
 | Who picks `i` | Your loop counter | Your stride (`+= 8`) | Hardware (`threadIdx + blockIdx`) |
-| Fast memory | L1/L2 cache | L1/L2 cache | Shared memory (48 KB/SM) |
+| Nearby storage | Registers and caches | Registers and caches | Registers, shared memory, caches; capacity is device-dependent |
 | Slow memory | RAM | RAM | Global memory (VRAM) |
 | Hiding latency | Out-of-order execution | ILP across loop iterations | Warp switching |
-| Divergence cost | Branch misprediction | Breaks vectorization | Serializes warp lanes |
+| Conditional work | Branches or predication | Masks/selects or branches | Different active-lane paths can reduce throughput |
 
 **The scaling ladder:**
 
@@ -1139,7 +1144,7 @@ g++ -O2 -march=native -fopt-info-vec-optimized my_code.cpp
 ```
 
 **Rules for auto-vectorization:**
-- No loop-carried dependencies (`a[i] = a[i-1] + 1` cannot vectorize)
+- Independence is the simplest case. Dependencies require analysis: compilers can transform some reductions, recurrences and scans; an arbitrary dependency cannot simply run in independent lanes.
 - Simple data types (float, int — not complex objects)
 - Aligned memory helps (`alignas(32) float data[1024];`)
 - Use `-O2` or `-O3` with `-march=native`
@@ -1151,13 +1156,17 @@ When auto-vectorization fails or you need specific instructions:
 ```cpp
 #include <immintrin.h>
 
-void add_vectors_avx(float* a, float* b, float* c, int n) {
-    for (int i = 0; i < n; i += 8) {
-        __m256 va = _mm256_load_ps(&a[i]);   // Load 8 floats from a
-        __m256 vb = _mm256_load_ps(&b[i]);   // Load 8 floats from b
+// Contract: n >= 0; a, b, c each contain n floats; c does not overlap inputs.
+// Build for an AVX-capable target. Unaligned loads still require 8 valid floats.
+void add_vectors_avx(const float* a, const float* b, float* c, int n) {
+    int i = 0;
+    for (; i <= n - 8; i += 8) {
+        __m256 va = _mm256_loadu_ps(&a[i]);  // No 32-byte alignment requirement
+        __m256 vb = _mm256_loadu_ps(&b[i]);
         __m256 vc = _mm256_add_ps(va, vb);   // Add 8 pairs at once
-        _mm256_store_ps(&c[i], vc);           // Store 8 results to c
+        _mm256_storeu_ps(&c[i], vc);
     }
+    for (; i < n; ++i) c[i] = a[i] + b[i];
 }
 ```
 
@@ -1165,23 +1174,23 @@ void add_vectors_avx(float* a, float* b, float* c, int n) {
 
 | Operation | Intrinsic | What it does |
 |-----------|-----------|-------------|
-| Load aligned | `_mm256_load_ps(ptr)` | Load 8 **32-byte-aligned** floats — **crashes if misaligned** |
+| Load aligned | `_mm256_load_ps(ptr)` | Requires 32-byte alignment and 8 readable floats; violating the contract can fault |
 | Load unaligned | `_mm256_loadu_ps(ptr)` | Load 8 floats (any alignment) — safer default |
 | Store | `_mm256_store_ps(ptr, v)` | Store 8 floats (aligned) |
-| Stream store | `_mm256_stream_ps(ptr, v)` | Write bypassing cache — use for large write-once buffers |
+| Stream store | `_mm256_stream_ps(ptr, v)` | Non-temporal store hint; obey alignment and ordering requirements and measure reuse |
 | Add | `_mm256_add_ps(a, b)` | 8 parallel additions |
 | Multiply | `_mm256_mul_ps(a, b)` | 8 parallel multiplications |
-| **FMA** | `_mm256_fmadd_ps(a, b, c)` | 8 parallel `a*b + c` — **one instruction, not two; also more precise** |
+| **FMA** | `_mm256_fmadd_ps(a, b, c)` | 8 `a*b+c` results, one rounding each; may differ from separately rounded operations |
 | Broadcast | `_mm256_set1_ps(x)` | Fill all 8 lanes with same value |
 | Horizontal add | `_mm256_hadd_ps(a, b)` | Add adjacent pairs within each 128-bit half |
 | Compare | `_mm256_cmp_ps(a, b, _CMP_GT_OS)` | Per-lane compare → all-0s or all-1s mask |
-| Blend | `_mm256_blendv_ps(a, b, mask)` | Select per-lane: `mask[i] ? b[i] : a[i]` |
+| Blend | `_mm256_blendv_ps(a, b, mask)` | Select `b[i]` if the mask lane's sign bit is set; otherwise `a[i]` |
 | Permute (cross-lane) | `_mm256_permutevar8x32_ps(v, idx)` | Full cross-lane reorder by index vector |
 | Gather | `_mm256_i32gather_ps(base, idx, 4)` | Load from non-contiguous addresses |
 
-> **`_mm256_load_ps` alignment:** If `ptr` is not 32-byte aligned, this generates a segfault (`#GP` fault) at runtime — not a compile error. When in doubt, use `_mm256_loadu_ps` (the `u` = unaligned). On modern CPUs the performance difference is negligible.
+> **Alignment contract:** `_mm256_load_ps` requires 32-byte alignment; violating that requirement can fault, and compiler transformations can change how the failure appears. Prefer `_mm256_loadu_ps` when alignment is not established. Both forms require eight readable floats. A pointer aligned to four bytes can still be unsuitable for the aligned intrinsic.
 
-> **FMA is the core of deep learning:** `_mm256_fmadd_ps(a, b, c)` computes `a*b + c` in a single fused instruction. GEMM (matrix multiplication), convolutions, and transformer attention inner loops are entirely composed of FMA. This is why FLOPS counts are usually reported as "FLOPS of FMA." On AVX2, 8-wide FMA at 2 ops/cycle = **16 GFLOPS/GHz per core**.
+> **FMA accounting:** `_mm256_fmadd_ps(a, b, c)` computes eight `a*b+c` results with one rounding per lane. That is conventionally counted as 16 floating-point operations per vector instruction. An assumed issue rate of one such instruction per cycle at 1 GHz gives 16 GFLOP/s; actual issue rate and sustained frequency depend on the CPU. Neural-network kernels also perform loads, stores, indexing, reductions, and non-FMA operations.
 
 **Aligned memory:**
 
@@ -1189,39 +1198,45 @@ void add_vectors_avx(float* a, float* b, float* c, int n) {
 // Aligned allocation (required for _mm256_load_ps)
 alignas(32) float data[1024];
 
-// Or dynamic allocation
-float* data = (float*)aligned_alloc(32, 1024 * sizeof(float));
+// Or dynamic allocation on implementations providing std::aligned_alloc:
+// #include <cstdlib>; byte count must be a multiple of the alignment.
+float* dynamic_data = static_cast<float*>(std::aligned_alloc(32, 1024 * sizeof(float)));
+if (!dynamic_data) { /* handle allocation failure before accessing it */ }
+// ... use only when allocation succeeded ...
+std::free(dynamic_data);
 ```
 
 ---
 
-### Top 10 Most-Used Intrinsics in Real Codebases
+### Ten Useful Intrinsics to Learn First
 
-Analysis of SIMD usage across GitHub repositories (production ML frameworks, databases, parsers) shows the same ~10 intrinsics appear in 80%+ of vectorized code. These are the ones worth memorizing first.
+These examples cover arithmetic, data movement, selection, and rearrangement. Their order is a learning sequence, not a measured popularity ranking. Look up operand constraints and target features before using an intrinsic.
 
-| Rank | Intrinsic | ISA | What it does | Why it's everywhere |
+| # | Intrinsic | Required feature | What it does | Example use |
 |------|-----------|-----|--------------|---------------------|
 | 1 | `_mm256_add_ps(a, b)` | AVX | Add 8 float32 | Core of every FP loop |
 | 2 | `_mm256_loadu_ps(ptr)` | AVX | Load 8 floats, unaligned | Default load — no alignment constraint |
 | 3 | `_mm256_storeu_ps(ptr, v)` | AVX | Store 8 floats, unaligned | Default store |
-| 4 | `_mm256_fmadd_ps(a, b, c)` | FMA+AVX2 | `a*b + c` in one instruction | GEMM, convolution, attention |
+| 4 | `_mm256_fmadd_ps(a, b, c)` | FMA + AVX state support | `a*b + c` with one rounding | GEMM, convolution, attention |
 | 5 | `_mm_add_ps(a, b)` | SSE | Add 4 float32 (128-bit) | SSE compat code, horizontal ops |
 | 6 | `_mm_set1_epi32(x)` | SSE2 | Broadcast int to all 4 lanes | Loading integer constants |
 | 7 | `_mm256_cmp_ps(a, b, pred)` | AVX | Compare → bitmask | Conditional selection, NaN handling |
 | 8 | `_mm_loadu_si128(ptr)` | SSE2 | Load 128-bit integer vector | String/byte processing |
 | 9 | `_mm_shuffle_epi32(v, imm)` | SSE2 | Reorder 32-bit int lanes | Data rearrangement, AoS→SoA |
-| 10 | `_mm_popcnt_u32(x)` | SSE4.2 | Count set bits in 32-bit int | Database filters, Hamming distance |
+| 10 | `_mm_popcnt_u32(x)` | POPCNT (its own CPU feature) | Count set bits in 32-bit int | Database filters, Hamming distance |
 
-**Patterns behind the rankings:**
+**Patterns to recognize:**
 
-- **`_ps` (packed single) dominates** — float32 is the workhorse of ML inference and scientific computing. Learn `_ps` variants first.
-- **Unaligned loads/stores are preferred** (`_loadu_`, `_storeu_`) — on Haswell and newer, the penalty for cache-line-crossing loads is ≤1 cycle. The code simplicity is worth it.
+- **`_ps` means packed single precision** — use these examples to learn FP32 vectors, then compare integer or reduced-precision operations for your application.
+- **Unaligned loads/stores simplify alignment requirements** (`_loadu_`, `_storeu_`). They still require valid memory for every accessed lane. Cache-line and page crossings can affect cost; measure on the target CPU.
 - **SSE2 128-bit still common** — many codebases use SSE2 for compatibility or for 128-bit sub-operations (horizontal reduction, remainder loops, byte processing).
-- **`_mm_shuffle_epi32` is the workhorse for integer rearrangement** — appears in virtually every AoS→SoA conversion, hash function, and string parser.
-- **`_mm_popcnt_u32/u64` is an outlier** — not strictly a SIMD register instruction (operates on scalar registers), but uses the SSE4.2 ISA feature bit and dominates database and bit-manipulation code (Hamming distance, counting set bits in filters).
+- **`_mm_shuffle_epi32` rearranges integer lanes** — useful when data layout differs from the following operation's required lane order.
+- **`_mm_popcnt_u32/u64` operates on scalar registers** — POPCNT has an independent feature bit; SSE4.2 support alone is not the feature contract to check.
 
 ```cpp
-// The most common inner loop pattern in real ML code (ranks 2, 4, 3):
+// Inner-loop sketch: n is a multiple of 8; A/B contain n floats;
+// acc was initialized, and out has space for 8 floats.
+// For arbitrary n, handle the remainder as in add_vectors_avx.
 for (int i = 0; i < n; i += 8) {
     __m256 a = _mm256_loadu_ps(&A[i]);     // rank 2
     __m256 b = _mm256_loadu_ps(&B[i]);     // rank 2
@@ -1230,7 +1245,7 @@ for (int i = 0; i < n; i += 8) {
 _mm256_storeu_ps(out, acc);                // rank 3
 ```
 
-> **Source:** Usage statistics from [simd.info intrinsic statistics](https://simd.info/blog/intrinsic_statistics_repositories_insights_and_patterns/) and analysis of GitHub repositories including production ML frameworks, databases, and codec libraries.
+> **Reference:** [Intel Intrinsics Guide](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html). Instruction-set names, lane width, and instruction throughput describe different properties.
 
 ---
 
@@ -1241,7 +1256,7 @@ A different lens — grouped by what you're trying to do, with both SSE (128-bit
 #### 1. Data Movement & Initialization
 
 ```cpp
-// Load — unaligned is the default today (negligible penalty on modern CPUs)
+// Unaligned loads accept any valid float address. Cost depends on cache/page splits and CPU.
 __m128 a = _mm_loadu_ps(ptr);       // SSE:  4 floats
 __m256 b = _mm256_loadu_ps(ptr);    // AVX:  8 floats
 
@@ -1265,7 +1280,7 @@ __m256 v = _mm256_setr_ps(0,1,2,3,4,5,6,7);  // natural order (r = reversed para
 __m256 r = _mm256_add_ps(a, b);     // a[i] + b[i]
 __m256 r = _mm256_sub_ps(a, b);     // a[i] - b[i]
 __m256 r = _mm256_mul_ps(a, b);     // a[i] * b[i]
-__m256 r = _mm256_div_ps(a, b);     // a[i] / b[i]  (slow — ~20 cycles)
+__m256 r = _mm256_div_ps(a, b);     // a[i] / b[i]; consult the target CPU's latency/throughput
 
 // FMA — the most important arithmetic intrinsic
 __m256 r = _mm256_fmadd_ps(a, b, c); // a[i]*b[i] + c[i], single instruction
@@ -1280,7 +1295,7 @@ __m256i r = _mm256_mullo_epi32(a, b);  // low 32 bits of each 32×32 product
 
 #### 3. Comparison & Selection (Branchless Conditionals)
 
-SIMD has no branches. The fundamental pattern: **compare → mask → blend**.
+Vector code can branch. For independent per-element conditions, a useful pattern is **compare → mask → blend**. This computes a selection per lane; it does not automatically suppress earlier invalid loads or arithmetic in an unselected expression.
 
 ```cpp
 // Step 1: Compare → produces per-lane all-1s (true) or all-0s (false)
@@ -1301,7 +1316,7 @@ __m256 sign_mask = _mm256_set1_ps(-0.0f);         // sign bit only
 __m256 abs_v     = _mm256_andnot_ps(sign_mask, v); // clear sign bit = |v|
 ```
 
-> **Comparison predicates for `_mm256_cmp_ps`:** `_CMP_EQ_OS`, `_CMP_LT_OS`, `_CMP_LE_OS`, `_CMP_GT_OS`, `_CMP_GE_OS`, `_CMP_NEQ_OS`, `_CMP_UNORD_Q` (NaN check). The `_OS` suffix = ordered, signaling (raises exception on NaN). Use `_OQ` for quiet (no exception).
+> **Comparison predicates for `_mm256_cmp_ps`:** ordered comparisons return false for unordered (NaN) operands. Signaling predicates can set the floating-point invalid flag for a quiet NaN; quiet predicates still signal invalid for a signaling NaN. The flag causes a trap only if the relevant exception is unmasked. Choose the predicate and NaN policy explicitly. Comparison results contain all-zero or all-one bits, which work as blend masks; an arbitrary nonzero integer such as `1` does not have the required sign bit.
 
 #### 4. Data Shuffling & Reduction
 
@@ -1317,7 +1332,7 @@ __m128 h = _mm_hadd_ps(a, b);   // [a0+a1, a2+a3, b0+b1, b2+b3]
 // hadd is slow — only use it 1-2 times at the very end of a reduction loop
 ```
 
-> **`_mm_hadd_ps` warning:** Horizontal add is one of the slowest SIMD instructions (~3-5 cycles vs 0.5 for `_mm_add_ps`). Never put it inside a loop. Use it once at the end to collapse an accumulator register — or better, use the `hsum` idiom from the Inspecting SIMD Registers section.
+> **Reduction cost:** Accumulate vertically and reduce at the end when the algorithm permits it. Horizontal operations inside a reduction loop can add dependencies and shuffle work. Compare instruction **latency** with latency and reciprocal **throughput** with throughput on the same microarchitecture; these are different quantities. Use the [Intel Intrinsics Guide](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html) and measure the complete loop.
 
 ---
 
@@ -1337,7 +1352,7 @@ __m128 h = _mm_hadd_ps(a, b);   // [a0+a1, a2+a3, b0+b1, b2+b3]
 | Hadd | `_mm_hadd_ps(a, b)` | `_mm256_hadd_ps(a, b)` | Adjacent-pair add |
 
 **When to use SSE vs AVX:**
-- **AVX for throughput** — 2× the data per instruction, same latency
+- **AVX for wider operations** — twice as many FP32 elements per instruction as 128-bit SSE; speedup and latency depend on the CPU and workload
 - **SSE for compatibility** — SSE2 is available on every x86-64 CPU since ~2003
 - **SSE for remainder loops** — after the main AVX loop processes `n/8*8` elements, handle the last `n%8` with SSE or scalar
 
@@ -1420,7 +1435,7 @@ void scaled_add(const float* a, const float* b, float* c, float scale, int n) {
         __m256 vsum = _mm256_add_ps(va, vb);
 
         // 4. mul_ps: scale the result
-        //    (alternatively: _mm256_fmadd_ps(va, v_scale, _mm256_mul_ps(vb, v_scale)))
+        //    Keep this operation order to match the stated scalar reference.
         __m256 vres = _mm256_mul_ps(vsum, v_scale);
 
         // 5. storeu: write 8 results back to memory
@@ -1441,7 +1456,7 @@ void scaled_add(const float* a, const float* b, float* c, float scale, int n) {
 - `_mm256_storeu_ps` — write results
 - Remainder loop — handle `n % 8` trailing elements cleanly
 
-**FMA version** — if `a` and `b` have already been scaled separately, `fmadd` collapses two ops:
+**A different operation, suitable for FMA:** `a*scale+b` is a multiply-add. It is not the same expression as `(a+b)*scale`; rewriting expressions can change both mathematics and rounding.
 ```cpp
 // c[i] = a[i] * scale + b[i]
 __m256 vres = _mm256_fmadd_ps(va, v_scale, vb);
@@ -1451,7 +1466,7 @@ __m256 vres = _mm256_fmadd_ps(va, v_scale, vb);
 
 ### ARM NEON Intrinsics (Jetson, Apple Silicon, Mobile)
 
-ARM NEON is the 128-bit SIMD extension for ARM processors — it's what runs on NVIDIA Jetson (Cortex-A78AE), Apple Silicon (M-series), Qualcomm Snapdragon, AWS Graviton, and every modern phone. If you deploy AI at the edge, NEON is how you vectorize CPU-side preprocessing.
+Arm NEON (Advanced SIMD) provides 128-bit vector operations. The examples here target AArch64, including Jetson Orin's Cortex-A78AE CPU. Verify the CPU's optional extensions before using FP16 arithmetic or dot-product instructions. CPU preprocessing and CUDA kernels execute on different processors.
 
 #### NEON vs x86 SIMD
 
@@ -1460,11 +1475,11 @@ ARM NEON is the 128-bit SIMD extension for ARM processors — it's what runs on 
 | Width | 128-bit | 256-bit | **128-bit** | 128–2048-bit (scalable) |
 | FP32 lanes | 4 | 8 | **4** | 4–64 |
 | Registers | 16 (XMM) | 16 (YMM) | **32 (V0–V31)** | 32 (Z0–Z31) |
-| FMA | SSE: No, FMA3: Yes | Yes | **Yes (vfmaq)** | Yes |
+| FMA | Separate FMA extension | Separate FMA extension | **Yes (AArch64 vfmaq)** | Yes |
 | Header | `<immintrin.h>` | `<immintrin.h>` | **`<arm_neon.h>`** | `<arm_sve.h>` |
-| Compiler | gcc/clang `-msse4.2` | `-mavx2` | **`-march=armv8-a`** | `-march=armv8.2-a+sve` |
+| Compiler | Select only required SSE extensions | `-mavx2`; add `-mfma` for FMA | **AArch64 `-march=armv8-a`** | `-march=armv8.2-a+sve` |
 
-NEON has **32 registers** (vs 16 on x86 AVX2) — more registers means the compiler can keep more values live without spilling. This partly compensates for the narrower 128-bit width.
+These register counts describe AArch64 and ordinary x86-64 SSE/AVX code; AArch32 differs. Register count alone does not predict performance. The native lab compiles its dispatcher for the baseline CPU and isolates AVX2/FMA functions, so unsupported machines can run the scalar path.
 
 #### NEON Data Types
 
@@ -1497,12 +1512,12 @@ float32x4x2_t  // pair of float32x4_t (8 floats across 2 registers)
 | `vdupq_n_f32(s)` | Broadcast scalar to all 4 lanes | `_mm_set1_ps` |
 | `vmovq_n_f32(0)` | Zero vector | `_mm_setzero_ps` |
 | `vcvtq_f32_s32(v)` | INT32→FP32 convert | `_mm_cvtepi32_ps` |
-| `vcvtq_s32_f32(v)` | FP32→INT32 convert | `_mm_cvtps_epi32` |
-| `vaddvq_f32(v)` | **Horizontal sum (all 4 lanes)** | No single instruction! |
+| `vcvtq_s32_f32(v)` | FP32→INT32, truncate toward zero | `_mm_cvttps_epi32` for finite in-range values |
+| `vaddvq_f32(v)` | **Horizontal sum (all 4 lanes)** | Compare the generated reduction sequence |
 | `vmaxvq_f32(v)` | **Horizontal max** | No single instruction! |
 | `vld2q_f32(ptr)` | **Interleaved load** (AoS→SoA) | No equivalent |
 
-> **NEON advantage:** `vaddvq_f32` does a horizontal sum in a single instruction. On x86, horizontal reduction requires 3–4 shuffle+add steps. NEON also has `vld2q`/`vld3q`/`vld4q` for automatic AoS→SoA deinterleaving on load — extremely useful for RGB/RGBA image processing.
+> One intrinsic does not imply one instruction. The [Arm intrinsic reference](https://arm-software.github.io/acle/neon_intrinsics/advsimd.html) maps four-lane `vaddvq_f32` to two `FADDP` operations. The lab checks real AArch64 compiler output. Interleaved loads such as `vld3q` can help RGB processing, but benchmark the complete loop and verify its tail and row stride.
 
 #### Example 1: Vector Addition (NEON)
 
@@ -1538,14 +1553,14 @@ float dot_neon(const float* a, const float* b, int n) {
         float32x4_t vb = vld1q_f32(&b[i]);
         acc = vfmaq_f32(acc, va, vb);    // acc += va * vb (fused multiply-add)
     }
-    float result = vaddvq_f32(acc);       // horizontal sum — single instruction!
+    float result = vaddvq_f32(acc);       // horizontal sum; normally two FADDP instructions
     // Scalar remainder
     for (; i < n; i++) result += a[i] * b[i];
     return result;
 }
 ```
 
-Compare to x86: the `vaddvq_f32` at the end replaces the 4-instruction horizontal sum shuffle dance (`hadd → hadd → extract`).
+The reduction is outside the vector loop. Its cost depends on the generated instructions and target CPU, and its addition order can differ from a scalar left-to-right sum.
 
 #### Example 3: ReLU Activation (INT8, 16-wide)
 
@@ -1617,7 +1632,7 @@ void add_fp16(const __fp16* a, const __fp16* b, __fp16* c, int n) {
 g++ -O2 -march=armv8.2-a+fp16 -o fp16add fp16add.cpp
 ```
 
-8 FP16 values per 128-bit register — same throughput per register as 4× FP32, but half the memory traffic.
+Eight FP16 values fit in a 128-bit register, compared with four FP32 values. Storage is halved for the same element count; arithmetic throughput and accuracy depend on the target and algorithm.
 
 #### Example 6: Tiled 4×4 Matrix Multiply (NEON)
 
@@ -1654,17 +1669,17 @@ void matmul_4x4_neon(const float* A, const float* B, float* C) {
 | Register width | 256-bit | 128-bit |
 | FP32 lanes | 8 | 4 |
 | Registers | 16 | **32** |
-| Horizontal sum | 3–4 instructions | **1 instruction** (`vaddvq`) |
-| AoS deinterleave | Complex shuffles | **1 instruction** (`vld3q/vld4q`) |
+| Horizontal sum | Inspect generated reduction | Four-lane `vaddvq_f32` maps to two `FADDP`s |
+| AoS deinterleave | Loads and shuffles or gathers | Structured loads such as `LD3`/`LD4`; costs vary |
 | FP16 native | No (convert to FP32) | **Yes** (ARMv8.2-a) |
-| Cross-lane gotchas | 128-bit lane boundary | None (true 128-bit) |
+| Lane rules | Some shuffles stay within 128-bit halves | Read each operation's lane-selection rules |
 | Typical platform | Server, workstation | **Jetson, phone, Apple Silicon, Graviton** |
 
 **When to use NEON vs let the compiler vectorize:** Same rule as x86 — try auto-vectorization first (`-O2 -march=armv8.2-a`). Use manual NEON intrinsics when the compiler fails (complex access patterns, interleaved data, FP16 arithmetic) or when measurements justify tighter control over instruction selection. Intrinsics alone do not guarantee latency; memory contention, scheduling, and clocks still matter.
 
-#### ARM SVE/SVE2 — The Future
+#### Arm SVE/SVE2 — a separate optional extension
 
-SVE (Scalable Vector Extension) is ARM's answer to the fixed-width problem. Instead of 128 bits, SVE registers are **variable width** (128–2048 bits, set per chip). Your code works on any width without recompiling:
+SVE supports vector lengths from 128 to 2048 bits in 128-bit increments. A program written in a vector-length-agnostic style can adapt to the available length without recompiling, provided the CPU and operating system support the required instructions. Not every Arm CPU supports SVE; this is not an automatic upgrade of NEON. See [Arm's SVE learning path](https://learn.arm.com/learning-paths/servers-and-cloud-computing/sve/sve_basics/).
 
 ```cpp
 #include <arm_sve.h>
@@ -1677,16 +1692,16 @@ void add_sve(const float* a, const float* b, float* c, int n) {
         svst1(pred, &c[i], svadd_f32_m(pred, va, vb));
     }
 }
-// Same binary runs on 128-bit (Neoverse N1) and 256-bit (Neoverse V2) and future 512-bit
+// The loop obtains the lane count at runtime instead of assuming a particular width.
 ```
 
-SVE2 is available on Neoverse V2 (AWS Graviton4), Apple M4, and upcoming Jetson. NEON knowledge transfers directly — SVE is NEON with scalable width and predication.
+Keep the example as an SVE-specific function behind feature dispatch. Jetson Orin's Cortex-A78AE uses NEON, not SVE. Do not infer SVE or SVE2 support from an Arm product name, release date, or compiler accepting `-march`.
 
 ---
 
 ### Cross-Lane Limitations (The AVX2 Gotcha)
 
-Most AVX2 "256-bit" instructions actually execute as **two independent 128-bit halves**. This is the single most surprising architectural quirk in AVX2 and causes subtle bugs when you expect full cross-lane operations.
+Some 256-bit shuffle and horizontal-add instructions operate independently within 128-bit halves. This is the defined lane mapping of those instructions, not a general claim about how every AVX2 instruction executes inside a CPU. Ordinary packed addition adds each of all eight corresponding lanes.
 
 ```cpp
 // shuffle_ps looks like it works on 256-bit, but it only shuffles within each 128-bit half:
@@ -1710,29 +1725,22 @@ __m256 reversed = _mm256_permutevar8x32_ps(v, idx);       // true 8-element perm
 | `_mm256_permute2f128_ps` | Yes | Swaps/copies 128-bit halves |
 | `_mm256_permutevar8x32_ps` | Yes | Full 8-element permute (AVX2 only) |
 
-> **Rule of thumb:** If an intrinsic says "256-bit" but was available in AVX (not AVX2), suspect it operates on two 128-bit halves. Verify with [Intel Intrinsics Guide](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/) or [uops.info](https://uops.info/).
+> Read the operation's pseudocode in the [Intel Intrinsics Guide](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html). AVX already includes cross-half operations such as `permute2f128`; the extension's name is not enough to determine lane behavior.
 
 ---
 
 ### Inspecting SIMD Registers (Debugging)
 
-You can't `printf` a `__m256`. The standard pattern is a union, which lets you read individual lanes:
+Store the vector into an ordinary array before inspecting lanes. Reading a different active union member is not a portable C++ type-punning technique.
 
 ```cpp
-// Union for safe lane inspection (from hands-on-simd-programming)
-union float8 {
-    __m256  v;
-    float   a[8];
-    float8() : v(_mm256_setzero_ps()) {}
-    float8(__m256 x) : v(x) {}
-};
-
-// Usage
-float8 result(_mm256_fmadd_ps(va, vb, vc));
-printf("lane 0: %f, lane 3: %f\n", result.a[0], result.a[3]);
+float lanes[8];
+__m256 result = _mm256_fmadd_ps(va, vb, vc);
+_mm256_storeu_ps(lanes, result);
+printf("lane 0: %f, lane 3: %f\n", lanes[0], lanes[3]);
 
 // Or with structured binding in C++17:
-auto [l0,l1,l2,l3,l4,l5,l6,l7] = result.a;
+auto [l0,l1,l2,l3,l4,l5,l6,l7] = lanes;
 ```
 
 **Horizontal sum — reducing a vector to a scalar:**
@@ -1742,7 +1750,7 @@ This pattern appears everywhere: dot products, attention scores, reductions.
 ```cpp
 // Sum all 8 floats in a __m256 to a scalar
 float hsum(__m256 v) {
-    // Step 1: add pairs within each 128-bit half → [a+e, b+f, c+g, d+h | a+e, b+f, c+g, d+h]
+    // Step 1: add corresponding values from the low and high halves → [a+e,b+f,c+g,d+h]
     __m128 lo  = _mm256_castps256_ps128(v);          // lower 128 bits
     __m128 hi  = _mm256_extractf128_ps(v, 1);        // upper 128 bits
     __m128 sum = _mm_add_ps(lo, hi);                 // add the two halves
@@ -1756,14 +1764,17 @@ float hsum(__m256 v) {
 **Stream stores for large write-once buffers:**
 
 ```cpp
-// Non-temporal store: bypasses CPU cache entirely
-// Use when writing large output buffers you won't read back soon
+// Non-temporal store: requests a streaming/non-temporal cache policy.
+// Sketch preconditions: out is 32-byte aligned, n is a multiple of 8,
+// and all n output elements are allocated. Handle a remainder separately.
+// Consider it for large output buffers you will not read back soon.
 // (e.g., preprocessing output, frame buffer writes)
 for (int i = 0; i < n; i += 8) {
     __m256 result = /* compute */;
-    _mm256_stream_ps(&out[i], result);   // skip cache, write direct to memory
+    _mm256_stream_ps(&out[i], result);   // actual cache/coherence behavior is platform-dependent
 }
-_mm_sfence();  // memory fence — ensure all stream writes are visible
+_mm_sfence();  // Order preceding streaming stores before subsequent stores.
+// Cross-thread publication still needs a correct C++ synchronization protocol.
 
 // When to use: write-once buffers > L3 cache size
 // When NOT: if you'll read the data back soon (defeats the purpose)
@@ -1777,7 +1788,7 @@ float table[1024] = { /* lookup table */ };
 __m256i indices = _mm256_set_epi32(7, 3, 15, 0, 42, 8, 1, 100);  // arbitrary indices
 __m256 gathered = _mm256_i32gather_ps(table, indices, 4);          // scale=4 (sizeof float)
 
-// Note: gather throughput ≈ scalar loads — no bandwidth benefit for the gather itself.
+// Gather cost depends on CPU, cache residency, and address distribution.
 // The value: the *computation* after gather runs vectorized (8 FMAs instead of 8 scalar ops).
 // Good for: embedding lookups, sparse vector ops, non-sequential access patterns.
 ```
@@ -1786,7 +1797,7 @@ __m256 gathered = _mm256_i32gather_ps(table, indices, 4);          // scale=4 (s
 
 ### Cache Lines and Memory Alignment
 
-The CPU fetches memory in **64-byte cache lines** — not individual bytes. This is the physical reason SIMD alignment matters and the root cause of most false-sharing bugs in multithreaded code.
+Caches transfer and track blocks called cache lines. A 64-byte line is common on the x86 CPUs used in this lab, but line size is target-dependent. Instruction alignment requirements are a separate contract: `_mm256_load_ps` needs 32-byte alignment even if all its bytes are already cached.
 
 ```
 Cache line = 64 bytes = 16 floats = 8 doubles = 2 AVX registers
@@ -1799,10 +1810,10 @@ Cache line = 64 bytes = 16 floats = 8 doubles = 2 AVX registers
 
 | Scenario | Cache line impact |
 |----------|------------------|
-| `_mm256_load_ps` aligned | One cache line touched per load |
-| `_mm256_loadu_ps` misaligned | May touch two cache lines — up to 2× memory traffic |
-| False sharing (threads) | Two threads write different variables in same 64-byte line → cache ping-pong |
-| `alignas(64)` struct | Guarantees struct starts at cache line boundary |
+| `_mm256_load_ps` aligned | A 32-byte load stays within one 64-byte line |
+| `_mm256_loadu_ps` misaligned | May cross a line or page; this does not automatically double DRAM traffic |
+| False sharing (threads) | Independent writes share a coherence block and cause ownership traffic |
+| `alignas(64)` struct | Guarantees 64-byte alignment; useful when it matches the target's coherence granularity |
 
 ```cpp
 // False sharing — avoid this
@@ -1816,7 +1827,7 @@ struct alignas(64) WorkerA { int counter; };
 struct alignas(64) WorkerB { int counter; };
 ```
 
-**Rule:** Align SIMD buffers to 32 bytes (`alignas(32)`) for AVX. Align per-thread data to 64 bytes (`alignas(64)`) to prevent false sharing.
+**Rule:** Use unaligned operations unless alignment is established, and never access beyond the allocation. Separate frequently written thread-owned data using the target's coherence granularity; measure before and after padding. `alignas(64)` alone is not a portable guarantee against false sharing on every CPU.
 
 ---
 
@@ -1855,7 +1866,7 @@ for (int i = 0; i < N; i++)
 // You wanted: x0,x1,x2,x3,x4,x5,x6,x7 — but they're 24 bytes apart, not contiguous
 ```
 
-The x-values are **scattered** in memory. SIMD cannot load them efficiently — it would need gather (`_mm256_i32gather_ps`), which has the same throughput as scalar loads.
+The x-values are strided in memory. A compiler may use scalar loads, gathers, or wider loads followed by shuffles. Their relative cost depends on the CPU, cache residency, and other fields used by the loop.
 
 #### Struct of Arrays (SoA) — SIMD-friendly
 
@@ -1886,16 +1897,18 @@ Now the SIMD loop is clean — one load, one add, one store:
 ```cpp
 // SoA: x values are contiguous → direct sequential AVX load
 __m256 vdx = _mm256_set1_ps(dx);
-for (int i = 0; i < N; i += 8) {
+int i = 0;
+for (; i <= N - 8; i += 8) {
     __m256 vx = _mm256_loadu_ps(&p.x[i]);       // load x0..x7 — perfectly contiguous
     _mm256_storeu_ps(&p.x[i], _mm256_add_ps(vx, vdx));  // add dx to all 8 at once
 }
+for (; i < N; ++i) p.x[i] += dx;
 ```
 
 #### Side-by-side loop comparison
 
 ```cpp
-// AoS — compiler cannot auto-vectorize the x update (stride too large)
+// AoS — compiler may use strided loads/gathers or decline vectorization
 for (int i = 0; i < N; i++)
     particles[i].x += dx;           // stride = 24 bytes between x values
 
@@ -1909,40 +1922,44 @@ for (int i = 0; i < N; i++)
 | | AoS | SoA | AoSoA |
 |--|-----|-----|-------|
 | Memory pattern | `xyzxyzxyz...` | `xxx...yyy...zzz...` | `[xxxx yyyy][xxxx yyyy]...` |
-| SIMD efficiency | Low — gather/scatter needed | High — sequential load | High + cache-friendly |
-| GPU coalescing | Poor | Good | Good |
+| Per-field SIMD access | Often needs extra loads/shuffles | Contiguous values | Contiguous values within each tile |
+| GPU coalescing | Depends on fields and lane access | Often convenient for per-field work | Depends on tile and lane mapping |
 | Code readability | High — `p[i].x` | Medium — `p.x[i]` | Low — tiled indexing |
 | Best for | Small structs, OOP | Physics, ML kernels, SIMD | Intel oneDNN, CUTLASS tiling |
 
 **When to choose each:**
 - **AoS** — small datasets, all fields used together, readability matters more than throughput
 - **SoA** — large arrays, per-field operations, SIMD loops, GPU kernels
-- **AoSoA** — when you need SoA efficiency but also want cache-line-sized tiles for L1 reuse (oneDNN weight format, CUTLASS fragment layouts)
+- **AoSoA** — groups of records with contiguous fields within each group; choose tile size from the access pattern and measurements
 
-> **Deep learning connection:** cuDNN NCHW vs NHWC is exactly this choice. NCHW = SoA over spatial dimensions (all red pixels, then all green). NHWC = AoS over channels (all channels for one pixel together). Tensor Core layouts (e.g., `mma.sync` fragments) use AoSoA — 16×16 tiles packed for register-level reuse. Choosing the wrong layout forces expensive transposes that dominate runtime.
+> **Deep learning connection:** NCHW and NHWC also change which values are adjacent, but neither is universally faster. Tensor Core fragment layouts specify a particular distribution of elements across threads and registers; do not infer that mapping from the label AoSoA. Include any required layout conversion in end-to-end timing.
 
 ---
 
-### `std::simd` (C++26, Experimental)
+### Experimental SIMD and the C++26 Library
 
-The future of portable SIMD — no intrinsics, no platform-specific code:
+The following example uses libstdc++'s **Parallelism TS** API in `<experimental/simd>`. It is distinct from the C++26 `<simd>` API; changing only the header is not a migration plan. Check your library's supported interface. See the [GCC TS header documentation](https://gcc.gnu.org/onlinedocs/gcc-16.1.0/libstdc%2B%2B/api/a01262.html) and the [current C++ SIMD draft](https://eel.is/c++draft/simd).
 
 ```cpp
 #include <experimental/simd>
 namespace stdx = std::experimental;
 
-void add_vectors(float* a, float* b, float* c, int n) {
+// Same non-overlap and n >= 0 contract as add_vectors_avx above.
+void add_vectors_ts(const float* a, const float* b, float* c, int n) {
     using V = stdx::native_simd<float>;  // Auto-selects best width
-    for (int i = 0; i < n; i += V::size()) {
+    const int width = static_cast<int>(V::size());
+    int i = 0;
+    for (; i <= n - width; i += width) {
         V va(&a[i], stdx::element_aligned);
         V vb(&b[i], stdx::element_aligned);
         V vc = va + vb;
         vc.copy_to(&c[i], stdx::element_aligned);
     }
+    for (; i < n; ++i) c[i] = a[i] + b[i];
 }
 ```
 
-Available in GCC 11+ with `-std=c++23 -lstdc++exp`. Not yet production-ready but worth tracking.
+**Executed course check (2026-10-18):** the AVX and TS functions were compiled with GCC 13.3 using `-std=c++17 -O2 -mavx2 -fsanitize=address,undefined` and checked against scalar addition for lengths 0, 1, 7, 8, 9, 17, and 101, including pointers offset by one float and output guards. No extra library flag was required for this TS example. Recheck compilation and generated code on another standard library or architecture. `-march=native`/`-mavx2` binaries require a compatible execution target.
 
 ### Measurement First
 
@@ -1956,9 +1973,10 @@ perf stat -e instructions,cycles,cache-misses,fp_arith_inst_retired.256b_packed_
     ./my_program
 
 # Key ratios to check:
-#   instructions/cycles < 2.0  → probably stalled on memory
-#   cache-misses high           → data layout problem (try SoA)
-#   256b_packed_single low      → auto-vectorization failed, add -fopt-info-vec
+#   IPC alone cannot identify a memory bottleneck.
+#   Cache misses need an access count, hierarchy level, and latency context.
+#   FP event names/counting rules are CPU-specific; use perf list first.
+#   Confirm vectorization with a compiler report and disassembly as well.
 
 # Confirm vectorization happened
 g++ -O2 -march=native -fopt-info-vec-optimized my_code.cpp
@@ -2001,12 +2019,15 @@ Matrix mult: AI = O(N³) FLOP / O(N²) bytes → compute-bound for large N ✓
 The jump from SIMD to CUDA looks large but the underlying idea is the same. The key difference is *who* picks the element index:
 
 ```cpp
-// ── SIMD mindset: one thread, one instruction covers N elements ──
-for (int i = 0; i < n; i += 8) {
-    __m256 va = _mm256_load_ps(&a[i]);
-    __m256 vb = _mm256_load_ps(&b[i]);
-    _mm256_store_ps(&c[i], _mm256_add_ps(va, vb));
+// ── SIMD mindset: one thread, one instruction covers 8 FP32 elements ──
+// Contract: nonnegative n, n elements in each array, disjoint output.
+int i = 0;
+for (; i <= n - 8; i += 8) {
+    __m256 va = _mm256_loadu_ps(&a[i]);
+    __m256 vb = _mm256_loadu_ps(&b[i]);
+    _mm256_storeu_ps(&c[i], _mm256_add_ps(va, vb));
 }
+for (; i < n; ++i) c[i] = a[i] + b[i];
 // You write the stride (i += 8). The hardware runs 8 lanes silently.
 
 // ── GPU / SIMT mindset: one thread per element, hardware spawns thousands ──
@@ -2020,9 +2041,9 @@ __global__ void add(float* a, float* b, float* c, int n) {
 | Aspect | AVX (CPU SIMD) | CUDA warp (GPU SIMT) |
 |--------|---------------|----------------------|
 | Parallel width | 8× float32 | 32 threads |
-| Register file | `__m256` (256-bit) | 32× 32-bit registers per thread |
+| Register view | A `__m256` value holds 8 FP32 lanes | Per-thread registers; allocation depends on compiled kernel and target |
 | Memory | L1/L2 cache | Shared memory / global memory |
-| Divergence cost | Branch kills vectorization | Warp divergence serializes threads |
+| Conditional work | May use masks/selects, branches, or inhibit vectorization | Divergent paths change active lanes and can reduce throughput |
 | Programmer model | Explicit lanes (intrinsics) | Implicit (thread index) |
 
 ---
@@ -2043,12 +2064,12 @@ These are the issues that consume weeks of debugging in real HPC and ML systems.
 | Trap | What happens | Fix |
 |------|-------------|-----|
 | **`shared_ptr` in hot loops** | Atomic ref-count inc/dec every iteration → cache line contention | Use raw pointer or `unique_ptr` inside hot paths; bump `shared_ptr` count once outside the loop |
-| **False sharing** | Two threads update different variables in the same 64-byte cache line → invisible serialization | Pad thread-local data to `alignas(64)` |
+| **False sharing** | Independent writes contend for ownership of the same coherence block | Separate hot writes using the target's cache granularity and measure |
 | **Unaligned `_mm256_load_ps`** | Segfault (`#GP`) at runtime, not compile time | Use `_mm256_loadu_ps` unless you've verified 32-byte alignment with `alignas(32)` |
-| **Branching inside vectorized loops** | Compiler cannot vectorize; scalar fallback runs | Move conditionals outside the loop; use SIMD blend instructions (`_mm256_blendv_ps`) |
-| **Memory-bound SIMD** | SIMD adds complexity, negligible speedup | Profile first (Roofline); restructure data layout (SoA) before adding intrinsics |
-| **`par_unseq` with dependencies** | Silent data corruption or undefined behavior | Only use when elements are **completely independent** — no reads from neighboring indices |
-| **Ignoring NUMA** | Multi-socket systems: thread allocates memory on socket 0, socket 1 thread reads it → 2× bandwidth | Allocate memory on the NUMA node that will use it (`numactl`, `mbind`) |
+| **Branching inside vectorized loops** | May use masks, branches, or inhibit vectorization | Inspect the vectorization report and preserve bounds/NaN semantics |
+| **Memory-bound SIMD** | Speedup eventually stops at available bandwidth | Measure the complete loop; consider data reuse and layout |
+| **`par_unseq` with conflicting accesses** | Data races, invalid ordering, or forbidden synchronization | Read-only neighbors can be valid; overlapping writes and callback synchronization need careful analysis |
+| **Ignoring NUMA** | Remote accesses can raise latency and compete for interconnect bandwidth | Measure placement and first-touch behavior on the actual machine |
 
 ---
 

@@ -1,0 +1,318 @@
+{
+  "checked_utc": "2026-10-18T23:35:55.236918+00:00",
+  "sources": [
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "docs/automation/cron-jobs.md",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/automation/cron-jobs.md",
+      "sha256": "8768e51ee56c2d572fc55b64a1f24bc60f1aca9b73f39b1d54e7fea2c390dc1b",
+      "bytes": 11384,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "docs/channels/channel-routing.md",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/channels/channel-routing.md",
+      "sha256": "a254ecbe1021f4f69f1e60727569b189ef2d6abc5f8f127d26bb0c1483aa1592",
+      "bytes": 10961,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "docs/cli/cron.md",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/cli/cron.md",
+      "sha256": "6cbb0ff788293de7b7b1e8e05b106990cb2ea523603ba1724f18c6bda4fec90e",
+      "bytes": 38239,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "docs/concepts/agent-loop.md",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/concepts/agent-loop.md",
+      "sha256": "0691e0ae082fb838fc599041258b02f029f6f3ae340ba022d9155d460765b98e",
+      "bytes": 44309,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "docs/concepts/multi-agent.md",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/concepts/multi-agent.md",
+      "sha256": "b4de48f19515a4e8ebc5d09f2242dca2edc0d24f5c33272491c22a25ada78af5",
+      "bytes": 33455,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "docs/concepts/session.md",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/concepts/session.md",
+      "sha256": "a684699c10f569229641637d13db033f49af54cde1c5107a2bc50521afd960b9",
+      "bytes": 34603,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "docs/concepts/system-prompt.md",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/concepts/system-prompt.md",
+      "sha256": "f419d4b277118f750a2f8499c9b0f90de72c418fa5412a5ca58d47fb0fc4f67b",
+      "bytes": 29647,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "docs/gateway/protocol.md",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/gateway/protocol.md",
+      "sha256": "44f85c6ff7e0223017e4a0a0ab174d0a53cf3fc793a8e771f4da7dbe227b29ce",
+      "bytes": 8034,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "docs/gateway/protocol/auth.md",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/gateway/protocol/auth.md",
+      "sha256": "d2a7d45b5c1f50efceb2c1f9d17ebf295b7612854e28b1b9225340f517b3b8ce",
+      "bytes": 12634,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "docs/gateway/protocol/handshake.md",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/gateway/protocol/handshake.md",
+      "sha256": "fbc5d0e4cd509d43043e07c9bc9347bef8bdebda11b4f061c654b56b95ed10b7",
+      "bytes": 20142,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "docs/gateway/protocol/operator-methods.md",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/gateway/protocol/operator-methods.md",
+      "sha256": "f17947e7a935bb7c314a85b8525c60daf48314ad56f86fa9d1b8978c339ee200",
+      "bytes": 21482,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "docs/gateway/protocol/rpc-bootstrap-and-events.md",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/gateway/protocol/rpc-bootstrap-and-events.md",
+      "sha256": "09c3a484efc7b30ed8d5058e0ada9aca41cc5a0861d9f61dafb5fc4774810457",
+      "bytes": 39529,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "docs/gateway/protocol/transport.md",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/gateway/protocol/transport.md",
+      "sha256": "cc3485139a33f914b725fe21965e195d7ffc38ceca0b2d3f2514fcea03729621",
+      "bytes": 19366,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "docs/gateway/protocol/versioning.md",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/gateway/protocol/versioning.md",
+      "sha256": "348d4543f15cfad1da3529e5dc835742618c3b914c5e02873413032bb025f98e",
+      "bytes": 15168,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "docs/gateway/security/access-control.md",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/gateway/security/access-control.md",
+      "sha256": "3e52fb4543d809beae3d1d3843819a7ad95f571491ef8f8e12efe95c18b33b01",
+      "bytes": 7259,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "docs/gateway/security/index.md",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/gateway/security/index.md",
+      "sha256": "996758a2b5c89a10fb973327cb4c9b41b9b933ef3cce46ffd2625a69b16e7af3",
+      "bytes": 14456,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "docs/security/THREAT-MODEL-ATLAS.md",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/security/THREAT-MODEL-ATLAS.md",
+      "sha256": "b4d5a74133edb31a143e867f4bacb0b6403c41fd4703d76f25fa450d8f8ecc73",
+      "bytes": 28508,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "package.json",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/package.json",
+      "sha256": "6553df1a37905fed669229f8ef89e0fdfad7567fe21189b003f05b8c427a2891",
+      "bytes": 151002,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "packages/gateway-protocol/src/schema/error-shape.ts",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/packages/gateway-protocol/src/schema/error-shape.ts",
+      "sha256": "6032514510b517dd0b838de95e4b415f339b5d96cabe6115ab4ef2fb97ff1cbd",
+      "bytes": 540,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "packages/gateway-protocol/src/schema/frames.ts",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/packages/gateway-protocol/src/schema/frames.ts",
+      "sha256": "e6b32e28aec00e451c887f5ddbeac152a8e6a9691ea188f5b8c9601a3466de13",
+      "bytes": 8918,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "packages/gateway-protocol/src/schema/snapshot.ts",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/packages/gateway-protocol/src/schema/snapshot.ts",
+      "sha256": "c5f0716737276076100f80f9afa3b03f4626b3736a6bc0758c3ac43ba9a198ed",
+      "bytes": 10015,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "packages/sdk/package.json",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/packages/sdk/package.json",
+      "sha256": "8baab58e47cd55862feaf5f756da9323dc7d67d9da53170c48dc2f6a6733add2",
+      "bytes": 743,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "packages/sdk/src/client.test-support.ts",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/packages/sdk/src/client.test-support.ts",
+      "sha256": "21fccec86508516691af35474a2ee350a039b21848c0e0169ce52f13e04f5e37",
+      "bytes": 2995,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "packages/sdk/src/client.ts",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/packages/sdk/src/client.ts",
+      "sha256": "830b4cce915c63eaca72eb1b5053d27f17ffd955d6cda1d779114311afb59970",
+      "bytes": 20778,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenClaw",
+      "revision": "24aac3c15a01feb1946dad5b212282e78dc3941e",
+      "path": "packages/sdk/src/index.ts",
+      "url": "https://raw.githubusercontent.com/openclaw/openclaw/24aac3c15a01feb1946dad5b212282e78dc3941e/packages/sdk/src/index.ts",
+      "sha256": "99029d9984118f168fc2c1fafd8311dbf985c405fcf63df70af348e0e3b6eb73",
+      "bytes": 1924,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "OpenAI Agents SDK",
+      "revision": "9abc9182d06dbd28330af888306031269d57a175",
+      "path": "docs/guardrails.md",
+      "url": "https://raw.githubusercontent.com/openai/openai-agents-python/9abc9182d06dbd28330af888306031269d57a175/docs/guardrails.md",
+      "sha256": "ccdfa6eb4ca29ef5f265a2bad4d3d0b7786f1a3970f58cfcf07a641b3bb56667",
+      "bytes": 16786,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "Reflex benchmark",
+      "revision": "3528c2cc11d561599fa92df0316bbe222b50269f",
+      "path": "README.md",
+      "url": "https://raw.githubusercontent.com/reflex-dev/agent-benchmark/3528c2cc11d561599fa92df0316bbe222b50269f/README.md",
+      "sha256": "1edd58d47cdd9f30d8c6ab0c4167f56a0a16b5bb4361ea27af30a046159f1106",
+      "bytes": 11199,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "Agent Skills Eval",
+      "revision": "f10ae2b3c93055cadd82c02a3b7fe4cfbd9a4645",
+      "path": "package.json",
+      "url": "https://raw.githubusercontent.com/darkrishabh/agent-skills-eval/f10ae2b3c93055cadd82c02a3b7fe4cfbd9a4645/package.json",
+      "sha256": "437c47feffc855c553f7ba629239e7a1fe3eb81796b71607b41cd3c2846e6a38",
+      "bytes": 2945,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "LLM workshop",
+      "revision": "63069f99af8ce9a6ab6e261000f4f9f1daaa1ee9",
+      "path": "README.md",
+      "url": "https://raw.githubusercontent.com/angelos-p/llm-from-scratch/63069f99af8ce9a6ab6e261000f4f9f1daaa1ee9/README.md",
+      "sha256": "67399cfa7d1d752e21ce94dc8fd90e43882d97eaa6d5a1d82b96248167a2e253",
+      "bytes": 6564,
+      "method": "downloaded source, inspected; not executed"
+    },
+    {
+      "project": "Qwen/Qwen3.5-4B",
+      "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "path": "config.json",
+      "url": "https://huggingface.co/Qwen/Qwen3.5-4B/resolve/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a/config.json",
+      "sha256": "ddc63e1c717afa86c865bb5e01313d89d72bb53b97ad4a8a03ba8510c0621670",
+      "bytes": 3161,
+      "bundled_file": "Qwen3.5-4B-config.json",
+      "method": "pinned metadata only; no weights/inference"
+    },
+    {
+      "project": "ibm-granite/granite-embedding-97m-multilingual-r2",
+      "revision": "835ad14087e140460703cf0fae09f97d469d65c2",
+      "path": "config.json",
+      "url": "https://huggingface.co/ibm-granite/granite-embedding-97m-multilingual-r2/resolve/835ad14087e140460703cf0fae09f97d469d65c2/config.json",
+      "sha256": "de948b0bdc6f356afad7a84b276d8dd7e7fe10fb9add1bb5e610621c28e41ebc",
+      "bytes": 1216,
+      "bundled_file": "granite-embedding-97m-multilingual-r2-config.json",
+      "method": "pinned metadata only; no weights/inference"
+    },
+    {
+      "project": "ibm-granite/granite-embedding-97m-multilingual-r2",
+      "revision": "835ad14087e140460703cf0fae09f97d469d65c2",
+      "path": "modules.json",
+      "url": "https://huggingface.co/ibm-granite/granite-embedding-97m-multilingual-r2/resolve/835ad14087e140460703cf0fae09f97d469d65c2/modules.json",
+      "sha256": "84e40c8e006c9b1d6c122e02cba9b02458120b5fb0c87b746c41e0207cf642cf",
+      "bytes": 349,
+      "bundled_file": "granite-embedding-97m-multilingual-r2-modules.json",
+      "method": "pinned metadata only; no weights/inference"
+    },
+    {
+      "project": "ibm-granite/granite-embedding-97m-multilingual-r2",
+      "revision": "835ad14087e140460703cf0fae09f97d469d65c2",
+      "path": "1_Pooling/config.json",
+      "url": "https://huggingface.co/ibm-granite/granite-embedding-97m-multilingual-r2/resolve/835ad14087e140460703cf0fae09f97d469d65c2/1_Pooling/config.json",
+      "sha256": "8bc5c9a40814fcf48d2fbe7cfeff4bee6736c3c2a823ba0ce098985c59d12ab7",
+      "bytes": 313,
+      "bundled_file": "granite-embedding-97m-multilingual-r2-1_Pooling_config.json",
+      "method": "pinned metadata only; no weights/inference"
+    }
+  ],
+  "model_arithmetic": {
+    "full_attention_layers": 8,
+    "linear_attention_layers": 24,
+    "bf16_kv_bytes_per_token_per_sequence": 32768,
+    "bf16_kv_bytes": {
+      "4096": 134217728,
+      "8192": 268435456,
+      "16384": 536870912
+    },
+    "illustrative_float32_recurrent_matrix_bytes_per_sequence": 50331648,
+    "excludes": "convolution state, padding/layout, rollbacks, weights, activations, workspaces, indexes, embedding and vision components; not measured process memory"
+  }
+}

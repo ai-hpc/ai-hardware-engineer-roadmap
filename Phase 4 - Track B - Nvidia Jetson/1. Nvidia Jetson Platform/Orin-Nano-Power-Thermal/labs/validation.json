@@ -1,0 +1,11 @@
+{
+  "checked_on": "2026-10-18",
+  "evidence_kind": "CPU synthetic calculation tests; no power meter or Jetson",
+  "python": "3.12.3",
+  "tests_passed": 11,
+  "files_sha256": {
+    "energy_thermal.py": "6b5009ec5f23100f0f374cece7e49aacd90227a02cf73678972d0e7b825f23a9",
+    "test_energy_thermal.py": "1d17d2c208b3e78f7f8a779ec388d4f6ff39dea6f941ab8248dbd1368f4dca6d"
+  },
+  "reviewed_utc": "2026-10-18T21:19:36.294335+00:00"
+}

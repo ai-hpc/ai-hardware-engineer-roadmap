@@ -453,7 +453,7 @@ from pydantic import BaseModel, Field, HttpUrl
 class ModelConfig(BaseModel):
     chat_model: str
     embedding_model: str
-    temperature: float = Field(ge=0.0, le=2.0)
+    temperature: float | None = None  # Validate support/range in the provider adapter.
     max_tokens: int = Field(gt=0, le=8192)
 
 
@@ -481,8 +481,9 @@ class AgentConfig(BaseModel):
 def load_config(raw: dict) -> AgentConfig:
     config = AgentConfig.model_validate(raw)
 
-    if config.environment == "prod" and config.models.temperature > 0.7:
-        raise ValueError("production temperature is too high for this agent")
+    # Validate the selected model's capability manifest next: supported parameters,
+    # context/output limits and enabled tool/structured-output modes.
+    # A universal temperature threshold is neither portable nor a safety policy.
 
     return config
 ```
@@ -749,29 +750,17 @@ At startup, verify:
 
 Do not run an expensive prompt at startup.
 
-Use a cheap sanity check:
+Use a bounded sanity check through the actual provider adapter. Separate transport/authentication failure from model-quality failure. A four-token cap can truncate a reasoning model before any visible answer. Use a supported model-specific output budget and an explicit deadline.
 
 ```python
-def verify_model_client(client):
-    response = client.generate(
-        messages=[
-            {"role": "system", "content": "Return exactly OK."},
-            {"role": "user", "content": "health check"},
-        ],
-        max_tokens=4,
-        temperature=0,
-        timeout=5,
-    )
-
-    if "OK" not in response.text:
-        raise RuntimeError("model client health check failed")
+# Application adapter contract, not a vendor SDK method.
+def verify_model_client(probe):
+    result = probe()  # configured model, timeout, bounded request, no side-effect tools
+    if result.status != "completed" or result.text.strip() != "OK":
+        raise RuntimeError("model probe failed or returned incomplete/unexpected output")
 ```
 
-This does not prove model quality.
-
-It proves the model path is reachable and correctly configured.
-
----
+This intentionally rejects `NOT OK`; substring checks would accept it. It demonstrates only a configured probe response. It does not prove general correctness, tool authorization or future availability. Consider a cached readiness state and circuit breaker instead of making paid model calls on every liveness request. The [provider lab](Provider-Contract-Lab.md) exercises complete/refused/incomplete outcomes locally.
 
 ## 15. Deterministic graph startup
 

@@ -1,126 +1,79 @@
-// sample.cpp — Token sampling (top-k, top-p, temperature)
-//
-// Runs on CPU — logits are small (vocab_size floats) and sampling
-// has branchy control flow that GPUs handle poorly.
-
-#include "jllm_engine.h"
+// CPU sampler with an inspectable distribution and explicit filtering order.
+#include "jllm_sampling.h"
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
-#include <numeric>
-#include <vector>
+#include <limits>
 #include <random>
+#include <stdexcept>
+#include <unordered_set>
 
 namespace jllm {
+static thread_local std::mt19937 rng(42);
+void seed_sampler(unsigned int seed) { rng.seed(seed); }
 
-static thread_local std::mt19937 g_rng(42);
-
-struct TokenProb {
-    int   id;
-    float prob;
-};
-
-// Apply temperature scaling
-static void apply_temperature(float* logits, int n, float temperature) {
-    if (temperature <= 0.0f || temperature == 1.0f) return;
-    float inv_t = 1.0f / temperature;
-    for (int i = 0; i < n; i++)
-        logits[i] *= inv_t;
-}
-
-// Apply repetition penalty
-static void apply_repeat_penalty(float* logits, const int* recent_tokens,
-                                  int n_recent, float penalty) {
-    if (penalty <= 1.0f) return;
-    for (int i = 0; i < n_recent; i++) {
-        int tok = recent_tokens[i];
-        if (logits[tok] > 0) logits[tok] /= penalty;
-        else                 logits[tok] *= penalty;
+std::vector<TokenProbability> token_distribution(
+    const float* logits, int vocab_size, const GenParams& params,
+    const int* recent_tokens, int n_recent) {
+    if (!logits || vocab_size <= 0 || n_recent < 0 || (n_recent && !recent_tokens)
+        || !std::isfinite(params.temperature) || params.temperature < 0
+        || params.top_k < 0 || !std::isfinite(params.top_p)
+        || params.top_p <= 0 || params.top_p > 1
+        || !std::isfinite(params.repeat_penalty) || params.repeat_penalty < 1)
+        throw std::invalid_argument("invalid sampling input or parameters");
+    std::vector<double> adjusted(logits, logits + vocab_size);
+    bool has_finite = false;
+    for (double value : adjusted) {
+        if (std::isnan(value) || value == std::numeric_limits<double>::infinity())
+            throw std::invalid_argument("NaN/+infinity logits are unsupported");
+        has_finite = has_finite || std::isfinite(value);
     }
-}
-
-// Top-K: keep only the K highest logits
-static int top_k_filter(TokenProb* candidates, int n, int k) {
-    if (k >= n) return n;
-    std::partial_sort(candidates, candidates + k, candidates + n,
-                      [](const TokenProb& a, const TokenProb& b) {
-                          return a.prob > b.prob;
-                      });
-    return k;
-}
-
-// Top-P (nucleus): keep tokens until cumulative probability > p
-static int top_p_filter(TokenProb* candidates, int n, float p) {
-    // Already sorted by probability (descending) from top-k
-    float cumsum = 0.0f;
-    int cutoff = n;
-    for (int i = 0; i < n; i++) {
-        cumsum += candidates[i].prob;
-        if (cumsum > p) {
-            cutoff = i + 1;
-            break;
-        }
+    if (!has_finite) throw std::invalid_argument("all logits are masked");
+    std::unordered_set<int> seen;
+    for (int i = 0; i < n_recent; ++i) {
+        const int id = recent_tokens[i];
+        if (id < 0 || id >= vocab_size) throw std::invalid_argument("recent token out of range");
+        if (seen.insert(id).second)
+            adjusted[id] = adjusted[id] > 0 ? adjusted[id] / params.repeat_penalty
+                                           : adjusted[id] * params.repeat_penalty;
     }
-    return cutoff;
-}
-
-// Sample from filtered distribution
-static int sample_from(const TokenProb* candidates, int n) {
-    // Compute total probability for renormalization
-    float total = 0.0f;
-    for (int i = 0; i < n; i++) total += candidates[i].prob;
-
-    std::uniform_real_distribution<float> dist(0.0f, total);
-    float r = dist(g_rng);
-
-    float cumsum = 0.0f;
-    for (int i = 0; i < n; i++) {
-        cumsum += candidates[i].prob;
-        if (cumsum >= r) return candidates[i].id;
+    std::vector<TokenProbability> candidates;
+    for (int i = 0; i < vocab_size; ++i)
+        if (std::isfinite(adjusted[i])) candidates.push_back({i, adjusted[i]});
+    std::sort(candidates.begin(), candidates.end(), [](const auto& a, const auto& b) {
+        return a.probability == b.probability ? a.id < b.id : a.probability > b.probability;
+    });
+    if (params.temperature == 0) return {{candidates.front().id, 1.0}};
+    if (params.top_k > 0 && params.top_k < static_cast<int>(candidates.size()))
+        candidates.resize(params.top_k);
+    const double maximum = candidates.front().probability;
+    double total = 0;
+    for (auto& candidate : candidates) {
+        candidate.probability = std::exp((candidate.probability - maximum) / params.temperature);
+        total += candidate.probability;
     }
-    return candidates[n - 1].id;
+    for (auto& candidate : candidates) candidate.probability /= total;
+    if (params.top_p < 1) {
+        double cumulative = 0;
+        std::size_t keep = 0;
+        do { cumulative += candidates[keep++].probability; }
+        while (keep < candidates.size() && cumulative < params.top_p);
+        candidates.resize(keep);
+        for (auto& candidate : candidates) candidate.probability /= cumulative;
+    }
+    return candidates;
 }
-
-// Greedy: just pick the highest logit
-static int sample_greedy(const float* logits, int n) {
-    int best = 0;
-    for (int i = 1; i < n; i++)
-        if (logits[i] > logits[best]) best = i;
-    return best;
-}
-
-// ── Public API ──────────────────────────────────────────────────────────
 
 int sample_token(float* logits, int vocab_size, const GenParams& params,
                  const int* recent_tokens, int n_recent) {
-    // Greedy at temperature 0
-    if (params.temperature <= 0.0f)
-        return sample_greedy(logits, vocab_size);
-
-    // Apply penalties
-    apply_repeat_penalty(logits, recent_tokens, n_recent, params.repeat_penalty);
-    apply_temperature(logits, vocab_size, params.temperature);
-
-    // Softmax (on CPU — small array)
-    float max_val = *std::max_element(logits, logits + vocab_size);
-    float sum = 0.0f;
-    for (int i = 0; i < vocab_size; i++) {
-        logits[i] = expf(logits[i] - max_val);
-        sum += logits[i];
+    const auto candidates = token_distribution(logits, vocab_size, params, recent_tokens, n_recent);
+    if (candidates.size() == 1) return candidates.front().id;
+    std::uniform_real_distribution<double> uniform(0, 1);
+    const double value = uniform(rng);
+    double cumulative = 0;
+    for (const auto& candidate : candidates) {
+        cumulative += candidate.probability;
+        if (value < cumulative) return candidate.id;
     }
-    float inv_sum = 1.0f / sum;
-
-    // Build candidates
-    std::vector<TokenProb> candidates(vocab_size);
-    for (int i = 0; i < vocab_size; i++) {
-        candidates[i] = {i, logits[i] * inv_sum};
-    }
-
-    // Filter
-    int n = top_k_filter(candidates.data(), vocab_size, params.top_k);
-    n = top_p_filter(candidates.data(), n, params.top_p);
-
-    return sample_from(candidates.data(), n);
+    return candidates.back().id; // final rounding interval
 }
-
-}  // namespace jllm
+}

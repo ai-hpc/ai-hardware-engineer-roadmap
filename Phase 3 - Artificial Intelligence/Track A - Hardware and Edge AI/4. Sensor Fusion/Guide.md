@@ -16,6 +16,8 @@
 
 ---
 
+**Start with a working CPU experiment:** [Camera geometry and delayed sensor fusion](Camera-Time-Fusion-Lab/Guide.md) executes OpenCV pose recovery and NumPy filtering with a hash-pinned environment. Its measured failures explain why timestamps, target scale, and covariance matter before you add more sensors.
+
 ## Course sequence: one observation contract
 
 Begin with two sensors and one coordinate transform. Add modalities only after you can explain a residual plot. This sequence replaces calendar-based lists of advanced topics with artifacts the robotics courses can consume.

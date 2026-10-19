@@ -1,176 +1,42 @@
-# ReduceOps: Dimension Reduction
+# Reductions: axes, normalization and information flow
 
-ReduceOps aggregate values along one or more dimensions, returning a smaller tensor. Tinygrad has **2 primitive ReduceOps** — SUM and MAX — from which all others derive.
+A reduction combines entries along stated axes. Its output shape, accumulator dtype, identity and numerical order are part of the operation's meaning. Begin with [the executed operations lesson](../projects/README.md).
 
----
+## 1. Choose the axis from the formula
 
-## The Two Primitives
+For `A=[[1,2,3],[-1,0,2]]`, summing axis 0 gives `[0,2,5]`; summing axis 1 gives `[6,1]`. A mean additionally divides by the number of reduced entries, giving row means `[2,1/3]`.
 
-### SUM
+Matrix multiplication `C[i,j]=sum_k A[i,k]B[k,j]` reduces the shared inner axis. The manual `[2,3,1] × [1,3,2] → sum(axis=1)` example produces `[2,2]`. Reducing the last axis of that product instead would produce a different shape and meaning.
 
-```python
-from tinygrad import Tensor
+Changing reduction order can change floating-point rounding. Large/canceling values, low-precision accumulation and parallel trees need tolerances selected for the application. Agreement on a few small integers does not validate every numeric regime.
 
-x = Tensor([[1, 2, 3],
-            [4, 5, 6]])
+## 2. RMSNorm and LayerNorm are different
 
-x.sum()         # 21  — reduce all
-x.sum(axis=0)   # [5, 7, 9]  — reduce rows
-x.sum(axis=1)   # [6, 15]    — reduce columns
-x.sum(axis=1, keepdim=True)  # [[6], [15]]  — keep dims for broadcasting
+For one row with n values:
+
+```text
+RMSNorm(x)[i] = x[i] / sqrt(sum_j x[j]²/n + epsilon)
+LayerNorm(x)[i] = (x[i]-mean(x)) / sqrt(sum_j (x[j]-mean(x))²/n + epsilon)
 ```
 
-```
-axis=0 (sum columns):       axis=1 (sum rows):
-[[1,2,3],                   [[1+2+3] = [6]
- [4,5,6]]                    [4+5+6] = [15]]
-  ↓↓↓
-[5,7,9]
-```
+Learned scale/bias, when present, are additional named parameters. For a constant row `[3,3]`, RMSNorm remains positive while centered LayerNorm is zero before its affine parameters. With epsilon 7, RMSNorm returns `[0.75,0.75]` exactly.
 
-### MAX
+The custom-operations lesson verifies RMSNorm values, and the autograd lesson checks the gradient of its summed output against finite differences. State whether the normalized axis is channels, tokens or another dimension; changing it changes the model.
 
-```python
-x = Tensor([[1, 5, 3],
-            [4, 2, 6]])
+If a padded implementation loads invalid lanes as zero, those lanes must also be masked after transformations such as centering. `(0-mean)²` is not zero. The [CUDA fusion lesson](../../../Track%20A%20-%20GPU%20Infrastructure/Nvidia%20GPU/HPC%20Setup/CUDA-Advanced-Optimization/04-Kernel-Fusion.md#4-mask-reductions-after-the-transformation) has an executed counterexample.
 
-x.max()         # 6
-x.max(axis=0)   # [4, 5, 6]
-x.max(axis=1)   # [5, 6]
-```
+## 3. Stabilize softmax and apply masks at the right point
 
----
+Softmax uses `exp(score-max(score))/sum(exp(score-max(score)))`. Subtracting the maximum preserves the real-valued probabilities while avoiding unnecessary exponential overflow. `[1000,1000]` should yield `[0.5,0.5]`.
 
-## Derived Reductions
+Scaled dot-product attention computes `softmax(QK^T/sqrt(d))V`. In a causal sequence, row i may read only keys/values at positions `j<=i`. Apply the future-position mask to scores before softmax, then compute normalization over the allowed positions.
 
-| Op | Built From | Example |
-|----|------------|---------|
-| `x.mean()` | `x.sum() / x.numel()` | `[1,2,3,4]` → `2.5` |
-| `x.min()` | `-(-x).max()` | `[1,5,3,2]` → `1` |
-| `x.var()` | `((x - mean)**2).mean()` | variance |
-| `x.std()` | `x.var().sqrt()` | standard deviation |
-| `x.prod()` | `x.log().sum().exp()` | product |
+The course fixture has first value `[2,3]` and a large future value `[100,200]`. The first causal output must be exactly `[2,3]`. If it changes when only that future value changes, information leaked through the mask. Masking or slicing after an unmasked softmax cannot repair the earlier normalization.
 
----
+Every row in this exercise has at least its own valid position. A completely masked row needs a separately defined outcome; ordinary all-negative-infinity softmax can produce undefined/nonfinite results. This fixture does not claim to implement a general padding/empty-row attention kernel. [Attention definition](https://arxiv.org/abs/1706.03762).
 
-## Axes and keepdim
+## 4. Reduction is not scan
 
-```python
-x = Tensor.randn(2, 3, 4)
+For `[1,2,3,4]`, sum gives `10`, inclusive scan gives `[1,3,6,10]`, and exclusive scan gives `[0,1,3,6]`. A reduction tree alone does not supply every prefix. State the requested output before optimizing synchronization.
 
-x.sum(axis=0)              # (3, 4)
-x.sum(axis=1)              # (2, 4)
-x.sum(axis=2)              # (2, 3)
-x.sum()                    # scalar
-
-x.sum(axis=1, keepdim=True)  # (2, 1, 4)  ← useful for broadcasting
-```
-
-`keepdim=True` preserves the reduced dimension as size 1, making subsequent broadcasting straightforward.
-
----
-
-## Common Patterns
-
-### Pooling
-
-```python
-# Average pooling (2D)
-def avg_pool2d(x, k=2):
-    b, c, h, w = x.shape
-    return x.reshape(b, c, h//k, k, w//k, k).mean(axis=(3, 5))
-
-# Max pooling (2D)
-def max_pool2d(x, k=2):
-    b, c, h, w = x.shape
-    return x.reshape(b, c, h//k, k, w//k, k).max(axis=(3, 5))
-
-# Global average pooling
-def gap(x):  # (B,C,H,W) → (B,C)
-    return x.mean(axis=(2, 3))
-```
-
-### Normalization
-
-```python
-# Layer norm
-def layer_norm(x, eps=1e-5):
-    mean = x.mean(axis=-1, keepdim=True)
-    var = ((x - mean)**2).mean(axis=-1, keepdim=True)
-    return (x - mean) / (var + eps).sqrt()
-
-# Batch norm (simplified)
-def batch_norm(x, eps=1e-5):
-    mean = x.mean(axis=(0, 2, 3), keepdim=True)
-    var = x.var(axis=(0, 2, 3), keepdim=True)
-    return (x - mean) / (var + eps).sqrt()
-
-# RMS norm
-def rms_norm(x, eps=1e-6):
-    rms = (x * x).mean(axis=-1, keepdim=True).add(eps).sqrt()
-    return x / rms
-```
-
-### Attention
-
-```python
-# Numerically stable softmax
-def softmax(x, axis=-1):
-    max_x = x.max(axis=axis, keepdim=True)
-    exp_x = (x - max_x).exp()
-    return exp_x / exp_x.sum(axis=axis, keepdim=True)
-
-# Log-sum-exp
-def logsumexp(x, axis=-1):
-    max_x = x.max(axis=axis, keepdim=True)
-    return max_x.squeeze(axis) + (x - max_x).exp().sum(axis=axis).log()
-```
-
-### Loss Functions
-
-```python
-mse = ((pred - target)**2).mean()
-mae = (pred - target).abs().mean()
-
-def cross_entropy(logits, targets):
-    log_probs = logits.log_softmax(axis=-1)
-    return -(targets * log_probs).sum(axis=-1).mean()
-```
-
----
-
-## Numerical Stability
-
-```python
-# Unstable softmax (overflow for large x)
-def softmax_bad(x):
-    return x.exp() / x.exp().sum(axis=-1, keepdim=True)
-
-# Stable (subtract max first)
-def softmax_stable(x, axis=-1):
-    x = x - x.max(axis=axis, keepdim=True)
-    exp_x = x.exp()
-    return exp_x / exp_x.sum(axis=axis, keepdim=True)
-
-# Always add eps before log/sqrt
-safe_log  = (x + 1e-8).log()
-safe_sqrt = (x.maximum(0) + 1e-8).sqrt()
-```
-
----
-
-## Performance Notes
-
-- ReduceOps break **fusion boundaries** — elementwise ops before a reduce fuse together, and elementwise ops after a reduce start a new kernel
-- Large reductions across many elements are slower; prefer reducing the last (innermost) axis for better cache locality
-- `keepdim=True` avoids a reshape and is slightly more efficient when you need to broadcast back
-
----
-
-## Key Takeaways
-
-1. **2 primitives**: SUM and MAX
-2. All other reductions (MEAN, MIN, VAR, STD, PROD) are derived
-3. `axis` selects which dimension to collapse; `keepdim` preserves shape for broadcasting
-4. Reductions break kernel fusion — each reduce produces a separate kernel
-5. Numerical stability requires subtracting max before exponentiation in softmax/logsumexp
+**Transfer:** change Q/K/V to sequence length 5 and feature width 3. Compare with the scalar reference, change only a future value and verify earlier rows stay unchanged, then inspect the executed kernels. Preserve correctness before any latency comparison.

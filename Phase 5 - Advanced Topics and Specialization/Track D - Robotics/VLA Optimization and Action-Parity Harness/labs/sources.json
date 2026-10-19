@@ -1,0 +1,79 @@
+{
+  "checked_utc": "2026-10-18T22:46:37.365435+00:00",
+  "status": "source review only; no package/checkpoint execution",
+  "sources": [
+    {
+      "repo": "openvla/openvla",
+      "commit": "c8f03f48af692657d3060c19588038c7220e9af9",
+      "path": "README.md",
+      "url": "https://raw.githubusercontent.com/openvla/openvla/c8f03f48af692657d3060c19588038c7220e9af9/README.md",
+      "sha256": "ba8e9a2884e38a8000dafc98af4116512e37b0e143dad2f940100482bfd6b75c",
+      "bytes": 38458
+    },
+    {
+      "repo": "openvla/openvla",
+      "commit": "c8f03f48af692657d3060c19588038c7220e9af9",
+      "path": "prismatic/extern/hf/modeling_prismatic.py",
+      "url": "https://raw.githubusercontent.com/openvla/openvla/c8f03f48af692657d3060c19588038c7220e9af9/prismatic/extern/hf/modeling_prismatic.py",
+      "sha256": "9ce241c5ca09a4bed73654d0ca509baaff0fc5887d0bdd62e360ca8254f7794a",
+      "bytes": 26062
+    },
+    {
+      "repo": "Physical-Intelligence/openpi",
+      "commit": "215abfb217dbac7d5f1273282331b9b1866c0479",
+      "path": "src/openpi/models/pi0.py",
+      "url": "https://raw.githubusercontent.com/Physical-Intelligence/openpi/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/models/pi0.py",
+      "sha256": "24b32d7c6ed5e409459afa8ca5af96a4dae09c2dcdf48e828907e411f4f12342",
+      "bytes": 12887
+    },
+    {
+      "repo": "Physical-Intelligence/openpi",
+      "commit": "215abfb217dbac7d5f1273282331b9b1866c0479",
+      "path": "src/openpi/policies/policy.py",
+      "url": "https://raw.githubusercontent.com/Physical-Intelligence/openpi/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/policies/policy.py",
+      "sha256": "a2ac5236e23b11d0f5a840d4a8fef148d89dba921d5452ec5dfcd5a6ffa46f20",
+      "bytes": 5344
+    },
+    {
+      "repo": "Physical-Intelligence/openpi",
+      "commit": "215abfb217dbac7d5f1273282331b9b1866c0479",
+      "path": "src/openpi/transforms.py",
+      "url": "https://raw.githubusercontent.com/Physical-Intelligence/openpi/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/transforms.py",
+      "sha256": "a1b94e9e72849a18834778f229c6bb389a495eb7fbe0aa800edea728b9424ff4",
+      "bytes": 15752
+    },
+    {
+      "repo": "NVIDIA/Isaac-GR00T",
+      "commit": "dac54b313160c201c450f97df0fd74ebd379c892",
+      "path": "scripts/deployment/README.md",
+      "url": "https://raw.githubusercontent.com/NVIDIA/Isaac-GR00T/dac54b313160c201c450f97df0fd74ebd379c892/scripts/deployment/README.md",
+      "sha256": "e0c34edf03cdddb6da65995cb697ac30609c4d9b027ce2c2011fdb16f649629f",
+      "bytes": 26233
+    },
+    {
+      "url": "https://docs.nvidia.com/deeplearning/tensorrt/10.x.x/getting-started/support-matrix.html",
+      "description": "Archived TensorRT10.x runtime matrix; embedded Orin8.7 row has BF16/FP8 N/A",
+      "sha256": "f11e77a47199b9bdbce44e4146e23a8369f811f159869923244c6ce969767718",
+      "bytes": 284411,
+      "observed_orin_row": "{ computeCapability: '8.7', devices: ['NVIDIA Jetson AGX Orin'], TF32: 'Supported', FP32: 'Supported', FP16: 'Supported', FP8: 'N/A', FP4: 'N/A', BF16: 'N/A', INT8: 'Supported', DLA: 'Supported' }"
+    },
+    {
+      "url": "https://docs.nvidia.com/cuda/ampere-tuning-guide/index.html",
+      "description": "Ampere family instruction support; not proof of individual runtime support",
+      "sha256": "b0d8e414aa883884f34143b94183fa68a1fd3a8fcfcf82c202c393b140f6cb9a",
+      "bytes": 35559
+    },
+    {
+      "url": "https://www.itl.nist.gov/div898/software/dataplot/refman2/auxillar/exacbino.htm",
+      "description": "One-sided exact binomial limits",
+      "sha256": "fde1130b8297caf10b8f73e6931aa0c8ffa5f6ac4d3295237cbd70f3e63f2df2",
+      "bytes": 18232
+    },
+    {
+      "url": "https://proceedings.mlr.press/v202/leviathan23a.html",
+      "description": "Distribution-preserving speculative sampling",
+      "sha256": "9b2d5cf4c7ad7e6010659509de3452487d413d8452b2922c54db6540c23f53de",
+      "bytes": 15133
+    }
+  ]
+}

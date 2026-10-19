@@ -47,29 +47,19 @@ Pₖ₊₁|ₖ₊₁ = (I - Kₖ₊₁ × H) × Pₖ₊₁|ₖ
 
 ## Python Template
 
+Run from this course directory to reuse the shape-checked implementation in [kalman_6d.py](kalman_6d.py), without importing plotting dependencies:
+
 ```python
 import numpy as np
+from kalman_6d import KalmanFilter
 
-class KalmanFilter:
-    def __init__(self, F, H, Q, R, x0, P0):
-        self.F = F  # State transition
-        self.H = H  # Measurement matrix
-        self.Q = Q  # Process noise
-        self.R = R  # Measurement noise
-        self.x = x0  # Initial state
-        self.P = P0  # Initial covariance
-        self.I = np.eye(F.shape[0])
+kf = KalmanFilter(F=[[1,1],[0,1]], H=[[1,0]], Q=np.zeros((2,2)),
+                  R=[[2]], x0=[[0],[1]], P0=np.eye(2))
+kf.predict()
+kf.update([3])  # explicit flat-to-column conversion
+print(kf.x[:, 0])  # [2.0, 1.5]
+print(kf.P)        # [[1.0, .5], [.5, .75]]
 
-    def predict(self):
-        self.x = self.F @ self.x
-        self.P = self.F @ self.P @ self.F.T + self.Q
-
-    def update(self, z):
-        y = z - self.H @ self.x
-        S = self.H @ self.P @ self.H.T + self.R
-        K = self.P @ self.H.T @ np.linalg.inv(S)
-        self.x = self.x + K @ y
-        self.P = (self.I - K @ self.H) @ self.P
 ```
 
 ## Common Models
@@ -82,7 +72,7 @@ F = np.array([[1, dt],
 H = np.array([[1, 0]])
 Q = q * np.array([[dt**4/4, dt**3/2],
                   [dt**3/2, dt**2  ]])
-R = np.array([[σ²]])
+R = np.array([[sigma_position**2]])  # sigma_position is in metres
 ```
 
 ### Constant Velocity (2D)
@@ -120,7 +110,7 @@ H = np.array([[1, 0, 0]])
 **Process Noise (Q)**:
 - Too small → Filter ignores measurements, slow to adapt
 - Too large → Filter jumps around, noisy estimates
-- Start with: Q = 0.01 × I
+- Derive `Q(dt)` from a named motion-noise model and units; see [lesson 12](12-process-measurement-noise.md).
 
 **Measurement Noise (R)**:
 - Should match actual sensor noise
@@ -130,37 +120,36 @@ H = np.array([[1, 0, 0]])
 **Initial Covariance (P₀)**:
 - Represents initial uncertainty
 - Large values → Trust first measurements more
-- Start with: P₀ = 10 × I
+- Set each variance and cross-covariance from initial information; position and velocity entries have different units.
 
 ## Common Mistakes
 
 ❌ **Wrong**: `P = F @ P @ F + Q`
 ✅ **Right**: `P = F @ P @ F.T + Q`
 
-❌ **Wrong**: `K = P @ H.T / S`
-✅ **Right**: `K = P @ H.T @ np.linalg.inv(S)`
+For one scalar measurement, dividing by scalar `S` is valid. For a matrix innovation covariance, elementwise division is wrong; use `K = np.linalg.solve(S.T, (P @ H.T).T).T`.
 
-❌ **Wrong**: `z = 5.0` (scalar)
-✅ **Right**: `z = np.array([[5.0]])` (column vector)
+Match the implementation's shape contract: the scalar class accepts `5.0`; the general class accepts `[5.0]` or `[[5.0]]`. A flat two-element vector and a `(2,1)` column must not broadcast into a `(2,2)` residual.
 
 ## Diagnostics
 
 ### Check Filter Health
 
 ```python
-# 1. Innovation should be small
-innovation = z - H @ x_pred
-if np.abs(innovation) > 3 * np.sqrt(S):
-    print("Warning: Large innovation!")
+# General m-dimensional innovation: compare NIS to a declared chi-square gate.
+innovation = z - H @ x_pred  # z and x_pred are explicit column vectors
+nis = float((innovation.T @ np.linalg.solve(S, innovation)).item())
+# For m=1, a threshold of 9 is the squared three-standard-deviation gate.
+# For m>1 choose the corresponding chi-square quantile, not per-entry sqrt(S).
 
-# 2. Covariance should be positive definite
-eigenvalues = np.linalg.eigvals(P)
-if np.any(eigenvalues <= 0):
-    print("Warning: P not positive definite!")
+# Symmetry and semidefiniteness, allowing small floating-point roundoff.
+tolerance = 1e-12 * max(1., np.abs(P).max())
+if not np.allclose(P, P.T, rtol=0, atol=tolerance):
+    print("Inspect covariance asymmetry")
+if np.linalg.eigvalsh((P + P.T) / 2).min() < -tolerance:
+    print("Inspect negative covariance eigenvalue")
+# There is no universal [0,1] elementwise constraint on a matrix Kalman gain.
 
-# 3. Kalman gain should be 0 < K < 1
-if np.any(K < 0) or np.any(K > 1):
-    print("Warning: K out of range!")
 ```
 
 ## Extended Kalman Filter (EKF)
@@ -186,9 +175,10 @@ def update_ekf(x_pred, P_pred, z, h, H_jacobian, R):
     H = H_jacobian(x_pred)
     y = z - h(x_pred)
     S = H @ P_pred @ H.T + R
-    K = P_pred @ H.T @ np.linalg.inv(S)
+    K = np.linalg.solve(S.T, (P_pred @ H.T).T).T
     x = x_pred + K @ y
-    P = (I - K @ H) @ P_pred
+    a = np.eye(P_pred.shape[0]) - K @ H
+    P = a @ P_pred @ a.T + K @ R @ K.T
     return x, P
 ```
 
@@ -235,9 +225,9 @@ S:  m × m  (innovation covariance)
 
 1. **Use Joseph form** for covariance update (more stable)
 2. **Enforce symmetry**: `P = (P + P.T) / 2`
-3. **Check positive definiteness** regularly
+3. **Check covariance symmetry and semidefiniteness**; a large defect needs diagnosis
 4. **Use Cholesky decomposition** instead of matrix inverse when possible
-5. **Normalize quaternions** if tracking orientation
+5. **Use a consistent orientation-error model**; quaternion normalization alone does not propagate or reset its covariance
 
 ## Further Reading
 

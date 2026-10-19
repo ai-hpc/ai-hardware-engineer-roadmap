@@ -1,0 +1,45 @@
+{
+  "python": "3.12.3",
+  "numpy": "2.3.5",
+  "fixture": "original generated tones; no external recordings or personal data",
+  "source_sha256": "cfd9dbb00c69a3faf83ec79386708c1000ac8718a6d9ec4b70c7c4e05293526e",
+  "input_rate": 48000,
+  "input_frames": 48000,
+  "channels": 4,
+  "pcm_roundtrip_max_error": 1.50059607214037e-05,
+  "channel_rms": [
+    0.316228949785526,
+    0.2121232219400762,
+    0.316228949785526,
+    0.0
+  ],
+  "opposite_channel_average_rms": 0.0,
+  "output_frames": 16000,
+  "output_rate": 16000,
+  "stream_vs_single_block_max_error": 0.0,
+  "passband_1khz_amplitude": 0.4000008370406769,
+  "naive_4khz_alias_amplitude": 0.20000457763671653,
+  "filtered_4khz_alias_amplitude": 1.3352381093436245e-06,
+  "alias_reduction_db": 103.50962433226888,
+  "filter_taps": 511,
+  "causal_group_delay_ms": 5.3125,
+  "correct_duration_seconds": 1.0,
+  "wrong_header_duration_seconds": 3.0,
+  "wrong_header_original_1khz_becomes_hz": 333.3333333333333,
+  "stream_budget": {
+    "frame_bytes": 8,
+    "bytes_per_second": 384000,
+    "period_ms": 10.0,
+    "buffer_ms": 40.0,
+    "bit_clock_hz": 6144000
+  },
+  "clock_drift_50ppm_600seconds": {
+    "sample_difference": 1440.0,
+    "time_difference_ms": 30.0
+  },
+  "limitations": [
+    "no ALSA device or Jetson execution",
+    "fixed 3:1 mono FIR teaching resampler; no arbitrary rates or adaptive drift correction",
+    "synthetic audio does not measure speech accuracy or microphone quality"
+  ]
+}

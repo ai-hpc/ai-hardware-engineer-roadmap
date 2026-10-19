@@ -1,115 +1,92 @@
-# Orin Nano 8GB — custom carrier L4T engineering flow
+# Orin Nano 8 GB: a gated custom-carrier project
 
-**Phase 4 — Track B — Nvidia Jetson** · L4T customization module
+**Project:** boot a matched Jetson Linux image on a custom carrier and verify one sensor path used by a robot. The current course baseline is **JetPack 7.2.1 / R39.2.1**; an existing R35/R36 product should explicitly use its matching branch. No custom-carrier hardware execution is claimed by this page.
 
-This page is a **concrete step-by-step flowchart** for bringing **Jetson Linux (L4T)** up on a **custom board** around **Jetson Orin Nano 8GB**: inputs, process, and outputs per stage. Pin **exact** JetPack / L4T builds and tarball names from [NVIDIA Jetson documentation](https://docs.nvidia.com/jetson/) for your ship baseline—the example release tags below are illustrative.
+Choose the **exact module SKU** and carrier revision first. Commercial and developer-kit Nano 8 GB modules are distinct products. Keep a reference system available to separate a BSP regression from a carrier issue. Use the [release notes/download](https://developer.nvidia.com/embedded/jetpack/downloads/archive-7.2.1) and matching [quick start](https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/IN/QuickStart.html) for current host and installation prerequisites.
 
-**See also:** [Jetson-Module-Adaptation-Bring-Up-Orin-NX-Nano.md](Jetson-Module-Adaptation-Bring-Up-Orin-NX-Nano.md) (official-style adaptation), [T23x-Deployment.md](T23x-Deployment.md) (BCT / MB1), [ODMDATA-and-GPIO-Jetson-Linux.md](ODMDATA-and-GPIO-Jetson-Linux.md) (UPHY / GPIO layers).
+## The project has two routes
 
----
+**CPU route:** complete the native device-tree/overlay lab, map a schematic requirement to source/build artifacts, and submit a deployment review. This route is complete without a board, but it does not qualify hardware.
 
-## Before you start (scope check)
+**Hardware route:** continue through the gates below with the actual module, carrier, power supply, recovery connection, serial interface and required measurement equipment. The board-specific procedure must be reviewed against its schematic before applying power or flash commands.
 
-| Topic | Note |
-|--------|------|
-| **Reference design** | Start from the **NVIDIA Orin Nano devkit** or **module + carrier** documentation that matches your **SoC + module SKU**; copy the **closest** DT / flash config, then delta for your schematic. |
-| **Flash target** | **`mmcblk0p1`** applies to many **eMMC/SD** flows; **external NVMe/USB** on a custom carrier often uses **`l4t_initrd_flash.sh`** and a **different** board/storage argument—match the **Module Adaptation** guide for your storage topology. |
-| **`flash.sh` board name** | The second argument is a **configured board name** (see `Linux_for_Tegra/*.conf`), not a free-form string. After adaptation you may use a **custom** name defined by your `BOARD` / `.conf` pair. |
-| **Device tree workflow** | Decompiling a **`.dtb` → `.dts`** is valid for **learning and quick diffs**; **production** usually edits **kernel DTS sources** under the BSP’s kernel tree, rebuilds **`Image` + DTBs**, and installs artifacts into **`Linux_for_Tegra/`** per NVIDIA’s kernel customization guide. |
-
----
-
-## Step 1: Prepare host environment
-
-| Step | Input | Process | Output / result |
-|------|--------|---------|------------------|
-| Install Ubuntu & tools | Clean **Ubuntu 22.04** host (typical for JetPack 6.x host flashing) | Install `build-essential`, `device-tree-compiler` (`dtc`), `git`, `python3`, `libncurses-dev`, and any packages NVIDIA lists for your L4T release | Host can compile kernel, DTB, and run flash scripts |
-| Create workspace | Directory path | `mkdir -p ~/jetson-l4t-custom` (or your standard) | Workspace folder for BSP, sources, and build trees |
-
----
-
-## Step 2: Download L4T BSP and sources
-
-| Step | Input | Process | Output / result |
-|------|--------|---------|------------------|
-| Download L4T | Target **JetPack / L4T** (example: **JetPack 6.2.1 / L4T 36.4.4**) | Download from the **NVIDIA Jetson** developer / embedded pages for that release | Archives such as `Jetson_Linux_R36.4.4_aarch64.tbz2`, `Tegra_Linux_Sample-Root-Filesystem_R36.4.4_aarch64.tbz2`, and **public_sources** / kernel source tarballs (names vary slightly by release—use the page for your version) |
-| Extract BSP | L4T driver package archive | `tar -xf Jetson_Linux_R*_aarch64.tbz2` | **`Linux_for_Tegra/`** with flash scripts, prebuilt kernel artifacts, sample rootfs staging paths |
-| Extract kernel sources | Kernel / sources tarball from the same release line | Extract per **NVIDIA kernel customization** instructions for that JetPack | Kernel tree ready to patch, configure, and build (`ARCH=arm64`) |
-
----
-
-## Step 3: Prepare device tree (DTB)
-
-| Step | Input | Process | Output / result |
-|------|--------|---------|------------------|
-| Select reference DTB | **Baseline** DTB for Orin Nano + your starting carrier (from unpacked BSP / prebuilts, or from a first kernel build) | Copy the **closest** `.dtb` into a working folder | Known-good binary to diff against |
-| Convert DTB → DTS | `.dtb` file | `dtc -I dtb -O dts -o custom_board.dts <reference>.dtb` | Editable `.dts` for review (optional; prefer source DTS in tree for shipping) |
-| Edit DTS | Board schematic, net names, regulators, I2C/SPI/UART, GPIO, PCIe/USB/CSI | Align with **pinmux / porting** sections of the module adaptation guide; keep **ODMDATA / UPHY** consistent with physical wiring | `custom_board.dts` (or kernel `*.dts` patches) describing your hardware |
-| Compile DTS → DTB | Edited `.dts` | `dtc -I dts -O dtb -o custom_board.dtb custom_board.dts` (and/or kernel `make dtbs`) | `.dtb` ready to install under **`Linux_for_Tegra/kernel/dtb/`** (or the path your flash config expects) |
-
----
-
-## Step 4: Kernel configuration and build
-
-| Step | Input | Process | Output / result |
-|------|--------|---------|------------------|
-| Configure kernel | Kernel sources, SoC family `defconfig` from NVIDIA | `make ARCH=arm64 CROSS_COMPILE=... O=build tegra_defconfig` (exact `defconfig` name is release-specific) | Base config aligned with Jetson |
-| Enable drivers | Required peripherals | `make ARCH=arm64 O=build menuconfig` (or `nconfig`) | Config with drivers for storage, networking, sensors, cameras, etc. |
-| Compile kernel | Configured tree | `make ARCH=arm64 O=build -j"$(nproc)"` (plus `modules` / `modules_install` if you use out-of-tree modules) | `Image`, `modules`, and built **DTBs** per tree layout |
-| Install into `Linux_for_Tegra` | Built `Image`, DTBs, modules | Copy or `install` per NVIDIA guide into **`Linux_for_Tegra/kernel/`** (and rootfs if modules go on target) | Flash step picks up your kernel + DTB |
-
----
-
-## Step 5: Customize root filesystem
-
-| Step | Input | Process | Output / result |
-|------|--------|---------|------------------|
-| Extract rootfs | Sample rootfs archive | `sudo tar -xpf Tegra_Linux_Sample-Root-Filesystem_R*_aarch64.tbz2 -C rootfs` | Editable Ubuntu-based rootfs |
-| Install packages | Product dependencies | `chroot` + `qemu-aarch64-static` (cross) or native build host workflow per guide; `apt install` | Rootfs with libraries and apps |
-| Optional repack | Modified tree | `sudo tar -cJpf rootfs_custom.tbz2 -C rootfs .` | Custom archive you point **`Linux_for_Tegra/rootfs`** at before flash |
-
----
-
-## Step 6: Flash / boot
-
-| Step | Input | Process | Output / result |
-|------|--------|---------|------------------|
-| Flash to SD / eMMC | BSP, kernel, DTB, rootfs | `sudo ./flash.sh <board_name> <storage>` — example pattern: **internal** eMMC/SD boot targets often look like `mmcblk0p1`; **verify** against your board’s `flash.xml` / conf | Bootable media with Linux + your DTB/kernel |
-| Initrd / external storage | NVMe / USB boot on custom carrier | Often **`./tools/kernel_flash/l4t_initrd_flash.sh`** with board-specific env (see adaptation guide) | Image written to the correct device |
-| Serial console | USB–UART to debug header | Monitor at the baud rate in your carrier docs | Boot logs, UEFI / CBoot / kernel messages for bring-up |
-
----
-
-## Step 7: Test and debug peripherals
-
-| Step | Input | Process | Output / result |
-|------|--------|---------|------------------|
-| Minimal boot | Kernel + DTB + rootfs | Power on | Shell or login over serial / SSH |
-| Bus / GPIO smoke tests | Connected hardware | `i2cdetect`, `spidev` tests, UART loopback, **libgpiod** / line names on JetPack 6 (avoid relying on deprecated sysfs GPIO for new work) | Confirmed electrical + driver path |
-| Camera / USB / PCIe | Modules and cables | `dmesg`, `v4l2`, application tests | Integration verified |
-| Debug | Logs, device tree, regulator errors | Adjust DTS, kernel config, or BCT / pinmux; iterate Steps 4–6 | Stable board support |
-
----
-
-## Step 8: Iteration and versioning
-
-| Step | Input | Process | Output / result |
-|------|--------|---------|------------------|
-| Version control | DTS, kernel `defconfig` fragments, patches, flash config | `git` commits with **L4T version** in tag or README | Reproducible baselines and rollback |
-| Incremental testing | Small deltas | Repeat kernel/DTB/flash cycle | Production-ready image for your Orin Nano 8GB custom board |
-
----
-
-## One-line dependency graph
-
-```text
-Host + BSP ──► kernel/DTS work ──► install to Linux_for_Tegra ──► rootfs deltas ──► flash.sh / initrd flash ──► UART + tests ──► git tag
+```mermaid
+flowchart TD
+    A[Exact hardware and release manifest] --> B[Schematic delta and ownership map]
+    B --> C[Pinmux, BCT, DT and driver sources]
+    C --> D[Native syntax and contract checks]
+    D --> E[Build and inspect matched artifacts]
+    E --> F[Recovery-capable target deployment]
+    F --> G[Boot and one sensor contract]
+    G --> H[Failure, load and update tests]
 ```
 
----
+## Gate 1: freeze the compatibility set
 
-## Related in-repo material
+Record module SKU, carrier revision, BSP/rootfs/source releases, toolchain and the chosen update/boot-security policy. Save archive identities and hashes. Avoid a wildcard extraction such as `Jetson_Linux_R*`: a directory containing two releases should not silently choose or combine them.
 
-- **[Guide.md](Guide.md)** — L4T module overview and EchoPilot / NVMe reference.
-- **[Jetson-Module-Adaptation-Bring-Up-Orin-NX-Nano.md](Jetson-Module-Adaptation-Bring-Up-Orin-NX-Nano.md)** — board naming, `l4t_initrd_flash.sh`, pinmux, DT porting.
-- **[T23x-Deployment.md](T23x-Deployment.md)** — MB1/MB2 BCT tables when flash or boot firmware behavior must change.
+Create separate unmodified and product staging trees. Keep product changes as patches and generated configuration inputs, not undocumented edits scattered across an SDK Manager workspace. The [deployment manifest](Deployment.md#2-capture-a-release-manifest) gives a starting template.
+
+**Pass evidence:** another engineer can identify every input without asking which downloaded archive was used.
+
+## Gate 2: assign ownership to every change
+
+Use the [adaptation delta table](Jetson-Module-Adaptation-Bring-Up-Orin-NX-Nano.md). For the first sensor, specify power, bus/address, reset, interrupt, timestamp origin and software owner. Decide whether Linux or SPE owns the controller. “Both, depending on who accesses first” is not a protocol.
+
+Preserve the module's supported memory configuration. A carrier change does not make a random DRAM timing change necessary. Treat boot-time pin state separately from runtime direction.
+
+**Pass evidence:** every source change has a reason linked to the schematic or a product requirement.
+
+## Gate 3: execute a small native check
+
+Run the [device-tree lab](../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Kernel-Internals/labs/README.md). It uses real `dtc`, `fdtoverlay` and `fdtget`, with fictional hardware descriptions. Retain one valid merge, one unresolved-symbol failure and one structurally valid but contract-invalid result.
+
+For a real BSP, build through the matched source tree and run applicable binding checks. Direct `dtc` on a source requiring C preprocessing/includes is not a universal substitute for the kernel build. Rebuilding a DTB does not necessarily require a full new kernel image, but the compiler/includes/bindings must match the intended source context.
+
+**Pass evidence:** explain exactly what compilation and validation established, and which electrical/driver questions remain open.
+
+## Gate 4: assemble the bootable set
+
+Follow the selected release's kernel and rootfs flow, including NVIDIA integration, required modules and initramfs regeneration. Install the actual generated DTBs selected by the board configuration. R39.2.1 uses current source/build layouts; `tegra_defconfig` and `nvbuild.sh` from archived R35 instructions are not generic current commands.
+
+Build a minimal image by specifying needed packages and services. Ensure a startup service declares its dependencies and publishes meaningful readiness. An application image with a working Python import is not proof that its sensor, CUDA driver or model contract works.
+
+**Pass evidence:** source inputs, selected outputs and their hashes agree; no stale prebuilt artifact remains selected accidentally.
+
+## Gate 5: review the flash plan
+
+Orin NX/Nano production image flows use the supported initrd flashing path. The method and layout must agree with the update design. Commercial Nano/NX modules do not inherit eMMC merely because an old example uses `mmcblk0p1`; target storage names are workflow-specific. The current developer-kit ISO route is another documented installation path, with its own customization process. [Flashing support](https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/SD/FlashingSupport.html).
+
+Before writing, confirm the exact target, recovery access, capacity/layout, generated artifact selection and retained recovery image. `--no-flash` prepares files and may still require real board metadata; it is not a harmless general-purpose linter.
+
+**Pass evidence:** the command is specific to the intended board/media and the team can recover a failed deployment. Hardware writes were not executed during the CPU course review.
+
+## Gate 6: prove boot and one transaction
+
+Capture serial logs from power-on. Record bootloader/kernel/rootfs identities and the running DT properties relevant to the change. Verify storage and a single documented sensor transaction. If it fails, use the [stage-based diagnosis table](Deployment.md#8-diagnose-by-the-last-stage-that-worked).
+
+Do not infer driver correctness from the existence of a device node. Read a known identifier and then validate actual sample units, byte order, sign extension and timing. An IMU's stationary acceleration magnitude should be interpreted using the selected scale and gravity convention, not raw counts mislabeled as m/s².
+
+**Pass evidence:** a repeatable input/output contract, with units and a recorded failure case.
+
+## Gate 7: test the robot-facing behavior
+
+Suppose a 200 Hz sensor produces one sample every 5 ms. If an application blocks for 40 ms, eight samples may arrive during the pause. A queue with eight slots has no spare capacity for boundary alignment or preexisting occupancy. Choose and test an overflow policy: drop oldest, drop newest, stop acquisition, or signal a fault according to the estimator's needs.
+
+A sample dequeued now may have been captured much earlier. Include capture time and an age limit; a backlog of stale data is not current feedback. Test sensor disconnect, malformed sample, delayed consumer, process restart and loss of the firmware reply. The [SPE protocol lab](../4.%20FSP%20%28Firmware%20Support%20Package%29%20Customization/labs/README.md) exercises timeout and restart correlation on a CPU.
+
+**Pass evidence:** deterministic handling of each injected failure, plus target latency/thermal/load measurements where required.
+
+## Gate 8: qualify updates and retain the release
+
+Use the platform [rootfs/A-B](../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Rootfs-and-AB-Redundancy/Guide.md) and [OTA](../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-OTA-Deep-Dive/Guide.md) procedures. Test the actual old-to-new transition and application data compatibility. A rollback image cannot help if the new application irreversibly changed shared data without a migration policy.
+
+Archive the manifest, inputs, outputs, test logs, known limitations and recovery procedure. A clean cold boot is one result; it does not establish all power states, all update interruptions or an industrial qualification.
+
+## Submission and answers
+
+Submit a dependency diagram, native lab output, exact release manifest and a table separating **executed CPU checks**, **documented target procedures**, and **executed hardware checks**. For the CPU route, leave the last category explicitly unexecuted.
+
+**Review question:** why might the same DT overlay work after Linux boots but fail to make storage accessible during flashing? **Answer:** the recovery environment is a separate boot context with its own selected tree and drivers. The normal rootfs cannot supply a missing dependency before it is mounted.
+
+**Review question:** why is “repeat Steps 4–6 until stable” insufficient? **Answer:** without a hypothesis and retained evidence, changing several layers at once can hide intermittent faults and lose the causal link between source and observed behavior.

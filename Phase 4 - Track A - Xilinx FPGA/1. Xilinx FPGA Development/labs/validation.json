@@ -1,0 +1,48 @@
+{
+  "reviewed_utc": "2026-10-18",
+  "environment": {
+    "os": "Ubuntu 24.04.4 LTS x86_64",
+    "python": "3.12.3",
+    "iverilog": "12.0",
+    "package": "Ubuntu noble iverilog 12.0-2build2",
+    "installation": "Debian package extracted under /tmp; no global installation"
+  },
+  "executed": {
+    "normal_simulation_seeds": [
+      1,
+      17,
+      2026
+    ],
+    "random_cycles_per_seed": 1000,
+    "faults": [
+      "overwrite-stall",
+      "wrap-overflow",
+      "retain-on-reset"
+    ],
+    "unittest_methods_passed": 2,
+    "seed_1": {
+      "accepted": 481,
+      "delivered": 480,
+      "flushed": 1,
+      "stalls": 438,
+      "replacements": 412,
+      "saturated": 3,
+      "cycles": 1013
+    },
+    "vcd_generated": true
+  },
+  "not_executed": [
+    "synthesis",
+    "place and route",
+    "static timing analysis",
+    "power analysis",
+    "FPGA board validation",
+    "formal verification"
+  ],
+  "sha256": {
+    "run_stream_lab.py": "d03a83a62f3145c2067241bf5412d17579208f25d1f5952066efdf4ade2671db",
+    "stream_increment.sv": "817526107aa76c0454c7d83b76ecb53ed974f1ceb56ccae92df3ef0375fc22ff",
+    "tb_stream_increment.sv": "51e842336c1f8672cfba25d15531bc17749b246fdd9b314de8460a4558aa884d",
+    "test_stream_lab.py": "db8961be4c477cadca40d92e08e4d659cdf0e03d875cd46cd4f6ab1ecff576b4"
+  }
+}

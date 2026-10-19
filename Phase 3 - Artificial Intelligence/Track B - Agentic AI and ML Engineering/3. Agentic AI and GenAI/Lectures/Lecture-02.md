@@ -73,7 +73,7 @@ The same gap exists between a model and a useful agent:
 The model reasons.
 The harness runs.
 
-If your product behavior is unreliable, the cause is **almost always in the harness**, not in the model weights.
+Diagnose the model, prompt/data, tools and harness separately. A perfect dispatcher cannot repair a consistently wrong model decision; a capable model cannot repair an executor that repeats a payment after a timeout.
 
 ---
 
@@ -129,7 +129,7 @@ Every turn the harness assembles a fresh prompt:
 
 This is the **most context-window-sensitive job** in the whole system.
 
-A harness that always sends the full transcript will **bankrupt you and degrade output**. A harness that compacts blindly will silently drop load-bearing detail.
+Sending an ever-growing full transcript increases cost and can exceed the context limit; its quality effect depends on the task. Blind compaction can drop constraints or required tool/continuation state. Measure both outcomes.
 
 See [Lecture 37 - System Prompt Architecture](Lecture-37.md) for an in-depth look at one production approach.
 
@@ -376,7 +376,7 @@ A harness with no log of `(prompt, model output, tool calls, tool results)` per 
 
 ### 6.5 Too many tools
 
-Every tool spec **costs tokens and confuses tool selection**. A harness that exposes 80 tools at once will produce worse output than the same harness exposing 8 contextually relevant ones.
+Tool specifications consume context and overlapping descriptions can confuse selection. Compare the full tool set with task-scoped subsets on held-out tasks; reducing 80 tools to 8 can also remove a necessary capability, so improved quality is not guaranteed.
 
 Skill systems exist to solve this: **load tools on demand**.
 

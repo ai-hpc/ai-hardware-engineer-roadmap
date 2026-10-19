@@ -1,0 +1,37 @@
+[
+  {
+    "repository": "tile-ai/TileRT",
+    "revision": "0ea19371f120977761bfa0cf6a2d08415d8fce0e",
+    "date": "2026-09-24T15:33:20Z",
+    "url": "https://github.com/tile-ai/TileRT/blob/0ea19371f120977761bfa0cf6a2d08415d8fce0e/README.md",
+    "sha256": "1a20f422a29f819d7dfd866be026d015a807d27eb97ce0d4f6294614c7c33287"
+  },
+  {
+    "repository": "NVIDIA/cutile-python",
+    "revision": "770b4937164f7cf98b5e19b0f55d688854b8ada5",
+    "date": "2026-10-16T00:51:20Z",
+    "url": "https://github.com/NVIDIA/cutile-python/blob/770b4937164f7cf98b5e19b0f55d688854b8ada5/README.md",
+    "sha256": "12b98dd8c9efe42a67e4500f1ff004f422785218fbc4783a74efe47ba33c783f"
+  },
+  {
+    "repository": "z-lab/dflash",
+    "revision": "07ebd93db9f472af339b644bb70221ad8428328a",
+    "date": "2026-08-18T20:58:29Z",
+    "url": "https://github.com/z-lab/dflash/blob/07ebd93db9f472af339b644bb70221ad8428328a/README.md",
+    "sha256": "e39074de245d5893f1812b18755fd3a232fedeb38ed2608d9dfd0b5b4db8780b"
+  },
+  {
+    "repository": "modular/modular",
+    "revision": "9d6a4ca8fc378f2cd5f1f70479bac27b8b3c2615",
+    "date": "2026-10-18T06:57:01Z",
+    "url": "https://github.com/modular/modular/blob/9d6a4ca8fc378f2cd5f1f70479bac27b8b3c2615/README.md",
+    "sha256": "ddc2ca44075e719dc35159e024edcf07a840b9931f69c4020195055f383ad870"
+  },
+  {
+    "documentation": "NVIDIA cuTile Python quickstart",
+    "url": "https://docs.nvidia.com/cuda/cutile-python/quickstart.html",
+    "verified_at": "2026-10-18",
+    "sha256": "31dc7050bccfb99b102f6053d65ec7e16493da6bc4bd034736ff34b6e6b98877",
+    "note": "Live documentation reports supported compute capabilities 8.x, 9.x, 10.x, 11.x, 12.x; driver r580+; matching major/minor tile compiler and NVCC/NVVM. The pinned repository README is more restrictive and was not treated as the current compatibility matrix."
+  }
+]

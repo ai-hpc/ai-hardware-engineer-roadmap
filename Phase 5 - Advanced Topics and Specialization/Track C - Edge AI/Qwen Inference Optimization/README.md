@@ -1,34 +1,20 @@
-# Qwen Inference Optimization — 6-Lecture Series
+# Qwen inference: from checkpoint metadata to a tested runtime
 
-A hands-on, hardware-first series on getting real throughput out of two specific Qwen models that bracket the deployment spectrum:
+**Reviewed 18 October 2026.** Six lessons use Qwen3-4B-Instruct-2507 and Qwen2.5-72B-Instruct as fixed case studies. Start with the [CPU lab](Lab-Guide.md): no pretrained weights or GPU are required. Allow 4–6 hours for the worked readings and portable exercises; optional device experiments take additional time.
 
-* **Qwen3-4B-Instruct-2507 (Q4_K_M)** — edge target, runs on Jetson Orin Nano 8 GB.
-* **Qwen2.5-72B-Instruct (FP16)** — datacenter target, is typically deployed across multiple GPUs at FP16; exact fit depends on memory and context.
+The required path teaches tensor dimensions, rotary positions, quantization scales, cache budgets, parallel reductions, speculative-prefix arithmetic, and matrix layout. The optional current-library exercise actually runs a tiny random Qwen3 on CPU and inspects full model metadata without allocating model weights.
 
-Both are Qwen-family causal transformers; their exact configurations and deployment scale differ. The [Qwen3-4B-Instruct-2507 config](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507/blob/main/config.json) and [Qwen2.5-72B config](https://huggingface.co/Qwen/Qwen2.5-72B-Instruct/blob/main/config.json) are the source of shape calculations. The series teaches both endpoints, then unifies them through cross-model strategies (speculative decoding, edge↔cloud routing).
-
-**Scope:** inference only. Training and fine-tuning are out of scope.
-
-| Lecture | Title | Focus |
+| Lesson | Question to answer | Evidence |
 |---|---|---|
-| [01](Lecture-01.md) | Qwen Architecture Deep Dive | Config, shapes, GQA, RoPE, SwiGLU, tokenizer |
-| [02](Lecture-02.md) | Quantizing Qwen3-4B to Q4 | AWQ, GPTQ, K-quants, calibration, GGUF layout |
-| [03](Lecture-03.md) | Decode Optimization on Jetson | GEMV chain, KV cache, fusion, CUDA Graphs, INT8 KV |
-| [04](Lecture-04.md) | Qwen2.5-72B Multi-GPU FP16 | TP/PP, NCCL hot path, paged attention, YaRN |
-| [05](Lecture-05.md) | Cross-Model & Production Serving | Speculative decoding, vLLM/TRT-LLM, observability, hybrid |
-| [06](Lecture-06.md) | Batched GEMM vs Normal GEMM | cuBLAS API forms, layout, tensor cores, bit-exact reproducibility |
+| [1. Checkpoint and architecture](Lecture-01.md) | Do shapes, norms, positions and template match this release? | config snapshots, exact parameter counts, cached/full comparison |
+| [2. Quantization](Lecture-02.md) | Which bytes and errors does this representation introduce? | row-scale experiment, corrupted-scale failure, conversion manifest |
+| [3. Decode on Jetson](Lecture-03.md) | Is the limiting cost traffic, launches, attention or another stage? | correct byte calculations and controlled measurement plan |
+| [4. Multi-GPU execution](Lecture-04.md) | What is partitioned, replicated and communicated? | partial-output sum and per-rank budget |
+| [5. Serving](Lecture-05.md) | Does speculation/routing improve completed work at the required latency? | prefix simulation and capacity calculation |
+| [6. GEMM validation](Lecture-06.md) | Are the stored layout and numerical contract correct? | non-square padded matrix tests |
 
-**Prerequisites:**
+**Prerequisites:** [Edge LLM inference](../Edge%20LLM%20Inference%20Internals/Lecture-01.md), matrix multiplication, basic probability, and Python. Read the [Jetson compatibility guide](../../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/Compatibility.md) before optional device work and [quantization foundations](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/04%20-%20Quantization/Guide.md) for numerical background.
 
-* Phase 5 — Edge AI — [Edge LLM Inference Internals](../Edge%20LLM%20Inference%20Internals/Lecture-01.md) (GEMV vs GEMM, roofline)
-* Phase 4 Track B — [Jetson Real-Time Inference](../../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Real-Time-Inference/Guide.md)
-* Phase 4 Track C — [Quantization](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/04%20-%20Quantization/Guide.md)
+**Validation boundary:** 14 portable tests and the pinned Transformers CPU/meta exercise executed successfully. Pretrained 4B/72B conversion, model-quality benchmarks, Jetson throughput, cuBLAS GPU work, and multi-GPU serving were not run. Each optional procedure states its prerequisites and the evidence needed for a stronger claim. Model fit depends on the complete memory budget and supported runtime, not its advertised parameter size.
 
-
-## Integration lab: Do the tensor shapes agree with the exact Qwen checkpoint?
-
-Extract the pinned configuration before tracing kernels; recompute projection and KV sizes. Separate the Jetson small-model experiment from the multi-GPU 72B experiment instead of pooling their metrics.
-
-**Acceptance evidence:** The report must reconcile predicted and stored parameter counts, isolate prefill/decode, and state runtime/quantization support. Pass the bottleneck shape distribution to kernel engineering.
-
-**Continue:** take this artifact to [02 - Kernel Engineering](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/02%20-%20Kernel%20Engineering/Guide.md). Explain which assumption from this course the next engineer must preserve.
+**Finish:** submit raw outputs, hashes, one deliberately rejected configuration, and a short explanation of the dominant measured or estimated cost. Hand the resulting shape/workload distribution to [kernel engineering](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/02%20-%20Kernel%20Engineering/Guide.md).

@@ -1,0 +1,53 @@
+{
+  "review_date": "2026-10-18",
+  "scope": "Build-only BPF ELF, skeleton, native reader and invalid CLI inputs; no BPF load or attachment",
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "os_release": {
+    "PRETTY_NAME": "\"Ubuntu 24.04.4 LTS\"",
+    "NAME": "\"Ubuntu\"",
+    "VERSION_ID": "\"24.04\"",
+    "VERSION": "\"24.04.4 LTS (Noble Numbat)\"",
+    "VERSION_CODENAME": "noble",
+    "ID": "ubuntu",
+    "ID_LIKE": "debian",
+    "HOME_URL": "\"https://www.ubuntu.com/\"",
+    "SUPPORT_URL": "\"https://help.ubuntu.com/\"",
+    "BUG_REPORT_URL": "\"https://bugs.launchpad.net/ubuntu/\"",
+    "PRIVACY_POLICY_URL": "\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"",
+    "UBUNTU_CODENAME": "noble",
+    "LOGO": "ubuntu-logo"
+  },
+  "tools": {
+    "clang": "Ubuntu clang version 18.1.3 (1ubuntu1)",
+    "cc": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+    "bpftool": "bpftool v7.4.0\nusing libbpf v1.4\nfeatures:",
+    "development_packages": {
+      "libelf-dev_0.190-1.1ubuntu0.1_amd64.deb": "0.190-1.1ubuntu0.1",
+      "libbpf-dev_1%3a1.3.0-2build2_amd64.deb": "1:1.3.0-2build2"
+    }
+  },
+  "host_btf_sha256": "8c10e7e174e89c92f1d2708f12bb5268dc381e57e867397534c4e145348622e0",
+  "validation_command": "COURSE_BPF_INCLUDE=/tmp/course-os-bpf/sysroot/usr/include python3 -m unittest discover -s 'Phase 1 - Foundational Knowledge/3. Operating Systems/labs' -p 'test_*.py' -v",
+  "result": {
+    "passed": 9,
+    "skipped": 0,
+    "failed": 0,
+    "bpf_build_tests": 3,
+    "rt_tests": 3,
+    "spsc_tests": 3,
+    "invalid_cli_cases": 7
+  },
+  "not_run": [
+    "BPF kernel load/verifier acceptance",
+    "BPF attachment",
+    "runtime tracing or overhead",
+    "GPU/camera operations"
+  ],
+  "source_sha256": {
+    "ioctl_latency.h": "dd72c5a27ae692e94339e08e3ced7f16a8698c367ae12315cfce9d7517166496",
+    "ioctl_latency.bpf.c": "c5158cb90c61bf98f822a96226a5071f6093f894f8fff68740d88814e8180e1c",
+    "ioctl_latency.c": "d122f33a824ccc6c4d8adbd836bb98dafd08323122ca69f2482c92b426f9ec3e",
+    "test_bpf_build.py": "b784662f664a83ff3f3976067c345dc68053079dda125fd8e2cea58e8d796a64",
+    "BPF-Build-Lab.md": "bc9b04a562a9e9cfa8d4506181abb0dd3b296e8f02f7600da054b9bc3cc81dfc"
+  }
+}

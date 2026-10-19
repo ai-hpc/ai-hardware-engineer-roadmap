@@ -1,0 +1,467 @@
+{
+  "reviewed_utc": "2026-10-18T22:06:58.692911+00:00",
+  "method": "Actual HTTPS GET of cited upstream documentation/source, maximum 5MB per response. Hashes describe downloaded bytes, not hardware execution. Mutable web pages may change.",
+  "sources": [
+    {
+      "url": "https://bleak.readthedocs.io/en/latest/api/client.html",
+      "final_url": "https://bleak.readthedocs.io/en/latest/api/client.html",
+      "status": 200,
+      "bytes": 68219,
+      "sha256": "d707abd845edbd2bd18f2476621f5eeb611ddbb451108bb6459fdfe32e06e34a"
+    },
+    {
+      "url": "https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32c6/api-guides/coexist.html",
+      "final_url": "https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32c6/api-guides/coexist.html",
+      "status": 200,
+      "bytes": 38207,
+      "sha256": "1cc6d79527be722ffcd2dda2a38d2e6775ad05dd9d1672d57286bf51310147de"
+    },
+    {
+      "url": "https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32c6/get-started/establish-serial-connection.html",
+      "final_url": "https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32c6/get-started/establish-serial-connection.html",
+      "status": 200,
+      "bytes": 38203,
+      "sha256": "a2367b6a632cfd707f0922b18b246bd217eb14334d9bd43315c7470f2cb1c612"
+    },
+    {
+      "url": "https://docs.espressif.com/projects/esp-zigbee-sdk/en/latest/esp32c6/migration-guide/v2.x/overview.html",
+      "final_url": "https://docs.espressif.com/projects/esp-zigbee-sdk/en/latest/esp32c6/migration-guide/v2.x/overview.html",
+      "status": 200,
+      "bytes": 19042,
+      "sha256": "b5d309072fbdfdb3412bfa08966e9e85d01d61f0456a660c1e1918a5967b13ff"
+    },
+    {
+      "url": "https://docs.nvidia.com/jetson/orin-nano-devkit/user-guide/latest/hardware_layout.html",
+      "final_url": "https://docs.nvidia.com/jetson/orin-nano-devkit/user-guide/latest/hardware_layout.html",
+      "status": 200,
+      "bytes": 28283,
+      "sha256": "9ed02ce46718ec94e7d6ab63032ce6a1eaaa96b1e990f157585d888462c6d420"
+    },
+    {
+      "url": "https://docs.python.org/3/library/socket.html",
+      "final_url": "https://docs.python.org/3/library/socket.html",
+      "status": 200,
+      "bytes": 309740,
+      "sha256": "ce2dbf8cb57a4d9f62858f8980271491ca042ba7ff2d1ff6f966c39acf836c80"
+    },
+    {
+      "url": "https://github.com/espressif/esp-zigbee-sdk/tree/c9e2c3e12642c704096dfefe25b62212b47229ba/examples/esp_zigbee_host",
+      "final_url": "https://github.com/espressif/esp-zigbee-sdk/tree/c9e2c3e12642c704096dfefe25b62212b47229ba/examples/esp_zigbee_host",
+      "status": 200,
+      "bytes": 266301,
+      "sha256": "8916928fa0b87c344f0edcaba6d8a338c3519f74a337a87781035c7549690dfe"
+    },
+    {
+      "url": "https://github.com/espressif/esp-zigbee-sdk/tree/c9e2c3e12642c704096dfefe25b62212b47229ba/examples/esp_zigbee_ncp",
+      "final_url": "https://github.com/espressif/esp-zigbee-sdk/tree/c9e2c3e12642c704096dfefe25b62212b47229ba/examples/esp_zigbee_ncp",
+      "status": 200,
+      "bytes": 255653,
+      "sha256": "0d585ea8d3a66511a596eecc6c31a68bfae1645949a2a6b4bbf5fad2b9aa06fb"
+    },
+    {
+      "url": "https://networkmanager.dev/docs/api/latest/nmcli-examples.html",
+      "final_url": "https://networkmanager.dev/docs/api/latest/nmcli-examples.html",
+      "status": 200,
+      "bytes": 39490,
+      "sha256": "da3b7bf861bb9986829bd2a7aa6487bb39ba4a00e1cf3ad6f5e5d61725ca6837"
+    },
+    {
+      "url": "https://networkmanager.dev/docs/api/latest/nmcli.html",
+      "final_url": "https://networkmanager.dev/docs/api/latest/nmcli.html",
+      "status": 200,
+      "bytes": 101247,
+      "sha256": "fdecaf26138b80965a135642c2874656b57e81909b22ed10fbf9717563672f90"
+    },
+    {
+      "url": "https://openthread.io/guides/border-router/build-docker",
+      "final_url": "https://openthread.io/guides/border-router/build-docker",
+      "status": 200,
+      "bytes": 100915,
+      "sha256": "df55f39af6daa0dd71fac968ccc11db4cade5b05fdcd8c4fdde10bc6cd92ebb6"
+    },
+    {
+      "url": "https://openthread.io/guides/border-router/build-native",
+      "final_url": "https://openthread.io/guides/border-router/build-native",
+      "status": 200,
+      "bytes": 86533,
+      "sha256": "dbd16bcf8a975860b44cfb2ac46d1ba63966416c45ac5f237f58a10a698b219d"
+    },
+    {
+      "url": "https://openthread.io/platforms/co-processor",
+      "final_url": "https://openthread.io/platforms/co-processor",
+      "status": 200,
+      "bytes": 75866,
+      "sha256": "b9cb42a9f5a0af6aebe84fac9246b63158365565cd495000a2a7e32e34e5cb76"
+    },
+    {
+      "url": "https://openthread.io/platforms/co-processor/ot-daemon",
+      "final_url": "https://openthread.io/platforms/co-processor/ot-daemon",
+      "status": 200,
+      "bytes": 75593,
+      "sha256": "26e37df4c44513abf9106390186e4621b2d7fb6614c485fd036706a77263b31a"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/ai-hpc/jetson-esp-hosted/ce36dec9294988e598f04e84c9d28092ca9e9786/esp_hosted_ng/host/README.md",
+      "final_url": "https://raw.githubusercontent.com/ai-hpc/jetson-esp-hosted/ce36dec9294988e598f04e84c9d28092ca9e9786/esp_hosted_ng/host/README.md",
+      "status": 200,
+      "bytes": 6249,
+      "sha256": "d0150242c1088c36090b379856fb3416958c25c3b0d4052073e93e670236f109"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/espressif/esp-hosted-linux/9b56ff96a1bc95acaa68d8023794b8353701c5e3/docs/getting-started/build-and-flash.md",
+      "final_url": "https://raw.githubusercontent.com/espressif/esp-hosted-linux/9b56ff96a1bc95acaa68d8023794b8353701c5e3/docs/getting-started/build-and-flash.md",
+      "status": 200,
+      "bytes": 5635,
+      "sha256": "313929de8cf3399257047ec36bf637a567d2963064e9133bfcf031ab51472042"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/espressif/esp-hosted-linux/9b56ff96a1bc95acaa68d8023794b8353701c5e3/docs/getting-started/hardware-setup.md",
+      "final_url": "https://raw.githubusercontent.com/espressif/esp-hosted-linux/9b56ff96a1bc95acaa68d8023794b8353701c5e3/docs/getting-started/hardware-setup.md",
+      "status": 200,
+      "bytes": 7789,
+      "sha256": "0311045972802536b1cb0c7234d0fd5929c1b750cb597c2e3be1e4949db6823a"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/espressif/esp-hosted-linux/9b56ff96a1bc95acaa68d8023794b8353701c5e3/docs/guides/thread-rcp.md",
+      "final_url": "https://raw.githubusercontent.com/espressif/esp-hosted-linux/9b56ff96a1bc95acaa68d8023794b8353701c5e3/docs/guides/thread-rcp.md",
+      "status": 200,
+      "bytes": 7375,
+      "sha256": "ed2c05b3831d27c9b36ce3ea2e60370f737c42b5e9efaceb9af7c3c0cdcc9199"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/espressif/esp-hosted-linux/9b56ff96a1bc95acaa68d8023794b8353701c5e3/docs/porting.md",
+      "final_url": "https://raw.githubusercontent.com/espressif/esp-hosted-linux/9b56ff96a1bc95acaa68d8023794b8353701c5e3/docs/porting.md",
+      "status": 200,
+      "bytes": 8885,
+      "sha256": "db9e8ef1221ce22ccc4910867849f5e371b3f85c841188e7f4275123e8fdcf11"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/espressif/esp-hosted-linux/9b56ff96a1bc95acaa68d8023794b8353701c5e3/docs/reference/supported-hardware.md",
+      "final_url": "https://raw.githubusercontent.com/espressif/esp-hosted-linux/9b56ff96a1bc95acaa68d8023794b8353701c5e3/docs/reference/supported-hardware.md",
+      "status": 200,
+      "bytes": 5815,
+      "sha256": "a8bb9300392dc28566d0b95872109b26fbf6a14f402e09e03b604c739409f2f4"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/espressif/esp-hosted-linux/9b56ff96a1bc95acaa68d8023794b8353701c5e3/esp/esp_driver/.env",
+      "final_url": "https://raw.githubusercontent.com/espressif/esp-hosted-linux/9b56ff96a1bc95acaa68d8023794b8353701c5e3/esp/esp_driver/.env",
+      "status": 200,
+      "bytes": 67,
+      "sha256": "d8672522c6d45ef3ab5a2609ab16f3d5d24227dfc1b29f622fd1d5c751b67956"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/espressif/esp-hosted/a0422923d01fa5cd5f4987885fe743656398b7c5/README.md",
+      "final_url": "https://raw.githubusercontent.com/espressif/esp-hosted/a0422923d01fa5cd5f4987885fe743656398b7c5/README.md",
+      "status": 200,
+      "bytes": 5973,
+      "sha256": "4d96b6e2bd7b73bb8bd79f35620ab10245074de13a89f9abfabe82bdce466115"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/espressif/esp-idf/735507283d5b2f9fb363a1901172dbd9e847945d/examples/openthread/ot_rcp/README.md",
+      "final_url": "https://raw.githubusercontent.com/espressif/esp-idf/735507283d5b2f9fb363a1901172dbd9e847945d/examples/openthread/ot_rcp/README.md",
+      "status": 200,
+      "bytes": 3920,
+      "sha256": "a8ac0c3e90a5ba10d125b10af48e2f40f06dd8a4ad64adf9f11b7fef92ab0815"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/espressif/esp-idf/735507283d5b2f9fb363a1901172dbd9e847945d/examples/openthread/ot_rcp/main/esp_ot_config.h",
+      "final_url": "https://raw.githubusercontent.com/espressif/esp-idf/735507283d5b2f9fb363a1901172dbd9e847945d/examples/openthread/ot_rcp/main/esp_ot_config.h",
+      "status": 200,
+      "bytes": 4265,
+      "sha256": "22fe2e7c2934d86188bcc4457df01ca49a16ebe83bda3b7ecf542124e47fcfeb"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/espressif/esp-zigbee-sdk/c9e2c3e12642c704096dfefe25b62212b47229ba/docs/en/user-guide/ncp.rst",
+      "final_url": "https://raw.githubusercontent.com/espressif/esp-zigbee-sdk/c9e2c3e12642c704096dfefe25b62212b47229ba/docs/en/user-guide/ncp.rst",
+      "status": 200,
+      "bytes": 200193,
+      "sha256": "acfce586d4c81530f591cbd3f6766b489a1837be3813938d7eb1e9c6fb86c2a2"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/espressif/esp-zigbee-sdk/e2fdf4ad8558e5beb306b0d7040072d76244c413/README.md",
+      "final_url": "https://raw.githubusercontent.com/espressif/esp-zigbee-sdk/e2fdf4ad8558e5beb306b0d7040072d76244c413/README.md",
+      "status": 200,
+      "bytes": 3425,
+      "sha256": "35b00cee0617481588caaf0312b572690a302853b709ea5a172f46703880292c"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/espressif/esp-zigbee-sdk/e2fdf4ad8558e5beb306b0d7040072d76244c413/RELEASE_NOTES.md",
+      "final_url": "https://raw.githubusercontent.com/espressif/esp-zigbee-sdk/e2fdf4ad8558e5beb306b0d7040072d76244c413/RELEASE_NOTES.md",
+      "status": 200,
+      "bytes": 48499,
+      "sha256": "cc73cbb8c689c028f4dd1c11e3b403c56a286de91983ef5ef425c916509b650c"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/espressif/esp-zigbee-sdk/e2fdf4ad8558e5beb306b0d7040072d76244c413/examples/zigbee_gateway/README.md",
+      "final_url": "https://raw.githubusercontent.com/espressif/esp-zigbee-sdk/e2fdf4ad8558e5beb306b0d7040072d76244c413/examples/zigbee_gateway/README.md",
+      "status": 200,
+      "bytes": 8105,
+      "sha256": "8994c583c112d1ec8c5647cf7f4b5f5e77b372cf62ede636e846e53a8d053065"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/openthread/ot-br-posix/6e50b731e86457f7f42e69743cf794796b48ccf4/etc/cmake/options.cmake",
+      "final_url": "https://raw.githubusercontent.com/openthread/ot-br-posix/6e50b731e86457f7f42e69743cf794796b48ccf4/etc/cmake/options.cmake",
+      "status": 200,
+      "bytes": 12762,
+      "sha256": "966cde88956d21850f39735c92b1495bb8fe0759c0bca0befb741e2e7c72f69b"
+    },
+    {
+      "url": "https://software.es.net/iperf/invoking.html",
+      "final_url": "https://software.es.net/iperf/invoking.html",
+      "status": 200,
+      "bytes": 132265,
+      "sha256": "04fc0b0af16f661f7ddc2289b9d055150d00f0e6bd083fef85a34d298eff40e2"
+    },
+    {
+      "url": "https://www.bluetooth.com/specifications/assigned-numbers/",
+      "final_url": "https://www.bluetooth.com/specifications/assigned-numbers/",
+      "status": 200,
+      "bytes": 370727,
+      "sha256": "25b6d80c9ed23a8947a9eca80dc02c4aad10946b73ce6f17432d04ac4b666a17"
+    },
+    {
+      "url": "https://www.rfc-editor.org/rfc/rfc1055",
+      "final_url": "https://www.rfc-editor.org/info/rfc1055/",
+      "status": 200,
+      "bytes": 121043,
+      "sha256": "68ae6a65cb64416421862d3a154ce9eaa9aa5b33e82e158d31b450685798823c"
+    },
+    {
+      "url": "https://www.wireguard.com/quickstart/",
+      "final_url": "https://www.wireguard.com/quickstart/",
+      "status": 200,
+      "bytes": 14329,
+      "sha256": "a6eaa9cc05e624223887464735fd9deaf5d421ef98e0145bdc67e4b5b1b29a26"
+    }
+  ],
+  "earlier_pinned_source_checks": [
+    {
+      "repo": "espressif/esp-zigbee-sdk",
+      "revision": "e2fdf4ad8558e5beb306b0d7040072d76244c413",
+      "path": "README.md",
+      "url": "https://raw.githubusercontent.com/espressif/esp-zigbee-sdk/e2fdf4ad8558e5beb306b0d7040072d76244c413/README.md",
+      "sha256": "35b00cee0617481588caaf0312b572690a302853b709ea5a172f46703880292c",
+      "bytes": 3425
+    },
+    {
+      "repo": "espressif/esp-zigbee-sdk",
+      "revision": "e2fdf4ad8558e5beb306b0d7040072d76244c413",
+      "path": "RELEASE_NOTES.md",
+      "url": "https://raw.githubusercontent.com/espressif/esp-zigbee-sdk/e2fdf4ad8558e5beb306b0d7040072d76244c413/RELEASE_NOTES.md",
+      "sha256": "cc73cbb8c689c028f4dd1c11e3b403c56a286de91983ef5ef425c916509b650c",
+      "bytes": 48499
+    },
+    {
+      "repo": "espressif/esp-zigbee-sdk",
+      "revision": "e2fdf4ad8558e5beb306b0d7040072d76244c413",
+      "path": "examples/esp_zigbee_ncp/README.md",
+      "url": "https://raw.githubusercontent.com/espressif/esp-zigbee-sdk/e2fdf4ad8558e5beb306b0d7040072d76244c413/examples/esp_zigbee_ncp/README.md",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "repo": "espressif/esp-zigbee-sdk",
+      "revision": "e2fdf4ad8558e5beb306b0d7040072d76244c413",
+      "path": "examples/esp_zigbee_ncp/main/idf_component.yml",
+      "url": "https://raw.githubusercontent.com/espressif/esp-zigbee-sdk/e2fdf4ad8558e5beb306b0d7040072d76244c413/examples/esp_zigbee_ncp/main/idf_component.yml",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "repo": "espressif/esp-zigbee-sdk",
+      "revision": "e2fdf4ad8558e5beb306b0d7040072d76244c413",
+      "path": "examples/zigbee_gateway/README.md",
+      "url": "https://raw.githubusercontent.com/espressif/esp-zigbee-sdk/e2fdf4ad8558e5beb306b0d7040072d76244c413/examples/zigbee_gateway/README.md",
+      "sha256": "8994c583c112d1ec8c5647cf7f4b5f5e77b372cf62ede636e846e53a8d053065",
+      "bytes": 8105
+    },
+    {
+      "repo": "espressif/esp-zigbee-sdk",
+      "revision": "e2fdf4ad8558e5beb306b0d7040072d76244c413",
+      "path": "examples/zigbee_gateway/main/idf_component.yml",
+      "url": "https://raw.githubusercontent.com/espressif/esp-zigbee-sdk/e2fdf4ad8558e5beb306b0d7040072d76244c413/examples/zigbee_gateway/main/idf_component.yml",
+      "sha256": "cc6351c42d7b56b26bdf538b1ee3d4c5ea7a358d128df69324a01bdae87e2e59",
+      "bytes": 409
+    },
+    {
+      "repo": "espressif/esp-hosted",
+      "revision": "a0422923d01fa5cd5f4987885fe743656398b7c5",
+      "path": "README.md",
+      "url": "https://raw.githubusercontent.com/espressif/esp-hosted/a0422923d01fa5cd5f4987885fe743656398b7c5/README.md",
+      "sha256": "4d96b6e2bd7b73bb8bd79f35620ab10245074de13a89f9abfabe82bdce466115",
+      "bytes": 5973
+    },
+    {
+      "repo": "espressif/esp-hosted",
+      "revision": "a0422923d01fa5cd5f4987885fe743656398b7c5",
+      "path": "esp_hosted_ng/README.md",
+      "url": "https://raw.githubusercontent.com/espressif/esp-hosted/a0422923d01fa5cd5f4987885fe743656398b7c5/esp_hosted_ng/README.md",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "repo": "espressif/esp-hosted",
+      "revision": "a0422923d01fa5cd5f4987885fe743656398b7c5",
+      "path": "esp_hosted_ng/docs/setup.md",
+      "url": "https://raw.githubusercontent.com/espressif/esp-hosted/a0422923d01fa5cd5f4987885fe743656398b7c5/esp_hosted_ng/docs/setup.md",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "repo": "espressif/esp-hosted",
+      "revision": "a0422923d01fa5cd5f4987885fe743656398b7c5",
+      "path": "esp_hosted_ng/docs/porting_guide.md",
+      "url": "https://raw.githubusercontent.com/espressif/esp-hosted/a0422923d01fa5cd5f4987885fe743656398b7c5/esp_hosted_ng/docs/porting_guide.md",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "repo": "espressif/esp-hosted",
+      "revision": "a0422923d01fa5cd5f4987885fe743656398b7c5",
+      "path": "esp_hosted_ng/docs/spi_protocol.md",
+      "url": "https://raw.githubusercontent.com/espressif/esp-hosted/a0422923d01fa5cd5f4987885fe743656398b7c5/esp_hosted_ng/docs/spi_protocol.md",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "repo": "espressif/esp-hosted",
+      "revision": "a0422923d01fa5cd5f4987885fe743656398b7c5",
+      "path": "esp_hosted_ng/esp/esp_driver/setup.sh",
+      "url": "https://raw.githubusercontent.com/espressif/esp-hosted/a0422923d01fa5cd5f4987885fe743656398b7c5/esp_hosted_ng/esp/esp_driver/setup.sh",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "repo": "espressif/esp-hosted",
+      "revision": "a0422923d01fa5cd5f4987885fe743656398b7c5",
+      "path": "esp_hosted_ng/esp/esp_driver/network_adapter/main/Kconfig.projbuild",
+      "url": "https://raw.githubusercontent.com/espressif/esp-hosted/a0422923d01fa5cd5f4987885fe743656398b7c5/esp_hosted_ng/esp/esp_driver/network_adapter/main/Kconfig.projbuild",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "repo": "espressif/esp-idf",
+      "revision": "1c42e514c90ae621af33bde3b6ad3dac22edcbfd",
+      "path": "examples/openthread/ot_rcp/README.md",
+      "url": "https://raw.githubusercontent.com/espressif/esp-idf/1c42e514c90ae621af33bde3b6ad3dac22edcbfd/examples/openthread/ot_rcp/README.md",
+      "sha256": "850cf43543da72ddd8a30df134723416512c2ac79489a13f0c0e07ae53346f7d",
+      "bytes": 3995
+    },
+    {
+      "repo": "espressif/esp-idf",
+      "revision": "1c42e514c90ae621af33bde3b6ad3dac22edcbfd",
+      "path": "examples/openthread/ot_rcp/main/Kconfig.projbuild",
+      "url": "https://raw.githubusercontent.com/espressif/esp-idf/1c42e514c90ae621af33bde3b6ad3dac22edcbfd/examples/openthread/ot_rcp/main/Kconfig.projbuild",
+      "sha256": "71804225f90009dfa613d3c74fb217144ac64cf356401d44a1b1f64063ccfd75",
+      "bytes": 514
+    },
+    {
+      "repo": "espressif/esp-idf",
+      "revision": "1c42e514c90ae621af33bde3b6ad3dac22edcbfd",
+      "path": "examples/openthread/ot_rcp/sdkconfig.defaults",
+      "url": "https://raw.githubusercontent.com/espressif/esp-idf/1c42e514c90ae621af33bde3b6ad3dac22edcbfd/examples/openthread/ot_rcp/sdkconfig.defaults",
+      "sha256": "5f3b3f4cc36098e8cf239b7dd820277ba803ff52d868cbd49e9dee3e27da8b3b",
+      "bytes": 1341
+    },
+    {
+      "repo": "espressif/esp-idf",
+      "revision": "1c42e514c90ae621af33bde3b6ad3dac22edcbfd",
+      "path": "examples/openthread/ot_rcp/sdkconfig.defaults.esp32c6",
+      "url": "https://raw.githubusercontent.com/espressif/esp-idf/1c42e514c90ae621af33bde3b6ad3dac22edcbfd/examples/openthread/ot_rcp/sdkconfig.defaults.esp32c6",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "repo": "openthread/ot-br-posix",
+      "revision": "6e50b731e86457f7f42e69743cf794796b48ccf4",
+      "path": "script/setup",
+      "url": "https://raw.githubusercontent.com/openthread/ot-br-posix/6e50b731e86457f7f42e69743cf794796b48ccf4/script/setup",
+      "sha256": "c4833914cc42074dde68e1893a1d15572bc83a874fc5eb98192d4d7fd8e15192",
+      "bytes": 2401
+    },
+    {
+      "repo": "openthread/ot-br-posix",
+      "revision": "6e50b731e86457f7f42e69743cf794796b48ccf4",
+      "path": "script/_initrc",
+      "url": "https://raw.githubusercontent.com/openthread/ot-br-posix/6e50b731e86457f7f42e69743cf794796b48ccf4/script/_initrc",
+      "sha256": "c9c0d9c04314ff799b10208b67b26f18f6eed92bdc7461c827e2220d2fc8308a",
+      "bytes": 4921
+    },
+    {
+      "repo": "openthread/ot-br-posix",
+      "revision": "6e50b731e86457f7f42e69743cf794796b48ccf4",
+      "path": "src/agent/main.cpp",
+      "url": "https://raw.githubusercontent.com/openthread/ot-br-posix/6e50b731e86457f7f42e69743cf794796b48ccf4/src/agent/main.cpp",
+      "sha256": "5a237e0e1a7eaac6187b71f8c7b1c288f0fa783ed43398e8cef89d7283aef4a4",
+      "bytes": 1763
+    },
+    {
+      "repo": "openthread/ot-br-posix",
+      "revision": "6e50b731e86457f7f42e69743cf794796b48ccf4",
+      "path": "etc/cmake/options.cmake",
+      "url": "https://raw.githubusercontent.com/openthread/ot-br-posix/6e50b731e86457f7f42e69743cf794796b48ccf4/etc/cmake/options.cmake",
+      "sha256": "966cde88956d21850f39735c92b1495bb8fe0759c0bca0befb741e2e7c72f69b",
+      "bytes": 12762
+    },
+    {
+      "repo": "openthread/openthread",
+      "revision": "227561fe2446fa57e8a1aa192c81e31396db9ac9",
+      "path": "src/posix/platform/radio_url.cpp",
+      "url": "https://raw.githubusercontent.com/openthread/openthread/227561fe2446fa57e8a1aa192c81e31396db9ac9/src/posix/platform/radio_url.cpp",
+      "sha256": "ae769fca014eb58e75840c8098dd6f6789c4c84253dddecabe5b3a05879d3ec1",
+      "bytes": 10888
+    },
+    {
+      "repo": "openthread/openthread",
+      "revision": "227561fe2446fa57e8a1aa192c81e31396db9ac9",
+      "path": "src/posix/main.c",
+      "url": "https://raw.githubusercontent.com/openthread/openthread/227561fe2446fa57e8a1aa192c81e31396db9ac9/src/posix/main.c",
+      "sha256": "07b602ab61df7c508200cbf0100f2061ede40bd66b64b4afa8188c4f590c4119",
+      "bytes": 15161
+    },
+    {
+      "repo": "ai-hpc/jetson-esp-hosted",
+      "revision": "ce36dec9294988e598f04e84c9d28092ca9e9786",
+      "path": "esp_hosted_ng/host/README.md",
+      "url": "https://raw.githubusercontent.com/ai-hpc/jetson-esp-hosted/ce36dec9294988e598f04e84c9d28092ca9e9786/esp_hosted_ng/host/README.md",
+      "sha256": "d0150242c1088c36090b379856fb3416958c25c3b0d4052073e93e670236f109",
+      "bytes": 6249
+    },
+    {
+      "repo": "ai-hpc/jetson-esp-hosted",
+      "revision": "ce36dec9294988e598f04e84c9d28092ca9e9786",
+      "path": "esp_hosted_ng/host/jetson_orin_nano_init.sh",
+      "url": "https://raw.githubusercontent.com/ai-hpc/jetson-esp-hosted/ce36dec9294988e598f04e84c9d28092ca9e9786/esp_hosted_ng/host/jetson_orin_nano_init.sh",
+      "sha256": "f86c3ecb0d426e5f93511c4f8c348b00911b3a3d45b4bbb08d463753bb1c24d0",
+      "bytes": 4870
+    }
+  ],
+  "resolved_branches": {
+    "espressif/esp-zigbee-sdk": {
+      "branch": "main",
+      "revision": "e2fdf4ad8558e5beb306b0d7040072d76244c413",
+      "date": "2026-10-16T11:37:28Z"
+    },
+    "espressif/esp-hosted": {
+      "branch": "master",
+      "revision": "a0422923d01fa5cd5f4987885fe743656398b7c5",
+      "date": "2026-09-09T10:10:13Z"
+    },
+    "espressif/esp-idf": {
+      "branch": "master",
+      "revision": "1c42e514c90ae621af33bde3b6ad3dac22edcbfd",
+      "date": "2026-10-16T07:43:44Z"
+    },
+    "openthread/ot-br-posix": {
+      "branch": "main",
+      "revision": "6e50b731e86457f7f42e69743cf794796b48ccf4",
+      "date": "2026-10-18T05:03:31Z"
+    },
+    "openthread/openthread": {
+      "branch": "main",
+      "revision": "227561fe2446fa57e8a1aa192c81e31396db9ac9",
+      "date": "2026-10-17T16:02:59Z"
+    },
+    "ai-hpc/jetson-esp-hosted": {
+      "branch": "master",
+      "revision": "ce36dec9294988e598f04e84c9d28092ca9e9786",
+      "date": "2026-04-20T01:13:43Z"
+    }
+  },
+  "additional_pins": {
+    "esp-hosted-linux": "9b56ff96a1bc95acaa68d8023794b8353701c5e3",
+    "zigbee-release-v1.0": "c9e2c3e12642c704096dfefe25b62212b47229ba",
+    "esp-idf-v5.5.4": "735507283d5b2f9fb363a1901172dbd9e847945d"
+  }
+}

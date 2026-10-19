@@ -10,7 +10,9 @@ A video and an action array are not enough. You need to know what the operator s
 
 For each stream retain the source timestamp, clock domain, sequence number, and reception timestamp where available. Calibrate clock offset and monitor drift. A camera frame's acquisition timestamp is preferable to a timestamp assigned after video decoding. Record the controller mode, command period, robot configuration, gripper semantics, camera intrinsics/extrinsics, and calibration revision with each session.
 
-An illustrative alignment contract says: observation includes only measurements available by decision time \(t\); action is the command applied over \([t,t+\Delta t)\). If a dataset uses a different convention, document and convert it. Nearest-neighbor alignment can accidentally choose a future image. Causal interpolation uses past information; offline target construction may use future measurements only when those measurements are labels, not deployed inputs.
+An illustrative alignment contract says: observation includes only measurements available by decision time \(t\); action is the command applied over \([t,t+\Delta t)\). If a dataset uses a different convention, document and convert it. Nearest-neighbor alignment can accidentally choose a future image. Interpolation is causal only when every supporting sample has arrived by the decision time. At the newest time point, sample-and-hold or an explicitly modeled extrapolation is often what is actually available. Offline target construction may use future measurements only when those measurements are labels, not deployed inputs.
+
+For example, a frame captured at 100 ms but received at 160 ms is unavailable to a decision at 140 ms, even though its capture time is earlier. At 170 ms it is available and its observation age is **70 ms**, not the 10 ms since receipt. Use capture time for physical freshness and receipt time for availability, after establishing a common clock mapping.
 
 ## Teleoperation changes the data distribution
 
@@ -42,7 +44,7 @@ Storage estimates also guide collection. Three uncompressed 640×480 RGB cameras
 
 ## Build the collection audit
 
-**Exercise / pseudocode.** Use an existing episode bundle or synthesize three timestamped camera streams, robot states, and commands. The [shared lab guide](Lab-Guide.md) supplies CPU contract exercises; this collection audit is an additional implementation task.
+**Exercise / pseudocode.** Use an existing episode bundle or synthesize three timestamped camera streams, robot states, and commands. Begin with the supplied [dataset and execution lab](Dataset-and-Execution-Lab.md): its episode fixture carries capture/ready timestamps, explicit units and frame transforms, train-only normalizers, and episode-boundary masks. It implements a bounded two-dimensional conversion and replay; the three-camera collection audit below extends that reference.
 
 1. Write an episode schema and controller contract. Include source IDs, calibration hashes, action units, control period, success definition, termination reason, and intervention spans.
 2. Build causal alignment to a control timeline. Save alignment residuals and report maximum, median, and p99 observation age for each sensor.

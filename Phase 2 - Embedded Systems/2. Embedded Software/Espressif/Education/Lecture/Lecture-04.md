@@ -1,160 +1,40 @@
-# Lecture 4 - Solution tracks: AI, connectivity, peripherals, low power, and gateways
+# Lecture 4 - AI, connectivity, low power, and gateways as measured experiments
 
-**Course:** [Official education path guide](../Guide.md) | **Phase 2 - Embedded Software**
+**Course:** [Education guide](../Guide.md) | **Previous:** [Native project](Lecture-03.md) | **Next:** [Integrated capstone](Lecture-05.md)
 
-**Previous:** [Lecture 03](Lecture-03.md) | **Next:** [Lecture 05 - Practical courses and building your own Espressif study plan](Lecture-05.md)
+Choose one specialization and give it an input contract, resource budget, and failure test. The official ecosystem supplies components; the engineering task is making their assumptions fit your device.
 
----
+## AI: count buffers before choosing a model
 
-## Why this lecture matters
+[ESP-SR](https://docs.espressif.com/projects/esp-sr/en/latest/esp32s3/index.html) covers speech-oriented components, while [ESP-DL](https://github.com/espressif/esp-dl) provides model deployment/inference facilities. Check target, SDK, operator, and model-format compatibility for the selected version. Current ESP-DL documentation describes ESP-PPQ quantization and `.espdl` deployment; do not assume that renaming an ONNX or TFLite file makes it runnable.
 
-One of the strongest parts of Espressif’s official education page is that it does not stop at beginner setup.
+For a teaching voice pipeline, one second of mono audio at 16 kHz with signed 16-bit samples is `16000 × 2 = 32000 bytes`, or 31.25 KiB. A 20 ms block is 320 samples / 640 bytes. Two such input blocks need 1280 bytes before feature buffers, model parameters, activations, task stacks, and driver storage. These are format calculations, not a claim that every ESP-SR model uses this input or buffering scheme.
 
-It points learners toward real **solution directions**.
+Now suppose a model has 120000 int8 weights: the raw weights occupy about 117.2 KiB. That is not total RAM. Persistent tensors, peak live activations, allocator alignment, scratch space, and memory placement can dominate. Compare the deployed input preprocessing against the training pipeline and evaluate quantization on representative held-out examples.
 
-That matters because at some point you need to stop asking:
+Use detection counts and latency, not one successful demo. If a classifier emits 10 decisions/s for one hour, it makes 36000 decisions. Ten false-positive decisions are not necessarily ten false activations after debouncing; report both decision-level error and user-visible activation events. Include silence, noise, unknown inputs, and the actual deployment environment.
 
-> "What board should I buy?"
+## Low power: integrate charge over states
 
-and start asking:
+A hypothetical sensor consumes 30 mA for 50 ms, 80 mA for a 20 ms transmit, and 0.02 mA for the remaining 9930 ms of a ten-second cycle:
 
-> "What kind of product or system am I trying to build?"
+```text
+average current = (30×50 + 80×20 + 0.02×9930) / 10000
+                = 0.32986 mA
+```
 
----
+These are assumed values, not measured ESP32 performance. Add retry probability, regulator efficiency, battery limits, and board leakage before estimating life. Measure at the actual supply boundary; a development board USB bridge may remain powered during MCU sleep. Check which wake sources and memory/peripheral state survive the selected mode in the [sleep-mode documentation](https://docs.espressif.com/projects/esp-idf/en/stable/esp32c6/api-reference/system/sleep_modes.html).
 
-## The major solution families Espressif highlights
+## Gateway: preserve meaning across protocols
 
-The official education page groups solutions around areas like:
+A gateway can receive a Zigbee attribute or Thread UDP report and expose it to a Linux application. Preserve the original units, source identity, timestamp/clock domain, and validity. Do not timestamp an old cached value as newly sampled merely because the host polled it again.
 
-- AI
-- connectivity
-- peripherals
-- low power
-- gateways
+Start with the [real OpenThread CPU experiment](../../../IoT/OpenThread/labs/CPU-Simulation.md). It proves protocol attachment and traffic in simulation. Then add an application-level stale-data rejection test. Moving the radio to hardware adds RF, power, and coexistence experiments; it does not remove the application contract.
 
-This is a much better structure than learning **random demos**.
+## Choose one falsifiable question
 
----
+- AI: Does the held-out negative set trigger the indicator more often than the stated target?
+- Power: Does measured charge per reporting cycle exceed the budget when retries occur?
+- Gateway: Does a stale or duplicate report ever become a fresh observation after reconnect?
 
-## AI solutions
-
-Espressif highlights items like:
-
-- `ESP-SR` for voice recognition
-- `ESP-WHO` for computer vision
-- `ESP-DL` for deep-learning development
-
-For our roadmap, that means:
-
-- these are not first-day tools
-- they are **direction markers** for later product-specific work
-
-If you are voice-oriented, `ESP-SR` matters.
-If you are camera-oriented, `ESP-WHO` matters.
-
----
-
-## Connectivity solutions
-
-The education page highlights a broad set of connectivity directions, including:
-
-- `ESP-NOW`
-- RainMaker
-- Mesh-Lite
-- Matter
-- Zigbee
-- OpenThread
-- gateway / bridge directions
-
-This is exactly where our roadmap should connect the **Espressif track** to the **IoT track**.
-
-In practice:
-
-- use the Espressif education path to understand the vendor landscape
-- then use our **IoT** modules to study the actual protocol architecture more deeply
-
----
-
-## Peripheral and device solutions
-
-Espressif also points learners toward:
-
-- peripheral drivers
-- USB solutions
-- camera solutions
-- LCD solutions
-
-This matters because many learners think **"ESP32 = only simple sensors."**
-
-The official education page shows a broader view:
-
-- HMI
-- USB peripherals
-- display devices
-- camera-connected products
-
-That broadens the idea of what Espressif hardware can be used for.
-
----
-
-## Low power and wireless protocol directions
-
-Espressif also emphasizes:
-
-- light sleep
-- deep sleep
-- ULP
-- BLE
-- Bluetooth Mesh
-
-This is a good reminder that not all ESP32 projects are:
-
-- always-on Wi-Fi nodes
-
-Some of the strongest designs are:
-
-- battery-powered
-- event-driven
-- protocol-specific
-
-So **product direction** should affect framework and architecture choices very early.
-
----
-
-## Gateway thinking
-
-One especially useful direction on the official page is **gateway thinking**:
-
-- protocol bridge
-- cloud path
-- multi-interface node
-
-This fits very well with your broader roadmap, especially where ESP32 devices may later support:
-
-- Jetson systems
-- local assistants
-- sensor hubs
-- radio co-processors
-
-That makes Espressif education relevant beyond standalone MCU projects.
-
----
-
-## Lab
-
-Choose one direction and write a short note:
-
-- AI voice device
-- low-power sensor
-- smart-home connectivity node
-- gateway / bridge
-
-Then answer:
-
-- which official Espressif solution family does it fit?
-- which framework would you start with?
-- which of our roadmap modules should you pair with it next?
-
----
-
-**Previous:** [Lecture 03](Lecture-03.md) | **Next:** [Lecture 05 - Practical courses and building your own Espressif study plan](Lecture-05.md)
+A useful result can be “the current design fails.” Record the evidence and change one constraint or implementation choice. Do not turn a vendor benchmark into an unconditional product claim.

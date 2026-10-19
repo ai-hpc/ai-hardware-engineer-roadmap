@@ -28,6 +28,8 @@ The identity quaternion is a weak convention test because some code paths specia
 
 Before tuning a controller, inspect scale, mass, center of mass, inertia, collision approximation, joint axes, limits, actuator gains, and default pose. Rendered geometry can look right while collision geometry is wrong. A tiny scale error can cause a large dynamics change.
 
+The [executed OpenUSD exercise](Simulation-CPU-Lab.md#predict-which-usd-opinion-wins) shows that changing `metersPerUnit` leaves an authored translation of 100 numerically unchanged. Converting a 100 cm translation to a metre-authored asset requires writing 1, together with consistent geometry, limits and inertial conversions; a metadata edit alone is insufficient.
+
 Use a gravity-only drop, a single-joint sweep inside limits, and a static-contact check. Inspect joint names rather than assuming import order. Keep asset overrides separate from the source asset and save both revisions.
 
 ## Lab

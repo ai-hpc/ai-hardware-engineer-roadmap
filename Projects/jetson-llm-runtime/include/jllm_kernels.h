@@ -2,8 +2,8 @@
 //
 // Design rules:
 //   1. Every kernel minimizes DRAM traffic (102 GB/s is the bottleneck)
-//   2. Tile sizes tuned for 48 KB shared memory per SM
-//   3. Thread blocks sized for 16 SMs × 48 warps max
+//   2. 48 KiB default per-block allocation differs from the 164 KiB SM maximum
+//   3. Thread blocks sized for actual device SM count × 48 warps maximum per SM
 //   4. Fuse everything possible (fewer kernels = fewer DRAM round-trips)
 //   5. INT4 dequant fused into compute (never write dequantized weights to DRAM)
 //
@@ -17,7 +17,7 @@
 
 // Orin SM 8.7 constants (duplicated here to avoid circular include with jllm.h)
 #ifndef JLLM_SHARED_MEM_SM
-#define JLLM_SHARED_MEM_SM   (48 * 1024)   // 48 KB per SM
+#define JLLM_SHARED_MEM_SM   (164 * 1024)  // maximum SM shared memory; query runtime limits
 #endif
 #ifndef JLLM_WARP_SIZE
 #define JLLM_WARP_SIZE       32
@@ -25,7 +25,7 @@
 
 namespace jllm {
 
-// Orin-optimal tile sizes (smaller than desktop — 48 KB shared mem)
+// Illustrative tile sizes; no target performance claim
 constexpr int TILE_M = 32;
 constexpr int TILE_N = 64;
 constexpr int TILE_K = 32;
@@ -37,7 +37,8 @@ constexpr int BLOCK_SIZE = 128;         // threads per block (4 warps, good occu
 // Q4_K dequant fused into GEMV — never writes dequantized weights to DRAM
 //
 // y[M] = W[M×K] (Q4) × x[K] (FP16)
-// W stored as: 4-bit weights + FP16 scales per group of 32
+// W uses GGML Q4_K 256-element/144-byte blocks with embedded scales/mins.
+// Separate scales and group_size arguments are legacy/unused by this kernel.
 //
 void gemv_q4(
     half*          y,          // output [M]
@@ -95,23 +96,25 @@ void rope_inplace(
     cudaStream_t   stream
 );
 
-// ── Flash Attention (single query, decode path) ──────────────────────────
-// Fused: Q×K^T → scale → softmax → ×V, all in shared memory + registers.
-// Tuned for 48 KB shared mem: TILE_Q=1 (decode), TILE_KV=64.
-// KV cache can be FP16 or INT8.
+// ── Tiled online attention (single query, decode path) ──────────────────
+// K and V each use token-major [capacity, n_kv_heads, head_dim] storage.
+// Reads prefix [0, seq_len); changing seq_len never changes the token stride.
+// Finite input/scaled scores, sufficient allocations, nonaliasing output, and positive finite
+// INT8 scales are caller requirements. Engine's KV pool supports FP16 only.
+// Returns validation/launch status; caller must also check stream completion.
 //
-void flash_attention_decode(
+cudaError_t flash_attention_decode(
     half*          output,     // [n_heads × head_dim]
     const half*    q,          // [n_heads × head_dim] (single query)
-    const void*    k_cache,    // [n_kv_heads × seq_len × head_dim] (FP16 or INT8)
-    const void*    v_cache,    // [n_kv_heads × seq_len × head_dim]
+    const void*    k_cache,    // [capacity × n_kv_heads × head_dim] (FP16 or INT8)
+    const void*    v_cache,    // separate K/V spans with the same token-major layout
     int            n_heads,
     int            n_kv_heads, // GQA: n_heads / n_kv_heads = group size
     int            head_dim,
     int            seq_len,    // current sequence length
     float          scale,      // 1/sqrt(head_dim)
     bool           kv_int8,    // true = INT8 KV cache
-    const float*   kv_scales,  // per-head scales if kv_int8 (else nullptr)
+    const float*   kv_scales,  // required for INT8: K[n_kv_heads], then V[n_kv_heads]
     cudaStream_t   stream
 );
 

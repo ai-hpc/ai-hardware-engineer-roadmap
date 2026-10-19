@@ -6,7 +6,7 @@
 
 Lecture 04 taught you to *trust the score* — to validate a single model honestly. This lecture is about what you do once you have several decent-but-imperfect models and want one that is better than any of them. A single model is rarely the strongest entry on a leaderboard or the most reliable thing in production; the standard move is to **combine** models. Ensembling is, at bottom, a way to **spend compute to buy accuracy** — you train and serve more models than you strictly need, and the combination beats the best individual learner.
 
-The reason ensembling works, and the reason there are *three different* ways to do it, comes straight from the **bias–variance decomposition**. Generalization error splits into three additive pieces — bias², variance, and irreducible noise — and each combiner attacks a different piece. **Bagging** drives down *variance* by averaging independent models. **Boosting** drives down *bias* by stacking weak models that each fix the last one's mistakes. **Stacking** learns a meta-model over diverse base learners and can chip at both. So the decomposition is not abstract theory; it is the decision procedure. Diagnose whether your model is bias-limited (underfitting) or variance-limited (overfitting), and the math tells you which combiner to reach for.
+The reason ensembling works, and the reason there are *three different* ways to do it, comes straight from the **bias–variance decomposition**. For squared-error regression under the assumptions below, expected error splits into three additive pieces — bias², variance, and irreducible noise — and each combiner attacks a different piece. **Bagging** can reduce *variance* by averaging imperfectly correlated models. **Boosting** drives down *bias* by stacking weak models that each fix the last one's mistakes. **Stacking** learns a meta-model over diverse base learners and can chip at both. So the decomposition is not abstract theory; it is the decision procedure. Diagnose whether your model is bias-limited (underfitting) or variance-limited (overfitting), and the math tells you which combiner to reach for.
 
 The cost is real and worth stating up front: an ensemble of $N$ models costs roughly $N\times$ the inference latency and $N\times$ the memory of one model. That tension — accuracy from combination versus the cost of serving many models — is exactly the pressure that makes the compression and distillation of Lecture 10 necessary. Combine to win the offline metric; compress to afford the online one.
 
@@ -51,7 +51,7 @@ The cross-terms vanish in expectation because $\varepsilon$ has zero mean and is
 
 ### The tradeoff
 
-As you increase model complexity, **bias falls** (a richer model can fit $f$ more closely) but **variance rises** (a richer model latches onto the noise in this particular $D$). Total error is U-shaped: too simple is **underfitting** (high bias, low variance), too complex is **overfitting** (low bias, high variance), and the sweet spot — best generalization — sits in between.
+In the classical schematic below, increasing flexibility can lower bias and raise variance. This is an intuition, not a universal monotonic law; optimization, regularization, data, and interpolation can produce other curves. The illustrated total error is U-shaped: too simple is **underfitting** (high bias, low variance), too complex is **overfitting** (low bias, high variance), and the sweet spot — best generalization — sits in between.
 
 ```text
  Error
@@ -81,7 +81,7 @@ Reduce noise only by **improving the data** — more samples, better features, c
 
 ## 2. Bagging — Bootstrap AGGregatING
 
-**Bagging reduces variance by averaging many independent models.** You train $n$ base learners *in parallel*, each on a slightly different version of the data, then combine their outputs. Because the models are trained independently, this is the variance-killing combiner.
+**Bagging can reduce variance by averaging models trained on bootstrap samples.** You train $n$ base learners *in parallel*, each on a slightly different version of the data, then combine their outputs. Their training jobs can run independently, but predictions are correlated because they share the original dataset. That correlation limits the gain.
 
 The "different version of the data" is a **bootstrap sample**: given a dataset of $m$ examples, draw $m$ examples **with replacement**. Sampling with replacement means some examples appear several times and others not at all. A classic result: each bootstrap sample contains about $1 - 1/e \approx 63\%$ of the unique examples, leaving ~37% untouched — the **out-of-bag (OOB)** examples, which you get to use as free validation data.
 
@@ -103,7 +103,7 @@ class Bagging:
 
     def predict(self, X):
         preds = [learner.predict(X) for learner in self.learners]
-        return np.array(preds).mean(axis=0)   # vote for classification
+        return np.array(preds).mean(axis=0)   # regression only; use votes/probabilities for classification
 ```
 
 ### Why averaging shrinks variance
@@ -115,7 +115,9 @@ For regression, the bagged prediction is the average over base learners, $\hat f
 └── error of the bagged model ──┘   └── average error of a single learner ──┘
 ```
 
-The ensemble's error is **no worse than**, and in practice better than, the average individual learner's error — the gain comes from cancelling the independent fluctuations (variance) while leaving the shared bias untouched. Bagging therefore **does not reduce bias**: if every base learner systematically underfits the same way, averaging them keeps that bias.
+For a fixed input and target, the squared error of the **arithmetic mean of predictions** is no larger than the mean of their squared errors. This is not a claim that every ensemble beats its best member, or that majority-vote classification has the same inequality. The expectation expression above is an idealized population average; a real ensemble has finitely many fitted members.
+
+With `M` members of variance `σ²` and equal pairwise correlation `ρ`, averaging gives `σ² * (ρ + (1−ρ)/M)`. For ten members with `ρ=0.8`, the variance is `0.82σ²`, not `0.1σ²`. **Guided variation:** for `ρ=0`, it is `0.1σ²`; for `ρ=1`, it remains `σ²`. Averaging does not cancel a shared systematic error, though bootstrap fitting can change the bias of the resulting estimator relative to a single fit. See the [scikit-learn ensemble guide](https://scikit-learn.org/stable/modules/ensemble.html).
 
 ### Unstable learners are where bagging pays off
 
@@ -126,7 +128,7 @@ Bagging helps most for **unstable** (high-variance) learners — models whose pr
 
 ### Random Forest — the canonical case
 
-**Random Forest = bagging with decision trees, plus one extra trick.** Beyond bootstrapping the rows, at each split a random forest considers only a **random subset of features**. This decorrelates the trees: without it, a few dominant features would make every tree look alike, and averaging near-identical models barely reduces variance. By forcing trees to use different features, you get genuinely diverse learners and the averaging bites harder. The result is one of the most robust off-the-shelf models in existence — little tuning, strong defaults, and the OOB samples give you a validation estimate for free, no separate split required.
+**Random Forest = bagging with decision trees, plus one extra trick.** Beyond bootstrapping the rows, at each split a random forest considers only a **random subset of features**. This decorrelates the trees: without it, a few dominant features would make every tree look alike, and averaging near-identical models barely reduces variance. By forcing trees to use different features, you get genuinely diverse learners and the averaging bites harder. The result is one of the most robust off-the-shelf models in existence — little tuning, strong defaults, and OOB samples provide an internal estimate. They do not replace an untouched final test set after model selection, and row bootstraps need special care when examples share an episode, person, or time period.
 
 > Bagging is **embarrassingly parallel**: the $n$ learners share nothing during training, so you can train them on $n$ machines/cores at once. This is its operational signature and the cleanest contrast with boosting.
 
@@ -184,7 +186,7 @@ class GradientBoosting:
 
 ### Why boosting overfits without regularization
 
-Boosting drives **bias** down — by construction it keeps fitting whatever error remains, so given enough rounds it can fit the training set arbitrarily well, *including its noise*. That is exactly the overfitting failure mode: keep boosting and training error goes to zero while test error turns back up. Unlike bagging (where adding more trees is essentially free and monotonically safe), **more boosting rounds is a knob that can hurt.** The standard regularizers:
+Boosting drives **bias** down — by construction it keeps fitting whatever error remains, so given enough rounds it can fit the training set arbitrarily well, *including its noise*. That is exactly the overfitting failure mode: keep boosting and training error goes to zero while test error turns back up. Additional bagged trees also cost memory and inference time, and finite-sample test performance need not improve monotonically. With boosting, **more boosting rounds is a knob that can hurt.** The standard regularizers:
 
 - **Shrinkage** — small learning rate $\eta$ (e.g. 0.01–0.1); each learner moves the ensemble only a little.
 - **Subsampling** — train each learner on a random subset of rows (stochastic gradient boosting) and/or columns.
@@ -248,7 +250,7 @@ Here is the mistake that quietly ruins naive stacking. If you train the base lea
 The fix is to give the meta-learner **out-of-fold (OOF) predictions** — predictions on data the base learner did *not* train on:
 
 - **Blending** — split off a small holdout: train base learners on the rest, predict on the holdout, train the meta-learner on those holdout predictions. Simple, but the meta-learner only sees a small slice.
-- **Stacking (proper)** — use **k-fold** cross-validation. Train base learners on $k-1$ folds, predict the held-out fold; rotate so every training row gets an out-of-fold prediction. The meta-learner trains on the full set of OOF predictions — uses all the data, no leakage.
+- **Stacking (proper)** — use **k-fold** cross-validation. Train base learners on $k-1$ folds, predict the held-out fold; rotate so every training row gets an out-of-fold prediction. The meta-learner trains on the OOF predictions. Fit preprocessing inside each fold too; use grouped or temporal folds when required. OOF meta-features prevent this specific leakage, not all forms of selection leakage. Evaluate the complete stack on an untouched outer split.
 
 ### Multi-layer stacking
 
@@ -276,7 +278,7 @@ That is the law of diminishing returns on a slide: a tiny accuracy gain for a mu
 | **Parallelizable?** | Yes — embarrassingly | No — sequential dependency | Base learners yes; levels sequential |
 | **Base learners** | Many copies of *one* unstable model (e.g. trees) | Many *weak* learners (shallow trees) | *Diverse* model types (RF + GBDT + MLP) |
 | **Diversity from** | Bootstrap samples (+ feature subsets) | Reweighting / residual focus | Different model architectures |
-| **Overfit risk** | Low — more learners is safe | **High if unregularized** — more rounds can hurt | Medium — leaks if you skip out-of-fold |
+| **Overfit risk** | More trees often stabilize the average; no monotonic test guarantee | **High if unregularized** — more rounds can hurt | Medium — leaks if you skip out-of-fold |
 | **Canonical example** | Random Forest | XGBoost / LightGBM (GBDT) | AutoGluon / Kaggle winners |
 | **Free validation** | Out-of-bag (OOB) estimate | Early-stopping on a holdout | Out-of-fold predictions |
 
@@ -292,14 +294,12 @@ The CS329P summary table, with $n$ = number of learners, $l$ = levels, $k$ = fol
 
 Read it as a recipe: **underfitting → boost; overfitting → bag; want the last 1% and have the compute → stack.**
 
-> **Hardware lens:** Every accuracy gain in this lecture is bought with **inference cost**. An ensemble of $N$ models is, at serve time, $N$ forward passes — roughly **$N\times$ the latency and $N\times$ the memory** of a single model (a 1000-tree GBDT evaluates 1000 trees per prediction; a 5-model stack runs 5 full models plus the meta-learner; multi-layer stacking multiplies again by levels and folds). Offline, on a Kaggle box, that is free — you have all night. Online, behind a latency SLA on a fixed accelerator budget, it is often *unaffordable*: you cannot put a 5× latency hit in a request path that must answer in 20 ms, and you may not have 5× the GPU memory to hold the ensemble resident. This is precisely the gap **Lecture 10 (Model Compression — Pruning, Quantization, Distillation)** exists to close. **Distillation** is the most direct answer: train the big ensemble to win the metric, then train *one* small student to mimic the ensemble's outputs — keeping much of the accuracy at $1\times$ inference cost. The workflow that ships is *ensemble to find the ceiling, distill to afford it.* So measure both numbers: the leaderboard score **and** the per-prediction cost, because in production the second one is a hard constraint, not a footnote. [→ Lecture 10](Lecture-10.md)
+> **Hardware lens:** serving an ensemble requires its members' work and, if resident together, their combined weights. Latency is not automatically `N×`: parallelism, batching, shared preprocessing, and heterogeneous models change it. Report actual end-to-end latency and memory for the full stack. Distillation or compatible weight averaging may reduce serving cost, but each resulting artifact needs independent quality and shift evaluation. [Lecture 10](Lecture-10.md) develops those tradeoffs.
 
-> **2026 update:** Five years on, the lecture's thesis holds, sharpened. **(1) GBDT ensembles still own tabular.** XGBoost, LightGBM, and CatBoost remain the default winners on tabular Kaggle competitions and most structured industry data — deep nets have *not* displaced them there, despite repeated attempts (TabNet, FT-Transformer, SAINT), and recent in-context tabular models like **TabPFN v2** are promising on small data but have not dethroned boosted trees at scale. **(2) Deep ensembles for uncertainty.** Training a handful of neural nets with different seeds and averaging is now a standard, strong baseline for **predictive uncertainty and calibration** — it reliably beats fancier Bayesian approximations, and is used where knowing *when the model is unsure* matters (safety, active learning, OOD detection). **(3) Weight-averaging instead of output-averaging — "model soups".** A 2022-onward idea that stuck: rather than serve $N$ models, **average their weights** into a single set. **Model soups** (averaging the weights of multiple fine-tunes of the same base model) and **SWA / WiSE-FT** improve accuracy and robustness while paying only **$1\times$ inference cost** — the holy grail the hardware lens asks for, with the catch that it requires the models to live in a compatible region of weight space (typically fine-tunes of a shared initialization, not arbitrary architectures). For LLMs, weight-space *merging* (e.g. linear/SLERP merges, TIES, DARE) is the same instinct applied to combining specialized fine-tunes into one served model. The pattern of the decade: **get the ensemble's accuracy without paying the ensemble's serving cost** — by distilling it (Lecture 10) or by averaging weights instead of outputs.
+**Current practice, checked 2026-10-18:** compare a well-tuned tree ensemble and an appropriate neural/tabular baseline on your data instead of declaring a universal winner. Deep ensembles are useful uncertainty baselines but can remain confidently wrong under shift. Weight averaging requires compatible parameter coordinates; independently initialized networks can permute hidden units, so blindly averaging them need not preserve their functions. Historical benchmark numbers above belong to the original CS329P example and are not measurements from this repository.
 
 ---
 
 ## Current as of
 
-Written June 2026. The **original CS329P content** — the bias–variance decomposition and tradeoff, bagging (bootstrap, OOB, Random Forest, the variance-reduction argument), boosting (AdaBoost vs. gradient boosting, residual = negative gradient, shrinkage/subsampling/early-stopping, GBDT with XGBoost/LightGBM), and stacking (diverse base learners, out-of-fold meta-features, multi-layer stacking with repeated k-fold bagging, AutoGluon, and the summary table) — is taught first because it remains the correct working mental model and maps one-to-one onto the 2021 slides. The **2026 refresh layer** flags what moved: GBDTs' continued dominance over deep nets on tabular data (and TabPFN as the watch-this-space exception), **deep ensembles** as the standard uncertainty/calibration baseline, and **weight-averaging — model soups, SWA, WiSE-FT, and LLM weight-merging** — as the way to capture an ensemble's accuracy at single-model inference cost, which together with **distillation (Lecture 10)** answers the hardware lens's core complaint. Where 2021 framing is dated, the original is presented before the update; nothing is silently rewritten.
-
-*Adapted from [Stanford CS329P](https://c.d2l.ai/stanford-cs329p) — Huang, Li & Smola, CC-BY-SA-4.0.*
+The original CS329P material is retained as an attributed teaching source. Reviewed 2026-10-18: qualified squared-error assumptions, correlated bagging, OOF preprocessing, historical benchmark scope, and measured serving costs.

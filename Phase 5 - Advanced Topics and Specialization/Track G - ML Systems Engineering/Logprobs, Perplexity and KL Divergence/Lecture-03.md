@@ -71,12 +71,12 @@ Here is the sentence to memorize:
 The anchor is the uniform distribution. If `q` spreads its mass evenly over a vocabulary of size `V`, then `q(x_t) = 1/V` for every token, every `1/q(x_t) = V`, and the geometric mean is exactly `V`:
 
 ```text
-    uniform over V symbols   →   PPL = V        (maximal confusion: no information)
+    uniform over V symbols   →   PPL = V        (uniform-predictor baseline)
     perfect, confident model →   PPL → 1        (q(truth)=1 everywhere → 0 loss)
-    real LLM on English text →   PPL ≈ 3–12     (per-token, BPE vocab ~32k–256k)
+    confidently wrong model →   PPL can exceed V without bound
 ```
 
-So perplexity collapses a `V`-dimensional distribution to a single number on the scale `[1, V]`: the *effective* number of choices. A 128k-token vocabulary with PPL 8 means the model, despite 128k options, behaves as if it were guessing among 8 — it has used context to rule out the other ~128,000.
+Perplexity lies in `[1, ∞]`, not `[1, V]`. With two tokens, assigning the observed token probability 0.001 gives PPL 1000. The effective-branching interpretation compares average surprise; it does not count how many tokens the model literally retained.
 
 **Worked micro-example.** Vocabulary `V = 4`: `{a, b, c, d}`. A two-token reference sequence `[a, c]`. The model predicts:
 
@@ -95,7 +95,7 @@ Compute the loss and perplexity:
     check (geometric mean): ( (1/0.7)(1/0.5) )^(1/2) = (2.857)^(1/2) = 1.690  ✓
 ```
 
-PPL `1.69` on a 4-symbol vocabulary: the model is performing well — its effective branching is far below the uniform ceiling of `4`. If it had predicted uniform `(0.25, 0.25, 0.25, 0.25)` at both steps, every `1/q = 4` and `PPL = 4` exactly: it would have learned nothing. The whole value of a language model is the distance it opens between `PPL` and `V`.
+PPL `1.69` is lower than the uniform-predictor baseline of 4 on these two observations. This tiny example demonstrates arithmetic, not broad model quality. A confidently wrong predictor can perform worse than uniform.
 
 ---
 
@@ -120,13 +120,13 @@ Perplexity is **per token**. But "token" is not a property of the text — it is
 
 Three wildly different perplexities — `403` vs `20` vs `1.8` — for **identical predictive skill on identical text**. The model that splits text into more, smaller, easier-to-predict tokens looks dramatically "better" by per-token PPL, purely as a tokenization artifact. Comparing PPL across models with different tokenizers or vocabularies is therefore meaningless. It is comparing the average difficulty of *their own* puzzle pieces, not their skill.
 
-**The fix: normalize by something tokenizer-invariant — raw bytes.** The total negative log-likelihood (in nats) over the corpus is tokenizer-independent (it is the model's total surprise at the *text*, however you slice it; the chain rule guarantees the joint sequence probability is the product of the per-token ones regardless of the split). Divide it by the number of raw UTF-8 **bytes** instead of tokens, and convert to bits. That is **bits-per-byte (BPB):**
+**A common denominator: raw bytes.** Each model assigns a probability to a token sequence representing the text. The chain rule factorizes that probability within that model; it does not force different tokenizers or models to assign the same probability. Compare total negative log-likelihood on identical text spans, divided by their original UTF-8 byte count, after specifying normalization, special tokens, boundaries, and context policy. That gives bits-per-byte (BPB):
 
 ```text
     BPB  =  total_nats / ( ln 2 · n_bytes )      =  total_bits / n_bytes
 ```
 
-For the example above, all three models spent 12 nats on 20 bytes (`"internationalization"` is 20 ASCII bytes), so all three score the **same** `BPB = 12 / (0.6931 × 20) = 0.866` bits/byte. Tokenization cancels. BPB (and its cousins bits-per-character and per-word perplexity, used when byte counts are awkward, e.g. CJK text) is the only fair way to rank models that tokenize differently. If you ever see a leaderboard comparing two different-tokenizer models by raw PPL, distrust it; if it reports BPB, trust it.
+In the example, the stipulated equal totals of 12 nats on 20 ASCII bytes give `12/(ln(2)*20)=0.866` bits/byte. The shared denominator removes the arbitrary token-count scale; different models will generally have different NLL numerators. BPB is useful evidence, not automatic proof of a fair comparison or better downstream behavior.
 
 ---
 
@@ -134,12 +134,12 @@ For the example above, all three models spent 12 nats on 20 bytes (`"internation
 
 The second trap is about *context*, and it bites the moment your evaluation document is longer than the model's context window.
 
-A model with context length `L` (say 4096) cannot ingest a 10,000-token WikiText document in one forward pass. The lazy fix — chop the document into **non-overlapping** chunks of `L` and score each independently — is wrong, and wrong in a direction that *flatters* a worse setup while *inflating* your reported number. Every chunk after the first starts cold: its first tokens are predicted with **little or no left context**, because the context that should have preceded them lives in the previous chunk and was thrown away. Tokens predicted with less context have higher NLL, so non-overlapping chunking systematically **over-estimates** perplexity.
+A model with context length `L` cannot condition on an arbitrarily long prefix in one ordinary forward pass. Non-overlapping chunks repeatedly discard left context. This changes the evaluation protocol and often raises measured PPL; a particular learned model is not mathematically guaranteed to improve with every added context token. Use overlapping windows when the intended question is prediction with as much available left context as the window allows.
 
 ```text
     Document (10k tokens), context L = 4096:
 
-    NON-OVERLAPPING (wrong):
+    NON-OVERLAPPING (shorter context near boundaries):
       chunk 1: [t0 .................. t4095]   t0 has 0 ctx, t4095 has full ctx
       chunk 2: [t4096 ............... t8191]   t4096 has 0 ctx AGAIN  ← inflates PPL
       chunk 3: [t8192 ............... t9999]   t8192 has 0 ctx AGAIN
@@ -149,14 +149,14 @@ A model with context length `L` (say 4096) cannot ingest a 10,000-token WikiText
       window 1: [t0 ........................ t4095]   score ALL (first window)
       window 2: [t_s ....................... t_{s+4095}]
                  └ first (L − s) tokens: CONTEXT ONLY, masked with -100
-                                          last  s tokens: SCORED with full ctx
+                                          last  s tokens: SCORED with available left context
       window 3: slide by s again ...
-                → every scored token (after the first window) sees a FULL L of context
+                → later targets see L−s through L−1 context tokens in full windows
 ```
 
-The HuggingFace strided approach slides a window of width `L` by a stride `s < L`. In each window it predicts only the **last `s` tokens** (those that now enjoy a full `L` of left context) and **masks the rest with `-100`** so they contribute context but no loss. Overlap `L − s` is the price you pay in compute for giving every scored token full context. Smaller stride → more overlap → more accurate (closer to the ideal of scoring every token with `L−1` tokens of context) → more forward passes. `s = L` degenerates back to the wrong non-overlapping method; `s = 1` is the exact-but-expensive limit. People typically pick `s = L/2` or `s = 512`.
+A width-`L`, stride-`s` window scores newly encountered targets and masks overlapping context. In full later windows, those targets have between `L−s` and `L−1` preceding tokens, not all `L` tokens. Stride one maximizes context per scored token but requires more forward passes. State the chosen protocol and inspect the actual target mask after causal shifting.
 
-Here is the canonical HF-style loop over WikiText-2:
+Here is a framework adaptation sketch for one unpadded token stream. Pin a compatible model, dataset, tokenizer, and Transformers release before executing it; this model-sized example was not run during the course refresh. The [CPU lab](Lab-01-Masked-Quality-Metrics.md) tests the denominator and window accounting independently:
 
 ```python
 import torch
@@ -167,13 +167,15 @@ device = "cuda"
 model_id = "your/model"
 model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.float16).to(device)
 tok   = AutoTokenizer.from_pretrained(model_id)
+model.eval()
 
 # WikiText-2: concatenate the test split into one long token stream.
 test = load_dataset("wikitext", "wikitext-2-raw-v1", split="test")
 enc  = tok("\n\n".join(test["text"]), return_tensors="pt")
 
 max_len = model.config.max_position_embeddings   # the model's context L
-stride  = 512                                    # s < L : the sliding stride
+stride  = min(512, max_len - 1)                  # require 1 <= stride < L
+assert max_len >= 2 and stride >= 1
 seq_len = enc.input_ids.size(1)
 
 nll_sum, n_tokens, prev_end = 0.0, 0, 0
@@ -187,9 +189,11 @@ for begin in range(0, seq_len, stride):
 
     with torch.no_grad():
         out = model(ids, labels=targets)
-        # HF returns MEAN loss over the (trg_len - 1) scored positions;
-        # multiply back up to a SUM so windows of unequal size aggregate correctly.
-        num_scored = trg_len - 1
+        # For standard causal loss: count valid targets AFTER its label shift.
+        # Later windows can predict their first NEW token using overlapping context.
+        num_scored = (targets[:, 1:] != -100).sum().item()
+        if num_scored == 0:
+            raise ValueError("No scored targets in this window")
         nll_sum   += out.loss.float() * num_scored
         n_tokens  += num_scored
 
@@ -202,7 +206,7 @@ ppl     = torch.exp(avg_nll)
 print(f"WikiText-2  PPL = {ppl.item():.3f}   (L={max_len}, stride={stride})")
 ```
 
-Two details that separate correct from almost-correct: (1) you must accumulate a **sum** of NLL weighted by the number of scored tokens and divide once at the end — averaging the per-window mean losses is wrong when the final window is shorter; (2) the off-by-one (`trg_len - 1`) is because the last position in a causal LM has no next-token target. Get either wrong and your PPL is quietly off by a few percent — enough to flip a quantization verdict.
+Two checks prevent denominator bugs: aggregate NLL sums weighted by actual scored-token counts, and count labels after shifting and masking. For length 10, window 6, stride 3, the counts are 5, 3, 1; subtracting one from each new-token count incorrectly gives 5, 2, 0. The first label in the first window has no preceding prediction; later windows supply overlap for their first new target. The [executable lab](Lab-01-Masked-Quality-Metrics.md) verifies every intended target is counted once.
 
 ---
 
@@ -221,14 +225,14 @@ A perplexity result is **not reproducible** unless you report, alongside the num
 
 ```text
     □ exact corpus + split + version   (wikitext-2-raw-v1 test ≠ wikitext-2-v1)
-    □ context length L                 (PPL drops as L grows: more context = less surprise)
-    □ stride s                         (smaller stride → slightly lower PPL)
+    □ context length L                 (changes the conditioning available to each prediction)
+    □ stride s                         (changes overlap, compute, and conditioning)
     □ dtype / precision                (FP16 vs BF16 vs the quant under test)
     □ tokenizer + whether raw or pre-tokenized text was used
     □ how documents were joined (newline glue) and whether BOS was prepended
 ```
 
-The single most common reproducibility failure is comparing your PPL to a paper's while using a different `L` or stride: longer context and smaller stride both *lower* PPL, so a setup difference masquerades as a model difference. Pin all six knobs, or the comparison is folklore.
+The single most common reproducibility failure is comparing your PPL to a paper's while using a different `L` or stride: longer context and smaller stride often lower PPL, so a setup difference masquerades as a model difference. Pin all six knobs, or the comparison is folklore.
 
 ---
 
@@ -274,7 +278,7 @@ For where this quantization-grading workflow plugs into a broader model-compress
 - **Perplexity is `exp` of the loss** — `PPL = exp(mean NLL) = exp(H(p, q)) = 2^(bits per token)` — and also the **geometric mean of `1/q(x_t)`**. No new content beyond Lecture 02; a new *reading*.
 - It reads as an **effective branching factor**: uniform over `V` → `PPL = V`; a confident correct model → `PPL → 1`; the gap between PPL and `V` is exactly what the model learned.
 - **Tokenizer trap:** per-token PPL is not comparable across tokenizers; more, smaller tokens flatter the number. Fix by reporting **bits-per-byte**, `BPB = total_nats / (ln2 · n_bytes)`, which cancels tokenization.
-- **Long-document trap:** non-overlapping chunking inflates PPL by re-paying a cold-start penalty at every boundary; the **HF strided window** (stride `s < L`, score only the last `L−s` tokens, mask the rest with `-100`) gives every scored token full context.
+- **Long-document accounting:** overlapping windows score newly encountered targets, with context-only labels masked. Count included targets after causal shifting. Later full windows offer between `L−s` and `L−1` left-context tokens; the final partial window must use its actual count.
 - **Reproducibility:** a PPL number is meaningless without corpus/split/version, context `L`, stride `s`, dtype, and tokenizer. Pin all of them.
 - **Quantization gate:** report **ΔPPL / PPL ratio** of INT4 vs FP16 (good 4-bit quant: <1–2%); `llama-perplexity` is the GGUF tool. But PPL is a **rough** proxy — equal-PPL quants differ — so KL-divergence and top-token agreement (Lecture 05) make the final call.
 

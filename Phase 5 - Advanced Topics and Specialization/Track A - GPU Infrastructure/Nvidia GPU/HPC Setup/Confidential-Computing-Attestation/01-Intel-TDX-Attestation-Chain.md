@@ -1,98 +1,72 @@
 # 01 — Intel TDX Attestation Chain
 
-## 1. What TDX Adds to a Multi-Tenant HPC Node
+**Learning target:** separate what TDX measures, what a guest supplies, and what a relying party authorizes. Read [the course introduction](README.md) first.
 
-A regular VM on a shared host trusts the hypervisor completely — the host admin, or anyone who compromises the host, can read guest memory. **Intel Trust Domain Extensions (TDX)** removes that assumption: it creates a **Trust Domain (TD)**, a hardware-isolated VM whose memory is encrypted and integrity-protected such that the hypervisor, host OS, and cloud operator cannot read or modify it. On a rented or multi-tenant HPC node, this is the difference between "the operator promises not to look" and "the operator's root access is cryptographically prevented from looking."
+## 1. Isolation has a defined boundary
 
-TDX alone only gets you confidentiality, though. The other half — **proving to a remote party that a genuine, unmodified TD is what actually ran** — is **remote attestation**, and that's the subject of this file.
+A Trust Domain (TD) is a VM whose private memory and execution state receive TDX protections against the host/VMM under Intel's threat model. Shared pages and data deliberately sent through I/O are outside the private-memory boundary. The host can still deny service. Software inside the TD remains part of the trusted computing base: a malicious guest application can copy its own secrets out.
 
-## 2. The TDX Module: CPU-Resident Root of Trust for Measurement
+The TDX module is signed, loadable software executing in SEAM, with measured identity and version information. It is **not immutable code stored inside the CPU package**. CPU mechanisms, authenticated module loading and platform firmware form part of the trust chain. [Intel TDX module description](https://www.intel.com/content/www/us/en/download/738875/intel-trust-domain-extension-intel-tdx-module.html), [current specifications](https://www.intel.com/content/www/us/en/developer/tools/trust-domain-extensions/documentation.html).
 
-When a TD launches, the hardware-isolated **Intel TDX Module** acts as the **Root of Trust for Measurement (RTM)** — the immutable, CPU-package-resident component that computes and stores cryptographic hashes of everything that boots. It maintains:
+## 2. Measurements are not automatic file monitoring
 
-| Register | Type | What it measures |
+| Field | Size/role | Interpretation |
 |---|---|---|
-| **MRTD** | Static, SHA-384 | The TD's initial build: virtual firmware, initialization parameters, initial memory layout. A one-shot "identity fingerprint" of the freshly launched domain. |
-| **RTMR[0..3]** | Dynamic, SHA-384, 4 registers | Runtime measurements extended during boot, exactly like TPM PCRs: `new_hash = SHA-384(old_hash ‖ payload)`. Tracks OS kernel, filesystem, and application payloads as they load — later stages layer on top of earlier ones, so tampering with any stage changes every subsequent hash. |
-| **REPORTDATA** | Free-form, 64 bytes | Not a measurement — a scratch field the guest can fill with *anything* at report-generation time. This is the hook applications use to bind their own data (a nonce, a public key, a claim hash) into a hardware-signed report. |
+| MRTD | SHA-384 initial TD measurement | Initial construction events and measured initial contents; not a hash of every future process |
+| RTMR[0..3] | Four extendable SHA-384 registers | Values extended by guest measurement software; meaning depends on the measured boot/runtime policy |
+| REPORTDATA | 64 caller-supplied bytes | Session binding data; not an automatically checked application assertion |
+| Module/TCB identity, TD attributes | Versioned quote fields | Verify module/TCB status and reject debug or other disallowed attributes |
 
-## 3. From TDCALL to TD Quote
+An RTMR extension has the conceptual form `new = SHA384(old || event_digest)`, where the supplied extension value is 48 bytes. The register does not independently inspect files. Firmware, measured boot, IMA or another trusted component must choose events and extend them. An event log lets a verifier recompute the sequence, but a matching log alone cannot show that omitted events were measured. The policy and measuring software must provide that assurance. [Intel module architecture specification](https://cdrdv2.intel.com/v1/dl/getContent/733575), [Intel runtime measurement discussion](https://www.intel.com/content/www/us/en/developer/articles/community/runtime-integrity-measure-and-attest-trust-domain.html).
 
-A tenant workload inside the TD requests a report with a single hardware instruction, and the report is transformed twice before it can leave the machine:
+**Worked example:** a TD boots an approved kernel and downloads `weights.bin` afterward. If no trusted component measures or validates the file, its hash does not magically appear in MRTD or RTMR. Replacing it may leave the quote measurements unchanged. A measured loader must validate the artifact and enforce its subsequent use; lesson 04 develops that lifecycle.
 
-```text
-[ Tenant Workload ]                [ Intel TDX Module ]                  [ Quoting Enclave (SGX) ]
-        │                                   │                                      │
-        │──TDCALL[TDG.MR.REPORT]──────────▶│                                      │
-        │                                   │  captures MRTD + RTMR[0..3]         │
-        │                                   │  + REPORTDATA (caller-supplied)     │
-        │                                   │  authenticates locally with an      │
-        │                                   │  HMAC only the CPU package can read │
-        │                                   │──local HMAC'd TD Report────────────▶│
-        │                                   │                       EVERIFYREPORT2 checks the HMAC
-        │                                   │                       replaces it with an asymmetric
-        │                                   │                       signature from an Attestation Key
-        │                                   │                                      │
-        │◀──────────────────────────────────────────── TD Quote ───────────────────┘
-```
-
-Two things to internalize here:
-
-- **The TD Report's HMAC never leaves the CPU package** — it's only useful for the local Quoting Enclave to check. A remote verifier can't validate a raw TD Report at all.
-- **The TD Quote is the re-signed, exportable object.** The Quoting Enclave (an SGX enclave on the same host) validates the local HMAC via `EVERIFYREPORT2`, then re-signs the report with a hardware-derived **Attestation Key** using ECDSA. This asymmetric signature is what a remote party can actually verify — and it's what the untrusted host routes out to a verifier.
-
-## 4. DCAP Verification: Chaining the Quote Back to Intel's Root CA
-
-A TD Quote's signature alone isn't enough — a verifier also needs to know the signing key itself is legitimate. **DCAP (Data Center Attestation Primitives)** provides that chain:
+## 3. Local report and remotely verifiable quote
 
 ```text
-TD Quote
-   ├─ ECDSA-P256 signature over the quote body   ──verified against──▶  Attestation Key
-   ├─ Attestation Key certified by                ──────────────────▶  PCK (Platform Certification Key) certificate
-   ├─ PCK certificate chains to                     ────────────────▶  Intel PCK Platform CA → Intel Root CA
-   ├─ Quoting Enclave identity                       ──────────────▶  MRSIGNER / ISVPRODID match expected values
-   └─ Live TCB status from Intel PCS collateral       ────────────▶  "UpToDate" / "OutOfDate" / specific advisory IDs
+TD application supplies REPORTDATA
+  → TDG.MR.REPORT produces a locally authenticated TDREPORT
+  → platform quoting infrastructure validates the report
+  → a certified quote-signing key signs a TD Quote
+  → remote verifier checks quote, endorsements and collateral
 ```
 
-```python
-def verify_tdx_quote(quote_bytes):
-    result = dcap_qvl.verify(quote_bytes)   # ECDSA sig, PCK chain -> Intel root CA, QE identity
-    return {
-        "signature_valid": result.signature_valid,
-        "chain_valid":     result.chain_valid_to_intel_root,
-        "tcb_status":      result.tcb_status,        # e.g. "UpToDate"
-        "advisory_ids":    result.advisory_ids,       # e.g. []
-    }
-```
+The report contains a MAC and may travel through software. The secret MAC key is not exported; the statement that the *MAC bytes never leave the package* is incorrect. A remote verifier needs the quote-verification chain, not a JSON rendering of TDREPORT. SGX-based TDX quoting is a common deployment; the supported quote path depends on platform and release. The [Intel runtime guide](https://cc-enabling.trustedservices.intel.com/intel-tdx-enabling-guide/07/trust_domain_at_runtime/) documents actual quote collection and verification paths.
 
-**Report the TCB status, don't collapse it to a boolean.** `UpToDate`, `OutOfDate`, and a specific advisory ID are different risk levels — an `OutOfDate` platform with a non-exploitable advisory for your threat model may be an acceptable accept, while a `Revoked` platform never should be. A verifier that flattens this into `passed: true/false` takes that policy decision away from whoever consumes the attestation, silently.
+For the SGX-based path, the quote's attestation-key signature, QE certification data, PCK certificate chain, signed TCB information, QE identity and revocation collateral must agree. The May 2026 base specification also describes security-engine-based attestation with a Quoting TD on supported platforms; do not force its endorsement chain into an SGX-only parser. Do not replace this with an ad hoc public-key check. A third-party verification service adds that service's signing key, policy and availability to your trust assumptions.
 
-This is the same chain the [canonical/tdx](https://github.com/canonical/tdx) open-source reference stack drives via `trustauthority-cli evidence --tdx` / `trustauthority-cli token`, just routed through Intel Tiber Trust Services as an external verifier instead of a local DCAP library — same trust chain, different verifier endpoint. That project is also the fastest path to a working TDX host + guest + attestation setup if you want to reproduce any of this on real Sapphire Rapids / Emerald Rapids / Xeon 6 hardware: host setup, TD image creation, boot, and both local (DCAP) and cloud-brokered (Intel Tiber Trust Services) attestation flows are scripted end to end.
+## 4. Use real DCAP interfaces and preserve their separate outcomes
 
-## 5. Binding Application Data via REPORTDATA
+The checked Intel header exposes `tdx_qv_verify_quote(...)` and unified `tee_verify_quote(...)`. They return an API status and write separate verification/collateral results. An API return of `SGX_QL_SUCCESS` means the call completed; it is not by itself an application acceptance decision. The old imaginary `dcap_qvl.verify()` object is not a runnable SDK interface. [Pinned DCAP C header](https://github.com/intel/confidential-computing.tee.dcap/blob/7ed37274294c5dc47bda4cec601bb727be2875e0/QuoteVerification/dcap_quoteverify/inc/sgx_dcap_quoteverify.h).
 
-REPORTDATA is what turns "this hardware is genuine" into "this hardware genuinely produced *this specific claim*." Any 64-byte value the workload wants attested to gets zero-padded into the field before requesting the report:
+For the strict DCAP acceptance example, require API success, collateral-expiration status zero and `SGX_QL_QV_RESULT_OK`, then apply the application measurement/binding policy. Non-terminal alternative results need explicit additional appraisal. [Intel DCAP library specification](https://download.01.org/intel-sgx/latest/dcap-latest/linux/docs/Intel_TDX_DCAP_Quoting_Library_API.pdf).
+
+A verifier adapter should record:
+
+1. API status, authenticated quote result and supplemental advisory information.
+2. Collateral expiration status, reference time and applicable revocation results.
+3. Parsed version/attributes/measurements from the **verified quote bytes**.
+4. Exact expected REPORTDATA and pending challenge identity.
+5. Policy revision and final accept/reject reason.
+
+For example, successful API execution with expired collateral is rejected under this course's strict policy. A non-current TCB may require a separately reviewed exception in another policy; do not silently translate it to “secure.” Cached, unexpired collateral can be legitimate: an online lookup on every request is not the definition of validity. If a verifier runs on an untrusted machine, protecting its result is a further problem; QvE/result-authentication options are not interchangeable with a trusted local QVL process.
+
+## 5. Bind exact bytes with a specified construction
+
+Choose a protocol transcript containing a verifier-generated random challenge, audience, application/model identity, session public key and expiry. In the CPU lab:
 
 ```text
-application_hash (32 bytes) ──zero-padded──▶ REPORTDATA (64 bytes) ──▶ TDCALL[TDG.MR.REPORT] ──▶ TD Report
+REPORTDATA = SHA512("course/binding/v1\0" || encoded_transcript)  # 64 bytes
 ```
 
-For example, an HPC job that wants to prove *which exact recipe and output* ran on a rented node computes a digest of its own claim (job spec, environment measurement, output hash) and drops it straight into REPORTDATA before requesting the quote. A verifier then does two independent checks — not one:
+This is the **course's chosen construction**, not a universal Intel convention. Some services define a different REPORTDATA composition, so an integration must use that service's documented calculation. Compare all 64 bytes. If a protocol chooses SHA-256 plus 32 zero bytes, verify the padding too; comparing only the first half leaves half the claimed binding unchecked. [Intel EAT profile](https://portal.trustauthority.intel.com/eat_profile.html).
 
-```python
-def check_tdx_binding(claim_hash, tdx_report):
-    return tdx_report.reportdata[:32] == claim_hash    # binding only — see file 03 for why this is not enough alone
-```
+A correct binding proves that authenticated evidence carries those bytes. It does not establish that the application was honest when choosing them. Accept only measurements of an application whose key generation, artifact validation and result handling you trust.
 
-Binding without the DCAP signature/chain check from §4 is a decorative check — a hand-crafted JSON blob with the right 32 bytes in a field named `reportdata` passes `check_tdx_binding` with no TDX Module ever involved. [File 03](./03-Dual-Vendor-Claim-Binding-and-Verification.md) covers this failure mode and its generalization in depth; treat §4 and §5 here as a matched pair, never one without the other.
+## Check your understanding
 
-## 6. Supported Hardware Quick Reference
+1. A quote has an approved MRTD but debug mode is enabled. **Reject under the strict policy; one allowed measurement does not override other attributes.**
+2. A quote is authentic and REPORTDATA matches yesterday's challenge. **Reject; no current pending challenge authorizes it.**
+3. A model is modified after a single measurement. **A snapshot alone does not prevent this. The workload must preserve verified artifact identity through use.**
 
-| Processor | Code Name | TDX Module Version |
-|---|---|---|
-| 4th Gen Intel Xeon Scalable | Sapphire Rapids | 1.5.x |
-| 5th Gen Intel Xeon Scalable | Emerald Rapids | 1.5.x |
-| Intel Xeon 6 (E-Cores) | Sierra Forest | 1.5.x |
-| Intel Xeon 6 (P-Cores) | Granite Rapids | 2.0.x |
-
-Check the currently loaded module version with `sudo dmesg | grep -i tdx` — the line reporting `virt/tdx: module initialized` alongside `major_version`/`minor_version`/`build_date` confirms both that TDX initialized and which module build is running.
+Next: [NVIDIA evidence and verifier results](02-NVIDIA-CC-Attestation-Chain.md).

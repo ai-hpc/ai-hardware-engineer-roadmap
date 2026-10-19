@@ -1,205 +1,61 @@
-# Hacking Tinygrad: Exploring the Compiler and IR
+# Read the actual tinygrad 0.14.0 pipeline
 
-## What Makes Tinygrad Hackable?
+**Before:** complete the [compiler project](../projects/README.md#3-inspect-compilation-separately). **Time:** 60–90 minutes. **Artifact:** one source-supported graph-to-execution trace. Paths below refer to [tag v0.14.0](https://github.com/tinygrad/tinygrad/tree/v0.14.0), not a moving checkout.
 
-Unlike PyTorch where the compiler and intermediate representation (IR) are hidden in C++/CUDA, tinygrad exposes everything in Python. You can:
-- See the computation graph
-- Inspect the IR at every stage
-- Modify operations before execution
-- Add custom backends
-- Debug kernel generation
+## 1. Locate the installed source
 
-## Setup
+From the environment in the main guide:
 
 ```bash
-pip install tinygrad
+/tmp/course-tinygrad-venv/bin/python - <<'PY'
+from importlib.metadata import version
+from pathlib import Path
+import tinygrad
+print(version('tinygrad'))
+print(Path(tinygrad.__file__).parent)
+PY
 ```
 
-Or clone [tinygrad](https://github.com/tinygrad/tinygrad) for development.
+The printed directory is the actual code the project imports. Record it and the wheel hash before interpreting a source diagram. The optional project runner rejects versions other than 0.14.0.
 
-## 1. Inspecting the Computation Graph
+## 2. Follow one function through the layers
 
-```python
-from tinygrad import Tensor, Device
-import os
+| Source location | Role in the pinned package |
+|---|---|
+| `tinygrad/tensor.py` | Tensor data/API, graph integration, realization and backward entry |
+| `tinygrad/uop/ops.py` | UOp representation and operation vocabulary |
+| `tinygrad/mixin/gradient.py` | Reverse-mode gradient rules and graph traversal |
+| `tinygrad/schedule/` | Group graph work into executable kernels and memory decisions |
+| `tinygrad/codegen/` and `codegen/opt/` | Lowering and kernel optimization |
+| `tinygrad/renderer/` | Target-specific program representation |
+| `tinygrad/engine/realize.py` | Compile/execute the scheduled work |
+| `tinygrad/runtime/ops_cpu.py` | Tested CPU runtime integration |
+| `tinygrad/nn/optim.py` | Optimizer state/update and training-context requirement |
 
-os.environ['DEBUG'] = '2'
+Use search within these files rather than assuming an old private function still exists. `LazyBuffer`, `ShapeTracker`, `ops_clang.py`, `ops_hsa.py` and a fabricated `Device._devices` registry are not this source map. [Official layout overview](https://docs.tinygrad.org/developer/layout/) gives orientation; the tag/wheel resolves discrepancies.
 
-a = Tensor([1, 2, 3, 4])
-b = Tensor([5, 6, 7, 8])
+## 3. Do not consume a schedule just to count it
 
-# Operations are lazy — nothing computed yet
-c = a + b
-d = c * 2
+In the pinned Tensor implementation, `linear_with_vars` transforms a sink, applies a tensor mapping and creates executable linear work; `schedule_linear()` exposes that schedule when no symbolic variables remain. This is an internal execution path with state effects, not a universally read-only graph query.
 
-# Inspect the UOp (graph node)
-print("UOp:", d.uop)
-print("Shape:", d.shape)
-print("Dtype:", d.dtype)
+During review, creating a schedule and then asking the original unexecuted tensor for values could expose storage before that scheduled work had run. The course therefore counts **actual executed kernels**, and inspects a separate pre-execution UOp root. If you study the internal schedule API, trace its matching execution function and lifetime rules before reusing those tensors.
 
-# Now execute
-result = d.realize()
-print("Result:", result.numpy())
-```
+**Worked distinction:** three Python operations need not mean three kernels; the generated program can fuse them. Conversely, one displayed high-level UOp tree can require several scheduled operations. Count at the layer that answers your question.
 
-## 2. Viewing the IR (Intermediate Representation)
+## 4. Trace autodiff and training separately
 
-```python
-from tinygrad import Tensor
-import os
+For `y=sum(x*x)`, follow the multiply/reduce gradient rules and accumulation when `x` appears twice. The expected result is `2x`. Then follow `Optimizer.step → schedule_step` to see why this version requires `Context(TRAINING=1)` and how parameter assignments become realized updates.
 
-os.environ['DEBUG'] = '4'  # Higher = more verbose
+The current constructor does not accept the older `requires_grad=True` argument. The package's parameter flag and gradient traversal differ from that older API. Do not infer API compatibility merely because the expression resembles PyTorch.
 
-a = Tensor.randn(32, 32)
-b = Tensor.randn(32, 32)
-c = a @ b
+**Exercise:** explain the gradient of broadcasting a vector into two identical rows before summing. Each original element is used twice, so its gradient is 2. Find where the gradient implementation reduces broadcast axes back to the source shape.
 
-# Prints IR stages: initial ops → after optimization → kernel codegen
-c.realize()
-```
+## 5. Separate renderer output from runtime responsibility
 
-## 3. Exploring the Scheduler
+A renderer describes executable work; the runtime must allocate/address storage, compile/load a compatible program, pass its ABI arguments, execute it with correct ordering, and keep buffers alive. A correct C string plus an incorrect argument declaration can still corrupt a result.
 
-```python
-from tinygrad import Tensor
+The [standalone C runtime](../projects/07_custom_backend.py) isolates those obligations with contiguous FP32 buffers and a declared `size_t` count. It is not registered with tinygrad. Extending it into a framework backend requires the actual pinned device/allocator/compiler/runtime interfaces plus dtype, layout, synchronization and error-path tests.
 
-x = Tensor([1, 2, 3, 4])
-y = Tensor([5, 6, 7, 8])
-z = (x + y) * 2
+## Completion
 
-schedule = z.schedule()
-print(f"Number of kernels: {len(schedule)}")
-for i, si in enumerate(schedule):
-    print(f"\nKernel {i}:")
-    print(f"  AST: {si.ast}")
-    print(f"  Buffers: {si.bufs}")
-```
-
-## 4. Custom Operations
-
-```python
-from tinygrad import Tensor
-
-def custom_activation(x: Tensor) -> Tensor:
-    """Custom activation: x^2 + sin(x)"""
-    return x * x + x.sin()
-
-x = Tensor([0.5, 1.0, 1.5, 2.0])
-y = custom_activation(x)
-print(y.numpy())
-# Decomposed into tinygrad primitives automatically
-```
-
-## 5. Inspecting Generated Kernels
-
-```python
-from tinygrad import Tensor, Device
-import os
-
-os.environ['DEBUG'] = '3'
-Device.DEFAULT = "CLANG"  # readable C output
-
-a = Tensor.randn(1024)
-b = a.relu().exp()
-b.realize()
-# Prints the actual C/CUDA/Metal code generated
-```
-
-## 6. Custom Backend Skeleton
-
-```python
-from tinygrad.device import Compiled, Allocator
-
-class MyCustomDevice(Compiled):
-    def __init__(self):
-        super().__init__(
-            allocator=MyAllocator(),
-            compiler=MyCompiler(),
-            runtime=MyRuntime()
-        )
-
-# See projects/07_custom_backend.py for a complete working implementation
-```
-
-## 7. Debugging with the Execution Schedule
-
-```python
-from tinygrad import Tensor
-
-x = Tensor.randn(10, 10)
-y = Tensor.randn(10, 10)
-
-z = (x @ y).relu()
-w = z.sum(axis=0)
-result = w.softmax()
-
-schedule = result.schedule()
-print(f"Execution plan: {len(schedule)} steps")
-for i, si in enumerate(schedule):
-    print(f"\nStep {i}: {si.ast}")
-```
-
-## 8. Watching Operation Fusion
-
-```python
-from tinygrad import Tensor
-import os
-
-os.environ['DEBUG'] = '4'
-
-x = Tensor.randn(100, 100)
-y = x + 1
-z = y * 2
-w = z - 1
-result = w / 2
-
-# Tinygrad fuses all of these into fewer kernels
-result.realize()
-```
-
-## 9. Zero-Copy Movement Ops
-
-```python
-from tinygrad import Tensor
-
-x = Tensor.randn(4, 8, 16)
-
-# These don't move data — just change ShapeTracker metadata
-y = x.permute(2, 0, 1)
-z = y.reshape(16, 32)
-z_exp = z.reshape(16, 32, 1)
-w = z_exp.expand(16, 32, 4)
-
-print("Shape:", w.shape)
-print("No data copied yet!")
-
-result = w.realize()  # Data moves here
-```
-
-## Debug Environment Variables
-
-| Variable | Effect |
-|----------|--------|
-| `DEBUG=1` | Kernel count and timing per `.realize()` |
-| `DEBUG=2` | Kernel names and output shapes |
-| `DEBUG=3` | Generated kernel source code (C/CUDA/MSL) |
-| `DEBUG=4` | Full UOp IR at every optimization stage |
-| `VIZ=1` | Open browser-based computation graph visualizer |
-| `BEAM=2` | Enable BEAM search kernel auto-tuning |
-| `NOOPT=1` | Disable all algebraic rewrites (baseline) |
-| `CLANG=1` | Force CPU/Clang backend (readable C output) |
-
-## Key Takeaways
-
-1. **Everything is visible** — No hidden C++ magic
-2. **Lazy evaluation** — Build graphs, optimize, then execute
-3. **Hackable at every level** — From high-level ops to kernel code
-4. **Great for learning** — See exactly how deep learning works
-5. **Easy to extend** — Add new ops, backends, or optimizations
-
-## Resources
-
-- [tinygrad GitHub](https://github.com/tinygrad/tinygrad)
-- [Architecture walkthrough](https://github.com/tinygrad/tinygrad/blob/master/docs/abstractions.py)
-- [Discord community](https://discord.gg/tinygrad)
-- See [projects/07_custom_backend.py](../projects/07_custom_backend.py) for a full custom backend
+Draw the path for the affine/ReLU example with exact source filenames, include a generated-code excerpt from your own debug run, and identify the input/output pointers and loop bounds. Add the changing-input JIT result and one limit of your trace. Keep instrumented compilation evidence separate from performance measurements.

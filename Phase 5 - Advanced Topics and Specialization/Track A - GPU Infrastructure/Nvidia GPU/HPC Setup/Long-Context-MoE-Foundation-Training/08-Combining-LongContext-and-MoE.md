@@ -1,223 +1,103 @@
-# Module 08 — Combining Long-Context and MoE
+# Module 08 — Combine context and expert parallelism correctly
 
-**Parent:** [Long-Context MoE Foundation Training](README.md)
+Long context distributes attention work; mixture of experts distributes selected feed-forward work. The same GPU ranks participate in different groups for those operations. You must understand those groups before interpreting memory, batch size, or communication.
 
-**One-line purpose:** Design a parallel-mesh layout that combines tensor, sequence, context, and expert parallelism cleanly, predict where the communication bottleneck moves as you scale either context length or expert count, and pick the trade-off that matches your hardware.
+**Before this lesson:** [attention](02-Long-Context-Attention.md), [MoE systems](05-MoE-Systems-Infrastructure.md), and [evaluation](07-Long-Context-Evaluation.md). **Outcome:** validate one concrete mesh, calculate logical payloads, and design a measured scaling comparison. The included CPU ledger verifies arithmetic. It does not initialize a distributed Megatron job or prove a topology is fast.
 
-**Prerequisites:** Modules 02 and 05. Comfort with NCCL collectives and bandwidth math.
+## 1. Give each parallelism axis a job
 
-**Artifact:** A decision table for a realistic 64×H200 cluster choosing TP × SP × CP × EP × DP for one model shape, plus a communication-cost breakdown by collective type.
+| Term | Work or state distributed across the group |
+|---|---|
+| Tensor parallelism (TP) | Pieces of a layer's matrix operations |
+| Context parallelism (CP) | Tokens from the same sequence, with attention communication |
+| Pipeline parallelism (PP) | Different layers/stages of the model |
+| Dense data parallelism (DP) | Independent sequence batches for the dense computation |
+| Expert parallelism (EP) | Different experts and the routed tokens sent to them |
+| Expert tensor parallelism (ETP) | Matrix pieces within each expert |
+| Sequence parallelism (SP) | Selected activation work/storage distributed over an existing TP group |
 
----
+SP is not an extra multiplier in world size. Expert and dense group layouts can overlap; multiplying TP×CP×PP×EP×DP as if all were independent axes is wrong for the Megatron layout used here.
 
-## Why it matters
+## 2. Work a 64-GPU example from the actual group definitions
 
-Long context and MoE both have substantial communication costs. Combined naively, those costs interact: more EP means more all-to-all volume per layer; more CP means more ring-attention rounds per layer; both want NVLink. If you do not lay out the mesh deliberately, you will spend most of your training time in NCCL.
+This lesson follows Megatron-LM commit `ce852bfb93f364f64a556602fc71a5d9ed2c377e`, inspected on 2026-10-18. For the standard decoder layout with the additional GTP/EGTP rematerialization factors fixed at one, the cardinalities are:
 
----
+`dense_DP = world_size / (TP × CP × PP)`
 
-## Mental model
+`expert_DP = world_size / (ETP × EP × PP)`
 
-### The full parallel-mesh dimensions
+The expert rank generator sets its own CP axis to one. Consequently, `expert_DP = dense_DP / EP` is not generally valid when CP or ETP differs. Custom layouts and nonunit rematerialization factors require their own derivation. [Pinned group construction](https://github.com/NVIDIA/Megatron-LM/blob/ce852bfb93f364f64a556602fc71a5d9ed2c377e/megatron/core/parallel_state.py#L930).
 
-In a modern Megatron-style trainer:
+For 64 GPUs, TP=2, CP=2, PP=2, EP=4, ETP=2, and eight experts:
 
-| Dimension | Splits along | Dominant collective | Goes well on |
-|-----------|--------------|---------------------|--------------|
-| Data (DP) | batch | all-reduce (gradients) | any link, hidden by overlap |
-| Tensor (TP) | hidden | all-gather + reduce-scatter per matmul | NVLink only |
-| Sequence (SP) | sequence (non-matmul) | piggybacks on TP collectives | NVLink only |
-| Context (CP) | sequence (attention) | ring all-gather of KV | NVLink for `CP ≤ 8`; InfiniBand viable for ring at larger CP |
-| Expert (EP) | experts | all-to-all (dispatch + combine) | NVLink only; cross-node costs explode |
-| Pipeline (PP) | layers | point-to-point activations | any link, hidden by overlap |
+| Calculation | Result |
+|---|---:|
+| Dense grid: 2×2×2×dense_DP=64 | dense_DP=8 |
+| Expert grid: 2×4×2×expert_DP=64 | expert_DP=4 |
+| Experts hosted by each EP rank, before ETP sharding | 8/4=2 |
+| Standard dense weight-replica group including CP | dense_DP×CP=16 |
 
-The constraint everyone hits: TP, EP, and CP all want NVLink; intra-node NVLink width is finite. You must choose which two of TP/EP/CP get to share the node.
+The last line is a parameter/gradient replication group, **not** 16 independent input batches. CP ranks hold parts of the same sequences. With one sequence per microbatch per dense DP replica and 16 accumulated microbatches, the global batch is `1×8×16=128` sequences. At 32,768 valid predicted tokens each, that would be 4,194,304 valid tokens per update; actual loss masking can reduce it.
 
-### Communication volume by dimension (per layer, per micro-batch)
+From the course's repository root:
 
-Let `T = tokens per rank per layer` (sequence length × micro-batch).
-
-- **TP all-gather of activations**: `T · H · (TP - 1) / TP` bytes per matmul (typically 4 matmuls per layer).
-- **CP ring of KV**: `T_local · 2 · H_kv · D · (CP - 1)` bytes per layer for the ring step.
-- **EP all-to-all (dispatch + combine)**: `T · k · H · 2` per all-to-all × 2 per layer.
-- **DP all-reduce of gradients**: `model_params · 4` bytes per step (fp32 grad accumulator), amortized over `micro_batches_per_step`.
-
-For a 32K-context, 64-expert, 8B-class model at `T = 32K, H = 4096, k = 2, H_kv = 8, D = 128, layers = 32`:
-
-| Collective | Bytes / layer / micro-batch | Total / micro-batch |
-|------------|------------------------------|----------------------|
-| TP all-gather | ~31 MB × 4 = 124 MB | 4.0 GB |
-| CP ring (CP=4) | ~24 MB | 0.77 GB |
-| EP all-to-all (EP=8) | ~104 MB × 2 = 208 MB | 6.7 GB |
-| DP all-reduce | (model_params × 4) / micro_batches | varies |
-
-EP all-to-all dominates. CP is second-tier. TP is well-overlapped with compute. This pattern holds for most realistic configs.
-
-### Mesh layout recipes
-
-#### Single 8×H200 node (no cross-node)
-
-| Model size | Sequence | Layout |
-|-----------|----------|--------|
-| 7B dense | 32K | TP=8, SP, no CP, no EP |
-| 8×7B MoE | 32K | TP=4, EP=2, SP |
-| 7B dense | 128K | TP=4, CP=2, SP, recompute |
-| 8×7B MoE | 128K | TP=2, EP=2, CP=2, SP (tight; consider FP8) |
-
-#### 8-node × 8 = 64×H200 cluster (NVSwitch intra-node, InfiniBand inter-node)
-
-| Model size | Sequence | Layout |
-|-----------|----------|--------|
-| 70B dense | 32K | TP=8 intra-node, PP=4 across nodes, DP=2 |
-| 70B dense | 128K | TP=8, PP=4, CP=2 (CP rotates within node), DP=1 |
-| 64-expert 8×7B MoE | 32K | TP=4, EP=2 intra-node, DP=8 across nodes |
-| 64-expert 70B MoE | 32K | TP=8, EP=8 (each intra-node), PP=4 across nodes, DP=2 |
-| 64-expert 70B MoE | 128K | TP=8, EP=8, PP=4, CP=2 — communication-tight, consider reducing EP to 4 |
-
-The principle: **cross-node hops should serve PP and DP, not EP or CP**. PP and DP are well-overlapped; EP and CP are not (yet).
-
-### Where the bottleneck moves as you scale
-
-Hold model size fixed and scale **context**:
-
-- 4K → 32K: TP+SP is enough.
-- 32K → 128K: introduce CP; activation memory becomes the limiter.
-- 128K → 1M: CP dominates, must overlap aggressively, consider mixed precision (FP8) for KV.
-
-Hold model size fixed and scale **experts**:
-
-- 8 → 32 experts: EP intra-node, all-to-all stays cheap.
-- 32 → 256 experts: EP crosses nodes, all-to-all dominates. Look at expert-sharing tricks (DeepSeek-V3 shared expert) or alternative routing.
-- 256+ experts: routing diversity is your bigger problem than systems; you usually need expert-parallel + topology-aware routing.
-
-Scale **both** context and experts: each pushes the other into a tighter regime. A realistic frontier MoE long-context model balances them — `~64–128 experts` with `~32–128K` context, not `1024 experts + 1M context`.
-
-### Overlap is the lever
-
-The communication-cost numbers above are upper bounds — they assume the collective is on the critical path. In practice:
-
-- **TP all-gather** overlaps with the next matmul (Megatron does this automatically with `--tp-comm-overlap`).
-- **CP ring** overlaps with attention compute (the ring step is hidden behind the next chunk's FlashAttention).
-- **EP all-to-all** can partially overlap with router compute (DeepSpeed's `MoE_dispatch_async`).
-- **DP all-reduce** overlaps with backward of next layer (standard ZeRO + gradient bucketing).
-
-When overlap is healthy, the **visible** communication cost is far less than the raw bytes. When overlap breaks (graph-capture issue, NCCL stream sync), it shows up as a sudden TFLOPs drop.
-
-### Fault tolerance under combined parallelism
-
-The more dimensions you slice, the more ways things can break. A practical floor:
-
-- Checkpoint every 30–60 minutes (Module 09).
-- Validate the mesh on a small step before launching a long run.
-- Monitor per-collective time as a first-class metric — most failures appear as a single collective hanging or slowing.
-
----
-
-## Build it
-
-### 1. Mesh-layout decision exercise
-
-For a target model + sequence + cluster, fill out:
-
-```
-Cluster: 8 nodes × 8 H200 (64 GPUs total), NVSwitch intra-node, IB inter-node
-Model: 64-expert (top-2) 7B base, hidden=4096, layers=32
-Sequence: 32K
-
-Choices:
-- TP =      (must be ≤ GPUs/node)
-- SP =      (always on if TP > 1)
-- EP =      (must divide num_experts; usually ≤ GPUs/node)
-- CP =      (must divide GPUs/node, leave room for TP and EP)
-- PP =      (usually = num_nodes if model fits per stage)
-- DP =      (= total_GPUs / (TP × EP × CP × PP))
-
-Constraints:
-- TP × EP × CP ≤ GPUs per node = 8
-- Total = TP × EP × CP × PP × DP = 64
-- Per-rank HBM usage ≤ 141 GB (with recomputation/offload headroom)
+```bash
+cd "Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training"
+python3 labs/ledger.py
+python3 -m unittest discover -s labs -p 'test_ledger.py' -v
 ```
 
-Iterate to find a layout that satisfies the constraints and minimizes EP cross-node hops.
+Inspect the `mesh` result for dense DP8 and expert DP4. To test a different mesh from this course directory:
 
-### 2. Communication-cost calculator
-
-```python
-# comm_cost.py
-def per_layer_comm_bytes(T, H, H_kv, D, k, TP, CP, EP):
-    tp_ag = T * H * (TP - 1) // TP * 4         # 4 matmuls per layer
-    cp_ring = (T // CP) * 2 * H_kv * D * (CP - 1) if CP > 1 else 0
-    ep_a2a = T * k * H * 2 * 2 if EP > 1 else 0  # dispatch + combine
-    return dict(tp=tp_ag * 2, cp=cp_ring * 2, ep=ep_a2a)  # bytes (bf16)
-
-def bw_for_collective(coll, intra_node_bw_GBs, inter_node_bw_GBs, crosses_node):
-    return inter_node_bw_GBs if crosses_node else intra_node_bw_GBs
-
-# Plug in your layout choices and see expected per-layer comm time
+```bash
+python3 - <<'PYCODE'
+import sys
+sys.path.insert(0, 'labs')
+from ledger import dense_mesh
+print(dense_mesh(64, tp=2, pp=2, cp=2, ep=4, expert_tp=2, experts=8))
+try:
+    dense_mesh(60, tp=2, pp=2, cp=2, ep=4, experts=8)
+except ValueError as error:
+    print('rejected:', error)
+PYCODE
 ```
 
-Print the breakdown for two or three candidate layouts; pick the one with the smallest **maximum** collective time per layer.
+Sixty GPUs cannot be divided by the eight-rank dense model group. The ledger also rejects nonintegral expert divisions. Passing the ledger is only the first check: the real framework must construct rank groups with matching pipeline groups, valid ordering, compatible layers, and supported kernels. In this source, unequal dense/expert DP imposes a PP-last ordering condition when PP>1. Print actual rank membership in your real job before reasoning about which transfers stay inside a node.
 
-### 3. Sanity-run
+## 3. Calculate payload before claiming network bandwidth
 
-If you have the cluster, run a 20-step training iteration with each candidate layout. Compare:
+Use explicit units and state whether a count describes one rank, one layer, or the whole job.
 
-- Per-iter wall-clock.
-- Per-collective time (Megatron-LM `--log-throughput --log-communication-volume`).
-- Per-GPU TFLOPs achieved.
+**MoE dispatch example.** A source rank owns T=8,192 token rows, hidden width H=4,096, uses top-k=2, and sends two-byte activations. The unpadded logical expert-input payload is:
 
-The layout with the smallest predicted comm should match the measured fastest. If it does not, your overlap assumptions are wrong somewhere — fix that before scaling up.
+`T × k × H × 2 = 134,217,728 bytes = 128 MiB`.
 
----
+If returned expert outputs have the same width/dtype, the return payload is another 128 MiB. This is an assignment-size calculation. Actual remote bytes depend on local expert assignments, capacity/drop policy, padding, tensor sharding, metadata, quantization, and the dispatcher algorithm. EP=1 can have that logical payload with zero inter-rank dispatch traffic.
 
-## Use it in the real stack
+**One CP ring illustration.** A rank holds 4,096 local tokens, eight KV heads of dimension 128, and two-byte K/V elements. Its K+V block is `2×4,096×8×128×2 = 16 MiB`. In an illustrative four-rank ring that circulates each block through three peers, a rank sends three such blocks, 48 MiB, in the forward circulation. This omits backward, queries, metadata, causal scheduling, and implementation-specific compression/overlap. Other CP algorithms have different transfers.
 
-The Megatron-LM flags that pin a mesh:
+**Collective convention.** For an ideal eight-rank ring AllGather whose final tensor is 64 MiB per rank, each rank receives 56 MiB and sends 56 MiB. Do not label the eight-MiB local contribution as the full tensor size when comparing bandwidth formulas. Use the [collectives lab and accounting](../NCCL-Deep-Dive/CPU-Collectives-Lab/Guide.md) to keep algorithm bandwidth, normalized bus bandwidth, and measured link traffic distinct.
 
-```
---tensor-model-parallel-size <TP>
---pipeline-model-parallel-size <PP>
---context-parallel-size <CP>
---expert-model-parallel-size <EP>
---sequence-parallel
---tp-comm-overlap
---num-experts <E>
---moe-token-dispatcher-type alltoall
-```
+## 4. Map groups onto hardware, then measure
 
-NeMo Megatron Bridge wraps these in a higher-level config; for long-context MoE the "MoE Long-Context Training" skill page gives reference configs by model size + sequence + cluster.
+A group that contains more ranks than one node has GPUs necessarily spans nodes. TP=8 and CP=2 do not make their 16-rank combined dense model slice fit inside an eight-GPU node. Which individual TP, CP, and expert transfers cross nodes depends on rank ordering and the overlapping group layouts.
 
-DeepSpeed has a different API but the same dimensions; for an EP-centric setup, DeepSpeed-MoE is sometimes cleaner.
+Compare a few valid layouts while holding the intended objective and valid-token batch constant. Record peak memory, useful tokens per second, step-time distribution, expert assignment counts, dropped assignments, tokens receiving no expert output, and time spent on the critical path. A shorter step caused by dropping more tokens is not equivalent training work.
 
----
+Communication and compute overlap share memory bandwidth, buffers, streams, and network resources. Summing isolated kernel times does not predict overlapped step time. Start with traces that identify the stalled operation and its dependency; adjust one layout or scheduling choice, then repeat the same workload.
 
-## Measure it
+**Model FLOPs utilization (MFU)** compares a stated model-FLOP estimate per second with a stated hardware peak. For MoE, distinguish selected-expert work from all stored expert parameters; for long context, include the intended attention computation. Explain whether recomputation is excluded from the model numerator and which precision/peak is used. There is no universal healthy MFU percentage across these workloads. Useful-token throughput plus unchanged evaluation is often easier to compare.
 
-For each candidate layout:
+## 5. Configuration combinations need source checks
 
-- **Predicted vs measured per-collective time**.
-- **Achieved TFLOPs per GPU** as fraction of theoretical peak.
-- **Step time breakdown** by phase (fwd compute, bwd compute, tp comm, ep comm, cp comm, dp comm).
-- **Per-rank peak HBM** — must fit with headroom.
+A launch configuration must include the model, tokenizer, data, precision, optimizer, batch contract, attention backend, mesh, checkpoint path, and framework/container revisions. A fragment with only parallelism values is a design sketch, not a runnable training recipe.
 
-A healthy combined-parallelism run on 64×H200 holds per-GPU TFLOPs at ~45–55% of peak. If you are at 30%, you are spending too much time in collectives; if at 65%+, you are probably not using all available parallelism.
+For example, the checked Megatron argument validation rejects `recompute_granularity='selective'` together with a nonempty `recompute_method`; copying `selective` and `block` from separate examples creates an invalid combination. The same code disables SP when TP=1 and requires SP for its TP communication overlap option. Read the installed version's validation instead of assuming that individually valid options compose. [Pinned argument checks](https://github.com/NVIDIA/Megatron-LM/blob/ce852bfb93f364f64a556602fc71a5d9ed2c377e/megatron/training/arguments.py#L1323).
 
----
+## Exercise with answers
 
-## Ship it
+Keep the example's world size, TP, PP, EP, ETP, and expert count, but increase CP from two to four. **Answer:** dense DP becomes four while expert DP stays four. At microbatch one and accumulation 16, global batch falls from 128 to 64 sequences. Raising accumulation to 32 restores that sequence count, but it does not prove equal throughput or identical floating-point updates.
 
-Drop into `lcm-course/`:
+Submit the two grid equations, actual or planned rank membership, the global-batch calculation, and one payload ledger. Mark the mesh as **arithmetic-checked** until the real framework has initialized it; mark performance as **unmeasured** until a specified workload runs on the intended hardware.
 
-1. `mesh_decision_table.md` — candidate layouts, predicted comm costs, chosen layout with rationale.
-2. `comm_cost.py` and its CSV output.
-3. (If cluster access) `mesh_sanity_run.log` with per-layout measurements and a one-paragraph conclusion identifying the dominant collective.
-
----
-
-## Related pages
-
-- [Module 02 — Long-context attention mechanics](02-Long-Context-Attention.md)
-- [Module 05 — MoE systems and infrastructure](05-MoE-Systems-Infrastructure.md)
-- [Module 09 — Distributed training infrastructure](09-Distributed-Training-Infrastructure.md)
-- NeMo Megatron Bridge MoE long-context skill: <https://docs.nvidia.com/nemo/megatron-bridge/nightly/skills/perf-techniques/moe-long-context/SKILL.html>
-- Megatron-LM mesh README: <https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/transformer/README.md>
+**Continue:** [Module 09 — Distributed training and recovery](09-Distributed-Training-Infrastructure.md).

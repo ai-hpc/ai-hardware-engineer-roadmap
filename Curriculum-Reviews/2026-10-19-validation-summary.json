@@ -1,0 +1,187 @@
+{
+  "review_date_utc": "2026-10-19",
+  "updated_at_utc": "2026-10-19T00:49:10.570609+00:00",
+  "scope": "Five-hour curriculum improvement review across all six phases, emphasizing robotics, AI and independent learning. Checks below have different scopes and are not interchangeable.",
+  "inventory": {
+    "source_markdown_pages": 748,
+    "course_entry_pages": 194,
+    "report": "2026-10-19-inventory.json",
+    "starting_source_markdown_pages": 623
+  },
+  "portable_checks": {
+    "report": "2026-10-19-portable-checks.json",
+    "result_saved_at_utc": "2026-10-19T00:27:12.590964+00:00",
+    "suites": 73,
+    "suite_status_counts": {
+      "passed": 72,
+      "skipped": 1
+    },
+    "tests_discovered": 785,
+    "tests_run": 779,
+    "tests_executed": 749,
+    "tests_skipped": 30,
+    "skipped_groups": 1,
+    "skipped_subtests": 0,
+    "failures": 0,
+    "errors": 0,
+    "optional_environment_note": "TVM suite wholly skipped in baseline, separately executed in pinned environment; optional lab manifests record additional framework/native executions. Do not sum overlapping runs as unique tests."
+  },
+  "static_source_checks": {
+    "local_broken_links": 0,
+    "python_and_shell_fenced_blocks_parsed": 988,
+    "fenced_block_parser_errors": 0,
+    "syntax_scope": "Parsing only, not execution of every example or external command",
+    "resolvable_local_manifest_hashes_checked": 469,
+    "local_manifest_hash_mismatches": 0,
+    "unresolved_pathlike_hash_keys": 236,
+    "hash_scope": "Unresolved keys include temporary/external/upstream paths and are not counted as verified local files."
+  },
+  "browser_checks": {
+    "all_source_pages_mobile": {
+      "result_saved_at_utc": "2026-10-19T00:47:32.882397+00:00",
+      "pages": 748,
+      "passed": 748,
+      "viewport": {
+        "width": 390,
+        "height": 950
+      },
+      "checks": [
+        "HTTP200",
+        "nonempty main heading",
+        "no document horizontal overflow",
+        "images loaded",
+        "Mermaid diagrams rendered without syntax errors",
+        "no page JavaScript exceptions"
+      ],
+      "math_note": "Full formula completion checked separately below.",
+      "run_settings": {
+        "pages": 748,
+        "elapsed_seconds": 657.871462598996,
+        "network_policy": "GitHub repository metadata API requests blocked; course assets and fonts loaded normally",
+        "workers": 4,
+        "viewport": {
+          "width": 390,
+          "height": 950
+        }
+      }
+    },
+    "selected_pages": {
+      "result_saved_at_utc": "2026-10-19T00:33:59.180037+00:00",
+      "unique_pages": 25,
+      "cases": 75,
+      "passed": 75,
+      "viewport_widths": [
+        320,
+        390,
+        1440
+      ],
+      "scope": "Learner entry pages, new lab pages, advanced RL equations, embedded plots and diagrams."
+    },
+    "math": {
+      "pages": 96,
+      "formulas": 2021,
+      "passed_pages": 96,
+      "external_requests_blocked": [
+        "https://api.github.com/repos/ai-hpc/ai-hardware-engineer-roadmap",
+        "https://api.github.com/repos/ai-hpc/ai-hardware-engineer-roadmap/releases/latest",
+        "https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback"
+      ],
+      "network_policy": "All HTTP requests except127.0.0.1:8765 blocked; entire math loader,fonts,and accessibility from local site",
+      "viewport_widths": [
+        390,
+        320
+      ],
+      "small_screen_pages_without_overflow": 96
+    },
+    "navigation": {
+      "checked_at_utc": "2026-10-19T00:18:09.056461+00:00",
+      "successful_search_clicks": 8,
+      "search_cases": 8,
+      "keyboard_search_and_escape": true,
+      "mobile_drawer_open_navigation_close": true,
+      "horizontal_scrollers_checked": 5,
+      "scroll_boundary": "Viewport containment; content may extend into prose margins",
+      "dark_mode_pages": 2,
+      "accessibility_scope": "Representative keyboard navigation, computed colors and MathML accessibility-tree preservation; not a full screen-reader or WCAG certification."
+    },
+    "environment": "Local Google Chrome through Playwright; desktop and mobile viewport emulation, not physical touch devices.",
+    "final_overview_revisions": {
+      "pages": 4,
+      "cases": 12,
+      "passed": 12,
+      "viewport_widths": [
+        320,
+        390,
+        1440
+      ],
+      "scope": "README, role-selection guide and revised GPU/inference overview pages"
+    }
+  },
+  "downloaded_source_validation": {
+    "full_suite_snapshot": {
+      "snapshot_utc": "2026-10-18T23:59:57.397655+00:00",
+      "source_files": 1430,
+      "no_git_metadata": true,
+      "working_directory": "Unrelated directory; archive and cwd paths contain spaces",
+      "passed_suites": 72,
+      "skipped_suites": 1,
+      "failed_suites": 0,
+      "methods_executed": 749,
+      "methods_skipped": 30,
+      "groups_skipped": 1,
+      "extra_actual_mujoco_tests": 18,
+      "non_markdown_assets_byte_identical": 671
+    },
+    "final_docs_and_tooling_snapshot": {
+      "snapshot_utc": "2026-10-19T00:36:16.122952+00:00",
+      "source_files": 1539,
+      "no_git_metadata": true,
+      "tooling_tests_passed": 30,
+      "strict_build_exit_code": 0,
+      "non_markdown_assets_byte_identical": 780,
+      "mathjax_vendor_files": 108,
+      "mathjax_font_files": 23,
+      "mathjax_license_and_provenance_preserved": true,
+      "note": "Latest public inventory/summary/report metadata may postdate this immutable archive. Full749 suite was not repeated in this second archive; final workspace run is recorded above."
+    }
+  },
+  "external_route_links": {
+    "pages": 12,
+    "unique_urls": 17,
+    "http_200_after_redirects": 17,
+    "scope": "Primary-source links from entry and new robotics/AI labs only; HTTP reachability, not external fragment validation or a full-site external-link crawl."
+  },
+  "limitations": [
+    "No hosted deployment or hosted CI run is claimed.",
+    "GPU/model-scale benchmarks, Isaac simulator scenes and training, FPGA board timing, Jetson deployment, physical robots and custom silicon need their named equipment/environments.",
+    "CPU arithmetic, actual CPU execution, target compilation, simulation and measurements on hardware are distinguished in each lab.",
+    "A curriculum-wide structure/entry review and targeted technical revisions do not certify every historical statement or external command."
+  ],
+  "built_heading_links": {
+    "html_pages": 942,
+    "snapshot_stable": true,
+    "dead_references": 0,
+    "unique_dead_targets": 0,
+    "counts": {
+      "all_links": 140442,
+      "no_heading_fragment": 75404,
+      "out_of_scope": 8582,
+      "heading_links_checked": 56456,
+      "same_page_heading_links": 56263,
+      "cross_page_heading_links": 193
+    },
+    "result_saved_at_utc": "2026-10-19T00:38:17.279767+00:00"
+  },
+  "linked_file_downloads": {
+    "files": 396,
+    "http200_and_source_hash_match": 396,
+    "result_saved_at_utc": "2026-10-19T00:36:57.874540+00:00"
+  },
+  "final_strict_build": {
+    "command": "STRICT=1 bash scripts/build_docs_local.sh",
+    "passed": true,
+    "reported_seconds": 22.98,
+    "heading_anchor_warnings_enabled": true,
+    "result_saved_at_utc": "2026-10-19T00:49:10.501688+00:00"
+  }
+}

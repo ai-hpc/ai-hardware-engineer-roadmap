@@ -2,7 +2,7 @@
 
 ## Overview
 
-The core problem this lecture addresses is: what happens when the synchronization primitives from the previous lectures are used incorrectly, or when correct usage leads to emergent timing failures? Two failure modes dominate: deadlock (tasks waiting for each other forever) and priority inversion (a high-priority task stalled by a low-priority one). The mental model to carry here is that of a traffic deadlock at a four-way intersection where each car is blocking the path of the next — no one can move. Priority inversion is subtler: imagine the most important person in a building being unable to get to their meeting because a janitor locked the conference room and then got stuck behind a slow colleague. For an AI hardware engineer, these are not theoretical problems: the Mars Pathfinder rover was reset by priority inversion in 1997, and AV systems share the same architectural patterns that caused it.
+The core problem this lecture addresses is: what happens when the synchronization primitives from the previous lectures are used incorrectly, or when correct usage leads to emergent timing failures? Two failure modes dominate: deadlock (tasks waiting for each other forever) and priority inversion (a high-priority task stalled by a low-priority one). The mental model to carry here is that of a traffic deadlock at a four-way intersection where each car is blocking the path of the next — no one can move. Priority inversion is subtler: imagine the most important person in a building being unable to get to their meeting because a janitor locked the conference room and then got stuck behind a slow colleague. For an AI hardware engineer, these are not theoretical problems: the Mars Pathfinder spacecraft suffered resets involving priority inversion in 1997, and AV systems share the same architectural patterns that caused it.
 
 ---
 
@@ -35,7 +35,7 @@ A **deadlock** is a state where a set of processes are each waiting for a resour
 | No preemption of resources | Resources cannot be forcibly taken from a holder; only voluntary release |
 | Circular wait | A cycle exists in the resource-allocation graph: P1 → R1 → P2 → R2 → P1 |
 
-> **Key Insight:** The Coffman conditions are a checklist for designing deadlock-free systems. Before writing code that acquires multiple locks, check each condition: Can you make resources shareable? Can you acquire all locks upfront? Can you use trylock? Can you define a global lock ordering? Each "yes" removes one condition and eliminates deadlock.
+> **Key Insight:** The Coffman conditions are a checklist for designing deadlock-free systems. Before writing code that acquires multiple locks, check each condition: Can you make resources shareable? Can you acquire all locks upfront? Can you use trylock? Can you define a global lock ordering? The complete protocol must actually break a condition. Merely calling trylock does not release resources already held and can produce livelock if retries are poorly coordinated.
 
 ---
 
@@ -46,11 +46,11 @@ Attack one of the four conditions at design time:
 | Condition to Break | Technique | Trade-off |
 |---|---|---|
 | Hold-and-wait | Acquire all locks simultaneously before starting; release all if any acquisition fails | Reduces concurrency; may require retry |
-| Circular wait | Global lock ordering: always acquire locks in a fixed, documented order | Requires discipline across all call sites; lockdep enforces this |
-| No preemption | `mutex_trylock()` with randomized exponential backoff | Retry overhead; potential livelock |
-| Mutual exclusion | Use lock-free data structures | Higher implementation complexity |
+| Circular wait | Acquire all nested locks in a consistent order | Cover every call path; lockdep can diagnose observed dependency cycles |
+| Hold-and-wait | On a failed trylock, release acquired locks and retry under an explicit policy | No forced ownership transfer; possible livelock/starvation |
+| Mutual exclusion where unnecessary | Share immutable snapshots or redesign resource ownership | Requires a valid lifetime/update protocol |
 
-**Global lock ordering** is the most practical approach in kernel and embedded code. Linux documents lock ordering in code comments and enforces it at runtime with lockdep annotations (`lockdep_assert_held`, `lockdep_set_class`).
+**Global lock ordering** is the most practical approach in kernel and embedded code. Linux documents lock ordering and uses lockdep to validate observed dependency paths. Lockdep diagnoses violations; it does not reorder lock acquisitions or make an incorrect program correct.
 
 Step-by-step: how to implement global lock ordering:
 
@@ -58,10 +58,10 @@ Step-by-step: how to implement global lock ordering:
 2. Assign each a numeric rank (e.g., Lock A = rank 1, Lock B = rank 2).
 3. Mandate that locks are always acquired in ascending rank order.
 4. Document this ordering in a comment at the lock declaration site.
-5. Use `lockdep_set_class` to assign each lock to a class so lockdep can verify the ordering automatically.
+5. Use appropriate lock classes/subclasses and assertions where needed. A lock class is not a numeric rank; lockdep learns dependencies from instrumented execution.
 6. In code review, reject any patch that acquires a lower-ranked lock while holding a higher-ranked one.
 
-> **Common Pitfall:** Global lock ordering breaks silently when two independent developers add new locks without consulting the existing ordering. One developer adds Lock C acquired while holding Lock A; another adds Lock D acquired while holding Lock C. Neither knows that Lock D is also acquired while holding Lock A elsewhere, creating an A→C→D cycle. Use lockdep in CI to catch this automatically.
+> **Common Pitfall:** Global lock ordering breaks silently when two independent developers add new locks without consulting the existing ordering. One developer adds Lock C acquired while holding Lock A; another adds Lock D acquired while holding Lock C. Neither notices a third path acquiring A while holding D, creating A→C→D→A. Exercise the relevant paths under a lockdep-enabled test kernel; unexecuted dependencies may remain unseen.
 
 ---
 
@@ -69,8 +69,8 @@ Step-by-step: how to implement global lock ordering:
 
 When prevention is too costly, the OS can detect deadlocks at runtime:
 
-- **Resource allocation graph**: nodes for processes (P) and resources (R); edge P→R means P waits for R; edge R→P means R is held by P; a cycle indicates deadlock
-- **Wait-for graph**: simplified form; edge P→Q means P waits for something held by Q; cycle = deadlock
+- **Resource allocation graph**: nodes for processes (P) and resources (R); edge P→R means P waits for R; edge R→P means R is held by P; for single-instance exclusive resources, a cycle establishes deadlock; multiple instances need a fuller availability analysis
+- **Wait-for graph**: simplified form; edge P→Q means P waits for something held by Q; a cycle can establish deadlock under the single-instance exclusive-wait model
 
 ```
   Resource Allocation Graph:
@@ -119,41 +119,17 @@ The inversion unfolds in four steps:
   Duration of inversion: unbounded (as long as M runs)
 ```
 
-Effective priority of `H` is **inverted to below `M`'s level** for the entire duration of `M`'s execution. Duration of inversion is **unbounded** without PI.
+H retains its configured priority but cannot run past the lock acquisition. Unrelated medium-priority execution can extend its wait without a bound derived from L's critical section alone.
 
 > **Key Insight:** Priority inversion does not require any bug in the individual tasks. L, M, and H are all behaving correctly according to their own logic. The failure is systemic: the interaction of correct behaviors produces an emergent incorrect outcome. This is why it is so dangerous — code review alone cannot catch it.
 
 ---
 
-## Mars Pathfinder Case Study (1997)
+## Mars Pathfinder: use the first-person account
 
-The Mars Pathfinder rover experienced **periodic system resets** approximately 18 hours after landing on the Martian surface. This case study is **required reading** in every safety-critical system design course because the bug was discovered 140 million km away.
+Flight-software lead Glenn Reeves described a low-priority ASI/MET task holding a mutex within the select/pipe IPC implementation. Higher-priority `bc_dist` blocked on that resource while medium-priority work delayed the holder. The still-higher-priority `bc_sched` detected that distribution had missed its cycle and initiated recovery. The team reproduced the failure in the laboratory and changed the semaphore creation configuration to enable priority inheritance. See the [preserved first-person account by Glenn Reeves](https://huichen-cs.github.io/course/CISC7310X/26FA/lecture/MarsPathfinder.htm).
 
-**Root cause: unbounded priority inversion**
-
-| Task | Priority | Role |
-|---|---|---|
-| `bc_dist` | High | Data distribution bus — held the critical mutex |
-| `bc_sched` | Low | Bus scheduler — also needed the mutex to release it |
-| `ASI_MET` | Medium | Meteorological data acquisition — CPU-intensive |
-
-Sequence: `bc_sched` (low) held the mutex → `bc_dist` (high) blocked waiting → `ASI_MET` (medium) preempted `bc_sched` and ran continuously → `bc_sched` never ran → `bc_dist` missed its watchdog deadline → VxWorks watchdog timer fired → full system reset.
-
-```
-  Mars Pathfinder Priority Inversion:
-
-  bc_dist (HIGH):   [woken]──[BLOCKED waiting for mutex]────────────[WATCHDOG RESET]
-  ASI_MET (MED):    ──────────────────────[RUNNING]────────────────►
-  bc_sched (LOW):   [holds mutex]──[PREEMPTED]─────────────────────[never resumes]
-                                   ▲
-                              preempted by ASI_MET here
-```
-
-**Fix**: enable the `PTHREAD_PRIO_INHERIT` flag on the shared VxWorks mutex. The PI feature existed in VxWorks but was disabled by default. The fix was uploaded to the already-landed rover via uplink command.
-
-**Lesson for AV/robotics**: priority inversion can cause safety-critical resets in deployed, inaccessible hardware. PI mutexes must be the default for any resource shared between tasks of different priorities in safety-critical systems.
-
----
+Do not reverse those priorities or describe the fix as setting a POSIX `PTHREAD_PRIO_INHERIT` flag on VxWorks. The useful lesson is to include library-internal locks in the timing model and preserve diagnostic/recovery capabilities. This historical example is not a mandatory named requirement in every automotive safety standard.
 
 ## Priority Inheritance (PI)
 
@@ -161,19 +137,21 @@ When high-priority task `H` blocks on a mutex held by low-priority task `L`, the
 
 - **Transitive PI**: if `L` is also blocked on another mutex held by `X`, the boost propagates to `X` along the entire blocking chain
 - Linux `rtmutex` implements PI for kernel code and userspace (via `FUTEX_LOCK_PI`)
-- PREEMPT_RT converts most kernel `spinlock_t` to `rtmutex` → system-wide PI without changing driver code
+- PREEMPT_RT changes `spinlock_t` semantics to an RT-mutex-based implementation; `raw_spinlock_t` remains a spinning primitive. Driver context and nesting rules still require review. [Kernel lock types](https://docs.kernel.org/locking/locktypes.html).
 
 ```
   Priority Inheritance in Action:
 
   BEFORE PI:                          AFTER PI ENABLED:
   H (pri 90): BLOCKED                 H (pri 90): BLOCKED
-  M (pri 50): RUNNING                 M (pri 50): BLOCKED (cannot preempt L anymore)
+  M (pri 50): RUNNING                 M (pri 50): READY (does not preempt boosted L)
   L (pri 10): PREEMPTED by M          L (pri 10 → boosted to 90): RUNNING
                                                                    releases mutex
                                                                    L returns to pri 10
                                       H (pri 90): UNBLOCKED, runs
 ```
+
+Reading fragment showing the setup API names; a complete program must branch on each returned error number.
 
 ```c
 // POSIX userspace PI mutex
@@ -182,38 +160,23 @@ pthread_mutexattr_init(&attr);
 pthread_mutexattr_setprotocol(&attr, PTHREAD_PRIO_INHERIT);
 // PTHREAD_PRIO_INHERIT: boost holder to waiter's priority when blocked
 pthread_mutex_init(&mutex, &attr);
-// Requires SCHED_FIFO/SCHED_RR threads for PI to have meaningful effect
-// On SCHED_OTHER (CFS), priorities are not strictly enforced and PI has limited benefit
+// Check every return code and destroy the attributes when no longer needed.
+// This is a setup excerpt; it does not demonstrate a measured PI experiment.
 ```
 
-> **Common Pitfall:** Enabling PI mutexes without using `SCHED_FIFO` or `SCHED_RR` threads is a common mistake. PI boosts the holder's priority, but if all threads use `SCHED_OTHER` (CFS), the concept of "priority" is relative and the boost may not have the desired effect. PI is most effective in real-time scheduling contexts.
+PI behavior and useful priority donation depend on the actual scheduling policies, implementation, and protocol support. Check initialization errors and measure the intended mixed-priority workload. Enabling PI does not itself choose task priorities or establish a response-time bound.
 
 ---
 
-## Priority Ceiling Protocol
+## Priority ceiling and bounded blocking
 
-Each mutex is assigned a **ceiling priority** = highest priority of any task that will ever acquire it. Any task acquiring the mutex **immediately runs at the ceiling priority** for the duration of ownership.
+An immediate priority-ceiling protocol raises a task to the configured resource ceiling while it owns that resource. The ceiling must account for every task permitted to use it. POSIX exposes a priority-protection protocol, but platform support, valid priorities, return codes, scheduling policy, and the exact protocol must be checked. Do not assume that every Linux mutex implementation supports every POSIX option. [POSIX mutex protocol](https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_mutexattr_getprotocol.html).
 
-- Prevents priority inversion entirely without needing runtime priority discovery
-- Requires static analysis: all potential lock acquirers and their priorities must be known at design time
-- POSIX: `PTHREAD_PRIO_PROTECT` protocol (`pthread_mutexattr_setprotocol`)
-- Mandated by: ARINC 653 (avionics partitioned RTOS), AUTOSAR OS (automotive ECUs)
-- Stronger formal guarantees than PI for safety-certified systems where the task model is fixed at configuration time
+This does not eliminate blocking. Consider a single-CPU fictional system: L acquires a resource, then H becomes runnable while L has 0.6 ms of protected work left. H cannot use that resource until L releases it. Under an applicable protocol, unrelated medium-priority work should not extend that interval arbitrarily; H still experiences the remaining critical section and relevant scheduler/interference costs.
 
-```
-  Priority Ceiling vs Priority Inheritance:
+**Worked response-time accounting:** H needs 1.2 ms of its own CPU work, may block for 0.6 ms on L, and has a 2 ms deadline. The sum is already 1.8 ms before higher-priority interference, interrupts, release jitter, and overhead. A measured 1 ms extra interference would make this instance miss its deadline. PI or a ceiling is not permission to omit blocking from the analysis.
 
-  PI: ceiling is discovered dynamically at runtime when H blocks
-      Overhead: runtime priority boost when contention occurs
-      Suitable for: dynamic task models, general POSIX RT
-
-  Priority Ceiling: ceiling is set statically at mutex creation time
-      Overhead: every acquisition raises priority to ceiling (even without contention)
-      Suitable for: AUTOSAR ECUs, ARINC 653 where task set is fixed
-      Stronger guarantee: L's priority is raised BEFORE H blocks, so H never blocks at all
-```
-
-The transition from understanding deadlock prevention to understanding priority inversion is natural: both problems arise from incorrect interactions between multiple locks and multiple tasks. The difference is that deadlock is a liveness failure (no progress) while priority inversion is a timing failure (correct result, wrong time).
+Priority inheritance propagates inherited urgency along applicable blocking chains, but it does not break a deadlock, shorten the protected algorithm, complete a device operation, or cure a holder that never releases. The timing policy needs bounded critical sections, valid lock ordering, and a defined recovery path.
 
 ---
 
@@ -226,7 +189,7 @@ CONFIG_PROVE_LOCKING=y
 CONFIG_LOCK_STAT=y      # adds per-lock contention statistics
 ```
 
-- Assigns each lock a **lock class** based on its static address in the kernel binary
+- Tracks lock classes and their dependency/context relationships; initialization and explicit class/subclass annotations affect that classification
 - Records every lock acquisition chain: "lock A was held when lock B was acquired"
 - Reports AB-BA cycles at first detection — before they manifest as actual hangs
 - Reports invalid lock-from-interrupt context: e.g., `mutex_lock()` called from hardirq context
@@ -240,7 +203,7 @@ but task holds lock:
 which lock already depends on the new lock.
 ```
 
-Enable during all development, CI, and regression testing. `lockdep` adds ~10% runtime overhead; disable in production or performance-sensitive contexts.
+Enable the relevant debug configuration in development/test kernels when practical. Its runtime/memory overhead depends on the workload and configuration; measure it rather than assuming a universal percentage.
 
 `lockdep_assert_held(&lock)`: assertion that documents and verifies that a lock is held at a given point; useful for complex drivers with multi-step lock protocols.
 
@@ -252,9 +215,9 @@ Enable during all development, CI, and regression testing. `lockdep` adds ~10% r
 
 Hardware or software **watchdog**: if a process does not **kick the watchdog** within the timeout period, the system resets or enters a safe state. Provides **defense-in-depth** against deadlocks that escape lockdep in deployed hardware.
 
-The Mars Pathfinder watchdog worked correctly; it correctly detected `bc_dist` missing its deadline. The root problem was the missing PI configuration that caused `bc_dist` to miss the deadline in the first place.
+In the Pathfinder account, cycle-completion checking detected the missed distribution work and invoked recovery. A watchdog/reset mechanism can help recover availability, but the resulting physical behavior depends on the surrounding system.
 
-> **Common Pitfall:** Treating watchdog resets as an acceptable recovery mechanism for priority inversion is wrong. A watchdog reset on a vehicle's ADAS controller causes a controlled disengagement — the driver must take over. In the worst case, the reset occurs at a moment when the driver has no time to react. The correct fix is to eliminate the inversion, not to rely on the watchdog.
+A reset does not automatically produce a safe physical state or a controlled disengagement. Define the independent actuator/output behavior, fault notification, restart state, and recovery conditions. Investigate the root cause rather than counting successful reboots as proof of correct timing.
 
 ---
 
@@ -270,19 +233,18 @@ The Mars Pathfinder watchdog worked correctly; it correctly detected `bc_dist` m
 ### Conceptual Review
 
 - **Why can priority inversion occur even when every individual task is behaving correctly?** Inversion is an emergent property of task interactions, not a bug in any one task. L holds a mutex correctly. H waits for it correctly. M preempts L correctly. The problem is that no one designed the system to prevent the indirect blocking chain L→H via the mutex.
-- **What is the single most important lesson of Mars Pathfinder?** Priority inheritance was available in VxWorks but disabled by default. Safety-critical systems must audit every mutex that is shared between tasks of different priorities and ensure PI is enabled. "The feature exists" is not the same as "the feature is enabled."
-- **How does priority inheritance differ from priority ceiling?** PI boosts the lock holder's priority dynamically when a higher-priority waiter blocks. Priority ceiling boosts the acquirer to the ceiling immediately, even if no high-priority task is waiting. PI has lower average overhead; priority ceiling has stronger predictability guarantees.
+- **What is the single most important lesson of Mars Pathfinder?** Priority inheritance was available in VxWorks but disabled by default. Audit the actual shared-resource protocol and bounded blocking, including library-internal synchronization. PI is one applicable mechanism, not a universal substitute for ownership design. "The feature exists" is not the same as "the feature is enabled."
+- **How does priority inheritance differ from immediate priority ceiling?** PI raises effective priority in response to a blocked higher-priority waiter; an immediate-ceiling protocol raises it when the resource is acquired. Both still require bounded critical sections and the protocol’s scheduling/nesting assumptions.
 - **What does lockdep report and what does it not report?** lockdep reports potential deadlock cycles (AB-BA orderings) and lock-context violations (sleeping lock in IRQ context). It does not report priority inversion — that requires separate tools like `cyclictest` or real-time scheduling analysis.
 - **Why is transitive PI important?** If H blocks on a mutex held by L, and L blocks on a different mutex held by X, then X also needs to be boosted — otherwise L cannot run, cannot release its mutex to unblock H. Transitive PI propagates the boost along the entire blocking chain.
-- **When is priority ceiling mandatory instead of just recommended?** In AUTOSAR OS and ARINC 653 environments where the complete task set and their resource usage is fixed at configuration time and formally verified. These standards require formal proof of bounded priority inversion, which priority ceiling provides statically.
+- **Does a ceiling mean the high-priority task never waits?** No. A low-priority holder may already own the resource and run at the ceiling before the high-priority task is released. That task still waits for the remaining critical section. The purpose is a controlled blocking bound under the protocol’s assumptions.
 
 ---
 
-## AI Hardware Connection
+## Apply the analysis to a robot
 
-- PI mutex (`rtmutex` / `PTHREAD_PRIO_INHERIT`) is required for openpilot `controlsd` (highest priority) sharing cereal shared-memory state with `plannerd` (medium) and log-writing processes (low); without PI, the Mars Pathfinder scenario can recur in a production AV system
-- The Mars Pathfinder root cause analysis is a mandatory reference document in ASIL-B safety reviews; it demonstrates that priority inversion can cause safety-critical resets in deployed, inaccessible hardware with zero possibility of manual intervention
-- `PTHREAD_PRIO_INHERIT` is used in ROS2 real-time executor configurations to prevent control callbacks from being starved by data-logging threads; the rclcpp real-time executor documentation explicitly references this requirement
-- `lockdep` is standard practice during embedded Linux driver development on Jetson and i.MX platforms; AB-BA cycles in camera, ISP, and DMA subsystem locks must be eliminated before hardware deployment
-- Priority ceiling protocol is used in AUTOSAR-compliant ECU software where all task priorities and shared resource sets are fixed at configuration time; this is stronger than PI for ASIL-D certified safety functions
-- PREEMPT_RT's system-wide conversion of `spinlock_t` to `rtmutex` means that PI is automatically applied to all kernel synchronization on the CAN bus driver, V4L2 camera driver, and GPU driver without any driver code changes
+List the resources shared by the sensor, inference, logging, and control tasks. For each, record the owner, maximum critical-section work, possible blocking/device waits, task priorities, and ordering relative to other locks. Do not assume a particular openpilot or ROS 2 process uses a PI mutex without examining its pinned source.
+
+PREEMPT_RT changes many lock semantics, but raw locks, device waits, callback lifetime, and driver-specific critical sections still require analysis. A lock-free queue avoids one mutex but introduces its own capacity, ownership, and progress assumptions; compare the tested [SPSC queue](../labs/SPSC-Queue.md).
+
+**Check:** H needs 1.2 ms CPU, can block 0.6 ms, and suffers 0.4 ms additional interference. Does a 2 ms deadline hold? **Answer:** No: response demand is already 2.2 ms under these additive, non-overlapping assumptions. Turning on PI does not erase the 0.6 ms protected work.

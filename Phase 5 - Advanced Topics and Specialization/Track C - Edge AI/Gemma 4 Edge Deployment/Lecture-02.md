@@ -10,7 +10,7 @@ Before converting, confirm that the pinned converter understands the exact Gemma
 
 ## 2. A complete numerical exercise
 
-This symmetric INT4 teaching example uses values from -7 to 7 and a scale per row. It is not a GGUF or NVFP4 encoder.
+This symmetric INT4 teaching example uses values from -7 to 7 and a scale per row. It stores the codes in INT8 containers for inspection; it does not pack two weights per byte or encode GGUF/NVFP4. Run the complete block with Python and NumPy, for example in the [optional Qwen CPU environment](../Qwen%20Inference%20Optimization/Lab-Guide.md#2-run-the-optional-current-library-experiment). The [portable Qwen quantization exercise](../Qwen%20Inference%20Optimization/Lab-Guide.md#1-run-the-portable-experiments) implements the same mechanism with the standard library if NumPy is unavailable.
 
 ```python
 import numpy as np
@@ -26,9 +26,25 @@ candidate = w_hat @ x
 print("weights_max_abs", float(np.max(np.abs(w - w_hat))))
 print("outputs", reference, candidate)
 print("output_max_abs", float(np.max(np.abs(reference - candidate))))
+
+# Nearest rounding without clipping has per-weight error at most scale/2.
+# A small allowance covers arithmetic rounding in this FP32 example.
+weight_bound = scale / 2 + 1e-6
+assert np.all(np.abs(w - w_hat) <= weight_bound)
+output_bound = (scale[:, 0] / 2) * np.sum(np.abs(x))
+assert np.all(np.abs(reference - candidate) <= output_bound + 1e-6)
+
+corrupted = q.astype(np.float32) * scale[::-1]
+corruption_detected = not np.all(np.abs(w - corrupted) <= weight_bound)
+assert corruption_detected
+print("swapped_scales_rejected", corruption_detected)
 ```
 
-Now put a large outlier in one row. Predict which small values disappear before running it. Compare per-row and per-tensor scaling, then deliberately swap scales between rows; the checker must reject the corrupted reconstruction. This tests the mechanism rather than relying on a model producing plausible prose.
+The observed FP32 outputs are approximately `[3.3, 0.1]` and `[2.714286, 0.1]`, with maximum output error `0.585714`. The first row's scale is about `0.285714`; its weight error is at most `0.142858`, but the input can amplify that error. By the triangle inequality, the first output error is bounded by `(scale/2) × sum(abs(x)) = 0.928572`. This is a numerical reconstruction check, not a task-quality acceptance threshold.
+
+There is a useful rounding trap: `-1 / (2/7)` is mathematically `-3.5`. FP32 division here lands just above that midpoint and rounds to `-3`; the portable Python-float exercise rounds to `-4`, giving first output `3.285714`. Both satisfy the rounding-error bound. A format contract must specify scale and arithmetic precision as well as the rounding rule; matching the label “INT4” is insufficient to demand identical integer codes.
+
+Now put a large outlier in one row. Predict which small values disappear before running it. Compare per-row and per-tensor scaling. The supplied scale-swap assertion must still detect the original corrupted reconstruction; check any changed fixture independently. This tests the mechanism rather than relying on a model producing plausible prose.
 
 ## 3. Account for metadata and temporary storage
 

@@ -1,0 +1,198 @@
+{
+  "evidence": "real SDKs with local HTTP fixtures; no model execution",
+  "packages": {
+    "anthropic": "1.15.0",
+    "openai": "3.35.1",
+    "httpx": "0.28.1",
+    "httpx2": "2.14.0",
+    "pydantic": "2.14.1"
+  },
+  "runs": [
+    {
+      "provider": "claude",
+      "answer": "5",
+      "request_bodies": [
+        {
+          "max_tokens": 256,
+          "messages": [
+            {
+              "role": "user",
+              "content": "Add 2 and 3."
+            }
+          ],
+          "model": "fixture-model",
+          "tools": [
+            {
+              "name": "add_integers",
+              "description": "Add two bounded integers.",
+              "input_schema": {
+                "type": "object",
+                "properties": {
+                  "a": {
+                    "type": "integer"
+                  },
+                  "b": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "a",
+                  "b"
+                ],
+                "additionalProperties": false
+              },
+              "strict": true
+            }
+          ]
+        },
+        {
+          "max_tokens": 256,
+          "messages": [
+            {
+              "role": "user",
+              "content": "Add 2 and 3."
+            },
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "id": "tool-1",
+                  "input": {
+                    "a": 2,
+                    "b": 3
+                  },
+                  "name": "add_integers",
+                  "type": "tool_use"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "tool_result",
+                  "tool_use_id": "tool-1",
+                  "content": "{\"ok\": true, \"sum\": 5}",
+                  "is_error": false
+                }
+              ]
+            }
+          ],
+          "model": "fixture-model",
+          "tools": [
+            {
+              "name": "add_integers",
+              "description": "Add two bounded integers.",
+              "input_schema": {
+                "type": "object",
+                "properties": {
+                  "a": {
+                    "type": "integer"
+                  },
+                  "b": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "a",
+                  "b"
+                ],
+                "additionalProperties": false
+              },
+              "strict": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "provider": "openai",
+      "answer": "5",
+      "request_bodies": [
+        {
+          "model": "fixture-model",
+          "input": [
+            {
+              "role": "user",
+              "content": "Add 2 and 3."
+            }
+          ],
+          "max_output_tokens": 256,
+          "store": false,
+          "tools": [
+            {
+              "type": "function",
+              "name": "add_integers",
+              "description": "Add two bounded integers.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "a": {
+                    "type": "integer"
+                  },
+                  "b": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "a",
+                  "b"
+                ],
+                "additionalProperties": false
+              },
+              "strict": true
+            }
+          ]
+        },
+        {
+          "model": "fixture-model",
+          "input": [
+            {
+              "role": "user",
+              "content": "Add 2 and 3."
+            },
+            {
+              "arguments": "{\"a\":2,\"b\":3}",
+              "call_id": "call-1",
+              "name": "add_integers",
+              "type": "function_call",
+              "id": "fc_call-1",
+              "status": "completed"
+            },
+            {
+              "type": "function_call_output",
+              "call_id": "call-1",
+              "output": "{\"ok\": true, \"sum\": 5}"
+            }
+          ],
+          "max_output_tokens": 256,
+          "store": false,
+          "tools": [
+            {
+              "type": "function",
+              "name": "add_integers",
+              "description": "Add two bounded integers.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "a": {
+                    "type": "integer"
+                  },
+                  "b": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "a",
+                  "b"
+                ],
+                "additionalProperties": false
+              },
+              "strict": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

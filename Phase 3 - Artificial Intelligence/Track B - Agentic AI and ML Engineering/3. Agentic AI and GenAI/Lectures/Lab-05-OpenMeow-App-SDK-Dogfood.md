@@ -379,12 +379,9 @@ You need:
 - auth token or local auth mode
 - `@openclaw/sdk` available in your environment
 
-The OpenMeow example documents this target shape:
+The current OpenClaw source declares `@openclaw/sdk` **private**, version `0.0.0-private`, with workspace dependencies. Do not assume `pnpm add @openclaw/sdk` installs a public, compatible release. Use the pinned OpenClaw workspace's SDK build and a matching Gateway, or adapt against the separately published gateway-client package with its own documented contract. See [Lecture 38](Lecture-38.md) and [source evidence](Lecture-Source-Evidence.md).
 
-```bash
-pnpm add @openclaw/sdk
-OPENCLAW_GATEWAY_URL=http://127.0.0.1:18789 pnpm tsx index.ts
-```
+This live integration was not executed for the course. The adapter fixture exercise and a real Gateway smoke test are separate results; record both revisions if you perform the optional smoke test.
 
 Adapt the URL to your actual Gateway.
 
@@ -502,7 +499,7 @@ coven doctor
 coven daemon start
 coven run codex "summarize this repository"
 coven sessions
-coven attach <session-id>
+coven attach "${COVEN_SESSION_ID:?Set COVEN_SESSION_ID to an existing authorized identifier}"
 ```
 
 If you do not have Codex or Claude Code installed, `coven doctor` should still help identify missing harnesses.

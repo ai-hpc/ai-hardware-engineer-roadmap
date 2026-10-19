@@ -25,18 +25,18 @@ Unit 01 tells you *what* to optimize (which ops and where time is spent). This u
 ## 1. Custom kernel authoring frameworks
 
 * **Triton**
-    * A language and compiler that lets you write **GPU kernels in Python**. You describe **tile-based** computation: instead of one thread touching one element, you work in small blocks (tiles) of data that fit in **shared memory** (fast on-chip memory shared by a thread block), which reduces repeated reads from **global memory** (slow GPU DRAM). Used for matmul, attention, and custom ops.
-    * **Automatic tuning** means the compiler searches over tile sizes, block sizes, and other parameters to find a fast configuration for your GPU; you get good performance without hand-tuning every time.
+    * A language and compiler for GPU kernels expressed through Python. You describe logical tiles; compiler layouts map values across threads, registers, and shared memory as needed. A logical tile is not automatically a shared-memory allocation. Used for matmul, attention, and custom operators.
+    * **Automatic tuning** benchmarks a supplied configuration search space for selected keys. It has a compilation/measurement cost and does not guarantee that the search space contains the best kernel; record tuning budget separately from steady-state execution.
     * Integrates with PyTorch via `torch.compile` and custom ops. Study official tutorials and Flash-Attention–style patterns to see how production attention kernels are expressed.
 * **CUTLASS / CuTe (CuTe DSL)**
     * **CUTLASS** — NVIDIA's **CUDA template library** for **GEMM** (General Matrix Multiply: the core math behind linear layers and matmuls), **conv** (convolution, used in CNNs), and custom ops. It is the reference implementation for high-performance matrix math on NVIDIA GPUs; many frameworks and libraries build on or mimic its design.
-    * **CuTe (CUDA Template Engine)** — A C++ **DSL** (domain-specific language) and header library shipped inside CUTLASS. It gives you:
+    * **CuTe C++ library** — Layout and tensor abstractions shipped inside CUTLASS. It gives you:
         * **Layout abstractions:** A way to describe *how* data is arranged in memory — **shape** (e.g. 128×64), **stride** (how many elements to skip along each dimension), and **composition** (e.g. a big matrix as a grid of smaller tiles). You define logical **tiles** (rectangular sub-blocks) and map them to **global memory** (GPU DRAM), **shared memory** (on-chip, per thread block), and **registers** (per-thread), without writing error-prone index math by hand.
-        * **Copy primitives:** Building blocks like `copy()` that generate optimized load/store instructions — **vectorized** (moving multiple elements per instruction), **async** (overlap with compute when the hardware supports it), and **predicated** (mask off out-of-bounds). They are **correct by construction** for different thread and memory layouts, so you avoid subtle bugs when changing tile sizes or hardware.
+        * **Copy primitives:** Building blocks for vectorized, asynchronous, and predicated loads/stores on supported targets. Layout abstractions reduce manual indexing, but the author must still validate bounds, alignment, synchronization, lifetimes, and tail handling.
         * **Tiling and partitioning:** You compose layouts to describe **thread block tile** (work per block of threads), **warp tile** (work per warp — 32 threads), and **MMA** (Matrix Multiply-Accumulate: the tensor-core operation that does many multiply-adds in one instruction). Getting these sizes right is essential to match **tensor cores** (hardware units that do dense matrix math very fast), **shared memory size**, and **register pressure** (how many registers each thread needs; too many can limit occupancy).
-    * CuTe is the backbone of modern CUTLASS and **cuBLASLt** (NVIDIA's library for batched GEMM with flexible layouts). Learning it helps you understand how production GEMM and attention kernels are structured and how to write or customize kernels for inference (e.g. Blackwell, **FP8** — 8-bit floating point for faster, lower-precision math).
+    * CuTe provides layout and tensor abstractions used by modern CUTLASS. The C++ CuTe library and the Python-facing CuTe DSL are related but distinct interfaces; follow the [official CuTe documentation](https://docs.nvidia.com/cutlass/latest/media/docs/cpp/cute/index.html) and [CuTe DSL documentation](https://docs.nvidia.com/cutlass/latest/media/docs/pythonDSL/overview.html) for the pinned release. Study cuBLASLt as a separate library API rather than assuming its internal implementation.
 * **Flash-Attention (v2/v3), Quack**
-    * **Fused attention** kernels: they combine the steps of attention (computing **Q/K/V** — query, key, value — from inputs; doing the attention scores and softmax; applying to values) into one or a few kernels instead of many separate kernel launches. Fewer launches and less round-trips to memory mean lower latency and higher throughput.
+    * **Fused attention** kernels usually consume already projected **Q/K/V** tensors, then combine attention-score, softmax, and weighted-value calculations without materializing the full score matrix. Q/K/V projection is usually a separate operation; verify the particular implementation's fusion boundary.
     * **Online softmax** means computing the softmax in a single pass over the data (with a recurrence), so you don't need to store all scores in memory — critical for **long-context** (very long sequences) where the full attention matrix would not fit.
     * **Memory-efficient attention** avoids materializing the full N×N attention matrix; you stream and reduce in tiles. Study **tiling** (how the workload is split into blocks), **memory utilization** (how much of bandwidth you use), and **data movement** (what gets read/written and where).
     * **Deep dive:** [FlashAttention — A Systems / Kernel Course](FlashAttention%20Course/Guide.md) — 10-lecture course covering roofline, online softmax, FA1/FA2/FA3 algorithms, repo anatomy, backward correctness harness, inference / paged-KV path, Hopper specifics, and a capstone patch.
@@ -52,7 +52,7 @@ Unit 01 tells you *what* to optimize (which ops and where time is spent). This u
     * **Memory utilization** — For long sequences, the attention mechanism would naively need O(N²) memory (N = sequence length). You must design kernels that use memory sparingly (tiling, streaming, online softmax) so models can scale to **1M+ context** (millions of tokens).
     * **KV-cache layout** — During autoregressive generation, **key** and **value** tensors from previous tokens are cached and reused. How you lay them out in memory (contiguous, paged, sharded) affects bandwidth and kernel efficiency; poor layout can dominate runtime.
     * **Data movement and bandwidth** — Attention is often **memory-bound**: the GPU spends more time moving data than computing. Kernels that reduce redundant reads/writes and maximize useful **bandwidth** (bytes per second from memory) are critical.
-* **Patterns** — Flash-Attention, **FlashInfer**, **Magic-Attention** (e.g. GTC 2026): fused attention implementations with **variable length** (different sequence lengths per batch item) and production-grade correctness and testing.
+* **Patterns** — Study pinned [FlashAttention](https://github.com/Dao-AILab/flash-attention) and [FlashInfer](https://github.com/flashinfer-ai/flashinfer) implementations. Compare supported variable-length inputs, cache layouts, hardware, dtypes, and test coverage. A project name alone does not establish support for your exact workload.
 * **Analysis**
     * **Roofline** — A simple model that relates performance to **arithmetic intensity** (ops per byte). It shows a "roof" (compute-bound limit) and a "ridge" (memory-bound limit). For attention, you often sit on the memory-bound side; the goal is to reduce bytes moved or increase reuse.
     * **Occupancy** — How many **warps** (groups of 32 threads) can run concurrently on an **SM** (Streaming Multiprocessor — the GPU's compute unit). Higher occupancy can hide **latency** (e.g. memory access delay), but too many registers per thread can lower it; you balance register use and parallelism.
@@ -101,11 +101,11 @@ When the model or batch is spread across **multiple GPUs** or **multiple nodes**
 
 * [Triton Documentation](https://triton-lang.org/) — Language and GPU kernel patterns.
 * [CUTLASS](https://github.com/NVIDIA/cutlass) — CUDA templates for GEMM and more.
-* [CuTe](https://github.com/NVIDIA/cutlass/tree/main/cute) — Layout and copy DSL.
+* [CuTe](https://docs.nvidia.com/cutlass/latest/media/docs/cpp/cute/index.html) — Layout and tensor abstractions; [CuTe DSL](https://docs.nvidia.com/cutlass/latest/media/docs/pythonDSL/overview.html) for the Python interface.
 * [Flash-Attention](https://github.com/Dao-AILab/flash-attention) — Memory-efficient attention.
 * [NCCL](https://developer.nvidia.com/nccl) — NVIDIA Collective Communications Library.
 * [Pallas / Mosaic (JAX)](https://github.com/google/jax/tree/main/jax/experimental/pallas) — GPU/TPU kernel authoring.
-* GTC 2026: Magic-Attention and long-context kernel talks.
+* [FlashInfer](https://github.com/flashinfer-ai/flashinfer) — Inference kernel library and source tests; record a release/commit for every experiment.
 
 ---
 

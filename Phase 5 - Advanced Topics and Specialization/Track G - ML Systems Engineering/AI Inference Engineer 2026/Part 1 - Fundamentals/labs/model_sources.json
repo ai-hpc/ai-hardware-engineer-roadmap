@@ -1,0 +1,27 @@
+{
+  "reviewed": "2026-10-18",
+  "scope": "Configuration only; no pretrained weights or runtime loaded. Llama gated config not downloaded.",
+  "models": [
+    {
+      "model": "Qwen/Qwen2.5-72B-Instruct",
+      "revision": "495f39366efef23836d0cfae4fbe635880d2be31",
+      "url": "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct/resolve/495f39366efef23836d0cfae4fbe635880d2be31/config.json",
+      "file": "qwen25_config.json",
+      "sha256": "14ca217334fe0fd10148413592d68c99eeb33431ed89c1afa130fee560be2a29"
+    },
+    {
+      "model": "Qwen/Qwen3-235B-A22B",
+      "revision": "8efa61729e24bd65b1d152b5ab5409052aa80e65",
+      "url": "https://huggingface.co/Qwen/Qwen3-235B-A22B/resolve/8efa61729e24bd65b1d152b5ab5409052aa80e65/config.json",
+      "file": "qwen3_moe_config.json",
+      "sha256": "0ecd5d6fe6f2db6739e4e36ab06b88ebe7bd013ef31b9583f43796059a2b23a4"
+    },
+    {
+      "model": "deepseek-ai/DeepSeek-V3.1",
+      "revision": "c0781d039fb7a1ba2abc4add0bdc293e92d2b8db",
+      "url": "https://huggingface.co/deepseek-ai/DeepSeek-V3.1/resolve/c0781d039fb7a1ba2abc4add0bdc293e92d2b8db/config.json",
+      "file": "deepseek_v31_config.json",
+      "sha256": "3e5d192d745758862b0a3e6338ee181991db49933dbbd3185e1bde34944e7bad"
+    }
+  ]
+}

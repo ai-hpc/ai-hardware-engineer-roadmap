@@ -1,0 +1,42 @@
+{
+  "backend": "gloo",
+  "device": "cpu",
+  "ranks": 2,
+  "python": "3.12.3",
+  "torch": "2.14.0+cpu",
+  "per_rank_samples": [
+    2,
+    3
+  ],
+  "all_reduce_sum": [
+    3.0,
+    3.0
+  ],
+  "all_gather": [
+    1.0,
+    2.0
+  ],
+  "serial_gradient": [
+    -47.50000000000001,
+    -13.500000000000002
+  ],
+  "comparisons": {
+    "local_mean": {
+      "gradient": [
+        -41.791666666666664,
+        -12.625
+      ],
+      "max_gradient_error": 5.708333333333343,
+      "max_parameter_error": 0.057083333333333486
+    },
+    "global_sample_mean": {
+      "gradient": [
+        -47.5,
+        -13.5
+      ],
+      "max_gradient_error": 7.105427357601002e-15,
+      "max_parameter_error": 1.1102230246251565e-16
+    }
+  },
+  "script_sha256": "e466cc479ffbc37db7c3ba8c1a732c8f26968061b0b2a7be6fae411755308aa1"
+}

@@ -1,298 +1,93 @@
-# Lecture 8: Multi-Core Scheduling, CPU Affinity & isolcpus
+# Lecture 8: CPU Placement, Affinity, and Isolation
 
-## Overview
+## The problem: eligibility is different from exclusivity
 
-The core problem this lecture addresses is: when you have multiple CPUs and multiple tasks, how do you control *which task runs on which CPU*, and why does that control matter for performance? On a modern server or SoC, the Linux scheduler makes CPU placement decisions dozens of times per second. Those decisions are excellent for fairness but terrible for latency predictability — the scheduler can migrate a task between CPUs at any time, flushing its warm cache and adding hundreds of microseconds of overhead. The mental model to carry here is that of assigned seating on a plane: the default (open seating) works for most passengers, but for critical roles you need reserved, guaranteed seats. For an AI hardware engineer, controlling CPU placement is the difference between a neural network inference pipeline with predictable 2ms latency and one with random 10ms spikes caused by the OS moving threads around.
+A perception worker is allowed on logical CPUs `{2, 3}`. It may migrate between them. A single-CPU mask `{2}` removes that choice while CPU 2 remains available, but other threads may also run on CPU 2. Neither mask reserves cache capacity, memory bandwidth, GPU execution, or a deadline.
 
----
+Pinning can help locality and repeatability; it can also strand work behind a busy CPU. Compare measured workloads instead of assuming all scheduler migration is harmful. Migration does not literally flush every cache, and its cost depends on topology and working set.
 
-## SMP Scheduler Architecture
-
-Linux SMP scheduler uses **per-CPU runqueues** (`struct rq`) to **reduce contention**:
-
-- `load_balance()` triggered by: idle CPU detection, periodic `rebalance_domains()`, and explicit migration requests
-- Load metric: sum of task weights (CFS nice-weighted) on each runqueue
-- `migration/N` kernel threads execute the actual task moves on behalf of the scheduler
-- Goal: equalize load across CPUs while respecting topology constraints (prefer same-core > same-package > same-NUMA node)
-
-```
-  SMP Load Balancing Overview:
-
-  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-  │   CPU 0      │    │   CPU 1      │    │   CPU 2      │    │   CPU 3      │
-  │  runqueue    │    │  runqueue    │    │  runqueue    │    │  runqueue    │
-  │  [T1][T2]   │    │  [T3][T4]   │    │  [ ]         │    │  [T5]        │
-  │  [T5]       │    │             │    │              │    │              │
-  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘    └──────┬───────┘
-         │                   │                   │                   │
-         └───────────────────┴─── load_balance() ┴───────────────────┘
-                         (equalizes task counts across CPUs)
-```
-
-While **load balancing** is beneficial for throughput workloads, it is **harmful for real-time and inference workloads** where cache warmth and latency predictability matter more than fairness.
-
----
-
-## CPU Topology Hierarchy
-
-```
-Physical Package (Socket)
-  └── DIE
-        └── MC (physical core)
-              └── SMT Thread (hyperthreading — 2 logical CPUs per core)
-```
-
-Linux models this as a `struct sched_domain` hierarchy. **Imbalance threshold and migration cost** increase at higher domain levels; the scheduler is **reluctant to migrate across NUMA boundaries**.
-
-```
-  Cache Sharing by Topology Level:
-
-  ┌─────────────────────────────────────────────────┐
-  │  NUMA Node 0 (Socket 0)                         │
-  │  ┌───────────────────┐  ┌───────────────────┐   │
-  │  │  Physical Core 0  │  │  Physical Core 1  │   │
-  │  │  ┌────┐  ┌────┐  │  │  ┌────┐  ┌────┐  │   │
-  │  │  │CPU0│  │CPU1│  │  │  │CPU2│  │CPU3│  │   │
-  │  │  └────┘  └────┘  │  │  └────┘  └────┘  │   │
-  │  │  Shared L1+L2    │  │  Shared L1+L2    │   │
-  │  └─────────┬─────────┘  └─────────┬─────────┘   │
-  │            └──────────┬────────────┘             │
-  │                 Shared L3 (LLC)                  │
-  └─────────────────────────────────────────────────┘
-```
-
-### Topology Inspection
+## Inspect actual topology
 
 ```bash
-lscpu                                                     # summary + per-CPU table
-lscpu -e                                                  # extended per-CPU table
-cat /sys/devices/system/cpu/cpu0/topology/core_id         # physical core ID
-cat /sys/devices/system/cpu/cpu0/topology/physical_package_id  # socket ID
-cat /sys/devices/system/cpu/cpu0/topology/thread_siblings # sibling SMT bitmask
-cat /sys/devices/system/cpu/cpu0/topology/core_cpus_list  # all logical CPUs on this core
+lscpu
+lscpu -e
+cat /proc/self/status
+cat /proc/self/cgroup
 ```
 
-**SMT siblings** share L1/L2 caches and execution units. Inference workloads should **pin to physical cores** (one thread per core), not to both siblings of an SMT pair, to avoid **resource contention**.
+Read `Cpus_allowed_list` and `Mems_allowed_list` in the status output. CPU numbers identify logical CPUs, not physical core numbers. Core IDs may repeat across sockets. SMT sibling relationships, cache sharing, heterogeneous CPU capacities, and NUMA nodes are platform properties; a socket need not equal a NUMA node, and a core need not have two SMT threads.
 
-> **Key Insight:** Two hyperthreads on the same physical core share the L1 instruction cache, L1 data cache, and integer/FP execution units. Running two competing inference threads on sibling SMT CPUs can be *slower* than running them on separate physical cores. Always verify with profiling before assuming hyperthreading helps.
+For an available CPU, inspect its directory under `/sys/devices/system/cpu/cpuN/topology/`, especially `thread_siblings_list`, `core_id`, and `physical_package_id`. Missing files are a platform limitation to record. Never copy a Jetson CPU range from a different module's core count.
 
----
+**Worked placement:** suppose CPUs 0/4 share one physical core and 1/5 share another. Two compute workers on 0 and 4 compete for that core's resources. Moving one to 1 changes the physical resources available; moving it to 5 uses the same second core. Whether two SMT threads improve throughput still needs measurement.
 
-## CPU Affinity
+## Affinity is per thread
 
-**Affinity mask**: bitmask specifying which CPUs a task is allowed to execute on. Without pinning, the scheduler is free to **migrate a task to any CPU at any time**.
+Linux `sched_setaffinity` applies to a thread ID. `taskset` can launch a process with an inherited mask, but existing threads may already have different masks; `taskset -a` addresses all threads of a process when supported. Libraries can create workers or change affinity later. Verify each relevant thread rather than inspecting only the process leader.
 
-```c
-// System call interface
-cpu_set_t mask;
-CPU_ZERO(&mask);
-CPU_SET(2, &mask); CPU_SET(3, &mask);  // allow execution only on CPUs 2 and 3
-sched_setaffinity(pid, sizeof(mask), &mask);
-sched_getaffinity(pid, sizeof(mask), &mask);
+The effective set is constrained by online CPUs, cpuset restrictions, and other platform rules. An empty permitted intersection fails. Always check return values and read back the result. The [Linux affinity API](https://man7.org/linux/man-pages/man2/sched_setaffinity.2.html) explains these restrictions and inheritance.
+
+This Linux/Python experiment changes only its own process and restores its mask; it needs no root access. It is a functional placement exercise, not a benchmark:
+
+```python
+import os
+
+original = os.sched_getaffinity(0)
+chosen = min(original)
+try:
+    os.sched_setaffinity(0, {chosen})
+    actual = os.sched_getaffinity(0)
+    assert actual == {chosen}
+    print("requested", chosen, "allowed", sorted(actual))
+finally:
+    os.sched_setaffinity(0, original)
 ```
 
-```bash
-taskset -c 2,3 ./inference_app      # launch process with affinity to CPUs 2 and 3
-taskset -cp 2,3 <pid>               # apply affinity to an already-running process
-cat /proc/<pid>/status | grep Cpus_allowed
-```
+For a compiled version with malformed-mask tests and checked thread APIs, run [rt-demo](demos/rt-demo/README.md). Never assume CPU 0 is available inside a container or batch allocation.
 
-Benefits of affinity pinning:
-- Eliminates scheduler-induced migrations; preserves L1/L2 cache warmth
-- Avoids TLB flush cost on migration (~thousands of cycles on x86)
-- Reduces latency variance; makes timing more predictable
+## Separate the isolation mechanisms
 
-| Mechanism | Kernel Interface | Granularity | Persistence | Tool |
-|---|---|---|---|---|
-| CPU affinity | `sched_setaffinity` | Per-task | Until process exits | `taskset` |
-| `isolcpus` | Boot parameter | Per-CPU | Boot-time | kernel cmdline |
-| cpuset cgroup | `/sys/fs/cgroup/cpuset` | Per-cgroup | Until reconfigured | `cgset`, k8s |
-| `numactl` | `numactl --cpunodebind` | Per-NUMA node | Per-invocation | `numactl` |
-| Intel CAT | `/sys/fs/resctrl` | Per-LLC-way | Until reconfigured | `pqos`, `resctrl` |
-
-> **Common Pitfall:** `sched_setaffinity` restricts where a task *can* run, but it does not prevent other tasks from running on those same CPUs. If you pin your inference thread to CPU 2 but don't isolate CPU 2, OS daemons and kernel threads can still run there and evict your cache. Affinity pinning alone is not sufficient — it must be combined with `isolcpus` for full isolation.
-
----
-
-## isolcpus — Removing CPUs from the General Scheduler
-
-`isolcpus=` is a **kernel boot parameter**. CPUs listed are **removed from the general scheduling pool** permanently at boot. No task is placed on an isolated CPU unless **explicitly assigned** via `taskset` or `sched_setaffinity`.
-
-Complementary parameters for full isolation:
-
-```
-isolcpus=2,3,4,5 nohz_full=2,3,4,5 rcu_nocbs=2,3,4,5 irqaffinity=0,1
-```
-
-| Parameter | Effect |
-|---|---|
-| `isolcpus=N` | Removes CPU N from general scheduler pool |
-| `nohz_full=N` | Disables periodic scheduler tick on CPU N (tickless) |
-| `rcu_nocbs=N` | Offloads RCU callbacks off CPU N to `rcuoc` kthreads |
-| `irqaffinity=0,1` | Routes all hardware IRQs to CPUs 0 and 1 only |
-
-```
-  CPU Isolation Layout (4-core example):
-
-  ┌───────────────────────────────────────────────────────┐
-  │  CPU 0          CPU 1          CPU 2          CPU 3   │
-  │  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐ │
-  │  │ OS/Kernel│   │ OS/Kernel│   │  RT/AI   │   │  RT/AI   │ │
-  │  │ tasks    │   │ tasks    │   │  thread  │   │  thread  │ │
-  │  │ IRQs ✓   │   │ IRQs ✓   │   │  IRQs ✗  │   │  IRQs ✗  │ │
-  │  │ tick ✓   │   │ tick ✓   │   │  tick ✗  │   │  tick ✗  │ │
-  │  │ RCU ✓    │   │ RCU ✓    │   │  RCU ✗   │   │  RCU ✗   │ │
-  │  └──────────┘   └──────────┘   └──────────┘   └──────────┘ │
-  │  ◄── General scheduler pool ──►◄───── Isolated ─────────►  │
-  └───────────────────────────────────────────────────────┘
-```
-
-**Combined effect**: OS jitter reduced from ~200µs worst-case to **<10µs on isolated cores**. After boot, verify with `cyclictest` and confirm no IRQs are delivered to isolated CPUs via `cat /proc/interrupts`.
-
-`tuna`: command-line tool that wraps `isolcpus` and IRQ affinity management for runtime CPU shielding configuration.
-
-> **Key Insight:** `isolcpus` is a boot-time declaration that says "these CPUs are reserved." `nohz_full` turns off the timer tick (which would otherwise interrupt the isolated CPU every 1ms). `rcu_nocbs` removes RCU callbacks. Together they push the OS almost entirely off the isolated CPUs. Without all three, isolation is incomplete.
-
----
-
-## CPU Frequency Scaling
-
-**Variable CPU frequency** is another source of **latency jitter**. When a CPU transitions from a low power state to high frequency, instructions per second changes mid-task, making timing analysis unreliable.
-
-| Governor | Behavior | Use Case |
+| Mechanism | What it controls | What it does not establish |
 |---|---|---|
-| `performance` | Always at maximum frequency | Deterministic RT / inference latency |
-| `powersave` | Always at minimum frequency | Battery-constrained idle systems |
-| `schedutil` | Tracks CFS utilization signal | General throughput workloads |
-| `ondemand` | Ramps on load, scales down on idle | Legacy desktop |
+| Affinity mask | Where a particular thread may run | Exclusive use of those CPUs |
+| cpuset controller | CPU and memory-node eligibility for a group | Complete IRQ/firmware/device isolation |
+| Isolated cpuset partition, when supported/configured | Scheduler load-balancing participation for that partition | Absence of every kernel activity |
+| `nohz_full` | Adaptive tick suppression under required conditions | No interrupts, timers, or scheduler activity |
+| `rcu_nocbs` | Callback offloading mechanism | Correct placement of every offload thread by itself |
+| IRQ affinity | Placement for interrupts that honor that control | Relocation of all managed or per-CPU interrupts |
+
+The kernel documents `isolcpus` as deprecated in favor of cpusets for relevant isolation use cases. Its flags have different meanings; `domain` isolation cannot simply be undone through the same boot parameter at runtime. Do not describe it as deleting CPUs from the scheduler. Explicitly eligible tasks and unavoidable kernel activity can still run. Consult [kernel parameters](https://docs.kernel.org/admin-guide/kernel-parameters.html) and [adaptive ticks](https://docs.kernel.org/timers/no_hz.html).
+
+Allocate housekeeping capacity for device completion, networking, storage, RCU, and management. If a control task relies on a callback that cannot get CPU time, isolating the control task more aggressively can break progress. Reserve capacity using the workload's dependencies, then observe interrupt counters and thread placement under load.
+
+## cgroup v2: requested versus effective resources
+
+The old `/sys/fs/cgroup/cpuset/...` layout is a cgroup v1 example; do not assume it on a v2 host. On v2, the controller must be available and enabled in the relevant hierarchy. Delegation, ancestor constraints, partition state, and process placement rules matter.
+
+Inspect the hierarchy before any configuration:
 
 ```bash
-# Set performance governor on all CPUs
-echo performance > /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
-# Or via cpupower
-cpupower frequency-set -g performance
+findmnt -t cgroup2
+cat /sys/fs/cgroup/cgroup.controllers
+cat /sys/fs/cgroup/cgroup.subtree_control
 ```
 
-Variable frequency causes timing jitter; frequency transitions add up to 200µs of latency. **Always use `performance` governor** on RT and inference cores.
+For your actual group, compare `cpuset.cpus` with `cpuset.cpus.effective`, and `cpuset.mems` with `cpuset.mems.effective`. A configured string is not enough to demonstrate that the group obtained those resources. A normal cpuset can overlap other groups; an isolated partition has additional validity and exclusivity rules. Use the [cgroup v2 cpuset documentation](https://docs.kernel.org/admin-guide/cgroup-v2.html#cpuset) or your service manager's supported configuration path. This lesson does not modify the host hierarchy.
 
-> **Common Pitfall:** On mobile SoCs (Jetson, Qualcomm), the `performance` governor may conflict with thermal throttling. Monitor `cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq` during load tests to confirm the frequency stays fixed. If thermal limits are hit, the CPU throttles regardless of governor setting.
+**Check:** a child requests CPUs 2–5, but its parent's effective set is 2–3. Does the child obtain four CPUs? **Answer:** no; child eligibility cannot exceed the ancestor's restrictions. Inspect effective values and configuration errors.
 
----
+## Frequency, thermal state, and shared resources
 
-## cpuset Cgroup Controller
+A generic `performance` governor requests the highest frequency allowed by its policy. It does not override firmware, thermal throttling, power limits, or every driver's autonomous behavior. `powersave` semantics also depend on the driver. Frequency and idle-state exit are related but distinct mechanisms; governor selection alone does not remove idle exit latency. See [CPU performance scaling](https://docs.kernel.org/admin-guide/pm/cpufreq.html).
 
-While `isolcpus` works at boot time, **`cpuset` cgroups** provide a **runtime mechanism** to assign process groups to CPU subsets **without a reboot**.
+Run a warm steady-state workload and record temperature, power limits, effective frequency observations, and task latency together. Do not treat a brief cool-board result as sustained performance. CPU pinning also does not stop another core from consuming shared memory bandwidth.
 
-```bash
-mkdir /sys/fs/cgroup/cpuset/inference
-echo "4-7" > /sys/fs/cgroup/cpuset/inference/cpuset.cpus   # assign CPUs 4-7 to this group
-echo "0"   > /sys/fs/cgroup/cpuset/inference/cpuset.mems   # bind to NUMA node 0 memory
-echo <pid> > /sys/fs/cgroup/cpuset/inference/cgroup.procs  # add process to the group
-```
+On supported systems, resource-control interfaces can restrict cache allocation and monitor bandwidth. Nonoverlapping allocation masks require correct configuration across the relevant groups; they do not pin arbitrary model weights permanently in cache or guarantee a miss rate. Generic `perf` events such as `cache-misses` must be interpreted using the actual PMU event mapping, not relabeled as precise LLC statistics without evidence. Read [resctrl](https://docs.kernel.org/filesystems/resctrl.html).
 
-This creates a CPU partition: all threads in the `inference` cgroup are scheduled only on CPUs 4–7, and their memory allocations come from NUMA node 0.
+For memory placement, continue to [Lecture 16](Lecture-16.md): `numastat -p` describes placement/accounting, not a trace of every remote memory access. CPU pinning alone does not move existing pages.
 
-Kubernetes uses `cpu_manager_policy=static` to allocate exclusive CPUs to **Guaranteed QoS** pods via cpuset internally. Pair with `topologyManagerPolicy=single-numa-node` to align CPU and GPU PCIe topology for GPU pods.
+## A controlled learning experiment
 
----
+Run the same CPU workload with its default allowed set, one selected logical CPU, and two separate physical cores if available. Keep input, software, thread count, and measurement duration fixed. Save effective masks, topology, wall time, CPU time, migrations/context switches when observable, and output correctness. Repeat under a documented competing load.
 
-## Cache Topology and Intel CAT
-
-CPU affinity and isolation control which threads run where, but they don't prevent **shared cache pollution**. Even a pinned inference thread shares the **L3 LLC** with OS daemons running on other cores. **Intel CAT** addresses this.
-
-### Cache Sharing
-
-- L1 (32–64 KB), L2 (256 KB–1 MB): private per physical core
-- L3 / LLC (8–64 MB+): shared across all cores in a package
-- SMT siblings share L1 + L2 + execution units; avoid co-locating competing workloads on same physical core
-
-```bash
-perf stat -e cache-misses,cache-references ./inference    # measure LLC miss rate
-```
-
-### Intel Cache Allocation Technology (CAT / RDT)
-
-Partitions LLC ways between workloads using Capacity Bitmasks (CBM). Prevents co-located OS daemons from evicting hot model weights.
-
-```
-  Intel CAT LLC Partitioning (16-way cache):
-
-  ┌───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┐
-  │ 0 │ 1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │ 9 │10 │11 │12 │13 │14 │15 │  LLC ways
-  └───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┘
-  ◄───────────────────────────►◄──────────────────────────────────►
-      Inference group (ways 0-7)         OS/other (ways 8-15)
-      CBM: 0x00FF                        CBM: 0xFF00
-```
-
-```bash
-mount -t resctrl resctrl /sys/fs/resctrl
-mkdir /sys/fs/resctrl/inference
-# Allocate LLC ways 0–3 (4 ways) exclusively to inference group
-echo "L3:0=0x000f" > /sys/fs/resctrl/inference/schemata
-# 0x000f = binary 0000 0000 0000 1111 = ways 0,1,2,3
-echo <pid> > /sys/fs/resctrl/inference/tasks
-```
-
-Management tool: `pqos` (Intel RDT OSS tools). Also supports Memory Bandwidth Allocation (MBA) to limit DRAM bandwidth consumed by background workloads.
-
-> **Key Insight:** Without Intel CAT, a single `kworker` or `systemd-journald` burst can flush 30–50% of the LLC. The next inference forward pass then pays L3-miss penalties on every weight access. CAT gives model weights a reserved cache partition that OS activity cannot touch.
-
----
-
-## NUMA Affinity
-
-On multi-socket servers and SoCs with asymmetric memory topology, the **NUMA node from which memory is allocated** matters as much as which CPU runs the task. **Cross-NUMA memory access** adds latency on every cache miss.
-
-```bash
-# Pin process to socket 0 CPUs + socket 0 memory
-numactl --cpunodebind=0 --membind=0 ./inference
-
-# Show CPU <-> GPU PCIe topology
-nvidia-smi topo -m
-
-# Show per-process NUMA access stats
-numastat -p <pid>
-
-# Show NUMA hit/miss counters
-numastat
-```
-
-**AutoNUMA** (`/proc/sys/kernel/numa_balancing`): **disable on latency-sensitive inference nodes**. Automatic page migration causes **TLB shootdown IPIs** that add jitter spikes.
-
-> **Common Pitfall:** If the GPU PCIe root port attaches to socket 0 and your inference process allocates memory on socket 1 (the OS default when socket 0 is under pressure), every DMA transfer suffers cross-NUMA latency. Always confirm NUMA binding with `numastat -p <pid>` after launching inference and verify the `Numa_miss` counter is near zero.
-
----
-
-## Summary
-
-| Mechanism | Kernel/User? | Granularity | Persistence | Tool |
-|---|---|---|---|---|
-| `sched_setaffinity` | Kernel syscall | Per-task | Process lifetime | `taskset` |
-| `isolcpus` | Kernel boot param | Per-CPU | Boot-time | kernel cmdline |
-| `nohz_full` | Kernel boot param | Per-CPU | Boot-time | kernel cmdline |
-| `rcu_nocbs` | Kernel boot param | Per-CPU | Boot-time | kernel cmdline |
-| cpuset cgroup | Kernel cgroup | Per-cgroup | Dynamic | `cgset`, kubectl |
-| `cpufreq performance` | Kernel driver | Per-CPU | Dynamic | `cpupower` |
-| Intel CAT | Kernel resctrl | Per-LLC-way | Dynamic | `pqos` |
-| `numactl` | Userspace wrapper | Per-NUMA node | Per-invocation | `numactl` |
-
-### Conceptual Review
-
-- **Why is CPU affinity alone not enough to eliminate jitter?** Affinity prevents the target task from migrating away, but it does not prevent other tasks from running on the pinned CPU. `isolcpus` must be used to exclude all other tasks from the CPU.
-- **What is the difference between `isolcpus` and `sched_setaffinity`?** `isolcpus` removes a CPU from the kernel's general scheduler pool — the scheduler will never place an ordinary task there. `sched_setaffinity` restricts one specific task to a set of CPUs, but those CPUs remain in the general pool.
-- **Why disable `nohz_full` on non-isolated CPUs?** The timer tick is needed for accurate scheduler accounting on CPUs running multiple tasks. Only isolated CPUs benefit from tickless operation.
-- **Why avoid SMT siblings for competing workloads?** Two hyperthreads on the same physical core share L1 cache and execution units. A competing thread evicts the inference thread's cache lines and competes for FP units, causing unpredictable slowdowns.
-- **What problem does Intel CAT solve that CPU affinity does not?** Affinity controls which CPU runs which task. CAT controls which LLC cache *ways* are available to which task. Even with affinity pinning, an OS daemon on a different core can evict model weights from the shared LLC.
-- **Why disable AutoNUMA on inference nodes?** AutoNUMA migrates pages between NUMA nodes to improve locality, but the migration itself causes TLB shootdown IPIs on all CPUs that map the migrated page. This adds latency spikes that are invisible to the task but visible in latency histograms.
-
----
-
-## AI Hardware Connection
-
-- `isolcpus=4-11 nohz_full=4-11 rcu_nocbs=4-11` on Jetson Orin dedicates 8 ARM cores exclusively to AI inference threads; the OS and sensor drivers run on cores 0–3, preventing OS jitter from entering the inference latency budget
-- Kubernetes `cpu_manager_policy=static` uses cpuset cgroups to give TensorRT inference pods exclusive physical CPU cores, eliminating noisy-neighbor scheduler interference in multi-tenant inference clusters
-- CPU affinity pinning for ROS2 real-time callback groups ensures deterministic execution of LiDAR processing and motion control nodes; scheduler migration would invalidate WCET measurements
-- NUMA-aware memory binding (`numactl -m 0`) reduces first-inference latency on multi-socket servers where the GPU PCIe root port attaches to socket 0; model weights in socket-1 memory incur cross-NUMA fetch overhead on every forward pass
-- Intel CAT partitions LLC so OS daemons cannot evict hot model layer weights during inference; without CAT, a `kworker` burst can flush 30–50% of LLC, causing a spike of LLC-miss latency at the start of the next forward pass
-- `cpufreq performance` governor is non-negotiable on AV edge compute: frequency ramp-up delay from a low-power C-state can add 100–200µs to the first GPU kernel launch after an idle period
+Do not require pinning to win. A useful result explains why it helped, hurt, or made no measurable difference. For a robot pipeline, also record queue age and missed deadlines: a throughput improvement can hide older sensor data.

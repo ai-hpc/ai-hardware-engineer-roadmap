@@ -1,0 +1,59 @@
+[
+  {
+    "path": "esp_hosted_ng/host/README.md",
+    "revision": "ce36dec9294988e598f04e84c9d28092ca9e9786",
+    "url": "https://raw.githubusercontent.com/ai-hpc/jetson-esp-hosted/ce36dec9294988e598f04e84c9d28092ca9e9786/esp_hosted_ng/host/README.md",
+    "sha256": "d0150242c1088c36090b379856fb3416958c25c3b0d4052073e93e670236f109",
+    "bytes": 6249
+  },
+  {
+    "path": "esp_hosted_ng/host/jetson_orin_nano_init.sh",
+    "revision": "ce36dec9294988e598f04e84c9d28092ca9e9786",
+    "url": "https://raw.githubusercontent.com/ai-hpc/jetson-esp-hosted/ce36dec9294988e598f04e84c9d28092ca9e9786/esp_hosted_ng/host/jetson_orin_nano_init.sh",
+    "sha256": "f86c3ecb0d426e5f93511c4f8c348b00911b3a3d45b4bbb08d463753bb1c24d0",
+    "bytes": 4870
+  },
+  {
+    "path": "esp_hosted_ng/host/Makefile",
+    "revision": "ce36dec9294988e598f04e84c9d28092ca9e9786",
+    "url": "https://raw.githubusercontent.com/ai-hpc/jetson-esp-hosted/ce36dec9294988e598f04e84c9d28092ca9e9786/esp_hosted_ng/host/Makefile",
+    "sha256": "f84a0bbf0ccd4c4eba3ede15f526c9c9d9767e69d05e38d1ad5475fc12dfcd01",
+    "bytes": 1533
+  },
+  {
+    "path": "esp_hosted_ng/host/main.c",
+    "revision": "ce36dec9294988e598f04e84c9d28092ca9e9786",
+    "url": "https://raw.githubusercontent.com/ai-hpc/jetson-esp-hosted/ce36dec9294988e598f04e84c9d28092ca9e9786/esp_hosted_ng/host/main.c",
+    "sha256": "5e92a5db68fb3c810006586a853c27bbe84dff0b3c5cc11a78d839d3fd29e2ad",
+    "bytes": 28302
+  },
+  {
+    "path": "esp_hosted_ng/host/spi/esp_spi.c",
+    "revision": "ce36dec9294988e598f04e84c9d28092ca9e9786",
+    "url": "https://raw.githubusercontent.com/ai-hpc/jetson-esp-hosted/ce36dec9294988e598f04e84c9d28092ca9e9786/esp_hosted_ng/host/spi/esp_spi.c",
+    "sha256": "3402d01a8b9ab35107be4f9ff1543eb53ad0c5d7f8bfd903b903dd3ab88100db",
+    "bytes": 21775
+  },
+  {
+    "path": "esp_hosted_ng/host/esp_cfg80211.c",
+    "revision": "ce36dec9294988e598f04e84c9d28092ca9e9786",
+    "url": "https://raw.githubusercontent.com/ai-hpc/jetson-esp-hosted/ce36dec9294988e598f04e84c9d28092ca9e9786/esp_hosted_ng/host/esp_cfg80211.c",
+    "sha256": "b2f0c37489601db485358aec88b40f3e7449237915ab429e3274ef13daa68eea",
+    "bytes": 36237
+  },
+  {
+    "path": "esp_hosted_ng/host/esp_bt.c",
+    "revision": "ce36dec9294988e598f04e84c9d28092ca9e9786",
+    "url": "https://raw.githubusercontent.com/ai-hpc/jetson-esp-hosted/ce36dec9294988e598f04e84c9d28092ca9e9786/esp_hosted_ng/host/esp_bt.c",
+    "sha256": "5d984a15e79515813728f0ead53bff1199061b5d2c7a94c3e8cfe15ee7ad5383",
+    "bytes": 5391
+  },
+  {
+    "path": "net/bluetooth/hci_core.c",
+    "revision": "v5.15",
+    "url": "https://raw.githubusercontent.com/torvalds/linux/v5.15/net/bluetooth/hci_core.c",
+    "sha256": "d4ca764ba14ab7a2d120a90f3dee6543bac17e822b2ed19b4bc053a0c56f778e",
+    "bytes": 127299,
+    "role": "Linux HCI ownership reference; inspect target kernel separately"
+  }
+]

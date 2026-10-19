@@ -1,53 +1,20 @@
-# Part 1 — Fundamentals of AI Inference / MLSys
+# Part 1 — Fundamentals of AI inference
 
-The mental model layer of the course. Five lectures that build, in order, the four things every AI inference engineer needs before touching a specific model or hardware target:
+Learn to trace a token, count its memory, and define a useful service measurement. The complete beginner route runs on a CPU and requires no model weights. Large-model GPU serving is an optional later experiment with separate evidence.
 
-1. **What the role is** — the four inference shapes, the metrics that matter, the diagnostic flow.
-2. **What a transformer actually executes** — prefill vs decode, the KV cache as the load-bearing structure, the three regimes (compute / memory / scheduler bound).
-3. **What the hardware does** — roofline, bandwidth, the memory hierarchy, what the marketing-shaped specs actually buy.
-4. **What precision means in 2026** — FP16 → FP8 → FP4 → INT4 and the parity validation discipline that keeps quantization honest.
-5. **What runtimes exist and why** — vLLM, SGLang, TensorRT-LLM, llama.cpp, MLX, and the workload matrix for picking between them.
+| Lesson | What you will be able to explain |
+|---|---|
+| [01 — workload and service metrics](Lecture-01.md) | TTFT, average TPOT versus individual ITL, useful throughput, tails, and cost |
+| [02 — transformer execution](Lecture-02.md) | Prefill, incremental decoding, GQA, cache growth, and absolute-position masks |
+| [03 — roofline bounds](Lecture-03.md) | FLOPs/bytes, compatible ceilings, units, and why a bound is not a benchmark |
+| [04 — precision contracts](Lecture-04.md) | Weights/activations/KV, scales and tails, calibration and task quality |
+| [05 — runtime selection](Lecture-05.md) | Source-backed compatibility and a fair matched comparison |
+| [CPU lab](labs/README.md) | Run attention/cache, expert-routing, storage, and speculation checks |
 
-By the end of Part 1, a reader should be able to open a model card for a model they have never heard of, and predict — within a margin defended by the math — what its KV cache will cost, where its decode bandwidth ceiling sits, which candidate precisions require quality evaluation, and which runtime has the required model/kernel support. The model-specific parts (Part 2 dense / Part 3 MoE) then deepen that mental model with two concrete anchor pairs each.
+Read one lesson, predict its worked example, then run the relevant lab case. The lab has 22 standard-library tests and two optional PyTorch CPU comparisons, all executed in the recorded validation environment. Three pinned public model configurations support the memory exercises; no pretrained checkpoint is loaded.
 
-## Lectures
+Your first artifact is a benchmark contract and a small tested reference, not an invented cluster throughput result. Explain the 40 GiB dense-cache example, the non-square cached-mask counterexample, and Qwen3's explicit head dimension. Keep precision, cache layout, and allocator overhead separate.
 
-<div class="lecture-map" markdown>
+Before progressing, distinguish storage capacity from transfer traffic; a per-token active parameter count from batch work; and a kernel timing from client-observed latency. State which conditions make a stage compute-, memory-, communication-, or scheduling-limited instead of memorizing that all decode is bandwidth-bound.
 
-| # | Title | Core question it answers |
-|---|-------|--------------------------|
-| 01 | [The 2026 inference engineer's mental model](Lecture-01.md) | What does the role *do*, day to day, and what metrics decide whether the work was good? |
-| 02 | [Transformer execution — from tokens to bits](Lecture-02.md) | What actually runs on the GPU when a token is generated, and why decode is the bandwidth-bound problem? |
-| 03 | [Roofline, bandwidth, and the memory hierarchy](Lecture-03.md) | Which hardware spec lines move which metric, and which are noise? |
-| 04 | [The precision stack — FP16 → FP8 → FP4 → INT4](Lecture-04.md) | What does each precision floor cost, what does each one buy, and how do we *know* parity? |
-| 05 | [The runtime landscape — vLLM, SGLang, TensorRT-LLM, llama.cpp, MLX](Lecture-05.md) | Given a workload + hardware + SLO, which runtime do we start with — and why? |
-
-</div>
-
-## What you ship from Part 1
-
-* A worked benchmark template repo that can boot one runtime against one model and emit TTFT / TPOT / throughput / peak memory.
-* A short written analysis of one model card (your choice) that derives its KV-cache cost, dominant-cost regime, and a recommended runtime + precision starting point.
-* A roofline plot for one target GPU + one specific kernel showing arithmetic intensity vs achieved bandwidth.
-
-You will use this template repo throughout Parts 2 and 3.
-
-## Exit criteria
-
-You are ready for Part 2 when you can:
-
-* Sketch the prefill-vs-decode split of a transformer forward pass on a whiteboard and state the batch/context/shape assumptions under which either stage becomes compute- or bandwidth-bound.
-* Compute the KV cache bytes-per-token formula for any model from its `config.json`.
-* Propose a precision candidate from prior evidence, then define the task-specific validation needed for this checkpoint and runtime.
-* Defend, in two sentences, why you would pick vLLM over TensorRT-LLM (or vice versa) for a given workload.
-
-If any of these is shaky, re-read the matching lecture before moving on. Part 2 assumes you have all four.
-
-
-## Carry this course into the physical-AI system
-
-**Start from:** A small model, tokenizer, and a CPU or available GPU reference.
-
-**Build and challenge:** Trace prefill and decode for explicit batch/context shapes. Derive weight and state traffic, then explain when compute, bandwidth, or scheduling dominates.
-
-**Pass forward:** A baseline benchmark with numerical and resource assumptions for dense serving. Continue with [the connected course](../Part%202%20-%20Dense%20at%20Hopper/README.md) and keep the artifact in the [Physical AI Design Studio](../../../../Physical-AI-Design-Studio.md).
+Continue to [dense-model deployment reasoning](../Part%202%20-%20Dense%20at%20Hopper/README.md), then [MoE routing](../Part%203%20-%20MoE%20at%20Blackwell/README.md). Carry the benchmark contract into the [Physical AI Design Studio](../../../../Physical-AI-Design-Studio.md) with the hardware measurements clearly separated from CPU reference evidence.

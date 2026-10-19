@@ -29,7 +29,7 @@ Tensor parallelism splits operations within layers; pipeline parallelism distrib
 
 With \(W\) workers, per-worker microbatch \(b\), and \(G\) accumulation steps, nominal global batch is \(WbG\). This equality does not guarantee identical optimization if examples have different numbers of valid action coordinates.
 
-The correct global masked mean is total loss numerator divided by total valid denominator. Averaging microbatch means gives equal weight to microbatches, even when one contains twice as many valid targets. Under gradient-averaging distributed runtimes, scale local summed losses consistently with the globally reduced denominator and the runtime's averaging convention. Test against a single-process reference before scaling.
+The correct global masked mean is total loss numerator divided by total valid denominator. Averaging microbatch means gives equal weight to microbatches, even when one contains twice as many valid targets. Under gradient-averaging distributed runtimes, scale local summed losses consistently with the globally reduced denominator and the runtime's averaging convention. For example, if default DDP averages gradients over `W` ranks and the entire accumulated update contains `D` valid weighted coordinates, backpropagate each local loss **sum** multiplied by `W/D`. Reduce `D` across all participating ranks and accumulated microbatches. Do not divide by the accumulation count again when it is already included in `D`. All ranks must follow the same synchronized-step protocol, including ranks with zero local targets. Test against a single-process reference before scaling.
 
 Mixed precision adds another sequence constraint: accumulation, loss scaling if used, gradient unscaling, clipping, optimizer step, and scaler update must occur in the intended order. Do not clip scaled gradients as though they were physical gradient magnitudes. The framework's official AMP examples provide API guidance; pin the version rather than assuming the moving documentation matches an installed runtime. [PyTorch AMP examples](https://docs.pytorch.org/docs/main/notes/amp_examples.html).
 
@@ -46,6 +46,8 @@ A resumable checkpoint includes parameters, optimizer moments, scheduler, precis
 Seeds do not promise identical results across libraries, releases, GPU architectures, or nondeterministic kernels. Distinguish bitwise restart parity in a controlled environment from statistical reproducibility across environments. Framework documentation describes these limitations and deterministic options. [PyTorch reproducibility notes](https://docs.pytorch.org/docs/main/notes/randomness.html).
 
 For claims, predefine the hypothesis, primary metric, holdout, compute/data budget, seed count, and stopping rule. Tune on development data; report final tests once the choice is fixed. Save failed runs and reasons for exclusion. A model chosen from many seeds and reported only at its best is a selection procedure that must be disclosed.
+
+The supplied [two-process CPU collectives lab](../../Track%20A%20-%20GPU%20Infrastructure/Nvidia%20GPU/HPC%20Setup/NCCL-Deep-Dive/CPU-Collectives-Lab/Guide.md) runs real PyTorch/Gloo with unequal local sample counts and checks gradients against a serial reference. Its intentionally wrong mean-of-rank-means result makes this reduction error visible. This validates distributed arithmetic on CPU, not VLA scaling or NCCL performance.
 
 ## Build, interrupt, and profile
 

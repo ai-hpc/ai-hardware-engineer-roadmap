@@ -4,9 +4,9 @@
 
 ---
 
-Four lectures built one equation. Lecture 02 earned `H(p, q) = H(p) + D_KL(p ‖ q)`; Lecture 03 wrapped it in `PPL = exp(H(p, q))`; Lecture 04 proved the third term is `D_KL(p ‖ q) = E_p[log p − log q] ≥ 0`, asymmetric, the avoidable waste. This lecture turns the identity loose. The claim is strong and worth stating plainly: **every major systems technique for making a model cheaper, smaller, safer, or faster is a campaign to shrink one specific KL** — or, when the KL is held *fixed by construction*, to read it as the gate that decides whether the cheaper model ships.
+The preceding lectures connect cross-entropy, perplexity, and KL. This lecture applies them to quantization, distillation, alignment, and speculative decoding. These techniques use different distributions and objectives: do not substitute a reference-model KL for data NLL, or treat a small numerical drift as a complete task-quality verdict.
 
-Walk the cast. Quantization grading asks *how far did INT4 drift from FP16* — that is `D_KL(p_fp16 ‖ q_quant)`, and llama.cpp will print it for you. Knowledge distillation *trains* a student to minimize `D_KL(p_teacher ‖ q_student)` at temperature. RLHF doesn't just maximize reward — it maximizes reward **minus** a KL leash `β·D_KL(π_θ ‖ π_ref)` that stops the policy from wandering off into reward-hacked gibberish, and that same leash survives unchanged from PPO to DPO to GRPO. Speculative decoding looks different — it is provably *lossless*, KL be damned — but the acceptance rule is a log-probability-ratio test, and the speedup it delivers is governed by exactly how small the draft-to-target gap is. One equation, four machines.
+Quantization can measure drift from a reference model. Distillation may train against teacher distributions. Some alignment methods regularize policy drift; the precise penalty depends on the objective and configuration. Exact speculative sampling preserves the target distribution under its acceptance/correction assumptions, while runtime and draft quality determine whether it accelerates execution.
 
 The throughline for a senior engineer: **`p` is always the distribution you trust, `q` is always the distribution you can afford.** Data, teacher, FP16 reference, reference policy, target model — those are `p`. Student, quant, tuned policy, draft model — those are `q`. Read every section below by asking *which `p`, which `q`, and is the KL being minimized or measured?*
 
@@ -20,7 +20,7 @@ By the end of this lecture, you should be able to:
 2. Grade a quantization the way llama.cpp's `--kl-divergence` mode does — **mean/median `D_KL`, token-probability RMS, top-1/top-k agreement, and PPL ratio** — and explain why PPL alone is "rough."
 3. Cite the **2026 finding** that quantization *format* matters more than nominal bit-width and that intrinsic metrics are necessary but **not sufficient**, and translate it into a ship/no-ship rule.
 4. Derive knowledge distillation as **forward-KL matching at temperature `T`**, explain "dark knowledge" and the `T²` gradient scaling, and say why forward KL makes the student *mode-covering*.
-5. Show that the **RLHF KL penalty is the invariant** across PPO → DPO → GRPO, and that DPO's closed form is the exact optimum of the KL-regularized reward objective.
+5. Derive the optimal unrestricted policy for a KL-regularized reward objective, then distinguish that derivation from finite-data DPO training and configurable PPO/GRPO regularization.
 6. Prove that **speculative decoding's accepted samples are distributed exactly as the target `p`**, and relate acceptance length to the draft-target KL gap.
 7. Build a **capstone quant grader**: FP16 reference vs quantized model over WikiText-2, reporting the full metric panel plus a thresholded `verdict()`.
 
@@ -38,7 +38,7 @@ The whole course collapses to one line you should be able to write blind:
    (mean −log q) entropy)    (training) or MEASURES (a gate)
 ```
 
-`p` is reference/trusted (data, teacher, FP16, reference policy, target model); `q` is the approximation (student, quant, tuned policy, draft model). The identity matters here because it tells you *what you are actually moving*. When a quant's PPL rises, the identity says the increase is **entirely** in `D_KL(p_fp16 ‖ q_quant)` — `H(p)` is a property of the data and cannot change. So a PPL delta and a KL are the *same measurement* read two ways; the only question is which one correlates better with what a user notices. (Spoiler from §2: the KL and top-1 agreement do.)
+For fixed prefixes, teacher-reference KL is `E_p_reference[log p_reference − log q]`. Held-out NLL change is `E_data[log p_reference − log q]`. The expectations differ. A quantized model can improve finite-sample data PPL while having positive teacher KL. The [CPU lab](Lab-01-Masked-Quality-Metrics.md) supplies a two-token counterexample. Report both measurements with their distributions, masks, and denominators.
 
 Here is the map for the rest of the lecture — four techniques, one column each:
 
@@ -82,24 +82,11 @@ The workflow is two passes. First, run the **FP16 reference** over a corpus (Wik
 
 The RMS framing is the one to internalize: quantization is, to first order, **additive noise on the logits**, and the RMS Δ token-prob is literally the standard deviation of that noise after it propagates through softmax. A quant with RMS Δ of 0.002 is whispering; one at 0.02 is shouting.
 
-### 2.3 The 2026 finding — format over bit-width, intrinsic-necessary-not-sufficient
+### 2.3 Scope empirical quantization results correctly
 
-The decisive empirical result of this cycle is **arXiv 2601.14277, "Which Quantization Should I Use? A Systematic Evaluation of llama.cpp Quantization on Llama-3.1-8B"** (January 2026). Two findings every MLSys engineer should carry:
+[Which Quantization Should I Use?](https://arxiv.org/abs/2601.14277v1), submitted January 11, 2026, evaluates llama.cpp formats on Llama-3.1-8B-Instruct using task scores, perplexity, CPU throughput, and storage. The study covers one model/runtime setup, not evidence that a single KL threshold or format ranking generalizes to all models and GPUs.
 
-1. **Format matters more than nominal bit-width.** A well-designed ~4-bit format (the K-quants/I-quants with their importance-weighted, mixed-precision block layouts) can *beat* a naively-rounded format at a *higher* nominal bit count. "4-bit" is not a quality tier; the **packing scheme** is. Do not rank quants by the number in their name.
-2. **Intrinsic metrics are necessary but NOT sufficient.** Two quants with near-identical PPL — even near-identical mean KLD — can **diverge measurably on reasoning and instruction-following benchmarks** (GSM8K, MMLU-Pro, IFEval). The distributional gate catches gross breakage; it does **not** certify that multi-step reasoning survived. A 0.3% PPL bump can hide a real GSM8K regression because the failure lives in a *few* high-leverage tokens deep in a chain of thought, which the corpus mean drowns out. (For *what* those downstream evals are — the coding/agent capability ladder from HumanEval through SWE-bench, Terminal-Bench, and MCPMark — see [Agentic AI · Lecture 23 §8](../../../Phase%203%20-%20Artificial%20Intelligence/Track%20B%20-%20Agentic%20AI%20and%20ML%20Engineering/3.%20Agentic%20AI%20and%20GenAI/Lectures/Lecture-23.md).)
-
-The practical rule of thumb that falls out:
-
-```text
-   RANK quants by:  mean D_KL(p_fp16 ‖ q_quant)  and  top-1 agreement %
-                    (these track perceived quality better than the PPL delta)
-   GATE on intrinsic:  reject anything with mean KLD or top-1 agreement out of band
-   CONFIRM on downstream:  the survivors MUST pass a reasoning/instruction eval
-                           (PPL/KLD necessary, NOT sufficient)
-```
-
-> **2026 update:** the consensus has hardened around two slogans. **(a) "Format over bit-width"** — choose the quantization *scheme* (K-quant/I-quant, importance-weighted, mixed-precision blocks), not the bit count on the label; a good 4-bit format beats a sloppy 5-bit one. **(b) "KLD over PPL, intrinsic over nothing, downstream over intrinsic"** — mean `D_KL` and top-1 agreement correlate with perceived quality better than the PPL delta, but *all* intrinsic metrics are necessary-not-sufficient: a quant can match PPL and KLD yet quietly lose a reasoning benchmark, so the intrinsic panel is the **fast filter**, and a downstream eval is the **verdict**. (arXiv 2601.14277.)
+Use numerical checks to catch conversion defects, then evaluate representative held-out tasks and hardware performance. Predeclare tolerances from your use case. Compare rare failures as well as means. A small average PPL or KL difference does not certify reasoning, tool use, or robot action quality; neither metric is itself a direct measurement of those outcomes.
 
 ---
 
@@ -152,7 +139,7 @@ Reinforcement learning from human feedback fine-tunes a policy `π_θ` to maximi
                 └──── chase reward ────┘        └──── but don't stray from the trusted model ────┘
 ```
 
-Here `p = π_ref` (trusted), `q = π_θ` (the policy you can afford to move). `β` sets the leash length: large `β` keeps `π_θ` glued to `π_ref` (safe, timid); small `β` lets it roam (capable, risky). The KL term is what prevents reward hacking, mode collapse, and the slow drift into off-distribution text — it is the **regularizer that keeps the tuned model recognizably the same model.**
+Here the KL direction is `D_KL(π_θ ‖ π_ref)`: the tuned policy is in the expectation slot. A positive coefficient penalizes divergence but does not guarantee safety, prevent every form of reward hacking, or establish task competence. Evaluate those properties separately.
 
 ### 4.1 DPO is the closed-form optimum of exactly this objective
 
@@ -164,19 +151,17 @@ The elegant result (Rafailov et al., 2023): the **KL-regularized reward objectiv
    ⇒ solve for the implicit reward:   r(x, y)  =  β · log( π*(y|x) / π_ref(y|x) )  +  β·log Z(x)
 ```
 
-Substitute that implicit reward into the Bradley–Terry preference model and the partition function `Z(x)` cancels, leaving **Direct Preference Optimization** — a simple classification loss on preference pairs `(y_win, y_lose)` that trains the policy directly. DPO is not a different objective from RLHF; it is the *same KL-regularized reward objective solved in closed form*. The KL leash is baked into its very derivation — it is the `β·log(π_θ/π_ref)` term sitting inside the loss.
+Substituting the optimal-policy relation into a Bradley–Terry preference model leads to the DPO objective on preference pairs. The closed form describes an unrestricted policy for a specified reward and reference; fitting a parameterized language model on finite preference data remains an optimization problem. DPO training does not automatically achieve that ideal optimum. See the [original DPO paper](https://arxiv.org/abs/2305.18290).
 
-### 4.2 The KL term is the invariant across PPO → DPO → GRPO
+### 4.2 Inspect the actual alignment objective
 
-The algorithms churn; the leash does not.
+| Method | Relationship to reference KL |
+|---|---|
+| PPO used for RLHF | Often adds a reference-policy KL reward penalty; PPO itself is a policy optimization algorithm and does not require this specific penalty. |
+| DPO | Derives a preference objective using a KL-regularized reward formulation and reference log-probability ratios. |
+| GRPO | May include an explicit reference KL term; configuration and implementation decide whether it is active. |
 
-| Method | What changed | The KL term |
-|--------|--------------|-------------|
-| **PPO** (RLHF classic) | online RL, learned reward model, value network | **explicit** `−β·D_KL(π_θ ‖ π_ref)` in the per-token reward |
-| **DPO** | drops the RL loop; offline on preference pairs | **implicit** — baked into the closed-form `β·log(π_θ/π_ref)` |
-| **GRPO** (DeepSeek) | drops the value network; group-relative advantage from sampled completions | **explicit** `D_KL(π_θ ‖ π_ref)` term retained in the objective |
-
-GRPO is the one to note: in stripping away the value-function critic (a major simplification that powered the DeepSeek-R1 reasoning results), it **kept the explicit KL term**. That is the tell. Across every redesign of the last three years — online vs offline, with critic or without — the constant is the leash to `π_ref`. **The KL penalty is the invariant of alignment**, and it is exactly the third term of this course's identity, now playing referee instead of grader.
+As checked 2026-10-18, [TRL's GRPO documentation](https://huggingface.co/docs/trl/grpo_trainer) specifies `beta=0.0` by default, disabling the KL penalty. Record the actual version, coefficient, estimator, token/sequence normalization, and masks. There is no invariant nonzero “KL leash” across every alignment method or run.
 
 ---
 
@@ -221,7 +206,7 @@ So what does the draft quality buy you? **Acceptance rate**, and therefore **exp
 
 This is the algorithm's-eye view of what you met as a *systems* technique in [MLSys Deep Dives — Lecture 06](../MLSys%20Deep%20Dives/Lecture-06.md) (EAGLE-3, DFlash, the verify-kernel stack, and acceptance length as the governing metric), and as an *on-device measurement* in the [Gemma 4 Edge Deployment — Lecture 06](../../Track%20C%20-%20Edge%20AI/Gemma%204%20Edge%20Deployment/Lecture-06.md) MTP-drafter lecture, where acceptance length is profiled on real silicon. Same acceptance rule, three altitudes: the math here, the systems there, the hardware there.
 
-> **Hardware lens:** the draft model is itself a `q` you can grade with §2's tools *before* you ship it — run the FP16 reference and the draft over a corpus and read the per-token KL/agreement. A draft with high top-1 agreement to the target is a draft with high acceptance length, which is throughput. The draft's quality and its speedup are the *same measurement* (the `p`/`q` gap), so the grader you build in §6 doubles as a draft-quality predictor — and, as always, the target's logits are **cached once** and reused across every candidate draft you evaluate.
+> **Hardware lens:** draft/reference distribution comparisons can help select candidates, but acceptance and speed are different measurements. Exact single-token speculative acceptance depends on distribution overlap, `Σ min(p,q)=1−TV(p,q)`. End-to-end speed also depends on draft cost, verification cost, accepted length, batch size, and hardware. Measure each; high top-1 agreement alone does not guarantee useful speedup.
 
 ---
 
@@ -323,5 +308,5 @@ The thresholds are deliberately conservative starting points (`mean_kld` in nats
 
 - **The 2026 quant-eval findings (the headline).** Per **arXiv 2601.14277** ("Which Quantization Should I Use? A Systematic Evaluation of llama.cpp Quantization on Llama-3.1-8B," Jan 2026): **(1) format beats nominal bit-width** — rank quants by their packing scheme (K-quant/I-quant, importance-weighted, mixed-precision blocks), never by the number in the name; a good 4-bit format outperforms a sloppy higher-bit one. **(2) intrinsic metrics are necessary but not sufficient** — quants with near-equal PPL *and* near-equal mean KLD can still diverge on reasoning/instruction benchmarks, so the intrinsic panel is the fast filter and a downstream eval is the verdict. The field consensus is now **"KLD over PPL"** for the intrinsic gate: mean `D_KL(p_fp16 ‖ q_quant)` and top-1 agreement track perceived quality better than the PPL delta.
 - **Tooling.** `llama.cpp`'s `--kl-divergence` / `--kl-divergence-base` flags report the full panel (mean/median/max KLD, RMS Δ token-prob, top-1/top-k agreement, PPL ratio); flag names and output formatting drift across releases — verify against your build.
-- **Alignment.** PPO → DPO → GRPO continue to churn, but the **KL leash to `π_ref` is the invariant**; GRPO (DeepSeek) notably retains an *explicit* KL term after dropping the value network. DPO remains the closed-form optimum of the same KL-regularized reward objective.
+- **Alignment.** Record the objective and configuration. Reference KL may be explicit, implicit in a derivation, or absent. A DPO optimal-policy derivation is not proof that finite-data training reaches that optimum.
 - **Speculative decoding.** Losslessness is a theorem, not a trend — it does not age. The frontier (EAGLE-3, DFlash, and the MiMo + TileRT throughput milestone) is about driving the draft-target gap *down* to raise acceptance length; those throughput numbers are vendor-reported and tracked in [MLSys Deep Dives — Lecture 06](../MLSys%20Deep%20Dives/Lecture-06.md).

@@ -1,0 +1,76 @@
+{
+  "scope": "Qwen3 config arithmetic; no weights loaded or hardware inference executed",
+  "shapes_output_by_input": {
+    "q": [
+      4096,
+      2560
+    ],
+    "k": [
+      1024,
+      2560
+    ],
+    "v": [
+      1024,
+      2560
+    ],
+    "o": [
+      2560,
+      4096
+    ],
+    "gate": [
+      9728,
+      2560
+    ],
+    "up": [
+      9728,
+      2560
+    ],
+    "down": [
+      2560,
+      9728
+    ]
+  },
+  "unique_parameters_tied": 4022468096,
+  "unique_parameters_if_untied": 4411424256,
+  "lm_head_macs_per_decode_step": 388956160,
+  "formats": {
+    "Q4_0": {
+      "enum": 2,
+      "block": 32,
+      "block_bytes": 18,
+      "bits_per_weight": 4.5
+    },
+    "Q8_0": {
+      "enum": 8,
+      "block": 32,
+      "block_bytes": 34,
+      "bits_per_weight": 8.5
+    },
+    "Q4_K": {
+      "enum": 12,
+      "block": 256,
+      "block_bytes": 144,
+      "bits_per_weight": 4.5
+    },
+    "Q5_K": {
+      "enum": 13,
+      "block": 256,
+      "block_bytes": 176,
+      "bits_per_weight": 5.5
+    },
+    "Q6_K": {
+      "enum": 14,
+      "block": 256,
+      "block_bytes": 210,
+      "bits_per_weight": 6.5625
+    }
+  },
+  "kv_fp16_4096_bytes": 603979776,
+  "illustrative_mixed_weights_bytes": 2363590144,
+  "kv_fp16_max_config_context_bytes": 38654705664,
+  "hypothetical_bandwidth_GB_per_s": 50,
+  "optimistic_weight_only_tokens_per_s": 21.15425981400606,
+  "optimistic_weights_plus_full_kv_read_tokens_per_s": 16.848802672861705,
+  "fp16_linear_flops_per_byte_batch1": 0.9993656370467965,
+  "fp16_linear_flops_per_byte_batch32": 31.362940275650843
+}

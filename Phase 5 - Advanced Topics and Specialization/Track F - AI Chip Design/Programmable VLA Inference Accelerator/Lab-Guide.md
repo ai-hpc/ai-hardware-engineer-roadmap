@@ -2,6 +2,8 @@
 
 These labs reproduce the proposal's arithmetic and expose assumptions that change architecture decisions. They are **analytical fixtures**, not pretrained-policy, GPU, simulator, FPGA, or silicon benchmarks. Use Python 3.10+; no packages, network, model download, or privileged settings are required.
 
+For an optional real framework trace after these arithmetic exercises, continue to [trace the model you trained](Model-to-Hardware-Lab.md). It reuses the VLA action-generation checkpoint and CPU PyTorch environment, exports its graph, and measures actual operator calls. Its five optional tests skip explicitly when PyTorch is absent.
+
 ## Files and setup
 
 From the repository root, in one Bash session:

@@ -1,8 +1,11 @@
 # Part 4 · Lecture 09 — The Phase You Forgot: Batched Prefill
 
+**Practice:** [CPU source lab](CPU-Source-Lab.md). Historical GPU results are source reports; use the **Answers** after attempting the self-check.
+
+
 ## Overview
 
-For roughly six weeks, the case-study engine had **no prefill path at all**. Every token of a prompt went through the single-token decode step. Ingesting 32,768 tokens took **812.2 seconds** of wall clock.
+For roughly the recorded development period, the case-study engine had **no prefill path at all**. Every token of a prompt went through the single-token decode step. Ingesting 32,768 tokens took **812.2 seconds** of wall clock.
 
 Nobody had missed it in the sense of not knowing. It is written down in the project's own roadmap as item 2 of "next, in order." What happened is more interesting and much more common: **the scoreboard measured decode, so the engineering went to decode**, and the phase that was 3.57× behind the reference sat untouched while the phase that ended up 3.26× ahead got seventeen rounds of attention.
 
@@ -18,17 +21,17 @@ From [Part 1 Lecture 02](../Part%201%20-%20Fundamentals/Lecture-02.md), restated
 
 ```text
    PREFILL   process N prompt tokens.  All N are known up front.
-             → parallel over the sequence.  GEMM.  arithmetic intensity ~ N.
-             → COMPUTE-bound.  a weight tile is read once, used N times.
+             → parallel over the sequence.  GEMM.  weight-only BF16 intensity ~ N FLOP/byte before other traffic.
+             → often greater reuse; can become compute-bound at sufficient batch/tile size.
 
    DECODE    produce token t+1 given t.  Inherently serial.
-             → sequence dimension is 1.  GEMV.  arithmetic intensity ~ 1.
-             → MEMORY-bound.  a weight tile is read once, used once.
+             → sequence dimension is 1.  GEMV at batch 1. BF16 weight-only intensity ~1 FLOP/byte; low-bit differs.
+             → often weight/latency-bound at batch 1; context, batching and kernels matter.
 ```
 
-The consequence that matters here: **prefill's win comes from batching, and it is free in the sense that no approximation is involved.** You are not trading accuracy or changing the math — you are reading each weight tile once instead of *N* times for a computation whose result is identical either way.
+The consequence that matters here: **prefill's win comes from batching, and it is free in the sense that no approximation is involved.** You are not trading accuracy or changing the math — you are reading each weight tile once instead of *N* times for mathematically equivalent causal computations. Floating-point kernels may produce different rounded results.
 
-An engine that walks the prompt token by token is doing decode's work *N* times to accomplish prefill's job. Its prefill throughput is, by construction, its decode throughput. That is exactly what the case study measured:
+An engine that walks the prompt token by token is doing decode's work *N* times to accomplish prefill's job. Its prefill executes a decode-like path, though throughput can differ with context, LM-head omission, and timing boundaries. That is exactly what the case study measured:
 
 ```text
    main @ a169ff4, 32,768 prompt tokens:   812.2 s   =   40.35 tok/s
@@ -38,7 +41,7 @@ An engine that walks the prompt token by token is doing decode's work *N* times 
     which is the whole opportunity."
 ```
 
-When your prefill and decode numbers are the same number, you have not measured two things. You have measured one thing twice, and the missing feature is worth roughly the batch width you are not using.
+A ratio near one suggests a token-serial implementation but does not prove it; inspect the schedule. The potential win is bounded by the phases that can batch, compute capacity, memory traffic, and routing reuse, not simply by chunk width.
 
 ### 1.1 The reference's shape tells you what is possible
 
@@ -49,7 +52,7 @@ When your prefill and decode numbers are the same number, you have not measured 
 
 Read that table as a diagnosis rather than a scoreboard. The reference is **7.8× faster at prefill than at decode** on the same hardware and weights (143.88 vs 18.44). That ratio is the signature of a working batched prefill. The candidate's ratio was ~1.0. The gap between those two ratios *is* the missing feature, and it was quantified before anyone wrote the code.
 
-Note also the reference's error bar: **±0.23 tok/s, ±0.16%**, over 3 reps. Prefill is a much quieter measurement than decode — it is compute-bound and runs long enough to average out scheduling noise. That has a practical consequence for [Lecture 02](Lecture-02.md)'s significance gate: your noise floor is not one number for the whole engine, and a 2% gate that is generous for decode may be loose for prefill.
+Note also the reference's error bar: **±0.23 tok/s, ±0.16%**, over 3 reps. This reported prefill sample is quieter than the cited decode samples. Longer runs can reduce some scheduling noise; the result does not establish that every prefill workload is compute-bound or quieter. That has a practical consequence for [Lecture 02](Lecture-02.md)'s significance gate: your noise floor is not one number for the whole engine, and a 2% gate that is generous for decode may be loose for prefill.
 
 ---
 
@@ -75,11 +78,11 @@ In pseudocode, the before and after:
    collectives:   92 × N                   collectives:   92 × N/C
 ```
 
-Three costs drop by the same factor `C`, and it is worth separating them because they respond differently:
+These are idealized batched-phase counts, not guaranteed whole-engine reductions. The 92-collective illustration uses ExpertsOnly; the later head-sharded configuration uses 185. Separate the three costs because they respond differently:
 
 * **Weight traffic** falls by `C` *only for weights every token in the chunk touches.* §4 is about why that qualifier is the whole story on an MoE.
-* **Launch count** falls by `C` unconditionally. Given [Lecture 03](Lecture-03.md)'s finding that this engine was launch-bound, this alone is significant — a chunk of 32 removes 31/32 of the launch bill for the prompt.
-* **Collective count** falls by `C` unconditionally, and each collective gets `C` times wider. Since [Lecture 03 §2](Lecture-03.md) established these are latency-bound (512× the payload for 1.45× the time), trading many narrow reduces for few wide ones is close to pure profit.
+* **Launch count** can fall toward `C` for phases whose kernels truly accept C rows; a reordered driver that still loops over tokens does not obtain that reduction. Count actual launches and graph nodes, including recurrent operations that remain sequential.
+* **Collective count** can fall by `C` when independent token payloads are genuinely batched, and each collective gets `C` times wider. Since [Lecture 03 §2](Lecture-03.md) established these are latency-bound (512× the payload for 1.45× the time), trading many narrow reduces for few wide ones is close to pure profit.
 
 ### 2.1 The lineage, in four PRs
 
@@ -97,7 +100,7 @@ In merge order — which is **#133 → #144 → #136**, confirmed by the frontie
 That order matters, because the four PRs are **three different axes applied in sequence**, not four attempts at one thing:
 
 * **#144 batches the schedule.** *Phase-major* means every token in the tile completes one phase — all the attention, then one reduce, then all the FFN — instead of each token walking the whole layer. Same kernels, same arithmetic, same M=1 shapes; only the issue order changes. And the reason it pays is not latency: collectives cost ~0.01 ms of an 18.8 ms token, so batching them looks worthless. Under CUDA-graph capture the binding cost is **graph size** — capture is worth 1.93× on the per-token path's 3,308-node graph and only 1.56× on a T=16 tile's 61,258-node one. **Nodes are the currency**, and 185 collectives per token are worth deleting whatever they cost in time.
-* **#136 batches the arithmetic inside each phase** — projections, router, expert dispatch — so the M=1 GEMVs finally become M=T. This is what #144 was a prerequisite for.
+* **#136 batches the arithmetic inside each phase** — projections, router, expert dispatch — so the M=1 GEMVs finally become M=T. This is the subsequent implementation step in this record.
 * **#148 amortizes the weight reads**, which is the different and larger effect §4 is about. Its own commit draws the distinction: the tile driver *"batches the collectives but still streams the weights per token."*
 
 The legality argument for #144's reorder is worth keeping, because it is the one you will need for any schedule change: the only cross-token dependencies inside a layer run along the **recurrent** axis — the KDA convolution state and the MLA KV rows — and both are consumed by **attention**, which still runs strictly in token order. Nothing in token *t+1*'s attention reads token *t*'s FFN output; that flows to the next *layer*. **A reorder is legal exactly when every cross-token dependency lives on an axis you keep ordered.**
@@ -150,7 +153,7 @@ Worth noting what is *not* in that table: **an eval tier.** #148 merged with no 
 
 If a chunk of `C` tokens reads each weight tile once instead of `C` times, why is the measured win a small multiple rather than something close to `C`?
 
-For a **dense** model, it very nearly is `C` (until you hit the compute roofline). For a **sparse MoE**, it is not, and the reason is routing divergence:
+For a **dense** model, the weight-read component can approach a C-fold amortization; end-to-end latency need not approach a C-fold speedup. For a **sparse MoE**, it is not, and the reason is routing divergence:
 
 ```text
    dense layer, chunk of C tokens:
@@ -162,20 +165,22 @@ For a **dense** model, it very nearly is `C` (until you hit the compute roofline
        token 2 → experts {d, e, f, ... }      probably mostly different
        ...
        the chunk touches  UNION of all tokens' top-16
-                       ≈ min(16·C, 896)  distinct experts
+                       ≤ min(16·C, 896)  distinct experts (upper bound, not expectation)
 
        at C = 32:  up to 512 distinct experts for 32 tokens.
-       each expert's weights read once, used ~1 time.
+       under independent uniform top-16 routing:
+       E[union] = 896 × (1 − (1 − 16/896)^32) ≈ 393 experts
+       512 assignments / 393 ≈ 1.30 uses per touched expert
        expert traffic barely amortizes at all.
 ```
 
-So on this architecture, chunking amortizes the **dense and replicated** parts — attention projections, norms, router, the 2 shared experts, the LM head — and largely fails to amortize the **896 routed experts**, which are 531 of the 553 GiB. That is precisely why a 2.47× lands where a dense model would show much more.
+This model predicts that chunking can amortize the **dense and replicated** parts — attention projections, norms, router, the 2 shared experts, the LM head — and largely fails to amortize the **896 routed experts**, which are 531 of the 553 GiB. It is one plausible limit on the measured gain; establish attribution with per-phase timing and actual routing reuse rather than the ratio alone.
 
-Two independent confirmations that this is the real constraint rather than a plausible story:
+Two observations motivate further work, but do not establish a unique bottleneck:
 
 **The project's own next steps target exactly these two places.** The open work at the time of writing is [#154](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/154) "*chunk-native causal MLA attention for batched prefill*" and [#155](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/155) "*CSR + grouped IQ1_S MMA on scored chunk MoE*". The second is the fix this analysis predicts: **group the chunk's tokens by expert** so that when you do pay to read an expert's weights, you spend them on every token in the chunk that routed there, and express the routing as a sparse (CSR) structure rather than a per-token loop.
 
-**It is the same problem expert parallelism solves at scale.** [Part 3 Lecture 03](../Part%203%20-%20MoE%20at%20Blackwell/Lecture-03.md)'s all-to-all — gather every token destined for expert *e* onto the rank holding *e*, run one grouped GEMM, scatter back — is grouping-by-expert with a network in the middle. The single-node chunked version has the same shape without the network. **Grouped GEMM is the canonical MoE primitive for exactly this reason**, and it is what turns a chunk of divergently-routed tokens back into dense work.
+**It is the same problem expert parallelism solves at scale.** [Part 3 Lecture 03](../Part%203%20-%20MoE%20at%20Blackwell/Lecture-03.md)'s all-to-all — gather every token destined for expert *e* onto the rank holding *e*, run one grouped GEMM, scatter back — is grouping-by-expert with a network in the middle. Within a rank the same grouping pattern can be used without a network exchange; multi-rank dispatch still requires communication according to its placement. **Grouped GEMM is the canonical MoE primitive for exactly this reason**, and it is what turns a chunk of divergently-routed tokens back into dense work.
 
 > **The general lesson.** Batching amortizes a weight read across the tokens that *share* it. Any sparsity that makes tokens need different weights reduces batching's value in direct proportion. On a sparse model, "batch it" is not the end of the design — it is the setup for "now group by what they share."
 
@@ -185,7 +190,7 @@ Two independent confirmations that this is the real constraint rather than a pla
 
 Now the part that generalizes beyond kernels.
 
-Prefill was known-missing, written down, and 3.57× behind the reference. It stayed untouched for six weeks. The mechanism is not negligence — it is that **the scoreboard measured decode at 128k, the reward paid for decode at 128k, and so every contributor's rational move was decode at 128k.** Seventeen frontier advances went into a phase that was already winning.
+Prefill was known-missing, written down, and 3.57× behind the reference. It stayed untouched for the recorded development period. The mechanism is not negligence — it is that **the scoreboard measured decode at 128k, the reward paid for decode at 128k, and so every contributor's rational move was decode at 128k.** The recorded frontier advances went into a phase that was already winning.
 
 The fix was to change the metric, and the reasoning recorded in the contribution guide is exactly right:
 
@@ -282,11 +287,21 @@ Pass criterion: your artifact contains a phase table with both engines' ratios, 
 6. You demote decode from tier basis to a 1% regression guard. A contributor submits a prefill win that costs 0.8% of decode. It passes. Argue both sides, then state what you would actually do.
 7. Three decode PRs improved prefill by 31% and nobody noticed for a week. What is the minimum instrumentation that would have caught it, and what would it have cost?
 
+## Answers
+
+1. Inspect whether the prompt follows a per-token driver. Equal rates suggest but do not prove this. A speedup prediction needs phase fractions and actual reuse; it is not automatically the chunk width.
+2. The 7.80× ratio is consistent with more useful prefill batching, but different context/timing boundaries prevent a unique attribution. A near-one ratio motivates examining the schedule.
+3. Dense weights are shared by all rows; sparse tokens may visit different experts. Grouping by expert exposes the reuse that exists, but cannot invent reuse when each expert receives one row.
+4. 1.44× compares paths in one binary; 1.75× compares to a historical pre-rebase parent; 2.47× compares to an older phase frontier. A current tier needs a fresh current baseline and its own correctness gate.
+5. Check whether measurement, rewards, ownership, and the available benchmark prioritize the phase. An open issue alone does not establish technical difficulty.
+6. A 0.8% loss fits the stated guard, but may still matter to a latency-sensitive deployment or fall within noise. Measure uncertainty and the deployment objective, then document the tradeoff and policy.
+7. Record both prefill and decode on the same input/configuration for each candidate, plus uncertainty and correctness. Account for the actual extra benchmark duration; it is not necessarily free.
+
 ---
 
 ## References
 
-* **SparkInfer-K3 prefill work** — [#133](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/133), [#136](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/136), [#144](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/144), [#148](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/148); the metric change in [#131](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/131) and [#132](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/132); the stale-seed post-mortem in [`bench/scripts/reference.lock`](https://github.com/gittensor-ai-lab/sparkinfer-k3/blob/main/bench/scripts/reference.lock) and [`CONTRIBUTING.md`](https://github.com/gittensor-ai-lab/sparkinfer-k3/blob/main/CONTRIBUTING.md).
+* **SparkInfer-K3 prefill work** — [#133](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/133), [#136](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/136), [#144](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/144), [#148](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/148); the metric change in [#131](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/131) and [#132](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/132); the stale-seed post-mortem in [`bench/scripts/reference.lock`](https://github.com/gittensor-ai-lab/sparkinfer-k3/blob/7689cc77e0e18d4b4f1937cf2a189dcd5a8d90f3/bench/scripts/reference.lock) and [`CONTRIBUTING.md`](https://github.com/gittensor-ai-lab/sparkinfer-k3/blob/7689cc77e0e18d4b4f1937cf2a189dcd5a8d90f3/CONTRIBUTING.md).
 * **Chunked prefill (Sarathi)** — [arXiv:2308.16369](https://arxiv.org/abs/2308.16369) and **Sarathi-Serve** [arXiv:2403.02310](https://arxiv.org/abs/2403.02310) — the origin of splitting prefill to interleave with decode, and the stall-free-batching argument.
 * **Orca (continuous batching)** — [OSDI '22](https://www.usenix.org/conference/osdi22/presentation/yu) — iteration-level scheduling, the mixed-batch idea.
 * **vLLM chunked prefill** — [docs.vllm.ai](https://docs.vllm.ai/en/latest/) — the production knob.

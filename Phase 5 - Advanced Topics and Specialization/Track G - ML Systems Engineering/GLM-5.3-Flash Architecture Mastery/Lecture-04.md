@@ -4,7 +4,7 @@
 
 ---
 
-[Module 03](Lecture-03.md) derived the recurrence correctly, but a token-by-token Python loop implementing it would be useless on real hardware: prefill hands you hundreds or thousands of tokens at once, and discarding that parallelism to satisfy a serial recurrence throws away nearly all of the GPU's throughput. This module covers the two things a production KDA implementation needs that the recurrence alone does not give you: a way to parallelize it, and everything in the sublayer that surrounds it.
+[Module 03](Lecture-03.md) derived the recurrence correctly, and a token-by-token CPU loop is useful as a correctness reference. GPU prefill needs a different implementation to exploit the many prompt positions available together. This module covers the two things a production KDA implementation needs that the recurrence alone does not give you: a way to parallelize it, and everything in the sublayer that surrounds it.
 
 ---
 
@@ -43,7 +43,7 @@ Affine updates **compose**. Substitute the update for step `t` into the update f
             =  (A_{t+1} A_t) · S_{t−1}  +  (A_{t+1} B_t + B_{t+1})
 ```
 
-Two consecutive steps collapse into a single affine update with a **composed** transition matrix `A_{t+1}A_t` and a **composed** offset `A_{t+1}B_t + B_{t+1}`. Nothing stops you from continuing this for an entire chunk of `L` tokens: the whole chunk's effect on the incoming state reduces to one composed `A` and one composed `B`, computable independently of the state you had *before* the chunk started. That independence is exactly what makes chunk-level parallelism possible — you can compute each chunk's composed transition while chunks are processed in parallel across sequence positions, then apply the (cheap, sequential) chunk-to-chunk composition afterward.
+Two consecutive steps collapse into a single affine update with a **composed** transition matrix `A_{t+1}A_t` and a **composed** offset `A_{t+1}B_t + B_{t+1}`. Nothing stops you from continuing this for an entire chunk of `L` tokens: the whole chunk's effect on the incoming state reduces to one composed `A` and one composed `B`, computable independently of the state you had *before* the chunk started. That independence is exactly what makes chunk-level parallelism possible — you can compute each chunk's composed transition while chunks are processed in parallel across sequence positions, then propagate incoming states between chunks or use a suitable parallel scan. The cost of that propagation still needs to be measured.
 
 ```text
    ┌────────────────────────────────────────────────────────────────────┐
@@ -52,8 +52,9 @@ Two consecutive steps collapse into a single affine update with a **composed** t
    │  d_k × d_k matrix A_t for every token and multiply them out         │
    │  explicitly — that throws away the diagonal (D_t) and rank-one      │
    │  ((I − β k kᵀ)) structure that makes each A_t cheap to apply in     │
-   │  the first place. A real chunked kernel keeps A_t and B_t in their  │
-   │  structured (diagonal + rank-one) form throughout the composition. │
+   │  the first place. Efficient kernels instead use blockwise matrix products and   │
+   │  structured solves; a product of these A_t matrices is not in     │
+   │  general another diagonal-plus-rank-one matrix. │
    └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -144,7 +145,7 @@ Because decode and prefill use structurally different kernels for the *same* mat
    └────────────────────────────────────────────────────────────────────┘
 ```
 
-The concrete test design, expanding on [Module 03](Lecture-03.md)'s single-step reference:
+The following is **test-design pseudocode**; its helper names are intentionally abstract. The runnable [CPU hybrid-state lab](CPU-Hybrid-State-Lab.md) provides both a scalar reference and an actual pinned Transformers recurrent/chunked comparison:
 
 ```python
 def test_recurrent_vs_chunked(seq_len, chunk_sizes, tol=1e-4):
@@ -188,6 +189,8 @@ This is **Stage 3 of the [capstone ladder](Lecture-12.md)**: extend Module 03's 
 ---
 
 ## Current as of
+
+**Reviewed October 18, 2026.** [Pinned config, upstream code and CPU evidence](CPU-Hybrid-State-Lab.md#sources-and-execution-boundary) identify what was checked. Hardware capacity and throughput remain deployment-specific.
 
 * **Timeless:** the affine-composition identity and why it enables chunk-parallel execution, the prefill/decode kernel-family distinction, the two-part correctness invariant.
 * **Checkpoint-specific:** the exact stage list in §3 (which normalizations, which gates, convolution kernel width) should be verified against the reference implementation's actual KDA sublayer — the ordering shown here is the conceptual shape, not a guarantee of the precise operation sequence in every revision.

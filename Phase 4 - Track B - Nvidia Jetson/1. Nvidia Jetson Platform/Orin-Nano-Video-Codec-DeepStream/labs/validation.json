@@ -1,0 +1,20 @@
+{
+  "reviewed_utc": "2026-10-18T20:51:38.866409+00:00",
+  "host": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3",
+  "gstreamer": "GStreamer 1.24.2",
+  "ffmpeg": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+  "tests_passed": 9,
+  "source_sha256": {
+    "test_video_lab.py": "287fa1068a4d1b8a34f7ea4c33f978293a5c932328180ec2eee377367112fd9b",
+    "codec_lab.py": "23cdeea75258c8c55ae5a8b2589b1776d4aa62a3b23d49690f7d30371a904df9",
+    "video_lab.py": "9d5700ec6647d277837b1ee1b88e869811b7e6613ad4b3b6af969de349a44e95",
+    "test_codec_lab.py": "985f9bebbfb23e34480ab1e127685ee4f64dff8436cc840e8a12429d767bb7e5"
+  },
+  "limits": [
+    "CPU synthetic sources only",
+    "no camera sensor, Jetson, DeepStream, or GPU execution",
+    "live timings are finite host-dependent observations",
+    "codec pixel tolerance is fixture-specific, not task quality"
+  ]
+}

@@ -2,25 +2,24 @@
 
 ## Overview
 
-Every AI compiler — TVM, Triton, tinygrad, XLA, torch.compile — eventually needs to turn high-level tensor operations into **machine instructions** that run on a specific chip. LLVM is the infrastructure that makes this possible **without writing a full compiler from scratch** for every new hardware target. The core challenge this lecture addresses is: how does LLVM represent programs in a way that is both hardware-independent (so optimizations apply everywhere) and hardware-aware (so the final code exploits specific chip features)? The mental model to carry forward is that LLVM is a **universal translation layer**: frontends (C, Rust, CUDA, ML compilers) lower their programs into LLVM IR, LLVM optimizes the IR, and then a target-specific backend generates native code. For an AI chip designer, understanding LLVM IR means you can write a backend for your custom accelerator and immediately inherit decades of compiler optimizations — without reimplementing constant folding, dead code elimination, or loop unrolling.
+AI compilers eventually need executable kernels and a runtime that can launch them. LLVM is one widely used route to machine code; other paths emit C/CUDA source, invoke existing libraries, or use a separate compiler. Learning LLVM helps you understand this part of the pipeline without assuming every framework follows the same route. The core challenge this lecture addresses is: how does LLVM represent programs in a way that is both hardware-independent (so optimizations apply everywhere) and hardware-aware (so the final code exploits specific chip features)? The mental model to carry forward is that LLVM is a **universal translation layer**: frontends (C, Rust, CUDA, ML compilers) lower their programs into LLVM IR, LLVM optimizes the IR, and then a target-specific backend generates native code. For an AI chip designer, LLVM can supply reusable analyses and transformations. A working target still needs legal operations, ABI and memory rules, runtime integration, and validation; merely adding an instruction description does not make a model executable.
 
 ---
 
 ## Why LLVM Matters for AI Hardware
 
-| Without LLVM | With LLVM |
+| Reusable infrastructure | Work that remains target-specific |
 |---|---|
-| Every new chip needs a full compiler from scratch | Write only the backend; inherit the optimization pipeline |
-| Optimizations reimplemented per target | ~70 optimization passes shared across all targets |
-| ML frameworks must generate assembly directly | Frameworks emit LLVM IR; LLVM handles instruction selection, register allocation, scheduling |
-| No ecosystem tooling | Get debuggers (LLDB), profilers, sanitizers, LTO for free |
+| IR, analyses, and many transformations | Accurate target costs, legal types, instruction selection |
+| Object and assembly infrastructure | Target encoding, ABI, calling conventions, linking |
+| Debugging and validation frameworks | Target support, runtime, debug information, test coverage |
 
 **Concrete examples in AI:**
-- **TVM** uses LLVM to generate CPU kernels (x86 AVX-512, ARM NEON/SVE) and GPU kernels (NVPTX for CUDA, AMDGPU for ROCm)
+- **TVM** can generate CPU kernels through LLVM; other targets may use source-code generators or separate device compilers.
 - **Triton** (used by torch.compile) lowers to LLVM IR → NVPTX backend → PTX → cubin
 - **Julia** (used in Flux.jl ML framework) compiles to LLVM IR
 - **MLIR** (next lectures) is built on top of LLVM's infrastructure
-- **Custom AI accelerator compilers** (Cerebras, SambaNova, Graphcore) use LLVM backends
+- **Custom accelerator compilers** can use LLVM where its execution model fits, alongside a higher-level compiler and device runtime.
 
 ---
 
@@ -32,7 +31,7 @@ Every AI compiler — TVM, Triton, tinygrad, XLA, torch.compile — eventually n
 │              │     │   (Optimizer)     │     │   (CodeGen)      │
 │  C → Clang   │     │                  │     │                  │
 │  Rust → rustc│────▶│   LLVM IR        │────▶│  x86-64          │
-│  CUDA → nvcc │     │   Optimization   │     │  AArch64         │
+│  CUDA → Clang │     │   Optimization   │     │  AArch64         │
 │  TVM → codegen│    │   Passes         │     │  NVPTX (GPU)     │
 │  Triton      │     │                  │     │  AMDGPU          │
 │              │     │                  │     │  RISC-V          │
@@ -41,11 +40,11 @@ Every AI compiler — TVM, Triton, tinygrad, XLA, torch.compile — eventually n
 ```
 
 The key insight is **separation of concerns**:
-- Frontends only need to emit valid LLVM IR — they don't know about registers, instruction encoding, or pipeline hazards
+- Frontends emit IR that preserves source semantics, including ABI, aliasing, arithmetic, and memory behavior; target choices can already influence this step.
 - The optimizer works on LLVM IR and is target-independent (mostly) — it doesn't know whether the code came from C or a neural network compiler
-- Backends only need to translate LLVM IR to machine code — they don't know whether the program is a web server or a matrix multiply kernel
+- Backends legalize and select instructions, allocate resources, and emit target code. High-level operation structure can be hard to recover after lowering.
 
-> **Key Insight:** This three-phase design is why LLVM dominates compiler infrastructure. Adding a new source language means writing one frontend. Adding a new hardware target means writing one backend. The N×M problem (N languages × M targets) becomes N+M. For AI hardware, this means your custom chip gets a compiler for free once you write the backend — and every ML framework that emits LLVM IR can target your chip.
+The separation lets many frontends reuse many backends. It reduces duplicated compiler work, but does not guarantee that an arbitrary frontend program can run efficiently—or at all—on a device with restricted control flow, memory, or supported operators.
 
 ---
 
@@ -67,7 +66,7 @@ Every variable is **assigned exactly once**. Instead of mutating variables, you 
 %x2 = mul i32 %x1, 2     ; %x2 = 16, assigned once
 ```
 
-**Why SSA?** It makes optimization trivially correct. If `%x1` is defined exactly once, every use of `%x1` sees the same value — no need to track which assignment reaches which use. This enables **constant propagation, dead code elimination, and common subexpression elimination** to be simple graph transformations.
+**Why SSA?** It makes data dependencies explicit and simplifies many analyses. Optimization still requires proofs about side effects, control flow, poison/undefined behavior, and arithmetic semantics. If `%x1` is defined exactly once, every use of `%x1` sees the same value — no need to track which assignment reaches which use. This enables **constant propagation, dead code elimination, and common subexpression elimination** to be simple graph transformations.
 
 When control flow merges (e.g., after an if-else), SSA uses **phi nodes** to select which value to use:
 
@@ -108,9 +107,9 @@ LLVM IR is strongly typed. Every value has an explicit type. This catches errors
 ```llvm
 %sum  = add i32 %a, %b              ; integer add
 %prod = fmul float %x, %y           ; floating-point multiply
-%mac  = call float @llvm.fmuladd.f32(float %a, float %b, float %c)
+%mac  = call float @llvm.fma.f32(float %a, float %b, float %c)
                                       ; fused multiply-add: a*b + c
-                                      ; maps to FMA instruction on hardware that supports it
+                                      ; requires fused semantics; target may use an instruction or a library call
 ```
 
 **Memory:**
@@ -160,13 +159,15 @@ float dot4(float *a, float *b) {
 }
 ```
 
-**LLVM IR (simplified, after optimization):**
+**Complete LLVM IR example:** the input pointers need only 4-byte alignment. This is an explicit vector representation, not a promised textual output from every optimizer. The ordered reduction preserves the addition order; arbitrary reassociation needs an appropriate numerical contract.
 ```llvm
+declare float @llvm.vector.reduce.fadd.v4f32(float, <4 x float>)
+
 define float @dot4(ptr %a, ptr %b) {
 entry:
   ; Load all 4 elements as vectors
-  %va = load <4 x float>, ptr %a, align 16
-  %vb = load <4 x float>, ptr %b, align 16
+  %va = load <4 x float>, ptr %a, align 4
+  %vb = load <4 x float>, ptr %b, align 4
 
   ; Element-wise multiply
   %vmul = fmul <4 x float> %va, %vb
@@ -178,16 +179,9 @@ entry:
 }
 ```
 
-**What the backends produce:**
+The backend may use vector loads and multiplies, then scalar or vector operations for the ordered reduction. Exact instructions depend on target features, alignment, numerical flags, and compiler version. A `<4 x float>` value does not guarantee one native instruction on every target. In particular, changing a multiply followed by an add into an FMA can change rounding and needs permission in the IR semantics.
 
-| Target | Generated instructions |
-|---|---|
-| x86-64 (AVX) | `vmovaps` → `vmulps` → `vhaddps` → `vhaddps` |
-| AArch64 (NEON) | `ld1` → `fmul` → `faddp` → `faddp` |
-| NVPTX (CUDA) | `ld.global.v4.f32` → `fma.rn.f32` (×4) |
-
-The **same LLVM IR** produces optimal code for three completely different architectures. This is the power of the **three-phase design**.
-
+**Check your understanding:** can we strengthen `align 4` to `align 16` because it might be faster? No. Alignment is a promise about the actual address. An unsupported stronger promise can make otherwise valid input undefined.
 ---
 
 ## LLVM IR Representations: Three Forms
@@ -218,7 +212,7 @@ llc dot4.bc -o dot4.o -filetype=obj
 opt -O2 dot4.bc -o dot4_opt.bc
 ```
 
-> **Key Insight:** ML compilers like TVM construct LLVM IR programmatically using the C++ API (or the C bindings). They never write `.ll` files — they build `llvm::Module`, `llvm::Function`, `llvm::BasicBlock`, and `llvm::Instruction` objects in memory, then call the backend to emit machine code directly. Understanding the text form is essential for debugging, but the programmatic API is what you'll use in practice.
+> **Key Insight:** ML compilers like TVM construct LLVM IR programmatically using the C++ API (or the C bindings). They commonly build `llvm::Module`, `llvm::Function`, `llvm::BasicBlock`, and `llvm::Instruction` objects in memory, then call the backend to emit machine code directly. Understanding the text form is essential for debugging, but the programmatic API is what you'll use in practice.
 
 ---
 
@@ -263,13 +257,13 @@ attributes #0 = { nounwind "target-cpu"="skylake" "target-features"="+avx2,+fma"
 
 LLVM supports multiple address spaces via the pointer type, which is critical for GPU and accelerator programming where different memory regions have different performance characteristics.
 
-| Address Space | GPU Meaning | AI Relevance |
+| Address Space | NVPTX Meaning | AI Relevance |
 |---|---|---|
 | 0 (default) | Generic | CPU memory, or generic GPU memory |
 | 1 | Global | Tensor data in VRAM (weights, activations) |
 | 3 | Shared | Tile buffers in on-chip SRAM (shared memory on GPU) |
 | 4 | Constant | Read-only data (quantization scale factors, LUTs) |
-| 5 | Local (private) | Per-thread registers/stack |
+| 5 | Local (private) | Per-thread addressable local memory; not a promise of register storage |
 
 ```llvm
 ; Load from global memory (GPU VRAM)
@@ -279,23 +273,20 @@ LLVM supports multiple address spaces via the pointer type, which is critical fo
 store float %val, ptr addrspace(3) %shared_ptr
 ```
 
-For a custom AI accelerator, you define your own address space mapping to describe your memory hierarchy (e.g., address space 1 = weight SRAM, 2 = activation SRAM, 3 = accumulator registers).
+These numeric meanings are target-specific, not universal LLVM rules. For a custom AI accelerator, define and consistently lower your own address space mapping to describe your memory hierarchy (e.g., address space 1 = weight SRAM, 2 = activation SRAM, 3 = accumulator registers).
 
 ---
 
 ## Intrinsics: Hardware-Specific Operations
 
-Intrinsics are LLVM's mechanism for exposing **hardware-specific operations** that have no equivalent in generic IR. They look like function calls but compile to **specific instructions**.
+Intrinsics describe operations with compiler-known semantics. Some are target-independent, such as fused arithmetic; others are target-specific. They may lower to one instruction, several instructions, or a library call, depending on target support.
 
 ```llvm
 ; Fused multiply-add (maps to FMA instruction)
-%fma = call float @llvm.fmuladd.f32(float %a, float %b, float %c)
+%fma = call float @llvm.fma.f32(float %a, float %b, float %c)
 
 ; Vector reduction (maps to horizontal add on x86, FADDP on ARM)
 %sum = call float @llvm.vector.reduce.fadd.v8f32(float 0.0, <8 x float> %v)
-
-; Matrix multiply intrinsic (AMX on Sapphire Rapids)
-call void @llvm.x86.tamx.tdpbf16ps(i8 %dst, i8 %src1, i8 %src2)
 
 ; NVIDIA-specific: warp shuffle (requires NVPTX backend)
 %shfl = call i32 @llvm.nvvm.shfl.sync.bfly.i32(i32 -1, i32 %val, i32 %lane, i32 31)
@@ -306,13 +297,13 @@ call void @llvm.x86.tamx.tdpbf16ps(i8 %dst, i8 %src1, i8 %src2)
 declare <64 x i32> @llvm.myaccel.mac.i8.8x8(<64 x i8> %a, <64 x i8> %b, <64 x i32> %acc)
 ```
 
-The backend pattern-matches this intrinsic to your hardware instruction.
+This is a design sketch, not a built-in intrinsic. Names beginning `llvm.` are reserved for LLVM intrinsics: register the definition and semantics in the compiler and implement its lowering, or use an ordinary external runtime function name. Describe side effects and ordering accurately so optimizations cannot move a DMA or device operation across its dependencies.
 
 ---
 
 ## Building LLVM IR Programmatically
 
-This is how ML compilers (TVM, Triton, etc.) actually construct LLVM IR — not by writing text files, but by using the C++ API.
+The following C++ fragment illustrates IRBuilder construction. It is not a complete executable: add the `llvm` namespace, module setup, argument handling, loop termination, and `verifyModule`. In particular, a loop entered unconditionally must not load element zero when n=0. Use the complete [CPU lowering lab](../Labs/Tiling-and-Dataflow.md) to execute and inspect a verified module.
 
 ```cpp
 #include "llvm/IR/IRBuilder.h"
@@ -325,7 +316,7 @@ Module mod("ai_kernel", ctx);
 IRBuilder<> builder(ctx);
 
 // Define function: void relu(float* input, float* output, int n)
-Type *floatPtrTy = PointerType::get(Type::getFloatTy(ctx), 0);
+Type *floatPtrTy = PointerType::get(ctx, 0);  // opaque pointer, address space 0
 Type *i32Ty = Type::getInt32Ty(ctx);
 FunctionType *fnTy = FunctionType::get(
     Type::getVoidTy(ctx),
@@ -377,7 +368,7 @@ i->addIncoming(ConstantInt::get(i32Ty, 0), entry);
 | Vector types | The IR representation of SIMD — how AI compilers express parallelism within a thread |
 | Address spaces | Model the memory hierarchy of GPUs and custom accelerators |
 | Intrinsics | The escape hatch for hardware-specific operations (tensor cores, MAC units) |
-| Three-phase design | Write one backend → get all ML frameworks for free |
+| Three-phase design | Reuse infrastructure while implementing target, runtime, and semantic contracts |
 
 ---
 
@@ -388,3 +379,9 @@ i->addIncoming(ConstantInt::get(i32Ty, 0), entry);
 * **"Getting Started with LLVM Core Libraries" by Bruno Cardoso Lopes and Rafael Auler:** Practical book for building tools on LLVM.
 * **[Mapping High-Level Constructs to LLVM IR](https://mapping-high-level-constructs-to-llvm-ir.readthedocs.io/):** Community guide for translating programming patterns to IR.
 * **TVM source: `src/target/llvm/codegen_llvm.cc`:** Real-world example of an ML compiler generating LLVM IR programmatically.
+
+## A concrete first artifact
+
+Complete the [matrix lowering lab](../Labs/Tiling-and-Dataflow.md). Open its generated `04-matmul.ll` and identify a function, a basic block, a load, a store, a branch, and a return value. Trace the original 2×3 by 3×2 shapes to the pointer arithmetic that replaced them. Explain why compiling this CPU program is evidence of a working lowering pipeline, but not evidence of support for a custom accelerator.
+
+For arithmetic details, compare [`llvm.fma` and `llvm.fmuladd`](https://llvm.org/docs/LangRef.html#llvm-fma-intrinsic): the former specifies fused behavior, while the latter permits contraction. Preserve that distinction when choosing a MAC instruction.

@@ -4,7 +4,7 @@
 
 Until Isaac Sim 6.0, "physics" in Isaac Sim meant PhysX. Now there is a second engine: **Newton**, an open-source GPU physics engine built on NVIDIA Warp, with Google DeepMind's MuJoCo-Warp as its primary backend. It is experimental in Isaac Sim 6.1 and a selectable backend in Isaac Lab 3.0. It also runs on its own, without Kit and without an RTX renderer, which makes it the lightest way to do serious physics on an 8 GB card.
 
-A second engine is not just a curiosity. It gives you different contact models, solvers for cloth and soft bodies, kit-less training, and a hard test of your policies: a policy that only works on one solver has learned that solver. This lecture explains what Newton is, how it plugs into Isaac Sim and Isaac Lab, which solvers it has, how its contacts differ from PhysX, what does and doesn't transfer between engines, and what each path costs on your GPU.
+A second engine is not just a curiosity. It gives you different contact models, solvers for cloth and soft bodies, kit-less training, and a hard test of your policies: a policy that fails after an engine switch may depend on its original dynamics, contact model, ordering or timing. Diagnose those differences before attributing failure to overfitting. This lecture explains what Newton is, how it plugs into Isaac Sim and Isaac Lab, which solvers it has, how its contacts differ from PhysX, what does and doesn't transfer between engines, and what each path costs on your GPU.
 
 By the end you should be able to:
 
@@ -48,7 +48,7 @@ Every physics engine makes modeling choices: how contacts are generated, how fri
  └──────────────────────────────────────────────────────────────────────┘
 ```
 
-* **Governance.** Newton is a Linux Foundation project, started by Disney Research, Google DeepMind and NVIDIA. Its code is Apache-2.0. It extends and generalizes Warp's deprecated `warp.sim` and uses MuJoCo-Warp as its primary backend. It needs Python 3.10+ and runs on Linux, Windows, and macOS (CPU only). On the GPU it needs an NVIDIA card (Maxwell or newer) with a driver of 545 or newer; no local CUDA toolkit is needed.
+* **Governance.** Newton is a Linux Foundation project, started by Disney Research, Google DeepMind and NVIDIA. Its code is Apache-2.0. It extends and generalizes Warp's deprecated `warp.sim` and uses MuJoCo-Warp as its primary backend. It needs Python 3.10+ and runs on Linux, Windows, and macOS (CPU only). The [1.5.2 README](https://github.com/newton-physics/newton/blob/v1.5.2/README.md) lists Maxwell-or-newer NVIDIA GPUs with driver 545+ for its CUDA 12 distribution; the installed Warp wheel and solver can impose additional constraints. This is not an Isaac Sim rendering requirement. No local CUDA toolkit is needed for the prebuilt wheel.
 * **Backend vs solver.** Isaac Lab's terminology is worth adopting. A *backend* (PhysX, Newton, OvPhysX) owns the simulation lifecycle and data exchange. A *solver* is the numerical method inside a backend. Newton is not the same thing as MJWarp: it hosts MJWarp, Kamino, VBD, MPM and others, and **solver settings are not numerically portable between solver families.**
 * **Quaternions.** Warp's `wp.quat` stores **(x, y, z, w)**, the same order as Isaac Lab 3.0. The Isaac Sim experimental prim API uses **wxyz**. Convert when you move poses between a standalone Newton script and Isaac Sim wrappers.
 
@@ -58,8 +58,8 @@ Every physics engine makes modeling choices: how contacts are generated, how fri
 |---|---|---|
 | Newton bundled with Isaac Sim 6.1 | 1.5.0 (with MuJoCo / mujoco-warp 3.11.0) | Isaac Sim 6.1 release notes |
 | Newton in Isaac Lab 3.0.0-EA | 1.5.2 | v3.0.0-EA release notes |
-| Newton on PyPI (latest) | 1.6.0 | newton releases / PyPI |
-| MuJoCo-Warp (latest upstream) | 3.14.0 | google-deepmind/mujoco_warp |
+| Standalone Newton on PyPI, checked 2026-10-18 | 1.7.0 | [Package metadata](https://pypi.org/project/newton/) — separate from the pinned lab below |
+| Standalone MuJoCo-Warp on PyPI, checked 2026-10-18 | 3.16.0 | [Package metadata](https://pypi.org/project/mujoco-warp/) — do not inject into a locked Isaac environment |
 
 The Isaac Sim docs warn that installing a different Newton, or an editable Newton checkout, into Isaac Sim's Python environment can break it. **Use a separate virtual environment for standalone Newton**, pinned to the version you want to compare against (`newton[examples]==1.5.2` to match Isaac Lab 3.0).
 
@@ -262,11 +262,11 @@ Optional: run Lecture 04's `franka_hold.py` under Newton with the same pattern. 
 
 ### Lab 5b — Kit-less Newton: worlds sweep
 
-Use a separate environment so you don't disturb Isaac Sim's pinned packages:
+Use a separate environment so you don't disturb Isaac Sim's pinned packages. The [CPU simulation lab](Simulation-CPU-Lab.md) supplies a smaller, actually executed Newton/XPBD path with analytic free-fall and contact checks. The viewer, MuJoCo-Warp, cloth, and CUDA graph exercises below have not been executed here:
 
 ```bash
 python3.12 -m venv ~/env_newton && source ~/env_newton/bin/activate
-pip install "newton[examples]==1.5.2"           # match Isaac Lab 3.0-EA's Newton
+pip install "newton[examples]==1.5.2" "warp-lang==1.16.0"           # match Isaac Lab 3.0-EA's Newton
 python -m newton.examples --list
 python -m newton.examples basic_shapes           # GL viewer: XPBD by default, --solver vbd also
 python -m newton.examples pyramid --benchmark --num-pyramids 4 --pyramid-size 10
@@ -285,13 +285,17 @@ p.add_argument("--solver", choices=["xpbd", "mujoco"], default="mujoco")
 p.add_argument("--worlds", type=int, default=1)
 p.add_argument("--height", type=int, default=4)
 p.add_argument("--fps", type=int, default=60)            # control rate: one "env step" per frame
-p.add_argument("--substeps", type=int, default=4)        # keep even: states ping-pong back to s0
+p.add_argument("--substeps", type=int, default=4)        # graph replay requires an even ping-pong count
 p.add_argument("--frames", type=int, default=300)
 p.add_argument("--nconmax", type=int, default=None)      # MuJoCo-Warp contacts per world
 p.add_argument("--no-graph", action="store_true")
 p.add_argument("--device", default=None)                 # cpu, cuda:0
 args = p.parse_args()
+if min(args.worlds, args.height, args.fps, args.substeps, args.frames) <= 0:
+    p.error("worlds, height, fps, substeps and frames must be positive")
 if args.device: wp.set_device(args.device)
+if wp.get_device().is_cuda and not args.no_graph and args.substeps % 2:
+    p.error("graph replay needs even substeps to return to the same input buffer; use --no-graph")
 
 H = 0.05
 stack = newton.ModelBuilder()

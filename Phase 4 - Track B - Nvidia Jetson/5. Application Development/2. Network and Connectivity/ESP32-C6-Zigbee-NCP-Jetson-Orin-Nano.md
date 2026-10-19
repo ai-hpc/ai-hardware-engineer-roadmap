@@ -1,488 +1,95 @@
-# ESP32-C6 Zigbee NCP on Jetson Orin Nano - Project Guide
+# Zigbee on Jetson: versioned NCP and RCP architectures
 
-> **Goal:** Use a **second ESP32-C6** as a **Zigbee Network Co-Processor (NCP)** for the **Jetson Orin Nano 8GB Developer Kit**, so the Jetson can act as the higher-level Zigbee host while keeping your first ESP32-C6 dedicated to **ESP-Hosted Wi-Fi/BLE**.
+**Reviewed 18 October 2026.** ESP Zigbee SDK **2.0.5**, released 16 October, is current at commit `e2fdf4ad8558e5beb306b0d7040072d76244c413`. Its main tree does **not** contain the old `examples/esp_zigbee_ncp` directory. Cloning current main and changing into that path fails. This lesson gives a current architecture choice and a separately pinned legacy NCP exercise. [Official release notes](https://github.com/espressif/esp-zigbee-sdk/blob/e2fdf4ad8558e5beb306b0d7040072d76244c413/RELEASE_NOTES.md).
 
-**Hub:** [Network and Connectivity](Guide.md)  
-**Related local guides:** [ESP32-C6 ESP-Hosted over SPI on Jetson Orin Nano](ESP32-C6-ESP-Hosted-SPI-Jetson-Orin-Nano.md) · [ESP32-C6 OpenThread RCP on Jetson Orin Nano](ESP32-C6-OpenThread-RCP-Jetson-Orin-Nano.md) · [Peripheral Access](../1.%20Peripheral%20Access/Guide.md)
+**Prerequisites:** [networking](Guide.md), byte order and [framing lab](Localhost-Network-Lab.md). **Deliverable:** a version/stack-placement map, passing SLIP tests, and a staged integration contract. No Zigbee radio, coordinator network or Jetson host stack was executed during this review.
 
----
+## 1. Separate three independent choices
 
-## 1. Why this project matters
+| Choice | Examples | What it determines |
+|---|---|---|
+| Network protocol | Zigbee, Thread | Addressing, network formation and application conventions |
+| Stack location | NCP, RCP | Which processor runs the network stack |
+| Physical host link | UART, SPI, SDIO | How host and coprocessor exchange bytes |
 
-This is the clean next experiment after your current Jetson + ESP32-C6 networking work:
+Zigbee and Thread both use IEEE 802.15.4, but a Thread node does not join a Zigbee network. An NCP runs the network stack and presents higher-level commands; an RCP presents radio/minimal-MAC operations to a host stack. UART is not inherently NCP, and SPI is not inherently RCP.
 
-- the first ESP32-C6 already gives Jetson `wlan0` and BLE through **ESP-Hosted**
-- the second ESP32-C6 already proved it can act as an **802.15.4 coprocessor**
-- your current **Thread** path is not blocked at the radio or UART level, but **full OTBR** is blocked on the present Jetson kernel because `CONFIG_IP_MROUTE` and `CONFIG_IPV6_MROUTE` are missing
+In a Zigbee NCP design, Linux normally runs gateway/application logic through the coprocessor protocol. The coprocessor does not automatically register a Linux IPv6 interface. In an RCP design, the chosen host must actually implement a compatible Zigbee stack; “a serial device exists” is not that implementation.
 
-Zigbee is a good next step because it still uses **IEEE 802.15.4**, but it does **not** require OTBR's IPv6 border-routing path. That means the specific Linux multicast-routing blocker you hit with OTBR should not be the main issue for a Zigbee host/NCP design. That last point is an engineering inference from the protocol architecture, not a claim that the whole Jetson Zigbee stack is already turnkey.
+## 2. Current v2 and legacy v1 are different software families
 
-What this project teaches:
+| SDK family | Zigbee core | Relevant scope |
+|---|---|---|
+| v2.x / 2.0.5 | Espressif implementation; `ezb_` core and `esp_zigbee_` SDK APIs | Current designs; on-device apps and ESP-host gateway examples |
+| `release/v1.0` maintenance line | ZBOSS; legacy APIs | Existing products and explicitly versioned NCP/host examples |
 
-- how a Linux host talks to a Zigbee coprocessor instead of a Thread RCP
-- how Zigbee differs from Thread even though both use 802.15.4
-- how to keep Wi-Fi/BLE and Zigbee on separate radios for a cleaner system design
-- where Jetson integration becomes a host-application problem instead of a Linux-network-interface problem
+The v2 migration changes headers, API organization and persistent-storage handling. It is not just a function-name search/replace. Moving old network state into the new NVS representation requires the documented migration path; casually erasing flash discards commissioning state and keys. The 2.0.4 release changed the default NVS partition name, so inspect the exact 2.0.5 example/configuration rather than blindly copying an older partition table. [SDK support policy](https://github.com/espressif/esp-zigbee-sdk/blob/e2fdf4ad8558e5beb306b0d7040072d76244c413/README.md), [migration guide](https://docs.espressif.com/projects/esp-zigbee-sdk/en/latest/esp32c6/migration-guide/v2.x/overview.html).
 
----
+The current SDK recommends ESP-IDF 5.5.4. The pinned legacy branch README recommends 5.3.2 and its example manifest constrains the Zigbee/ZBOSS libraries to the 1.6 family. The SDK2 recommendation does not validate an old NCP dependency set. Keep the resolved component lock, not only a broad `>=5.0` IDF constraint.
 
-## 2. Current Status and Scope
+## 3. What the current gateway example actually demonstrates
 
-On your current Jetson image, the OpenThread RCP path has already been validated up to the point where the node can become `leader`. The failure happens later when `otbr-agent` tries to initialize border-routing support and the kernel reports:
+The v2 `zigbee_gateway` example runs the Zigbee stack/application on an **ESP Wi-Fi-capable host** and uses another IEEE 802.15.4 ESP chip running `ot_rcp` as its radio. It is not a Linux executable for Jetson. Its checked README also leaves higher-level Wi-Fi gateway interaction for future work; do not describe it as a finished cloud gateway. [Current gateway example](https://github.com/espressif/esp-zigbee-sdk/blob/e2fdf4ad8558e5beb306b0d7040072d76244c413/examples/zigbee_gateway/README.md).
 
-```text
-InitMulticastRouterSock() ... Protocol not available
-```
+Current [ESP-Hosted-Linux RCP support](https://github.com/espressif/esp-hosted-linux/blob/9b56ff96a1bc95acaa68d8023794b8353701c5e3/docs/guides/thread-rcp.md) can expose a compatible radio stream to Linux, but explicitly does not bundle or qualify a Linux Zigbee userspace stack. Upstream Thread RF tests cannot be relabeled Zigbee application tests.
 
-You also confirmed directly that the kernel is missing:
+For a product, select a documented host/adapter combination with the required Zigbee role and devices. For learning, the local exercises below establish framing and host-state reasoning without claiming that a missing Linux stack has been implemented.
 
-```text
-# CONFIG_IP_MROUTE is not set
-# CONFIG_IPV6_MROUTE is not set
-```
+## 4. Reproduce the legacy source intentionally
 
-This guide is therefore scoped as:
+The maintenance branch resolved to `c9e2c3e12642c704096dfefe25b62212b47229ba` on review. It contains **both** `esp_zigbee_ncp` and `esp_zigbee_host`; the latter targets ESP chips, not Linux. The NCP README's old statement promising a future host example is stale compared with the actual tree. [NCP source](https://github.com/espressif/esp-zigbee-sdk/tree/c9e2c3e12642c704096dfefe25b62212b47229ba/examples/esp_zigbee_ncp), [ESP host source](https://github.com/espressif/esp-zigbee-sdk/tree/c9e2c3e12642c704096dfefe25b62212b47229ba/examples/esp_zigbee_host).
 
-- **current practical next path:** Zigbee host + coprocessor work on the existing Jetson image
-- **deferred path:** rebuild or replace JetPack / kernel later for full OTBR
-
-One expectation must be stated clearly: Zigbee on Jetson will not look like Thread on Jetson.
-
-- Thread + OTBR creates a Linux-facing interface such as `wpan0`
-- Zigbee NCP does **not** create a Linux IP interface
-- instead, the Jetson host application speaks a Zigbee coprocessor protocol and manages Zigbee roles, joins, clusters, and device state itself
-
----
-
-## 3. Target Architecture
-
-```text
-Jetson Orin Nano
-  |
-  |-- SPI -> ESP32-C6 #1 -> ESP-Hosted -> wlan0 + hci0
-  |
-  |-- UART (recommended first) -> ESP32-C6 #2 -> Zigbee NCP
-  |                                 ^
-  |                                 |
-  |                         ESP ZNSP over SLIP
-  |
-  +--> Linux host side
-        |-- Zigbee host application / gateway logic
-        |-- Coordinator or Router role management
-        |
-        +--> Wi-Fi / Ethernet / USB network uplink
-```
-
-**Target outcome**
-
-- Jetson keeps using `wlan0` from the first ESP32-C6 as its normal Wi-Fi path
-- Jetson talks to the second ESP32-C6 over UART or SPI as a Zigbee coprocessor
-- the Zigbee side can form or join a Zigbee network
-- joined Zigbee devices are managed from the host side through Zigbee commands, not through a Linux `wpan0` interface
-
----
-
-## 4. Why Use a Second ESP32-C6
-
-This guide intentionally keeps Zigbee off the first ESP32-C6.
-
-Why:
-
-- **ESP-Hosted** already uses the first chip as a Jetson Wi-Fi/BLE coprocessor
-- Zigbee also uses the ESP32-C6's **802.15.4** radio
-- Espressif documents that ESP32-C6 has **one shared 2.4 GHz RF module** for Wi-Fi, Bluetooth LE, and IEEE 802.15.4, with time-division multiplexing managing access
-- combining all of that into one custom firmware stack is possible in theory, but much harder to stabilize than using two radios
-
-So the safer split remains:
-
-- **ESP32-C6 #1** for Jetson Wi-Fi/BLE through ESP-Hosted
-- **ESP32-C6 #2** for Zigbee coprocessor work
-
----
-
-## 5. Hardware and Software Prerequisites
-
-### Hardware
-
-- Jetson Orin Nano 8GB Developer Kit
-- your existing **ESP32-C6 #1** already working with ESP-Hosted over SPI
-- a **second ESP32-C6 dev board**
-- jumper wires for a direct UART link, or optionally a USB cable if you first validate over the board's USB-UART bridge
-- USB cable for flashing and monitoring the second ESP32-C6
-- one or more Zigbee devices for later validation:
-  - another ESP32-C6 or ESP32-H2 running a Zigbee end-device example
-  - a commercial Zigbee end device
-
-### Software
-
-- JetPack 6.x / L4T 36.x on Jetson
-- ESP-IDF installed on a Linux build machine
-- Espressif [ESP Zigbee SDK](https://github.com/espressif/esp-zigbee-sdk)
-- a host-side application plan on Jetson:
-  - your own Zigbee host tool in C/C++/Python
-  - or a future host example based on Espressif's documented NCP protocol
-
-### Recommended first transport
-
-Espressif documents the Zigbee NCP protocol over either **UART** or **SPI**. On your Jetson, **UART is the better first transport**.
-
-Why:
-
-- it avoids colliding with the SPI bus already used by ESP-Hosted
-- your Jetson header UART path is already electrically understood from the Thread/RCP work
-- the NCP protocol is explicitly documented over UART
-- debugging framed serial traffic is simpler than debugging a new SPI host stack and a new Zigbee stack at the same time
-
-For the fastest lab bring-up, a board USB-UART path to Jetson is acceptable. For the cleaner embedded path, move to the Jetson header UART once the host logic is understood.
-
----
-
-## 6. The Official Models You Are Implementing
-
-Espressif's current Zigbee material exposes **two related but distinct host-side patterns**:
-
-### Zigbee NCP model
-
-The official Zigbee NCP guide defines **ESP ZNSP** as the protocol a **host application processor** uses to interact with the Zigbee stack on a **Network Co-Processor**. Those frames are carried over **SLIP**, and the transport can be **UART** or **SPI**.
-
-That is the conceptual model that best fits Jetson:
-
-- Jetson is the host processor
-- ESP32-C6 runs the Zigbee stack as the coprocessor
-- Jetson sends network-management and application commands over the NCP link
-
-The official NCP API also exposes host connection modes for:
-
-- `NCP_HOST_CONNECTION_MODE_UART`
-- `NCP_HOST_CONNECTION_MODE_SPI`
-
-### Zigbee gateway + RCP model
-
-Espressif's current example tree also contains a **`zigbee_gateway`** example. That example runs on a Wi-Fi-capable ESP host SoC and uses an **802.15.4 RCP** running `ot_rcp` on another chip.
-
-That matters for Jetson for two reasons:
-
-- it shows Espressif already treats Zigbee gateway designs as a **multi-chip host + 802.15.4 radio** problem
-- it also shows that the latest official example emphasis is stronger on an **ESP host SoC gateway** than on a turnkey Linux host daemon
-
-As of **April 21, 2026**, the official `esp_zigbee_ncp` example README still says a separate host example will be provided later as a reference. So the right expectation on Jetson is:
-
-- the **wire protocol and NCP device side are officially documented**
-- the **Linux host side is still more custom than OTBR**
-
----
-
-## 7. Zigbee Roles on Jetson: What Makes Sense
-
-Espressif documents support for:
-
-- **Coordinator**
-- **Router**
-- **(Sleepy) End Device**
-
-For a Jetson-hosted gateway, the most useful roles are:
-
-### Coordinator
-
-Use this if the Jetson should create and manage the Zigbee network itself. This is the most natural role for a Linux host acting as a gateway, bridge, or coordinator appliance.
-
-### Router
-
-Use this if the Jetson should join an existing Zigbee network instead of forming its own.
-
-### End Device
-
-This is generally **not** the role you want for a Jetson-class host. End-device behavior is more appropriate for battery devices or compact application nodes, not for a Linux gateway.
-
----
-
-## 8. Wire the Jetson UART to the Zigbee NCP
-
-The official `esp_zigbee_ncp` example shows a simple UART connection where the host TX goes to the NCP's `GPIO4` RX pin and the host RX comes from the NCP's `GPIO5` TX pin. That aligns well with the UART wiring pattern you already used on Jetson.
-
-For the Jetson Orin Nano header path on your current image:
-
-| Function | Jetson pin | Linux device | Direction |
-|---|---:|---|---|
-| UART1_TXD | `8` | `/dev/ttyTHS1` | Jetson -> ESP |
-| UART1_RXD | `10` | `/dev/ttyTHS1` | ESP -> Jetson |
-| Ground | `6` or `9` or `14` | -- | common reference |
-
-For the ESP32-C6 NCP side:
-
-| Function | ESP32-C6 pin | Direction |
-|---|---:|---|
-| NCP RX | `GPIO4` | Jetson TX -> ESP RX |
-| NCP TX | `GPIO5` | ESP TX -> Jetson RX |
-| Ground | `GND` | common reference |
-
-So the direct wiring is:
-
-```text
-Jetson pin 8  (UART1_TXD) -> ESP32-C6 GPIO4
-Jetson pin 10 (UART1_RXD) <- ESP32-C6 GPIO5
-Jetson GND                -> ESP32-C6 GND
-```
-
-The official NCP example README also notes that these UART pins can be changed in:
-
-```text
-idf.py menuconfig -> Component config -> Zigbee Network Co-processor
-```
-
-So if your board routing or chosen transport differs, treat the example's pin settings and your bench wiring as one matched pair.
-
-### Jetson UART prerequisites
-
-The same Jetson-side UART precautions from the Thread guide still apply:
-
-- disable `nvgetty` if it owns the header UART
-- keep the port on **3.3 V logic**
-- do not let multiple processes fight over `/dev/ttyTHS1`
-
-Basic port setup example:
+Source-reviewed, unexecuted hardware sequence:
 
 ```bash
-sudo systemctl stop nvgetty
-sudo systemctl disable nvgetty
-sudo stty -F /dev/ttyTHS1 115200 cs8 -cstopb -parenb raw -echo
-```
-
-Use the actual baud configured on both sides. The exact Zigbee NCP example baud must match the host application's serial configuration.
-
----
-
-## 9. Build and Flash the ESP32-C6 Zigbee NCP Firmware
-
-The official Techpedia Zigbee solution page points to:
-
-```text
-esp-zigbee-sdk/examples/esp_zigbee_ncp
-```
-
-and the current official GitHub example page documents it as the NCP device example for ESP32-C6.
-
-On your Linux build host:
-
-```bash
-git clone --depth=1 https://github.com/espressif/esp-zigbee-sdk.git
-cd esp-zigbee-sdk/examples/esp_zigbee_ncp
-
-# Use a compatible ESP-IDF version for the SDK
-# The current SDK README recommends ESP-IDF v5.5.4 for new work.
-
+git clone --branch release/v1.0 https://github.com/espressif/esp-zigbee-sdk.git esp-zigbee-legacy
+cd esp-zigbee-legacy
+git checkout --detach c9e2c3e12642c704096dfefe25b62212b47229ba
+cd examples/esp_zigbee_ncp
+# Activate the selected legacy-compatible ESP-IDF environment first.
 idf.py set-target esp32c6
 idf.py menuconfig
 idf.py build
 ```
 
-Flash it:
+Choose the actual serial transport pins and baud, resolve and retain `dependencies.lock`, then flash the discovered programming port. The example's GPIO4 RX/GPIO5 TX wiring is an example setting, not a Jetson UART mapping. Confirm the board's pinmux and connect compatible logic with TX/RX crossed. Close the serial monitor before the binary host owns the data port.
+
+For a Linux port, study the legacy ESP host's transport, framing and command code, then replace ESP-IDF UART/task/timing dependencies with Linux equivalents. That port is an additional implementation project; this course does not provide an untested one-command daemon.
+
+## 5. Framing is necessary but not sufficient
+
+Legacy ESP ZNSP uses SLIP framing plus a defined payload and a 16-bit CRC. Its fields have specified byte order. A valid SLIP frame can still contain the wrong command ID, length, CRC, transaction reference or payload type. [Pinned protocol source](https://github.com/espressif/esp-zigbee-sdk/blob/c9e2c3e12642c704096dfefe25b62212b47229ba/docs/en/user-guide/ncp.rst).
+
+Run the course's [bounded SLIP implementation](labs/slip.py):
 
 ```bash
-# Use the actual USB serial port for the second ESP32-C6 board
-idf.py -p /dev/ttyUSB0 flash monitor
+python3 -m unittest discover -s \
+  'Phase 4 - Track B - Nvidia Jetson/5. Application Development/2. Network and Connectivity/labs' \
+  -p 'test_slip.py' -v
 ```
 
-The example README documents:
+Three tests cover every byte value across fragmented input, independent expected wire bytes, multiple frames, invalid escapes, oversized frames and resynchronization. The code deliberately does not implement ZNSP CRC or commands. Its 4,096-byte default is a teaching bound, not a claim about the protocol's maximum.
 
-- the board acts as a Zigbee NCP
-- it works together with a host via UART
-- `GPIO4` / `GPIO5` are the example RX/TX mapping
-- host-side operations such as `NETWORK_INIT`, `NETWORK_PRIMARY_CHANNEL_SET`, `NETWORK_FORMNETWORK`, and `START` trigger network formation and coordinator behavior
+**Worked UART budget:** a 100-byte payload at 115200 baud with 8N1 takes at least `100 × 10 / 115200 = 8.68 ms`. If every payload byte needs SLIP escaping, payload transmission approximately doubles before delimiters, CRC and response. Choosing a high-level protocol does not remove transport costs.
 
-### Port naming note
+## 6. Define host behavior before sending commands
 
-As with the Thread guide:
+A host implementation needs explicit states: disconnected, version-negotiated, configured, joining/forming, running and recovering. Distinguish a command acknowledgement from an asynchronous event that the network formed or an end device joined. Bound retries and preserve transaction identity.
 
-- do not hardcode `/dev/ttyACM0`
-- do not assume every board shows up as `/dev/ttyUSB0`
+A coordinator starts a Zigbee network; a router joins and forwards; an end device joins through a parent and may sleep. A mains-powered gateway often uses coordinator functionality, but it cannot become the coordinator of an already existing network merely by changing a role field. Preserve network identity and device state during recovery.
 
-Use the actual device path exposed by the second ESP32-C6 board on your Linux machine.
+Test transport independently, then version/status queries, network formation, a controlled join window, endpoint/cluster discovery, an attribute read, a state-changing command, and reconnect. Each stage needs an observed response/event and a failure case. Do not treat a successful serial write as successful device control.
 
----
+The [UDP command exercise](Localhost-Network-Lab.md) shows why losing an acknowledgement after an action makes a blind retry ambiguous. Apply the protocol's actual transaction/response rules rather than inventing exactly-once delivery.
 
-## 10. What the Jetson Host Actually Has to Do
+## 7. Coexistence and architecture decisions
 
-This is the biggest conceptual difference from OTBR.
+C6's Wi-Fi, BLE and IEEE 802.15.4 share a radio. Separate SoCs can reduce contention, while adding power, wiring and software coordination. Current Espressif guidance identifies restricted/unstable combinations, especially continuous router reception while other radios are busy. [RF coexistence guidance](https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32c6/api-guides/coexist.html).
 
-With Thread + OTBR, the Jetson host launches an existing daemon and gets a Linux-facing control path such as `ot-ctl`. With Zigbee NCP, the host must drive the Zigbee control flow more directly.
+Zigbee NCP does not use OTBR's IPv6 border-routing machinery, so an OTBR-specific multicast-routing failure is not the same failure path. This architectural distinction is not proof that a Linux Zigbee host works, nor evidence that the learner's kernel lacks any particular option.
 
-The official Zigbee NCP frame list shows host operations such as:
+## 8. Assessment
 
-- `NETWORK_INIT`
-- `NETWORK_START`
-- `NETWORK_STATE`
-- `NETWORK_FORM`
-- `NETWORK_JOIN`
-- `NETWORK_PERMIT_JOINING`
-- `NETWORK_ROLE_GET` / `NETWORK_ROLE_SET`
-- `NETWORK_CHANNEL_SET`
-- `NETWORK_PAN_ID_SET`
-- `NETWORK_PRIMARY_KEY_SET`
-- `ZCL_ATTR_READ`
-- `ZCL_ATTR_WRITE`
-- `APS_DATA_REQUEST`
+Submit the version map, your escaped-byte example, passing local tests and a host-state diagram with two failure transitions. For hardware work, add source/configuration hashes and actual transport/network/device results.
 
-So the host side on Jetson is responsible for:
-
-- opening the UART or SPI transport
-- SLIP-framing and parsing **ESP ZNSP** packets
-- forming or joining a Zigbee network
-- keeping track of role and stack status
-- sending ZDO, APS, and ZCL commands to devices
-- reacting to join, leave, attribute-report, and indication events
-
-That is why Zigbee on Jetson is **not blocked by the same kernel issue as OTBR**, but is also **not yet as turnkey as `otbr-agent`**.
-
----
-
-## 11. Recommended Bring-Up Milestones on Jetson
-
-Treat this as a staged host-integration problem.
-
-### Milestone 1: NCP transport only
-
-Prove the Jetson can open the NCP serial path and exchange framed traffic without resets or dropped bytes.
-
-Success looks like:
-
-- no contention on `/dev/ttyTHS1`
-- stable NCP startup logs on the ESP side
-- successful host/NCP framing exchange
-
-### Milestone 2: basic network control
-
-Implement or validate:
-
-- `NETWORK_INIT`
-- `NETWORK_STATE`
-- `NETWORK_ROLE_SET`
-- channel / PAN / key configuration commands
-
-Success looks like:
-
-- the host can read stack state
-- the host can set the intended role
-- the NCP persists or reports the configured network settings correctly
-
-### Milestone 3: form a coordinator network
-
-If Jetson is the gateway:
-
-- set Coordinator role
-- form a new network
-- open joining for a test window
-
-Success looks like:
-
-- the network forms successfully
-- permit-join window opens
-- a test Zigbee end device can join
-
-### Milestone 4: real device control
-
-Move from stack bring-up to application behavior:
-
-- discover joined devices
-- read or write attributes
-- test cluster commands
-- verify device notifications or reports reach the host
-
-At that point, Zigbee integration is no longer a serial-demo exercise. It becomes a real coordinator/gateway design.
-
----
-
-## 12. Why This Path Is Different from the Current Thread Blocker
-
-Your current OTBR failure is specifically tied to **Linux border routing**, not to the ESP32-C6 radio or 802.15.4 itself.
-
-The proof from the Thread work is:
-
-- Jetson could already talk to the ESP32-C6 RCP
-- the Thread node could already become `leader`
-- the crash happened later when OTBR tried to initialize Linux multicast-routing support
-
-Zigbee NCP changes the problem shape:
-
-- no OTBR
-- no `wpan0`
-- no IPv6 border-routing socket
-- host logic speaks Zigbee control messages over serial instead
-
-So the missing Jetson kernel options:
-
-- `CONFIG_IP_MROUTE`
-- `CONFIG_IPV6_MROUTE`
-
-should not be the main blocker for Zigbee host/NCP work.
-
-That is the architectural reason this is the right next experiment while you defer the JetPack/kernel rebuild for later Thread OTBR work.
-
----
-
-## 13. Common Failure Modes
-
-### The host expects a Linux radio interface like `wpan0`
-
-That is the wrong model for Zigbee NCP. Success is not measured by a new Linux network interface. It is measured by host/NCP command exchange, network formation or join, and actual Zigbee device control.
-
-### UART transport is unstable
-
-Typical causes:
-
-- wrong baud rate
-- multiple processes opening `/dev/ttyTHS1`
-- `nvgetty` still attached
-- TX/RX swapped
-- ESP UART pin config does not match the bench wiring
-
-### You assume the current SDK repo only supports the gateway/RCP path
-
-The official docs expose both:
-
-- a Zigbee gateway / RCP example
-- a Zigbee NCP example and NCP protocol documentation
-
-But the Linux host side is still more manual than the Thread OTBR flow, so read the docs as an API/protocol contract, not as a promise of a one-command Jetson daemon.
-
-### Trying to merge Zigbee onto the first ESP32-C6 immediately
-
-Avoid it for now.
-
-You already have:
-
-- a working ESP-Hosted split
-- a validated second-radio concept
-
-Preserve that clean architecture until the separate Zigbee path is stable.
-
----
-
-## 14. Good Next Steps
-
-- flash `esp_zigbee_ncp` onto the second ESP32-C6
-- start with UART before attempting SPI
-- treat the Jetson work as a host-protocol bring-up, not a Linux netdev bring-up
-- choose **Coordinator** first if Jetson is meant to be the gateway
-- keep the Thread OTBR kernel rebuild as a separate later milestone
-
----
-
-## 15. References
-
-### Official upstream references
-
-- [ESP Zigbee SDK introduction](https://docs.espressif.com/projects/esp-zigbee-sdk/en/latest/esp32c6/introduction.html)
-- [ESP Zigbee NCP guide](https://docs.espressif.com/projects/esp-zigbee-sdk/en/latest/esp32c6/user-guide/ncp.html)
-- [ESP Zigbee NCP API reference](https://docs.espressif.com/projects/esp-zigbee-sdk/en/latest/esp32c6/api-reference/esp_zigbee_ncp.html)
-- [ESP Zigbee SDK repository](https://github.com/espressif/esp-zigbee-sdk)
-- [ESP Zigbee NCP example](https://github.com/espressif/esp-zigbee-sdk/tree/main/examples/esp_zigbee_ncp)
-- [ESP Zigbee gateway example](https://github.com/espressif/esp-zigbee-sdk/tree/main/examples/zigbee_gateway)
-- [ESP-Techpedia Zigbee solution introduction](https://docs.espressif.com/projects/esp-techpedia/en/latest/esp-friends/solution-introduction/zigbee/zigbee-solution.html)
-- [ESP32-C6 RF coexistence](https://docs.espressif.com/projects/esp-idf/en/v5.1.3/esp32c6/api-guides/coexist.html)
-
-### Local roadmap references
-
-- [ESP32-C6 ESP-Hosted over SPI on Jetson Orin Nano](ESP32-C6-ESP-Hosted-SPI-Jetson-Orin-Nano.md)
-- [ESP32-C6 OpenThread RCP on Jetson Orin Nano](ESP32-C6-OpenThread-RCP-Jetson-Orin-Nano.md)
-- [Network and Connectivity hub](Guide.md)
+**Diagnostic answers:** an RCP is not a Zigbee application; an ESP-host example is not a Linux host binary; same UART pins do not imply compatible protocols; a coordinator log does not prove a particular device's cluster commands work. Continue with the [Thread comparison](ESP32-C6-OpenThread-RCP-Jetson-Orin-Nano.md) and explain where each stack runs.

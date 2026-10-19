@@ -1,0 +1,36 @@
+{
+  "camera_video_prefix": "camera02",
+  "calibration_camera_id": 1,
+  "frames": 4,
+  "detections": 0,
+  "source_fps": 10.0,
+  "depth_units": "dataset units",
+  "metric_scale": null,
+  "wall_seconds": 0.0584665059868712,
+  "alignment": "assumed paired frame index; matching FPS is not sensor synchronization proof",
+  "known_tone": {
+    "peak_hz": 1.2000000000000002,
+    "sample_rate_hz": 20.0,
+    "bin_spacing_hz": 0.05,
+    "samples": 400,
+    "scope": "spectral peak; no physiological or thermal validation"
+  },
+  "aliased_8hz_tone": {
+    "peak_hz": 2.0,
+    "sample_rate_hz": 10.0,
+    "bin_spacing_hz": 0.05,
+    "samples": 200,
+    "scope": "spectral peak; no physiological or thermal validation"
+  },
+  "numpy": "2.3.5",
+  "opencv": "4.13.0",
+  "source_sha256": {
+    "depth_utils.py": "d72a4be2c2644c77985f4b09a04560cd43f2e20124aef39b07455b0715a467af",
+    "detection.py": "04512ace994e1a77fd6c47a60f9318b0be351f5a90dc8688db06a24302cdbdde",
+    "calibration.py": "6beaefd8b16892474c1690398fb78a4caebf942c9908888de1ae040fa665386f",
+    "signal_reference.py": "595c1825cb53b428502af0fdbcd2c6f2f1b42b28ed1093457466d219725625d6",
+    "run_pipeline.py": "73147f6058076e259ec634ce70d6b13c8217da78f60e72ba103dbe26f0773eec"
+  },
+  "test_cases_passed": 10,
+  "evidence_scope": "original synthetic videos and tones; no external dataset, real thermal camera, physiological validation or Jetson run"
+}

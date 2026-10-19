@@ -67,6 +67,8 @@ Device Tree (.dts)          Kernel Driver (C code)
                             └─────────────────────────────┘
 ```
 
+Reading fragment; callbacks, headers, target-version signatures, and error/lifetime handling are omitted.
+
 ```c
 static const struct of_device_id mydev_of_match[] = {
     { .compatible = "vendor,mydevice-v2" },
@@ -110,7 +112,7 @@ camera_isp.dtb   (binary blob, ~10–500 KB)
 Linux kernel
     │
     │ of_platform_populate() scans DTB
-    │ creates platform_device for each node with status="okay"
+    │ populates appropriate available nodes on supported buses
     ▼
 platform_device "camera_isp@fe100000"
     │
@@ -125,6 +127,8 @@ Device ready for use
 ```
 
 ### Node Structure
+
+Illustrative DTS fragment, not a standalone board description: the parent bus must supply compatible address/size cells and ranges; clock/reset/domain providers and binding macros must exist.
 
 ```dts
 soc {
@@ -144,7 +148,7 @@ soc {
 };
 ```
 
-The `compatible` property lists IDs from **most-specific to least-specific**. The driver's `of_match_table` is checked against all entries; the **first match wins**. This allows one driver to support multiple hardware revisions.
+The `compatible` property lists IDs from **most-specific to least-specific**. The driver's `of_match_table` is checked against all entries; the matching code selects a compatible match according to its scoring and bus rules; do not assume textual table order alone defines every result. This allows one driver to support multiple hardware revisions.
 
 ### Key DTS Properties
 
@@ -156,90 +160,41 @@ The `compatible` property lists IDs from **most-specific to least-specific**. Th
 | `clocks` / `clock-names` | Clock framework | `devm_clk_get(dev, "isp")`, `clk_prepare_enable()` |
 | `resets` / `reset-names` | Reset controller | `devm_reset_control_get(dev, "isp")` |
 | `dmas` / `dma-names` | DMA engine | `dma_request_chan(dev, "dma")` |
-| `power-domains` | genpd | Automatic on `pm_runtime_get()` |
+| `power-domains` | genpd and runtime PM | Driver-specific PM setup; prefer checked `pm_runtime_resume_and_get()` where appropriate |
 | `status` | Boot scan | `"okay"` enables; `"disabled"` skips probe |
 
 > **Key Insight:** The `status = "okay"` / `"disabled"` property is how the DTS controls which hardware blocks are active without recompiling the kernel. To disable a peripheral, set `status = "disabled"` in a DTS overlay — the kernel skips its probe entirely. This is how Jetson carrier board customization works.
 
 ---
 
-## Device Tree Overlays (DTBO)
+## Device Tree overlays
 
-The base DTB describes the SoC itself. For boards that support multiple hardware configurations — different camera sensors, optional peripherals, add-on modules — rebuilding the full DTB for each variant is impractical. **Overlays** solve this: they are incremental patches applied on top of the base DTB.
+An overlay applies changes to a base tree. Bootloader support and a kernel's runtime overlay support are separate features. A configfs directory such as `/sys/kernel/config/device-tree/overlays` is **not a universal mainline userspace interface** merely because CONFIG_CONFIGFS_FS is enabled; some vendor kernels add their own interfaces. Do not paste a runtime removal command into an active camera pipeline without a device lifetime design.
 
-Overlays are **incremental additions** to the base DTB, applied at runtime (via `/sys/kernel/config/device-tree/overlays/`) or by the bootloader. They add, modify, or delete nodes **without recompiling the full DTB**.
+Use the [native Device Tree lab](../../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Kernel-Internals/labs/README.md) to compile a real base/overlay and inspect results with `dtc`, `fdtoverlay`, and `fdtget`. Its source addresses describe a synthetic device; passing the tools does not verify wiring, clocks, or a physical device driver.
 
-```bash
-# Compile overlay source to binary
-dtc -I dts -O dtb -o camera_imx477.dtbo camera_imx477.dts
+## probe(): acquire, initialize, then publish
 
-# Jetson: reference in extlinux.conf
-FDT_OVERLAYS /boot/camera_imx477.dtbo
+A successful probe is a transaction. Validate each resource and keep an unwind path for every operation that is not automatically reversed. An IRQ can fire as soon as it is registered, so its handler-visible state must already be initialized. Acquiring a clock/reset handle does not automatically enable the clock or deassert the reset.
 
-# Runtime apply (if ConfigFS enabled)
-mkdir /sys/kernel/config/device-tree/overlays/camera
-cp camera_imx477.dtbo /sys/kernel/config/device-tree/overlays/camera/dtbo
-echo 1 > /sys/kernel/config/device-tree/overlays/camera/status
+**Protocol pseudocode, not a complete driver:**
+
+```text
+allocate private state; initialize locks, wait queues, removal flag
+map the documented MMIO resource; check error pointer
+get IRQ number; if negative, return that error (including deferred probe)
+get named clocks and resets; check every error pointer
+establish power/clock/reset state in device-required order
+mask and clear stale device interrupt sources as specified
+register IRQ with fully initialized handler state; check result
+initialize queues and device-visible descriptor ordering
+publish subsystem interface only after it can accept operations
+unmask/start hardware when the device protocol permits
 ```
 
-Used in Jetson Xavier/Orin for camera carrier board (sensor module) configuration and in Raspberry Pi for HAT descriptor overlays.
+Use names matching the binding: a DTS with `clock-names = "isp", "aclk"` does not satisfy a driver requesting `"core"` by magic. `dev_err_probe()` helps report and propagate resource errors such as `-EPROBE_DEFER`; deferred dependencies are not necessarily permanent missing hardware.
 
----
-
-## probe() Function: Resource Setup Pattern
-
-The `probe()` function is the driver's **initialization entry point**. Its job is to claim all hardware resources, initialize the device, and register it with any higher-level subsystems (V4L2, IIO, etc.). The key pattern is using `devm_*` (**managed resource**) functions for every allocation:
-
-```c
-static int mydev_probe(struct platform_device *pdev)
-{
-    struct device *dev = &pdev->dev;
-    struct mydev_priv *priv;
-    struct resource *res;
-    int irq, ret;
-
-    /* Allocate driver private state — freed automatically on probe failure or driver unbind */
-    priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-    if (!priv)
-        return -ENOMEM;
-
-    /* Map MMIO registers from DTS 'reg' property — unmapped automatically on cleanup */
-    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-    priv->base = devm_ioremap_resource(dev, res);
-    if (IS_ERR(priv->base))
-        return PTR_ERR(priv->base);   /* devm unwinds previous allocations */
-
-    /* Register interrupt handler from DTS 'interrupts' property */
-    irq = platform_get_irq(pdev, 0);
-    ret = devm_request_irq(dev, irq, mydev_isr,
-                           IRQF_SHARED, "mydevice", priv);
-    if (ret)
-        return ret;
-
-    /* Acquire clock and reset from DTS 'clocks' and 'resets' properties */
-    priv->clk = devm_clk_get(dev, "core");
-    priv->rst = devm_reset_control_get(dev, "rst");
-
-    platform_set_drvdata(pdev, priv);   /* store priv pointer for later retrieval */
-    return 0;
-}
-```
-
-If any `devm_*` call fails and the function returns a negative error code, all previously acquired managed resources are **automatically released in reverse order**. No `goto err_cleanup` labels needed.
-
-The step-by-step sequence of a successful probe:
-
-1. **Allocate private state** (`devm_kzalloc`) — driver-specific context structure that persists for the device lifetime.
-2. **Map MMIO** (`devm_ioremap_resource`) — makes hardware registers accessible via `readl`/`writel`.
-3. **Register IRQ** (`devm_request_irq`) — connects the hardware interrupt line to the driver's ISR function.
-4. **Acquire clocks** (`devm_clk_get`) — gets a handle to the clock that drives the peripheral.
-5. **Acquire reset** (`devm_reset_control_get`) — gets control of the hardware reset line for initialization.
-6. **Store private data** (`platform_set_drvdata`) — makes the private structure retrievable in other callbacks (ISR, fops, sysfs).
-7. **Return 0** — signals success to the bus; device is now active.
-
-> **Common Pitfall:** Calling `clk_prepare_enable()` in `probe()` but forgetting to call `clk_disable_unprepare()` in `remove()` leaves the clock running after the driver unloads. On embedded systems, this wastes power and may prevent the SoC from entering low-power sleep states. Use `devm_clk_get_enabled()` (kernel 5.19+) which disables the clock automatically on device detach.
-
----
+On failure or removal, prevent new submissions, stop/abort hardware using its specified protocol, synchronize IRQs and callbacks, drain/cancel work, retire user-visible interfaces, and release resources only when no live reference can use them. Exact ordering is device-specific. `devm_clk_get_enabled()` can pair clock enable/disable on kernels that provide it, but does not replace reset or DMA quiescence.
 
 ## devm_* Managed Resources
 
@@ -259,13 +214,18 @@ The `devres` framework is what makes the `devm_*` pattern work. Each `devm_*` ca
 
 Custom managed resources: `devm_add_action(dev, fn, data)` registers an arbitrary cleanup function.
 
-> **Key Insight:** The `devres` framework transforms the driver error handling problem from "undo everything correctly on every possible failure path" to "just return the error code." The framework handles the unwinding automatically. This eliminates an entire class of resource leak bugs that plagued pre-devres drivers, especially on iterative FPGA bring-up where `modprobe`/`rmmod` cycles happen dozens of times.
+Managed allocation reduces repetitive unwind code when its lifetime matches the device. Check cleanup-registration failures too: `devm_add_action_or_reset()` is useful when a failed action registration must immediately undo a preceding operation. Managed cleanup still depends on correct acquisition order and hardware/callback lifetime.
 
 ---
+
+
+Managed cleanup is reverse acquisition order, not proof of safe asynchronous teardown. Open files, mappings, IRQ handlers, work items, and DMA may outlive a callback unless the driver explicitly stops or references them. Check target-kernel signatures: platform-driver remove callbacks changed across kernel versions.
 
 ## sysfs Attributes
 
 Once a driver is probed, it can expose **hardware state to userspace** through the **sysfs** virtual filesystem. sysfs attributes appear as files under `/sys/bus/platform/devices/` and can be read or written with standard file operations.
+
+Reading fragment: register the attribute group with the device, ensure the device is powered for MMIO, and synchronize removal/concurrent state as the hardware requires. This RO attribute is not writable.
 
 ```c
 static ssize_t utilization_show(struct device *dev,
@@ -283,7 +243,7 @@ static struct attribute *mydev_attrs[] = {
 ATTRIBUTE_GROUPS(mydev);
 ```
 
-sysfs attributes appear at `/sys/bus/platform/devices/mydevice.0/utilization`. Userspace reads with `cat`; write with `echo`. Must be re-entrant; protect shared state with a mutex or spinlock.
+sysfs attributes appear at `/sys/bus/platform/devices/mydevice.0/utilization`. Userspace can read this RO attribute with `cat`; writable attributes require a separately implemented and validated store callback. Callbacks must handle concurrent access and removal under the device's locking and power-management protocol.
 
 sysfs attributes are **ABI** — once exported to userspace, removing or renaming them **breaks userspace consumers**. Export only stable, meaningful values. Use `debugfs` (below) for internal debug state that may change between kernel versions.
 
@@ -296,15 +256,15 @@ With sysfs covered, the next piece is how the kernel notifies userspace when dev
 The kernel emits **uevent** netlink messages on **device add/remove**. `udevd` receives them, matches `/etc/udev/rules.d/` rules, and acts:
 
 - Creates `/dev/` device nodes with correct owner and permissions
-- Loads firmware via `request_firmware()` mechanism
+- May participate in configured firmware fallback paths; the kernel firmware loader commonly reads firmware directly
 - Runs `modprobe` for modules with matching `MODULE_DEVICE_TABLE` entries
 - Executes custom scripts for device initialization
 
 ```
-SUBSYSTEM=="video4linux", ATTRS{name}=="IMX477*", SYMLINK+="camera0", MODE="0666"
+SUBSYSTEM=="video4linux", ATTR{name}=="EXACT_CAPTURE_NODE_NAME", SYMLINK+="camera0", GROUP="video", MODE="0660"
 ```
 
-This rule creates a stable symlink `/dev/camera0` pointing to the actual `/dev/video0` node whenever an IMX477 sensor is detected. This insulates application code from device number changes when multiple cameras are present.
+This is a rule template, not a tested sensor identity. Replace the name after inspecting the actual capture node with `udevadm info`; choose stable parent properties when names are ambiguous, and ensure the chosen group exists. A sensor subdevice and a capture node are different objects. Multiple matching devices must not compete for one ambiguous alias.
 
 ---
 
@@ -329,9 +289,9 @@ debugfs is meant purely for development and debugging. Unlike sysfs, it carries 
 |----------|-----------------|-----------|----------------|---------|
 | PCIe | Yes (config space) | No | `pci_device_id` vendor:device | NVIDIA GPU, Intel E810 NIC |
 | USB | Yes (descriptor) | No | `usb_device_id` vid:pid | UVC camera, USB GNSS |
-| Platform | No | Yes (DTS/ACPI) | `of_match_table` compatible | UART, FPGA AXI peripheral |
-| I2C | Partial (address) | Yes | `of_match_table` + I2C address | IMX477, ICM-42688 IMU |
-| SPI | Partial (CS) | Yes | `of_match_table` + SPI chip select | ADC, display controller |
+| Platform | Usually no generic self-enumeration | DT, ACPI, or another supported description | `of_match_table` compatible | UART, FPGA AXI peripheral |
+| I2C | Address probing is not reliable identification | DT/ACPI/board description commonly | `of_match_table` + I2C address | IMX477, ICM-42688 IMU |
+| SPI | Chip select is not device identification | DT/ACPI/board description commonly | `of_match_table` + SPI chip select | ADC, display controller |
 
 ### Conceptual Review
 
@@ -339,21 +299,22 @@ debugfs is meant purely for development and debugging. Unlike sysfs, it carries 
 
 - **What happens when a driver module is loaded and a matching DTS node exists?** The module's `module_init` calls `platform_driver_register()`. The platform bus immediately checks if any already-registered devices match the driver's `of_match_table`. If so, it calls `probe()` right away. Conversely, if the device is registered first, the bus calls `probe()` when the matching driver registers.
 
-- **What is the purpose of the `compatible` property having multiple strings?** It creates a priority list from most-specific to least-specific. The kernel tries each string in order. A new driver can match on `"vendor,mydevice-v2"` while an older, fallback driver matches on `"vendor,mydevice"`. This allows hardware revisions to use specialized drivers while maintaining backward compatibility.
+- **What is the purpose of the `compatible` property having multiple strings?** It creates a priority list from most-specific to least-specific. Compatible matching prefers more-specific entries according to the bus/OF matching rules. A new driver can match on `"vendor,mydevice-v2"` while an older, fallback driver matches on `"vendor,mydevice"`. This allows hardware revisions to use specialized drivers while maintaining backward compatibility.
 
 - **Why is `devm_*` preferred over manual resource management?** Manual resource management requires a correct cleanup for every possible error path in `probe()`. Adding one new resource requires updating every error label. `devm_*` automates the cleanup: the framework unwinds all managed resources in reverse order whenever the device detaches, regardless of where in `probe()` the failure occurred.
 
-- **What is a Device Tree overlay and when is it used?** An overlay is a compiled patch (`.dtbo`) that adds, modifies, or removes nodes from the base DTB at boot time or runtime. It is used for modular hardware configurations like camera carrier boards on Jetson, where the same base board can have different sensor modules installed.
+- **What is a Device Tree overlay and when is it used?** An overlay is a compiled patch (`.dtbo`) that adds, modifies, or changes the tree according to the supported overlay semantics at boot time or runtime. It is used for modular hardware configurations like camera carrier boards on Jetson, where the same base board can have different sensor modules installed.
 
 - **What is the difference between sysfs and debugfs for driver state?** sysfs attributes are ABI-stable: once exported, removing them breaks userspace tools and monitoring dashboards. They are for stable, meaningful values like device state and hardware counters. debugfs has no stability guarantee — it is for developer diagnostics, register dumps, and transient debugging data.
 
 ---
 
-## AI Hardware Connection
+## Bring-up exercise
 
-- DTS nodes with correct `compatible` strings link Jetson IMX477 and AR0234 camera sensors to NVIDIA's V4L2 sensor drivers; `reg` specifies the I2C address and `clocks` provisions the NVCSI clock tree
-- NVDLA on Jetson is a platform device with DTS entries for MMIO base, IRQ lines, clock domains, and DMA channels; the kernel driver maps all resources via `devm_ioremap_resource` and `dma_request_chan`
-- Custom Xilinx Zynq AXI peripherals for sensor fusion or pre-processing are described as platform devices in the DTS; `reg` specifies AXI slave base address and size; the driver accesses registers with `ioread32` / `iowrite32`
-- DTBO overlays enable hot-swappable camera module configuration on Jetson development kits without reflashing the base system image, accelerating sensor bring-up iteration
-- sysfs `DEVICE_ATTR_RO` attributes expose AI accelerator utilization counters and error registers to Prometheus node exporters and health monitoring daemons without requiring privileged ioctls
-- `devm_*` managed resources prevent resource leaks in FPGA driver `probe()` error paths, which are exercised at every module reload during iterative hardware bring-up cycles
+Use the native [Device Tree/module lab](../../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Kernel-Internals/labs/README.md). Explain the difference between: DT syntax accepted, overlay applied, binding validated, module compiled, driver matched, probe succeeded, and hardware operation tested. These are seven distinct evidence boundaries.
+
+For an actual board, build a resource table from the final tree and the driver's named requests. Include MMIO size, interrupt source, clocks, reset, power, pinmux, DMA addressing limits, and removal ownership. Overlays do not make a physically non-hotpluggable camera hot-swappable.
+
+**Check:** Why initialize a wait queue before registering an IRQ? **Answer:** The handler may run immediately after registration and touch the queue. Registering first creates a race with uninitialized state.
+
+**Check:** Does managed cleanup retire a mapped userspace buffer safely? **Answer:** Only if the lifetime protocol already prevents remaining users and device access. `devm_*` reverses allocations; it does not invent that protocol.

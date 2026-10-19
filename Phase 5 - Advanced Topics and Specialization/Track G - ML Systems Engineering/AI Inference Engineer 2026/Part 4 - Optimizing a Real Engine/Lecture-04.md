@@ -1,12 +1,15 @@
 # Part 4 · Lecture 04 — Launch Geometry: Grids, Occupancy, and 327 Norms per Token
 
+**Practice:** [CPU source lab](CPU-Source-Lab.md). Historical GPU results are source reports; use the **Answers** after attempting the self-check.
+
+
 ## Overview
 
 The cheapest wins in this case study were not better algorithms. They were **the same arithmetic, launched in a different shape.**
 
-An H200 has **132 streaming multiprocessors**. A kernel launched with 12 blocks uses 9% of it. A kernel launched with one block uses 0.8%. In batch-1 decode, where every natural parallel axis has collapsed to size 1, launching tiny grids is not an unusual mistake — it is the *default* outcome of writing a kernel that is correct.
+The case-study H200 has **132 streaming multiprocessors**. A 12-block kernel can cover at most 9.1% of SMs simultaneously; a single-block kernel at most 0.8%. These bounds are not occupancy or utilization measurements. In batch-1 decode, where every natural parallel axis has collapsed to size 1, launching tiny grids is not an unusual mistake — it is the *default* outcome of writing a kernel that is correct.
 
-Three PRs in this lecture, worth +4.0%, +6.7%, and a 21% step, contain no new mathematics between them. One widened a block. One added a grid axis. One replaced a hardcoded constant with a derivation. What makes them worth a lecture is the *reasoning* that found them and the discipline that proved they changed nothing but speed.
+The launch-only components preserve the intended mathematics, but the bundled PR #127 also adds an approximate expert-weight threshold. Its 21% headline cannot be attributed solely to launch geometry. One widened a block. One added a grid axis. One replaced a hardcoded constant with a derivation. What makes them worth a lecture is the *reasoning* that found them and the discipline that separates measured speed, numerical changes, and untested paths.
 
 By the end you should be able to look at a kernel's launch configuration and say whether it is starving the machine, distinguish starvation from contention in a profile, and prove a launch-shape change is bit-identical rather than merely passing a tolerance.
 
@@ -14,21 +17,11 @@ By the end you should be able to look at a kernel's launch configuration and say
 
 ## 1. The arithmetic nobody does
 
-Two numbers, multiplied. That is the whole diagnostic.
+**Grid coverage and occupancy are different.** With 132 SMs, 12 independent blocks can occupy at most 12 SMs at one instant: a coverage upper bound of 12/132 = 9.1%. CUDA occupancy means resident warps divided by the maximum resident warps **per SM**. It also depends on block size, registers, shared memory, and hardware limits.
 
-```text
-   H200 (sm_90):  132 SMs
+A 256-block grid does not necessarily execute in two waves: multiple blocks may reside on one SM. Conversely, 132 blocks do not guarantee high resident-warp occupancy or balanced execution. Start with launch dimensions, then use duration, achieved bandwidth, resident blocks/warps, and stall evidence to distinguish limited parallelism from saturated bandwidth.
 
-   grid    1 block   →   0.8%  of SMs have work
-   grid   12 blocks  →   9.1%
-   grid   48 blocks  →  36.4%
-   grid  128 blocks  →  97.0%   (but a tail: 132 would be one wave)
-   grid  256 blocks  →  two waves, each ~full
-```
-
-The reason this is not done routinely is that **the symptom does not look like a shape problem.** A starved kernel shows low achieved bandwidth, low FLOPs, and a duration longer than the work justifies — exactly the fingerprint of a memory-bound kernel. Every throughput metric agrees that you are bandwidth-limited. None of them mentions that 91% of the GPU is idle.
-
-The distinguishing measurement is grid dimensions against SM count, which no throughput counter reports. You have to go and look.
+The analogy is a workshop: opening twelve jobs cannot keep 132 independent workstations busy, but opening 132 jobs still says nothing about how efficiently each station operates.
 
 ### 1.1 Why decode is structurally prone to this
 
@@ -84,7 +77,7 @@ And this is not hypothetical: an earlier measurement of this branch drew an **`a
    the APPLY      → elementwise, once `inv` is fixed → widen freely, byte-identical
 ```
 
-Two supporting facts make the split exactly bit-identical. Idle threads above 128 contribute `0` to `block_sum`, and `x + 0` is an IEEE identity — so the longer warp-tree sum over 1024 threads produces the same bits as the 4-warp one. And at `BLOCK == 128` with no vectorized path the code stays on the *original* kernel rather than the specialization, so a reviewer can check the equivalence in one line instead of trusting it.
+For the finite sum-of-squares fixtures, added threads contribute positive zero. Identity still requires the nonzero terms to retain the same association and compiler operations; adding zeros alone does not prove that a changed reduction tree preserves bits. Signed zero, NaNs, and altered association require separate treatment. And at `BLOCK == 128` with no vectorized path the code stays on the *original* kernel rather than the specialization, so a reviewer can check the equivalence in one line instead of trusting it.
 
 > **Split a kernel at the boundary between its reduction and its elementwise apply.** The reduction's width is part of its numerics; the apply's is not. Widening the second gives you the bandwidth win with byte-identical output, while widening the first is an accuracy change you would have to defend. This is the same association argument as [Lecture 06 §2.1](Lecture-06.md) and [Lecture 08 §8](Lecture-08.md), used here to decide *where not to optimize*.
 
@@ -129,24 +122,9 @@ This is the most transferable paragraph in the PR, and it deserves to be quoted 
 
 > *Profiled at ctx 131072, the kernel moves ~3.1 MB per launch and takes **87 µs against a ~0.9 µs bandwidth floor**, with a **982 ns stddev**. Tight variance and a 95× gap to bandwidth is not contention and not arithmetic — it is starvation of blocks.*
 
-The inference chain:
+The source interprets a small grid, low achieved bandwidth, and stable timing as insufficient parallelism. That is a reasonable hypothesis, but the quoted inference is stronger than the evidence: a bandwidth floor is a lower bound, not what a small kernel “should” cost. Stable timing does not rule out stable contention, instruction cost, or memory latency.
 
-```text
-   1.  bytes moved ÷ device bandwidth  =  0.9 µs   ← what it SHOULD cost
-   2.  measured                        =  87 µs    ← 95× off
-   3.  stddev                          =  982 ns   ← 1.1% of the mean
-
-   contention would be NOISY   (other work interfering → high variance)
-   arithmetic would be VISIBLE (FLOPs would account for the time)
-   a 95× gap that is REPEATABLE TO 1% is a structural property
-       of the launch, not of the machine's state.
-
-   ⇒ the blocks are not there.
-```
-
-**Variance is the discriminator.** A kernel that is slow because it is fighting other work is slow *inconsistently*. A kernel that is slow because it only ever occupies 9% of the device is slow with metronome regularity. Reporting a standard deviation alongside a mean is what makes that distinction available — and most profiling writeups omit it.
-
-> **Steal this.** Always report the spread, not just the mean. `87 µs ± 1 µs` and `87 µs ± 30 µs` are different diagnoses with the same headline.
+The concrete experiment is to expose another independent grid axis while preserving the work, then measure kernel and end-to-end time, requested/actual bytes where counters are available, and numerical outputs. The measured value-tiling win supports the hypothesis; it does not uniquely prove it.
 
 ### 3.2 Manufacturing the axis, and proving it is legal
 
@@ -237,7 +215,7 @@ Each change is behind a **runtime environment gate**, so "before" and "after" ar
            differs and no rebuild separates them."
 ```
 
-What this eliminates: build-flag drift, compiler version differences, driver state, link-order effects, and the whole class of "we rebuilt and something else changed." Those are not hypothetical — they are why [Lecture 02](Lecture-02.md) records a PR that had to *rebuild every eval from scratch with a pinned compiler.*
+What this holds fixed: build flags, compiler version, and link order. Driver state, clocks, thermals, and scheduling still vary; interleave repeated runs. It reduces, and the whole class of "we rebuilt and something else changed." Those are not hypothetical — they are why [Lecture 02](Lecture-02.md) records a PR that had to *rebuild every eval from scratch with a pinned compiler.*
 
 [**PR #127**](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/127) takes it to its conclusion. It bundles a dozen changes, each individually gated, and publishes the **complete restore set** that returns `main`'s exact behaviour on one binary:
 
@@ -295,9 +273,20 @@ A numeric test that passes at `1e-6` tells you the change is *acceptable*. It ca
    ctx128: IDENTICAL   ctx256: IDENTICAL   ctx512: IDENTICAL
    ctx1024: IDENTICAL  ctx2048: IDENTICAL  ctx4096: IDENTICAL
 
-   and at 2x the deepest graded depth, 8192 real ids, full 93 layers:
-   BIT-IDENTICAL: default build == all-gates-off, one binary
+   and at 8192 real ids, full 93 layers:
+   author reports BIT-IDENTICAL for this fixture
+   this does not exercise a depth gate that activates at 16384
 ```
+
+### The deep-context approximation needs its own acceptance test
+
+The pinned kernel defaults to `SPARKINFER_K3_MOE_WEPS=0.08` and `SPARKINFER_K3_WEPS_MINPOS=16384`. It skips selected expert contributions whose normalized weights fall below the threshold, once the position gate is live. The published byte-identity checks at 128–8192 tokens do not activate that branch. A null position pointer also makes the gate live, so standalone kernel fixtures need explicit state.
+
+A small routing weight is not a bound on the corresponding output contribution. For `y = Σ w_i f_i(x)`, dropping set D gives `||Δy|| ≤ Σ_D |w_i| ||f_i(x)||`. A relative bound additionally divides by `||y||`, which can be tiny through cancellation. The source comment's `(number skipped) × epsilon` is only a weight-mass bound, not a general relative-output-error bound.
+
+**Counterexample:** sixteen experts each have normalized weight 1/16 = 0.0625 and each returns 1. The exact weighted sum is 1. A strict 0.08 threshold drops every term and returns 0. This is an admissible arithmetic input, not a claim that the real model produces it. It proves that a small per-expert threshold alone gives no useful quality guarantee.
+
+Accept an approximate path only after measuring real prefixes beyond the gate, reporting skip count and dropped weight mass, comparing against threshold zero with the same inputs, and evaluating task quality. Keep its speed claim separate from exact launch-only improvements. The [CPU source lab](CPU-Source-Lab.md) reproduces this counterexample using the existing expert-combine fixture.
 
 ### 7.1 The FMA trap
 
@@ -348,30 +337,22 @@ The parity gate runs at ≤4096 tokens; the split path engages only at long cont
 
 > **A passing gate is only evidence if the gate exercises the code you changed.** Before citing green CI, ask which of your gates actually reached the new path. If none did, say so.
 
-#127 handles a similar situation the opposite way — by *construction* rather than by measurement. Its expert-weight threshold drops routed-expert contributions whose renormalized router weight is below `8e-2`, but only past position 16384:
-
-* Below 16k the gate holds it **off**, so it is byte-inert at every depth the parity suite grades.
-* Shallow-depth thresholding **was measured and found harmful** — KL 1.1e-1 at ctx 2048 ungated — and is excluded by construction rather than by convention.
-* Past 16k it acts only on the flattened tail of the router's own weight distribution, and the output norm absorbs the scale.
-
-> *"The gate is a quality guard, not an optimisation."*
-
-That is the right shape for an approximation you cannot fully validate: **bound it to the regime where you have an argument, prove it inert everywhere you can measure, and document the measurement that made you bound it.**
+PR #127 disables its approximate threshold in the shallow parity region after an ungated shallow experiment exceeded the KL bar. That prevents the known shallow failure; it does **not** validate the deep region. “The output norm absorbs the scale” is insufficient because dropping experts generally changes direction as well as magnitude. The counterexamples above demonstrate the gap in the claimed error bound. Keep deep real-prefix quality unestablished until measured.
 
 ---
 
 ## Lab — audit your launch geometry
 
 1. **Dump every kernel's grid and block.** Instrument your launches or read them from a profiler. Produce a table: kernel, grid, block, calls per token, total time per token.
-2. **Add the occupancy column.** `blocks ÷ SMs`. Flag everything under 50%.
-3. **Sort by wasted SM-time** — `time_per_token × (1 − occupancy)`. This ranks by *recoverable* time, not by duration, and the order will differ from your profiler's.
-4. **For your top offender, do the #77 calculation.** Bytes moved ÷ device bandwidth = floor. Measured time. Ratio. **And the standard deviation over ≥10 reps.** Tight variance plus a large ratio means starvation; wide variance means contention.
+2. **Add a grid-coverage bound.** `min(blocks, SMs) ÷ SMs`; report block size and resource-limited occupancy separately. Flag small grids for inspection.
+3. **Prioritize measured critical-path time.** A small-grid coverage heuristic may suggest candidates, but `time × idle-SM fraction` is not recoverable time: dependencies, resource limits, and memory traffic constrain the attainable gain.
+4. **For your top offender, do the #77 calculation.** Bytes moved ÷ device bandwidth = floor. Measured time. Ratio. **And the standard deviation over ≥10 reps.** Neither variance pattern uniquely identifies the cause. State competing explanations and a controlled intervention.
 5. **Find an axis.** For that kernel, identify a dimension you can split with no cross-block reduction, no duplicated reads, and no layout change. If all three fail, you have a genuinely harder problem — say which one failed.
 6. **Gate it at runtime.** Implement the new geometry behind an environment variable so both arms are one binary. Measure ABBA-interleaved, three pairs, and publish the individual reps.
 7. **Prove the correctness claim you are making.** If bit-identical: `cmp` the output bytes, at more than one depth. If not: say what reassociates, and state whether your gate can even see the change.
 8. **`grep` for your sharded dimensions.** For every dimension your parallelism divides, find every kernel whose grid mentions it (§5). Report the list, even the ones that are fine.
 
-Pass criterion: a committed table ranking your kernels by recoverable SM-time, one reshaped kernel measured single-binary ABBA, and a correctness claim backed by the right kind of check.
+Pass criterion: a committed table recording kernel time, grid coverage, resource limits, and your bottleneck hypothesis, one reshaped kernel measured single-binary ABBA, and a correctness claim backed by the right kind of check.
 
 ---
 
@@ -386,6 +367,18 @@ Pass criterion: a committed table ranking your kernels by recoverable SM-time, o
 7. A PR claims bit-identical and cites a numeric test passing at `1e-6`. Write the two-sentence review comment.
 8. Your accuracy gate is green, but the code path you changed only engages above 16k context and the gate runs at 4k. What may you conclude from the green gate?
 9. A correct, positive, well-measured optimization scores `none` three times and then `s` with no code change. Explain, and say what you do with the branch in the meantime.
+
+## Answers
+
+1. Insufficient exposed parallelism is a candidate. The ratio and low variance alone rule out neither instruction cost nor stable contention; inspect grid/resources and test a work-preserving reshape.
+2. A wider block and aligned vectorized elementwise accesses may improve intra-block parallelism and memory instruction efficiency. One block is this implementation's design, not a mathematical requirement for RMSNorm; multi-block reduction is possible with a merge cost.
+3. A new reduction tree can alter the sum, inverse RMS, and every output. Preserve the nonzero association and arithmetic/compiler behavior; added zero lanes alone are not a proof. Byte-compare the stated fixture.
+4. Search all launch expressions using head count, including sibling KDA/MLA kernels, scratch sizing, and split budgets. Recompute the resulting grids per rank.
+5. The compiler may have fused multiply-add and removed an intermediate rounding. `__fmul_rn` preserves the multiplication rounding in the documented CUDA path; inspect compilation and compare outputs.
+6. Additional resident blocks can hide latency, but registers/shared memory and useful work determine whether two are better. Measure rather than maximizing occupancy blindly.
+7. A tolerance test supports bounded error on tested inputs, not byte identity. Request byte comparisons and the tested shapes/flags, including the branch activation region.
+8. Only the unchanged shallow path passed. The modified deep branch remains untested; run real data beyond its threshold.
+9. Frontier, surrounding kernels, launch strategy, noise, or scoring policy changed. Preserve the branch and its measurements, rebase, and rerun controlled comparisons before claiming a new win.
 
 ---
 

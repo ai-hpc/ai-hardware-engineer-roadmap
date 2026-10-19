@@ -25,8 +25,38 @@ Quantization (INT8, INT4, etc.) is a major lever for latency and throughput. It 
 ## 1. Post-training quantization (PTQ)
 
 * **INT8 / INT4** — Calibration (representative data), per-tensor vs per-channel scales, calibration datasets.
-* **Tooling** — TensorRT INT8, ONNX Runtime QDQ, PyTorch `torch.quantization`. How each represents scales and zero-points.
-* **Kernel impact** — Runtimes dispatch to quantized kernels (e.g. INT8 GEMM, INT4 matmul); understanding the kernel path for quantized models.
+* **Tooling** — TensorRT explicit Q/DQ, ONNX Runtime quantization, and [torchao](https://docs.pytorch.org/ao/stable/index.html). PyTorch documents migration away from older `torch.quantization`/`torch.ao.quantization` workflows; match the recipe to installed versions.
+* **Kernel impact** — Inspect whether the runtime uses a native low-precision kernel, fused unpack/dequantization, a floating-point fallback, or an unsupported operator. A file containing INT4 weights does not determine the arithmetic instructions.
+
+## Worked example: representation before speed
+
+For affine integer quantization, define the positive scale `s`, integer zero-point `z`, integer range, and rounding rule:
+
+```text
+q = clamp(round(x / s) + z, q_min, q_max)
+x_reconstructed = s × (q - z)
+```
+
+With signed INT4, `q_min=-8`, `q_max=7`, `s=0.1`, `z=0`, and round-to-nearest/ties-to-even:
+
+| Original value | Integer | Reconstructed | Absolute error |
+|---|---|---|---|
+| −0.16 | −2 | −0.20 | 0.04 |
+| 0.04 | 0 | 0.00 | 0.04 |
+| 0.27 | 3 | 0.30 | 0.03 |
+| 0.90 | 7 | 0.70 | 0.20 |
+
+The final row saturates. Rounding error without clipping is bounded by half a quantization step; clipping can make the error larger. FP4 formats use a floating-point codebook and possibly multiple scales, so this integer formula is not an NVFP4 implementation.
+
+**Memory calculation:** 64 INT4 weights use 32 packed payload bytes. Add a 2-byte scale per 64-value group and the total is 34 bytes before other metadata, padding, or alignment. Against FP16's 128 bytes, that is about `3.76×` smaller, not automatically `4×`. It is a storage estimate, not measured speedup.
+
+**Self-check:** if a zero-point is swapped with a scale, can output shape checks detect it? **Answer:** usually not. Reconstruct known values and compare outputs; a semantic parameter error can preserve every shape.
+
+## Current support is a tuple, not a dtype name
+
+Record `(runtime release, device, operator, weight format, activation format, accumulation dtype, scale layout)`. Verify the actual executed kernel before claiming acceleration. Calibration uses representative development data; held-out evaluation data remains separate.
+
+**Reviewed 2026-10-18 (TensorRT 11.4 `latest` documentation):** the [TensorRT explicit-quantization documentation](https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/quantized-types-explicit-quantization.html) uses Q/DQ with strong typing, and [its scheme matrix](https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/quantized-types-schemes.html) places specific restrictions on INT4 and block formats. TensorRT 11.4 networks are strongly typed by default. Older TensorRT releases used different precision/calibration workflows. TensorRT 11.4 does not support JetPack: use the installed JetPack-supported 10.x documentation for Jetson, as explained in [NVIDIA's migration boundary](https://docs.nvidia.com/deeplearning/tensorrt/latest/api/migration/tensorrt-10x-to-11x-jetson.html). Use the documentation matching the target's supported release, particularly on Jetson. The [PyTorch migration page](https://docs.pytorch.org/docs/stable/quantization.html) directs new quantization development to torchao.
 
 ---
 
@@ -47,8 +77,8 @@ Quantization (INT8, INT4, etc.) is a major lever for latency and throughput. It 
 
 ## Resources
 
-* [TensorRT Quantization](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#optimizing_int8_c)
-* [PyTorch Quantization](https://pytorch.org/docs/stable/quantization.html)
+* [TensorRT Explicit Quantization](https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/quantized-types-explicit-quantization.html)
+* [torchao Workflows](https://docs.pytorch.org/ao/stable/workflows/index.html)
 * [tinygrad](https://github.com/tinygrad/tinygrad) — Search for quantization passes and kernel support.
 
 ---

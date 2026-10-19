@@ -1,0 +1,26 @@
+{
+  "reviewed_utc": "2026-10-18T21:34:22.489845+00:00",
+  "python": "3.12.3",
+  "compiler": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "tests_passed": 6,
+  "sequential_reference_operations_per_normal_build": 300000,
+  "concurrent_items_per_normal_build": 400000,
+  "instrumentation": [
+    "optimized C++17",
+    "AddressSanitizer and UndefinedBehaviorSanitizer",
+    "missing-full-check mutant rejected"
+  ],
+  "limits": [
+    "ordinary CPU threads; no DMA or hardware execution",
+    "no ThreadSanitizer execution or exhaustive interleaving proof"
+  ],
+  "source_sha256": {
+    "spsc_queue.h": "ca25589f3cd800a47845bb1cb52050c3fee7418374965e01236898cdac2970fe",
+    "spsc_demo.cpp": "b819766abe52969b5afc8ca0539ef1c76a0e52af41e0200d3b6b92a3d62cd28a",
+    "test_spsc_queue.py": "c1cae4801fdf92b8389f5eb51a88fe13767da7054eff7283d5dd736b4d4e1d71",
+    "test_rt_demo.py": "91f416aebbb8c9f6566d53ddf06b54711b67bb0b485addc4df0b3229eb5a8186",
+    "../Lectures/demos/rt-demo/rt_demo.c": "f6d96fbd8864724b85f2301b6bd6851de22d5447f158e3d8d5ff86e3b0bd356a"
+  },
+  "spsc_tests_passed": 3,
+  "runtime_api_tests_passed": 3
+}

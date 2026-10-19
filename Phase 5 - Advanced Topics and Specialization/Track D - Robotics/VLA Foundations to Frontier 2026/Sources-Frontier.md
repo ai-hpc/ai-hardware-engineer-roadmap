@@ -1,5 +1,7 @@
 # Primary sources for the 2026 VLA frontier
 
+The [October 18 source update](Current-Update-2026-10-18.md) supplements the original snapshot with current access and pinned artifact details.
+
 Read these alongside [Lectures 25–30](Lecture-25.md), using the dated [frontier register](Frontier-Register.md) to distinguish announcements, papers, and executable releases. **Checked 2026-10-13.** Sources support only the nearby claims in the lectures; the course's calculations and fixture designs are original teaching exercises, not measured results from these systems.
 
 ## Physical Intelligence — read architecture, then artifacts

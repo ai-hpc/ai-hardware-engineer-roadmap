@@ -108,11 +108,11 @@ Run this on every imported robot, and again after every assembly. Lab 6a automat
 
 | # | Check | How | Failure looks like | Fix |
 |---|---|---|---|---|
-| 1 | Units | `UsdGeom.GetStageMetersPerUnit`, `GetStageUpAxis` | Robot 100× too big or small; lying on its side | Fix the source, or set stage units before referencing |
+| 1 | Units | `UsdGeom.GetStageMetersPerUnit`, `GetStageUpAxis` | Robot 100× too big or small; lying on its side | Convert source geometry, transforms, mass/inertia and limits consistently; changing metadata alone does not rescale authored values |
 | 2 | One articulation root, on the right prim | Count prims with `ArticulationRootAPI` | 0 roots: links fall apart; 2 roots after assembly | Re-import with explicit `fix_base`; disable the attached robot's root |
 | 3 | Base type | Hold test: play with no targets changed, watch the root pose | Fixed arm topples, or mobile base cannot move | `fix_base=True/False` |
 | 4 | Mass and inertia | `get_link_masses()`, `get_link_inertias()` → eigenvalues > 0 and \( I_1 + I_2 \ge I_3 \) | Jitter, explosions, "massless" links | Fix inertials in the source; `link_density` as a fallback |
-| 5 | Collision coverage | Every rigid body has ≥ 1 collider (traverse instance proxies); viewport: *Show by type → Physics → Colliders* | Fingers pass through objects | Add collision geometry, or `collision_from_visuals` with a deliberate `collision_type` |
+| 5 | Collision coverage | Every body intended to make contact has its intended colliders (traverse instance proxies); sensor or abstract links may intentionally have none; viewport: *Show by type → Physics → Colliders* | Fingers pass through objects | Add collision geometry, or `collision_from_visuals` with a deliberate `collision_type` |
 | 6 | Self-collision at rest | Robot Self-Collision Detector (`isaacsim.robot_setup.collision_detector`) | Robot twitches or explodes at t = 0 | Filter adjacent overlapping pairs (`UsdPhysics.FilteredPairsAPI`) |
 | 7 | Joint limits and axes | `get_dof_limits()` vs datasheet; jog each joint in the GUI | Joint moves the wrong way, or past its stops | Fix the URDF axis/sign; never patch it downstream |
 | 8 | Drives | `get_dof_gains()`, `get_dof_max_efforts()`; hold test drift | Sag under gravity, oscillation, saturation | §4 |
@@ -141,7 +141,7 @@ $$
 \tau = k_p\,(q_{\text{target}} - q) + k_d\,(\dot q_{\text{target}} - \dot q), \qquad |\tau| \le \tau_{\max}
 $$
 
-Stiffness \( k_p > 0 \) gives position control. \( k_p = 0, k_d > 0 \) gives velocity control (wheels). A drive of type *acceleration* is normalized by the joint's mass, so it behaves like an ideal actuator that is independent of configuration. A *force* drive applies \( \tau \) directly. NVIDIA's manipulator tutorial tunes with natural frequency and damping ratio, where \( m \) is the joint's effective inertia:
+Stiffness \( k_p > 0 \) gives position control. \( k_p = 0, k_d > 0 \) gives velocity control (wheels). A drive of type *acceleration* is normalized by the joint's mass, which reduces sensitivity to effective inertia in the drive response. Joint coupling, contacts, limits and discretization still affect the resulting motion. A *force* drive applies \( \tau \) directly. NVIDIA's manipulator tutorial tunes with natural frequency and damping ratio, where \( m \) is the joint's effective inertia:
 
 $$
 \omega_n = \sqrt{k_p / m}, \qquad \zeta = \frac{k_d}{2\,m\,\omega_n}
@@ -192,7 +192,7 @@ Frames: cuMotion works in the robot base frame. The graph planner's `plan_to_pos
 
 **Planning shares the card with everything else.** cuMotion is GPU-accelerated, and its world interface lives on the Warp device you give it. NVIDIA's RMPflow example passes `device="cpu"`, and the trajectory-optimizer example uses the default. Planning latency is wall-clock time in your control loop. RRT is stochastic, so expect a distribution with a tail, not a single number. The first call includes warm-up and allocation, so discard it. Planner GPU work competes with physics and RTX for SMs and memory, so measure it with the scene running, not in isolation.
 
-> **8 GB budget.** One imported arm plus a gripper, a few obstacles, and a cuMotion planner fit comfortably on an RTX 4060. Even so, the card is below NVIDIA's 16 GB minimum, so close other GPU apps and keep the Lecture 01 fixed-cost number in mind. Run validation and planning-latency sweeps headless. Use hull colliders except at contact surfaces, the `performance` mesh variant, and planner device `cpu` if VRAM is tight (measure both). What does not fit is many robots × decomposed colliders × cameras. That is a Lecture 07/10 problem, and a cloud L40S or RTX PRO 6000 is the fallback, not a bigger planner.
+> **8 GB budget.** An imported arm, gripper, obstacles and planner require a measured memory budget; this full-simulator combination was not validated on an RTX 4060. Even so, the card is below NVIDIA's 16 GB minimum, so close other GPU apps and keep the Lecture 01 fixed-cost number in mind. Run validation and planning-latency sweeps headless. Use hull colliders except at contact surfaces, the `performance` mesh variant, and planner device `cpu` if VRAM is tight (measure both). What does not fit is many robots × decomposed colliders × cameras. That is a Lecture 07/10 problem, and a cloud L40S or RTX PRO 6000 is the fallback, not a bigger planner.
 
 ---
 

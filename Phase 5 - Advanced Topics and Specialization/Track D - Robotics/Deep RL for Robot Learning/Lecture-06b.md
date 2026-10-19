@@ -2,11 +2,11 @@
 
 ## Overview
 
-[Lecture 05](Lecture-05.md) built the actor-critic: a policy (the player) and a value function (the coach), tied together by GAE. [Lecture 06](Lecture-06.md) added PPO's clipped surrogate and the trust-region argument behind it. This lecture opens the code that turns those equations into walking robots: **RSL-RL**, the PPO library from ETH Zurich's Robotic Systems Lab and NVIDIA. It is the default RL library in Isaac Lab, and it is also used by legged_gym, mjlab, and MuJoCo Playground. When a legged-locomotion or manipulation paper says "we train with PPO", this is usually the PPO it means.
+[Lecture 05](Lecture-05.md) introduces actor-critic and GAE; [Lecture 06](Lecture-06.md) adds PPO. This lecture reads **RSL-RL**, a supported robot-learning backend used with Isaac Lab and other simulator integrations. It is one implementation with specific choices; a paper reporting PPO need not use this library or its defaults.
 
-RSL-RL is small on purpose. The whole library is about 4,800 lines, and the algorithm itself, `rsl_rl/algorithms/ppo.py`, is under 500. You can read all of it in an afternoon. This lecture reads it with you, line by line against the equations from Lectures 05 and 06, then trains it on a batched pendulum you write yourself and runs the ablations that show which of its choices matter.
+The pinned algorithm and runner are compact enough to inspect alongside the equations. Read the exact tag named below; source organization, APIs, and line counts can change. The custom-environment training exercise is an integration task, not evidence that this checkout has executed an RSL-RL training run.
 
-**Version pin:** `rsl-rl-lib==5.5.1` (tag `v5.5.1`, September 2026), the version Isaac Lab 3.0 pins. Line numbers below refer to that tag. The 4.x and 5.x releases reorganized the library: older code and tutorials use a single `ActorCritic` module and a `policy=` config, which you will learn to recognize in Section 9.
+**Version pin for this standalone lecture:** `rsl-rl-lib==5.5.1`, tag `v5.5.1`. Line numbers refer to that tag. This differs from Isaac Lab's September `v3.0.0-EA` tag, which pins 5.4.1; a later reviewed 3.0 branch commit uses 5.5.1. See the [exact compatibility record](../Isaac%20Sim%20and%20Isaac%20Lab/Compatibility.md#pin-the-source-including-the-documentation). Older tutorials use a single `ActorCritic` module and a `policy=` config; Section 9 explains the changed organization.
 
 By the end you should be able to:
 
@@ -19,11 +19,11 @@ By the end you should be able to:
 
 ---
 
-## 1. Why it matters: one library, most robot PPO
+## 1. Why it matters: inspect a concrete robot PPO implementation
 
 The same 500 lines of PPO train ANYmal and Unitree quadrupeds, humanoids, and Franka manipulation tasks across several simulators. Three reasons to know it well:
 
-* **Reproducing papers.** Most published locomotion results inherit RSL-RL's defaults: adaptive learning rate, clipped value loss, separate actor and critic networks, a short rollout over thousands of environments. If you reimplement PPO "from the paper", you will not match their curves until you match these choices.
+* **Reproducing papers.** For a result that uses RSL-RL, inspect its actual configuration rather than assuming defaults: adaptive learning rate, clipped value loss, separate actor and critic networks, a short rollout over thousands of environments. If you reimplement PPO "from the paper", you will not match their curves until you match these choices.
 * **Debugging your own training.** When an Isaac Lab run plateaus, the fix is usually in this file: a value target off by a time-out, a reward scale fighting the value clip, a learning rate the KL rule drove to its floor. You need to know which line is responsible.
 * **Extending it.** The library's purpose is to be modified. Asymmetric critics, symmetry augmentation, curiosity, and student-teacher distillation are all small, readable additions to the same loop.
 
@@ -70,7 +70,9 @@ obs = TensorDict({"policy": proprio_and_commands, "privileged": sim_state}, batc
 and the runner config maps **observation sets** (what each model needs) to **groups** (what the environment provides):
 
 ```python
-"obs_groups": {"actor": ["policy"], "critic": ["policy", "privileged"]}
+runner_config_excerpt = {
+    "obs_groups": {"actor": ["policy"], "critic": ["policy", "privileged"]}
+}
 ```
 
 Each model concatenates its groups in order (`mlp_model.py:113-118`). `resolve_obs_groups` (`utils/utils.py:192`) fills in a missing set: first with a group of the same name, then with the `"policy"` group, and otherwise it raises an error. The sets RSL-RL knows are `actor`, `critic`, `student`, `teacher`, and `rnd_state`.
@@ -105,9 +107,11 @@ $$
 \tilde r_t = r_t + \gamma\, V(s_t)\cdot \mathbb{1}[\text{time-out at } t]
 $$
 
-and then let the `done` flag cut the GAE recursion as usual. Notice that it uses \(V(s_t)\), the value of the state **before** the step, not \(V(s_{t+1})\). That is an approximation forced by the environment API. GPU environments reset in place, so the observation returned at a time-out is already the next episode's first state, and the true \(s_{t+1}\) is gone. Using the previous state's value is accurate when \(V\) changes slowly over one control step, which is usually true at 50 Hz.
+and then let the `done` flag cut the GAE recursion as usual. Notice that this pinned implementation uses \(V(s_t)\), the value **before** the step, rather than \(V(s_{t+1})\). It is an approximation in this collection path, where auto-reset can replace the final observation. An adapter can instead preserve the true final observation and evaluate it before reset; this is not a mathematical requirement of GPU simulation. The bootstrap error from substituting the old value is \(\gamma[V(s_t)-V(s_{t+1})]\). A 50 Hz rate alone does not bound that error near contact, failure, or success transitions. Test the assumption against preserved final-state values if it matters for your task.
 
 Isaac Lab's `RslRlVecEnvWrapper` sets `dones = terminated | truncated`, and it reports `extras["time_outs"] = truncated` **only for infinite-horizon tasks** (`cfg.is_finite_horizon == False`). For a task that really ends at the time limit (the robot is scored at the final step), the time-out is a real terminal state and must not be bootstrapped. Lab 6b-c measures what happens when bootstrapping is missing.
+
+Test the simultaneous-flags case too. The [EA wrapper source](https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/source/isaaclab_rl/isaaclab_rl/rsl_rl/vecenv_wrapper.py) forwards `truncated` without excluding `terminated`. If your task can set both on the same transition, the reward correction above can bootstrap a genuine terminal state. Preserve both flags and enforce terminal precedence in your task/adapter, for example a time-out correction mask of `truncated & ~terminated`, under the continuing-task interpretation. The [CPU test](CPU-Lab.md) includes this boundary case.
 
 ---
 
@@ -243,7 +247,7 @@ for float32 observations (all groups, stored once), actions, two distribution-pa
 
 ## 10. Build it
 
-Everything goes in `rslrl_lab/`. You need only PyTorch and `pip install rsl-rl-lib==5.5.1`. The labs run on CPU in minutes, and faster on any GPU.
+Save the supplied source block as `rslrl_lab/pendulum_rsl.py`, creating the directory first. Use an isolated environment with compatible PyTorch and `rsl-rl-lib==5.5.1`; the latter installs its declared dependencies, including TensorDict. This is an upstream-based implementation exercise, not an executed RSL-RL training result in the course evidence. Begin with `--num_envs 8 --steps 8 --iters 1 --device cpu` and record actual runtime before choosing a larger run. A GPU speedup depends on workload size and is not guaranteed.
 
 ### Lab 6b-a — Map the equations to the code
 
@@ -365,7 +369,7 @@ if __name__ == "__main__":
 
 ```bash
 pip install rsl-rl-lib==5.5.1
-python rslrl_lab/pendulum_rsl.py                       # about 2-3 minutes on a laptop CPU
+python rslrl_lab/pendulum_rsl.py --num_envs 8 --steps 8 --iters 1 --device cpu  # unexecuted smoke recipe
 ```
 
 The evaluation uses the unscaled Pendulum reward, so scores compare directly with Gymnasium's. A random policy scores around −1,200 per episode, and a policy that swings up and balances scores around −150. Things to notice:
@@ -420,7 +424,7 @@ Open `source/isaaclab_tasks/isaaclab_tasks/core/velocity/config/anymal_d/agents/
 | `Perf/total_fps` | \(NT / (t_c + t_l)\) | Throughput to compare across hardware and `num_envs` |
 | Evaluation return, ≥ 3 seeds | Lab script | The number to report, with spread (Lecture 13) |
 
-**Reference results from one CPU test run** of Lab 6b-c (512 environments, 32 steps, 150 iterations, rsl-rl-lib 5.5.1, PyTorch 2.14 CPU, 3 seeds). These are one machine's measurements, not benchmarks:
+**Previously reported results, not reproduced in the 2026-10-18 review.** The original course records Lab 6b-c with 512 environments, 32 steps, 150 iterations, RSL-RL 5.5.1, PyTorch 2.14 CPU, and three seeds. Raw logs, an environment lock, and the executed script revision are not present alongside this table. Preserve it as an unverified historical report; do not use these numbers as a learner pass threshold or a current performance claim. A new run must save those missing artifacts.
 
 | Configuration | Eval return after 30 iterations | Eval return after 150 iterations |
 |---|---|---|
@@ -432,7 +436,7 @@ Open `source/isaaclab_tasks/isaaclab_tasks/core/velocity/config/anymal_d/agents/
 
 Mean ± sample std over seeds 0, 1, 2, with the individual seeds in parentheses. Evaluation is the deterministic policy over 256 episodes, in Gymnasium Pendulum units (random ≈ −1,200). Each 150-iteration run took about 1 minute with four runs sharing a 4-core CPU.
 
-What the numbers say, and what they don't:
+Conditional interpretation of the reported table, pending reproduction:
 
 * **Every configuration solves Pendulum by 150 iterations.** On an easy task, none of these choices changes the final result. They change how fast you get there, which is what you pay for in GPU-hours on a hard task.
 * **Time-out bootstrapping and the adaptive learning rate both speed up early learning by a wide margin.** Their 30-iteration returns are more than 2× worse than the baseline, and the seed ranges do not overlap. Without time-outs, the critic is taught that the world ends every 200 steps, and its values carry a time dependence it cannot observe. The fixed-rate gap is the adaptive rule at work. In baseline seed 0, it pushed the learning rate from 1e-3 to its 1e-2 ceiling within the first iteration and held it there for 27 iterations, 10× the fixed rate, before backing off to 2e-3 as the KL grew.

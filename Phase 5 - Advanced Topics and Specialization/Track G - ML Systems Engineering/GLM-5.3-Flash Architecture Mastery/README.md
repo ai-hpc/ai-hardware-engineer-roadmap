@@ -1,5 +1,7 @@
 # GLM-5.3-Flash Architecture Mastery
 
+**Learner route:** this is an advanced case study. Start with Module 03’s single-head recurrence and the [CPU hybrid-state lab](CPU-Hybrid-State-Lab.md), then follow Module 12’s staged build. The lab has a standard-library route and an optional actual PyTorch comparison against pinned upstream KDA/KPool functions. The 8-GPU deployment remains a separate milestone. Source-attributed engine measurements are not local course measurements.
+
 <div class="course-identity mlsys" markdown="1">
 <div class="course-identity__icon">Sₜ</div>
 <div markdown="1">
@@ -14,6 +16,7 @@
 GLM-5.3-Flash is not GLM-5.3 with fewer layers or lower precision. Z.ai describes a **redesigned hybrid architecture**: sparse parameter activation (MoE), recurrent sequence memory (KDA), compressed per-token history (MLA), selective historical retrieval (DSA/KPool), and manifold-constrained multi-stream residuals (mHC) — five mechanisms, each attacking a different cost, composed into one decoder. Treating any two of them as interchangeable, or assuming one subsumes another, is the single most common way to misread this model.
 
 **Target deployment:** an 8× RTX 5090 (PCIe Gen4, no P2P) system serving the NVFP4 checkpoint — the `sparkinfer-frontier` case study threaded through Modules 09–12.
+The [original model config](https://huggingface.co/zai-org/GLM-5.3-Flash/blob/46a050bec13002ad29ee795c16e61cf4fa3c4a9c/config.json), [upstream implementation](https://github.com/huggingface/transformers/blob/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/glm5_next/modeling_glm5_next.py) and [separate NVFP4 deployment report](https://github.com/gittensor-ai-lab/sparkinfer-frontier/blob/58ca63a416bcc866dbf8b8a2605643a51a5b221a/README.md) were checked on October 18, 2026. That report keeps prefix caching disabled for a stated correctness issue; its throughput is not a claim about other revisions or hardware.
 **Level:** principal AI engineer. This course assumes you can already read a CUDA profiler and derive a roofline; it does not re-teach either.
 
 **Layer mapping:** L4–L7 — model mathematics through multi-GPU serving. It sits directly on top of [Hardware-Aware LLM Quantization](../Hardware-Aware%20LLM%20Quantization/README.md) (this checkpoint *is* an NVFP4 deployment) and below nothing — this is the architecture the rest of Track G's tooling serves.

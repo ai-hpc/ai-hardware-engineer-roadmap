@@ -9,7 +9,7 @@
 </div>
 </div>
 
-**Source cutoff: October 13, 2026.** This is a substantial engineering course, not a claim to cover every paper or developments later in October. Current-model coverage distinguishes announced results, papers, code, downloadable weights, API access, and partner access. Start with [Lecture 01](Lecture-01.md); use the [frontier register](Frontier-Register.md) when selecting an actual model artifact.
+**Research snapshot: October 13, 2026, with a [targeted source and execution update checked October 18](Current-Update-2026-10-18.md).** This is a substantial engineering course, not a claim to cover every paper or developments later in October. Current-model coverage distinguishes announced results, papers, code, downloadable weights, API access, and partner access. Start with [Lecture 01](Lecture-01.md); use the [frontier register](Frontier-Register.md) when selecting an actual model artifact.
 
 A VLA maps visual observations, language, and often robot state/history to actions. Professional work requires understanding the entire chain: data provenance, representation, learning objective, model architecture, action semantics, controller integration, inference timing, and closed-loop evidence. This course teaches that chain through worked examples, guided experiments, negative controls, and independent transfer tasks.
 
@@ -102,7 +102,7 @@ The first CPU capstone trains a tiny nine-parameter grounding model with a fixed
 
 ## Labs, hardware, and assessment
 
-Start with the [laboratory guide](Lab-Guide.md). The supplied CPU exercises use the Python standard library and require no model downloads. They include a trainable synthetic policy, episode-safe chunks, action normalization, delayed-action eligibility, and paired task-level statistics. Tests run in curriculum CI.
+Start with the [laboratory guide](Lab-Guide.md). The core supplied CPU exercises use the Python standard library and require no model downloads. The [action-generation lab](Action-Generation-Lab.md) adds seven framework-free numerical checks and optional real PyTorch training for diffusion and flow; that training route needs the documented framework installation. They include a trainable synthetic policy, episode-safe chunks, action normalization, delayed-action eligibility, paired task-level statistics, and a supplied [recorded-data conversion and action-dispatch exercise](Dataset-and-Execution-Lab.md). Tests run in curriculum CI.
 
 GPU exercises depend on the selected model and environment. There is no single VRAM minimum for all VLAs. Measure simultaneous model, camera, simulator, workspace, and training-state memory, and use the selected upstream support matrix. The [Isaac lab guide](../Isaac%20Sim%20and%20Isaac%20Lab/Lab-Guide.md) separates supported simulation from reduced exercises. CPU success does not validate RTX simulation, checkpoint fine-tuning, or a physical controller.
 

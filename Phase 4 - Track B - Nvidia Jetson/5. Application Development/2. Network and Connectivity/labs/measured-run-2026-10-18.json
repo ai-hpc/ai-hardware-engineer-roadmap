@@ -1,0 +1,155 @@
+{
+  "python": "3.12.3",
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "transport": "real TCP and UDP sockets on 127.0.0.1, OS-assigned ephemeral ports",
+  "tcp": {
+    "samples": 30,
+    "rtt_ms": [
+      0.37908199010416865,
+      0.2405520062893629,
+      0.3438830026425421,
+      0.23326100199483335,
+      15.432632993906736,
+      0.3295030037406832,
+      0.4259429988451302,
+      0.2112820220645517,
+      0.25024102069437504,
+      15.358261996880174,
+      0.2540519926697016,
+      0.24947102065198123,
+      0.21917198318988085,
+      0.27706200489774346,
+      15.373361995443702,
+      0.4034040030092001,
+      0.2542510046623647,
+      0.4933940072078258,
+      0.27593199047259986,
+      15.50631399732083,
+      0.4784640041179955,
+      0.31163200037553906,
+      0.24016201496124268,
+      0.2524319861549884,
+      15.40148098138161,
+      0.2587619819678366,
+      0.27446201420389116,
+      0.44408300891518593,
+      0.24127200595103204,
+      15.563762979581952
+    ],
+    "p50_ms": 0.27706200489774346,
+    "p95_ms": 15.50631399732083,
+    "max_ms": 15.563762979581952,
+    "injected_server_work_ms": [
+      0,
+      0,
+      0,
+      0,
+      15,
+      0,
+      0,
+      0,
+      0,
+      15,
+      0,
+      0,
+      0,
+      0,
+      15,
+      0,
+      0,
+      0,
+      0,
+      15,
+      0,
+      0,
+      0,
+      0,
+      15,
+      0,
+      0,
+      0,
+      0,
+      15
+    ],
+    "timing_meaning": "client send to complete response, includes server work; not radio latency"
+  },
+  "udp": {
+    "requests": [
+      {
+        "sequence": 0,
+        "attempts": 2,
+        "reply": {
+          "status": "applied",
+          "sequence": 0,
+          "value_after_application": 2,
+          "duplicate": false
+        },
+        "completion_ms": 30.596163996960968
+      },
+      {
+        "sequence": 1,
+        "attempts": 2,
+        "reply": {
+          "status": "applied",
+          "sequence": 1,
+          "value_after_application": 5,
+          "duplicate": true
+        },
+        "completion_ms": 30.449343990767375
+      },
+      {
+        "sequence": 3,
+        "attempts": 1,
+        "reply": {
+          "status": "applied",
+          "sequence": 3,
+          "value_after_application": 9,
+          "duplicate": false
+        },
+        "completion_ms": 0.12089000665582716
+      },
+      {
+        "sequence": 2,
+        "attempts": 1,
+        "reply": {
+          "status": "out_of_order",
+          "sequence": 2
+        },
+        "completion_ms": 0.10314999963156879
+      },
+      {
+        "sequence": 4,
+        "attempts": 1,
+        "reply": {
+          "status": "expired",
+          "sequence": 4
+        },
+        "completion_ms": 0.08993098163045943
+      },
+      {
+        "sequence": 5,
+        "attempts": 1,
+        "reply": {
+          "status": "applied",
+          "sequence": 5,
+          "value_after_application": 10,
+          "duplicate": false
+        },
+        "completion_ms": 0.1424799847882241
+      }
+    ],
+    "received_datagrams": {
+      "0": 2,
+      "1": 2,
+      "3": 1,
+      "2": 1,
+      "4": 1,
+      "5": 1
+    },
+    "final_counter": 10,
+    "unique_applied_commands": 4,
+    "faults": "one discarded request; one discarded ACK; reordered sequence 2; expired sequence 4",
+    "limit": "deduplication lasts only within this in-memory session; not exactly-once delivery"
+  },
+  "source_sha256": "d619f67d9ca00987c08acb7607dd43bed8d407dd9a9ef1b652d8f70761c4b637"
+}

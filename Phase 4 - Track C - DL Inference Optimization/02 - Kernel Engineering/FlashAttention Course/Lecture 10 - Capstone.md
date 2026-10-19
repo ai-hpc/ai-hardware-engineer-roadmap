@@ -1,176 +1,63 @@
-# Lecture 10 — Capstone
+# Lecture 10 — Capstone: preserve a contract while changing an implementation
 
-**Parent:** [FlashAttention Course](Guide.md)
+**Course:** [FlashAttention](Guide.md) · **Reviewed:** 18 October 2026
 
-**One-line purpose:** Pick one focused kernel-path change, implement it, prove it correct, benchmark it, and write the report a hiring manager (or your future self) can actually read.
+**Goal:** produce a small, reproducible engineering change. **Artifact:** a patch, correctness evidence and a report that clearly separates CPU results, source review and optional GPU measurements.
 
-**Prerequisites:** Lectures 1–9, including the correctness harness from Lecture 7 and the benchmarks from Lectures 5/6/8/9.
+## 1. Choose an achievable scope
 
-**Artifact:** A patch on top of `flash-attention`, a correctness report (harness output), a benchmark report (CSV + plot), and a 1–2 page write-up. Together: a single PR-style artifact you can show.
+| Route | Concrete change | Required evidence |
+|---|---|---|
+| CPU mathematical path | Add a documented sliding-window mask to the tiled reference | Explicit allowed-pair examples, dense/tiled forward comparison, gradient tests, empty/tail cases |
+| CPU inference path | Add a bounded cache append plus partial-page fixture | Full-prefill versus incremental agreement, capacity/position failures, no double rotation |
+| GPU kernel path | Modify one supported tile/dispatch/mask path in a pinned implementation | Same correctness contract, GPU memory/synchronization checks, controlled before/after timing |
+| API/documentation path | Correct a reproducible interface/shape/mask defect | Minimal failing case, corrected behavior and exact version boundary |
 
----
+The CPU routes are complete learning outcomes. They do not claim that a Python loop is an optimized FlashAttention GPU kernel. Publishing an upstream PR is optional; a reviewable local patch is enough.
 
-## Why it matters
+## 2. Write the acceptance rule first
 
-The hardest skill to demonstrate as a kernel engineer is the loop of "find a real bottleneck, write a working change, prove it does not break anything, prove it is faster." This capstone is that loop in miniature on a codebase that matters.
+For the window-mask route, define positions before code. With lower-right alignment, query i has aligned position `i + S − L`; a causal left window of width W permits keys from `position−W+1` through `position`, clipped to valid keys. State whether W counts the current token. A different convention can also be valid, but all implementations and tests must agree.
 
-Do not try to outperform Tri Dao on the main kernel — that is not the point. The point is to ship a credible, well-measured, well-documented change.
+Use at least:
 
----
+- A square sequence and a rectangular decode sequence.
+- A query longer than available keys, producing fully masked rows under the chosen alignment.
+- Tile tails and tile size one.
+- A wrong mask/alignment case that the test actually rejects.
+- Float64 forward and gradient checks, then one lower-precision comparison on identical quantized inputs.
 
-## Mental model: what counts as a good capstone
+Do not call a passing finite fixture a proof over all tensors. The derivation establishes the mathematical invariant; tests catch implementation defects over declared coverage.
 
-A good capstone is **focused**, **measurable**, and **honest**. It has:
+## 3. Run the baseline before the change
 
-1. A specific path you changed, with a short paragraph of why.
-2. A correctness section that runs your Lecture 7 harness on the changed path.
-3. A benchmark section that compares before-and-after on at least one shape range.
-4. A "limitations" section. If the patch only wins for `d = 64`, say so. If it slows down small batches, say so.
+Use [the CPU lab](CPU-Attention-Lab.md) and retain its test/report files. Freeze the input seeds and comparison tolerances. Make one change and rerun the affected checks. If a new requirement changes the semantics, update the oracle and explain why; do not quietly weaken thresholds to turn a failure green.
 
-A bad capstone reimplements FA2 from scratch and ends up at "I got within 4× of upstream." Skip that. Pick a small, real change instead.
+For a GPU extension, use a workload that fits available memory. A float64 dense score oracle at 64k length may itself require tens of GiB per head; compare smaller cases or selected rows with a justified reference strategy. Do not allocate a huge oracle just because the fused candidate fits.
 
----
+## 4. Keep performance claims tied to their boundary
 
-## Capstone options (pick one)
+CPU reference timing can reveal Python/array overhead, but cannot predict CUDA performance. GPU kernel timing excludes tokenizer, model layers and serving queues unless deliberately included. Full-model tokens/s requires the full model path and request workload. Time-to-first-token includes more than an attention prefill call.
 
-### Option A — Hand-fused mask path
+For a kernel report, collect warmups, repeated measurements, a spread statistic, device/runtime versions, exact shapes and useful FLOP convention. Distinguish requested backend from observed executed kernel. If a supported backend is unavailable, report the reason instead of relabeling fallback execution.
 
-Pick a mask the upstream kernel does not handle in-fused form (custom block-sparse, document-block diagonal for packed-sequence training, or a sliding-window + global-tokens hybrid). Implement it as a Triton kernel in the style of `flash_attn/flash_attn_triton.py`. Compare correctness against a math reference. Compare speed against the upstream path that falls back to attention with `attn_bias`.
+A slower change can still complete the course when the evidence explains why. No arbitrary target speedup, “within 20% of upstream,” or universal reproducibility percentage is required.
 
-Why this is good: you exercise the masking machinery, you produce a kernel that has a real use case (long-context with global tokens, e.g. retrieval-augmented setups), and the benchmark gap is large.
+## 5. Submit a report another learner can reproduce
 
-### Option B — Decode-step paged-KV optimisation
-
-In the style of the cacheon-sglang-miner project we worked on, take `flash_attn_with_kvcache` and produce a fused path that does in-kernel rotary plus an extra small optimisation — e.g. preloading the next layer's `K, V` while the current attention runs, or skipping a redundant H2D copy in the calling layer. Benchmark decode TPS at long context (16k–32k).
-
-Why this is good: directly applicable to serving stacks; the harness is small (decode shape only); the win is end-to-end TPS, not micro.
-
-### Option C — FA3 numerics audit at long context
-
-Generate stress inputs (e.g. extreme score magnitudes that hit subnormal exp(-large)) and audit the bf16 / fp16 / fp8 forward outputs of FA3 against an fp64 reference for `N ∈ {8k, 16k, 32k, 64k}`. Build a per-row error CDF (not just a max-error number). Identify the shape where the dtype tolerance is exceeded; check whether `--rotary` / causal mask / sliding-window changes it.
-
-Why this is good: numerics audits never get done and they always find something. Outputs are publication-quality plots.
-
-### Option D — Triton port of one FA2 path
-
-Take one upstream FA2 head-dim path (e.g. `d = 64, causal=True, no dropout`) and write the Triton equivalent (start from `flash_attn_triton.py` which is incomplete and outdated). Match upstream within ±20% on a sweep. Document where Triton's autotuner picks tile sizes vs upstream's hand-picked traits.
-
-Why this is good: you learn the Triton expression of online softmax, and you produce a portable kernel for non-NVIDIA backends (Triton supports AMD).
-
-### Option E — A real PR
-
-If you have one *actually* small, *actually* useful patch (a doc fix, a missing varlen mask combo, a CMake clean-up, a numerics-tolerance bug surfaced by your harness), propose it upstream. The capstone artifact is the GitHub PR plus your correctness/benchmark addendum.
-
-This option is the most useful but also the highest variance — your timing is in the hands of reviewers.
-
----
-
-## Build it
-
-For whichever option:
-
-1. **State the change in one sentence.** "I am adding an in-kernel sliding-window-plus-global-tokens mask path for the FA2 forward at head_dim 128, causal=True."
-2. **Implement.** Smallest possible diff. Do not refactor neighbouring code.
-3. **Run the Lecture 7 harness.** Add at least one shape that exercises your change. All rows must pass at the documented tolerance.
-4. **Run a benchmark.** At least three shapes spanning small / medium / large in your target dimension. Use median-of-N timings after warmup.
-5. **Write the report** (template below).
-
----
-
-## Report template
-
-```
-# <Capstone title>
-
-## What
-One paragraph. What did you change and where?
-
-## Why
-One paragraph. What workload or bottleneck motivated this?
-
-## How
-Two-to-five paragraphs of technical content:
-- Algorithmic / scheduling change (mental model from Lecture 2 / 3 / 6 / 9)
-- File-level diff summary (`path/to/file.cu`: added X, modified Y)
-- Edge cases handled (masks, dtypes, head_dims you support and skip)
-
-## Correctness
-- Reference: PyTorch SDPA math backend OR the NumPy harness from Lecture 2.
-- Harness output table (paste the JSON from Lecture 7).
-- Tolerance bands used and why.
-
-## Performance
-- Hardware: GPU model, CUDA version, driver, peak bf16 TFLOPs.
-- Sweep table: shape × {before, after, % delta, achieved TFLOPs, achieved HBM BW}.
-- One plot.
-
-## Limitations
-- Shapes that regress.
-- Shapes that are not supported by the new path.
-- Numerics caveats at the edges.
-
-## What I would do next
-Two or three bullets. Honest about scope.
+```text
+Question and baseline:
+Input/mask/position/precision contract:
+Revision, environment and exact commands:
+One implementation change:
+Correctness tests, thresholds and failed cases:
+Measured results and timing boundary:
+Source-reviewed or unexecuted extensions:
+Limitations and next experiment:
 ```
 
----
+Include the patch, raw JSON/CSV output and one figure only if it helps explain the result. Keep a numerical counterexample or mutation that demonstrates your checks detect the intended bug.
 
-## Use it in the real stack
+**Example conclusion:** “The added window mask matches the dense float64 reference for these shapes and gradients; a lower-right/upper-left mutation fails the decode fixture. CPU execution was measured. No GPU throughput or full-model quality is claimed.”
 
-A capstone that integrates with a real serving stack is worth 10× one that just lives in a notebook. If you went with Option B, plug it into the cacheon-sglang-miner repo or a vLLM fork, run an SN14-style correctness sweep, and report end-to-end TPS not just kernel time. That is the artifact that gets you hired into MTS Kernels or DL Inference Optimization roles.
-
----
-
-## Measure it
-
-You already have all the measurement tools from earlier lectures:
-
-- Lecture 1 roofline notebook → confirm your change moves the kernel in the expected direction (memory-bound → compute-bound or vice versa).
-- Lecture 4 Nsight Compute metrics → confirm tensor-core utilisation, HBM traffic, occupancy.
-- Lecture 7 harness → correctness.
-- Lecture 8 paged-decode bench → if Option B.
-
-Use all of them. Drop the raw outputs in an appendix.
-
----
-
-## Ship it
-
-Final deliverable in `flash-attn-course/capstone/`:
-
-1. `README.md` — the report.
-2. `patch.diff` — the actual code change as a git diff.
-3. `correctness_report.json` — harness output.
-4. `benchmark.csv` and `benchmark.png` — your sweep.
-5. (Optional) `ncu_before.ncu-rep`, `ncu_after.ncu-rep` — profiling reports.
-
-If you can hand someone that directory and they can understand within 10 minutes what you did and why it works, you have finished the course.
-
----
-
-## What good looks like
-
-- Honest scope. A 30-line patch with a clean benchmark beats a 1000-line patch with vague numbers.
-- Real workload framing. "This helps decode TPS at 32k context on H200" beats "this kernel is 1.3× faster on synthetic inputs."
-- Reproducibility. Anyone with your patch and your benchmark script must be able to reproduce your numbers within ~10%.
-- A line in the limitations section. If your report has no limitations section, you have not measured enough.
-
----
-
-## Where to go after this course
-
-- **Kernel engineering depth:** CUTLASS examples, CUDA samples, NVIDIA HPC SDK, PTX manual, write a Hopper-specific GEMM from scratch.
-- **Inference serving depth:** vLLM internals, SGLang's RadixAttention, TensorRT-LLM plugins, the cacheon-style production kernels.
-- **Compiler depth:** Triton internals (`triton/python/triton/compiler/`), MLIR-based GPU compilers, the Mosaic / Pallas GPU backends.
-- **ML systems research:** speculative decoding, MoE attention variants, multi-query rolling attention, FP4 numerics, infinite-context architectures.
-
-The FA codebase will keep getting more interesting (FA4, FA-MoE, FA-paged-v2). You are now equipped to follow along.
-
----
-
-## Related pages
-
-- [Lecture 7 — Backward pass and validation](Lecture%2007%20-%20Backward%20Pass%20and%20Validation.md)
-- [Lecture 9 — Hopper / FA3 / FA4](Lecture%2009%20-%20Hopper%20FA3%20FA4.md)
-- [02 — Kernel Engineering](../Guide.md)
-- [DL Inference Runtimes and Deployment](../../05%20-%20Inference%20Runtimes%20and%20Deployment/Guide.md)
+Continue to [the compiler stack](../../03%20-%20Compiler%20Stack/Guide.md) with the exact mask/layout/precision contract your backend must preserve. The meaningful artifact is a tested boundary, not a guessed benchmark table.

@@ -1,0 +1,22 @@
+{
+  "date_utc": "2026-10-18T22:07:31.820402+00:00",
+  "python": "3.12.3",
+  "portable_tests": 11,
+  "optional_tests": 0,
+  "result": "passed",
+  "scope": "actual localhost TCP/UDP and SLIP framing",
+  "commands": [
+    "python3 -m unittest discover -s 'Phase 4 - Track B - Nvidia Jetson/5. Application Development/2. Network and Connectivity/labs' -p 'test_*.py' -v"
+  ],
+  "source_sha256": {
+    "test_localhost.py": "6f9eadb98f72588a72784e4a11f556fdc395ed77655ecc12baeac91990e7c99e",
+    "test_slip.py": "2d562ba3a674201fa60e84f688dd24ee29497e8f7b56e3c6035bdbc6c7fae27f",
+    "localhost_lab.py": "d619f67d9ca00987c08acb7607dd43bed8d407dd9a9ef1b652d8f70761c4b637",
+    "slip.py": "18052535af93dce019431569d1c43daa0c77966d61b247550781cc5ceb373a05"
+  },
+  "unexecuted": [
+    "Jetson hardware and BSP configuration",
+    "ESP firmware builds or flashing",
+    "physical radio/audio tests"
+  ]
+}

@@ -55,7 +55,7 @@ Use this map when choosing architecture.
 
 Concrete examples:
 
-- OpenAI Agents SDK documents agents, tools, handoffs, guardrails, sessions, tracing, and MCP integration.
+- OpenAI has three distinct choices: Responses for direct model/API integration; Agents SDK for an application-owned loop; and the managed Agents API for hosted harness/session orchestration. An SDK running in your process is not a managed hosting service. See the [official comparison](https://developers.openai.com/api/docs/guides/agents).
 - LangGraph is useful when the agent is a long-running, stateful workflow that needs checkpointing and human-in-the-loop controls.
 - MCP is useful when you want tools and context servers to be reusable across IDEs, chat apps, local assistants, and agent runtimes.
 - OpenClaw is a useful case study for gateway-based assistants: channels, sessions, routing, agent ownership, and local-first control.
@@ -128,75 +128,21 @@ This contract matters because **provider APIs change faster** than your product 
 
 ## 4. Own the Adapter Boundary
 
-A clean **adapter** converts provider-specific responses into your **runtime contract**.
+The dataclasses above describe application concepts, not a universal provider wire format. Their `budget_usd` field is a request declaration, not enforced accounting. A runtime must reserve a conservative per-call allowance before the call, reconcile actual usage afterward, and handle unknown prices or missing usage explicitly.
 
-```python
-import os
-from typing import Protocol
+Use the actual [provider contract lab](Provider-Contract-Lab.md) and [adapters](labs/provider_loops.py) to compare two protocols:
 
+| Detail | Claude Messages | OpenAI Responses |
+|---|---|---|
+| Model call | `messages.create` | `responses.create` |
+| Tool request | `tool_use` content block | `function_call` output item |
+| Correlation key | block `id` → `tool_use_id` | `call_id` → `call_id` |
+| Tool result | `tool_result` block in a user message | `function_call_output` input item |
+| Continuation state | Complete assistant blocks | Complete output items, including required reasoning state |
 
-class ModelAdapter(Protocol):
-    def run_turn(
-        self,
-        messages: list[dict],
-        tools: list[ToolSpec],
-        model: str,
-    ) -> tuple[str, list[ToolCall], dict]:
-        """Return text, tool calls, and usage metadata."""
-        ...
+An adapter must retain opaque provider continuation state; reducing every response to `(text, calls, usage)` can lose it. A `role="tool"` message is not accepted as a universal substitute. Preserve multiple calls and match every result to its call ID. Define what happens on incomplete output, refusal, continuation signals, duplicate IDs and budget exhaustion before permitting side effects.
 
-
-class AgentRuntime:
-    def __init__(self, adapter: ModelAdapter, tool_registry: dict[str, callable]):
-        self.adapter = adapter
-        self.tool_registry = tool_registry
-
-    def run(self, request: AgentRequest) -> AgentResponse:
-        model = os.environ.get("AGENT_MODEL", "default-agent-model")
-        messages = list(request.messages)
-        events: list[RuntimeEvent] = []
-        all_tool_calls: list[ToolCall] = []
-        input_tokens = 0
-        output_tokens = 0
-
-        for _step in range(request.max_steps):
-            text, tool_calls, usage = self.adapter.run_turn(messages, request.tools, model)
-            input_tokens += int(usage.get("input_tokens", 0))
-            output_tokens += int(usage.get("output_tokens", 0))
-
-            if not tool_calls:
-                events.append(RuntimeEvent("done", request.session_id, {"text": text}))
-                return AgentResponse(text, events, input_tokens, output_tokens, all_tool_calls)
-
-            all_tool_calls.extend(tool_calls)
-            messages.append({"role": "assistant", "content": text, "tool_calls": tool_calls})
-
-            for call in tool_calls:
-                tool = next((t for t in request.tools if t.name == call.name), None)
-                if tool is None:
-                    result = ToolResult(call.call_id, f"Unknown tool: {call.name}", is_error=True)
-                elif tool.requires_approval or tool.risk in {"write", "destructive"}:
-                    events.append(RuntimeEvent("policy_block", request.session_id, {"tool": call.name}))
-                    result = ToolResult(call.call_id, "Blocked: approval required", is_error=True)
-                else:
-                    handler = self.tool_registry[call.name]
-                    result = ToolResult(call.call_id, str(handler(**call.arguments)))
-
-                events.append(RuntimeEvent("tool_result", request.session_id, result.__dict__))
-                messages.append({"role": "tool", "tool_call_id": call.call_id, "content": result.content})
-
-        return AgentResponse(
-            final_text="Stopped: max_steps reached before completion.",
-            events=events,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            tool_calls=all_tool_calls,
-        )
-```
-
-The adapter can call OpenAI, Anthropic, a local model, or a routed gateway. The runtime code should not care.
-
----
+The CPU fixture tests exercise real SDK request serialization and response parsing. They do not measure model tool-selection quality or prove service compatibility for a specific live model. They implement only bounded local arithmetic tools, with no shell, remote MCP, built-in server tools, durable restart or paid API budget.
 
 ## 5. Tool Boundaries and MCP
 

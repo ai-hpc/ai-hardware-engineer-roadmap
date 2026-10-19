@@ -2,6 +2,10 @@
 
 **Collection:** [MCP for AI Agents](README.md) | **Previous:** [← Lecture 06](Lecture-06.md) | **Next:** [Lecture 08](Lecture-08.md)
 
+
+**Protocol scope:** the detailed wire/SDK examples below teach the `2025-11-25` compatibility contract. Start with the [current 2026-07-28 protocol lesson](Protocol-2026-07-28.md) for new implementations; do not relabel an old handshake or reverse-request example as current.
+
+
 ---
 
 Every prior lecture made MCP *more capable* — more primitives, more transports, remote servers reachable over the internet. This lecture is the bill. The reason MCP is interesting is the reason it is dangerous: it converts an LLM's text output into **real actions on real systems holding real data**. A model that "decides" to call `delete_file`, `send_email`, or `transfer_funds` is no longer producing tokens — it is producing side effects, and the protocol's whole job is to make that easy. Easy for you is easy for an attacker.
@@ -205,4 +209,4 @@ If you cannot tick every box, you have a demo, not a server people can safely de
 
 ## Current as of
 
-This lecture is current as of **June 2026**, pinned to the latest stable MCP specification, **2025-11-25**. The six attack patterns, the lethal-trifecta framing, and the defenses track the **OWASP MCP Security Cheat Sheet** and **MITRE ATLAS** as of this writing; the audience-bound-token mitigation relies on **Resource Indicators (RFC 8707)** as covered in [Lecture 06](Lecture-06.md), and the approval-gate annotations (`readOnlyHint` / `destructiveHint`) on the tool model from [Lecture 03](Lecture-03.md). Treat specific server SDK security features as a snapshot and verify against the installed version.
+The original June-2026 examples target `2025-11-25`. Reviewed 2026-10-18: **2026-07-28 is current**, with a different request, result, subscription, and retry contract. Use the [current lesson and official sources](Protocol-2026-07-28.md) before implementing or migrating. SDK snippets here have not been executed against the new revision; retained benchmark numbers are historical references, not local measurements.

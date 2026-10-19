@@ -12,14 +12,25 @@
 #include <sys/mman.h>
 #include <cassert>
 #include <cstdio>
+#include <exception>
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv) try {
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <model.gguf>\n", argv[0]);
         return 1;
     }
 
     const char* model_path = argv[1];
+    int device_count=0;
+    const auto device_status=cudaGetDeviceCount(&device_count);
+    if(device_status==cudaErrorNoDevice || device_status==cudaErrorInsufficientDriver
+        || (device_status==cudaSuccess && device_count==0)) {
+        fprintf(stderr,"SKIP: model mapping requires a usable CUDA device/driver; not executed\n");
+        return 77;
+    }
+    if(device_status!=cudaSuccess) {
+        fprintf(stderr,"FAIL: device enumeration: %s\n",cudaGetErrorString(device_status));return 1;
+    }
     printf("=== jetson-llm model loading test ===\n\n");
 
     // ── Test 1: System probe ─────────────────────────────────
@@ -80,6 +91,7 @@ int main(int argc, char** argv) {
     jllm::Tokenizer tokenizer;
     bool tok_ok = tokenizer.load_from_gguf(model_path);
     printf("  Loaded: %s\n", tok_ok ? "yes" : "no");
+    if(!tok_ok){fprintf(stderr,"FAIL: tokenizer profile or vocabulary was not loaded\n");return 1;}
     if (tok_ok) {
         printf("  Vocab size: %zu\n", tokenizer.vocab.size());
         printf("  BOS ID: %d\n", tokenizer.bos_id);
@@ -105,6 +117,7 @@ int main(int argc, char** argv) {
 
     bool loaded = jllm::load_and_map_weights(model_path, &weights, &weights_size, &mw, cfg);
     printf("  Loaded: %s (%ld MB)\n", loaded ? "yes" : "no", weights_size / (1024*1024));
+    if(!loaded){fprintf(stderr,"FAIL: model weights were not mapped\n");return 1;}
 
     if (loaded) {
         printf("  tok_embd:    %p\n", (void*)mw.tok_embd);
@@ -142,4 +155,6 @@ int main(int argc, char** argv) {
     printf("  All model loading tests passed!\n");
     printf("═══════════════════════════════════════\n");
     return 0;
+} catch(const std::exception& error) {
+    fprintf(stderr,"FAIL: model loading test: %s\n",error.what());return 1;
 }

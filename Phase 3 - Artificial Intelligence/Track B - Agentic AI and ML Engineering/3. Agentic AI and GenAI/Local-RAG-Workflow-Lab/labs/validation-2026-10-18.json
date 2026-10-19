@@ -1,0 +1,111 @@
+{
+  "checked_utc": "2026-10-18T22:23:38.842012+00:00",
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "environment": {
+    "python": "3.12.3",
+    "sqlite": "3.45.1",
+    "packages": {
+      "ormsgpack": "1.13.0",
+      "langgraph-sdk": "0.4.8",
+      "anyio": "4.15.1",
+      "requests": "2.34.2",
+      "aiosqlite": "0.22.1",
+      "langsmith": "0.14.11",
+      "sniffio": "1.3.1",
+      "langgraph-checkpoint": "4.3.0",
+      "h11": "0.16.0",
+      "langchain-text-splitters": "1.1.3",
+      "starlette": "1.9.0",
+      "langgraph-prebuilt": "1.1.1",
+      "zstandard": "0.25.0",
+      "packaging": "26.3",
+      "charset-normalizer": "3.5.2",
+      "langgraph-checkpoint-sqlite": "3.1.2",
+      "uuid_utils": "0.17.1",
+      "PyYAML": "6.0.3",
+      "certifi": "2026.10.18",
+      "httpx2": "2.14.0",
+      "urllib3": "2.8.0",
+      "websockets": "16.1.1",
+      "distro": "1.9.0",
+      "jsonpatch": "1.35",
+      "pip": "24.0",
+      "langgraph": "1.2.16",
+      "xxhash": "4.0.1",
+      "httpcore2": "2.14.0",
+      "httpx": "0.28.1",
+      "orjson": "3.13.0",
+      "sqlite-vec": "0.1.9",
+      "langchain-core": "1.6.12",
+      "typing_extensions": "4.16.0",
+      "pydantic_core": "2.50.1",
+      "truststore": "0.10.5",
+      "tenacity": "9.2.1",
+      "requests-toolbelt": "1.0.0",
+      "jsonpointer": "3.3",
+      "langchain-protocol": "0.0.19",
+      "pydantic": "2.14.1",
+      "typing-inspection": "0.4.4",
+      "httpcore": "1.0.9",
+      "annotated-doc": "0.0.5",
+      "annotated-types": "0.8.0",
+      "fastapi": "0.146.0",
+      "idna": "3.20",
+      "opentelemetry-api": "1.45.1"
+    }
+  },
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Local-RAG-Workflow-Lab/labs",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "test_actual_fts_current_revision_and_private_exclusion (test_local_rag.RetrievalTests.test_actual_fts_current_revision_and_private_exclusion) ... ok\ntest_citations_bind_identity_revision_span_and_hash (test_local_rag.RetrievalTests.test_citations_bind_identity_revision_span_and_hash) ... ok\ntest_empty_unknown_and_invalid_queries (test_local_rag.RetrievalTests.test_empty_unknown_and_invalid_queries) ... ok\ntest_metrics_use_relevance_denominator_and_unanswerable_separately (test_local_rag.RetrievalTests.test_metrics_use_relevance_denominator_and_unanswerable_separately) ... ok\ntest_operator_injection_is_data_and_tool_schema_has_no_identity (test_local_rag.RetrievalTests.test_operator_injection_is_data_and_tool_schema_has_no_identity) ... ok\ntest_revision_boundary_is_half_open (test_local_rag.RetrievalTests.test_revision_boundary_is_half_open) ... ok\ntest_trusted_roles_scope_index_and_cache (test_local_rag.RetrievalTests.test_trusted_roles_scope_index_and_cache) ... ok\n\n----------------------------------------------------------------------\nRan 7 tests in 0.008s\n\nOK\n"
+    },
+    {
+      "command": [
+        "/tmp/course-agent-workflow-venv/bin/python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Local-RAG-Workflow-Lab/labs/optional",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "test_character_splitter_is_not_a_hard_limit_but_recursive_fallback_is (test_service.ServiceTests.test_character_splitter_is_not_a_hard_limit_but_recursive_fallback_is) ... ok\ntest_post_sse_framing_and_get_method_mismatch (test_service.ServiceTests.test_post_sse_framing_and_get_method_mismatch) ... ok\ntest_readiness_lifespan_and_public_answer (test_service.ServiceTests.test_readiness_lifespan_and_public_answer) ... ok\ntest_schema_bounds_identity_and_boolean_integer_rejected (test_service.ServiceTests.test_schema_bounds_identity_and_boolean_integer_rejected) ... ok\ntest_real_process_restart_and_crash_after_commit_deduplicates (test_workflow.WorkflowTests.test_real_process_restart_and_crash_after_commit_deduplicates) ... ok\ntest_rejection_and_unanswerable_do_not_publish (test_workflow.WorkflowTests.test_rejection_and_unanswerable_do_not_publish) ... ok\ntest_retry_is_not_approval_and_ids_bind_content (test_workflow.WorkflowTests.test_retry_is_not_approval_and_ids_bind_content) ... ok\n\n----------------------------------------------------------------------\nRan 7 tests in 22.483s\n\nOK\n"
+    }
+  ],
+  "artifact_sha256": {
+    "corpus.json": "123787dfd4350eecedd6053ad23ae42b373b99f3f8f720703beaf5633bc61315",
+    "local_rag.py": "dcbba13c986ce7129efa012bd2090cc62c9ad5247ea3c26978407455e220ff42",
+    "measured-test-k1-2026-10-18.json": "8a8382a9e1fa01488c5e09427454af69eb1a0cf7234853c2d023d16c0302e429",
+    "measured-test-k3-2026-10-18.json": "a2e0c6f68987b73723a12463108b58c64a942362af7fc77708053470f8a57170",
+    "optional/test_service.py": "d1439258fdb489a57a535f63cbaa0efb78c90e1f4fa992791293ecf99f607892",
+    "optional/test_workflow.py": "11bde6a5aeb81f913ca9dda935bfc2ecf047cf42bc2e7c21ca05693952a7b28b",
+    "queries.json": "8fe2de0ff8c693c9d115e8a0336dd715e26de1ce968af33964f199cd1e4aceac",
+    "requirements-linux-cpu-py312.txt": "407688ee345736a4fd98e93935bffdd16e56b9f8735bb1e0de3ae4aadba486a3",
+    "service_lab.py": "772d9b4dd64e91ed4794a073a74193a5865d997fbde8a33cbc837bdfe8600da8",
+    "test_local_rag.py": "59bcc9d39c3752fb1884606996e0b79c7813b2229b038fcda1df37a7ea3ffc1b",
+    "workflow_lab.py": "8f0ae292bda3636ccb4565c1b187acde0b13b2135447a34c60ded9d86f8b82c7"
+  },
+  "not_executed": [
+    "provider LLM requests",
+    "GPU inference",
+    "remote MCP HTTP/OAuth",
+    "production authentication, TLS, load or cancellation tests"
+  ],
+  "scope": "Synthetic local fixtures; no real robot specifications or generalization claim."
+}

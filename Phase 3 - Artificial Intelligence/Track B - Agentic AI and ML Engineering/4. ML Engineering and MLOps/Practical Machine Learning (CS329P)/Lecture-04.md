@@ -17,7 +17,7 @@ The throughline is a single quantity you can never directly observe — **genera
 By the end of this lecture you should be able to:
 
 1. **Choose the right metric** for a classification, regression, or ranking problem, and explain precisely why accuracy fails under class imbalance.
-2. **Read a confusion matrix** and derive precision, recall, F1, ROC-AUC, and PR-AUC from it — and pick a decision threshold deliberately rather than defaulting to 0.5.
+2. **Read a confusion matrix** and derive precision, recall, and F1 from it; use scores across thresholds for ROC-AUC and precision-recall summaries — and pick a decision threshold deliberately rather than defaulting to 0.5.
 3. **Diagnose underfitting vs. overfitting** from the training-vs-generalization error gap and the model-complexity curve, and prescribe the right fix for each.
 4. **Design a train/validation/test split** with the discipline that the test set is used exactly once and hyperparameters are tuned on validation only.
 5. **Apply k-fold cross-validation** and recognize the cases where vanilla CV is *wrong* — time series and grouped data.
@@ -59,9 +59,9 @@ Precision and recall trade off, and *which one matters is a domain decision, not
 F1 = 2 · (precision · recall) / (precision + recall)
 ```
 
-The harmonic mean (not the arithmetic) is deliberate: it punishes imbalance between the two. A model with precision 1.0 and recall 0.0 has arithmetic mean 0.5 but F1 of 0 — F1 refuses to give credit for being great on one axis while failing the other. When false positives and false negatives carry different costs, weight them with the general **Fβ** (β > 1 favors recall, β < 1 favors precision).
+The harmonic mean (not the arithmetic) is deliberate: it punishes imbalance between the two. A model with precision 1.0 and recall 0.01 has arithmetic mean 0.505 but F1 about 0.0198 — F1 refuses to give credit for being great on one axis while failing the other. When false positives and false negatives carry different costs, weight them with the general **Fβ** (β > 1 favors recall, β < 1 favors precision).
 
-**Threshold choice.** A classifier outputs a *score* (a probability-like number `o`), and you turn it into a label by comparing to a threshold θ: predict positive if `o ≥ θ`, else negative. The default θ = 0.5 is a convention, not a law. Lowering θ catches more positives (recall ↑) at the cost of more false alarms (precision ↓); raising it does the reverse. Every (precision, recall) pair you saw above is *a single point on a curve* that the threshold sweeps out — which is exactly what the next two metrics summarize.
+**Threshold choice.** A classifier outputs a *score* (a probability-like number `o`), and you turn it into a label by comparing to a threshold θ: predict positive if `o ≥ θ`, else negative. The default θ = 0.5 is a convention, not a law. Lowering θ cannot reduce recall on a fixed dataset and cannot reduce the false-positive count, but precision itself need not change monotonically. Choose the threshold on validation data using a declared cost or operating constraint. Every (precision, recall) pair you saw above is *a single point on a curve* that the threshold sweeps out — which is exactly what the next two metrics summarize.
 
 **ROC-AUC** measures how well the model *separates the two classes across all thresholds*, independent of any one choice of θ. Sweep θ from high to low and plot the **ROC curve** — True Positive Rate against False Positive Rate:
 
@@ -70,9 +70,9 @@ TPR = #(true positive predictions)  / #(positive examples)     ← y-axis (= rec
 FPR = #(false positive predictions) / #(negative examples)     ← x-axis
 ```
 
-The **area under this curve (AUC)** lands in `[0.5, 1]`: 0.5 is a coin flip (the diagonal, no separating power), 1.0 is perfect separation. Intuitively, AUC is the probability that the model scores a random positive higher than a random negative. Its strength — threshold-independence — is also its trap: **ROC-AUC is optimistic on heavily imbalanced data** because FPR has a huge negative-class denominator, so even thousands of false positives barely move the x-axis.
+ROC-AUC lies in `[0,1]`, with 0.5 for random ranking in expectation and 1 for perfect ranking. An entirely reversed ranking can score 0. It equals the probability that a randomly chosen positive outranks a randomly chosen negative, awarding half credit to ties. AUC describes ranking, not calibration or the false-alarm burden at the operating threshold. A small false-positive rate can still mean many false alarms when negatives are numerous.
 
-**PR-AUC** (area under the **Precision-Recall** curve) is the fix. It plots precision against recall across thresholds and ignores true negatives entirely, so it stays honest when negatives vastly outnumber positives. **Rule of thumb: balanced classes → ROC-AUC is fine; rare-positive problems (fraud, retrieval, anomaly detection) → trust PR-AUC.**
+Precision-recall curves expose the fraction of retrieved/flagged items that are positive and are useful alongside ROC curves for rare-positive tasks. Distinguish **average precision (AP)**, which weights precision by recall increments, from trapezoidal area under the PR curve; they are not numerically identical. Record prevalence, positive-class definition, confidence intervals, and the actual operating threshold. Neither summary replaces a task-specific cost calculation. See [scikit-learn metrics](https://scikit-learn.org/stable/modules/model_evaluation.html).
 
 ### 1.2 Regression metrics
 
@@ -228,7 +228,7 @@ Report the average validation error over all K rounds.
             └──────┴──────┴──────┴──────┴──────┘
 ```
 
-Every example serves as validation exactly once, so you get a lower-variance estimate of generalization error and an error bar (the spread across folds) for free, at the cost of training K times. **Popular choices are K = 5 or 10.**
+Every example serves as validation once, at the cost of fitting K models. Fold scores are correlated because their training sets overlap. Their spread is a useful descriptive statistic, not automatically a valid confidence interval; the variance benefit depends on the problem and split design. **Popular choices are K = 5 or 10.**
 
 ### When cross-validation is *wrong*
 
@@ -245,7 +245,7 @@ Vanilla random splitting (and vanilla k-fold) assumes examples are **i.i.d.** �
 ```
 
 - **Clustered / grouped data** — photos of the same person, clips from the same video, multiple lab results from the same patient. Examples within a cluster are correlated, so if some clips of a video land in train and others in validation, the model recognizes the *video*, not the action. **Split whole clusters, not individual examples** — this is **group k-fold**, where every record sharing a group ID stays on the same side of the split.
-- **Highly imbalanced classes** — **sample more from the minority class** when forming splits (stratify) so a rare class isn't entirely absent from validation by chance.
+- **Highly imbalanced classes** — **preserve approximate class proportions** when forming splits (stratify). Stratification is not oversampling; oversampling or synthetic examples belong inside each training fold only. Preserve groups and time ordering when those constraints matter, even if exact class balance is impossible.
 
 ### The leakage hall of fame
 
@@ -272,7 +272,7 @@ A `Pipeline` makes this automatic — it re-fits every step inside each CV fold,
 
 - **Target leakage** — a feature that encodes the answer. A `was_charged_late_fee` column predicting "loan defaulted" is leakage if the fee is only assessed *after* default; an `account_closed_date` predicting churn; a feature computed using post-outcome information. It produces a spectacular validation score and total failure in production, because at prediction time the leaking feature doesn't exist yet. Audit: for every feature, ask *"would I actually have this value at the moment I need to predict?"*
 - **Duplicate / near-duplicate records straddling the split.** Common when you merge datasets — e.g. you scrape images from a search engine to evaluate a model trained on ImageNet, and some are the very same images. The "test" example is one the model already memorized, so the score is fiction. De-duplicate (including *near*-duplicates — resized, recompressed, lightly cropped copies) **before** splitting.
-- **Excessive validation reuse is cheating.** Tune hyperparameters against the same validation set hundreds of times and you slowly overfit *to the validation set* — your "validation error" stops tracking the test set. Nested CV, or a final untouched test set, is the guard.
+- **Repeated model selection can overfit validation.** Tune hyperparameters against the same validation set hundreds of times and you slowly overfit *to the validation set* — your "validation error" stops tracking the test set. Nested CV, or a final untouched test set, is the guard.
 
 The summary: the test set is spent once; a validation set held out from training estimates it and may be reused for selection — but only if it's drawn to resemble the test distribution and kept clean. An improper validation set is the most common path to **over-estimating** model performance, and over-estimates are the ones that ship.
 
@@ -280,9 +280,17 @@ The summary: the test set is spent once; a validation set held out from training
 
 > **2026 update:** Evaluation is the part of the 2021 lecture that the generative-AI era stress-tested hardest, because the bedrock assumption — *there exists a single ground-truth label to compute a metric against* — often no longer holds. When the output is a paragraph, an essay, or generated code, there's no one right string to match: a translation can be excellent in a dozen surface forms, so exact-match and even BLEU/ROUGE correlate weakly with quality. The field's pragmatic answer is **LLM-as-judge** — prompt a strong model to score or rank outputs (pairwise comparison is more reliable than absolute scoring), validated against human preference. It scales, but it imports its own biases (position bias toward the first option, verbosity bias toward longer answers, self-preference toward its own family's style), so it is a noisy proxy, not ground truth, and should be calibrated against human ratings. (For *how* to wire up an LLM judge and which model to call, defer to the provider's own current docs rather than memory — see the Lecture-05 tooling notes.) Meanwhile the **leakage** theme of §3 reappears, scaled to the whole internet, as **benchmark contamination**: if the test questions (MMLU, GSM8K, HumanEval) leaked into the pretraining corpus, a high score measures memorization, not capability — the exact "duplicate records across the split" bug, except the split is *the internet vs. the benchmark* and you usually can't inspect the training set. The defenses are the same in spirit (held-out, freshly-collected, time-gated evaluation sets released *after* a model's training cutoff; canary strings; private leaderboards), and so is the moral: **the score is a promise about unseen data, and contamination is the lie that makes it too good to be true.**
 
-> **Hardware lens:** Metrics are not just statistics, they are *deployment constraints*, and on the systems side the most consequential ones are the operational metrics this lecture lists almost in passing — **inference latency** and throughput. A model that wins on F1 but misses a p99 latency budget cannot ship in an ad-serving or interactive path; the "best model" is the Pareto frontier of *quality × latency × cost*, not the top of the accuracy column. This reframes evaluation as a hardware problem: you measure tail latency (p50/p95/p99) under realistic batch sizes on the *actual* target accelerator, because a model that's accurate enough but 3× too slow gets quantized (INT8/FP8), distilled, or pruned — each of which trades a sliver of the §1 quality metrics for the latency the §1.3 business metrics demand. And evaluation itself is now a compute budget: running a 50-task LLM benchmark suite, or an LLM-as-judge pass over thousands of generations, is a non-trivial GPU bill, which is why offline eval increasingly gets the same throughput engineering — batching, caching, the input-pipeline discipline from Lecture-02 — as training. Generalization, in the end, is measured on the hardware you'll actually serve from, under the latency the business actually requires.
+> **Hardware lens:** Metrics are not just statistics, they are *deployment constraints*, and on the systems side the most consequential ones are the operational metrics this lecture lists almost in passing — **inference latency** and throughput. A model that wins on F1 but misses a p99 latency budget cannot ship in an ad-serving or interactive path; the "best model" is the Pareto frontier of *quality × latency × cost*, not the top of the accuracy column. This reframes evaluation as a hardware problem: you measure tail latency (p50/p95/p99) under realistic batch sizes on the *actual* target accelerator, because a model that's accurate enough but 3× too slow gets quantized (INT8/FP8), distilled, or pruned — each of which trades a sliver of the §1 quality metrics for the latency the §1.3 business metrics demand. And evaluation itself is now a compute budget: running a 50-task LLM benchmark suite, or an LLM-as-judge pass over thousands of generations, is a non-trivial GPU bill, which is why offline eval increasingly gets the same throughput engineering — batching, caching, the input-pipeline discipline from Lecture-02 — as training. Statistical generalization and target-hardware latency are distinct measurements. Re-evaluate numerical/task quality after conversion or kernel changes, and measure serving performance on the actual target.
 
 ---
+
+## Worked decision and independent check
+
+In 100 held-out cases, suppose 10 require a stop. A model catches 9, misses 1, and unnecessarily stops on 6 others: `TP=9, FN=1, FP=6, TN=84`. Accuracy is 93%, recall 90%, precision 60%, and F1 72%. Always predicting “continue” scores 90% accuracy but zero recall. With declared costs of five per missed stop and one per unnecessary stop, the model costs 11 versus the baseline's 50. These are teaching costs, not a real safety specification.
+
+Lower the threshold on a **validation** set, then evaluate the selected rule once on held-out episodes. Complete the [PyTorch CPU stop-model lab](../../../2.%20Deep%20Learning%20Frameworks/PyTorch/CPU-Robot-Stop-Lab/Guide.md) to see this protocol execute. Independent check: set `TP=8,FN=2,FP=2,TN=88`; accuracy is 96%, recall 80%, precision 80%, F1 80%, and cost 12. Higher accuracy and F1 do not imply lower declared operating cost.
+
+Source/API review: 2026-10-18; [cross-validation guidance](https://scikit-learn.org/stable/modules/cross_validation.html). Other historical examples remain attributed below.
 
 ## Current as of
 

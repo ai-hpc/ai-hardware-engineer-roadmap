@@ -1,0 +1,56 @@
+{
+  "checked_utc": "2026-10-18T22:53:56.430353+00:00",
+  "scope": "CPU numeric/calibration/metadata checks; no GPU execution or model-weight downloads",
+  "portable_tests": {
+    "command": "python3 -m unittest discover -s '<course>/labs' -p 'test_*.py' -v",
+    "passed": 8
+  },
+  "optional_tests": {
+    "command": "/tmp/course-pytorch-cpu-venv/bin/python -m unittest discover -s '<course>/labs/optional' -v",
+    "passed": 9,
+    "python": "3.12.3",
+    "torch": "2.14.0+cpu"
+  },
+  "experiment": {
+    "command": "/tmp/course-pytorch-cpu-venv/bin/python '<course>/labs/calibration_experiment.py' --output /tmp/course-fp4-calibration-final --epochs 40",
+    "report": "measured-run-2026-10-18.json",
+    "seed": 31,
+    "epochs": 40,
+    "selected_epoch": 38,
+    "policies": 3,
+    "reload_max_abs_logit_error": 0
+  },
+  "metadata_verification": {
+    "pinned_files": 8,
+    "http_200_and_sha256_match": 8,
+    "record": "metadata-verification-2026-10-18.json"
+  },
+  "source_links": {
+    "unique_urls": 17,
+    "http_200": 17,
+    "record": "source-check-2026-10-18.json"
+  },
+  "unexecuted": [
+    "27B target or external drafter inference",
+    "native NVIDIA FP4 packing/dispatch",
+    "GPU profiling and clock control",
+    "262K context runtime feasibility",
+    "real robot deployment"
+  ],
+  "limitations": [
+    "Teaching packed layout is not a vendor ABI",
+    "CPU inference dequantizes to float32; no acceleration claim",
+    "Synthetic task is not LLM or collision-safety validation",
+    "Quantizer calibration objectives need not improve held-out task metrics",
+    "Historical publisher device benchmarks are not local measurements"
+  ],
+  "source_sha256": {
+    "fp4_reference.py": "690ed6326b4745a9dff459c21a2c91a34bbf7fa8ca2b045b72abf4955ff6bd80",
+    "verify_model_metadata.py": "320e2a0009ebdfc37130836d3426af7ab825daff032562a168f294efe67b0ce6",
+    "quant_contracts.py": "10de7af659d55fb0ef284de2804f3d9a6329256bab81218e1d074383fa4dd9c4",
+    "test_quant_contracts.py": "9155b496b1f0833058d1342f4489fb369864ef588d24f3cb14d2f729a15bf47e",
+    "calibration_experiment.py": "61d2fa1037d12bf9449c491ace9f19b7df6b4459c2c7f6df0b20c5b70bc2db22",
+    "optional/test_fp4_reference.py": "5fd74e335f9ec30257f210b18912e022884fb1d17e6475120c8afdcc9b28ac24",
+    "optional/test_calibration_experiment.py": "1060a549449953701bb01f65a694a6260fadf176ad131007989029a11453d6dd"
+  }
+}

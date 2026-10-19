@@ -1,0 +1,72 @@
+{
+  "experiment": "synthetic real BPSK; no RF or NR execution",
+  "ebn0_db": 2.0,
+  "train_bits": 2000,
+  "learned_weight": 4.807830034280458,
+  "learned_intercept": -2.8171532561036243,
+  "learned_threshold": 0.585951091452267,
+  "analytic_matched_ber": 0.03750612835892598,
+  "results": {
+    "matched": {
+      "actual_bias": 0.6,
+      "zero_threshold": {
+        "bits": 20000,
+        "errors": 2442,
+        "ber": 0.1221,
+        "bce": 0.3218393687244437
+      },
+      "matched_oracle": {
+        "bits": 20000,
+        "errors": 748,
+        "ber": 0.0374,
+        "bce": 0.09693841521828088
+      },
+      "learned": {
+        "bits": 20000,
+        "errors": 756,
+        "ber": 0.0378,
+        "bce": 0.1023447742320867
+      }
+    },
+    "shifted": {
+      "actual_bias": -0.6,
+      "zero_threshold": {
+        "bits": 20000,
+        "errors": 2412,
+        "ber": 0.1206,
+        "bce": 0.3230504946422551
+      },
+      "matched_oracle": {
+        "bits": 20000,
+        "errors": 751,
+        "ber": 0.03755,
+        "bce": 0.09604934515884699
+      },
+      "learned": {
+        "bits": 20000,
+        "errors": 6305,
+        "ber": 0.31525,
+        "bce": 0.8943791967970542
+      }
+    }
+  },
+  "budget": {
+    "mu1_slot_us": 500.0,
+    "mu3_slot_us": 125.0,
+    "conv_macs_per_slot": [
+      475517952,
+      93929472,
+      73382400
+    ],
+    "total_macs_per_slot": 642829824,
+    "required_tmac_per_second": 1.285659648,
+    "first_activation_fp16_bytes": 5870592,
+    "one_antenna_complex_int16_bytes_per_second": 122880000,
+    "window_1024_at_2msps_us": 512.0
+  },
+  "window_start_samples": [
+    0,
+    4
+  ],
+  "explicit_trailing_samples_discarded": 3
+}

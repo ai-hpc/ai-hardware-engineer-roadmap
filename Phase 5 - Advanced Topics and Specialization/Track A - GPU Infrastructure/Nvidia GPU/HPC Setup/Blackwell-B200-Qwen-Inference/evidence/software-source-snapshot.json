@@ -1,0 +1,65 @@
+{
+  "sources": [
+    {
+      "repository": "vllm-project/vllm",
+      "revision": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+      "path": "vllm/engine/arg_utils.py",
+      "url": "https://raw.githubusercontent.com/vllm-project/vllm/5df63a7203cdb9328d824a27b682e77c7b9928be/vllm/engine/arg_utils.py",
+      "sha256": "c10281277fd9a90dc8b22670db4f1af53708c5caa2aefee7aa861fa579329219",
+      "bytes": 139040,
+      "checked_utc": "2026-10-18"
+    },
+    {
+      "repository": "vllm-project/vllm",
+      "revision": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+      "path": "vllm/entrypoints/cli/serve.py",
+      "url": "https://raw.githubusercontent.com/vllm-project/vllm/5df63a7203cdb9328d824a27b682e77c7b9928be/vllm/entrypoints/cli/serve.py",
+      "sha256": "fc1692aa4caec2328ed8d0138074d65651dbef6d768f60cb0c834ed2d7376080",
+      "bytes": 15955,
+      "checked_utc": "2026-10-18"
+    },
+    {
+      "repository": "vllm-project/vllm",
+      "revision": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+      "path": "vllm/entrypoints/launchers/cli_args.py",
+      "url": "https://raw.githubusercontent.com/vllm-project/vllm/5df63a7203cdb9328d824a27b682e77c7b9928be/vllm/entrypoints/launchers/cli_args.py",
+      "sha256": "76221e2c10a0c5cffb7820a25c176a436777eb2008737cc5b1effaa014ebad28",
+      "bytes": 26078,
+      "checked_utc": "2026-10-18"
+    },
+    {
+      "repository": "vllm-project/vllm",
+      "revision": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+      "path": "docs/design/cuda_graphs.md",
+      "url": "https://raw.githubusercontent.com/vllm-project/vllm/5df63a7203cdb9328d824a27b682e77c7b9928be/docs/design/cuda_graphs.md",
+      "sha256": "ddb442ae086789ec618d6acb2f757e9b9dff348e0c05f0256f874c0cfbbcf199",
+      "bytes": 19906,
+      "checked_utc": "2026-10-18"
+    },
+    {
+      "repository": "NVIDIA/cutlass",
+      "revision": "098de2a652cf8f00fd70b2df54051c7eccbb855a",
+      "path": "examples/72_blackwell_narrow_precision_gemm/72a_blackwell_nvfp4_bf16_gemm.cu",
+      "url": "https://raw.githubusercontent.com/NVIDIA/cutlass/098de2a652cf8f00fd70b2df54051c7eccbb855a/examples/72_blackwell_narrow_precision_gemm/72a_blackwell_nvfp4_bf16_gemm.cu",
+      "sha256": "ba5b70b1bb8113b5baa2759c2e3bacd93947b5370873cbfc2a0f57fdf8b86436",
+      "bytes": 21899,
+      "checked_utc": "2026-10-18"
+    },
+    {
+      "repository": "NVIDIA/cutlass",
+      "revision": "098de2a652cf8f00fd70b2df54051c7eccbb855a",
+      "path": "examples/72_blackwell_narrow_precision_gemm/CMakeLists.txt",
+      "url": "https://raw.githubusercontent.com/NVIDIA/cutlass/098de2a652cf8f00fd70b2df54051c7eccbb855a/examples/72_blackwell_narrow_precision_gemm/CMakeLists.txt",
+      "sha256": "6ef8e39e64c955726e7659338e360eee9858d85f85d53127149686ceddd32696",
+      "bytes": 1995,
+      "checked_utc": "2026-10-18"
+    }
+  ],
+  "reviewed_releases": {
+    "vllm": "0.32.0",
+    "cutlass": "4.8.0",
+    "transformer_engine_documentation": "2.20.2",
+    "tensorrt_documentation": "11.4"
+  },
+  "boundary": "source and documentation checks only; serving runtime and CUDA examples not installed or executed"
+}

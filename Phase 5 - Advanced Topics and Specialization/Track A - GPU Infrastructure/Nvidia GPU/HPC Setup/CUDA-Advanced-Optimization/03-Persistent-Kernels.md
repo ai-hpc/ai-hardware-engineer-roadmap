@@ -1,323 +1,91 @@
-# 03 — Persistent Kernels
+# 03 — Persistent work: reuse blocks, preserve ownership
 
-## 1. The Problem: Kernel Launch Overhead at Extreme Frequency
+**Outcome:** distinguish finite tile scheduling from a long-running host/device server, and explain why a queue needs more than a flag. Follow `finite_tile_worker` in the [compiled lab source](labs/cuda_examples.cu).
 
-CUDA Graphs reduce CPU overhead for a fixed sequence of kernels. But some workloads need to **dynamically dispatch work** to the GPU — such as online inference servers where requests arrive continuously with unknown timing.
+## 1. Persistence does not mean “runs forever”
 
-```
-Standard inference serving model:
-  Request arrives → CPU prepares batch → launch kernels → wait for result → next request
+A persistent kernel keeps a set of blocks working through multiple tasks or tiles during one launch. It can finish after a known finite workload. A long-running polling service is one possible design with additional progress, shutdown and communication requirements.
 
-Timeline:
-  [CPU prep 50µs][kernel 2ms][CPU prep 50µs][kernel 2ms]...
-  ↑ repeated kernel launch setup ↑
-```
-
-For **low-latency streaming inference** (robotics, real-time control), even CUDA Graphs have limits:
-- Graphs require fixed shapes
-- Each request still requires a CPU-side graph replay call
-- Multi-stream contention from concurrent requests
-
-**Persistent kernels** solve this with a different approach: the kernel **never exits**. It runs forever, polling for new work.
-
----
-
-## 2. What is a Persistent Kernel?
-
-A persistent kernel is a kernel that:
-1. Launches **once** at startup with all SMs
-2. **Loops forever** polling a GPU-side work queue
-3. Processes work items as they arrive
-4. The CPU submits work by writing to GPU memory (zero kernel launch overhead)
-
-```
-Standard model:         Persistent model:
-CPU launches kernel → | GPU kernel runs forever
-GPU runs kernel      | CPU writes work to GPU queue
-GPU kernel exits     | GPU polls queue, processes work
-CPU launches again   | CPU writes more work
-GPU runs kernel      | GPU processes again
-GPU kernel exits     | ...
-...                  |
-```
-
----
-
-## 3. Persistent Kernel Architecture
-
-```
-GPU memory:
-┌─────────────────────────────────────────────────────┐
-│  Work Queue (ring buffer)                           │
-│  ┌──────┬──────┬──────┬──────┬──────┬──────┐       │
-│  │ W0   │ W1   │ W2   │ empty│ empty│ empty│       │
-│  └──────┴──────┴──────┴──────┴──────┴──────┘       │
-│         ↑ head                  ↑ tail              │
-│                                                     │
-│  Work Item:                                         │
-│  { input_ptr, output_ptr, batch_size, status }     │
-└─────────────────────────────────────────────────────┘
-
-CPU thread:                    GPU persistent kernel:
-  while (serving):               while (running):
-    prepare_input()                work = poll_queue()
-    write_to_queue()               if work is valid:
-    wait_for_output()                process(work)
-                                     signal_done(work)
-```
-
----
-
-## 4. Persistent Kernel Implementation
-
-### Work Queue Structure (GPU-accessible)
-
-```cpp
-struct WorkItem {
-    float*   input;
-    float*   output;
-    int      batch_size;
-    int      seq_len;
-    int      status;   // 0=empty, 1=pending, 2=done
-    int      padding[2];
-};
-
-#define MAX_QUEUE_SIZE 64
-
-struct WorkQueue {
-    WorkItem items[MAX_QUEUE_SIZE];
-    int      head;   // next slot to read (GPU side)
-    int      tail;   // next slot to write (CPU side)
-    int      running;
-};
-```
-
-### The Persistent Kernel
-
-```cpp
-__global__ void persistent_inference_kernel(
-    WorkQueue* queue,
-    ModelWeights* weights,
-    int num_sms
-) {
-    // Only run one thread block per SM for maximum control
-    if (blockIdx.x >= num_sms) return;
-
-    int sm_id = blockIdx.x;
-
-    while (queue->running) {
-        // Spin-wait for work (polling — burns cycles but zero latency)
-        int slot = -1;
-        if (threadIdx.x == 0) {
-            // Thread 0 polls for available work
-            int expected = sm_id % MAX_QUEUE_SIZE;  // round-robin assignment
-            if (atomicCAS(&queue->items[expected].status, 1, 0) == 1) {
-                slot = expected;
-            }
-        }
-
-        // Broadcast slot to all threads in block
-        slot = __shfl_sync(0xffffffff, slot, 0);
-
-        if (slot >= 0) {
-            WorkItem* work = &queue->items[slot];
-
-            // Run the actual inference
-            run_transformer_layer(
-                work->input, work->output,
-                work->batch_size, work->seq_len,
-                weights
-            );
-
-            // Signal completion (CPU waits on this)
-            __threadfence_system();   // ensure output visible to CPU
-            atomicExch(&work->status, 2);   // mark done
-        }
-
-        // Brief pause to avoid excessive power draw from spin-wait
-        // __nanosleep(100);   // CUDA 11.1+ on Ampere+
-    }
-}
-```
-
-### CPU Submit Path (Zero Overhead)
-
-```cpp
-class PersistentInferenceServer {
-    WorkQueue* d_queue;
-    WorkQueue* h_queue;   // pinned host mirror
-
-    int submit(float* input, float* output, int batch, int seq) {
-        // Find empty slot
-        int slot = allocate_slot();
-
-        // Write work item directly to GPU memory via pinned mapping
-        WorkItem& item = d_queue->items[slot];
-        item.input      = input;
-        item.output     = output;
-        item.batch_size = batch;
-        item.seq_len    = seq;
-
-        // Memory fence then set status — GPU sees this atomically
-        __atomic_thread_fence(__ATOMIC_SEQ_CST);
-        atomicExch(&item.status, 1);   // mark pending
-
-        return slot;
-    }
-
-    void wait(int slot) {
-        // Poll until GPU signals done (spin-wait on CPU side)
-        while (atomicLoad(&d_queue->items[slot].status) != 2)
-            _mm_pause();   // CPU spin hint (reduces power)
-    }
-};
-```
-
----
-
-## 5. Persistent Kernels for LLM Token Streaming
-
-The most important production use case: streaming token generation without kernel launch per token.
-
-```
-Standard vLLM/TRT-LLM decode:
-  For each token:
-    CPU: launch attention kernel (10µs)
-    GPU: attention (5ms)
-    CPU: launch FFN kernel (10µs)
-    GPU: FFN (5ms)
-  Total per token: 10.04ms, of which 0.02ms = CPU overhead (0.2%)
-  ← overhead is small for normal decode
-
-For speculative decoding with tiny draft model (0.5ms compute):
-  CPU: launch kernel (10µs)
-  GPU: tiny draft model (0.5ms)
-  CPU overhead: 2% — now matters
-```
-
-With persistent kernel for draft model:
-
-```cpp
-__global__ void draft_model_persistent(
-    TokenStream* token_stream,
-    TinyModelWeights* weights
-) {
-    auto grid = cooperative_groups::this_grid();
-
-    while (token_stream->active) {
-        // Poll for next input token
-        int token = spin_wait_for_token(token_stream);
-
-        // Run tiny draft model (no kernel launch overhead)
-        int proposed_tokens[5];
-        draft_forward(token, weights, proposed_tokens, 5);
-
-        // Write proposals for verifier
-        write_proposals(token_stream, proposed_tokens);
-        grid.sync();   // sync all SMs before signaling
-
-        signal_proposals_ready(token_stream);
-    }
-}
-```
-
----
-
-## 6. Persistent Kernels in Production Frameworks
-
-### TensorRT-LLM Persistent GEMM
-
-TRT-LLM uses persistent kernels for its GEMM operations when the decoder runs in "streaming" mode:
-
-```cpp
-// From TRT-LLM source (simplified)
-// The GEMM kernel stays resident, processing one token's projection per iteration
-template<typename T>
-__global__ void persistent_gemm_kernel(
-    const T* A, const T* B, T* C,
-    int M, int N, int K,
-    volatile int* tile_counter   // atomically-incremented work counter
-) {
-    // Tiles are processed until all are done
-    while (true) {
-        int tile_id = atomicAdd(const_cast<int*>(tile_counter), 1);
-        if (tile_id >= total_tiles) break;   // all work done
-
-        int tile_m = tile_id / num_tiles_n;
-        int tile_n = tile_id % num_tiles_n;
-
-        compute_gemm_tile(A, B, C, tile_m, tile_n, M, N, K);
-    }
-}
-```
-
-### FlashAttention Persistent Attention (Hopper)
-
-FlashAttention-3 on H200 uses persistent warps that overlap compute and I/O:
-
-```
-Warpgroup A (Producer): continuously loads tiles from HBM
-Warpgroup B (Consumer): computes GEMM on loaded tiles
-Warpgroup C (Consumer): computes softmax + accumulate
-
-These run concurrently via warp specialization (see topic 05)
-The kernel persists for the entire attention computation
-```
-
----
-
-## 7. Persistent Kernel Trade-offs
-
-| Factor | Persistent Kernel | Standard Kernel |
+| Design | Work becomes available | Completion |
 |---|---|---|
-| Launch overhead | Zero (kernel already running) | 5–20 µs per launch |
-| GPU idle between work items | Zero (polling) | Kernel launch gap |
-| Power consumption | Higher (SM busy spinning) | Lower (SM sleeps between launches) |
-| Flexibility | Fixed SM occupancy | Dynamic SM allocation |
-| Debugging difficulty | Very high (infinite loop) | Standard |
-| Best for | High-frequency, low-latency workloads | Batch compute, throughput workloads |
-| Not suitable for | Low-frequency tasks (wasteful spinning) | Latency-critical streaming |
+| Ordinary grid | Defined before launch | Blocks finish their assigned indices |
+| Finite tile scheduler | Defined before launch | All tiles claimed and finished |
+| Persistent service | May arrive during execution | Explicit shutdown/drain protocol |
 
-### Power consideration
+The useful question is whether reusing resident work helps a measured workload. Polling, task claiming and synchronization have costs. Persistent work can consume resources that other kernels need and can affect power, fairness and responsiveness.
 
-```
-Persistent kernel spinning uses ~150W more per GPU vs idle between kernels.
-On 8x H200, always-on persistent kernels: ~1.2 kW extra (out of 5.6 kW total)
-→ 21% more power for zero-launch-overhead
+## 2. Start with a finite, understandable scheduler
 
-Production decision: use persistent kernels ONLY for latency-critical paths
-(e.g., draft model in speculative decoding, streaming token generation)
-Use standard kernels for batch throughput workloads (training, offline inference)
+The lab fixes all input data before launch. A device counter starts at zero. One thread per block atomically claims a tile ID and writes it into shared memory. A block barrier makes the ID available to all members. The block computes that tile, then synchronizes before claiming another.
+
+```text
+one thread claims tile -> block-wide publication -> process valid elements
+            ^                                             |
+            +------------- finish all consumers ---------+
+
+If the claimed tile is outside the finite range, the whole block exits.
 ```
 
----
+The atomic counter gives each valid tile a unique claim. It does not publish a concurrently written host payload: no such producer exists in this example. Inputs were copied before the kernel in the same stream, and output is read after completion.
 
-## 8. Softer Alternative: Thread Block Specialization
+**Worked case:** `n=1003`, tile width 256. There are four tiles with 256, 256, 256 and 235 valid elements. A serial illustrative assignment across three workers gives 491, 256 and 256 elements. Actual GPU claim order may differ; the required property is complete, exactly-once coverage, not a particular worker count distribution.
 
-For cases where full persistence is too aggressive, **persistent thread blocks** stay alive between tasks using `__grid_constant__` and device-side work queues:
+Run the [CPU contract exercise](labs/README.md) to check that coverage across boundary sizes, then compare the compiled GPU program against its numerical reference when hardware is available.
 
-```cpp
-__global__ void semi_persistent_kernel(WorkQueue* queue) {
-    // Process multiple work items per launch (amortize launch cost)
-    // but kernel DOES eventually exit
-    while (true) {
-        WorkItem* work = try_dequeue(queue);
-        if (work == nullptr) break;   // no more work, exit cleanly
-        process(work);
-    }
-}
+## 3. Blocks are not named SMs
 
-// Launch once with enough blocks to drain the queue efficiently
-// Re-launch when queue refills (much less frequent than per-item launch)
+`blockIdx.x` identifies a logical block. It does not identify the SM that schedules it. Choosing a block count using the device's SM count is a scheduling heuristic, not an affinity guarantee.
+
+A persistent kernel may be limited by registers, shared memory, occupancy, load imbalance or work-queue contention. More resident blocks can improve latency hiding while also competing for resources. Measure multiple block counts on the same workload and inspect the generated code and profiler results.
+
+For established persistent GEMM scheduling, inspect the selected [CUTLASS implementation](https://github.com/NVIDIA/cutlass) and its exact architecture-specific example. A finite GEMM tile scheduler does not imply that an entire LLM decode loop stays inside one indefinitely running kernel.
+
+## 4. A concurrent queue needs a protocol
+
+A bounded queue slot has a lifecycle such as:
+
+```text
+FREE -> producer owns slot -> READY -> consumer owns slot -> DONE -> FREE
 ```
 
-This is what **TensorRT-LLM inflight batching** uses — work items accumulate in a queue, one launch drains the current queue, giving ~10–50× fewer kernel launches than naive per-request launching.
+This is **protocol pseudocode**, not a portable CPU/GPU implementation. A complete implementation must define:
 
----
+- addressability: which host/device allocation each participant may access;
+- atomic scope and supported operations for that memory and platform;
+- release/acquire publication of payload and completion;
+- sequence/generation identity to prevent confusion when a slot is reused;
+- ownership while input/output buffers are in use;
+- bounded capacity, backpressure, cancellation and shutdown;
+- forward progress when work competes with other GPU activity.
 
-## References
+A host cannot normally dereference an ordinary device pointer. A host fence is not automatically a GPU-system publication protocol. Device-scope atomics are not automatically system-scope atomics. `volatile` does not make a data race correct. Read the [CUDA C++ memory model](https://nvidia.github.io/cccl/libcudacxx/extended_api/memory_model.html) and the platform's supported memory/atomic capabilities before building such a service.
 
-- [Persistent Thread Models in GPU Computing](https://developer.nvidia.com/blog/cuda-pro-tip-kepler-sm-efficient-persistent-threads/)
-- [TensorRT-LLM Inflight Batching](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/architecture/inflight_batching.md)
-- [FlashAttention-3 Architecture](https://arxiv.org/abs/2407.08608)
-- [CUDA Thread Communication Patterns](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html)
+**Ownership failure:** changing a slot from READY back to FREE when a consumer merely claims it lets the producer overwrite inputs still being processed. Use a separate owned/running state and release the slot only after the required completion and consumption steps.
+
+## 5. Signal completion after all work finishes
+
+A fence orders the calling thread's memory operations; it does not automatically wait for every other thread to finish producing output. A completion signal must follow the synchronization that establishes all relevant writes are complete and their publication visible to the intended consumer.
+
+Likewise, a warp shuffle from lane zero only broadcasts within its warp. The lab uses a shared tile variable and a block barrier to publish a block-wide work ID. Mixing these scopes can leave some warps processing the wrong tile or exiting inconsistently.
+
+A service shutdown must let all participants reach compatible collective decisions. One thread observing `running=false` while another waits at a collective can hang the kernel. Specify who requests shutdown, whether pending tasks drain, how cancellation is reported, and when memory may be freed.
+
+## 6. Persistence, graphs and batching solve different problems
+
+Graphs reduce repeated launch setup for a dependency structure. Batching changes how requests share work. A persistent tile scheduler reuses blocks during a kernel. A serving engine can combine these ideas, but one does not prove the presence of another.
+
+Do not label an invented queue sketch “the TensorRT-LLM implementation”. Read a pinned runtime source and trace the actual path. Similarly, the `__grid_constant__` parameter annotation concerns parameter semantics; it does not make a kernel persistent.
+
+**Hypothetical overhead comparison:** if a request contains 10 ms of device work and 20 µs of exposed submission delay, removing that delay can save at most about 0.2% of that simplified total. A much shorter device workload may present a different tradeoff. This bound assumes the delay is on the critical path and ignores any new queue/polling cost.
+
+## 7. Decide with evidence
+
+Compare a correct ordinary grid, a graph replay where applicable, and a finite persistent alternative. Keep inputs, numerical contract and workload distribution fixed. Report throughput, per-item latency, tail behavior, fairness, memory use and measured power under named conditions.
+
+There is no universal extra wattage or speedup for persistence. Never infer that a robot control deadline holds just because kernel launches are fewer. The complete acquisition-to-command age still matters.
+
+**Exercise:** increase tile-count imbalance, then explain when dynamic claiming can improve load balance. Add a deliberately duplicated claim to the CPU model and show that the coverage check catches it. A CPU model proves the indexing property it tests; it does not prove CUDA atomic visibility or progress.
+
+**Completion:** explain the finite scheduler, its tail and termination cases, and the additional obligations of a host/device queue. Runtime results require a GPU; compilation and CPU coverage are separate evidence levels.
+
+**Next:** [kernel fusion](04-Kernel-Fusion.md).

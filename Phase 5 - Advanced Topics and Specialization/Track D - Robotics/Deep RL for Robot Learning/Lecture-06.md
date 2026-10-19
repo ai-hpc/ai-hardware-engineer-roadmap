@@ -1,5 +1,7 @@
 # Lecture 06: PPO, Trust Regions, and the KL Leash
 
+**Numerical checkpoint:** the [CPU lab](CPU-Lab.md#check-ppos-sign-before-optimizing) works positive- and negative-advantage clipping by hand and tests the sign convention. Complete it before copying the GPU update loop.
+
 ## Overview
 
 A golfer who hits one great round does not rebuild their whole swing that evening. A good coach lets them adjust a little after each session, sees what happens, and adjusts again. Big changes based on a handful of shots usually make things worse, because those shots were partly luck, and because a changed swing produces *different* shots that the old evidence says nothing about.
@@ -7,7 +9,7 @@ A golfer who hits one great round does not rebuild their whole swing that evenin
 Lectures 04-05 had two wasteful habits. Each batch of rollouts was used for **one** gradient step and then thrown away. And nothing stopped that step from being too big: a step that looks small in parameter space can change the policy's behavior a lot. This lecture fixes both:
 
 * **Reuse old tries** with importance sampling: reweight each old action by how much more or less likely the *new* policy is to take it.
-* **Limit each step** so the new policy stays close to the one that collected the data. PPO does this by **clipping** the reweighting ratio, for example to [0.8, 1.2]: there is no extra reward for changing any action's probability by more than 20%. TRPO does it with an explicit KL-divergence constraint, and natural gradient does it by measuring step size in behavior space.
+* **Discourage excessive improvement on the sampled actions.** PPO clips a surrogate objective, for example with bounds [0.8, 1.2]. It removes some incentives to move farther in the advantage-favored direction; it does not constrain every probability ratio or the actual KL. TRPO uses an approximate KL-constrained update. Both need measured diagnostics and evaluation.
 
 Then there is a second, different leash. When you fine-tune a policy that already works, such as a BC policy or π0.5, you also want it to stay close to **where it started**, so RL improves the task without erasing the general skills it arrived with. That is a KL penalty to a frozen **reference** policy. PPO plus a reference KL is the core recipe of RLHF for chat models, and of most PPO-based VLA post-training.
 
@@ -29,7 +31,7 @@ By the end you should be able to:
 | Step size in parameters ≠ step size in behavior | One bad step collapses the policy, and the next rollouts come from a broken policy | Clip the probability ratio, or constrain KL |
 | Fine-tuning drifts from a good starting point | Gains on the training layouts, losses on everything else | KL penalty to a frozen reference |
 
-> **Robot connection.** π0.5 arrives knowing a lot: how to grasp, how to read instructions, how to handle objects it was never fine-tuned on. RL on a handful of LIBERO layouts can buy success on those layouts by quietly forgetting the rest, and the perturbed-layout tests, where objects are moved, are exactly where that shows up. A **KL leash** to the original π0.5 keeps the improved policy close to its original behavior everywhere it is not being rewarded to change. There is a catch that drives Lecture 11: the PPO ratio and the KL both need \(\log \pi_\theta(a \mid o)\), which a flow-matching action expert does not give cheaply.
+> **Robot connection.** Fine-tuning can improve selected layouts while degrading other tasks. A reference-KL penalty discourages drift on the observations where it is evaluated; it does not protect every unseen state or guarantee preservation of a pretrained model's skills. Keep held-out task and perturbation evaluations. Flow-matching policies also need a defined likelihood/regularization construction, covered in Lecture 11.
 
 ---
 
@@ -55,7 +57,7 @@ By the end you should be able to:
 
 ## 3. Importance sampling and the surrogate objective
 
-Data was collected by \(\pi_{\text{old}}\), and we want to evaluate a slightly different \(\pi_\theta\). For any function \(f\):
+Data was collected by \(\pi_{\text{old}}\), and we want to evaluate a slightly different \(\pi_\theta\). For a fixed state and integrable function \(f\), assuming the old policy has positive probability wherever the new policy contributes:
 
 $$
 \mathbb{E}_{a \sim \pi_\theta}[f(a)] = \mathbb{E}_{a \sim \pi_{\text{old}}}\!\left[\frac{\pi_\theta(a \mid s)}{\pi_{\text{old}}(a \mid s)} f(a)\right]
@@ -74,7 +76,7 @@ Two warnings are already visible:
 * **The ratio is per step, not per trajectory.** A full trajectory importance weight is a product of \(T\) ratios, and its variance grows exponentially with \(T\). The per-step version stays usable, but it ignores the fact that \(\pi_\theta\) would also visit **different states**. The expectation is still over \(s \sim \pi_{\text{old}}\).
 * **Ratios far from 1 mean noisy estimates.** If \(r_t = 5\), one sample carries five times its normal weight. Unbounded, the optimizer will happily push a few ratios to extreme values on a minibatch it has memorized.
 
-Section 4 shows when ignoring the state-distribution change is safe.
+Section 4 states assumptions under which a bound controls the state-distribution mismatch; a finite sampled PPO batch does not establish them.
 
 ---
 
@@ -86,7 +88,13 @@ $$
 J(\pi') - J(\pi) = \mathbb{E}_{\tau \sim \pi'}\!\left[\sum_{t} \gamma^t A^{\pi}(s_t, a_t)\right]
 $$
 
-**Proof by telescoping.** Write \(A^\pi(s_t, a_t) = \mathbb{E}[r_t + \gamma V^\pi(s_{t+1}) - V^\pi(s_t)]\) and sum along a trajectory from \(\pi'\):
+**Proof by telescoping.** Start with the advantage as an expected TD error:
+
+\[
+A^\pi(s_t, a_t) = \mathbb{E}[r_t + \gamma V^\pi(s_{t+1}) - V^\pi(s_t)].
+\]
+
+Then sum along a trajectory from \(\pi'\):
 
 $$
 \mathbb{E}_{\tau \sim \pi'}\!\left[\sum_t \gamma^t \big(r_t + \gamma V^\pi(s_{t+1}) - V^\pi(s_t)\big)\right] = \mathbb{E}_{\tau \sim \pi'}\!\left[\sum_t \gamma^t r_t\right] - \mathbb{E}_{s_0}\big[V^\pi(s_0)\big] = J(\pi') - J(\pi)
@@ -100,11 +108,17 @@ $$
 J(\pi') \;\ge\; J(\pi) + L_\pi(\pi') - \frac{4 \epsilon \gamma}{(1-\gamma)^2}\, \max_s \mathrm{KL}\big(\pi(\cdot \mid s)\,\Vert\,\pi'(\cdot \mid s)\big), \qquad \epsilon = \max_{s,a} \lvert A^\pi(s,a) \rvert
 $$
 
-where \(L_\pi(\pi')\) is the surrogate advantage term. Three readings of this bound:
+Here the **discount-weighted, unnormalized** surrogate advantage sum is
+
+\[
+L_\pi(\pi') = \sum_{t\ge0}\gamma^t\mathbb{E}_{s_t\sim\pi,a_t\sim\pi'}[A^\pi(s_t,a_t)].
+\]
+
+If using a normalized discounted-state distribution, multiply its expectation by \(1/(1-\gamma)\). Section 3's plain empirical average is a practical objective and must not be substituted into this bound without matching that normalization. Assume bounded rewards, \(0\le\gamma<1\), a common initial-state distribution, and a vanishing tail term in the telescoping argument. Three readings of this bound:
 
 * **Small policy change means small change in visited states**, so the surrogate is trustworthy inside a KL ball.
 * The penalty scales as \(1/(1-\gamma)^2\), the **square of the effective horizon**. This is the same compounding as behavioral cloning's \(O(\epsilon T^2)\) in Lecture 02: a per-step difference grows into a state-distribution difference over the horizon. Long horizons, or short ones made long by tiny control steps, demand smaller steps. Action chunks help here too (Lecture 13).
-* Maximizing the right-hand side gives **guaranteed monotonic improvement** (a minorize-maximize scheme). But the constant is so pessimistic that the resulting steps are tiny, so every practical method replaces the penalty with something looser.
+* The exact bound supports monotonic improvement if its lower bound is improved under the theorem's assumptions. Practical sampled average-KL TRPO and PPO clipping approximate that construction; neither inherits a blanket monotonic-improvement guarantee. [TRPO paper](https://arxiv.org/abs/1502.05477).
 
 ---
 
@@ -115,7 +129,7 @@ where \(L_\pi(\pi')\) is the surrogate advantage term. Three readings of this bo
 | **TRPO** | \(\max_\theta L(\theta)\) s.t. \(\mathbb{E}_s[\mathrm{KL}(\pi_{\text{old}} \Vert \pi_\theta)] \le \delta\) | Conjugate gradient (~10 Fisher-vector products) + line search | Principled; awkward with shared actor-critic nets and minibatches |
 | **Natural gradient** | \(\Delta\theta \propto F^{-1} g\) | Same machinery as TRPO without the line search | Parameterization-invariant |
 | **Adaptive KL penalty** | \(\max L - \beta\, \mathrm{KL}\); double \(\beta\) if KL > 1.5·target, halve if < target/1.5 | First-order | A PPO variant in the original paper |
-| **PPO-clip** | \(\max L^{\text{CLIP}}\) (Section 6) | First-order, Adam, minibatches | The default almost everywhere |
+| **PPO-clip** | \(\max L^{\text{CLIP}}\) (Section 6) | First-order, Adam, minibatches | A widely used practical surrogate; no hard ratio constraint |
 
 **Natural gradient in three lines.** To second order, \(\mathrm{KL}(\pi_\theta \Vert \pi_{\theta + \Delta}) \approx \tfrac12 \Delta^\top F \Delta\), where \(F = \mathbb{E}[\nabla \log \pi\, \nabla \log \pi^\top]\) is the Fisher information matrix. Maximizing the linearized objective \(g^\top \Delta\) subject to \(\tfrac12 \Delta^\top F \Delta \le \delta\) gives:
 
@@ -163,8 +177,8 @@ with GAE targets \(\hat R_t\) from Lecture 05 and an optional entropy bonus \(c_
 
 | Diagnostic | Formula (samples from \(\pi_{\text{old}}\), \(r = \pi_\theta/\pi_{\text{old}}\)) | Healthy range (rule of thumb) |
 |---|---|---|
-| **Approx-KL** \(\mathrm{KL}(\pi_{\text{old}} \Vert \pi_\theta)\) | \(\mathbb{E}[(r - 1) - \log r]\): unbiased, always ≥ 0 (Schulman's "k3") | ~0.01-0.05; spikes mean the step was too big |
-| **Clip fraction** | share of samples with \(\lvert r - 1 \rvert > \varepsilon\) | ~0.1-0.3; near 0 means epochs are wasted; near 0.5 means too aggressive |
+| **Approx-KL** \(\mathrm{KL}(\pi_{\text{old}} \Vert \pi_\theta)\) | \(\mathbb{E}[(r - 1) - \log r]\): nonnegative per finite positive ratio; unbiased for fixed policies under the old sampling distribution and matching support | Choose a task-dependent target; a minibatch estimate is noisy and does not bound unseen states |
+| **Clip fraction** | share of samples with \(\lvert r - 1 \rvert > \varepsilon\) | Read with advantages and KL; zero clipping can coexist with useful learning, and this count is not the fraction of zeroed gradients |
 | **Early stop** | break the epoch loop when approx-KL > `target_kl` | Makes "number of epochs" an upper bound |
 
 ---
@@ -185,7 +199,17 @@ $$
 \mathrm{KL}\big(\mathcal{N}(\mu, \sigma^2)\,\Vert\,\mathcal{N}(\mu_{\text{ref}}, \sigma_{\text{ref}}^2)\big) = \log\frac{\sigma_{\text{ref}}}{\sigma} + \frac{\sigma^2 + (\mu - \mu_{\text{ref}})^2}{2\sigma_{\text{ref}}^2} - \frac12
 $$
 
-* **In the reward** (sampled KL), as in InstructGPT-style RLHF: \(r_t \leftarrow r_t - \beta \big(\log \pi_\theta(a_t \mid s_t) - \log \pi_{\text{ref}}(a_t \mid s_t)\big)\). The critic then learns a KL-aware value, and drift is penalized as a cost the agent can plan around.
+* **In the reward** (sampled KL), as in InstructGPT-style RLHF. Define the sampled log-ratio, then subtract its weighted cost:
+
+    \[
+    \begin{aligned}
+    k_t &= \log \pi_\theta(a_t \mid s_t)
+          - \log \pi_{\text{ref}}(a_t \mid s_t), \\
+    r_t &\leftarrow r_t - \beta k_t.
+    \end{aligned}
+    \]
+
+    The critic then learns a KL-aware value, and drift is penalized as a cost the agent can plan around.
 
 \(\beta\) is a real trade-off, not a free safety knob. Too small and the policy drifts and may exploit simulator bugs or reward-model errors (Lecture 08 shows the reward-model case). Too large and it cannot move far enough from the reference to fix the failures you are training on. The direction \(\mathrm{KL}(\pi_\theta \Vert \pi_{\text{ref}})\) is the standard choice. It penalizes \(\pi_\theta\) for putting probability where the reference would not, which is what "don't do things the original policy never would" means.
 
@@ -197,7 +221,9 @@ $$
 
 The ICLR blog post "The 37 Implementation Details of PPO" (Huang et al.) and the large-scale study by Andrychowicz et al. (2020) are the references for this section. The ones that matter most for continuous-control robot tasks:
 
-| Detail | What | ManiSkill `ppo.py` default (at time of writing) |
+Defaults below were checked against [ManiSkill commit 62ff3a5](https://github.com/haosulab/ManiSkill/blob/62ff3a5896b4d5b4cf0ac4c8d79afe600c9404a3/examples/baselines/ppo/ppo.py) on 2026-10-18. They describe that example configuration, not universal robot PPO settings.
+
+| Detail | What | Checked ManiSkill `ppo.py` default |
 |---|---|---|
 | Advantage normalization | Per minibatch, zero mean and unit std | on |
 | Epochs × minibatches | Passes over the batch × splits per pass | 4 × 32 |
@@ -250,7 +276,7 @@ Log `rollout_time` and `update_time` separately every iteration (ManiSkill's scr
 | Component | Full fine-tune of a \(P\)-param policy | LoRA fine-tune |
 |---|---|---|
 | Trainable policy + Adam (mixed precision) | ~16 B × \(P\) | ~2 B × \(P\) frozen base + small adapters with their optimizer state |
-| Frozen reference for the KL leash | ~2 B × \(P\) (bf16 copy, no optimizer) | **0 extra**: reference = same weights with adapters disabled (PEFT's `disable_adapter()` context) |
+| Frozen reference for the KL leash | ~2 B × \(P\) (bf16 copy, no optimizer) | No duplicate base only if disabling adapters exactly reconstructs the intended reference; retain a separate frozen reference otherwise |
 | Critic | Lecture 05, Section 7 | Same |
 | Old log-probs / ref log-probs | 1 float per sample each | Same |
 | Activations | Grows with minibatch × sequence length | Same (LoRA does not shrink activations) |
@@ -261,7 +287,7 @@ The LoRA trick removes the reference copy's memory but **not its compute**. Refe
 
 ## 10. Build it
 
-Code lives in `ppo/` and reuses `make_env`, `mlp`, `gae`, and `explained_variance` from Lecture 05's `actor_critic/a2c_gae.py`.
+The following `ppo/` names describe an implementation exercise; those trainer files are not supplied in this checkout. The included executable baseline is [CPU-Lab.md](CPU-Lab.md). The update fragment below is numerically checked separately, while PickCube training and its adapter remain unexecuted integration work. Reuse the masks and final-observation contract from Lecture 05, and pin the simulator before assembling the full trainer.
 
 ### Lab 6a — PPO from scratch on PickCube (1024-4096 envs)
 
@@ -277,7 +303,10 @@ def gaussian_kl(mu, std, mu_ref, std_ref):          # KL(N(mu,std) || N(mu_ref,s
 
 def ppo_update(actor, critic, log_std, opt, B, a, actor_on=True, ref_std=None):
     """B: flat batch with obs, act, logp_old, adv, ret, and optionally mu_ref. Returns diagnostics."""
-    n = B["obs"].shape[0]; mb = n // a.minibatches
+    n = B["obs"].shape[0]
+    if not 1 <= a.minibatches <= n:
+        raise ValueError("minibatches must be between 1 and the nonempty batch size")
+    mb = max(1, n // a.minibatches)
     params = [p for g in opt.param_groups for p in g["params"]]
     log = {"clipfrac": [], "approx_kl": [], "kl_ref": [], "updates": 0}
     for epoch in range(a.epochs):
@@ -294,7 +323,7 @@ def ppo_update(actor, critic, log_std, opt, B, a, actor_on=True, ref_std=None):
                 log["clipfrac"].append(((ratio - 1).abs() > a.clip).float().mean().item())
             if approx_kl > a.target_kl:                                         # step leash: stop this iteration
                 return log
-            adv = B["adv"][idx]; adv = (adv - adv.mean()) / (adv.std() + 1e-8)
+            adv = B["adv"][idx]; adv = (adv - adv.mean()) / (adv.std(correction=0) + 1e-8)
             pg_loss = -torch.min(ratio * adv, ratio.clamp(1 - a.clip, 1 + a.clip) * adv).mean()
             v_loss = 0.5 * (critic(B["obs"][idx]).squeeze(-1) - B["ret"][idx]).pow(2).mean()
             loss = a.vf_coef * v_loss

@@ -22,7 +22,7 @@ By the end you should be able to:
 |---|---|---|
 | Pre-training | Next-token prediction on web text | VLM pre-training on web images + text (PaliGemma-class backbone) |
 | Supervised fine-tune | Curated instruction / answer pairs | Robot demonstrations, per-suite fine-tunes (e.g., LIBERO) |
-| **Score source** | Human preferences → reward model; or a verifier (unit tests, math checker) | Simulator success predicate (`bowl on plate`), free and exact in sim |
+| **Score source** | Human preferences → reward model; or a verifier (unit tests, math checker) | Simulator success predicate; inexpensive to evaluate, but only as correct as its task definition and implementation |
 | **Compare against** | G answers to the *same prompt* | G episodes from the *same initial table layout* (same sim seed) |
 | **Leash** | KL to the SFT model | KL to the original π0.5 checkpoint |
 | **Hidden information** | Whole conversation as context | Recent frames only → give the critic privileged sim state ([Lecture 05](Lecture-05.md)) |
@@ -50,11 +50,11 @@ $$
 \max_\theta \; \mathbb{E}_{x,\, y \sim \pi_\theta}\big[r_\phi(x, y)\big] - \beta\, \mathrm{KL}\big(\pi_\theta(\cdot \mid x) \,\|\, \pi_{\text{ref}}(\cdot \mid x)\big)
 $$
 
-optimized with PPO (InstructGPT). In memory during training: **policy** (trained), **reference** (frozen), **reward model** (frozen), **value/critic** (trained). Four models of similar size, two with optimizer state. That memory bill is what motivated everything in 2.3-2.4.
+A common RLHF-PPO implementation uses a trainable policy, frozen reference, frozen reward model, and trainable value estimator. They need not be four equally sized or separate networks: sharing, offloading, model size, and the reward source change the memory budget. GRPO removes the learned value estimator; it does not remove all rollout or reward costs.
 
 ### 2.2 Verifiers and process rewards
 
-When correctness can be checked (math answers, code with unit tests), skip the reward model and use the checker directly: **RL with verifiable rewards (RLVR)**. A verifier cannot be "fooled" the way a learned reward model can, though it can still be gamed if it checks the wrong thing (a test suite that only checks the output format).
+When a checker exists, its result can supply an RL reward. Unit tests, symbolic checks, and simulator success predicates each have a coverage boundary; implementations can contain exploitable bugs and incomplete specifications. Record what is actually verified. A deterministic checker is not a guarantee that the intended real-world task was solved.
 
 * **Outcome reward:** one score at the end. Cheap, sparse, exactly our 0/1 success signal.
 * **Process reward:** a score for each intermediate step from a learned per-step checker. Denser credit assignment, but it is another learned model in the loop and can be hacked. The robot analog is a learned progress estimator or a dense shaped reward.
@@ -67,7 +67,7 @@ $$
 \pi^*(y \mid x) = \frac{1}{Z(x)}\, \pi_{\text{ref}}(y \mid x)\, \exp\!\big(r(x, y)/\beta\big)
 $$
 
-which is the "soft optimality" result from [Lecture 08](Lecture-08.md) again. Solving for \(r\) gives \(r(x,y) = \beta \log \frac{\pi^*(y\mid x)}{\pi_{\text{ref}}(y\mid x)} + \beta \log Z(x)\). Substitute that into the Bradley-Terry loss and \(Z(x)\) cancels in the difference. The result is **DPO**, preference learning with no reward model and no sampling:
+which is the "soft optimality" result from [Lecture 08](Lecture-08.md) again. Solving for \(r\) gives \(r(x,y) = \beta \log \frac{\pi^*(y\mid x)}{\pi_{\text{ref}}(y\mid x)} + \beta \log Z(x)\). Substitute that into the Bradley-Terry loss and \(Z(x)\) cancels in the difference. The result is **DPO**, preference learning without a separately trained reward model or on-policy generation inside the basic offline update; it still needs a preference dataset, whose construction may involve sampling:
 
 $$
 \mathcal{L}_{\text{DPO}}(\theta) = -\mathbb{E}\left[\log \sigma\!\left(\beta \log \frac{\pi_\theta(y_w \mid x)}{\pi_{\text{ref}}(y_w \mid x)} - \beta \log \frac{\pi_\theta(y_l \mid x)}{\pi_{\text{ref}}(y_l \mid x)}\right)\right]
@@ -83,24 +83,31 @@ $$
 \hat A_i = \frac{r_i - \operatorname{mean}(r_{1:G})}{\operatorname{std}(r_{1:G}) + \epsilon}
 $$
 
-and a PPO-style clipped objective per token \(t\) with ratio \(\rho_{i,t} = \pi_\theta(y_{i,t} \mid x, y_{i,<t}) / \pi_{\theta_{\text{old}}}(y_{i,t} \mid x, y_{i,<t})\):
+For each token \(t\), define the current-to-old probability ratio:
+
+\[
+\rho_{i,t} = \frac{\pi_\theta(y_{i,t} \mid x, y_{i,<t})}
+{\pi_{\theta_{\text{old}}}(y_{i,t} \mid x, y_{i,<t})}.
+\]
+
+Then use a PPO-style clipped objective:
 
 $$
 J(\theta) = \mathbb{E}\left[\frac{1}{G}\sum_{i=1}^{G} \frac{1}{|y_i|}\sum_{t} \Big(\min\big(\rho_{i,t}\hat A_i,\; \operatorname{clip}(\rho_{i,t}, 1-\varepsilon, 1+\varepsilon)\hat A_i\big) - \beta\, \hat{D}_{\text{KL}}\Big)\right]
 $$
 
-with the per-token KL estimate \(\hat D_{\text{KL}} = \frac{\pi_{\text{ref}}}{\pi_\theta} - \log\frac{\pi_{\text{ref}}}{\pi_\theta} - 1\), which is non-negative and unbiased for the KL under samples from \(\pi_\theta\).
+with the per-token KL estimate \(\hat D_{\text{KL}} = \frac{\pi_{\text{ref}}}{\pi_\theta} - \log\frac{\pi_{\text{ref}}}{\pi_\theta} - 1\), which is nonnegative for a finite positive ratio and has the stated expectation under samples from the **current** policy with matching support. Reusing samples from an old policy changes that expectation unless corrected; differentiating a sampled expression also requires the correct objective/weighting. Do not call every implementation of this penalty an unbiased current-policy KL estimator.
 
 Things to notice, all already in [Lecture 04](Lecture-04.md):
 
 * **No critic.** The group mean is a Monte-Carlo estimate of \(V(x)\). Dropping the value network removes one model and its optimizer state, which is the memory saving the GRPO paper emphasizes.
-* **RLOO** uses the *leave-one-out* mean \(b_i = \frac{1}{G-1}\sum_{j \ne i} r_j\). Because \(b_i\) does not depend on sample \(i\), the gradient estimate is exactly unbiased. The plain group-mean advantage works out to exactly \(\frac{G-1}{G}\) times the leave-one-out advantage, so it is unbiased up to that constant scale. The std division is what changes the weighting.
+* **RLOO** uses the *leave-one-out* mean \(b_i = \frac{1}{G-1}\sum_{j \ne i} r_j\). Because \(b_i\) does not depend on sample \(i\), the gradient estimate is exactly unbiased. The plain group-mean advantage works out to exactly \(\frac{G-1}{G}\) times the leave-one-out advantage, so the unnormalized group-mean estimator has a known multiplicative bias relative to the return gradient. For G=2 it is half the leave-one-out estimator. This identity assumes conditionally independent samples from the same policy at the same initial condition; std normalization, clipping, and selecting groups introduce additional changes.
 * **Dividing by the std** reweights prompts: a group with success rate near 0 or 1 has small std, so its few informative samples get large advantages. This is a choice you make, not something you get for free. Measure with and without it.
 * **Zero-variance groups.** If all \(G\) rewards are equal (all 0 or all 1), then \(\hat A_i = 0\) for every sample and the group contributes nothing except the KL term. With binary rewards this is common. DAPO's "dynamic sampling" keeps drawing prompts until the batch is filled with groups that have mixed outcomes. Section 4 does the arithmetic for robots.
 
 ### 2.5 GRPO became a family
 
-Few teams that describe their RL algorithm run the original GRPO unchanged. Paniego's August 2026 survey of public frontier-lab reports ("How frontier models train on outcomes in 2026") found the same pattern repeatedly: GRPO is the starting point, and each lab changes one or two things about it. The variants are small edits to the objective above:
+GRPO is a family of related objectives. Compare the actual loss, masks, sampling distribution, and normalization in a pinned implementation; sharing an algorithm name does not make two training runs equivalent. The primary papers below describe these representative changes:
 
 | Variant | What it changes | Problem it targets |
 |---|---|---|
@@ -109,7 +116,7 @@ Few teams that describe their RL algorithm run the original GRPO unchanged. Pani
 | **GSPO** | Importance ratio and clipping at the **sequence** level (length-normalized sequence likelihood) instead of per token | Noisy per-token ratios; instability, notably for MoE models |
 | **CISPO** (MiniMax-M1) | Clips the importance-sampling **weight** (stop-gradient) instead of clipping the token's update | PPO-style clipping zeroes the gradient of rare, high-ratio tokens; CISPO keeps every token contributing |
 
-The tooling now encodes this. In TRL, `GRPOConfig(loss_type=...)` defaults to `"dapo"`, and the docs mark the original `"grpo"` loss as not recommended because of its length bias. `importance_sampling_level="sequence"` gives GSPO. The logged metric `frac_reward_zero_std` is the fraction of groups whose rewards all match: exactly the zero-variance fraction this lecture measures in Section 4. Mistral's Magistral report, quoted in the same survey, makes it a rule: filter out every zero-advantage group when forming a batch.
+The checked [TRL configuration](https://github.com/huggingface/trl/blob/6d6901c5e3963108076131ac4979d344566b13a2/trl/trainer/grpo_config.py) defaults to `loss_type="dapo"`. Its `importance_sampling_level="sequence"` uses a length-normalized sequence ratio; reproducing a full GSPO recipe also requires its other loss, clipping, and sampling settings. Pin the package/commit rather than treating this as a stable default. Log zero-variance groups and any selection/resampling policy; filtering them changes which initial conditions contribute to training.
 
 **Robot translation.** These choices have direct analogs for a chunked VLA, and you should make them deliberately:
 
@@ -127,23 +134,25 @@ Optimize a proxy hard enough and the policy finds where the proxy is wrong: a re
 
 ### 3.1 VLAs with an explicit action likelihood
 
-If the policy emits discretized action tokens (the OpenVLA family bins each action dimension into tokens), then \(\log \pi_\theta(a \mid o)\) is a sum of token log-probs, the same as for text. GRPO and PPO apply directly: per-initial-state groups replace per-prompt groups, and the sim success check replaces the verifier. **SimpleVLA-RL** is an example of this line: an RL framework built on OpenVLA-OFT with VLA-specific trajectory sampling and parallelized multi-environment rendering. It reports strong LIBERO results and gains on RoboTwin, and it describes a "pushcut" phenomenon in which RL discovers behaviors absent from the demonstrations. (Read the paper for the numbers; they depend on the setup.)
+The original OpenVLA predicts discretized action tokens. For that specific autoregressive policy, the probability of the sampled token sequence factors into conditional token probabilities. Preserve the exact sampling rule, masks, and old log-probabilities before applying a policy-gradient update.
+
+OpenVLA-OFT is a different action-head contract: its checked quickstart loads an MLP head for **continuous actions trained with L1 regression**. That head does not supply categorical action-token likelihoods merely because the backbone came from OpenVLA. An RL adaptation must define its stochastic policy and scored random variables explicitly. SimpleVLA-RL supports OpenVLA/OpenVLA-OFT variants, but its model modifications and loss implementation must be inspected rather than inferred from the model name. [Pinned OFT inference example](https://github.com/moojink/openvla-oft/blob/e4287e94541f459edc4feabc4e181f537cd569a8/README.md), [pinned SimpleVLA-RL code map](https://github.com/PRIME-RL/SimpleVLA-RL/blob/7c51662df27b586f9e8a1ab35fcf849f2b8852f9/README.md).
 
 ### 3.2 Why a flow-matching head has no cheap likelihood
 
-π0.5's action expert produces a chunk \(a \in \mathbb{R}^{P \times 7}\) (Lecture 03's \(P\) = predicted chunk length) by integrating a learned velocity field from noise. Convention for this lecture: \(\tau = 0\) is noise, \(\tau = 1\) is the action (π0's paper uses the opposite time direction; the math is the same with \(\tau \to 1-\tau\)):
+For a seven-dimensional robot adapter, a flow action expert produces a chunk \(a \in \mathbb{R}^{P \times 7}\); other embodiments and internal padded action widths differ. Here P denotes predicted chunk length (Lecture 03); generation integrates a learned velocity field from noise. Convention for this lecture: \(\tau = 0\) is noise, \(\tau = 1\) is the action (π0's paper uses the opposite time direction; the math is the same with \(\tau \to 1-\tau\)):
 
 $$
 x_0 \sim \mathcal{N}(0, I), \qquad x_{k+1} = x_k + \Delta\, v_\theta(x_k, \tau_k, o), \qquad a = x_K, \quad \Delta = 1/K
 $$
 
-That sampler is **deterministic** given \(x_0\). The density of \(a\) follows from the instantaneous change-of-variables formula:
+The Euler sampler is **deterministic given its initial noise**; fresh initial noise still makes repeated calls stochastic. For an ideal continuous, invertible ODE flow, the density follows from the instantaneous change-of-variables formula:
 
 $$
 \log p_\theta(a \mid o) = \log \mathcal{N}(x_0; 0, I) - \int_0^1 \nabla_x \cdot v_\theta(x_\tau, \tau, o)\, d\tau
 $$
 
-The divergence is the trace of a \(350 \times 350\) Jacobian for a 50×7 chunk, needed at every integration point, along a trajectory that has to be inverted from \(a\) back to \(x_0\), and then differentiated with respect to \(\theta\) for the policy gradient. Exact computation needs one vector-Jacobian product per action dimension (350) at every integration point. Stochastic (Hutchinson) trace estimators cut that to a few products, at the price of noise. For a multi-billion-parameter model in an RL loop, that is not workable. Hence the workarounds.
+For a 50×7 mathematical action space, the divergence is the trace of a 350×350 Jacobian along the continuous flow. Exact reverse-mode trace evaluation can require one vector-Jacobian product per dimension, while stochastic trace estimates trade cost for noise. The exact density of a finite Euler map instead involves discrete Jacobian determinants and invertibility conditions; the continuous formula is not automatically its exact likelihood. These costs motivate surrogate or stochastic-chain constructions, but whether a method is affordable requires measurement.
 
 ### 3.3 Workaround 1: make the sampler stochastic
 
@@ -165,7 +174,7 @@ $$
 \nabla_\theta J = \mathbb{E}\left[\sum_t \sum_{k=0}^{K-1} \nabla_\theta \log p_\theta\big(x^{t}_{k+1} \mid x^{t}_k, o_t\big)\, A_t\right]
 $$
 
-This is an exact policy gradient **for the noisy sampler**. The marginal \(p_\theta(a \mid o)\) is never needed, because the action is a deterministic function of the chain \((x_0, \dots, x_K)\). A bonus: with a shared \(\sigma_k\), the KL between the current and reference policy's step distributions is closed form:
+This likelihood-ratio identity applies to the **noisy sampler** with parameter-independent initial noise, correct return/discount weights, and a valid action-independent baseline. Replacing the return by estimated advantages, using old-policy data, or clipping ratios makes the practical update an approximation. The marginal \(p_\theta(a \mid o)\) need not be computed for that latent-chain estimator, because the action is a deterministic function of the chain \((x_0, \dots, x_K)\). A bonus: with a shared \(\sigma_k\), the KL between the current and reference policy's step distributions is closed form:
 
 $$
 \mathrm{KL}\big(\mathcal{N}(\mu_\theta, \sigma_k^2 I) \,\|\, \mathcal{N}(\mu_{\text{ref}}, \sigma_k^2 I)\big) = \frac{\lVert \mu_\theta - \mu_{\text{ref}} \rVert^2}{2\sigma_k^2}
@@ -184,7 +193,7 @@ The caveat: naive noise injection (the version in this lecture's lab) **changes 
 
 ### 3.4 Workaround 2: steer the noise, freeze the policy (DSRL)
 
-From [Lecture 10](Lecture-10.md): keep the flow policy frozen and train a small RL policy \(\pi_\psi(x_0 \mid o)\) that picks the **input noise**. The flow model maps any noise to a plausible action, so the RL agent cannot leave the data manifold. It needs only black-box sampling access to the base policy, and it is sample-efficient. The cost: the base weights do not change. If the final deliverable must be a single set of weights (a competition that accepts only the checkpoint, a deployment stack with no hook for the noise policy), you have to distill afterwards.
+From [Lecture 10](Lecture-10.md): keep the flow policy frozen and train a smaller policy over its input noise. This limits actions to the frozen generator's image, but it does **not** guarantee a data-manifold or safety constraint: unusual noise and out-of-distribution observations can still produce poor actions. Evaluate the induced action distribution and closed-loop behavior. Distillation into another policy requires its own parity check.
 
 ### 3.5 Workaround 3: regression on your own rollouts
 
@@ -218,7 +227,7 @@ $$
 P(\text{zero variance}) = p^G + (1-p)^G
 $$
 
-At \(p = 0.9\) and \(G = 8\) that is about 0.43: almost half your rollouts are wasted. Public π0.5 numbers on the standard LIBERO suites are already high, so this is the *normal* case for nominal layouts. Remedies: filter zero-variance groups and resample (DAPO-style dynamic sampling); spend rollouts on layouts with intermediate success, such as perturbed layouts ([Lecture 12](Lecture-12.md) makes this a curriculum); or increase \(G\) only for layouts with \(p\) near the edges.
+At \(p = 0.9\) and \(G = 8\) that is about 0.43: about 43% of groups have no reward-relative signal under the independent Bernoulli assumption. They can still inform evaluation, a critic, or a regularizer. The actual fraction depends on the checkpoint and layout distribution; measure it. Remedies: filter zero-variance groups and resample (DAPO-style dynamic sampling); spend rollouts on layouts with intermediate success, such as perturbed layouts ([Lecture 12](Lecture-12.md) makes this a curriculum); or increase \(G\) only for layouts with \(p\) near the edges.
 
 **Colocated vs disaggregated.**
 
@@ -242,7 +251,7 @@ LLM agents (coding, browsing, terminal use) are trained the same way, but their 
 | **Sandbox** | One container per rollout; startup latency and failure robustness matter | One simulator worker (CPU process) per env; MuJoCo state is cheap to save, restore, and fork |
 | **Trainer** | Consumes rollouts, ideally without waiting for the slowest one | Same |
 
-The hardware lesson that transfers directly is the **long tail**. In a synchronous loop, every update waits for the slowest rollout in the batch. Agent rollouts vary from seconds to hours. LIBERO episodes vary too: successes terminate early, failures run to the 220-520-step limit. So **a synchronous batch is always waiting on its failures**, and the better the policy gets, the more idle time the long tail costs. The fix the lab reports describe (GLM-5's slime, TRL's experimental `AsyncGRPOTrainer`) is to **decouple generation from training**: rollout workers run at their own pace on their own engines, and the trainer consumes whatever has finished. The price is **staleness**: some rollouts come from a policy one or two updates old. The importance ratio in the clipped objective is what corrects for it, and a bound on maximum staleness keeps the correction small. Measure: trainer idle fraction, rollout-duration histogram (successes vs failures), and staleness (policy versions behind) per batch.
+Synchronous learning waits for its slowest participating rollout, which may be a failure, a long success, or a stalled worker. Separating rollout generation and learning can reduce idle time but introduces policy-version staleness and possibly biased completion-based sampling. Per-action importance ratios do not fully correct a changed state/trajectory distribution, and a fixed number of stale versions does not bound KL. Preserve behavior-policy scores and versions, cap or reject stale data under a measured policy-change rule, and evaluate the complete off-policy correction/selection scheme. Record idle time, duration distributions, and actual divergence as well as version lag.
 
 **RL specialists, then distill.** The same survey of reports finds a second pattern: labs run RL on *domain specialists*, then transfer the gains into one final model with on-policy distillation (DeepSeek-V4, MiMo-V2-Flash, LFM2.5 are the examples cited). Outcome rewards find the behavior; distillation moves it with a dense per-token signal. The robot version is natural when only one checkpoint can be submitted: RL per suite or per failure mode, then distill the specialists into a single π0.5 with the flow-matching loss on their rollouts (Section 3.6, and Phase 5 of the [capstone](Lecture-14.md)).
 
@@ -268,11 +277,11 @@ Cutting \(K\) from 10 to 5 saves only the second term. Measure both terms with t
 |---|---|---|
 | Policy weights (bf16) | ~6 GB | ~6 GB (frozen base) |
 | Grads + fp32 master + Adam moments | ~42 GB (≈ 14 B/param) | adapters only, < 1 GB |
-| Reference policy | +6 GB frozen copy | **free**: disable adapters |
-| Critic | VLM-sized: another ~48 GB; small head on shared features: ≈ 0 | small head |
+| Reference policy | +6 GB frozen copy | No duplicate base if adapters-off exactly equals the intended frozen reference |
+| Critic | VLM-sized: another ~48 GB; small head on shared features: smaller, but nonzero training/activation cost | small head |
 | Activations (K-step recompute) | batch × K dependent: measure | same |
 
-This is why GRPO-style (no critic) and LoRA (free reference) are the default single-80 GB configuration, and why full-parameter PPO with a VLM-sized critic is a multi-GPU job.
+This is an illustrative memory ledger, not an 80-GB fit guarantee. Adapter count, optimizer/precision implementation, sequence and image sizes, rollout storage, critic design, and activation checkpointing must be measured. Disabling adapters recovers the intended reference only if the shared base is immutable and the reference adapter state is exactly represented; an already adapted starting policy may need a frozen adapter copy.
 
 **GPU-hour split.** For \(E\) episodes per iteration:
 
@@ -281,11 +290,13 @@ $$
 \text{GPU-h}_{\text{learn}} \approx \frac{\text{epochs} \cdot E \cdot (T/H) \cdot t_{\text{update}}}{B \cdot 3600}
 $$
 
-Expect the rollout term to dominate unless you run many epochs. Batching across environments (larger \(N\)) is the first lever; chunk-execution horizon \(H\) is the second.
+These expressions estimate wall-hours for a single GPU under the stated batching assumptions. Multiply each phase's wall-hours by its allocated GPU count for GPU-hours; include simulator, synchronization, idle time, and changing episode lengths. Measure which term dominates. Batching across environments (larger \(N\)) is the first lever; chunk-execution horizon \(H\) is the second.
 
 ---
 
 ## 6. Build it: GRPO on your flow policy (rung 2)
+
+**Execution boundary:** the mathematical functions in Labs 1a–1b are checked on CPU by the optional tests linked from [CPU-Lab.md](CPU-Lab.md). The simulator rollout/training exercise below is a design to implement and validate, not a supplied or executed PickCube trainer.
 
 Start from the chunked flow-matching policy for `PickCube-v1` (state observations) from [Lecture 03](Lecture-03.md), with interface `policy(x, tau, obs) -> velocity` and chunks `x` of shape `(B, H, 7)`. In this lab `H` is the full predicted chunk (Lecture 03's \(P\)), and the whole chunk is executed. L03's `Flow.forward(o, x, t)` takes a flat `x` of size `P * 7` and `t` of shape `(B, 1)`, so wrap it to this interface (reshape `x`, unsqueeze `tau`). If your L03 code uses the opposite time convention, flip `tau`.
 
@@ -295,112 +306,132 @@ Start from the chunked flow-matching policy for `PickCube-v1` (state observation
 # vla_rl/flow_rl.py
 import math, torch
 
+def _sigma_vector(sigma, K, reference, allow_zero):
+    sigma = torch.as_tensor(sigma, dtype=reference.dtype, device=reference.device)
+    if sigma.shape != (K,) or not torch.isfinite(sigma).all():
+        raise ValueError("sigma must be finite with one value per denoising step")
+    if (sigma < 0).any() or (not allow_zero and (sigma == 0).any()):
+        raise ValueError("likelihood needs strictly positive sigma; sampling permits zero")
+    return sigma
+
+@torch.no_grad()
 def sample_chain(policy, obs, H, A, K, sigma):
-    """Noisy Euler sampler. Returns action chunk (B,H,A) and chain (B,K+1,H,A)."""
-    x = torch.randn(obs.shape[0], H, A, device=obs.device)
+    """Collect fixed latent samples, not a reparameterized training graph."""
+    if any(type(v) is not int or v < 1 for v in (H, A, K)):
+        raise ValueError("H, A and K must be positive integers")
+    if obs.ndim != 2 or obs.shape[0] == 0 or not obs.is_floating_point() or not torch.isfinite(obs).all():
+        raise ValueError("obs must be finite floating [batch,features]")
+    sigma = _sigma_vector(sigma, K, obs, allow_zero=True)
+    x = torch.randn(obs.shape[0], H, A, device=obs.device, dtype=obs.dtype)
     xs, dt = [x], 1.0 / K
     for k in range(K):
-        tau = torch.full((obs.shape[0],), k * dt, device=obs.device)
-        x = x + dt * policy(x, tau, obs) + sigma[k] * torch.randn_like(x)
+        tau = torch.full((obs.shape[0],), k * dt, device=obs.device, dtype=obs.dtype)
+        velocity = policy(x, tau, obs)
+        if velocity.shape != x.shape or not torch.isfinite(velocity).all():
+            raise ValueError("policy must return finite velocity matching the action shape")
+        x = x + dt * velocity + sigma[k] * torch.randn_like(x)
         xs.append(x)
+    if not torch.isfinite(x).all():
+        raise ValueError("nonfinite sampled chain")
     return x, torch.stack(xs, 1)
 
 def chain_logprob(policy, obs, chain, sigma):
-    """Per-step Gaussian log-probs (B,K) and step means (B,K,H,A). One batched pass over all K steps."""
+    """Score detached latent samples; gradients flow only through current means."""
+    if chain.ndim != 4 or min(chain.shape) < 1 or chain.shape[1] < 2:
+        raise ValueError("chain must be [B,K+1,H,A] with positive dimensions and K>=1")
+    if obs.ndim != 2 or obs.shape[0] != chain.shape[0] or not obs.is_floating_point():
+        raise ValueError("obs and chain batch dimensions must match")
+    if chain.dtype != obs.dtype or chain.device != obs.device:
+        raise ValueError("obs and chain must share floating dtype and device")
+    if not torch.isfinite(chain).all() or not torch.isfinite(obs).all():
+        raise ValueError("finite observations and chain required")
+    chain, obs = chain.detach(), obs.detach()
     B, K = chain.shape[0], chain.shape[1] - 1
+    sigma = _sigma_vector(sigma, K, chain, allow_zero=False)
     x_k, x_next = chain[:, :-1].flatten(0, 1), chain[:, 1:].flatten(0, 1)
-    tau = (torch.arange(K, device=obs.device) / K).repeat(B)
-    mu = x_k + (1.0 / K) * policy(x_k, tau, obs.repeat_interleave(K, 0))
-    s = sigma.repeat(B).view(-1, 1, 1)
-    logp = (-0.5 * ((x_next - mu) / s) ** 2 - torch.log(s) - 0.5 * math.log(2 * math.pi)).sum((1, 2))
+    tau = (torch.arange(K, device=obs.device, dtype=obs.dtype) / K).repeat(B)
+    velocity = policy(x_k, tau, obs.repeat_interleave(K, 0))
+    if velocity.shape != x_k.shape or not torch.isfinite(velocity).all():
+        raise ValueError("policy must return finite velocity matching the action shape")
+    mu = x_k + (1.0 / K) * velocity
+    sd = sigma.repeat(B).view(-1, 1, 1)
+    logp = (-0.5 * ((x_next - mu) / sd) ** 2 - torch.log(sd) - 0.5 * math.log(2 * math.pi)).sum((1, 2))
     return logp.view(B, K), mu.view(B, K, *chain.shape[2:])
 ```
 
-Sanity check before any RL: `chain_logprob` on a chain freshly produced by `sample_chain` (same weights) must give a ratio of exactly 1, and the per-step log-prob must match `torch.distributions.Normal(mu, s).log_prob(x_next).sum((1,2))`.
+Before RL, compare the per-step log-probability with an independent Normal distribution and a scalar hand calculation. Freeze old log-probabilities at collection; unchanged weights then produce a ratio of one up to numeric tolerance. Positive sigma is required for the Gaussian density. With sigma=0, sampling is still possible but this log-density and Gaussian KL are undefined. See the CPU lab's optional snippet tests.
 
 ### Lab 1b — Per-initial-state groups and the GRPO loss
 
 ```python
-def group_advantages(success, G, normalize_std=True):
-    r = success.view(-1, G)
+def group_advantages(success, G, normalize_std=True, leave_one_out=False):
+    if type(G) is not int or G < 2 or success.ndim != 1 or success.numel() == 0 or success.numel() % G:
+        raise ValueError("need nonempty complete groups with G>=2")
+    if not success.is_floating_point() or not torch.isfinite(success).all():
+        raise ValueError("rewards must be finite floating values")
+    r = success.detach().reshape(-1, G)
     adv = r - r.mean(1, keepdim=True)
-    std = r.std(1, keepdim=True)
+    if leave_one_out:
+        adv = adv * (G / (G - 1))
+    std = r.std(1, keepdim=True, correction=0)  # stated population-std convention
     if normalize_std:
         adv = adv / (std + 1e-6)
-    informative = (std.squeeze(1) > 0)                      # groups with mixed outcomes
-    return adv.view(-1), informative.repeat_interleave(G)
+    informative = std.squeeze(1) > 0
+    return adv.reshape(-1), informative.repeat_interleave(G)
 
 def grpo_loss(policy, obs, chain, old_logp, mu_ref, adv, sigma, clip=0.2, beta=0.01):
-    logp, mu = chain_logprob(policy, obs, chain, sigma)     # (B,K)
-    ratio = torch.exp(logp - old_logp)                      # one ratio per denoising step
-    A = adv[:, None]
+    logp, mu = chain_logprob(policy, obs, chain, sigma)
+    if old_logp.shape != logp.shape or mu_ref.shape != mu.shape or adv.shape != (logp.shape[0],):
+        raise ValueError("old scores, reference means and advantages must match the batch")
+    if not 0 < clip < 1 or beta < 0 or not math.isfinite(beta):
+        raise ValueError("invalid clip or KL coefficient")
+    if any(not torch.isfinite(v).all() for v in (old_logp, mu_ref, adv)):
+        raise ValueError("finite rollout statistics required")
+    sigma = _sigma_vector(sigma, logp.shape[1], chain, allow_zero=False)
+    ratio = torch.exp(logp - old_logp.detach())
+    if not torch.isfinite(ratio).all():
+        raise ValueError("nonfinite likelihood ratio")
+    A = adv.detach()[:, None]
     pg = -torch.min(ratio * A, ratio.clamp(1 - clip, 1 + clip) * A).mean()
-    kl = (((mu - mu_ref) ** 2).sum((2, 3)) / (2 * sigma[None] ** 2)).mean()   # closed-form Gaussian KL
+    kl = (((mu - mu_ref.detach()) ** 2).sum((2, 3)) / (2 * sigma[None] ** 2)).mean()
     clip_frac = ((ratio - 1).abs() > clip).float().mean()
     return pg + beta * kl, dict(pg=pg.item(), kl=kl.item(), clip_frac=clip_frac.item())
 ```
 
-### Lab 1c — Rollouts with seeded groups
+The loss averages inner-step terms and uses per-step ratios, so it is a practical clipped surrogate with a stated K-dependent normalization. The averaged conditional Gaussian KL is evaluated on stored old-policy chain states; it is not automatically the marginal action KL or the full current-policy trajectory KL. Record fixed K and positive shared variances when comparing runs. Zero-variance filtering and std normalization change the training objective/distribution.
 
-ManiSkill3's GPU `reset` accepts one seed per parallel environment, so a group is the same seed repeated G times:
+### Lab 1c — Simulator collection contract (integration exercise)
 
-```python
-# vla_rl/rollout.py
-@torch.no_grad()
-def collect_groups(env, policy, ref, init_seeds, G, H, A, K, sigma, n_chunks):
-    obs, _ = env.reset(seed=[s for s in init_seeds for _ in range(G)])
-    assert obs.view(len(init_seeds), G, -1).std(1).max() < 1e-4, "group members must share a layout"
-    success = torch.zeros(obs.shape[0], dtype=torch.bool, device=obs.device)
-    buf = {k: [] for k in ("obs", "chain", "logp", "mu_ref")}
-    for _ in range(n_chunks):                                # execute the full chunk: clean credit
-        chunk, chain = sample_chain(policy, obs, H, A, K, sigma)
-        logp, _ = chain_logprob(policy, obs, chain, sigma)
-        _, mu_ref = chain_logprob(ref, obs, chain, sigma)
-        for k, v in zip(buf, (obs, chain, logp, mu_ref)):
-            buf[k].append(v)
-        for h in range(H):
-            obs, _, _, _, info = env.step(chunk[:, h].clamp(-1, 1))
-            success |= info["success"].bool()
-    return {k: torch.stack(v, 1).flatten(0, 1) for k, v in buf.items()}, success.float()
+Implement a collector against a pinned simulator adapter, then test these conditions before training. A repeated seed is a request for reproducibility, not proof of identical initial states: compare full relevant simulator state, observations, and independent policy RNG streams.
+
+```text
+PLANNED SIMULATOR INTEGRATION — no implementation is supplied here
+reset each group to the same verified initial condition
+for each active episode:
+    save observation, sampled latent chain, old log-probs, reference means
+    execute admitted actions with documented units, bounds and frame
+    accumulate rewards and actual executed duration
+    stop this episode on termination/truncation; preserve its final observation
+    never let a reset observation or later episode enter this episode's reward
+mask inactive/padded decisions before group statistics and loss reduction
+retain task/initial-state/episode IDs and all sampler settings
 ```
 
-(The buffer is flattened env-major, so each environment's `n_chunks` decisions are contiguous; repeat the per-episode advantage with `repeat_interleave(n_chunks)`.) Use `env = gym.make("PickCube-v1", num_envs=num_groups*G, obs_mode="state")` and keep `n_chunks * H` within the task's time limit.
+For discounted control, aggregate a chunk reward as `sum(gamma**j * reward[j])` and bootstrap with `gamma**executed_steps`, applying true termination and truncation rules from the [existing CPU lab](CPU-Lab.md). A chunk may finish early; its actual duration can differ from H. For an undiscounted binary episode-success objective, say so explicitly and keep every decision attached to the correct episode.
 
-### Lab 1d — Training loop and the filtered-BC baseline
+Clipping a sampled action before execution is a deterministic environment-side map. The latent-chain likelihood still scores the original sampled chain; do not pretend it is the Gaussian density of the clipped action. For filtered behavioral cloning, record the actual executed controls and masks, including shortened chunks and normalization. Exclude post-terminal padding from both regression and policy-gradient losses.
 
-```python
-ref = copy.deepcopy(policy).eval().requires_grad_(False)
-opt = torch.optim.AdamW(policy.parameters(), lr=1e-5)
-sigma = torch.full((K,), 0.05, device="cuda")              # sweep {0.02, 0.05, 0.1}
-for it in range(iters):
-    seeds = rng_seeds(num_groups)                           # your sampler; disjoint from eval seeds
-    data, success = collect_groups(env, policy, ref, seeds, G, H, 7, K, sigma, n_chunks)
-    adv, keep = group_advantages(success, G)
-    adv, keep = adv.repeat_interleave(n_chunks), keep.repeat_interleave(n_chunks)
-    log(zero_var_frac=1 - keep.float().mean(), success=success.mean())
-    idx = keep.nonzero().squeeze(1)                         # drop zero-variance groups
-    for _ in range(2):                                      # epochs
-        for mb in idx[torch.randperm(len(idx))].split(256):
-            loss, stats = grpo_loss(policy, data["obs"][mb], data["chain"][mb],
-                                    data["logp"][mb], data["mu_ref"][mb], adv[mb], sigma)
-            opt.zero_grad(); loss.backward()
-            torch.nn.utils.clip_grad_norm_(policy.parameters(), 1.0); opt.step()
-```
+### Lab 1d — Training and comparisons (integration exercise)
 
-Filtered BC on the same rollout budget: collect the same number of episodes per iteration, keep the executed chunks from successful episodes, and take the same number of optimizer steps with the plain flow-matching loss:
+Freeze the intended reference, collect valid groups without gradients, compute old scores once, and update with a bounded number of epochs. Keep KL/ratio and task-quality diagnostics. An all-uninformative batch needs an explicit skip/resample decision; it must not report a successful policy-gradient update.
 
-```python
-def flow_matching_loss(policy, obs, a1):                    # tau=0 noise, tau=1 action
-    x0, tau = torch.randn_like(a1), torch.rand(a1.shape[0], device=a1.device)
-    xt = (1 - tau)[:, None, None] * x0 + tau[:, None, None] * a1
-    return ((policy(xt, tau, obs) - (a1 - x0)) ** 2).mean()
-```
+Compare with filtered behavioral cloning using the same collection budget and a stated update budget. Sample ordinary flow-matching noise and time for the regression target; do not attach a pathwise gradient through the recorded rollout. This comparison still requires a real dataset and complete collector/trainer implementation.
 
-Evaluate every few iterations with **deterministic** sampling (\(\sigma = 0\)) and with the training \(\sigma\), on (a) held-out seeds from the training distribution and (b) **perturbed initial poses** outside it (the same perturbation protocol you used in [Lecture 02](Lecture-02.md) and [Lecture 06](Lecture-06.md)).
+Evaluate the training sampler and the intended deployment sampler on held-out initial conditions. Setting intermediate sigma to zero removes those injected noises, but **fresh initial Gaussian noise remains stochastic**. Use fixed initial noise to test repeatability, and multiple independent noises to estimate success. Do not label zero-intermediate-noise sampling deterministic without stating the initial-noise policy.
 
 ### Lab 2 (optional, rung 3) — One RL iteration of π0.5 on LIBERO
 
-If you have an 80 GB GPU: use a framework that already wires π0/π0.5 + LIBERO + PPO/GRPO (RLinf lists all three) and run *one* iteration on a single LIBERO task. The goal is not a better policy. It is a measured split of one iteration: rollout seconds, log-prob recompute seconds, optimizer seconds, weight-sync seconds, peak memory. Follow the framework's own LIBERO example rather than inventing flags.
+For an optional pretrained-model experiment, select a supported pinned RL framework recipe and calculate its actual hardware/precision/adapter requirements first. A single 80-GB GPU is not guaranteed to fit the model, optimizer, reference, rollout storage, and simulator. Run one documented small iteration only after its environment and dataset prerequisites are present; report measured rollout, recomputation, optimizer, synchronization, and memory costs. No such pretrained VLA RL iteration was executed for this course review.
 
 ---
 
@@ -417,7 +448,7 @@ If you have an 80 GB GPU: use a framework that already wires π0/π0.5 + LIBERO 
 | Metric | Definition | Why it matters |
 |---|---|---|
 | Success, nominal / perturbed | Deterministic eval on held-out seeds and on perturbed poses | The real target; perturbed shows whether RL improved understanding or memorized layouts |
-| Success, \(\sigma=0\) vs \(\sigma>0\) | Same policy, two samplers | Did the deterministic policy inherit what the noisy one learned? |
+| Success, \(\sigma=0\) vs \(\sigma>0\) | Same policy, two samplers | Did the intended sampler retain the learned behavior? Record both initial and intermediate noise settings. |
 | Zero-variance group fraction | Groups with all-equal outcomes / total | Wasted rollouts; compare with \(p^G + (1-p)^G\) |
 | KL to reference | Mean closed-form step KL | Leash tightness; spikes precede collapse |
 | Clip fraction, ratio stats | From `grpo_loss` | Step size sanity (Lecture 06) |
@@ -456,8 +487,8 @@ You can move on when you can:
 ## Self-check
 
 1. Base π0.5 succeeds 92% of the time on a LIBERO task's nominal layouts. With \(G = 8\), roughly what fraction of groups give zero policy gradient? Name two ways to spend those rollouts better.
-2. You must post-train a ~3 B-parameter flow VLA on one 80 GB GPU. Compare full-parameter PPO with a VLM-sized critic, full-parameter GRPO, and LoRA GRPO by what must sit in memory. Which fits, and what does LoRA give you for free besides small optimizer state?
-3. You trained with \(\sigma_k = 0.1\) and success under the noisy sampler rose from 60% to 80%, but deterministic (\(\sigma = 0\)) success only went from 62% to 65%. Give a mechanism that explains the gap and two fixes.
+2. You must post-train a ~3 B-parameter flow VLA on one 80 GB GPU. Compare full-parameter PPO with a VLM-sized critic, full-parameter GRPO, and LoRA GRPO by what must sit in memory. What additional measurements determine fit, and under what conditions can LoRA share the reference base?
+3. You trained with \(\sigma_k = 0.1\) and success under the noisy sampler rose from 60% to 80%, but zero-intermediate-noise (\(\sigma = 0\), still sampling initial noise) success only went from 62% to 65%. Give a mechanism that explains the gap and two fixes.
 4. A teammate proposes cutting rollout denoising steps from 10 to 2 "to make RL 5× faster." Using \(t_{\text{chunk}} \approx t_{\text{prefix}} + K t_{\text{expert}}\), what speedup do you actually expect if the prefix is 60% of the chunk at \(K = 10\)? What must you check before trusting the trained policy at \(K = 10\) again?
 5. Your data includes teleoperated corrections recorded during autonomous runs. Why does an advantage-conditioned / weighted-regression method (RECAP-style) handle them naturally, while on-policy GRPO with noise-injected log-probs does not?
 6. After 200 GRPO iterations, success on the sim predicate is 97%, but videos show the bowl balanced on the plate's rim. What went wrong, which term in your objective should have limited it, and how do you detect this automatically next time?

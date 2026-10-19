@@ -13,16 +13,18 @@
 
 Isaac Sim is NVIDIA's robotics simulator: an Omniverse Kit application that composes a **USD** scene, steps it with **PhysX** (or the new **Newton** engine), renders sensors with **RTX**, and talks to **ROS 2**. Isaac Lab is the robot-learning framework on top of it: thousands of cloned environments on one GPU, managers for observations, rewards and randomization, and adapters for RL and imitation-learning libraries.
 
-This course teaches both from the bottom up — USD prims to trained policies — and treats the simulator as what it is on your desk: **a GPU program competing for a fixed VRAM and compute budget.** Every lab measures step time, render time, and memory, and every lecture says which knob moves which number.
+This course teaches both from the bottom up — USD prims to trained policies — and treats the simulator as what it is on your desk: **a GPU program competing for a fixed VRAM and compute budget.** The labs connect mathematical and interface checks to measurements of physics, rendering, training and memory. Each result identifies the workload and execution boundary.
 
-**Comprehensive VLA companion:** [VLA Foundations to Frontier 2026](../VLA%20Foundations%20to%20Frontier%202026/README.md) provides 32 lectures spanning history, architectures, data, imitation/flow/RL training, evaluation, deployment, and the research frontier verified through October 13, 2026. Use its [CPU labs](../VLA%20Foundations%20to%20Frontier%202026/Lab-Guide.md) and capstones alongside this specialization.
+**Comprehensive VLA companion:** [VLA Foundations to Frontier 2026](../VLA%20Foundations%20to%20Frontier%202026/README.md) provides 32 lectures spanning history, architectures, data, imitation/flow/RL training, evaluation, deployment, and the research frontier with a source update reviewed on October 18, 2026. Use its [CPU labs](../VLA%20Foundations%20to%20Frontier%202026/Lab-Guide.md) and capstones alongside this specialization.
 
-**Teaching release family (checked October 2026):** Resolve an exact commit and lockfile using the [lab manifest](Lab-Guide.md#version-and-hardware-contract); a moving release branch is not an immutable pin.
+**Teaching release family (rechecked 2026-10-18):** Resolve an exact commit and lockfile using the [lab manifest](Lab-Guide.md#version-and-hardware-contract); a moving release branch is not an immutable pin. The [compatibility record](Compatibility.md) links the official evidence and distinguishes the full simulator, kit-less Lab workflows, and the locally executed ROS-only lab.
+
+**Latest release update:** [Isaac Sim 6.2.0 GA](https://github.com/isaac-sim/IsaacSim/releases/tag/v6.2.0) shipped October 14, 2026. The lessons below retain their named 6.1 examples; use [the 6.2 upgrade checks](Compatibility.md#current-release-and-upgrade-checks) for changed sensor ownership, Newton views/substeps, actuator contracts, and current product compatibility. The moving Lab 3.0 branch now has different dependencies from its EA tag.
 
 | Component | Version | Notes |
 |---|---|---|
 | Isaac Sim | **6.1.0** (GA, Sept 2026) | Kit 110.3; Python 3.12; open-source extensions (Apache-2.0) on a closed Kit SDK, EULA required |
-| Isaac Lab | **3.0.0-EA** (`release/3.0.0`, Sept 2026) | Requires Isaac Sim 6.1; GA targeted for late October 2026. Breaking changes from 2.x are called out in [Lecture 09](Lecture-09.md). |
+| Isaac Lab | **3.0.0-EA** (tag commit `ae37b028ea415c91ea2bc32609efcd759ed2b974`, Sept 2026) | Full Isaac Sim workflows require Sim 6.1; kit-less workflows can omit it. GA remains an upstream target for late October 2026, not a released version. Breaking changes are in [Lecture 09](Lecture-09.md). |
 | OS / ROS 2 | Ubuntu 24.04 + ROS 2 **Jazzy** | Humble on 22.04 also supported |
 | Physics | PhysX 5 · Newton 1.5 | PhysX is Isaac Sim's default; Newton is experimental there. In Isaac Lab 3.0 the backend is selectable, and the core tasks (Cartpole, Lift) default to **Newton** (`newton_mjwarp`). |
 
@@ -50,7 +52,7 @@ The Core API changed under everyone's feet: Isaac Sim 5.0 introduced the **Core 
 
 | # | Title | Focus |
 |---|-------|-------|
-| 01 | [The Isaac Stack and Your First Simulation](Lecture-01.md) | Kit, USD, PhysX/Newton, RTX · application vs simulation vs stage · install on an 8 GB card · GUI / extension / standalone workflows · a first measured simulation |
+| 01 | [The Isaac Stack and Your First Simulation](Lecture-01.md) | Kit, USD, PhysX/Newton, RTX · application vs simulation vs stage · full-simulator requirements and reduced CPU entry path · GUI / extension / standalone workflows · a first measured simulation |
 | 02 | [USD for Roboticists](Lecture-02.md) | Prims, attributes, stages, layers · references, payloads, variants, instancing · physics schemas · raw USD vs wrappers · USD vs Fabric vs tensors · hosted assets |
 | 03 | [The Core Experimental API](Lecture-03.md) | Batched wrappers and regex paths · Warp arrays · data backends · `SimulationManager` / `RenderingManager` · callbacks · migrating from `World` |
 | 04 | [PhysX for Robots](Lecture-04.md) | Rigid bodies, colliders, contact offsets, friction · TGS vs PGS, iterations, timestep · CCD and GPU dynamics · articulations and joint drives · stable grasping |
@@ -78,6 +80,12 @@ The Core API changed under everyone's feet: Isaac Sim 5.0 introduced the **Core 
 The lectures use the [Curriculum Authoring Guide](../../../Curriculum-Authoring-Guide.md): explain the concept, work a small example, run an experiment, and assess the evidence. Lectures 14–21 add self-check guidance and staged engineering exercises; the lab guide identifies which checks run on a CPU and which require Isaac.
 
 ---
+
+## Executed CPU entry path
+
+Start with [Simulation before the GPU](Simulation-CPU-Lab.md): 27 standard-library tests, actual Newton 1.5.2/Warp 1.16 CPU physics, actual OpenUSD 26.8 composition, measured ROS 2 message rejection, and a separate-process known-weight policy adapter. It also supplies delay-identification and paired-regression exercises. These results are recorded in the [validation manifest](labs/validation-2026-10-18.json).
+
+The full Isaac Sim, Isaac Lab training, rendering and trained-policy examples remain optional and were not executed here. Their named source versions matter: 6.1 examples do not automatically become 6.2 examples when a link is updated. Follow the compatibility record and rerun the simulator-specific checks on the selected stack.
 
 ## Applied engineering labs
 
@@ -124,7 +132,7 @@ On an RTX 4060, every simulation decision is a resource decision:
 * **Physics and rendering share one GPU.** PhysX GPU dynamics, Newton's Warp kernels, RTX ray tracing, your policy network, and the desktop compositor all draw from the same 8 GB and the same SMs. A camera at 640×480 in 64 environments can cost more than the physics of 4,096 state-only environments.
 * **Step time has three parts:** physics, rendering, and Python/data movement. They respond to different knobs (solver iterations and substeps; render products, resolution and RTX settings; data backend and batch size). Optimizing the wrong one does nothing.
 * **The data path is a design choice.** USD is for authoring, Fabric is the GPU runtime store for transforms and rendering, and the physics tensor API is the zero-copy path for training. Reading poses through USD in a training loop is the most common silent slowdown.
-* **Real-time factor is a contract.** For ROS 2 sim-in-the-loop, the simulator has to keep up with wall-clock time; for RL it should run as far *above* real time as possible. The same scene can meet one and miss the other.
+* **Real-time factor is a contract.** A controller or operator tied to wall-clock time may require the simulator to keep up. An all-simulation-time ROS pipeline can run slower or faster if every component handles that clock consistently. For RL, throughput matters only after task correctness is established. Record which timing contract your scene must meet.
 
 Every **Measure it** section asks for physics ms/step, render ms/frame, env-steps/s, peak VRAM, and VRAM per environment, so by the capstone you have a performance model of your own GPU.
 
@@ -159,7 +167,7 @@ You are done with this special course when you can:
 
 * Isaac Sim 6.1 documentation — [docs](https://docs.isaacsim.omniverse.nvidia.com/6.1.0/index.html) · [GitHub](https://github.com/isaac-sim/IsaacSim) · [release notes](https://docs.isaacsim.omniverse.nvidia.com/6.1.0/overview/release_notes.html)
 * Core API → Core Experimental migration guide — [docs](https://docs.isaacsim.omniverse.nvidia.com/6.1.0/migration_guides/isaac_sim_6_0/core_api_to_core_experimental.html)
-* Isaac Lab — [GitHub](https://github.com/isaac-sim/IsaacLab) · [3.0 installation](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/setup/installation/index.html) · [3.0 migration guide](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/migration/migrating_to_isaaclab_3-0.html) · [v3.0.0-EA release notes](https://github.com/isaac-sim/IsaacLab/releases/tag/v3.0.0-EA)
+* Isaac Lab — [GitHub](https://github.com/isaac-sim/IsaacLab) · [3.0 installation](https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/docs/source/setup/installation/index.rst) · [3.0 migration guide](https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/docs/source/migration/migrating_to_isaaclab_3-0.rst) · [v3.0.0-EA release notes](https://github.com/isaac-sim/IsaacLab/releases/tag/v3.0.0-EA)
 * Newton physics — [GitHub](https://github.com/newton-physics/newton)
 * OpenUSD — [docs](https://openusd.org/release/index.html)
 

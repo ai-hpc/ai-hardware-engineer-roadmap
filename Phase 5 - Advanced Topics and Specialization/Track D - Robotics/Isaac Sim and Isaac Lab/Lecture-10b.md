@@ -54,7 +54,7 @@ Legged locomotion is where simulation-trained RL has most clearly paid off on re
 
 The rates come from the Isaac Lab task config, `sim.dt = 0.002` (500 Hz physics) and `decimation = 10` (a 50 Hz policy), and the deployed policy keeps them. `RobotPolicyRunner` reads them from the exported `env.yaml`. It runs inference once every `decimation` physics ticks and **holds** the joint targets in between, so the actuators see the same 50 Hz target updates as in training.
 
-Spot is a **floating-base** robot. Its base has six unactuated degrees of freedom, so it can only move by pushing on the ground through contacts. That is why locomotion is learned rather than scripted: the policy has to discover a gait that produces the right contact forces at the right times.
+Spot is a **floating-base** robot. Its base has six unactuated degrees of freedom, so it can only move by pushing on the ground through contacts. This motivates learning one possible locomotion controller: the policy has to discover a gait that produces the right contact forces at the right times.
 
 ---
 
@@ -144,12 +144,12 @@ This is a reactive follower with no obstacle avoidance. For real environments yo
 
 ## 6. The hardware view
 
-* **The policy is tiny.** The Isaac Lab task's actor, a 48 → 512 → 256 → 128 → 12 MLP, has about 190 k parameters, roughly 0.4 MFLOP per inference, at 50 Hz. It costs nothing on any GPU or on a Jetson. On a real robot, what matters is **latency and jitter**: the policy was trained with 0-8 ms of actuator delay, so a deployment that adds tens of milliseconds of jitter is out of distribution in time. This is why the RL Researcher Kit runs the policy onboard, on a Jetson AGX Orin payload, rather than over a network.
+* **The policy is tiny.** The Isaac Lab task's actor, a 48 → 512 → 256 → 128 → 12 MLP, has 190,860 dense-layer parameters including biases (189,952 weight MACs), about 0.38 MFLOP per inference before activation and runtime overhead. At 50 Hz this is a small arithmetic workload; latency, scheduling and memory movement still need measurement on the actual CPU/GPU/Jetson. On a real robot, what matters is **latency and jitter**: the policy was trained with 0-8 ms of actuator delay, so a deployment that adds tens of milliseconds of jitter is out of distribution in time. This is why the RL Researcher Kit runs the policy onboard, on a Jetson AGX Orin payload, rather than over a network.
 * **Physics runs at 500 Hz.** One Spot means 500 articulation steps per simulated second. For one robot that is cheap. For RL, Isaac Lab runs thousands of them in parallel, which is the whole point of [Lecture 10](Lecture-10.md).
 * **Rendering is the cost in this lab.** With the GUI, each frame (every 10 physics steps) renders the viewport, the path visualizations, and the robot. Headless, the same navigation run is mostly physics and Python. Measure the real-time factor both ways (Lab 10b-a).
 * **Engines are not interchangeable at the policy level.** Isaac Sim ships **separate** PhysX and Newton Spot policies, each trained against its own engine. A policy trained on one engine and run on the other sees contact dynamics it never trained on ([Lecture 05](Lecture-05.md)). Lab 10b-c measures that gap.
 
-> **8 GB budget.** One Spot on the default grid environment runs comfortably on a 4060, headless or in the GUI. The navigation lab is not GPU-bound. Training your own policy (Lab 10b-d) is where 8 GB matters. The task's PhysX config raises GPU contact-patch buffers, and thousands of Spots on generated terrain take real memory. Start at `--num_envs 512`-`1024` with `--viz none`, watch `nvidia-smi`, and expect longer wall-clock than on a 16-48 GB card. If training is too slow, deploy the bundled policy and treat Lab 10b-d as a cloud exercise.
+> **8 GB budget.** One Spot is a smaller workload than batched training, but this course did not validate its memory use or bottleneck on a 4060; full Isaac Sim remains above that card's documented hardware class. Training your own policy (Lab 10b-d) is where 8 GB matters. The task's PhysX config raises GPU contact-patch buffers, and thousands of Spots on generated terrain take real memory. Start at `--num_envs 512`-`1024` with `--viz none`, watch `nvidia-smi`, and expect longer wall-clock than on a 16-48 GB card. If training is too slow, deploy the bundled policy and treat Lab 10b-d as a cloud exercise.
 
 ---
 
@@ -302,7 +302,7 @@ omni.timeline.get_timeline_interface().stop()
 SimulationManager.deregister_callback(cb); spot.close(); simulation_app.close()
 ```
 
-**Navigator baseline, before Isaac Sim.** The `WaypointFollower` class needs nothing from Isaac Sim, so test it first on an ideal robot that applies each command perfectly (integrate \(v_x, v_y, \omega_z\) in the body frame at `dt = 0.02`). Run that way, the class above completes both courses at every limit setting in Lab 10b-c without exceeding its limits, and its peak cross-track error is about **0.3 m**: the corner-cutting set by the 0.3 m reach radius (about 0.5 m on the slalom at the slowest turn rate). That is your floor. In Isaac Sim, any cross-track error above it comes from the policy or the physics, not the navigator.
+**Navigator baseline, before Isaac Sim.** The `WaypointFollower` class needs nothing from Isaac Sim, so test it first on an ideal robot that applies each command perfectly (integrate \(v_x, v_y, \omega_z\) in the body frame at `dt = 0.02`). Run that way, the class above completes both courses at every limit setting in Lab 10b-c without exceeding its limits, and its peak cross-track error is about **0.3 m**: the corner-cutting set by the 0.3 m reach radius (about 0.5 m on the slalom at the slowest turn rate). That is your floor. It is a reference for that ideal plant and discretization, not a universal error floor. In a coupled loop, tracking error changes the poses seen by the navigator and can change later waypoint switches; investigate the complete feedback trajectory.
 
 Run both courses on both engines, headless. Plot the path (`x`, `y`) over the waypoints, the three commands over time, and the cross-track error. Before tuning anything, check two things. Does the robot track the *commands* (compare commanded \(v_x\) with the finite-difference velocity from the log)? Does the navigator produce sensible commands? Those are different layers' failures.
 

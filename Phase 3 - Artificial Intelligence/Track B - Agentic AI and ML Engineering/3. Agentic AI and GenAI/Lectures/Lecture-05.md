@@ -31,16 +31,16 @@ Input tokens → [Transformer] → Logits → Sample → Output token
 
 | Phase | What happens | Compute bound |
 |-------|-------------|---------------|
-| **Prefill** | Process all input tokens in parallel (matrix multiply) | Compute (FLOP-bound) |
-| **Decode** | Generate one token at a time (autoregressive) | Memory bandwidth |
+| **Prefill** | Process known prompt positions together, respecting the causal mask | Often compute intensive; depends on shape, batching and kernels |
+| **Decode** | Generate subsequent tokens autoregressively | Often bandwidth limited at small batch; weights, KV/state, communication and compute can each dominate |
 
-> **Hardware implication:** Prefill saturates GPU compute. Decode is bottlenecked by how fast you can stream weights from HBM. This is why inference accelerators (Groq, Etched) focus on memory bandwidth, not just FLOPS.
+> **Hardware implication:** measure the actual workload. Larger batches reuse weights; longer contexts increase attention-state traffic. A roofline estimate is a hypothesis to test, not proof that every prefill saturates compute or every decode is limited only by weights.
 
 ---
 
 ## 2. Tokens and Context Windows
 
-**Tokens ≠ words**. Rule of thumb: **1 token ≈ 0.75 English words** (4 characters).
+**Tokens ≠ words.** Rough English rules such as four characters per token are budgeting approximations. Code, identifiers, other languages and model tokenizers differ. Count the complete formatted request with the intended model.
 
 ```python
 import os
@@ -53,7 +53,7 @@ response = client.messages.count_tokens(
     model=os.environ.get("ANTHROPIC_MODEL", "your-model-id"),
     messages=[{"role": "user", "content": "Hello, how are you?"}]
 )
-print(response.input_tokens)  # → 10
+print(response.input_tokens)  # Actual count depends on model and request formatting.
 ```
 
 **Context windows change quickly. Think in categories instead of memorizing one snapshot:**
@@ -83,22 +83,20 @@ import os
 response = client.messages.create(
     model=os.environ.get("ANTHROPIC_MODEL", "your-model-id"),
     max_tokens=1024,
-    temperature=0.0,    # 0 = deterministic (good for agents/tools)
-                        # 1 = creative (good for writing)
-    top_p=1.0,
+    # Omit unsupported sampling parameters; use the model-specific contract.
     messages=[{"role": "user", "content": "What is 2+2?"}]
 )
 ```
 
-| Parameter | Effect | Agent recommendation |
-|-----------|--------|---------------------|
-| `temperature` | Randomness of sampling | 0.0–0.3 for tool use / reasoning |
-| `top_p` | Nucleus sampling cutoff | Leave at 1.0 (let temperature do the work) |
-| `max_tokens` | Hard output limit | Set generously — truncation breaks JSON |
+| Control | Meaning | What to verify |
+|---|---|---|
+| Sampling parameters | Change token sampling when supported | Supported names, ranges and combinations for the exact model/SDK |
+| Output-token limit | Caps generated output | Truncation status, reasoning budget and tool-call completeness |
+| Structured output / strict tools | Constrains supported output schemas | Refusal, incomplete output, and local semantic validation |
 
-> **Pro tip:** For tool-use agents, always use `temperature=0` or close to it. Randomness in function call generation causes JSON parse errors and unpredictable behavior.
+`temperature=0` does not guarantee identical results across kernels, revisions or service executions. It is not a JSON validator. Current Anthropic Python SDK 1.x removes `temperature`, `top_p` and `top_k` from its typed call signature; Claude 4.7+ rejects nondefault values at the API layer. The [current model lifecycle guide](https://platform.claude.com/docs/en/about-claude/model-deprecations) documents that distinction. Run the [provider lab](Provider-Contract-Lab.md) for the pinned SDK contract.
 
----
+All API examples on this page require a configured supported model and credentials and may incur charges; they were not executed against a hosted model. The fixture lab needs neither.
 
 ## 4. The Anatomy of an API Call
 
@@ -119,7 +117,7 @@ response = client.messages.create(
     ]
 )
 
-print(response.content[0].text)
+print("".join(block.text for block in response.content if block.type == "text"))
 print(f"Input tokens:  {response.usage.input_tokens}")
 print(f"Output tokens: {response.usage.output_tokens}")
 print(f"Stop reason:   {response.stop_reason}")  # end_turn | tool_use | max_tokens
@@ -131,7 +129,8 @@ print(f"Stop reason:   {response.stop_reason}")  # end_turn | tool_use | max_tok
 |-------|---------|
 | `end_turn` | Model finished naturally |
 | `tool_use` | Model wants to call a tool — your loop must handle this |
-| `max_tokens` | Hit the limit — increase or handle gracefully |
+| `max_tokens` | Incomplete output; never execute a partial tool call |
+| `refusal` / `pause_turn` | Distinct outcomes requiring an explicit policy; this minimal lab stops |
 
 ---
 
@@ -217,14 +216,14 @@ total = sum(
 print(f"Estimated loop cost: ${total:.4f}")
 ```
 
-> **Key insight:** In a 10-step agent loop, context grows linearly — step 10 has 10× the input tokens of step 1. This is why context management (summarization, pruning) is critical in production.
+**Worked answer:** these fictional prices and the explicitly assumed 2,000-token growth produce 110,000 input and 5,000 output tokens: `$0.330 + $0.075 = $0.405`. Actual contexts do not always grow by this amount. Sum actual usage, distinguish cache read/write charges and tool charges, and keep failed attempts in the total. A forecast is not a hard spend cap.
 
 ---
 
 ## Key Takeaways
 
-1. LLM inference = prefill (compute-bound) + decode (memory-bandwidth-bound)
-2. Use `temperature=0` for tool-use agents; reserve higher values for creative tasks
+1. Prefill and decode have different reuse patterns; profile before declaring the bottleneck
+2. Use supported model controls, structured schemas and local validation; sampling is not a correctness guarantee
 3. Check `stop_reason` — `tool_use` means your loop must call the tool and continue
 4. Route tasks to cheaper models where possible; the cost compounds in multi-step loops
 5. Context grows each step — plan for summarization or windowing in long-running agents
@@ -239,4 +238,4 @@ print(f"Estimated loop cost: ${total:.4f}")
 
 ---
 
-**Next:** [Lecture 07 — Prompt Engineering & Structured Output](Lecture-07.md)
+**Next:** [Lecture 06](Lecture-06.md)

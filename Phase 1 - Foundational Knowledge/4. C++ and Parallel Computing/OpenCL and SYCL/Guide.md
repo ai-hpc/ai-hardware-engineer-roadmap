@@ -22,7 +22,7 @@
 
 ## Why Learn This
 
-CUDA locks you to NVIDIA. HIP gets you AMD. OpenCL and SYCL get you **everything** — Intel GPUs, AMD GPUs, FPGAs, CPUs, even custom accelerators. As an AI hardware engineer, you'll encounter systems where NVIDIA isn't an option: Intel Gaudi accelerators, Xilinx/AMD FPGAs, embedded SoCs, or multi-vendor cloud instances.
+OpenCL and SYCL provide portable programming interfaces across supported implementations. They do not automatically support every accelerator: the compiler, runtime backend, driver, device, and required features must all match. A custom accelerator still needs a backend and runtime integration. Start with one working implementation, then test a second target with the same numerical contract.
 
 | | CUDA | HIP | OpenCL | SYCL |
 |---|---|---|---|---|
@@ -123,90 +123,20 @@ __kernel void vector_add(
 - `__constant` — pointer to constant memory
 - `__private` — (default) per-work-item
 
-### 1.5 Host Code — The Full Setup
+### 1.5 Run a checked host-and-kernel example
 
-OpenCL host code is verbose — you must explicitly create platform, device, context, queue, buffers, program, and kernel objects. This boilerplate is the price of portability.
-
-```cpp
-#include <CL/cl.h>
-#include <cstdio>
-#include <cstdlib>
-
-int main() {
-    const int N = 1024;
-    size_t bytes = N * sizeof(float);
-    float *h_a = (float*)malloc(bytes);
-    float *h_b = (float*)malloc(bytes);
-    float *h_c = (float*)malloc(bytes);
-
-    for (int i = 0; i < N; i++) { h_a[i] = i; h_b[i] = i * 2; }
-
-    // ── Step 1: Get platform and device ────────────────────────
-    cl_platform_id platform;
-    clGetPlatformIDs(1, &platform, NULL);
-
-    cl_device_id device;
-    clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, &device, NULL);
-
-    // ── Step 2: Create context and command queue ───────────────
-    cl_context ctx = clCreateContext(NULL, 1, &device, NULL, NULL, NULL);
-    cl_command_queue queue = clCreateCommandQueueWithProperties(ctx, device, 0, NULL);
-
-    // ── Step 3: Create buffers ─────────────────────────────────
-    cl_mem d_a = clCreateBuffer(ctx, CL_MEM_READ_ONLY,  bytes, NULL, NULL);
-    cl_mem d_b = clCreateBuffer(ctx, CL_MEM_READ_ONLY,  bytes, NULL, NULL);
-    cl_mem d_c = clCreateBuffer(ctx, CL_MEM_WRITE_ONLY, bytes, NULL, NULL);
-
-    // ── Step 4: Upload data ────────────────────────────────────
-    clEnqueueWriteBuffer(queue, d_a, CL_TRUE, 0, bytes, h_a, 0, NULL, NULL);
-    clEnqueueWriteBuffer(queue, d_b, CL_TRUE, 0, bytes, h_b, 0, NULL, NULL);
-
-    // ── Step 5: Build program from source ──────────────────────
-    const char* src = "__kernel void vector_add("
-        "__global const float* a, __global const float* b,"
-        "__global float* c, const int n) {"
-        "  int i = get_global_id(0);"
-        "  if (i < n) c[i] = a[i] + b[i];"
-        "}";
-
-    cl_program prog = clCreateProgramWithSource(ctx, 1, &src, NULL, NULL);
-    clBuildProgram(prog, 1, &device, "-cl-fast-relaxed-math", NULL, NULL);
-
-    // ── Step 6: Create kernel and set arguments ────────────────
-    cl_kernel kernel = clCreateKernel(prog, "vector_add", NULL);
-    clSetKernelArg(kernel, 0, sizeof(cl_mem), &d_a);
-    clSetKernelArg(kernel, 1, sizeof(cl_mem), &d_b);
-    clSetKernelArg(kernel, 2, sizeof(cl_mem), &d_c);
-    clSetKernelArg(kernel, 3, sizeof(int),    &N);
-
-    // ── Step 7: Launch kernel ──────────────────────────────────
-    size_t global_size = N;
-    size_t local_size  = 256;
-    clEnqueueNDRangeKernel(queue, kernel, 1, NULL,
-                           &global_size, &local_size, 0, NULL, NULL);
-
-    // ── Step 8: Read back results ──────────────────────────────
-    clEnqueueReadBuffer(queue, d_c, CL_TRUE, 0, bytes, h_c, 0, NULL, NULL);
-
-    printf("c[0] = %f, c[%d] = %f\n", h_c[0], N-1, h_c[N-1]);
-
-    // ── Cleanup ────────────────────────────────────────────────
-    clReleaseKernel(kernel);
-    clReleaseProgram(prog);
-    clReleaseMemObject(d_a); clReleaseMemObject(d_b); clReleaseMemObject(d_c);
-    clReleaseCommandQueue(queue);
-    clReleaseContext(ctx);
-    free(h_a); free(h_b); free(h_c);
-}
-```
+Use the [CPU OpenCL lab](labs/README.md) and its complete [vector_add_opencl.cpp](labs/vector_add_opencl.cpp). It enumerates platforms/devices, prefers a CPU device, checks every API operation, prints compiler errors, selects a legal work-group size, pads the launch, validates every output, and releases resources. An OpenCL **ICD loader** dispatches API calls; it needs an installed device implementation such as PoCL to execute kernels.
 
 ```bash
-# Compile (link against OpenCL ICD loader)
-gcc -O2 -o vecadd vecadd.c -lOpenCL
-
-# Run (works on any GPU/CPU with an OpenCL driver)
-./vecadd
+# From this sub-track directory, with OpenCL headers/loader and a device runtime installed:
+g++ -O2 -std=c++17 labs/vector_add_opencl.cpp -lOpenCL -o /tmp/vector_add_opencl
+/tmp/vector_add_opencl --self-test
+/tmp/vector_add_opencl --inject-build-error
 ```
+
+The last command should fail and display `BUILD_LOG`; treating a failed build as a valid kernel is a common cause of confusing downstream errors. The normal program uses an OpenCL 1.2 API/kernel baseline and does not enable relaxed floating-point math. It was compiled and executed on PoCL 5.0's CPU implementation on 2026-10-18; GPU and SYCL execution have not been validated by these checks.
+
+Follow one request through eight operations: device selection → context/queue creation → buffer allocation → input copies → program build → kernel argument setup → dispatch → checked output read. The queue is in order, and the output read blocks for completion. Kernel event timing excludes compilation, host allocation, transfers, and end-to-end application work.
 
 ### 1.6 Tiled Matrix Multiply with Local Memory
 
@@ -319,10 +249,9 @@ SYCL:
 
 | Implementation | Vendor | Backend targets |
 |---------------|--------|-----------------|
-| **Intel oneAPI DPC++** | Intel | Intel GPUs, CPUs, FPGAs, NVIDIA GPUs (via plugin) |
+| **Intel oneAPI DPC++** | Intel | Supported Intel targets; other GPU targets need compatible backend plugins |
 | **AdaptiveCpp** (formerly hipSYCL) | Open-source | AMD GPUs, NVIDIA GPUs, CPUs |
-| **ComputeCpp** | Codeplay | ARM Mali, Renesas, custom |
-| **triSYCL** | Xilinx/AMD | FPGAs (experimental) |
+| **Altera FPGA flow** | Altera | Separate FPGA toolchain/add-on and supported board package; see section 2.6 |
 
 ### 2.2 SYCL Hello World — Vector Addition
 
@@ -343,8 +272,9 @@ int main() {
         sycl::buffer<float> buf_b(b.data(), N);
         sycl::buffer<float> buf_c(c.data(), N);
 
-        // Select device (GPU preferred, falls back to CPU)
-        sycl::queue q(sycl::gpu_selector_v);
+        // Select an available device using the implementation's default policy.
+        // gpu_selector_v specifically requires a GPU; it does not fall back to CPU.
+        sycl::queue q(sycl::default_selector_v);
         std::cout << "Device: "
                   << q.get_device().get_info<sycl::info::device::name>()
                   << "\n";
@@ -359,8 +289,10 @@ int main() {
                 C[i] = A[i] + B[i];
             });
         });
+        q.wait_and_throw();  // surface asynchronous execution errors
     }  // buffer destructor → implicit copy back to host vectors
 
+    for (int i = 0; i < N; ++i) if (c[i] != a[i] + b[i]) return 1;
     std::cout << "c[0] = " << c[0] << ", c[" << N-1 << "] = " << c[N-1] << "\n";
 }
 ```
@@ -380,13 +312,17 @@ acpp -o vecadd vecadd.cpp --acpp-targets="cuda:sm_80"
 
 ### 2.3 USM (Unified Shared Memory) — CUDA-Like Pointers in SYCL
 
-Buffers/accessors are safe but unfamiliar to CUDA programmers. USM provides raw pointers:
+The buffer/accessor model expresses data dependencies; correctness still depends on bounds and lifetimes. USM provides raw pointers, so you must express dependencies explicitly. The following ordering example requires device-USM support; a full application must check allocation failures and release already allocated memory on exceptions:
 
 ```cpp
 #include <sycl/sycl.hpp>
+#include <vector>
+#include <stdexcept>
 
 int main() {
-    sycl::queue q(sycl::gpu_selector_v);
+    sycl::queue q(sycl::default_selector_v);
+    if (!q.get_device().has(sycl::aspect::usm_device_allocations))
+        throw std::runtime_error("device USM is unsupported");
     const int N = 1024;
 
     // Allocate device memory (like cudaMalloc)
@@ -400,15 +336,15 @@ int main() {
     // Copy to device (like cudaMemcpy)
     q.memcpy(d_a, h_a.data(), N * sizeof(float));
     q.memcpy(d_b, h_b.data(), N * sizeof(float));
-    q.wait();
+    q.wait_and_throw();
 
     // Launch kernel
     q.parallel_for(sycl::range<1>(N), [=](sycl::id<1> i) {
         d_c[i] = d_a[i] + d_b[i];
-    }).wait();
+    }).wait_and_throw();
 
     // Copy back
-    q.memcpy(h_c.data(), d_c, N * sizeof(float)).wait();
+    q.memcpy(h_c.data(), d_c, N * sizeof(float)).wait_and_throw();
 
     // Free
     sycl::free(d_a, q);
@@ -465,35 +401,36 @@ q.submit([&](sycl::handler& h) {
 });
 ```
 
-### 2.5 Sub-Groups (Warp/Wavefront Equivalent)
+### 2.5 Sub-groups: use the actual execution group
 
-SYCL `sub_group` maps to CUDA warps (32) or AMD wavefronts (64):
+A SYCL subgroup is implementation- and kernel-dependent; do not infer its size solely from the GPU vendor. Use group algorithms rather than assuming a power-of-two width and reading an out-of-range shuffle source. The [Khronos group-algorithm reference](https://github.khronos.org/SYCL_Reference/iface/group-algorithms-library.html) specifies the collective participation requirements.
 
 ```cpp
-q.parallel_for(
-    sycl::nd_range<1>(N, 256),
-    [=](sycl::nd_item<1> item) {
-        auto sg = item.get_sub_group();
-        int lane = sg.get_local_id();
-        int sg_size = sg.get_local_range()[0];   // 32 on NVIDIA, 64 on AMD
-
-        float val = data[item.get_global_id(0)];
-
-        // Warp-level reduction (portable!)
-        for (int offset = sg_size / 2; offset > 0; offset /= 2)
-            val += sycl::shift_group_left(sg, val, offset);
-
-        if (lane == 0)
-            result[sg.get_group_id()] = val;
+// Sketch preconditions: N > 0; device supports local size 128;
+// data points to N accessible floats; partial points to global accessible floats
+// initialized to zero. Both allocations remain alive until completion.
+constexpr size_t local = 128;
+const size_t global = ((N + local - 1) / local) * local;
+q.parallel_for(sycl::nd_range<1>(global, local), [=](sycl::nd_item<1> item) {
+    auto sg = item.get_sub_group();
+    size_t i = item.get_global_linear_id();
+    float value = i < N ? data[i] : 0.0f;  // no early return before the collective
+    float sum = sycl::reduce_over_group(sg, value, sycl::plus<float>{});
+    if (sg.leader()) {
+        // Reserve local slots per work-group: subgroup IDs are local to a group.
+        size_t slot = item.get_group_linear_id() * local + sg.get_group_linear_id();
+        partial[slot] = sum;
     }
-);
+}).wait_and_throw();
 ```
 
-This code runs correctly on NVIDIA (sub_group = 32), AMD (sub_group = 64), and Intel (sub_group = 8/16/32) without modification.
+Each subgroup writes a unique partial result; untouched slots remain zero. A second reduction combines the partials. The deliberately roomy output avoids collisions between different work-groups without fixing subgroup width. Production code can use a denser layout or a work-group/library reduction. Floating-point addition can regroup, so compare with a justified tolerance. This sketch has not been executed in the CPU OpenCL checks.
 
-### 2.6 SYCL for FPGA (Intel oneAPI)
+### 2.6 SYCL for FPGA: select the maintained FPGA toolchain
 
-Intel oneAPI DPC++ can compile SYCL kernels to FPGA bitstreams. The same C++ code targets GPU or FPGA — but FPGA-optimised kernels look different (pipes, loop unrolling, banking).
+**Reviewed 2026-10-18:** Intel removed FPGA support from its DPC++ compiler starting with release 2025.1; the old 2025.0 flow is a historical baseline. Use the separately documented [Altera FPGA add-on/toolchain](https://www.altera.com/products/development-tools/oneAPI-base-toolkit) and its supported board package for new FPGA work. See [Intel's transition notice](https://www.intel.com/content/www/us/en/developer/tools/oneapi/fpga.html). Do not assume that installing a current generic `icpx` supplies FPGA compilation.
+
+The following pipe example describes the programming idea and needs the selected FPGA toolchain's headers, device selector, and interface configuration. GPU source portability does not imply a suitable FPGA architecture.
 
 ```cpp
 // FPGA-optimised: use pipes for streaming
@@ -516,13 +453,13 @@ q.submit([&](sycl::handler& h) {
 });
 ```
 
-FPGA compilation takes hours (full place-and-route), so use **emulation** during development:
+Hardware compilation includes synthesis and physical implementation and can be expensive. Use emulation for functional iteration, then measure the implemented FPGA separately. These are **historical 2025.0-style command examples**, not commands validated with the current Altera flow:
 
 ```bash
 # Emulation (fast, runs on CPU)
 icpx -fsycl -fintelfpga -DFPGA_EMULATOR -o emu emu.cpp
 
-# FPGA hardware compile (30min–2hrs)
+# FPGA hardware compile (duration depends on design, machine, and tool version)
 icpx -fsycl -fintelfpga -Xshardware -o hw hw.cpp
 ```
 
@@ -530,19 +467,17 @@ icpx -fsycl -fintelfpga -Xshardware -o hw hw.cpp
 
 ## Part 3: OpenCL vs SYCL Decision Guide
 
-| Criterion | Choose OpenCL | Choose SYCL |
-|-----------|--------------|-------------|
-| **Existing C codebase** | Yes | No |
-| **Need FPGA (Xilinx)** | Yes (Vitis) | Partial (Intel only) |
-| **Modern C++ preferred** | No | Yes |
-| **Intel GPU / FPGA** | Works | Best (oneAPI) |
-| **AMD GPU** | Works | Works (AdaptiveCpp) |
-| **NVIDIA GPU** | Works | Works (DPC++ plugin, AdaptiveCpp) |
-| **Runtime kernel compilation** | Yes (source strings) | Optional (online compiler) |
-| **Team knows CUDA** | Harder transition | Easier transition (similar feel) |
-| **Long-term direction** | Maintenance mode | Actively developed |
+| Question | Evidence to collect |
+|---|---|
+| Which devices must run the program? | Exact vendor/device/runtime or compiler-backend support |
+| Which language features are required? | Device capabilities, supported extensions, compiler revision |
+| Is FPGA hardware compilation required? | Vendor toolchain, board package, supported API and license |
+| How is the program deployed? | Ahead-of-time or runtime compilation, driver and library requirements |
+| Does it meet the workload need? | Numerical validation and end-to-end timing on each intended target |
 
-**Practical advice:** For new projects targeting multiple vendors, use SYCL (specifically Intel DPC++ or AdaptiveCpp). For legacy code or Xilinx FPGA, OpenCL is still the right choice. For NVIDIA-only or AMD-only, just use CUDA or HIP — they're simpler and faster.
+OpenCL is not simply in “maintenance mode”: the Khronos registry lists **OpenCL3.1**, published 2026-09-17, as checked 2026-10-18. The CPU lab intentionally uses an OpenCL1.2 baseline on a tested PoCL5.0 runtime; a newer specification does not make that runtime expose every newer capability. SYCL2020 is a separate C++ programming model with implementation-specific backend support. [OpenCL registry](https://registry.khronos.org/OpenCL/), [SYCL2020 specification](https://registry.khronos.org/SYCL/specs/sycl-2020/html/sycl-2020.html).
+
+**Choose from evidence:** list target devices, required features, supported toolchains, deployment constraints, and available libraries. Run one correctness test and one end-to-end measurement on each candidate backend. A portable API does not guarantee portable performance; a vendor-specific API is not automatically faster for every workload.
 
 ---
 
@@ -550,9 +485,9 @@ icpx -fsycl -fintelfpga -Xshardware -o hw hw.cpp
 
 | Resource | Type | Focus |
 |----------|------|-------|
-| Khronos OpenCL 3.0 specification | Standard | Authoritative API reference |
+| Khronos OpenCL registry (current and archived specifications) | Standard | Authoritative API reference |
 | Khronos SYCL 2020 specification | Standard | Authoritative SYCL reference |
-| Intel oneAPI DPC++ documentation | Docs | SYCL implementation + FPGA |
+| Intel oneAPI DPC++ documentation | Docs | SYCL implementation; FPGA uses the separate supported Altera flow |
 | AdaptiveCpp (github.com/AdaptiveCpp) | Open-source | SYCL on AMD/NVIDIA/CPU |
 | *OpenCL Programming Guide* — Munshi et al. | Textbook | Comprehensive OpenCL |
 | *Data Parallel C++* — Reinders, Ashbaugh, Brodman | Textbook | SYCL/DPC++ (free PDF from Intel) |

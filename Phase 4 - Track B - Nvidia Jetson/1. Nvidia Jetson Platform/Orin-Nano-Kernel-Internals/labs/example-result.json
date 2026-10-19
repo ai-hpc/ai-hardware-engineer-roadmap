@@ -1,0 +1,19 @@
+{
+  "evidence_kind": "real dtc/libfdt compilation and merge; synthetic board, no hardware",
+  "dtc_version": "Version: DTC 1.7.0",
+  "before": {
+    "controller_status": "disabled",
+    "sample_rate_hz": 100
+  },
+  "after": {
+    "controller_status": "okay",
+    "sensor_status": "okay",
+    "compatible": "course,synthetic-sensor",
+    "address_hex": "48",
+    "sample_rate_hz": 200
+  },
+  "source_sha256": {
+    "board.dts": "07b1636002afad1600aee15d7c09b40b2f9b10283a9504167a380cb630f5e064",
+    "sensor-overlay.dts": "78544dbde8e1aec68816e2195c2ad216292ba7a6ca1f567b4d684334e9892643"
+  }
+}

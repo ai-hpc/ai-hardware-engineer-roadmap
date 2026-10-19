@@ -12,12 +12,18 @@
 
 A structured course for hardware and software engineers who need to **build, own, and ship** a custom embedded Linux—not just install one. The goal is clarity first: you should finish with a **mental model** that survives release renames and new boards.
 
+**Layer mapping:** L4 embedded Linux and L3 runtime integration. **Roles:** BSP, embedded Linux, edge AI, and robotics engineers. **Prerequisites:** shell/Git basics, a small C program, and the [observation freshness contract](../../Labs/Observation-Freshness.md). **Next:** the [embedded Linux service](../Guide.md) and a supported board deployment.
+
+**Course baseline, reviewed 2026-10-18:** Scarthgap 5.0.20, pinned to Poky commit `64e69ed23703f6358ec431d3f5f1f8483f974cae`, using `qemux86-64`. The supported newer Wrynose 6.0.3 setup is explained separately so its configuration workflow is not mixed into Scarthgap commands. See [release selection and host requirements](Lecture/Lecture-02.md).
+
+**First result:** run the [supplied age-check package's native tests](Labs/README.md), then follow it from recipe through image and SDK. The course supplies a real product layer, image recipe, seven native checks, and a [validation record](Labs/validation.json). Native behavior, metadata parsing, and source-fetch/unpack tasks were checked here; target compilation, full images, SDKs, and boot remain explicit learner exercises.
+
 **Time investment (typical):** 4–10 weeks part-time for Modules 0–6; full course including production topics 3–6 months alongside real hardware.
 
 **What you will be able to do**
 
 - Explain how BitBake, recipes, layers, and images relate end-to-end.
-- Reproduce a build from metadata alone (team-ready, not "works on my laptop").
+- Reproduce a build from pinned metadata, sources, configuration, and a recorded host environment.
 - Add a package, patch a component, and ship a smaller, testable image.
 - Debug failures using logs and task graphs instead of guessing.
 - Know when Yocto is the right tool—and when Buildroot or a vendor BSP is faster.

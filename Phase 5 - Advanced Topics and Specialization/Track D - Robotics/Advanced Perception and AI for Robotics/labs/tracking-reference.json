@@ -1,0 +1,76 @@
+{
+  "scope": "synthetic planar geometry and 1D Gaussian motion/association; not a detector or robot",
+  "capture_time_projection": {
+    "capture": 0.2,
+    "world_xy": [
+      5.0,
+      1.0000000000000002
+    ],
+    "covariance_xy": [
+      [
+        0.0005250000000000001,
+        -3.666666666666666e-05
+      ],
+      [
+        -3.666666666666666e-05,
+        0.0008373611111111111
+      ]
+    ],
+    "age": 0.2
+  },
+  "wrong_receive_time_projection": {
+    "capture": 0.4,
+    "world_xy": [
+      5.2,
+      1.0000000000000002
+    ],
+    "covariance_xy": [
+      [
+        0.0005250000000000001,
+        -3.666666666666666e-05
+      ],
+      [
+        -3.666666666666666e-05,
+        0.0008373611111111111
+      ]
+    ],
+    "age": 0.0
+  },
+  "wrong_time_error_m": 0.20000000000000018,
+  "kalman_prior": {
+    "x": 1.0,
+    "v": 1.0,
+    "P": [
+      0.5666666666666667,
+      0.35,
+      0.45
+    ]
+  },
+  "measurement_accepted": true,
+  "kalman_posterior": {
+    "x": 1.1868131868131868,
+    "v": 1.1153846153846154,
+    "P": [
+      0.03736263736263736,
+      0.023076923076923078,
+      0.24807692307692308
+    ]
+  },
+  "outlier_rejected": true,
+  "crossing_assignment": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      0
+    ]
+  ],
+  "limitations": [
+    "linearized independent pixel/depth/pose noise",
+    "no shared-error or cross-track covariance",
+    "1D constant-velocity target model",
+    "exact crossing/occlusion may be ambiguous"
+  ]
+}

@@ -21,7 +21,7 @@ Write a one-page requirements sheet:
 | Connectivity | Telemetry/task-request role, expiry, authentication, link-loss behavior |
 | Quality | Allowed loss, paired evaluation, confidence procedure, held-out conditions |
 
-The attachment's 0.5–4B parameters, 20–40 W, 16–32 GB external memory, 16–64 MiB SRAM, and 10–30 Hz are a **search region**. Replace each with evidence. Do not combine all upper bounds into a claimed feasible product.
+The teaching design envelope of 0.5–4B parameters, 20–40 W, 16–32 GB external memory, 16–64 MiB SRAM, and 10–30 Hz are a **search region**. Replace each with evidence. Do not combine all upper bounds into a claimed feasible product.
 
 ## 2. Build an evidence chain
 
@@ -57,7 +57,7 @@ Use these results to prioritize a real trace experiment. Iteration reduction, mo
 
 ## 4. Proposal audit
 
-For each claim in the pasted proposal, record one of four outcomes:
+For each claim in your design proposal, record one of four outcomes:
 
 - **Verified context:** supported by a dated primary specification, paper, or official repository; preserve its conditions.
 - **Engineering hypothesis:** plausible and now paired with a falsifying experiment.

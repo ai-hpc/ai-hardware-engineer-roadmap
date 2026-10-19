@@ -1,0 +1,200 @@
+{
+  "scope": "discrete synthetic point robots, shared integer clock, static known grid",
+  "greedy_assignment": {
+    "task_per_robot": [
+      0,
+      1
+    ],
+    "total_cost": 101.0
+  },
+  "optimal_assignment": {
+    "task_per_robot": [
+      1,
+      0
+    ],
+    "total_cost": 4.0
+  },
+  "independent_paths": {
+    "A": [
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        4,
+        1
+      ]
+    ],
+    "B": [
+      [
+        4,
+        1
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        1
+      ]
+    ]
+  },
+  "independent_conflicts": [
+    {
+      "kind": "vertex",
+      "time": 2,
+      "robots": [
+        "A",
+        "B"
+      ]
+    }
+  ],
+  "coordinated_paths": {
+    "A": [
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        4,
+        1
+      ]
+    ],
+    "B": [
+      [
+        4,
+        1
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        3,
+        0
+      ],
+      [
+        2,
+        0
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ]
+  },
+  "coordinated_conflicts": [],
+  "priority_failure_despite_joint_solution": true,
+  "joint_solution_witness": {
+    "A": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        0
+      ]
+    ],
+    "B": [
+      [
+        2,
+        0
+      ],
+      [
+        2,
+        0
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  "consensus_gain_quarter": [
+    [
+      0.0,
+      2.0
+    ],
+    [
+      0.5,
+      1.5
+    ],
+    [
+      0.75,
+      1.25
+    ],
+    [
+      0.875,
+      1.125
+    ],
+    [
+      0.9375,
+      1.0625
+    ]
+  ],
+  "consensus_gain_one": [
+    [
+      2.0,
+      0.0
+    ]
+  ],
+  "limitations": [
+    "no finite footprint, continuous dynamics or braking",
+    "no delayed/lost messages or clock skew",
+    "prioritized planning is incomplete; grid success does not establish physical collision avoidance"
+  ]
+}

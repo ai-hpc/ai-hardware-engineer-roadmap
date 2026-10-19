@@ -79,7 +79,7 @@ Optional libraries are `uv` extras placed *before* `isaaclab`: `uv run --extra s
  └── update: PPO for num_learning_epochs × num_mini_batches; log; maybe save model_<k>.pt
 ```
 
-The env-step order comes from `DirectRLEnv.step()` in `release/3.0.0`. Two consequences. First, one env step equals `decimation` physics steps, so the policy runs at \( 1 / (\text{decimation} \cdot dt) \) Hz. Second, `_get_dones()` runs **before** `_get_rewards()`, so per-step quantities that both need (distances, poses) belong in `_get_dones()`. The stock Cartpole refreshes its joint-state caches there.
+The env-step order comes from `DirectRLEnv.step()` in `release/3.0.0`. Two consequences. First, one env step equals `decimation` physics steps, so the policy runs at \( 1 / (\text{decimation} \cdot dt) \) Hz. The backend may execute decimation internally, so `_apply_action` is not guaranteed to be called once per integrated substep. Second, `_get_dones()` runs **before** `_get_rewards()`, so per-step quantities that both need (distances, poses) belong in `_get_dones()`. The stock Cartpole refreshes its joint-state caches there.
 
 The batch per iteration is \( N_{\text{env}} \times T \) transitions, where \( T \) is `num_steps_per_env`. For the stock Cartpole agent (`num_steps_per_env = 16`, default 4,096 envs) that is 65,536 transitions per update.
 
@@ -104,7 +104,7 @@ In the `release/3.0.0` configs of Cartpole, Lift and the cabinet task, the `defa
 
 **Where things land.** RSL-RL writes to `logs/rsl_rl/<experiment_name>/<YYYY-MM-DD_HH-MM-SS>[_<run_name>]/`: TensorBoard events, `model_<iteration>.pt` checkpoints every `save_interval` iterations, the dumped env and agent configs, a run manifest, and `videos/` when `--video` is on. Watch with `uv run python -m tensorboard.main --logdir logs`.
 
-**The scalars RSL-RL 5.5 logs** (from `rsl_rl/utils/logger.py` at `v5.5.1`, the version pinned by the 3.0 `pyproject.toml`):
+**The scalars RSL-RL 5.5 logs** (from `rsl_rl/utils/logger.py` at `v5.5.1`). This is the standalone lecture's source version; the September Lab EA tag pins 5.4.1, while a later reviewed 3.0 branch commit pins 5.5.1. Match the [recorded dependency snapshot](Compatibility.md#pin-the-source-including-the-documentation) and inspect the logger you actually installed:
 
 | Key | Read it as | Healthy shape |
 |---|---|---|
@@ -179,7 +179,7 @@ class FrankaReachEnvCfg(DirectRLEnvCfg):
     decimation: int = CabinetDecimationCfg()  # policy at 60 Hz on either backend
     sim: CabinetSimCfg = CabinetSimCfg()      # Newton: dt 1/600 s; PhysX: dt 1/60 s
     action_space = 7                          # arm joint-position offsets
-    observation_space = 20                    # q(7) + qd(7) + ee_pos(3) + (target - ee)(3)
+    observation_space = 27                    # q(7) + qd(7) + ee_pos(3) + (target-ee)(3) + last_action(7)
     state_space = 0
     scene: ReachSceneCfg = ReachSceneCfg(num_envs=1024, env_spacing=2.0)
 
@@ -215,7 +215,9 @@ class FrankaReachEnv(DirectRLEnv):
         ids, _ = self.robot.find_joints(self.cfg.arm_joint_names)
         self.arm_ids = torch.tensor(ids, dtype=torch.long, device=self.device)
         self.ee_idx = self.robot.find_bodies(self.cfg.ee_body_name)[0][0]
-        self.q0 = self.robot.data.default_joint_pos.torch[:, self.arm_ids]   # ProxyArray → torch
+        self.q0 = self.robot.data.default_joint_pos.torch[:, self.arm_ids].clone()   # immutable reset snapshot
+        limits = self.robot.data.soft_joint_pos_limits.torch[:, self.arm_ids].clone()
+        self.q_lo, self.q_hi = limits[..., 0], limits[..., 1]
         self.lo, self.hi = (torch.tensor(v, device=self.device) for v in (cfg.target_low, cfg.target_high))
         z = lambda *shape, **kw: torch.zeros(*shape, device=self.device, **kw)
         self.targets, self.ee_pos, self.q_targets = z(self.num_envs, 3), z(self.num_envs, 3), z(self.num_envs, len(ids))
@@ -225,7 +227,7 @@ class FrankaReachEnv(DirectRLEnv):
     def _pre_physics_step(self, actions: torch.Tensor) -> None:      # once per env step
         self.prev_actions[:] = self.actions
         self.actions[:] = actions.clamp(-1.0, 1.0)
-        self.q_targets[:] = self.q0 + self.cfg.action_scale * self.actions
+        self.q_targets[:] = (self.q0 + self.cfg.action_scale * self.actions).clamp(self.q_lo, self.q_hi)
 
     def _apply_action(self) -> None:                                  # `decimation` times
         self.robot.actuators.target_command.set_position_index(
@@ -257,13 +259,17 @@ class FrankaReachEnv(DirectRLEnv):
         self.robot.write_joint_position_to_sim_index(position=q, env_ids=env_ids)
         self.robot.write_joint_velocity_to_sim_index(velocity=torch.zeros_like(q), env_ids=env_ids)
         self.actions[env_ids], self.prev_actions[env_ids], self.success[env_ids] = 0.0, 0.0, False
+        self.q_targets[env_ids] = self.q0[env_ids]
+        self.sim.forward()                                            # refresh kinematics without advancing time
 
     def _get_observations(self) -> dict:
-        self._update_ee()   # recompute; just-reset envs may show pre-reset poses until the next physics step
+        self._update_ee()   # reset writes + sim.forward() must yield the new episode pose
         q = self.robot.data.joint_pos.torch[:, self.arm_ids] - self.q0
         qd = self.robot.data.joint_vel.torch[:, self.arm_ids]
-        return {"policy": torch.cat((q, qd, self.ee_pos, self.targets - self.ee_pos), dim=-1)}
+        return {"policy": torch.cat((q, qd, self.ee_pos, self.targets - self.ee_pos, self.actions), dim=-1)}
 ```
+
+**Task-state corrections:** the previous applied action is part of the 27-value observation because the next action-change penalty depends on it. Targets are clamped to the asset's soft joint limits. A partial reset clears actions and targets only for selected environments and refreshes kinematics without stepping time. Verify the first post-reset end-effector pose and untouched environments on each backend; joint-position writers alone do not establish sensor freshness. The [tensor-only CPU check](labs/reach_tensor_cpu.py) executes these class methods using a fake scene and actual PyTorch, so it checks tensor/reward/reset semantics but cannot validate Isaac physics or cache invalidation.
 
 Every Isaac Lab call above appears in the `release/3.0.0` sources of the stock Cartpole and cabinet direct tasks: `self.scene["…"]`, `find_joints`/`find_bodies`, `.data.*.torch`, `actuators.target_command.set_position_index`, `write_joint_*_to_sim_index`, `episode_length_buf`, `step_dt`, `extras["log"]`. Two 3.0 details matter here. `.data.*` returns a `ProxyArray`, so take `.torch` (or `.warp`). The older `set_joint_position_target_index` still exists but is marked deprecated in favor of the actuator command API. If you extend the task to target *orientations*, Isaac Lab 3.0 quaternions are **xyzw**, while the Isaac Sim experimental prim API is wxyz.
 
@@ -322,7 +328,9 @@ $$
 
 Here \( \text{FPS}_{\text{env}} \) is `benchmark runtime` (random actions, env only), \( \text{FPS}_{\text{collect}} \) is rollout collection with the policy (`benchmark training`, `runtime.collection_fps`), and \( \text{FPS}_{\text{total}} \) includes the PPO update (`runtime.total_fps`, the same quantity as RSL-RL's `Perf/total_fps`). Physics alone can be split out further with `ISAACLAB_PHYSICS_PROFILE=1` on a runtime benchmark, but only for tasks whose config sets a non-`None` `benchmark_mode`. That profiled run synchronizes the device, so treat it as a diagnostic, not a throughput number. Profiling a full run is [Lecture 12](Lecture-12.md)'s job.
 
-**Expected shapes as you sweep `num_envs`.** At small \( N \), FPS grows almost linearly, because per-step launch overhead (Python, kernel launches) is amortized over more envs. Then it bends as the SMs saturate, and contact-rich tasks bend earlier. Update time grows with the batch \( N \times T \) and the network, roughly independent of physics. Wall-clock-to-reward is U-shaped in \( N \). Too few envs means slow collection and noisy gradients. Too many means each iteration takes longer, and PPO's sample efficiency per transition falls.
+These reciprocal-rate differences are estimates only when task, batch, warm-up and measurement scope match. Separate runs can visit different states and perform different reset work. Use within-run ranges to attribute costs and report negative/noisy differences as an unresolved measurement, not a negative inference time.
+
+**Expected shapes as you sweep `num_envs`.** At small \( N \), FPS grows almost linearly, because per-step launch overhead (Python, kernel launches) is amortized over more envs. Then it bends as the SMs saturate, and contact-rich tasks bend earlier. Update time grows with the batch \( N \times T \) and the network, roughly independent of physics. Wall-clock-to-target can have a useful intermediate optimum, but a U shape is not guaranteed. Changing environment count also changes batch size and update frequency; evaluate sample efficiency as well as throughput rather than assuming either improves monotonically.
 
 **Backends are not like-for-like.** In the cabinet presets reused above, Newton steps at \( dt = 1/600 \) s with decimation 10, and PhysX at \( 1/60 \) s with decimation 1. Both act at 60 Hz, but Newton does ten physics steps per env step. Report env-steps/s **and** physics-steps/s (env-steps/s × decimation) before you call one engine faster.
 
@@ -497,9 +505,9 @@ You can move on when you can:
 
 ## References
 
-* Isaac Lab 3.0 — [Reinforcement Learning (train/play/checkpoints/troubleshooting)](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/concepts/reinforcement_learning.html), [Training with an RL agent](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/how-to/run_rl_training.html), [Quickstart](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/setup/quickstart.html)
+* Isaac Lab 3.0 — [Reinforcement Learning (train/play/checkpoints/troubleshooting)](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/concepts/reinforcement_learning.html), [Training with an RL agent](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/how-to/run_rl_training.html), [Quickstart](https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/docs/source/setup/quickstart.rst)
 * Isaac Lab 3.0 — [Backends and Presets](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/concepts/backends_and_presets.html), [Run benchmarks](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/developer-tools/benchmarking/run_benchmarks.html), [Reproducibility](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/features/reproducibility.html)
-* Isaac Lab 3.0 — [Creating a Direct Workflow RL Environment](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/how-to/create_direct_rl_env.html), [Build your own project or task (template generator)](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/developer-tools/template_generator.html), [SO-101 end-to-end tutorial](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/setup/tutorial.html)
+* Isaac Lab 3.0 — [Creating a Direct Workflow RL Environment](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/how-to/create_direct_rl_env.html), [Build your own project or task (template generator)](https://isaac-sim.github.io/IsaacLab/release/3.0.0/source/developer-tools/template_generator.html), [SO-101 end-to-end tutorial](https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/docs/source/setup/tutorial.rst)
 * Isaac Lab `release/3.0.0` source — [`direct_rl_env.py`](https://github.com/isaac-sim/IsaacLab/blob/release/3.0.0/source/isaaclab/isaaclab/envs/direct_rl_env.py), [`cartpole_direct_env.py`](https://github.com/isaac-sim/IsaacLab/blob/release/3.0.0/source/isaaclab_tasks/isaaclab_tasks/core/cartpole/cartpole_direct_env.py), [`cabinet_direct_env.py`](https://github.com/isaac-sim/IsaacLab/blob/release/3.0.0/source/isaaclab_tasks/isaaclab_tasks/core/cabinet/cabinet_direct_env.py)
 * Isaac Lab v3.0.0-EA release notes — [GitHub](https://github.com/isaac-sim/IsaacLab/releases/tag/v3.0.0-EA)
 * RSL-RL — [GitHub](https://github.com/leggedrobotics/rsl_rl) (logger and rollout storage read at tag `v5.5.1`)

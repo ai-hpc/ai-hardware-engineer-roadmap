@@ -1,0 +1,43 @@
+{
+  "evidence_kind": "actual Docker CPU containers, no Jetson or GPU",
+  "server_version": "29.3.0",
+  "image_id": "sha256:a3c0080a7c2fbcbec07f4c046e8e65dbda9e5c4e5a62958351b104e8306e3870",
+  "image_architecture": "amd64",
+  "base_reference": "python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1",
+  "observations": [
+    {
+      "model": "validated parameters",
+      "docker_health": "healthy",
+      "running_before_stop": true,
+      "live_status": 200,
+      "ready_status": 200,
+      "inference_status": 200,
+      "stale_input_status": 422,
+      "uid": 10001,
+      "read_only_write_rejected": true,
+      "clean_sigterm_exit": 0,
+      "model_sha256": "6eb38f710367c1b8c905b9b2d76fa27d03e24ab8f900cd0b40a384412ced4e22"
+    },
+    {
+      "model": "wrong parameters",
+      "docker_health": "unhealthy",
+      "running_before_stop": true,
+      "live_status": 200,
+      "ready_status": 503,
+      "inference_status": 503,
+      "stale_input_status": 503,
+      "uid": 10001,
+      "read_only_write_rejected": true,
+      "clean_sigterm_exit": 0,
+      "model_sha256": "ea49e30b08b19329b816079aa928339c32afdc4e428ad0b89705f9fd192d6838"
+    }
+  ],
+  "files_sha256": {
+    "Dockerfile": "a7a385d9333d00f4994130615a64a075089663fb8d72b08416eaf5893c9d6c93",
+    "service.py": "3f1a2145832a4f4ae48499c052c88de536588efcdb2ec211805764ecddd15712",
+    "model.json": "6eb38f710367c1b8c905b9b2d76fa27d03e24ab8f900cd0b40a384412ced4e22",
+    "container_smoke.py": "78c828805d13da9a23fa648ee9eaf18c720f07c77ad632339f4efa0fc0f1905d"
+  },
+  "local_image_tag": "course-edge-lifecycle:ad493115c9f5",
+  "checked_on": "2026-10-18"
+}

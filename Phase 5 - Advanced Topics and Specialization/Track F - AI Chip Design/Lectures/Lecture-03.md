@@ -2,7 +2,7 @@
 
 ## Overview
 
-LLVM IR is powerful but it has a fundamental limitation: it operates at **one level of abstraction** — roughly "C with vectors." When an ML compiler needs to reason about tensor operations, loop tiling, data layout, or hardware-specific memory hierarchies, LLVM IR is **too low-level**. You've already lowered away the information the optimizer needs. MLIR (Multi-Level Intermediate Representation) solves this by allowing **multiple levels of abstraction to coexist in the same IR**, connected by progressive lowering. The mental model is a **stack of languages**: at the top, you talk about "matrix multiply two tensors"; in the middle, you talk about "tile this loop nest and map tiles to processing elements"; at the bottom, you emit LLVM IR or hardware instructions. Each level is a **dialect** with its own operations, types, and optimization rules. For AI hardware engineers, MLIR is the framework that connects ML models to custom accelerator backends — it is the compiler infrastructure that TVM, Triton (via TTIR/TTGIR), IREE, and hardware vendor compilers are all converging on.
+LLVM IR is powerful but it has a fundamental limitation: it operates at **one level of abstraction** — roughly "C with vectors." When an ML compiler needs to reason about tensor operations, loop tiling, data layout, or hardware-specific memory hierarchies, LLVM IR is **too low-level**. You've already lowered away the information the optimizer needs. MLIR (Multi-Level Intermediate Representation) solves this by allowing **multiple levels of abstraction to coexist in the same IR**, connected by progressive lowering. The mental model is a **stack of languages**: at the top, you talk about "matrix multiply two tensors"; in the middle, you talk about "tile this loop nest and map tiles to processing elements"; at the bottom, you emit LLVM IR or hardware instructions. Each level is a **dialect** with its own operations, types, and optimization rules. For AI hardware engineers, MLIR is the framework that connects ML models to custom accelerator backends — Triton, IREE, and several vendor compilers use MLIR, while TVM also maintains its own compiler IRs and scheduling infrastructure. These are distinct designs, not one universal pipeline.
 
 ---
 
@@ -15,9 +15,9 @@ LLVM IR is powerful but it has a fundamental limitation: it operates at **one le
 | Hardware mapping | One flat address space model (with numbered spaces) | Dialects define custom memory hierarchy (scratchpad, accumulator, etc.) |
 | Multi-level optimization | Must lower everything to one level before optimizing | Each dialect optimizes at its own abstraction level |
 | Custom operations | Must use intrinsics (opaque function calls) | Define operations with full semantics, verification, and canonicalization |
-| Extensibility | Adding a new concept requires modifying LLVM core | Dialects are modular — add new ones without touching existing code |
+| Extensibility | New semantics may use intrinsics, calls, metadata, or compiler extensions | Dialects provide first-class extensible operations, types, and interfaces |
 
-**The key insight:** When you lower `matmul(A, B)` to LLVM IR loops, you lose the information that this is a matrix multiply. The LLVM vectorizer can vectorize the innermost loop, but it cannot **tile the loop nest** for cache locality or **map it to a systolic array**. MLIR keeps the high-level semantics alive long enough for **hardware-aware optimizations** to act on them.
+**The key insight:** lowering a matmul to loads, arithmetic, and branches makes its high-level structure harder to recognize. LLVM does have loop transformations, and projects such as Polly analyze affine loops; the issue is preserving useful information and expressing target-specific schedules reliably, not that all loop tiling is impossible below MLIR. MLIR lets a compiler choose when to consume that structure.
 
 ---
 
@@ -119,7 +119,7 @@ A **dialect** is a namespace of operations, types, and attributes. Think of it a
 | `memref` | Mid | Memory-backed tensors with explicit buffers and layouts |
 | `affine` | Mid-low | Affine loop nests for polyhedral optimization |
 | `scf` | Low | Structured control flow (for, while, if) |
-| `vector` | Low | Fixed-size vector operations (maps to SIMD/vector units) |
+| `vector` | Low | Fixed-size and scalable vector operations; target-supported lowering required |
 | `gpu` | Low | GPU-specific: thread/block indexing, barriers, shared memory |
 | `arith` | Low | Arithmetic operations (add, mul, cmp) on scalars and vectors |
 | `math` | Low | Math operations (exp, log, sqrt, tanh) |
@@ -135,6 +135,7 @@ Operations can contain **regions**, which contain **blocks** of operations. This
 func.func @relu(%input: tensor<1024xf32>) -> tensor<1024xf32> {
   // This is a block inside the function's region
   %zero = arith.constant 0.0 : f32
+  %output = tensor.empty() : tensor<1024xf32>
   %result = linalg.generic {
     indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
     iterator_types = ["parallel"]
@@ -172,7 +173,7 @@ memref<128x64xf32>                            // default layout (row-major)
 memref<128x64xf32, affine_map<(d0,d1) -> (d1, d0)>>  // column-major
 memref<128x64xf32, #gpu.address_space<workgroup>>     // GPU shared memory
 
-// Vector types (fixed-size, for SIMD)
+// Vector types (these examples are fixed-size; scalable forms also exist)
 vector<8xf32>                                 // 8-element vector
 vector<4x4xf32>                               // 2D vector (for matrix tiles)
 ```
@@ -226,7 +227,7 @@ Each arrow is a **lowering pass** that converts operations from one dialect to a
 | `vector` | Vector distribution, transfer read/write optimization |
 | `gpu` | Thread/block mapping, shared memory promotion |
 
-> **Key Insight:** The reason MLIR outperforms "lower everything to LLVM IR and optimize there" is that each level retains information that lower levels lose. At the `linalg` level, you know it's a matrix multiply — you can tile it for a systolic array. At the `affine` level, you know the loop bounds are affine functions of outer indices — you can apply polyhedral optimization. Once it's in LLVM IR, it's just loops and loads — the optimizer can vectorize and unroll but cannot re-tile or re-map to a spatial architecture.
+Retaining structure makes relevant transformations easier to express and verify. It does not guarantee that an MLIR-based compiler is faster: legal schedules, target support, cost models, and runtime overhead still determine the result. Recovering a high-level operation from low-level IR may be difficult, so choose lowering boundaries deliberately.
 
 ---
 
@@ -257,7 +258,7 @@ struct MyBufferizationPass : public PassWrapper<MyBufferizationPass, OperationPa
 
 ### Canonicalization
 
-Every dialect can register **canonicalization patterns** — simplification rules that are always correct to apply:
+Every dialect can register **canonicalization patterns** — simplification rules whose preconditions must establish semantic equivalence:
 
 ```mlir
 // Before canonicalization:
@@ -343,40 +344,27 @@ linalg.matmul → tiling to 8×8 tiles → myaccel.dma_transfer + myaccel.matmul
 
 ---
 
-## MLIR Tools
+## Run a real progressive lowering
+
+Use the complete [matrix fixture and lab](../Labs/Tiling-and-Dataflow.md), tested with MLIR20.1.2. Most operation examples above are fragments with surrounding values omitted; `matmul.mlir` is a complete module.
 
 ```bash
-# Parse and verify MLIR
-mlir-opt input.mlir
-
-# Run specific passes
-mlir-opt --linalg-tile="tile-sizes=32,32,16" input.mlir
-mlir-opt --convert-linalg-to-loops input.mlir
-mlir-opt --convert-scf-to-cf --convert-to-llvm input.mlir
-
-# Full lowering pipeline
-mlir-opt input.mlir \
-  --linalg-tile="tile-sizes=32,32,16" \
-  --convert-linalg-to-loops \
-  --lower-affine \
-  --convert-scf-to-cf \
-  --convert-to-llvm \
-  -o lowered.mlir
-
-# Translate to LLVM IR
-mlir-translate --mlir-to-llvmir lowered.mlir -o output.ll
-
-# Then compile with LLVM
-llc output.ll -o output.o -filetype=obj
+# From this Lectures directory, with a matching MLIR toolchain on PATH:
+mlir-opt ../Labs/matmul.mlir --convert-linalg-to-loops -o /tmp/course-loops.mlir
+python3 ../Labs/run_mlir_lab.py --output-dir /tmp/course-mlir-stages
 ```
+
+The helper parses/verifies, lowers to loops, converts the remaining dialects to LLVM, translates to LLVM IR, and actually executes the native CPU result. Expected result: **415**, after checking each matrix element. See the lab for version-suffixed executable names and environment overrides.
+
+Do not assume old tutorial flags such as `--linalg-tile` or `--linalg-tile-and-fuse-tensor-ops` exist in your build. Tiling can be driven through the Transform dialect or compiler APIs. Inspect `mlir-opt --help` and use the [Transform tutorial](https://mlir.llvm.org/docs/Tutorials/transform/Ch0/) matching your version. A successful parse, a successful lowering, and a correct executed result are three different checkpoints.
 
 ---
 
 ## Hands-On Exercises
 
-1. **Read MLIR output:** Install MLIR (comes with LLVM build). Write a simple `linalg.matmul` in MLIR text format. Run `mlir-opt --convert-linalg-to-loops` and observe the generated `scf.for` loop nest. Then run `--convert-scf-to-cf --convert-to-llvm` and observe the LLVM dialect output.
+1. **Read MLIR output:** run the complete matrix lab. Locate the three nested reduction loops in `02-loops.mlir`, then the branches and pointer operations in `03-llvm-dialect.mlir`. Explain where M, N, and K are represented at each stage.
 
-2. **Progressive lowering:** Start with a `tosa.conv2d` operation. Lower it through `tosa-to-linalg` → `linalg-tile` → `linalg-to-loops` → `convert-to-llvm`. At each stage, print the IR and observe how information is preserved then consumed.
+2. **Catch a real error:** change B's reduction dimension from three to four in a small `linalg.matmul` module while keeping A at 2×3. Run the verifier. Then change an input value without changing shape and run the lab's element checks. **Answer:** the first is a static shape error; the second is valid IR whose result violates the expected numerical test. A verifier cannot prove an arbitrary model computes the desired application behavior.
 
 3. **Tensor vs MemRef:** Write a function that takes `tensor<16x16xf32>` inputs, performs an element-wise add, and returns a tensor. Run `--one-shot-bufferize` and observe where tensors become memrefs and allocations appear. One-Shot Bufferize does not insert deallocations; study the ownership-based buffer deallocation pipeline separately, then check that no live alias outlasts its buffer. [Bufferization reference](https://mlir.llvm.org/docs/Bufferization/).
 
@@ -404,3 +392,7 @@ llc output.ll -o output.o -filetype=obj
 * **"MLIR: Scaling Compiler Infrastructure for Domain-Specific Computation" (CGO 2021):** The foundational paper by Lattner et al.
 * **[MLIR Tutorial](https://mlir.llvm.org/docs/Tutorials/Toy/):** The official Toy language tutorial — builds a full compiler using MLIR from scratch.
 * **[MLIR Open Design Meetings (YouTube)](https://www.youtube.com/channel/UCMQl4dniSlBiEFPXl9n5ueg):** Recordings of MLIR design discussions covering real-world use cases.
+
+## Tensor initialization is part of the operation
+
+The ReLU example uses `tensor.empty` only as an output shape because its scalar body overwrites every output element without reading `%out`. Its comparison/select rule maps NaN to zero and negative zero to positive zero; document that choice if matching a framework operator. For matmul, the output operand is an accumulator, so an uninitialized `tensor.empty` is insufficient: fill it with zero before computing `C = A @ B`, or supply a defined initial C for accumulation. The executable lab makes this initialization visible with `linalg.fill`.

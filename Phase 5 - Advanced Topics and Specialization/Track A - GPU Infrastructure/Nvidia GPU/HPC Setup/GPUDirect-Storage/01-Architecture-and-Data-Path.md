@@ -1,232 +1,101 @@
-# 01 — GDS Architecture & Data Path
+# 01 — Follow the payload and the control work
 
-## 1. The Problem GDS Solves
+GPUDirect Storage (GDS) can avoid staging file payloads in CPU memory before they
+reach a GPU. Learn to draw the actual path before predicting a speedup.
 
-Modern AI training reads enormous datasets — a single GPT-3 training run processes ~300 billion tokens, requiring continuous high-bandwidth streaming from storage to GPU. Before GDS, this path was:
+**Prerequisites:** files, memory, and bandwidth units. **Outcome:** a path diagram
+and a bounded bandwidth estimate for a robot-data or model-loading workload.
+Allow 45–90 minutes. Hardware execution is not required for the first exercise.
 
-```
-Traditional I/O Path (CPU-mediated):
+## Two paths for the same bytes
 
-NVMe SSD
-    │ PCIe Gen4 (7 GB/s per lane)
-    ▼
-CPU DRAM (bounce buffer)          ← CPU must allocate, manage, free
-    │ Memory controller (~50 GB/s shared)
-    ▼
-CPU Cache (L3)
-    │ PCIe Gen4
-    ▼
-GPU HBM
-
-Bottlenecks:
-  1. CPU DRAM bandwidth shared with all other traffic
-  2. CPU must be scheduled to run memcpy (OS context switch overhead)
-  3. Data copied twice: NVMe→DRAM, DRAM→GPU (double bandwidth cost)
-  4. CPU L3 cache pollution (loading large files thrashes the cache)
+```text
+Staged payload: storage -> host-memory buffer -> GPU buffer
+Direct payload: supported storage/transport path -> GPU buffer
+Control: host code opens files, submits requests, and handles completion
 ```
 
-```
-GPUDirect Storage Path (direct DMA):
+The [NVIDIA overview](https://docs.nvidia.com/gpudirect-storage/overview-guide/index.html)
+explains the distinction. “Direct” describes the payload path; it does not mean
+that the CPU disappears. In a staged path, DMA can perform transfers involving
+host memory. It is incorrect to assume every byte must pass through CPU
+instructions or the L3 cache.
 
-NVMe SSD (or NVMe-oF target)
-    │ PCIe Gen4
-    ▼
-PCIe Root Complex / Switch
-    │ Direct DMA (bypasses CPU)
-    ▼
-GPU HBM
+Avoid counting PCIe traffic by the number of boxes in the drawing. Each physical
+link carries the traffic that actually traverses it. A direct path may remove
+host-memory traffic without halving traffic on every link.
 
-Advantages:
-  1. No CPU bounce buffer → no DRAM bandwidth consumed
-  2. No CPU involvement → no context switch, no scheduling latency
-  3. Data copied once → half the PCIe traffic
-  4. DMA runs in parallel with GPU compute → overlap I/O and processing
-```
+## A small bandwidth calculation
 
----
+Consider these **hypothetical capacities**, chosen for an arithmetic exercise:
 
-## 2. Hardware Requirements for GDS
+- a storage device sustains 6 GB/s on the selected access pattern;
+- a shared upstream path can carry 10 GB/s;
+- the destination path can carry 20 GB/s.
 
-### PCIe Topology is Critical
+One reader cannot exceed `min(6, 10, 20) = 6 GB/s`. Four storage devices behind the
+same 10 GB/s upstream path do not create 24 GB/s of usable throughput through it.
+The shared link limits their aggregate. At 6 GB/s, moving a decimal 1 GB of payload
+has a transfer-only lower bound of about 0.167 seconds, before setup and other
+work. This is a calculation, not a benchmark.
 
-GDS works best when GPU and NVMe share a **PCIe path without crossing NUMA boundaries**. The WD Technical Brief reference system illustrates this:
+**Guided variation:** add 100 ms of required CPU image decoding per GB. Can GDS
+remove that time? Not by changing storage transfer alone. You need a different
+decode pipeline or an experiment showing overlap. The image still has to be
+interpreted before the model can use it.
 
-```
-Reference System PCIe Layout:
-┌───────────────────────────────────────────────────────────┐
-│  NUMA Node 0                    NUMA Node 1               │
-│                                                           │
-│  PCIe Switch 0                  PCIe Switch 1             │
-│  ┌──────────────────┐           ┌──────────────────┐      │
-│  │ GPU 0 (A100 80GB)│           │ GPU 2 (A100 80GB)│      │
-│  │ GPU 1 (A100 80GB)│           │ GPU 3 (A100 80GB)│      │
-│  │ CX-7 NIC 0       │           │ CX-7 NIC 3       │      │
-│  │ CX-7 NIC 1       │           │ CX-7 NIC 4       │      │
-│  │ CX-7 NIC 2       │           │ CX-7 NIC 5       │      │
-│  │ NVMe drives 0-7  │           │ NVMe drives 8-15 │      │
-│  └──────────────────┘           └──────────────────┘      │
-│         │                               │                  │
-│  Intel Xeon Gold 6348           Intel Xeon Gold 6348       │
-└───────────────────────────────────────────────────────────┘
+## Local storage, remote storage, and GPU communication
 
-Key: GPU and NVMe on the same PCIe switch = same NUMA node = optimal GDS path
-     8-Bay NVMe: Root Complex Connected (2 of the bays)
-     16-Bay drives: 10 on switches, 2 on root complex
-```
+| Mechanism | What it connects | What still needs verification |
+|---|---|---|
+| Local file I/O with GDS | A supported local storage/filesystem path and GPU memory | Mount, driver, topology, API path, payload correctness |
+| Remote file/block I/O with GDS | A supported network storage path and GPU memory | Transport, NIC, filesystem, network, and selected release support |
+| GPU-to-GPU peer access / GPUDirect RDMA | GPU memory and peer devices | Communication topology and peer/transport support |
 
-### Why NUMA Placement Matters for GDS
+GPU-to-GPU communication is related infrastructure, not a third file-storage
+API mode. An NCCL all-reduce is not a GDS read. Likewise, a remote namespace that
+appears under `/dev/nvme...` still has network latency and failure dependencies.
 
-```
-GPU 0 (NUMA 0) reads NVMe on PCIe Switch 0 (NUMA 0):
-  DMA path: NVMe → Switch 0 → GPU 0
-  No QPI/UPI inter-socket hop
-  Effective bandwidth: near full PCIe Gen4 x4 per NVMe (~7 GB/s)
+## Topology changes the hypothesis
 
-GPU 0 (NUMA 0) reads NVMe on PCIe Switch 1 (NUMA 1):
-  DMA path: NVMe → Switch 1 → QPI → Switch 0 → GPU 0
-  QPI bandwidth: ~40 GB/s total, shared
-  Effective bandwidth: reduced by ~30-50%
-  Also: higher latency (QPI hop = ~100 ns extra)
-```
+Draw GPUs, storage, NICs, PCIe switches/root complexes, CPUs, and inter-socket
+links. Mark shared resources and distinguish physical reachability from supported
+peer transfer. Sharing a NUMA node does not by itself prove a direct path or an
+optimal configuration. Firmware, address translation, access controls, switches,
+and software mode can change support.
 
----
+Use the official [GDS design guide](https://docs.nvidia.com/gpudirect-storage/design-guide/index.html)
+for the selected architecture. Do not assume a fixed cross-socket penalty or
+apply one historical system's measured bandwidth to a different topology.
 
-## 3. The Three GDS Data Paths
+## Fallback is part of the experiment
 
-GDS supports three distinct transport mechanisms:
+Depending on configuration and support, cuFile can use a compatibility path that
+stages data through host memory. A successful `cuFileRead` establishes neither a
+speedup nor direct DMA. Inspect path diagnostics and compare the same integrity-
+checked workload under declared modes. A disabled fallback can cause a visible
+failure on an unsupported path; an enabled fallback can preserve functionality.
 
-### Path 1: Local NVMe (Most Common)
+The software lesson explains the current release-dependent mode distinction:
+[Establish a supported path](03-Software-Stack.md).
 
-```
-GPU HBM ←──────────────────────── DMA ──────────────────────── NVMe SSD
-          PCIe Gen4 (up to 7 GB/s per x4 drive)
+## Practice: a robot-data loader
+
+Draw the complete path for recorded camera data:
+
+```text
+file -> read -> decode -> resize/normalize -> batch -> model -> evaluation
 ```
 
-Best for: single-node training with local NVMe RAID or individual drives.
+For each stage, label CPU or GPU work, input/output format, allocated bytes, and
+completion dependency. Choose a 1 GB hypothetical input and estimate each stage's
+bound from explicitly stated capacities. Then identify the measurements needed
+to replace those estimates.
 
-```
-Reference config bandwidth:
-  8-Bay NVMe, PCIe Gen4 x4 each:
-  8 × 7 GB/s = 56 GB/s aggregate read bandwidth
-  (practical: ~40-50 GB/s with GDS, considering overhead)
-```
+**Self-check with answer:** if storage already finishes while a longer computation
+runs, a faster isolated read may not reduce the steady-state step interval. The
+critical path and available overlap determine the benefit. First draw the timeline,
+then test it.
 
-### Path 2: NVMe-oF over RDMA/RoCE (Network-Attached GDS)
-
-```
-GPU HBM ←── RDMA DMA ──── NIC (ConnectX-7) ──── RoCE v2 ──── NVMe-oF Target
-                                                               (OpenFlex Data24)
-```
-
-The WD OpenFlex Data24 makes **remote NVMe look local** via RapidFlex adapters:
-- Disaggregated storage appears as local NVMe namespace
-- GPU reads from it using the same GDS API as local NVMe
-- No CPU on either end of the transfer
-
-```
-Reference system:
-  6 × ConnectX-7 @ 200 Gb/s (25 GB/s each)
-  Total GPU-facing bandwidth: 150 GB/s (6 × 25)
-  Storage side: 6 × 100 Gb/s (12.5 GB/s) = 75 GB/s
-  Bottleneck: storage side at 75 GB/s
-```
-
-### Path 3: GPU Memory P2P (GPUDirect RDMA)
-
-```
-GPU 0 HBM ←── NVLink/PCIe ──── GPU 1 HBM
-
-Or across network:
-GPU 0 (Server A) ←── NIC ──── RDMA ──── NIC ──── GPU 1 (Server B)
-```
-
-This is GPUDirect RDMA — GPU memory is directly readable/writable by remote NICs. Used in NCCL for multi-node training.
-
----
-
-## 4. GDS Internal Architecture
-
-### libcufile: The GDS User-Space Library
-
-```
-Application
-     │ cuFileRead() / cuFileWrite()
-     ▼
-libcufile (user-space daemon: cufile daemon)
-     │ ioctl()
-     ▼
-nvidia-fs kernel module (NVFS)
-     │ DMA programming
-     ▼
-PCIe BAR (GPU memory aperture)
-     │ Direct DMA
-     ▼
-NVMe driver / RDMA driver
-```
-
-The **nvidia-fs** kernel module is the core — it programs DMA engines to transfer between GPU HBM physical addresses and NVMe LBA addresses, bypassing the CPU data path.
-
-### Bounce Buffer Fallback
-
-When GDS is unavailable (wrong kernel, wrong driver, wrong PCIe path), libcufile **silently falls back** to the traditional CPU-mediated path:
-
-```
-GDS available:  cuFileRead() → direct DMA → GPU HBM
-GDS unavailable: cuFileRead() → CPU bounce buffer → GPU HBM (slower but works)
-```
-
-Always verify GDS is actually active — see [03-Software-Stack](./03-Software-Stack.md) for verification.
-
----
-
-## 5. Bandwidth Budget: What GDS Can and Cannot Do
-
-```
-PCIe Gen4 x16 total: 32 GB/s per direction
-PCIe Gen4 x4 per NVMe: ~7 GB/s sequential read
-
-GPU HBM bandwidth (A100): 2 TB/s
-GPU HBM bandwidth (H200): 4.8 TB/s
-
-GDS is limited by STORAGE and PCIe, not GPU HBM:
-  4 × A100 on 2 PCIe switches:
-    Each switch: 2 GPUs + 3 NICs + 4 NVMe drives
-    NVMe aggregate: 4 × 7 = 28 GB/s per switch
-    NIC aggregate: 3 × 25 = 75 GB/s per switch
-    PCIe switch bandwidth: typically 64 GB/s (non-blocking)
-
-  Practical GDS bandwidth per GPU:
-    Local NVMe: 14 GB/s (2 NVMe drives on same switch)
-    NVMe-oF: up to 25 GB/s per NIC (ConnectX-7)
-    Both simultaneously: limited by PCIe switch total bandwidth
-```
-
----
-
-## 6. GDS vs Traditional I/O: Latency and CPU Utilization
-
-```
-Operation: Read 1 GB from NVMe to GPU
-
-Traditional:
-  CPU load: ~100% on 1 core (memcpy + copy_to_user + copy_from_user)
-  Time: ~500 ms (DDR4 bandwidth limited)
-  CPU % freed: 0 (CPU fully busy)
-
-GDS:
-  CPU load: < 1% (only submits ioctl, DMA does the rest)
-  Time: ~150 ms (PCIe Gen4 limited, 7 GB/s per drive)
-  CPU freed: 99% (CPU can run training code while I/O happens)
-
-Key insight: GDS lets the GPU do I/O AND compute simultaneously
-             because neither requires the CPU during the transfer.
-```
-
----
-
-## References
-
-- [NVIDIA GPUDirect Storage Overview](https://docs.nvidia.com/gpudirect-storage/overview-guide/index.html)
-- [Western Digital OpenFlex + GDS Technical Brief](https://www.westerndigital.com/content/dam/doc-library/en_us/assets/public/western-digital/collateral/technical-brief/technical-brief-openflex-gpudirect-storage.pdf)
-- [NVIDIA GDS Design Guide](https://docs.nvidia.com/gpudirect-storage/design-guide/index.html)
-- [libcufile API Reference](https://docs.nvidia.com/gpudirect-storage/api-reference-guide/index.html)
+**Exit artifact:** path diagram, shared-link budget, and one falsifiable bottleneck
+hypothesis. Continue to [hardware/topology inspection](02-Hardware-Setup.md).

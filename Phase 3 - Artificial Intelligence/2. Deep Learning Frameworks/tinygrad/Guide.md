@@ -21,7 +21,7 @@
 - It's the inference engine inside **openpilot** (Phase 5E)
 - It exposes the IR, scheduler, and code generation that **Phase 4C** teaches you to build
 - You can add a **custom backend** (Phase 4C §7) targeting your own accelerator
-- It runs on CUDA, OpenCL, Metal, LLVM, and custom targets
+- Supported targets and compiler paths depend on the release; inspect the pinned runtime directory and device availability
 
 ## Key Concepts
 
@@ -32,11 +32,17 @@
 | Layouts and views | Determine when a view can avoid a copy | L2: memory layout optimization |
 | UOp IR | Intermediate representation before codegen | L2: same concept as MLIR/TVM IR |
 | BEAM search | Searches supported kernel optimization choices | L2: auto-tuning |
-| Backends | Same IR generates CUDA, OpenCL, LLVM code | L2: multi-target compilation |
+| Backends | Inspect code generation and runtime separately for the selected target | L2: multi-target compilation |
+
+## First executable route
+
+Run the [tested tinygrad 0.14.0 CPU compiler lab](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/00%20-%20CPU%20Compiler%20Lab/Guide.md). Compare materialized, lazy, and folded variants against a scalar oracle before counting kernels. It provides a hashed wheel pin, non-divisible dimensions, changed-input checks, and generated-code tracing. More fusion is not automatically lower end-to-end latency.
+
+Current [developer layout](https://docs.tinygrad.org/developer/layout/) describes UOps across tensor/gradient/compiler stages. `LazyBuffer` belongs to earlier implementations. Set process configuration before importing tinygrad, or use its supported `Context` override; changing an environment variable after import need not update cached settings. Backend code and debug output are version-specific.
 
 ## Projects
 
-1. **Trace a matmul:** `Tensor` → lazy buffer → scheduled ops → generated CUDA kernel. Document every step.
+1. **Trace a matmul:** `Tensor` → UOp graph → scheduled kernels → generated target code. Document every step.
 2. **DEBUG=4:** Run a small model, read the generated kernels. Count kernel launches.
 3. **BEAM=3 vs BEAM=0:** Compare kernel count and latency on the same model.
 4. **Logging backend:** Add a minimal hook that prints each kernel launch.

@@ -315,9 +315,11 @@ A process group has:
 Example:
 
 ```python
+import os
 import torch
 import torch.distributed as dist
 
+torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
 dist.init_process_group(
     backend="nccl",
     init_method="env://",
@@ -496,8 +498,8 @@ For network reachability:
 
 ```bash
 ip route
-ping <peer>
-nc -vz <peer> <port>
+ping -c 3 "${PEER_HOST:?set PEER_HOST to the test peer}"
+nc -vz "$PEER_HOST" "${PEER_PORT:?set PEER_PORT to the test service port}"
 ```
 
 For RDMA:
@@ -511,7 +513,7 @@ ib_read_bw
 For NCCL:
 
 ```bash
-NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,GRAPH,TUNING ...
+NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,GRAPH,TUNING ./all_reduce_perf -b 8 -e 1G -f 2 -g 1
 ```
 
 ---
@@ -539,25 +541,32 @@ If `A <-> C` is expected to work through routing, prove it.
 
 ### Step 2: transport tests
 
+These are upstream command patterns for your own test hosts; they were not executed against a network peer in this course review. Set `PEER_HOST` to the server and use two terminals/hosts. RDMA perftest and UCX need a matching server invocation without the peer argument first, plus compatible device/options on both sides. A single local command is not a completed inter-node test.
+
 For UCX:
 
 ```bash
 ucx_info -d
-ucx_perftest <peer> -t tag_bw
+ucx_perftest "${PEER_HOST:?set PEER_HOST to the test server}" -t tag_bw
 ```
 
 For RDMA:
 
 ```bash
 ibv_devinfo
-ib_write_bw <peer>
+ib_write_bw "${PEER_HOST:?set PEER_HOST to the RDMA test server}"
 ```
 
 For TCP fallback:
 
 ```bash
 iperf3 -s
-iperf3 -c <peer>
+```
+
+On the client host in another terminal:
+
+```bash
+iperf3 -c "${PEER_HOST:?set PEER_HOST to the iperf3 server}"
 ```
 
 ### Step 3: collective tests
@@ -573,7 +582,7 @@ For PyTorch:
 ```bash
 torchrun --nnodes=3 --nproc-per-node=1 \
   --rdzv_backend=c10d \
-  --rdzv_endpoint=<head>:29500 \
+  --rdzv_endpoint="$MASTER_ADDR:29500" \
   test_allreduce.py
 ```
 
@@ -602,7 +611,7 @@ replicas
 
 ## 12. Minimal PyTorch all-reduce test
 
-Use this before running a large model.
+Use this before running a large model. For the fully executed local CPU route, start with the [two-process Gloo/DDP practical](../Nvidia%20GPU/HPC%20Setup/NCCL-Deep-Dive/CPU-Collectives-Lab/Guide.md). This multi-node recipe requires each node to run the same launcher with `MASTER_ADDR` set to the shared reachable rendezvous host.
 
 ```python
 # test_allreduce.py
@@ -614,20 +623,26 @@ import torch.distributed as dist
 
 
 def main():
-    dist.init_process_group(backend=os.environ.get("BACKEND", "nccl"))
+    backend = os.environ.get("BACKEND", "nccl")
+    local_rank = int(os.environ["LOCAL_RANK"])
+    device = torch.device(f"cuda:{local_rank}" if backend == "nccl" else "cpu")
+    if device.type == "cuda":
+        torch.cuda.set_device(device)
+    from datetime import timedelta
+    dist.init_process_group(backend=backend, timeout=timedelta(seconds=60))
 
     rank = dist.get_rank()
     world = dist.get_world_size()
     host = socket.gethostname()
 
-    device = torch.device(f"cuda:{rank % torch.cuda.device_count()}")
-    torch.cuda.set_device(device)
 
     x = torch.ones(1, device=device) * (rank + 1)
     dist.all_reduce(x, op=dist.ReduceOp.SUM)
-    torch.cuda.synchronize()
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
 
     expected = world * (world + 1) / 2
+    assert x.item() == expected
     print(f"rank={rank} host={host} value={x.item()} expected={expected}")
 
     dist.destroy_process_group()
@@ -644,7 +659,7 @@ BACKEND=nccl torchrun \
   --nnodes=3 \
   --nproc-per-node=1 \
   --rdzv_backend=c10d \
-  --rdzv_endpoint=<head-node-ip>:29500 \
+  --rdzv_endpoint="$MASTER_ADDR:29500" \
   test_allreduce.py
 ```
 

@@ -1,0 +1,57 @@
+{
+  "scope": "scalar numerical experiments; no model or GPU benchmark",
+  "quantized_ints": [
+    [
+      0,
+      -4,
+      7,
+      0
+    ],
+    [
+      4,
+      -5,
+      7,
+      0
+    ]
+  ],
+  "row_scales": [
+    0.2857142857142857,
+    0.005714285714285714
+  ],
+  "reference_output": [
+    3.3,
+    0.1
+  ],
+  "quantized_output": [
+    3.2857142857142856,
+    0.1
+  ],
+  "maximum_output_error": 0.014285714285714235,
+  "rope_norm_before": 14.25,
+  "rope_norm_after": 14.250000000000002,
+  "tp_reference": [
+    3.3,
+    0.1
+  ],
+  "tp_sum_and_partials": [
+    [
+      3.3,
+      0.1
+    ],
+    [
+      [
+        2.0,
+        0.08
+      ],
+      [
+        1.3,
+        0.02
+      ]
+    ]
+  ],
+  "speculation_expected_tokens_alpha_055_k5": 2.1607096875000003,
+  "speculation_simulated_tokens_alpha_055_k5": 2.15674,
+  "illustrative_speculation_tokens_per_second": 37.5775597826087,
+  "peak_output_tokens_per_second": 347.22222222222223,
+  "replicas_if_measured_400_tps_at_70percent_limit": 2
+}

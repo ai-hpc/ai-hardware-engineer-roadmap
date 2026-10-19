@@ -1,0 +1,69 @@
+{
+  "scope": "synthetic scalar response and paired binary fixtures; no robot identification",
+  "truth": {
+    "tau_s": 0.08,
+    "delay_steps": 2,
+    "dt_s": 0.02
+  },
+  "fitted": {
+    "delay_steps": 2,
+    "delay_s": 0.04,
+    "a": 0.7787684881709799,
+    "tau_s": 0.07998673233426407,
+    "one_step_mse": 1.623547619473652e-06
+  },
+  "delay_candidates": [
+    {
+      "delay_steps": 0,
+      "delay_s": 0.0,
+      "a": 0.9799564538997538,
+      "tau_s": 0.9877936803374355,
+      "one_step_mse": 0.03291766990347053
+    },
+    {
+      "delay_steps": 1,
+      "delay_s": 0.02,
+      "a": 0.9737398850206999,
+      "tau_s": 0.7515669370298638,
+      "one_step_mse": 0.032719937050121856
+    },
+    {
+      "delay_steps": 2,
+      "delay_s": 0.04,
+      "a": 0.7787684881709799,
+      "tau_s": 0.07998673233426407,
+      "one_step_mse": 1.623547619473652e-06
+    },
+    {
+      "delay_steps": 5,
+      "delay_s": 0.1,
+      "a": 0.9916895662652419,
+      "tau_s": 2.3965993487217876,
+      "one_step_mse": 0.03315420716492023
+    },
+    {
+      "delay_steps": 6,
+      "delay_s": 0.12,
+      "a": 0.9956041073530282,
+      "tau_s": 4.539694300732736,
+      "one_step_mse": 0.03317946004278161
+    }
+  ],
+  "held_out_rmse": 4.2424028897690175e-05,
+  "zero_regressions_100": {
+    "episodes": 100,
+    "regressions": 0,
+    "improvements": 0,
+    "one_sided_95_upper_regression_probability": 0.026342720783174324,
+    "declared_margin": 0.01,
+    "gate_passed": false
+  },
+  "zero_regressions_1000": {
+    "episodes": 1000,
+    "regressions": 0,
+    "improvements": 0,
+    "one_sided_95_upper_regression_probability": 0.0026982432397605217,
+    "declared_margin": 0.01,
+    "gate_passed": true
+  }
+}

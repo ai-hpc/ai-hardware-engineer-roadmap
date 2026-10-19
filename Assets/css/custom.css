@@ -52,6 +52,14 @@
   word-break: normal;
 }
 
+/* MathJax's visually clipped MathML remains available to assistive tools.
+   Bound that hidden box too: its natural width can otherwise make a phone
+   page scroll sideways even when the visible equation fits. */
+.md-typeset mjx-assistive-mml {
+  width: 1px !important;
+  height: 1px !important;
+}
+
 /* Standalone bold label lines (e.g. "You will learn to:").
    Previously these were shrunk, greyed, and UPPERCASED — which made a label
    quieter than the text it introduces, and turned any fully-bold pull-quote

@@ -24,7 +24,7 @@ tinygrad is a minimal stack that exposes IR, scheduling, and backends in one cod
 
 ## 1. IR and ops
 
-* **Linearized representation** — How tinygrad turns a graph into a linear list of ops.
+* **UOp graphs and lowered programs** — Follow tensor-level UOps through graph scheduling, kernel optimization, linearization/rendering, and execution. `LazyBuffer` is part of older tutorials; use the [layout documentation](https://docs.tinygrad.org/developer/layout/) with the pinned source revision.
 * **Op types** — Unary, binary, reduce, movement, load/store; how they map to memory and compute.
 * **Memory buffers** — How tensors and buffers are assigned and reused.
 
@@ -46,8 +46,8 @@ tinygrad is a minimal stack that exposes IR, scheduling, and backends in one cod
 
 ## 4. Quantization in tinygrad
 
-* **Passes** — How quantization is represented and applied in the graph.
-* **Integration with compiler** — How quantized ops flow through scheduler and backends.
+* **Representation** — Inspect one concrete quantized model path and its scale/packing operations; do not assume every supported checkpoint implies a general quantization pass.
+* **Integration with compiler** — Trace unpacking, dequantization, arithmetic dtype, and generated kernels on the named backend. Low-bit storage alone does not establish native low-bit compute.
 
 ---
 
@@ -60,7 +60,7 @@ tinygrad is a minimal stack that exposes IR, scheduling, and backends in one cod
 
 ## Projects
 
-1. **Trace the pipeline** — Run a small model in tinygrad. Trace from Python to scheduled kernels; document the pipeline (graph → linearized IR → scheduler → backend code).
+1. **Trace the pipeline** — Start with the [tested CPU lab](../00%20-%20CPU%20Compiler%20Lab/Guide.md). Document tensor/UOp graph → scheduled kernels → optimized kernel IR → rendered source → runtime execution. Preserve generated-code and launch evidence.
 2. **Add an optimization** — Implement a simple optimization (e.g. constant fold or fuse two ops) in tinygrad. Measure impact on kernel count and runtime.
 3. **Backend hook** — Add a minimal "identity" or logging hook in a backend (e.g. log each kernel launch). Use it to verify which kernels run for a given model.
 

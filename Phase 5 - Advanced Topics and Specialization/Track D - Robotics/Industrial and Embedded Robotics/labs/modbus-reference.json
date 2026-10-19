@@ -1,0 +1,36 @@
+{
+  "scope": "actual localhost TCP client/server; generated register data; read-only subset",
+  "cases": [
+    {
+      "transaction": 4660,
+      "request_hex": "123400000006010300000002",
+      "response_hex": "12340000000701030409c41388",
+      "registers": [
+        2500,
+        5000
+      ]
+    },
+    {
+      "transaction": 4661,
+      "request_hex": "123500000006010300640001",
+      "response_hex": "123500000003018302",
+      "exception_code": 2
+    },
+    {
+      "transaction": 4662,
+      "request_hex": "1236000000020110",
+      "response_hex": "123600000003019001",
+      "exception_code": 1
+    }
+  ],
+  "decoded_application_units": {
+    "temperature_C": 25.0,
+    "supply_V": 5.0
+  },
+  "limitations": [
+    "no physical PLC/robot or sensor",
+    "not a full Modbus conformance implementation",
+    "no TLS/authentication or deterministic timing claim",
+    "no write operation or retry policy"
+  ]
+}

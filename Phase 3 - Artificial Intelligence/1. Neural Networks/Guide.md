@@ -14,6 +14,10 @@
 
 > **Goal:** Build a concrete, ground-up understanding of what AI is, what artificial neural networks are, how they learn, and how to implement everything hands-on using **tinygrad** — the minimal ML framework that exposes every fundamental operation.
 
+**Start here if the math is unfamiliar:** [AI and Robot Learning Foundations](../0.%20AI%20and%20Robot%20Learning%20Foundations/Guide.md) provides worked gradients, tensor shapes, held-out evaluation, and a tested CPU robot-policy lab. Python and the foundation diagnostic are sufficient to begin; C++ and embedded hardware are useful later, not entry requirements for these calculations.
+
+**Code status:** conceptual snippets below are exercises unless explicitly labeled otherwise. The MNIST adaptation is upstream-documented but has not been executed in this review. The foundation lab is the locally tested starting point. Record the framework version or source commit before adapting snippets; reviewed against primary documentation on 2026-10-18.
+
 **Related (separate topic):** **[Edge AI](../Track%20A%20-%20Hardware%20and%20Edge%20AI/6.%20Edge%20AI%20and%20Model%20Optimization/Guide.md)** — where models run on-device, latency/privacy tiers, train → optimize → deploy.
 
 ---
@@ -69,14 +73,14 @@ Reinforcement Learning:
 
 ### Where Neural Networks Fit
 
-Neural networks are a **family of supervised (and self-supervised) learning algorithms** that are especially powerful for:
+Neural networks are a **family of parameterized models** used in supervised, self-supervised, unsupervised, and reinforcement learning. Common applications include:
 - Images and video (CNNs)
 - Text and sequences (Transformers, RNNs)
 - Audio (CNNs + Transformers)
 - Tabular data (MLP)
 - Graphs (GNNs)
 
-They dominate modern AI because they can learn **arbitrary complex mappings** given enough data and compute.
+They can represent complex mappings. Whether training finds a useful mapping, and whether it generalizes to new conditions, depends on data, architecture, optimization, and evaluation. Representational capacity is not a guarantee of learning or reliable behavior.
 
 ---
 
@@ -154,18 +158,18 @@ The bias shifts the activation, allowing the network to learn when to activate r
 
 ### Concrete Example
 
-A single neuron classifying whether a tumor is malignant:
+A toy neuron scores whether a simulated cart needs braking. The weights are invented for arithmetic practice, not learned or calibrated:
 ```
-Inputs: x₁ = tumor size (cm), x₂ = patient age (years)
-Weights: w₁ = 0.8, w₂ = 0.3
-Bias: b = -2.0
+Inputs: x₁ = normalized speed = 1.5, x₂ = normalized obstacle proximity = 0.5
+Weights: w₁ = 0.8, w₂ = 0.4
+Bias: b = -1.0
 
-z = 0.8 × 3.5 + 0.3 × 45 + (-2.0)
-  = 2.8 + 13.5 - 2.0
-  = 14.3
+z = 0.8 × 1.5 + 0.4 × 0.5 - 1.0 = 0.4
 
-a = sigmoid(14.3) ≈ 0.9999  → malignant (high probability)
+a = sigmoid(0.4) ≈ 0.5987
 ```
+
+The sigmoid produces a number between 0 and 1. Interpreting it as a trustworthy probability requires calibration and held-out evidence; choosing a braking threshold also needs task-specific validation.
 
 ---
 
@@ -234,11 +238,13 @@ Fixes dying ReLU by allowing small negative gradient
 ### GELU (Gaussian Error Linear Unit)
 
 ```
-GELU(z) ≈ z · σ(1.702·z)
+GELU(z) = z · Φ(z), where Φ is the standard normal cumulative distribution
 
-Used in: Transformers (BERT, GPT)
-Smooth approximation of ReLU
+Used in: transformer feed-forward networks, including BERT and some GPT models
+Smoothly weights inputs rather than applying a hard zero threshold
 ```
+
+`z × sigmoid(1.702z)` is a particular approximation, not the definition. PyTorch also documents a tanh approximation; do not assume different approximations are numerically identical. See the [GELU API](https://docs.pytorch.org/docs/stable/generated/torch.nn.GELU.html).
 
 ### Softmax (Output Layer for Multi-class)
 
@@ -258,6 +264,8 @@ Use: multi-class classification output
 | Output (multi)   | Softmax                |
 | Output (regression) | None (linear)       |
 | RNN gates        | Tanh + Sigmoid         |
+
+These output activations describe interpretation. During training, a loss that already includes the activation should receive logits: [PyTorch CrossEntropyLoss](https://docs.pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html) takes unnormalized class scores, and `BCEWithLogitsLoss` includes the sigmoid calculation. Applying softmax or sigmoid twice changes the objective.
 
 ---
 
@@ -455,10 +463,12 @@ Backward (chain rule):
 
 Modern frameworks (including tinygrad) implement **autograd**: they build the computational graph during the forward pass, then automatically compute all gradients during `.backward()`.
 
-You never implement backprop by hand — you just define the forward pass.
+Usually you define the forward pass and let autograd compute derivatives. Implement a small backward pass and finite-difference check once so you can debug custom operations and incorrect gradients.
 
 ```python
 # tinygrad autograd example
+from tinygrad import Tensor
+
 x = Tensor([2.0], requires_grad=True)
 w = Tensor([3.0], requires_grad=True)
 b = Tensor([1.0], requires_grad=True)
@@ -521,7 +531,7 @@ The most widely used optimizer:
 
 ```
 mₜ = β₁·mₜ₋₁ + (1-β₁)·∇L          (1st moment: mean of gradients)
-vₜ = β₂·vₜ₋₁ + (1-β₂)·(∇L)²       (2nd moment: variance of gradients)
+vₜ = β₂·vₜ₋₁ + (1-β₂)·(∇L)²       (2nd raw moment: mean squared gradients)
 
 m̂ₜ = mₜ/(1-β₁ᵗ)                   (bias correction)
 v̂ₜ = vₜ/(1-β₂ᵗ)
@@ -549,7 +559,8 @@ Warmup + decay:    Start low, increase, then decrease (Transformers)
 ### Complete Training Loop
 
 ```python
-# Pseudocode (very close to tinygrad code)
+# Framework-neutral pseudocode using PyTorch-style train/eval names.
+# tinygrad uses its own documented training context; do not mix APIs.
 
 model = MyNetwork()
 optimizer = Adam(model.parameters(), lr=1e-3)
@@ -577,6 +588,7 @@ for epoch in range(num_epochs):
 
     # ── Validation phase ─────────────────────────────
     model.eval()
+    # evaluate must also disable gradient recording; eval() alone does not.
     val_loss, val_acc = evaluate(model, val_loader)
     print(f"Epoch {epoch}: loss={val_loss:.4f}, acc={val_acc:.2%}")
 ```
@@ -677,11 +689,11 @@ Output (Softmax)
 Max pooling reduces spatial dimensions, retaining the most prominent features:
 
 ```
-Input (4×4):       Max Pool 2×2:
- 1  3  2  4          3  4
+Input (4×4):       Max Pool 2×2, stride 2, no padding:
+ 1  3  2  4
  5  6  7  8    →     6  8
- 3  1  4  2          3  4
- 7  8  5  6          8  6
+ 3  1  4  2          8  6
+ 7  8  5  6
 ```
 
 ### CNN vs MLP for Images
@@ -695,22 +707,24 @@ MLP:
 CNN:
   - Local connectivity (filter slides over image)
   - Weight sharing (same filter at all positions)
-  - Translation invariant (cat in corner = cat in center)
+  - Translation equivariant in ideal stride-1 convolution away from boundaries
+  - Pooling/aggregation can add some translation tolerance; invariance is not automatic
   - Far fewer parameters
 ```
 
 ### Classic CNN Architectures
 
-| Model      | Year | Layers | Params  | Top-5 Acc |
-|------------|------|--------|---------|-----------|
-| LeNet-5    | 1998 | 7      | 60K     | —         |
-| AlexNet    | 2012 | 8      | 61M     | 84.6%     |
-| VGG-16     | 2014 | 16     | 138M    | 92.7%     |
-| ResNet-50  | 2015 | 50     | 25M     | 95.3%     |
-| MobileNetV2| 2018 | 53     | 3.4M    | 93.4%     |
-| EfficientNet| 2019| varies | varies  | 97.1%     |
+| Architecture | Design idea to inspect | Your comparison artifact |
+|---|---|---|
+| LeNet / AlexNet | Convolution, pooling, and dense heads | Input/output shapes and parameter counts |
+| VGG | Repeated small convolutions | Activation and weight memory by layer |
+| ResNet | Residual connections | Shape matching at each addition |
+| MobileNetV2 | Depthwise convolutions and inverted residual blocks | Per-operator time on the target device |
+| EfficientNet | Joint scaling choices | Quality/latency/memory at a named input size |
 
-MobileNet and EfficientNet are designed for **edge deployment** — accuracy vs. compute tradeoff.
+Accuracy belongs to a checkpoint, dataset split, preprocessing, and evaluation
+procedure. Compare measured models under the same protocol; a model-family
+name and an unqualified top-5 percentage are not a reproducible benchmark.
 
 ---
 
@@ -729,8 +743,8 @@ High Variance (overfitting): model too complex, memorizes noise
 
 Randomly zero out neurons during training:
 
-```python
-# During training:
+```text
+During training:
   For each neuron, with probability p, set output to 0
   Scale remaining neurons by 1/(1-p)
 
@@ -742,7 +756,7 @@ Effect: Forces network to learn redundant representations
 Typical p: 0.2–0.5
 ```
 
-### Weight Decay (L2 Regularization)
+### L2 Regularization and Weight Decay
 
 Add a penalty to the loss for large weights:
 
@@ -754,6 +768,8 @@ L_total = L_task + λ · Σ w²
 Effect: Keeps weights small, reduces overfitting
 Equivalent to Gaussian prior on weights (Bayesian view)
 ```
+
+For plain SGD, an L2 gradient term can be expressed as a weight-decay update with the appropriate coefficient. With adaptive optimizers such as Adam, this equivalence generally fails. AdamW applies decay separately; see [Decoupled Weight Decay Regularization](https://arxiv.org/abs/1711.05101).
 
 ### Batch Normalization
 
@@ -770,8 +786,11 @@ Benefits:
   - Faster training (higher learning rates)
   - Less sensitive to weight initialization
   - Mild regularization effect
-  - Reduces internal covariate shift
+  - Changes optimization behavior; the mechanism is not fully explained by
+    the original “internal covariate shift” intuition
 ```
+
+See [How Does Batch Normalization Help Optimization?](https://arxiv.org/abs/1805.11604) for evidence against treating that original explanation as settled. Training and evaluation also use different statistics in the usual BatchNorm configuration; preserve the running statistics with the weights.
 
 ### Early Stopping
 
@@ -808,7 +827,7 @@ Edge AI benefit: reduces need for large datasets
 
 ### Why tinygrad?
 
-tinygrad is a minimal ML framework (~1000 lines of core code) that exposes every fundamental operation clearly. Unlike PyTorch or TensorFlow:
+tinygrad is a compact tensor and compiler framework whose source is useful for tracing operations through scheduling and code generation. Its size, layout, and supported backends change; inspect the pinned revision rather than relying on a fixed line count.
 
 - No magic — you can read and understand the entire source
 - Teaches you **exactly** what happens inside a neural network
@@ -823,7 +842,7 @@ import numpy as np
 
 # Tensor creation
 x = Tensor([[1.0, 2.0, 3.0]])           # shape [1, 3]
-w = Tensor.kaiming_uniform(3, 4)        # shape [3, 4]
+w = Tensor.kaiming_uniform(3, 4, requires_grad=True)  # shape [3, 4]
 
 # Operations (lazy by default)
 z = x.matmul(w)                         # shape [1, 4]
@@ -894,7 +913,7 @@ class MLP:
         for i, layer in enumerate(self.linears[:-1]):
             x = layer(x).relu()          # hidden layers: ReLU
         x = self.linears[-1](x)          # output layer: no activation
-        return x.softmax()               # softmax for probabilities
+        return x                         # logits; loss applies log-softmax
 
     def parameters(self):
         params = []
@@ -905,67 +924,77 @@ class MLP:
 
 ### Training on MNIST
 
-```python
-from tinygrad.tensor import Tensor
-from tinygrad.nn.optim import Adam
-import numpy as np
+**Upstream-documented adaptation, not locally executed.** The current
+[tinygrad quickstart](https://docs.tinygrad.org/quickstart/) uses a training context
+and a loss on logits. The example below assumes the `MLP` class above returns
+logits. Record a tinygrad source commit/package version, NumPy version, dataset
+checksums, and device before using it as a reproducible experiment. The API
+review date is 2026-10-18; that date is not a software pin.
 
-# Load MNIST (use fetch from tinygrad)
+```python
+from tinygrad import Tensor, Context
+from tinygrad.nn.optim import Adam
 from tinygrad.helpers import fetch
 import gzip
+import numpy as np
+
+rng = np.random.default_rng(7)
+Tensor.manual_seed(7)
 
 def load_mnist():
     base = "https://storage.googleapis.com/cvdf-datasets/mnist/"
-    X_train = np.frombuffer(gzip.open(fetch(base+"train-images-idx3-ubyte.gz")).read(), np.uint8, offset=16).reshape(-1, 784)
-    Y_train = np.frombuffer(gzip.open(fetch(base+"train-labels-idx1-ubyte.gz")).read(), np.uint8, offset=8)
-    X_test  = np.frombuffer(gzip.open(fetch(base+"t10k-images-idx3-ubyte.gz")).read(), np.uint8, offset=16).reshape(-1, 784)
-    Y_test  = np.frombuffer(gzip.open(fetch(base+"t10k-labels-idx1-ubyte.gz")).read(), np.uint8, offset=8)
-    return X_train/255.0, Y_train, X_test/255.0, Y_test
+    def read(name, offset):
+        with gzip.open(fetch(base + name), "rb") as stream:
+            return np.frombuffer(stream.read(), np.uint8, offset=offset)
+    train_x = read("train-images-idx3-ubyte.gz", 16).reshape(-1, 784)
+    train_y = read("train-labels-idx1-ubyte.gz", 8)
+    test_x = read("t10k-images-idx3-ubyte.gz", 16).reshape(-1, 784)
+    test_y = read("t10k-labels-idx1-ubyte.gz", 8)
+    return train_x.astype(np.float32) / 255, train_y, test_x.astype(np.float32) / 255, test_y
 
-X_train, Y_train, X_test, Y_test = load_mnist()
-
-# Define model
+all_x, all_y, test_x, test_y = load_mnist()
+order = rng.permutation(len(all_x))
+train_ids, val_ids = order[5000:], order[:5000]
+train_x, train_y = all_x[train_ids], all_y[train_ids]
+val_x, val_y = all_x[val_ids], all_y[val_ids]
 model = MLP([784, 256, 128, 10])
 optimizer = Adam(model.parameters(), lr=1e-3)
+BATCH, EPOCHS = 64, 10  # fixed budget; use validation if changing it
 
-# Training loop
-BATCH = 64
-EPOCHS = 10
+def accuracy(xs, ys):
+    correct = 0
+    with Context(TRAINING=0):
+        for i in range(0, len(xs), BATCH):
+            predictions = model(Tensor(xs[i:i+BATCH])).numpy().argmax(axis=1)
+            correct += int((predictions == ys[i:i+BATCH]).sum())
+    return correct / len(xs)
 
 for epoch in range(EPOCHS):
-    # Shuffle
-    idx = np.random.permutation(len(X_train))
-    X_train, Y_train = X_train[idx], Y_train[idx]
+    order = rng.permutation(len(train_x))
+    loss_sum, examples = 0.0, 0
+    with Context(TRAINING=1):
+        for i in range(0, len(order), BATCH):
+            ids = order[i:i+BATCH]
+            xb = Tensor(train_x[ids])
+            yb = Tensor(train_y[ids].astype(np.int32))
+            logits = model(xb)
+            loss = logits.sparse_categorical_crossentropy(yb)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            loss_sum += loss.item() * len(ids)
+            examples += len(ids)
+    print(f"epoch={epoch+1} loss={loss_sum/examples:.4f} validation_accuracy={accuracy(val_x, val_y):.4f}")
 
-    total_loss = 0
-    for i in range(0, len(X_train), BATCH):
-        xb = Tensor(X_train[i:i+BATCH].astype(np.float32))
-        yb = Y_train[i:i+BATCH]
-
-        # Forward pass
-        out = model(xb)
-
-        # Cross-entropy loss
-        # One-hot encode labels
-        yb_onehot = np.zeros((len(yb), 10), dtype=np.float32)
-        yb_onehot[np.arange(len(yb)), yb] = 1.0
-        yb_t = Tensor(yb_onehot)
-
-        loss = -(yb_t * out.log()).sum(axis=1).mean()
-
-        # Backward
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.numpy()
-
-    # Validation
-    test_out = model(Tensor(X_test.astype(np.float32)))
-    preds = test_out.numpy().argmax(axis=1)
-    acc = (preds == Y_test).mean()
-    print(f"Epoch {epoch+1}: loss={total_loss/(len(X_train)//BATCH):.4f}, test_acc={acc:.2%}")
+# Once the candidate is fixed, evaluate the untouched test partition.
+print(f"final_test_accuracy={accuracy(test_x, test_y):.4f}")
 ```
+
+A complete lab also saves the parameters, split IDs, exact environment, and
+raw metrics. If you tune after reading the test score, report that set as
+development evidence and use a fresh evaluation for a final generalization
+claim. The CPU foundation lab is the tested route when this framework or
+network access is unavailable.
 
 ### Understanding tinygrad's Autograd
 
@@ -973,7 +1002,7 @@ for epoch in range(EPOCHS):
 # tinygrad builds a computation graph lazily
 # Every operation on a Tensor records itself
 
-x = Tensor([2.0])
+x = Tensor([2.0], requires_grad=True)
 y = x * x       # records: mul(x, x)
 z = y + x       # records: add(y, x)
 loss = z.sum()
@@ -1009,7 +1038,7 @@ class SimpleCNN:
         x = x.reshape(x.shape[0], -1)            # flatten → [batch, 3136]
         x = self.fc1(x).relu()
         x = self.fc2(x)
-        return x.softmax()
+        return x  # logits
 
     def parameters(self):
         params = []
@@ -1020,21 +1049,13 @@ class SimpleCNN:
 
 ### Exploring tinygrad Internals
 
-Study these files in the tinygrad source to deeply understand how ML works:
-
-```
-tinygrad/
-  tensor.py          ← Tensor class, all ops, autograd engine
-  lazybuffer.py      ← Lazy evaluation / computation graph
-  ops.py             ← All primitive operations
-  nn/
-    optim.py         ← SGD, Adam, AdaGrad implementations
-  runtime/
-    ops_cpu.py       ← How ops execute on CPU
-    ops_gpu.py       ← How ops execute on GPU
-```
-
-Reading `tensor.py` is one of the best ways to understand how autograd and deep learning frameworks work internally.
+Use the [upstream layout guide](https://docs.tinygrad.org/developer/layout/)
+with your pinned source revision. The current guide describes scheduling,
+code-generation optimization, rendering, and execution in `schedule/`,
+`codegen/opt/`, `codegen/`, `renderer/`, and `engine/`. Trace one small matmul
+through those stages and retain the generated program. Old tutorials referring
+to `lazybuffer.py` or `runtime/ops_cpu.py` describe earlier layouts; do not assume
+those paths exist in your checkout.
 
 ---
 
@@ -1142,12 +1163,17 @@ Steps:
 
 ### Practice Datasets
 
-| Dataset   | Task                | Samples | Input Size | Baseline |
-|-----------|---------------------|---------|------------|----------|
-| MNIST     | Digit classification | 70,000 | 28×28×1    | 99.7%    |
-| Fashion-MNIST | Clothing classification | 70,000 | 28×28×1 | 94%   |
-| CIFAR-10  | Object classification | 60,000 | 32×32×3   | 95%+     |
-| Iris      | Flower classification | 150   | 4 features | 97%     |
+| Dataset | Task | Input | First comparison |
+|---|---|---|---|
+| MNIST | Digit classification | 28×28 grayscale | Majority class, linear model, MLP |
+| Fashion-MNIST | Clothing classification | 28×28 grayscale | Same fixed model and split protocol |
+| CIFAR-10 | Object classification | 32×32 RGB | Small CNN with recorded augmentation |
+| Iris | Flower classification | Four tabular features | Simple classifier with stratified validation |
+
+Use each dataset's documented split, license, and checksum. Establish a baseline
+with your own exact training and evaluation recipe; this table makes no promised
+accuracy claim. For robot data, use whole episodes and task-relevant groups as
+explained in [evaluation foundations](../0.%20AI%20and%20Robot%20Learning%20Foundations/02-Evaluation-and-Robot-Learning.md).
 
 ---
 
@@ -1170,7 +1196,7 @@ Gradient descent:
 Adam update:
   m = β₁m + (1-β₁)g
   v = β₂v + (1-β₂)g²
-  W ← W - α·m̂/√(v̂+ε)
+  W ← W - α·m̂/(√v̂ + ε)
 
 Convolution output size:
   out = floor((in + 2p - k) / s) + 1

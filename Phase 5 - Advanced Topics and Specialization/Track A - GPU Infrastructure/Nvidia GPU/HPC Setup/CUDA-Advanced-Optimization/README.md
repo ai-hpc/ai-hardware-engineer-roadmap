@@ -1,6 +1,8 @@
 # CUDA Advanced Optimization — Deep Dive
 
-Five techniques used by GPU engineers at NVIDIA, OpenAI, and Meta to push inference and HPC kernels to hardware limits. These go far beyond basic CUDA programming — they are what separates a "working" GPU kernel from a "production" one.
+Study five optimization techniques through their correctness conditions, data movement and measured bottlenecks. Start with streams, memory ownership, array indexing and the CPU compiler lab before using architecture-specific mechanisms.
+
+**Begin with the [correctness lab](labs/README.md).** Nine CPU checks run without CUDA. Complete CUDA examples were compiled with CUDA 13.4.92; GPU execution is explicitly unvalidated because no usable CUDA device was available. The five lessons distinguish executable source, mathematical models and source-reviewed designs. Allow 45–60 minutes per lesson plus toolchain setup.
 
 ## Why These Techniques Matter
 
@@ -12,11 +14,11 @@ A graph replay still has a launch cost. A persistent kernel amortizes repeated d
 
 | # | Topic | What It Solves |
 |---|---|---|
-| 01 | [CUDA Graphs](./01-CUDA-Graphs.md) | CPU launch overhead kills latency at small batch sizes |
+| 01 | [CUDA Graphs](./01-CUDA-Graphs.md) | Repeated host submission can limit short operations |
 | 02 | [Cooperative Groups](./02-Cooperative-Groups.md) | Thread block boundary limits synchronization flexibility |
-| 03 | [Persistent Kernels](./03-Persistent-Kernels.md) | Repeated kernel launches waste SM setup time |
+| 03 | [Persistent Kernels](./03-Persistent-Kernels.md) | Reuse blocks across finite work items |
 | 04 | [Kernel Fusion](./04-Kernel-Fusion.md) | Separate kernels waste HBM bandwidth on intermediate results |
-| 05 | [Warp Specialization](./05-Warp-Specialization.md) | Compute and memory latency are not overlapped inside a kernel |
+| 05 | [Warp Specialization](./05-Warp-Specialization.md) | Assign roles and coordinate asynchronous buffer reuse |
 
 ## How They Relate
 
@@ -27,9 +29,9 @@ Persistent Kernels   → amortizes dispatch across multiple work items
 Kernel Fusion        → reduces HBM round-trips between operations
 Warp Specialization  → overlaps compute and memory within a single kernel
 
-Combined (e.g. FlashAttention-3):
-  Persistent kernel + warp specialization + cooperative groups
-  → benchmark the combined design; do not multiply isolated speedups
+Combined designs:
+  Trace the actual algorithm and target implementation.
+  Benchmark the combination; do not multiply isolated speedups.
 ```
 
 ## Quick Navigation

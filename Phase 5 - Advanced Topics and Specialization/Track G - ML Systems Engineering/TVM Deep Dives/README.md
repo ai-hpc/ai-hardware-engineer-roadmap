@@ -1,102 +1,41 @@
-# TVM Deep Dives — Apache TVM for MLSys Engineers
+# TVM Deep Dives — compile, inspect, and test a computation
 
-<div class="course-identity mlsys" markdown="1">
-<div class="course-identity__icon">TVM</div>
-<div markdown="1">
-<p class="course-identity__eyebrow">Phase 5 · ML Systems Engineering · Special Course</p>
-<p class="course-identity__title">Compile a model to the metal: the Apache TVM stack — Relax, TensorIR, MetaSchedule, BYOC, and MLC-LLM — as a senior MLSys engineer actually uses it.</p>
-<p class="course-identity__meta">Artifact: a tuned, deployed compiled model with a measured speedup report · Measure: latency, GFLOP/s vs roofline, tuning trials, binary size, $/inference</p>
-</div>
-</div>
+Learn how an ML compiler represents a tensor computation, changes its execution schedule, and packages a runnable artifact. Start on a CPU with tiny inputs whose answers you can check. GPU tuning, custom accelerator integration, and embedded deployment are extensions that require their own hardware and toolchain evidence.
 
-> *A framework runs the graph someone else optimized. A compiler lets you become that someone.*
+The [executable compiler lab](labs/README.md) compiles a 37-element affine operation and a small matmul+bias+ReLU model with Apache TVM's LLVM CPU backend. It checks vector tails, wrong shapes, output values, and real shared-library export/reload. No pretrained weights or GPU are required.
 
-Most ML engineers stop at the framework boundary. They call `model(x)`, the framework dispatches to cuDNN or oneDNN, and the hardware does what the vendor library decided it should do. That is fine until you hit a shape, a dtype, a fused pattern, or an accelerator that **no vendor library covers** — a custom NPU, an edge MCU, a WebGPU target, a quantization scheme nobody shipped a kernel for. At that boundary you stop being a user of kernels and start being an author of them. **Apache TVM is the open compiler stack for doing that at scale**, across the whole target zoo, without hand-writing a kernel per shape per device.
+## Prerequisites and route
 
-This course is how an MLSys engineer reads, drives, extends, and ships that stack. It is **build-first**: every lecture lowers a real computation, schedules it, tunes it, or deploys it, and reads a number off the other side.
+You should be comfortable with Python, matrix multiplication, array shapes, and a loop. If compiler IR is new, first complete the [CPU compiler introduction](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/00%20-%20CPU%20Compiler%20Lab/Guide.md). Allow roughly one session per lecture; spend longer on the optional tuning/hardware extensions when available.
 
-**Layer mapping:** L4 (compiler / graph optimization) is the spine, reaching down into L3 (kernels / codegen) and up into L5–L6 (runtime / deployment). This is the core L4 compiler-engineer skill set.
+| Lesson | Question | Artifact |
+|---|---|---|
+| [01 — compilation flow](Lecture-01.md) | What changes between graph, tensor program, and machine code? | Original/lowered IR plus checked CPU output |
+| [02 — schedules](Lecture-02.md) | Which loop changes preserve meaning and handle tails? | Vectorized 37-element kernel and boundary tests |
+| [03 — tuning](Lecture-03.md) | When does search repay its cost? | Candidate timings, correctness checks, and reuse assumptions |
+| [04 — graph optimization](Lecture-04.md) | When is fusion legal and worthwhile? | Shape/layout contract and a fusion/BYOC decision |
+| [05 — deployment](Lecture-05.md) | What must travel with a compiled artifact? | Exported/reloaded CPU module and deployment manifest |
 
-**Role targets:** ML Compiler Engineer · MLSys Engineer · AI Inference Engineer · Edge AI / TinyML Engineer · Accelerator Software Engineer (the person who writes the BYOC backend for a new chip).
+The outcome is a reproducible compiler experiment, not a required win over a framework. A framework may already call an excellent library kernel or use its own graph compiler. A result showing that TVM loses on a shape is useful when explained and measured fairly.
 
-**Prerequisites:**
+## Version map, checked 2026-10-18
 
-* Phase 4 — Track C — [ML Compiler and Graph Optimization](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md) — what a graph IR, an operator, and a lowering pass are.
-* Phase 5 — Edge AI — [Edge LLM Inference Internals](../../Track%20C%20-%20Edge%20AI/Edge%20LLM%20Inference%20Internals/Lecture-01.md) — GEMV vs GEMM, the roofline, the decode bottleneck. You will need the roofline to read every "Measure it" section here.
-* Comfort with Python (the whole TVM frontend is Python) and the ability to read CUDA C and LLVM-flavored loop code. No prior compiler-internals knowledge assumed — that is what this course builds.
+The lab pins **apache-tvm 0.27.0.post1**, installed from PyPI and actually executed. Its API uses `tvm.tirx`, `tvm.s_tir`, `from tvm.script import tirx as T`, `T.sblock`, and `Schedule.get_sblock`. The [moving upstream Quick Start](https://tvm.apache.org/docs/get_started/tutorials/quick_start.html) currently uses the separately named `tvm_tirx` package for several core pieces. That package is **not** present in the tested release wheel. These are different snapshots, not interchangeable import examples.
 
-**What comes after:** a compiled-model repo — one network, lowered and tuned with MetaSchedule for at least two targets (e.g. x86 + CUDA, or CUDA + an edge board), with a benchmark table comparing the framework baseline, the un-tuned TVM build, and the tuned TVM build against the hardware roofline, plus one BYOC offload experiment.
+| Material | How to use it |
+|---|---|
+| This lab | Install its exact requirements and run its complete files |
+| Latest website examples | Match the documented source/package revision before adapting |
+| Older `tvm.tir`, `tvm.meta_schedule`, `T.block`, `get_block` examples | Historical APIs; namespace replacement alone may be insufficient |
+| Relay/GraphExecutor/AutoTVM/Ansor/microTVM tutorials | Use an archived compatible checkout and explain the historical executor/toolchain |
+| MLC-LLM | Use its own documented compiler dependency and target packages; arbitrary TVM wheel compatibility is not established |
 
----
+Inspect `tvm.__version__`, `tvm.__file__`, build options, and exported IR before debugging a tutorial. A build option such as `USE_CUDA=ON` in a wheel does not mean a CUDA device was present or executed.
 
-## Why TVM, and why now
+## What makes an experiment convincing
 
-TVM is the oldest and most general of the open ML compilers (born at UW in 2017), and the one whose ideas — **a schedulable tensor IR, learning-based auto-tuning, bring-your-own-codegen** — propagated into everything that came after. Knowing TVM is the fastest way to understand the *whole* category, because the others are largely re-expressions of pieces of it.
+Use deterministic inputs, an independent numerical reference, odd shapes and tails, and an explicit dtype/layout contract. Record compiler/package versions, target, compile time, warmup, timing method, output error, and artifact hashes. Keep candidate correctness separate from performance ranking. Tiny kernels may measure Python/FFI overhead rather than useful hardware throughput.
 
-| Compiler | Graph IR | Tensor IR / scheduling | Auto-tuning | Strength | Where TVM differs |
-|---|---|---|---|---|---|
-| **Apache TVM** | Relax (Unity); Relay (legacy) | TensorIR (TIR) + schedules | MetaSchedule / Ansor / AutoTVM | Breadth of targets, open accelerator path (BYOC, VTA), edge → web → LLM | The reference point for this table |
-| **XLA** (JAX/TF) | HLO | implicit (fusion + libnvjit) | none (heuristics) | TPU, whole-program fusion | TVM exposes the schedule; XLA hides it |
-| **TensorRT** | builder graph | closed kernels | builder tactics | NVIDIA peak perf | Closed, single-vendor; TVM is open + multi-target |
-| **torch.compile / Inductor** | FX graph | Triton + C++ | autotune (Triton configs) | PyTorch-native, fast iteration | TVM ships standalone artifacts to non-Python, non-GPU targets |
-| **IREE / MLIR** | linalg-on-tensors | nested MLIR dialects | limited | mobile/edge, MLIR ecosystem | Overlapping goals; TVM's tuning + LLM path (MLC) are more mature |
+TVM is one compiler family among several. XLA has GPU autotuning and [persisted tuning caches](https://openxla.org/xla/persisted_autotuning); describing it as “no autotuning” is incorrect. PyTorch can compile graphs, and TensorRT, IREE, and MLC have their own supported workloads and deployment boundaries. Compare concrete versions and tasks rather than assigning a universal maturity ranking.
 
-The 2026-relevant reason to learn it specifically: **MLC-LLM** — the project that runs Llama / Qwen / Phi-class models on Metal, Vulkan, WebGPU, ROCm, and phones — is *built on TVM Unity*. The same Relax + TIR + dlight stack you learn in Lectures 4–5 is what compiles those models. TVM is the bridge between "I understand transformer execution" and "I can ship that transformer to a device nobody wrote a kernel for."
-
----
-
-## Course Map (5 lectures)
-
-The arc is the compiler itself, top to bottom and back up: read the stack → schedule a kernel → let the machine schedule it → optimize the graph and reach external codegen → ship the artifact.
-
-<div class="lecture-map" markdown>
-
-| # | Lecture | What you build / measure |
-|---|---------|--------------------------|
-| [01](Lecture-01.md) | **The TVM stack and the compilation flow** — Relax, TensorIR, and the unified `IRModule` | Import a model, print every IR level, build and run; map the import → optimize → lower → codegen → runtime pipeline |
-| [02](Lecture-02.md) | **TensorIR and the schedule space** — turning a compute definition into a hardware-mapped kernel | Schedule a matmul for CPU (tile + vectorize) and GPU (block/thread bind + shared-memory cache); `tensorize` to a Tensor Core intrinsic; GFLOP/s before/after |
-| [03](Lecture-03.md) | **Auto-tuning** — AutoTVM → Ansor → MetaSchedule, the learning-based compiler | `ms.tune_tir` a kernel and `ms.tune_relax` a model; read the tuning curve; tune a remote edge board over an RPC tracker |
-| [04](Lecture-04.md) | **Relax in depth** — dynamic shapes, operator fusion, and Bring Your Own Codegen (BYOC) | Symbolic-shape a model; fuse with `FuseOps`/`FuseTIR`; offload a subgraph to CUTLASS/TensorRT and measure fused-vs-unfused and offloaded-vs-native |
-| [05](Lecture-05.md) | **Shipping it** — runtime, microTVM, and LLMs with MLC-LLM | Package a module (GraphExecutor / Relax VM / AOT); deploy a tiny model to a bare-metal MCU with microTVM; compile + run an LLM with MLC-LLM across backends |
-
-</div>
-
----
-
-## Course Outcomes
-
-By the end you should be able to:
-
-* Read a TVM `IRModule` at every level — Relax graph, TIR `PrimFunc`, generated CUDA/LLVM — and explain what each pass changed and why.
-* Hand-schedule a kernel from a compute definition to a hardware-mapped implementation, and explain every primitive (`split`, `bind`, `cache_read`, `compute_at`, `tensorize`) in roofline terms.
-* Run MetaSchedule on a kernel and a whole model, distribute the measurement to real devices over RPC, and read the cost-model-vs-hardware tradeoff in the tuning curve.
-* Optimize a Relax graph (fusion, layout, memory planning, dynamic shape) and offload a subgraph to an external codegen path via BYOC — the exact skill of bringing up a new accelerator backend.
-* Ship a compiled artifact to a non-Python target: a server `.so`, an MCU C library, or an LLM across CUDA/Metal/Vulkan/WebGPU via MLC-LLM — and defend the numbers.
-
----
-
-## Exit Criteria
-
-You are done with this course when you can:
-
-* Take a model the framework already runs, compile it with TVM, **tune it, and beat the framework baseline** on at least one target — and show the roofline gap you closed.
-* Look at a profiler trace of your tuned kernel and say whether the remaining gap is compute-bound, memory-bound, or launch-bound, and which schedule primitive would move it.
-* Explain to an accelerator team **what a BYOC backend would have to implement** to offload their op set, and roughly how much of the graph it would capture.
-* Walk another engineer through your compiled-model repo and have them reproduce your tuned numbers on the same hardware class within ±10%.
-
-If you can only make TVM *run* a model, you have a transpiler. The point of this course is to make it *optimize* one — and to know, by the number, that it did.
-
----
-
-*Related: [MLSys Deep Dives](../MLSys%20Deep%20Dives/README.md) · [AI Inference Engineer 2026](../AI%20Inference%20Engineer%202026/README.md) · [Phase 4 — Track C — ML Compiler and Graph Optimization](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md)*
-
-**Study method:** use the [shared lesson cycle and completion rubric](../../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
-
-
-## Carry this course into the physical-AI system
-
-**Start from:** A minimal model subgraph with golden outputs and tensor contracts.
-
-**Build and challenge:** Lower to a pinned compiler/runtime target, preserve shape/layout semantics, and test odd sizes. Inspect generated code and buffer lifetimes before claiming fusion or reuse.
-
-**Pass forward:** A compiler/runtime ABI, generated kernel, and golden vectors for the chip-design capstone. Continue with [AI chip design](../../Track%20F%20-%20AI%20Chip%20Design/Guide.md) and keep the artifact in the [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md).
+Finish by explaining one transformation, one caught failure, and one measured limitation. Then continue to [AI chip design](../../Track%20F%20-%20AI%20Chip%20Design/Guide.md) or [inference engineering](../AI%20Inference%20Engineer%202026/README.md) with those contracts intact.

@@ -1,5 +1,7 @@
 # Lecture 2 — Build, load, and board policy on Jetson
 
+**Source boundary — reviewed October 18, 2026:** this is the historical NG fork at `ce36dec9294988e598f04e84c9d28092ca9e9786`. Board observations are attributed to that fork, not rerun here. Complete the [source-reading lab](../Source-Reading-Lab.md); it explains the current migration path and defects in these abbreviated source excerpts. Snippets containing `...` are reading excerpts, not standalone compilable programs.
+
 **Course:** [Jetson ESP-Hosted Host Code guide](../Guide.md) · **Phase 2 — Embedded Linux**
 
 **Previous:** [Lecture 01](Lecture-01.md) · **Next:** [Lecture 03 — SPI transport and IRQs](Lecture-03.md)
@@ -104,7 +106,7 @@ That distinction matters in real bring-up. You wire by **header pin**, but you d
 
 ## 3. Why `resetpin=-1` is a serious engineering choice
 
-The validated Jetson flow intentionally used:
+The reported legacy Jetson flow intentionally used:
 
 - `resetpin=-1`
 

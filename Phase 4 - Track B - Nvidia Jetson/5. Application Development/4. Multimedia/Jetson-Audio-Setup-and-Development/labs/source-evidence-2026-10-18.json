@@ -1,0 +1,153 @@
+{
+  "reviewed_utc": "2026-10-18T22:06:58.694123+00:00",
+  "method": "Actual HTTPS GET of cited upstream documentation/source, maximum 5MB per response. Hashes describe downloaded bytes, not hardware execution. Mutable web pages may change.",
+  "sources": [
+    {
+      "url": "https://docs.espressif.com/projects/esp-adf/en/latest/multimedia-boards/dev-boards/board-esp32-lyrat-v4.3.html",
+      "final_url": "https://docs.espressif.com/projects/esp-adf/en/latest/multimedia-boards/dev-boards/board-esp32-lyrat-v4.3.html",
+      "status": 200,
+      "bytes": 43976,
+      "sha256": "86878094037cad0ea0aa6d7a2ee517cc4e5dcc2b9acf39fa1c0b08ad2dd52462"
+    },
+    {
+      "url": "https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32/api-reference/peripherals/i2s.html",
+      "final_url": "https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32/api-reference/peripherals/i2s.html",
+      "status": 200,
+      "bytes": 400742,
+      "sha256": "1c573a51cdd823a6c03eb0698675571cdfc4054274e27c2e120a7762650004b7"
+    },
+    {
+      "url": "https://docs.kernel.org/sound/designs/timestamping.html",
+      "final_url": "https://docs.kernel.org/sound/designs/timestamping.html",
+      "status": 200,
+      "bytes": 22049,
+      "sha256": "bb2fd3a92b80b08eee214c482295ef21ab21aec034394984893176c33d9bede1"
+    },
+    {
+      "url": "https://docs.kernel.org/sound/soc/clocking.html",
+      "final_url": "https://docs.kernel.org/sound/soc/clocking.html",
+      "status": 200,
+      "bytes": 19582,
+      "sha256": "368659c70870ceb8b305b9f1164d27ad373ea17a313943c6799f4b71b0628f41"
+    },
+    {
+      "url": "https://docs.kernel.org/sound/soc/dapm.html",
+      "final_url": "https://docs.kernel.org/sound/soc/dapm.html",
+      "status": 200,
+      "bytes": 29415,
+      "sha256": "3333f846b2e576ab3ec9ca2e6292efafa45bae7868618f03abf9c8ad50f7ce55"
+    },
+    {
+      "url": "https://docs.kernel.org/sound/soc/overview.html",
+      "final_url": "https://docs.kernel.org/sound/soc/overview.html",
+      "status": 200,
+      "bytes": 12781,
+      "sha256": "45f8baf779880989abe70d2663e4cb1e3cabc172bdc8a01c879ed1a8d3eeb250"
+    },
+    {
+      "url": "https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/SD/CameraDevelopment/ArgusFramework/CameraSoftwareDevelopmentSolution.html",
+      "final_url": "https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/SD/CameraDevelopment/ArgusFramework/CameraSoftwareDevelopmentSolution.html",
+      "status": 200,
+      "bytes": 63582,
+      "sha256": "bab6bf3bc381902c8b53efe2397b004078190f864690e604afe4697fd12dcf40"
+    },
+    {
+      "url": "https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/SD/Communications/AudioSetupAndDevelopment.html",
+      "final_url": "https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/SD/Communications/AudioSetupAndDevelopment.html",
+      "status": 200,
+      "bytes": 290700,
+      "sha256": "0287f83cb01073a49bb75eb893367d6b0c428a06679a85a17f1a34b0ab094f25"
+    },
+    {
+      "url": "https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/SD/Multimedia/AcceleratedGstreamer.html",
+      "final_url": "https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/SD/Multimedia/AcceleratedGstreamer.html",
+      "status": 200,
+      "bytes": 308920,
+      "sha256": "a2703d0592b5d5e05ba873f5f9f166cdf5fdf0bdaa53c70a5d219da5a7409b91"
+    },
+    {
+      "url": "https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/SD/Multimedia/SoftwareEncodeInOrinNano.html",
+      "final_url": "https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/SD/Multimedia/SoftwareEncodeInOrinNano.html",
+      "status": 200,
+      "bytes": 72109,
+      "sha256": "7b4bdc8218c5119bac8f1501718f663b3ce904d27599e250fe6984baa4a13bee"
+    },
+    {
+      "url": "https://docs.nvidia.com/jetson/orin-nano-devkit/user-guide/latest/hardware_layout.html",
+      "final_url": "https://docs.nvidia.com/jetson/orin-nano-devkit/user-guide/latest/hardware_layout.html",
+      "status": 200,
+      "bytes": 28283,
+      "sha256": "9ed02ce46718ec94e7d6ab63032ce6a1eaaa96b1e990f157585d888462c6d420"
+    },
+    {
+      "url": "https://docs.pipewire.org/page_man_pipewire_conf_5.html",
+      "final_url": "https://docs.pipewire.org/page_man_pipewire_conf_5.html",
+      "status": 200,
+      "bytes": 39240,
+      "sha256": "4680aa3e771c6162c9268b3acb8bbca66faff85dde1063a51f2279e266f76a45"
+    },
+    {
+      "url": "https://docs.python.org/3/library/wave.html",
+      "final_url": "https://docs.python.org/3/library/wave.html",
+      "status": 200,
+      "bytes": 48619,
+      "sha256": "49b7a94c4df7de8f51a5018e261b0845936051a67d5c98d32661689b46556616"
+    },
+    {
+      "url": "https://github.com/espressif/esp-adf/issues/1607",
+      "final_url": "https://github.com/espressif/esp-adf/issues/1607",
+      "status": 200,
+      "bytes": 276201,
+      "sha256": "b2afb91803212e73b0632c75931741fb5d93884a57ca3344878fc80fc4e1c155"
+    },
+    {
+      "url": "https://gstreamer.freedesktop.org/documentation/coreelements/queue.html",
+      "final_url": "https://gstreamer.freedesktop.org/documentation/coreelements/queue.html",
+      "status": 200,
+      "bytes": 32309,
+      "sha256": "12ebb333b60b047721cdcf4a9fef05718f9cf2a13ad2d8f40ba7a9e69ef8687a"
+    },
+    {
+      "url": "https://gstreamer.freedesktop.org/documentation/x264/index.html",
+      "final_url": "https://gstreamer.freedesktop.org/documentation/x264/index.html",
+      "status": 200,
+      "bytes": 51016,
+      "sha256": "ee9ea9a3e2a8ca5fdd3af1b91171e4e3b4930fa80a461fff7d18295453ff424b"
+    },
+    {
+      "url": "https://numpy.org/doc/stable/reference/generated/numpy.sinc.html",
+      "final_url": "https://numpy.org/doc/stable/reference/generated/numpy.sinc.html",
+      "status": 200,
+      "bytes": 47380,
+      "sha256": "0d3f3a5b1556a7ce7a42799a62b5004e3d9bfd0f5da5c64ef1b14a12a71f2b1c"
+    },
+    {
+      "url": "https://pipewire.pages.freedesktop.org/wireplumber/daemon/configuration/bluetooth.html",
+      "final_url": "https://pipewire.pages.freedesktop.org/wireplumber/daemon/configuration/bluetooth.html",
+      "status": 200,
+      "bytes": 42175,
+      "sha256": "18727a1c89848dac636393df7a815409470d79386b8df83af502afd32b6af2bf"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/espressif/esp-adf/d6e1ef5ccf29ca52dcb8332a3232505366755012/components/audio_board/lyrat_v4_3/board_pins_config.c",
+      "final_url": "https://raw.githubusercontent.com/espressif/esp-adf/d6e1ef5ccf29ca52dcb8332a3232505366755012/components/audio_board/lyrat_v4_3/board_pins_config.c",
+      "status": 200,
+      "bytes": 3928,
+      "sha256": "77566b8b48e4942916d2073c3044fda7f12018995b4163f631dd77ce33eb3ab1"
+    },
+    {
+      "url": "https://www.alsa-project.org/alsa-doc/alsa-lib/pcm.html",
+      "final_url": "https://www.alsa-project.org/alsa-doc/alsa-lib/pcm.html",
+      "status": 200,
+      "bytes": 48591,
+      "sha256": "208ce6548cb5e5e8fc14c5e9a06ce9b637d01386088042f62ccc25c340ab9a17"
+    }
+  ],
+  "lyrat_board_source": {
+    "repo": "espressif/esp-adf",
+    "revision": "d6e1ef5ccf29ca52dcb8332a3232505366755012",
+    "date": "2026-08-31T11:36:02Z",
+    "path": "components/audio_board/lyrat_v4_3/board_pins_config.c",
+    "url": "https://raw.githubusercontent.com/espressif/esp-adf/d6e1ef5ccf29ca52dcb8332a3232505366755012/components/audio_board/lyrat_v4_3/board_pins_config.c"
+  }
+}

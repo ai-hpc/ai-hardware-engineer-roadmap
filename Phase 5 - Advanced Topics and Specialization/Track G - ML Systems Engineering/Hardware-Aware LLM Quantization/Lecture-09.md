@@ -1,255 +1,114 @@
-# Module 09 — KV Cache & Long Context
+# Module 09 — KV Cache and Hybrid State: Find the Correct Crossover
 
-**Collection:** [Hardware-Aware LLM Quantization](README.md) | **Previous:** [← Module 08](Lecture-08.md) | **Next:** [Module 10 →](Lecture-10.md)
+**Collection:** [Hardware-Aware LLM Quantization](README.md) | **Previous:** [Previous lesson](Lecture-08.md) | **Next:** [Next lesson](Lecture-10.md)
 
----
+A long prompt can exhaust memory even when weights fit. Calculate the state for
+the actual architecture and distinguish capacity from traffic. The worked case
+here uses the immutable metadata in [Source Evidence](Source-Evidence.md).
 
-Every ledger so far has treated the KV cache as a footnote. At 4 K context it is one. At 262 K it is **co-dominant with the entire model's weights**, and the correct optimization strategy inverts.
+## 1. The ordinary full-attention formula
 
-This module computes the inversion point exactly, and shows that a 262 K context target on a 32 GB card is not a quantization problem you can solve by compressing weights harder — it is an architecture-and-KV-format problem with a hard feasibility boundary.
-
----
-
-## Learning objectives
-
-By the end of this module you should be able to:
-
-1. Compute KV cache bytes per token from a model's GQA geometry.
-2. Compute the **crossover context length** where KV traffic equals weight traffic.
-3. Predict tok/s as a function of context length.
-4. Determine whether a given (model, context, VRAM) triple is **feasible at all**, before running anything.
-5. Explain why KV quantization is a different problem from weight quantization — online, per-head, and latency-critical.
-
----
-
-## 1. KV cache arithmetic
-
-The cache stores one K and one V vector per **KV head** (not per query head — that is what GQA buys), per layer, per token:
+For batch B, cached length L, N full-attention layers, H_kv key/value heads, head
+dimension D, and C bytes per stored element:
 
 ```text
-   KV_bytes_per_token  =  2  ×  n_layers  ×  n_kv_heads  ×  head_dim  ×  bytes_per_element
-                          │                  │
-                     K and V          GQA groups, NOT query heads
+KV_payload = 2 × B × L × N × H_kv × D × C
+              ^ keys and values
 ```
 
-For the case-study geometry (48 layers, `head_dim` 128 — with `n_kv_heads` shown both ways since the published inventory does not pin it):
+Use KV heads, not query heads, for GQA. Use allocated length/page count for capacity,
+valid attended length for the first traffic estimate. Sliding-window, compressed,
+shared-prefix and latent-attention implementations need their own formulas.
+Quantized cache adds scale/zero-point metadata, page padding and sometimes
+higher-precision residual windows.
 
-| `n_kv` | Elements/token | BF16 | FP8 | NVFP4 |
-|---:|---:|---:|---:|---:|
-| 8 | 98,304 | **192 KiB** | 96 KiB | 54 KiB |
-| 4 | 49,152 | 96 KiB | **48 KiB** | 27 KiB |
+**Worked conventional example:** 32 full-attention layers, 8 KV heads, head dimension
+128, BF16, one sequence of 16,384 tokens needs **2 GiB** of K/V payload. Forgetting
+V gives 1 GiB and underestimates memory by a factor of two.
 
-Two things follow immediately, and both are structural:
+## 2. Apply it to the pinned hybrid target
 
-* **KV cost is linear in `n_kv_heads`.** Halving KV heads halves both capacity and traffic — a bigger lever than any KV quantization format. This is why GQA (and MLA) exist, and why architecture choices dominate format choices here.
-* **KV cost is independent of `d_model` and `d_ff`.** A wider MLP costs weights, not cache. Weight optimization and KV optimization are **decoupled problems**.
-
----
-
-## 2. The crossover: when KV traffic overtakes the weights
-
-At every decode step, attention reads the **entire** cache for all previous tokens. So KV traffic grows linearly with context while weight traffic stays flat:
+The case has **16 full-attention layers**, **4 KV heads**, **head dimension 256**.
+Its other **48 linear-attention layers** maintain recurrent/convolution state,
+not a full K/V history in the normal recurrent decode path.
 
 ```text
-   B_token(L)  =  W  +  L × KV_bytes_per_token
-                  │      └──────────────────┘
-             15.88 GB      grows with context
+BF16 KV bytes per cached token = 2 × 16 × 4 × 256 × 2 = 65,536 bytes
+FP8  KV bytes per cached token = 2 × 16 × 4 × 256 × 1 = 32,768 bytes
 ```
 
-Setting the two terms equal gives the crossover:
+| Valid length, B=1 | BF16 K/V payload | FP8 payload, before metadata |
+|---:|---:|---:|
+| 4,096 | 256 MiB | 128 MiB |
+| 32,768 | 2 GiB | 1 GiB |
+| 131,072 | 8 GiB | 4 GiB |
+| 262,144 | 16 GiB | 8 GiB |
+
+This is an architectural calculation, **not a successful 262K runtime test**.
+Using all 64 layers in this formula overcounts full-attention KV fourfold.
+The five-layer external drafter has its own KV and must be counted separately.
+
+## 3. Recurrent state is not zero state
+
+A first state estimate for a gated delta recurrence may include a matrix per
+value head, e.g. `[value_heads, key_dim, value_dim]`, plus a short convolution
+history. Use the runtime's actual state layout, dtype, checkpoints and slot count.
+Do not substitute hidden_size² or assume BF16 when the config requests FP32 state.
+
+For the pinned target, an **illustrative one-slot matrix payload** is:
 
 ```text
-   L_crossover  =  W / KV_bytes_per_token
+48 layers × 48 value heads × 128 × 128 × 4 bytes = 150,994,944 bytes = 144 MiB
 ```
 
-| `n_kv` | KV format | KV/token | **Crossover** |
-|---:|---|---:|---:|
-| 8 | BF16 | 192 KiB | **80,770 tokens** |
-| 8 | FP8 | 96 KiB | 161,540 |
-| 8 | NVFP4 | 54 KiB | 287,182 |
-| 4 | BF16 | 96 KiB | 161,540 |
-| 4 | FP8 | 48 KiB | 323,079 |
-| 4 | NVFP4 | 27 KiB | 574,363 |
+This counts only those matrices. Speculative rollback may retain extra state
+slots/snapshots; prefill may use temporary state histories. The draft model and
+verification tree add their own allocations. Runtime peak memory can be much
+larger than persistent state. Measure it rather than calling recurrence “free.”
+
+## 4. Derive a crossover with declared assumptions
+
+Suppose the target's actual streamed weight traffic is W bytes per decode step.
+Ignoring cache reuse and other traffic, full-attention K/V read traffic approaches
+W near:
 
 ```text
-   traffic
-     ▲
-     │                                          ╱ KV (grows with L)
-     │                                       ╱
-     │                                    ╱
-  W ─┼─────────────────────────────────╳──────────────  weights (flat)
-     │                              ╱   │
-     │                           ╱      └── crossover
-     │                        ╱
-     └──────────────────────────────────────────────▶  context length L
-
-   L < crossover  :  a WEIGHT-dominated problem  →  Modules 04–07 apply
-   L > crossover  :  a KV-dominated problem      →  weight quantization stops helping
+L_star = W / (2 × B × N_full × H_kv × D × C)
 ```
 
-> **With BF16 KV and 8 KV heads, the crossover is ~81 K tokens.** Past that point, further weight quantization is attacking the smaller of the two terms. If you serve at 262 K, you have been on the wrong side of this line for most of your context window.
+Using **illustrative W=15.88 decimal GB** gives about **242,310 tokens in BF16**,
+or **484,619 tokens in FP8** for this architecture. These are sensitivity estimates,
+not measured throughput breakpoints. A different current weight ledger changes W;
+state, compute, KV layout and bandwidth utilization can move the practical crossover.
 
----
+The hypothetical 262K BF16 state plus the current target's 17.916 GB serialized
+payload already sums to about **35.10 GB**, before runtime workspace and recurrent
+state. That cannot fit in a 32 GB budget under those residency assumptions. FP8
+reduces K/V payload but is feasible only if the engine supports the exact model,
+cache scale scheme and rollback semantics. “Max positions=262144” is a model
+configuration limit, not a device-memory guarantee.
 
-## 3. Throughput versus context
+## 5. Test cache quantization separately
 
-Predicted decode throughput at the measured `BW_eff = 1296 GB/s`, with 4 KV heads and FP8 KV:
+Freeze weights and request sequence first. Compare cache formats on short/long
+retrieval and task tests, reporting scale granularity, per-head/per-token/block
+axes, residual windows and memory. K error changes scores; V error changes the
+weighted values. Quantizing them identically is a choice to evaluate.
 
-| Context | KV traffic | `B_token` | **tok/s** | vs short context |
-|---:|---:|---:|---:|---:|
-| 0 | 0.00 GB | 15.88 GB | **81.6** | — |
-| 4 K | 0.20 GB | 16.08 GB | 80.6 | −1 % |
-| 32 K | 1.61 GB | 17.49 GB | 74.1 | −9 % |
-| 128 K | 6.44 GB | 22.32 GB | 58.1 | −29 % |
-| **262 K** | **12.88 GB** | **28.76 GB** | **45.1** | **−45 %** |
+Then combine a successful cache policy with weight quantization and retest. Their
+errors interact. Prefix reuse, new request reset, speculative reject/rollback and
+page-tail handling deserve negative tests as much as average numerical error.
 
-**Decode throughput nearly halves across the context window** — even with FP8 KV and only 4 KV heads, which is already an aggressive configuration.
+## Practice, answers and deliverable
 
-This has a direct consequence for benchmarking honesty: **a tok/s number without a context length is meaningless.** A benchmark run at 4 K and deployed at 262 K overstates real throughput by ~80 %. [Module 12](Lecture-12.md) treats context as a mandatory reported variable for exactly this reason.
+Use the offline lab's `kv_payload_bytes` and the pinned config summary. Double
+batch: K/V payload doubles. Halve cache width: payload halves before metadata.
+Double **query** heads while keeping KV heads fixed: this formula is unchanged,
+although attention compute and model compatibility are affected.
 
----
+**Independent transfer:** a model has 40 layers but every fifth layer is full
+attention. At H_kv=8,D=128,L=32768,B=2,BF16, calculate K/V. **Answer: 2 GiB**,
+using 8 full-attention layers. Explain which additional runtime allocations remain.
 
-## 4. Feasibility: does 262 K fit at all?
-
-Capacity, not traffic, is the harder constraint. The budget:
-
-```text
-   32 GB card                    =  29.80 GiB
-   − weights                      −  18.80 GiB
-   − workspace / activations      −   1.00 GiB  (approx.)
-   ────────────────────────────────────────────
-   available for KV               ≈  10.00 GiB
-```
-
-Now the 262 144-token cache under each configuration:
-
-| `n_kv` | Format | 262 K cache | Fits in 10 GiB? |
-|---:|---|---:|:---:|
-| 8 | BF16 | 48.00 GiB | ✗ (4.8× over) |
-| 8 | FP8 | 24.00 GiB | ✗ (2.4× over) |
-| 8 | NVFP4 | 13.50 GiB | ✗ (1.35× over) |
-| 4 | BF16 | 24.00 GiB | ✗ |
-| 4 | FP8 | 12.00 GiB | ✗ (marginal) |
-| **4** | **NVFP4** | **6.75 GiB** | **✓** |
-
-```text
-   262 K context on a 32 GB card with 18.8 GiB of weights requires
-   BOTH  4 KV heads  AND  4-bit KV.  Every other combination overflows.
-```
-
-And notice what does **not** help: quantizing the vision tower (−0.86 GiB) or the embeddings (−1.18 GiB) buys VRAM but not nearly enough to rescue an 8-KV-head BF16 configuration, which is 38 GiB over budget.
-
-**This is where the "capacity optimization ≠ bandwidth optimization" distinction from [Module 01](Lecture-01.md) finally pays off in the other direction.** Evicting the vision tower and quantizing embeddings gained you *zero* tok/s — but at 262 K they are 2.04 GiB of headroom, and headroom is exactly what is scarce. **The same change is worthless for one objective and valuable for the other.** That is the whole reason the framework scores four factors instead of one.
-
-Practical order of operations at long context:
-
-```text
-   1. reduce n_kv_heads          ← architecture; biggest lever, but requires the model to have it
-   2. quantize KV to FP8/FP4     ← format; 2–3.6× capacity AND traffic
-   3. evict Class B/C tensors    ← vision tower, unused adapters: pure capacity
-   4. quantize embeddings        ← pure capacity
-   5. quantize weights harder    ← LAST; you are attacking the smaller term
-```
-
-Note that the list is **exactly inverted** from the short-context priority order in [Module 01 §8](Lecture-01.md).
-
----
-
-## 5. KV quantization is a different engineering problem
-
-Weight quantization is offline, one-shot, and you can spend an hour per tensor. KV quantization is none of those things:
-
-```text
-   WEIGHTS                          KV CACHE
-   ──────────────────────────       ───────────────────────────────────
-   quantized once, offline          quantized ONLINE, every token
-   full calibration available       no future data — must be causal
-   error is static                  error accumulates over the context
-   cost amortized to zero           cost is IN the decode critical path
-```
-
-Four consequences that shape any workable design:
-
-**1. Scaling must be per-head and per-token.** These are the legal axes from [Module 06 §4](Lecture-06.md) — a per-token scale on the K vector factors out of the attention logit, so it is free. A per-channel scale across `head_dim` does not.
-
-**2. The quantizer must be cheap.** It runs on the decode critical path. An MSE grid search ([Module 05](Lecture-05.md)) is out of the question; absmax or a running percentile is what you can afford.
-
-**3. Errors persist.** A weight error is the same on every token. A KV error is written once and then **re-read for every subsequent token in the sequence** — an early-token quantization error influences all 262 K downstream steps. This argues for keeping the first few tokens' KV in higher precision.
-
-**4. Which connects directly to attention sinks.** [Module 06 §3](Lecture-06.md) showed the first token carries massive activations and absorbs surplus attention mass. It is also the entry that gets re-read most often. Both arguments point the same way:
-
-```text
-   keep the first N tokens' KV in BF16/FP8  (N ≈ 4–128, cheap: 128 tokens × 48 KiB = 6 MB)
-   quantize the rest to FP4
-
-   → protects the sink mechanism
-   → protects the most-re-read entries
-   → costs ~0.06 % of the cache
-```
-
-This "sink-preserving KV quantization" pattern is common in current long-context systems, and both halves of its justification are things you derived in earlier modules.
-
----
-
-## 6. The long-context ledger
-
-Extend [Module 04's](Lecture-04.md) ledger with the context term:
-
-```python
-def ledger_at_context(B_token_weights_GB, n_layers, n_kv, head_dim,
-                      kv_bytes_per_elem, context_len,
-                      vram_GB=32.0, weights_GiB=18.80, workspace_GiB=1.0,
-                      bw_eff_GBs=1296):
-    GiB = 1024**3
-    kv_per_token = 2 * n_layers * n_kv * head_dim * kv_bytes_per_elem   # bytes
-    kv_traffic   = context_len * kv_per_token / 1e9                     # GB per decode step
-    kv_capacity  = context_len * kv_per_token / GiB                     # GiB resident
-
-    b_token   = B_token_weights_GB + kv_traffic
-    available = vram_GB * 1e9 / GiB - weights_GiB - workspace_GiB
-
-    return {
-        "kv_per_token_KiB": kv_per_token / 1024,
-        "crossover_tokens": B_token_weights_GB * 1e9 / kv_per_token,
-        "B_token_GB":       b_token,
-        "predicted_tps":    bw_eff_GBs / b_token,
-        "kv_capacity_GiB":  kv_capacity,
-        "fits":             kv_capacity <= available,
-        "headroom_GiB":     available - kv_capacity,
-    }
-```
-
-Run it across your full context range **before** choosing a KV format. It answers the feasibility question in microseconds, and infeasible configurations are extremely common at 100 K+ on consumer cards.
-
----
-
-## Checkpoint
-
-You should now be able to:
-
-1. Compute KV bytes/token from GQA geometry and explain why `d_model` does not appear.
-2. Compute the crossover context length and interpret which side of it you are on.
-3. Predict the tok/s decay curve across a context range.
-4. Determine feasibility of a (model, context, VRAM) triple before running anything.
-5. Give both reasons for keeping sink-token KV in higher precision.
-6. Explain why the long-context optimization order is the inverse of the short-context one.
-
----
-
-## Ship it
-
-Produce a **context sweep** for your deployment: KV bytes/token for your geometry in each format; the crossover length for each; a tok/s-vs-context table from 0 to your maximum; a feasibility table with headroom; and a written statement of which side of the crossover your **p50 and p99 serving context lengths** fall on.
-
-If p99 is past the crossover, your next optimization is KV, not weights — regardless of what the rest of this course made you want to do.
-
----
-
-## Current as of
-
-* **Timeless:** KV arithmetic, the crossover derivation, the capacity/traffic distinction, per-token scaling legality, the sink-preservation argument.
-* **Case-study pins:** `W = 15.88 GB`, `BW_eff = 1296 GB/s`, 48 layers / `head_dim` 128, 32 GB VRAM. `n_kv_heads` is **not** pinned by the published inventory — both 8 and 4 are tabulated; substitute your model's actual value.
-* **Refresh surface:** runtime support for FP4 KV cache is less mature than for FP8. Verify what your serving stack actually implements before planning around 4-bit KV; an unsupported format is an infeasible plan, not an aggressive one.
-
----
-
-**Next:** [Module 10 — Speculative Decoding →](Lecture-10.md)
+Submit a capacity table and a traffic table with different headings; include an
+explicit feasibility check before proposing a maximum-context hardware run.

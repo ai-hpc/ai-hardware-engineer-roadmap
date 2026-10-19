@@ -1,6 +1,6 @@
 # L40S x12 — Inference Deep Dive
 
-The NVIDIA L40S is a PCIe-based GPU designed for AI inference, graphics, and enterprise workloads. Unlike H100/H200 SXM, it uses GDDR6 memory and connects via PCIe — making it more cost-effective for inference-heavy deployments where the extreme bandwidth of HBM is not the bottleneck.
+The NVIDIA L40S is a PCIe-based GPU designed for AI inference, graphics, and enterprise workloads. Unlike H100/H200 SXM, it uses GDDR6 memory and connects via PCIe ; compare quality-qualified throughput, latency and complete-system cost for the intended workload.
 
 ## System Snapshot
 
@@ -11,8 +11,8 @@ The NVIDIA L40S is a PCIe-based GPU designed for AI inference, graphics, and ent
 | Memory per GPU | 48 GB GDDR6 |
 | Total GPU Memory | 576 GB |
 | Memory Bandwidth | 864 GB/s per GPU |
-| FP8 Tensor Core TFLOPS | ~733 TFLOPS per GPU |
-| BF16 / FP16 TFLOPS | ~366 dense; ~733 with supported structured sparsity |
+| FP8 Tensor Core TFLOPS | 733 dense / 1,466 structured-sparse per GPU |
+| BF16 / FP16 TFLOPS | approximately 362–366 dense; 733 structured-sparse (see source discrepancy in Chapter 1) |
 | TF32 TFLOPS | ~183 TFLOPS per GPU |
 | GPU Interconnect | PCIe 4.0 x16 (no NVLink) |
 | Form Factor | PCIe full-height, dual-slot |
@@ -26,11 +26,11 @@ The NVIDIA L40S is a PCIe-based GPU designed for AI inference, graphics, and ent
 | Memory bandwidth | 10.4 TB/s total | 38.4 TB/s total |
 | GPU interconnect | PCIe (no NVLink) | NVLink 4.0 900 GB/s |
 | Cost | Obtain a dated quote for the complete system | Obtain a comparable dated quote |
-| Best for | Cost-efficient inference | Training + large model inference |
+| Candidate workload | Independent models/graphics/inference that fit | Larger working sets and communication-intensive layouts |
 | GPU-only maximum power sum | ~4,200 W (12 GPUs) | ~5,600 W (8 GPUs) |
 | Model capacity | Depends on precision, metadata, KV, workspace, and sharding | Same accounting; larger aggregate HBM |
 
-**Choose L40S when:** inference throughput matters more than model size, cost is constrained, or you're running multiple smaller models simultaneously.
+**Evaluate L40S when** the model working sets and service requirements fit its memory/communication limits. Make the final choice from measured goodput and dated complete-system costs.
 
 ## Topic Index
 
@@ -40,7 +40,7 @@ The NVIDIA L40S is a PCIe-based GPU designed for AI inference, graphics, and ent
 | 02 | [Inference Optimization](./02-Inference-Optimization.md) | vLLM, TRT-LLM, quantization, batching strategies |
 | 03 | [Multi-GPU Strategy](./03-Multi-GPU-Strategy.md) | PCIe-constrained parallelism, pipeline vs tensor parallel |
 | 04 | [Deployment Guide](./04-Deployment-Guide.md) | Multi-instance deployment, model sharding, production setup |
-| 05 | [Benchmarks](./05-Benchmarks.md) | Throughput targets, latency baselines, cost/perf comparison |
+| 05 | [Benchmarks](./05-Benchmarks.md) | Feasible configurations, measured goodput, quality and cost accounting |
 
 ## Quick Navigation
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Single-robot ROS 2 is already a distributed system. **Multi-robot** systems add **coordination**: who does which task, which map is ground truth, and how robots avoid **interference** without a single point of failure. **Swarm** robotics pushes toward **many** cheap units with **local rules**; **HRI** layers add **humans** as peers in the loop.
+Single-robot ROS 2 is already a distributed system. **Multi-robot** systems add **coordination**: who does which task, how maps are aligned, how robots avoid interference, and how one component's failure affects the fleet. **Swarm** robotics pushes toward **many** units with **local rules**; **HRI** layers add **humans** as peers in the loop.
 
 **By the end of this lecture you should be able to:**
 
@@ -13,6 +13,12 @@ Single-robot ROS 2 is already a distributed system. **Multi-robot** systems add 
 * List **HRI** patterns: command, clarification, shared autonomy, and **safety-rated** speed reduction.
 
 **Prerequisite:** Comfortable with Nav2, TF2, and ROS 2 graphs from [Lecture 1 — Advanced Robot Operating System](../Advanced%20Robot%20Operating%20System/Lecture-01.md).
+
+**Worked practice:** [allocation, reservations, and consensus lab](Coordination-Lab.md).
+Find the optimal assignment for two robots, expose a head-on edge conflict,
+reserve space over time, and construct a case where priority planning fails
+despite an existing joint solution. The exercises run with Python's standard
+library and include the assumptions needed to interpret their results.
 
 ---
 
@@ -64,12 +70,17 @@ Classic **flocking** combines three forces:
 
 Add **obstacle avoidance** and you have a baseline for **many** agents. Parameters (weights, neighborhood radius) determine whether the swarm **clusters**, **disperses**, or **oscillates**.
 
+These steering rules are heuristics; a separation term does not prove collision
+avoidance under finite timesteps, limited actuation, or delayed observations.
+Check the [swept motion](../Robot%20Dynamics%20and%20Task%20Execution/Lecture-03-Trajectory-Execution.md),
+including motion between recorded positions and the other robot's footprint.
+
 ### 2.2 Decentralized vs centralized
 
 | Style | Pros | Cons |
 |-------|------|------|
 | **Centralized** | Global optimum easier | Single point of failure, comms bottleneck |
-| **Decentralized** | Robust, scalable | Harder analysis, emergent failures |
+| **Decentralized** | Can reduce central coordination bottlenecks | Connectivity, inconsistent state, and emergent failures still limit robustness and scale |
 
 **Stigmergy** (indirect coordination via environment, e.g. trails) appears in large robot swarms and ant-inspired algorithms.
 
@@ -93,15 +104,32 @@ The human provides **intent** (joystick direction, high-level “clean this room
 
 ### 3.3 Safety near humans
 
-**ISO/TS 15066** informs **speed** and **force** when humans enter collaborative spaces. Software implements **reduced speed** in proximity; **hardware** still owns **E-stop** and **protective stop** chains.
+For industrial collaborative applications, use the current robot and cell
+integration standards and assessed protective functions described in
+[the industrial lecture](../Industrial%20and%20Embedded%20Robotics/Lecture-01.md#13-collaborative-robots-cobots).
+An ordinary fleet planner's reduced-speed request is not itself a safety-rated
+protective function. Those industrial standards also do not automatically cover
+every public-space or consumer swarm deployment.
 
 ---
 
 ## 4. ROS 2 practical notes
 
 * **Namespaces and discovery:** Multiple robots on one network need clear **ROS_DOMAIN_ID** / DDS config and **namespacing** to avoid topic collisions.
+  A namespace does not automatically rename TF frame identifiers, and conventional
+  absolute `/tf` topics need deliberate remapping when isolating graphs. Use
+  unique frame IDs or an explicitly shared frame tree; see the
+  [local ROS integration exercise](../Robotics%20Foundations/ROS2-Lab.md).
+  Separate DDS domains also separate ordinary discovery and communication; robots
+  that must coordinate need a deliberately shared domain or an explicit bridge.
+  Neither domain IDs nor namespacing provide authentication or prove isolation
+  against a hostile participant.
 * **Nav2 multi-robot:** Use official patterns for **multiple robots** in simulation; verify **global frame** alignment before **fleet** goals.
-* **Open-RMF** (outside this lecture’s depth) targets **fleet** management in facilities; worth a follow-on if you deploy **many** robots in buildings.
+* **Open-RMF** supports fleet integration and traffic coordination. Study its
+  [traffic implementation](https://github.com/open-rmf/rmf_traffic) after the
+  reservation exercise. A negotiated schedule still needs adapters that report
+  and execute the actual robot motion; a timed-out participant may still occupy
+  the corridor.
 
 ---
 
@@ -118,6 +146,20 @@ The human provides **intent** (joystick direction, high-level “clean this room
 1. Why does **map merging** need **relative pose** between robots, not just two independent SLAM maps?
 2. What is one **failure mode** of purely **greedy** task assignment?
 3. How does **separation** in Reynolds differ from **obstacle avoidance**?
+
+<details markdown="1"><summary>Answer guidance</summary>
+
+1. Each local map can choose its own origin and axes. Corresponding geometry must
+   be transformed into a consistent frame, with uncertainty and false matches
+   handled, before a combined route has meaning.
+2. Assigning the nearest robot to each new task can repeatedly favor one robot
+   while starving another, or occupy a passage needed by a later task. Include
+   task history, reachability, and shared-space constraints in the analysis.
+3. Separation reacts to nearby agents; obstacle avoidance reacts to environmental
+   geometry. Both need body shape, dynamics, and timing checks. Simply adding
+   their requested steering vectors can still produce an invalid motion.
+
+</details>
 
 ---
 

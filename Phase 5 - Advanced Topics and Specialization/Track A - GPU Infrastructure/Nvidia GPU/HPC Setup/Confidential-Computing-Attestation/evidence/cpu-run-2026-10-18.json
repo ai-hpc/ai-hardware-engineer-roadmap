@@ -1,0 +1,45 @@
+{
+  "hardware_attestation": false,
+  "cases": [
+    {
+      "case": "valid",
+      "result": {
+        "accepted": true,
+        "model": "166fe0094fb0afb104b2d11e3b9d2d65a9959b6b984b00d2cbdedc1a2c25ea37",
+        "devices": [
+          "gpu-demo-0"
+        ],
+        "hardware_attestation": false,
+        "scope": "locally signed teaching fixtures"
+      }
+    },
+    {
+      "case": "replay",
+      "rejected": "unknown-or-consumed-challenge"
+    },
+    {
+      "case": "tampering",
+      "rejected": "signature"
+    },
+    {
+      "case": "authentic-disallowed-debug",
+      "rejected": "policy"
+    },
+    {
+      "case": "authentic-wrong-session",
+      "rejected": "binding"
+    },
+    {
+      "case": "expired-challenge",
+      "rejected": "challenge-time"
+    },
+    {
+      "case": "wrong-session-key",
+      "rejected": "possession"
+    },
+    {
+      "case": "missing-gpu",
+      "rejected": "device-inventory"
+    }
+  ]
+}

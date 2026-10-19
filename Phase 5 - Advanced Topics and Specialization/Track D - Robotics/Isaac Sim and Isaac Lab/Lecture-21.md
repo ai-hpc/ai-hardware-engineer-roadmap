@@ -43,6 +43,8 @@ Suppose the local policy runs at 50 Hz while a planner takes 2 seconds. The cont
 
 If the planner shares a GPU with RTX rendering and policy inference, test resource contention explicitly. The full DeepSeek checkpoint generally requires a separate capacity-planned service; do not assume it fits alongside simulation on a workstation.
 
+Before connecting a planner, run the [atomic request/reply lab](Simulation-CPU-Lab.md#3-atomic-observations-and-simulator-owned-actions) and the VLA [dataset/execution exercise](../VLA%20Foundations%20to%20Frontier%202026/Dataset-and-Execution-Lab.md). They provide concrete epoch, request identity and stale-data cases for the dispatcher design. A discrete skill service additionally needs object/skill allowlists and task-specific completion checks.
+
 ## Integration lab
 
 1. Start with a scripted skill and a planner stub returning a fixed valid plan.

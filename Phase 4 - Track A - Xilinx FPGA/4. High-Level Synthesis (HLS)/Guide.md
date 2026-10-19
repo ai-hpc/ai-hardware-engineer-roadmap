@@ -66,6 +66,8 @@ By the end, you should be able to:
 
 ## Unit 1: HLS Flow And Reports
 
+Start with the [native arithmetic and banking lab](labs/README.md). It executes a bounded int8 matrix-vector contract on a CPU, checks all 512 supported shapes, and catches deliberately broken tail/saturation behavior. This gives you a checked algorithm to carry into vendor C simulation; it does not establish HLS synthesis or FPGA performance.
+
 ### Learn
 
 - C/C++ to RTL transformation
@@ -99,6 +101,16 @@ A baseline HLS report explaining what hardware the code implied.
 ---
 
 ## Unit 2: Loops And Pipelining
+
+### Worked example: latency is different from initiation interval
+
+Suppose an accelerator accepts its first sample at edge 0 and produces that sample's result at edge 6: latency is 6 clocks. If it can accept a new sample every 2 clocks, its initiation interval (II) is 2. Five samples enter at edges 0, 2, 4, 6, 8 and leave at 6, 8, 10, 12, 14. With no stalls, the last result appears after `latency + (N - 1) × II = 14` clocks.
+
+An **assumed** implemented clock of 100 MHz and II=2 would permit 50 million samples/s in steady state; this is a calculation, not a measured result. Memory access conflicts, dependent accumulations, and limited operators can prevent II=1. A pipeline directive requests an outcome; the report tells you what the tool achieved. See [AMD's loop-pipelining explanation](https://docs.amd.com/r/en-US/ug1399-vitis-hls/Pipelining-Loops).
+
+Start with the [RTL streaming lab](../1.%20Xilinx%20FPGA%20Development/labs/README.md) to see how sink backpressure changes accepted transfers. Then implement the same byte saturation contract in HLS and compare accepted inputs/results. C simulation checks algorithm behavior; RTL co-simulation checks the generated interface under its test conditions; implementation timing is a separate result.
+
+**Check:** if latency becomes 10 clocks but II drops from 2 to 1, is the design always better? **Answer:** no. It improves ideal steady-state rate, but increases first-result latency and may use more area or miss the clock target. Compare the application's batch size, response deadline, stalls, and implemented reports.
 
 ### Learn
 
@@ -134,6 +146,12 @@ A table showing which directive improved throughput and what it cost.
 ---
 
 ## Unit 3: Memory Architecture
+
+### Worked example: unrolling needs matching ports
+
+Four column lanes require four weight reads and four vector reads for each group. If each array resides in a separate two-read-port memory, the ideal memory service bound is at least two cycles per group. Four suitable banks can reduce that bound, but the indexing must distribute the accesses: addresses `0,1,2,3` map to four cyclic banks, while `0,4,8,12` all map to one. Array dimension and stride matter. [Run the bank fixtures](labs/README.md#4-count-memory-demand-before-requesting-unroll), then compare the model with an actual HLS memory/scheduling report.
+
+Partitioning creates separately accessible storage; reshaping widens storage access. Neither is a promise of external DDR bandwidth. Loading a tile into a suitable local layout may be necessary before the desired compute parallelism is possible.
 
 ### Learn
 
@@ -171,6 +189,12 @@ A memory architecture report with diagrams for data movement and storage.
 ---
 
 ## Unit 4: Dataflow Design
+
+### Worked example: finite buffering absorbs bursts, not permanent overload
+
+For a FIFO, occupancy after an edge is previous occupancy plus accepted writes minus accepted reads. Count transfers only when their protocol accepts them. For accepted-write counts `[1,1,1,1,0,0]` and accepted-read counts `[0,0,1,0,1,1]` over six edges, occupancy from empty is `[1,2,2,3,2,1]`; this trace needs capacity at least three under the assumed simultaneous-transfer behavior. A different downstream stall can require more.
+
+If a producer permanently generates two items per cycle and a consumer can take one, no finite FIFO sustains the mismatch without backpressure or dropping. In a cyclic dataflow graph, also examine initial tokens and blocking order: capacity alone does not repair every deadlock. C simulation may not model the same finite channel capacity and concurrent scheduling as RTL. Test fill, drain, reset, and downstream stalls in the generated interface.
 
 ### Learn
 

@@ -1,5 +1,10 @@
 # Refresh Log — AI Inference Engineer 2026
 
+## 2026-10-18 — separate the 1017 release from the earlier conversion case
+
+Added an immutable-revision metadata comparison and saved evidence. Three official metadata files match byte-for-byte; all 48 declared shard hashes change between original and 1017. The earlier community conversion is analyzed separately. No model weights were downloaded or benchmarks inferred. Added a learner exercise that catches equal-config/changed-weight cases.
+
+
 ## 2026-10-13 — DeepSeek V4.1 Flash NVFP4 and learning workflow
 
 - Added Part 5: ten lectures, metadata/FP4/metric CPU exercises, and correctness tests.

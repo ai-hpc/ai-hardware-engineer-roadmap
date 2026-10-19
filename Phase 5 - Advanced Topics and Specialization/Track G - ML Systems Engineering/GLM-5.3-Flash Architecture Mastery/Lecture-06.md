@@ -28,7 +28,7 @@ By the end of this module you should be able to:
    Indexer heads              32                  64 main heads
    Indexer head dimension     128                 256-dim main K/Q/V heads
    Pool width                 4 tokens            (no pooling — token-indexed)
-   Main selection budget      2,048 positions     (no cap — full causal history)
+   Main selection budget      2,048 + tail slots   (attends selected token indices)
    Incomplete-tail handling   enabled             n/a
 ```
 
@@ -80,8 +80,8 @@ Ordinary causal attention needs one rule: position `i` may attend to position `j
    representation — the pool isn't "complete" until position 7 exists,
    and position 7 is in this query's future.
 
-   a query at position 8 (or later) MAY select this pool — all four
-   of its constituent tokens are now in the past.
+   a query at position 7 (or later) MAY select this pool — its last
+   token is now visible, including the current token itself.
 ```
 
 This is exactly the kind of boundary condition that clusters around small sequence lengths and pool-boundary arithmetic, particularly once you add padding or packed multi-document batches to the mix:
@@ -98,7 +98,7 @@ This is exactly the kind of boundary condition that clusters around small sequen
    9  →  two complete pools + a 1-token tail
 ```
 
-A correctness suite for this mechanism should construct sequences at every one of these lengths — and repeat the exercise with padded and packed-document inputs, where a document boundary can silently reintroduce the same off-by-one class of bug in a different guise (a pool spanning a document boundary must not let one document's tokens contribute to another document's selection or attention, exactly as ordinary packed-sequence attention must prevent cross-document leakage).
+The [CPU hybrid-state lab](CPU-Hybrid-State-Lab.md) executes the upstream grouping, visibility and tail methods at these lengths with left/right padding. Those methods assume a contiguous valid sequence after left padding. Packed documents require an explicitly segment-aware implementation or separate sequence/cache entries; a padding mask alone does not provide document isolation. For a backend that supports packing, repeat the exercise with packed-document inputs, where a document boundary can silently reintroduce the same off-by-one class of bug in a different guise (a pool spanning a document boundary must not let one document's tokens contribute to another document's selection or attention, exactly as ordinary packed-sequence attention must prevent cross-document leakage).
 
 ---
 
@@ -163,6 +163,8 @@ This is **Stage 5 of the [capstone ladder](Lecture-12.md)**: build a **KPool bou
 ---
 
 ## Current as of
+
+**Reviewed October 18, 2026.** [Pinned config, upstream code and CPU evidence](CPU-Hybrid-State-Lab.md#sources-and-execution-boundary) identify what was checked. Hardware capacity and throughput remain deployment-specific.
 
 * **Timeless:** the selection/attention separation that defines DeepSeek Sparse Attention generally, the pool-completion causality argument, the three-term decode cost decomposition.
 * **Checkpoint-specific:** 32 indexer heads, dimension 128, pool width 4, budget 2,048 (⇒ 2,051-slot buffers) are this checkpoint's configuration — re-derive the slot count if any of these change in a future revision.

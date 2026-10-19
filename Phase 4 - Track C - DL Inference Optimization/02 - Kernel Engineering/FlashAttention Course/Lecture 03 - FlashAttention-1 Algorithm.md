@@ -1,170 +1,55 @@
-# Lecture 3 — FlashAttention-1 Algorithm
+# Lecture 3 — FA1 traversal and the meaning of its IO bound
 
-**Parent:** [FlashAttention Course](Guide.md)
+**Course:** [FlashAttention](Guide.md) · **Reviewed:** 18 October 2026
 
-**One-line purpose:** Walk the FA1 forward and backward algorithm, explain its IO complexity bound, and connect the tiles in the paper to the variables in the source.
+**Goal:** relate an algorithm's loop order to memory traffic without confusing words, bytes or hardware counters. **Artifact:** an annotated traversal and a tested traffic estimate.
 
-**Prerequisites:** Lectures 1 and 2. You should be able to derive the IO of naive attention and run the blockwise-softmax NumPy check.
+## 1. Read the historical algorithm accurately
 
-**Artifact:** A pseudocode walk-through plus an HBM-byte counter you can run against arbitrary `(N, d, B_r, B_c)` that reproduces the paper's `O(N²d²/M)` bound to within a constant.
+The original FA1 Algorithm 1 has an **outer loop over K/V column blocks** and an inner loop over Q row blocks. It loads a K/V block, revisits Q/output/statistic blocks, and updates the running result. The [paper's Algorithm 1 and IO analysis](https://arxiv.org/html/2205.14135v2#S3.SS2) define the specific schedule and memory model.
 
----
+A query-outer implementation is also a valid tiled attention schedule. Our NumPy lab keeps one query block's numerator/statistics while streaming all K/V blocks, then stores that output. Do not label this loop order a verbatim transcription of FA1 Algorithm 1. Later implementations change scheduling and parallelism while preserving the attention function.
 
-## Why it matters
+## 2. Derive the bound with consistent units
 
-FA1 is the first kernel that turned attention from an `O(N²)`-bandwidth operation into an `O(N²d²/M)`-bandwidth one, where `M` is on-chip memory (SRAM). That single change is what made 32k–1M context training affordable. If you understand FA1, FA2 and FA3 become "the same thing, scheduled better."
+In the theoretical model, SRAM capacity `M` is measured in stored scalar elements. A K/V tile has width on the order of `M/D`; there are roughly `ND/M` K/V tiles. Revisiting `ND` query/output elements for each tile gives the term:
 
----
-
-## Mental model
-
-### Tiling Q, K, V
-
-Split the matrices into tiles:
-
-- `Q` into `T_r = ceil(N / B_r)` row blocks of size `B_r × d`.
-- `K` and `V` into `T_c = ceil(N / B_c)` column blocks of size `B_c × d`.
-
-Each block must fit, together with running scratch, in SRAM. For Ampere/Hopper that means roughly `B_r · d + B_c · d + B_r · B_c` words.
-
-### The forward loop (Algorithm 1 from the FA1 paper)
-
-```
-allocate O ∈ [N, d], LSE ∈ [N], all zero / -inf
-for i = 0 .. T_r - 1:                           # outer: over query tiles
-    Q_i = load Q rows [i·B_r : (i+1)·B_r]       # into SRAM
-    m_i = -inf vector of length B_r              # running max
-    ℓ_i =  0 vector of length B_r                # running sum-exp
-    O_i =  0 matrix [B_r, d]                     # running output
-    for j = 0 .. T_c - 1:                       # inner: over KV tiles
-        K_j, V_j = load tile [j·B_c : (j+1)·B_c]
-        S_ij = (Q_i @ K_j.T) / sqrt(d)          # SRAM only, [B_r, B_c]
-        m_ij = rowmax(S_ij)                      # in-register
-        P_ij = exp(S_ij - m_ij)                  # local probs
-        ℓ_ij = rowsum(P_ij)
-        m_new = max(m_i, m_ij)
-        rescale_old = exp(m_i  - m_new)
-        rescale_new = exp(m_ij - m_new)
-        O_i = rescale_old * O_i + rescale_new * (P_ij @ V_j)
-        ℓ_i = rescale_old * ℓ_i + rescale_new * ℓ_ij
-        m_i = m_new
-    O[i·B_r : (i+1)·B_r] = O_i / ℓ_i             # write back to HBM
-    LSE[i·B_r : (i+1)·B_r] = m_i + log(ℓ_i)
+```text
+(ND/M) × ND = N²D²/M element accesses
 ```
 
-This is the exact NumPy code from Lecture 2, mapped onto a two-level loop where the outer loop owns the HBM writes of `O` and `LSE`, and the inner loop stays in SRAM.
+This reasoning applies under the paper's stated capacity regime. Converting to bytes requires the relevant element widths; real kernels mix low-precision operands with wider accumulators and statistics. Substituting “100 KB” directly as an element count and reporting a precise byte total is dimensionally wrong.
 
-### Why this is `O(N²d²/M)` bytes
+## 3. Analyze the lab's different, explicit schedule
 
-Inner loop loads each `(K_j, V_j)` tile once per outer iteration `i`. That is `T_r · T_c · (2 B_c · d)` bytes for `K + V`, plus `T_r · (B_r · d)` for `Q` and `T_r · (B_r · d)` for `O / LSE` writes.
+For query length L, key length S, query/key dimension D, value dimension Dv, element size b and query row tile Br:
 
-Substituting `T_r = N/B_r` and `T_c = N/B_c`:
-
-```
-KV traffic ≈ (N/B_r) · (N/B_c) · (2 B_c · d · 2 bytes)
-           = 4 N² d / B_r           bytes
-```
-
-With `B_r = Θ(M / d)` (the largest `B_r` such that a `[B_r, d]` query tile and friends fit in SRAM `M`), this becomes `O(N² d² / M)` bytes — the FA1 bound.
-
-For typical `M = 100 KB` of SRAM per SM, `d = 64`, and `N = 8192`, that is roughly `N² d² / M ≈ (8192² · 64²) / 100e3 ≈ 27 MB` of HBM traffic — vs hundreds of MB for the naive variant. This is the win.
-
-### Backward in one sentence
-
-FA1 does not store `S` or `P`. To compute gradients it **recomputes** them tile by tile using `Q, K, V` and the saved `LSE`. That trades a small amount of extra compute for not having to store the `[N, N]` matrix. The backward pass is structurally identical to the forward pass with a few extra `[B_r, B_c]` matmuls — same `O(N²d²/M)` HBM complexity.
-
----
-
-## Build it
-
-Read the FA1 paper Section 3 (Algorithm 1 + Section 3.2 on backward). Then write this byte counter:
-
-```python
-# fa1_iobytes.py
-def naive_bytes(N, d, dtype=2):
-    qkv_load = 3 * N * d * dtype
-    s_rw     = 2 * N * N * dtype          # write S, read S
-    p_rw     = 2 * N * N * dtype          # write P, read P for PV
-    o_write  =     N * d * dtype
-    return qkv_load + s_rw + p_rw + o_write
-
-def fa1_bytes(N, d, Br, Bc, dtype=2):
-    Tr = -(-N // Br)
-    Tc = -(-N // Bc)
-    q_load   = Tr * (Br * d) * dtype                       # Q once
-    kv_load  = Tr * Tc * (2 * Bc * d) * dtype              # K, V per outer i
-    out_write = Tr * (Br * d) * dtype                      # O
-    lse_write = Tr * Br * 4                                # fp32 LSE
-    return q_load + kv_load + out_write + lse_write
-
-if __name__ == "__main__":
-    for N in [1024, 2048, 4096, 8192, 16384]:
-        for d in [64, 128]:
-            Br, Bc = 64, 64
-            naive = naive_bytes(N, d) / 1e6
-            fa1   = fa1_bytes(N, d, Br, Bc) / 1e6
-            ratio = naive / fa1
-            print(f"N={N:>5} d={d:>3} naive={naive:>8.1f} MB  fa1={fa1:>8.1f} MB  speedup={ratio:>5.1f}x")
+```text
+query_tiles = ceil(L/Br)
+Q and O bytes = L × (D + Dv) × b
+K and V bytes = query_tiles × S × (D + Dv) × b
+LSE bytes = L × stats_bytes
 ```
 
-Run it; you should see speedups growing roughly linearly in `N` (because the `N²` term dominates naive at the shapes you care about).
+This counts logical reads/writes under a no-cache model. Tail tiles count only valid elements. The column tile changes scratch size and scheduling, but partitioning the same full K/V pass into smaller pieces does not by itself change this formula.
 
-Also: try `B_r = B_c = 32, 64, 128`. The smaller the tile, the more KV passes you do per outer `i`, and the higher the HBM cost — match this against what FA1 picks at runtime by reading `csrc/flash_attn/src/flash_fwd_launch_template.h` (the dispatch table by `head_dim`).
+Run `attention_contract.py` at sequence lengths 4096 and 8192 with Br fixed at 64. The dominant term nearly quadruples. The tests require this behavior. There is no promise of linear HBM traffic or a byte-counter-to-profiler agreement within an invented percentage.
 
----
+## 4. Budget the live tile
 
-## Use it in the real stack
+A useful first sketch includes Q, K, V, output accumulators, score/probability tiles, per-row statistics and pipeline buffers. For one query tile, storage includes terms like `Br×D`, `Bc×D`, `Bc×Dv`, `Br×Dv`, and `Br×Bc`. Multiply each by its actual storage width and account for overlapping lifetimes before adding them.
 
-Trace one forward call from Python to the kernel. Start at:
+Registers, shared memory and compiler temporaries have different constraints. A tile that fits an abstract SRAM sum may still exceed register limits or reduce occupancy too far. A second buffering stage increases storage while potentially hiding latency.
 
-`flash-attention/flash_attn/flash_attn_interface.py → flash_attn_func()`
-↓
-`flash-attention/flash_attn/_C.pyi → mha_fwd(...)`
-↓
-`flash-attention/csrc/flash_attn/flash_api.cpp → mha_fwd()`
-↓
-`flash-attention/csrc/flash_attn/src/flash_fwd_launch_template.h → run_mha_fwd_<...>()`
-↓
-`flash-attention/csrc/flash_attn/src/flash_fwd_kernel.h → flash_fwd_kernel()`
+## 5. Connect the estimate to a profiler
 
-Inside `flash_fwd_kernel.h`, look for:
+For an optional GPU run, query the installed profiler's available metrics first:
 
-- The `for (int n_block = ...)` loop — that is the inner KV loop.
-- `__syncthreads()` and the `tOrO`, `tOrS`, `tOrP` register variables — the running output and probability tiles.
-- `softmax_rescale_o_` and similar — the rescale-by-`exp(m_old - m_new)` step.
-
-Match each FA1-paper variable to a real variable in the kernel. Write the mapping table in your notes (you will need it in Lecture 6 when you compare against FA2's slightly different naming).
-
----
-
-## Measure it
-
-You cannot easily count HBM bytes from PyTorch directly, but Nsight Compute can:
-
-```
-ncu --set full --target-processes all \
-    --metrics dram__bytes.sum,sm__sass_thread_inst_executed_op_dfma_pred_on.sum \
-    python attention_bench.py
+```bash
+ncu --query-metrics
+ncu --set basic --target-processes all -o attention-profile python your_selected_gpu_experiment.py
 ```
 
-Compare `dram__bytes.sum` for a naive SDPA call vs a FlashAttention call at the same `(N, d, H)`. You should see the FA byte count scale roughly as `N · d` rather than `N²`, matching your `fa1_bytes` model within ~20% (driver and L2 traffic make up the rest).
+Replace the script with a tested selected path and distinguish its warmups/reference calls from the target range before interpreting results. Metric names and availability vary by architecture. Kernel DRAM traffic, L2 traffic and logical tensor bytes are different quantities; caches can make the measured DRAM total smaller than the logical model.
 
----
-
-## Ship it
-
-Add to your `flash-attn-course/` working dir:
-
-1. `fa1_iobytes.py` — your byte counter, with at least three `(N, d)` rows printed.
-2. A short Markdown note mapping FA1 paper symbols (`m_i`, `ℓ_i`, `O_i`, `m_ij`, `ℓ_ij`) to the variable names in `flash_fwd_kernel.h`.
-3. One Nsight Compute report at a single shape, showing `dram__bytes.sum` for naive vs FA.
-
-If those three artifacts exist, you have actually read the kernel — not just the paper.
-
----
-
-## Related pages
-
-- [Lecture 2 — Online softmax and numerical correctness](Lecture%2002%20-%20Online%20Softmax%20and%20Numerical%20Correctness.md)
-- [Lecture 4 — GPU kernel performance basics](Lecture%2004%20-%20GPU%20Kernel%20Performance%20Basics.md)
-- [Lecture 6 — FlashAttention-2](Lecture%2006%20-%20FlashAttention-2.md)
+**Exercise:** doubling Br halves the repeated K/V term approximately. Does it guarantee half the runtime? **No.** It can increase live storage, change residency, padding and scheduling, or move the limiting resource. Submit the model's prediction and a separate outcome field marked measured or not run.

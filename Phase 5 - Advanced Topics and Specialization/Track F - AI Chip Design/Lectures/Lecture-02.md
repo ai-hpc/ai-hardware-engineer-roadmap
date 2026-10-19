@@ -2,7 +2,7 @@
 
 ## Overview
 
-Lecture 1 established that LLVM IR is the universal language between frontends and backends. This lecture addresses the next question: what happens to that IR between input and output? The answer is **passes** — modular transformations that analyze, optimize, and ultimately lower the IR into machine code. The core challenge is understanding how a matrix multiply expressed as simple loops in LLVM IR becomes a sequence of vector FMA instructions with optimal register usage and no unnecessary memory traffic. The mental model is a **pipeline of transformations**: each pass reads the IR, makes a specific improvement, and hands the result to the next pass. For AI hardware engineers, this is directly relevant because (1) when you write a backend for a custom accelerator, you need to implement target-specific passes, and (2) understanding what the optimizer can and cannot do tells you what your hardware must handle in silicon vs. what the compiler can fix in software.
+Lecture 1 established that LLVM IR is the universal language between frontends and backends. This lecture addresses the next question: what happens to that IR between input and output? The answer is **passes** — modular transformations that analyze, optimize, and ultimately lower the IR into machine code. The core challenge is understanding how a matrix multiply expressed as simple loops in LLVM IR becomes a sequence of vector FMA instructions while respecting register limits, dependencies, and memory behavior. The mental model is a **pipeline of transformations**: each pass reads the IR, makes a specific improvement, and hands the result to the next pass. For AI hardware engineers, this is directly relevant because (1) when you write a backend for a custom accelerator, you need to implement target-specific passes, and (2) understanding what the optimizer can and cannot do tells you what your hardware must handle in silicon vs. what the compiler can fix in software.
 
 ---
 
@@ -41,7 +41,7 @@ LLVM IR (.ll / .bc)
 
 ## Middle-End Optimization Passes
 
-These passes work on LLVM IR and are **target-independent** — they improve the code regardless of which chip will run it.
+These passes work on LLVM IR and are shared across targets. Many consult target cost information; a legal transformation is not necessarily profitable on every chip.
 
 ### Pass Categories
 
@@ -57,7 +57,7 @@ These passes work on LLVM IR and are **target-independent** — they improve the
 
 **1. Loop Vectorization (LoopVectorize)**
 
-This is the **single most important pass** for AI kernel performance on CPUs. It transforms scalar loops into **vector operations** that use SIMD hardware.
+This is an important pass for suitable CPU loops. Data movement, algorithm choice, library calls, fusion, and parallelism can matter more for a particular workload. It transforms scalar loops into **vector operations** that use SIMD hardware.
 
 ```llvm
 ; BEFORE vectorization — processes one element at a time
@@ -74,22 +74,24 @@ loop:
   %cmp = icmp slt i64 %i.next, %n
   br i1 %cmp, label %loop, label %exit
 
-; AFTER vectorization (VF=8 on AVX-256) — processes 8 elements at a time
+; AFTER vectorization: illustrative vector loop for n>0 and n divisible by 8.
+; A real generic function also needs a zero-trip guard, a scalar/masked tail,
+; and any required alias/alignment checks. This is not a complete function.
 loop.vec:
   %i = phi i64 [ 0, %entry ], [ %i.next, %loop.vec ]
   %a_ptr = getelementptr float, ptr %A, i64 %i
   %b_ptr = getelementptr float, ptr %B, i64 %i
-  %va = load <8 x float>, ptr %a_ptr, align 32
-  %vb = load <8 x float>, ptr %b_ptr, align 32
+  %va = load <8 x float>, ptr %a_ptr, align 4
+  %vb = load <8 x float>, ptr %b_ptr, align 4
   %vmul = fmul <8 x float> %va, %vb
   %c_ptr = getelementptr float, ptr %C, i64 %i
-  store <8 x float> %vmul, ptr %c_ptr, align 32
+  store <8 x float> %vmul, ptr %c_ptr, align 4
   %i.next = add i64 %i, 8
   %cmp = icmp slt i64 %i.next, %n
   br i1 %cmp, label %loop.vec, label %exit
 ```
 
-The vectorizer needs to prove that iterations are **independent** (no loop-carried dependencies) and that memory accesses **don't alias**. This is why `restrict` pointers and alignment annotations matter so much for AI kernel performance.
+The vectorizer must establish that its chosen transformation preserves dependencies. It may use alias analysis, runtime checks, recognized reductions, or other legality rules; complete non-aliasing is not required for every loop. This is why `restrict` pointers and alignment annotations matter so much for AI kernel performance.
 
 **2. Loop Unrolling (LoopUnroll)**
 
@@ -107,11 +109,11 @@ loop.unrolled:
   ; single branch back to loop header
 ```
 
-For AI kernels, unrolling is essential to keep the pipeline full — especially on GPUs where each warp needs enough independent instructions to hide memory latency.
+Unrolling can expose independent work, but also increases code size and live registers. Measure the effect; excessive unrolling can cause spills or lower GPU occupancy.
 
 **3. Inlining**
 
-Replaces a function call with the function body. Critical for AI compilers because small helper functions (activation functions, quantization scales) become zero-cost when inlined.
+Replaces a function call with the function body. Inlining removes the call boundary and can expose further optimization. The arithmetic itself still costs work, and larger code can hurt instruction-cache behavior.
 
 ```llvm
 ; BEFORE: call overhead for every element
@@ -173,12 +175,13 @@ Many critical optimizations (vectorization, load elimination, code motion) requi
 ```llvm
 ; Can the compiler vectorize this loop?
 define void @add(ptr %A, ptr %B, ptr %C, i64 %n) {
-  ; If A == C (output aliases input), vectorization changes semantics!
-  ; The compiler must prove A != C or insert runtime checks
+  ; Exact in-place C == A can be legal for an elementwise loop.
+  ; Shifted overlap, such as C == A + 1, can create loop-carried dependence.
+  ; Analyze actual access ranges and the transformation, not only pointer equality.
 }
 ```
 
-**Why this matters for AI compilers:** TVM and Triton annotate their buffers with `noalias` metadata because they know tensor buffers don't overlap. Without this, LLVM would conservatively refuse to vectorize most tensor operations.
+**Why this matters for AI compilers:** views and in-place operations can overlap. Attach `noalias` attributes only when the compiler or caller contract proves the required independence. Otherwise use a supported aliasing path or runtime checks. A false `noalias` promise can silently miscompile a program.
 
 ```llvm
 ; TVM-generated IR includes noalias:
@@ -187,13 +190,13 @@ define void @fused_relu(ptr noalias %input, ptr noalias %output, i64 %n) {
 }
 ```
 
-> **Key Insight:** When building an AI compiler, the most impactful thing you can do for code quality is provide accurate alias information. A single missing `noalias` annotation can prevent vectorization of an entire kernel, causing a 4–16× performance regression on CPUs.
+**Worked example:** in `C[i] = A[i] + B[i]`, exact `C == A` is elementwise in-place work. With `C == A + 1`, iteration zero writes the A element that iteration one would read. A scalar forward loop and an independently evaluated vector batch can therefore produce different results. Describe which alias patterns your public function permits before selecting an optimization.
 
 ---
 
 ## The Backend: From LLVM IR to Machine Code
 
-The backend (code generator) transforms LLVM IR into **native instructions** for a specific target. This is where AI hardware engineers spend **most of their time** when building a compiler for a custom chip.
+The backend (code generator) transforms LLVM IR into **native instructions** for a specific target. A custom-chip compiler also needs high-level partitioning, memory planning, runtime support, and numerical validation; the backend is one part of that system.
 
 ### Backend Pipeline
 
@@ -225,9 +228,9 @@ LLVM IR
 
 ### Stage 1: Instruction Selection (ISel)
 
-ISel maps LLVM IR patterns to target-specific machine instructions using **TableGen** pattern matching.
+Instruction selection maps legal IR operations to target instructions. LLVM targets can use SelectionDAG or GlobalISel, with generated TableGen patterns and target-specific code.
 
-**TableGen** is LLVM's domain-specific language for describing target architectures. You write `.td` files that declare registers, instructions, and patterns:
+**TableGen** describes registers, instructions, and patterns. The following fragments omit required target scaffolding, encoding fields, and register definitions; they illustrate design choices, not a buildable backend:
 
 ```tablegen
 // Define a register class for 32 general-purpose registers
@@ -260,7 +263,7 @@ def MyPipeline : SchedMachineModel {
   let MispredictPenalty = 10;   // branch mispredict cost
 }
 
-// MAC instruction uses the multiply unit for 2 cycles
+// Result latency of 2 cycles; resource occupancy is a separate scheduling fact
 def : WriteRes<WriteFMul, [MulUnit]> { let Latency = 2; }
 ```
 
@@ -268,15 +271,11 @@ The scheduler uses this model to interleave loads with computes — while one MA
 
 ### Stage 3: Register Allocation
 
-Maps unlimited virtual registers to the finite physical register file. For AI accelerators with large register files (GPUs have 65536 registers per SM), **register pressure is often the bottleneck** — running out of registers forces values to **spill to memory**, which is catastrophic for performance.
+Maps unlimited virtual registers to the finite physical register file. Register-file capacity is target-specific. Excess live values may spill to memory, add instructions, or reduce the number of resident GPU workgroups. Inspect the generated code and measurements rather than assigning a fixed performance penalty.
 
-| Algorithm | Speed | Code Quality | Used When |
-|---|---|---|---|
-| Linear scan | Fast | Good | JIT compilation, -O1 |
-| Graph coloring (Greedy) | Moderate | Best | Ahead-of-time, -O2/-O3 |
-| PBQP | Slow | Best for irregular architectures | Special targets |
+LLVM provides several register allocators; selection and behavior depend on the target and pipeline. The default greedy allocator uses heuristics including live-range splitting and eviction; it is not simply a synonym for textbook graph coloring. Faster and more specialized allocators have different tradeoffs.
 
-> **Key Insight:** For AI accelerators, register allocation quality directly determines kernel performance. A matrix multiply tile that fits in registers runs at compute speed; one that spills runs at memory speed. This is why GPU programming cares so much about "occupancy" — it's really about register pressure. When designing your accelerator's register file size, simulate the register allocation on representative AI kernels to find the right trade-off between area and spill frequency.
+Occupancy is constrained by registers **and** local/shared memory, thread limits, workgroup limits, and allocation granularity. A tile that fits in registers can still be bandwidth-bound. Compare representative kernels when choosing register-file capacity, and include the area and power cost of that capacity.
 
 ---
 
@@ -316,7 +315,7 @@ void MyAccelTargetLowering::setOperationAction() {
   // i16 multiply: promote to i32, then multiply
   setOperationAction(ISD::MUL, MVT::i16, Promote);
 
-  // i64 multiply: expand to two i32 multiplies + adds
+  // i64 multiply: expand using a legal sequence or helper call; not necessarily two multiplies
   setOperationAction(ISD::MUL, MVT::i64, Expand);
 
   // f32 fused multiply-add: native (our MAC unit)
@@ -374,13 +373,13 @@ llc -print-after-all input.ll -o /dev/null 2>&1
 
 ## Hands-On Exercises
 
-1. **Observe vectorization:** Write a simple element-wise ReLU loop in C. Compile with `clang -S -emit-llvm -O2` and examine the generated LLVM IR. Then compile with `clang -S -O2 -march=skylake` and examine the x86 assembly — find the `vmaxps` or `vblendvps` instructions. Repeat with `-march=armv8-a+simd` for NEON.
+1. **Observe vectorization:** write an elementwise ReLU loop in C and compile with `clang -S -emit-llvm -O2 -Rpass=loop-vectorize -Rpass-missed=loop-vectorize`. Preserve the diagnostic and inspect the IR. For assembly comparison use an explicit target, such as `--target=x86_64-linux-gnu -march=skylake` or `--target=aarch64-linux-gnu -march=armv8-a+simd`; changing `-march` alone does not switch the target architecture. Cross-compilation may need an appropriate sysroot. Do not execute a binary requiring unsupported host instructions.
 
-2. **Kill vectorization with aliasing:** Take the ReLU kernel and remove the `restrict` qualifier from the pointer parameters. Recompile and observe that the vectorizer either gives up or inserts expensive runtime alias checks. Add `noalias` metadata in the `.ll` file and verify vectorization returns.
+2. **Investigate aliasing:** compare a function whose contract permits overlapping buffers with a `restrict` version whose callers provide disjoint buffers. Inspect vectorization reports and any runtime range checks. The optimizer may vectorize both. Do not add `noalias` to an overlapping call merely to make a diagnostic disappear. Explain exact in-place versus shifted overlap using a four-element example.
 
 3. **Explore the NVPTX backend:** Write a simple LLVM IR function that loads from address space 1 (global), multiplies by a constant, and stores back. Compile with `llc -march=nvptx64 -mcpu=sm_80`. Read the PTX output — identify `ld.global`, `mul.f32`, and `st.global` instructions.
 
-4. **Backend skeleton:** Using LLVM's documentation, sketch a TableGen file for a hypothetical accelerator with: 16 general-purpose registers (R0–R15), `LOAD`, `STORE`, `ADD`, `MUL`, and `MAC` (fused multiply-add) instructions. Define the pattern for `MAC` to match `fadd(fmul(a, b), c)`.
+4. **Backend skeleton:** Using LLVM's documentation, sketch a TableGen file for a hypothetical accelerator with: 16 general-purpose registers (R0–R15), `LOAD`, `STORE`, `ADD`, `MUL`, and `MAC` (fused multiply-add) instructions. Define a pattern for a fused operation and explain why contracting an ordinary `fadd(fmul(a,b),c)` is not always numerically legal.
 
 ---
 
@@ -388,11 +387,11 @@ llc -print-after-all input.ll -o /dev/null 2>&1
 
 | Concept | Why It Matters for AI Hardware |
 |---|---|
-| Loop vectorization | Converts scalar AI kernels to SIMD — 4–16× speedup on CPUs |
-| Alias analysis | Without `noalias`, vectorization fails — the single biggest code quality factor |
+| Loop vectorization | Exposes SIMD when legal and profitable; measure benefit |
+| Alias analysis | Establishes safe memory transformations; false promises can miscompile |
 | Instruction selection | How your custom instructions get used by LLVM |
 | TableGen | The declarative language for describing your chip to LLVM |
-| Register allocation | Determines whether your kernel runs at compute or memory speed |
+| Register allocation | Controls placement, spills, and one resource limit on occupancy |
 | Scheduling model | Tells LLVM how to interleave instructions for your pipeline |
 | NVPTX backend | The reference for how an AI-relevant backend works |
 
@@ -406,3 +405,9 @@ llc -print-after-all input.ll -o /dev/null 2>&1
 * **[LLVM's Analysis and Transform Passes](https://llvm.org/docs/Passes.html):** Reference for all built-in passes.
 * **"Engineering a Compiler" by Cooper & Torczon:** Textbook covering instruction selection, register allocation, and scheduling in depth.
 * **Triton source: `python/triton/backends/nvidia/compiler.py`:** How Triton invokes the LLVM NVPTX backend.
+
+## Connect scheduling to a measured artifact
+
+In the [tiling and dataflow lab](../Labs/Tiling-and-Dataflow.md), compare TK=1 and TK=3 while retaining the same output tile. The numerical result and modeled logical traffic stay the same, while storage and array restart costs change. A cost model must represent these competing effects; a transformation name alone does not prove an improvement. Then inspect the real MLIR-generated LLVM IR and distinguish a legal lowering from a demonstrated speedup.
+
+Primary references: [LLVM vectorizers](https://llvm.org/docs/Vectorizers.html), [register allocation infrastructure](https://llvm.org/docs/CodeGenerator.html#register-allocation), and [GlobalISel](https://llvm.org/docs/GlobalISel/).

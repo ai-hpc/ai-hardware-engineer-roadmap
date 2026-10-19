@@ -1,0 +1,4 @@
+newton==1.5.2
+warp-lang==1.16.0
+numpy==2.5.4
+usd-core==26.8

@@ -1,6 +1,8 @@
 # Yocto — step-by-step lectures
 
-Work through these in order. Each file is one session: read it, do the lab at the end, then move on.
+Work through these in order. Each file teaches one engineering boundary and applies it to the same small observation-age checker. Reading and local exercises fit a study session; first image/SDK builds can take hours and should be scheduled separately.
+
+Start with the [runnable native package and supplied layer](../Labs/README.md). Choose a native, metadata, or full-image route in Lecture 1, and keep the claims attached to the work you actually ran. The baseline is pinned Scarthgap 5.0.20; Lecture 2 compares it with the current Wrynose setup.
 
 **Hub:** [Yocto course guide](../Guide.md)
 
@@ -25,7 +27,7 @@ Work through these in order. Each file is one session: read it, do the lab at th
 
 ## Reuse the same package across all sixteen sessions
 
-L1–5 establish a pinned baseline image; L6–8 add the observation service in your own layer; L9 ties boot artifacts to the hardware; L10 builds that service against the matching SDK; L11 records an intentional build failure and recovery. L12–13 add manifests and rebuild evidence. Choose the release-bundle capstone in L14 and use L15–16 as reference.
+L1–5 establish the environment and a pinned baseline; L6–8 package the observation-age checker in a product layer and image; L9 ties boot artifacts to hardware; L10 uses the matching SDK; L11 records an intentional failure and repair. L12–13 add manifests and rebuild evidence. The capstone in L14 supplies exact target acceptance cases and optional service/hardware/release extensions; L15–16 support retrieval and maintenance.
 
 For every session retain the diff, command, output artifact, and target observation. A list of concepts or a successful BitBake exit alone cannot prove that the right package reached the target.
 

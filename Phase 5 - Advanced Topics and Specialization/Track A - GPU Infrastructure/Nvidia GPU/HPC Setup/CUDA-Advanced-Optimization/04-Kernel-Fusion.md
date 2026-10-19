@@ -1,357 +1,101 @@
-# 04 — Kernel Fusion
+# 04 — Kernel fusion: reduce traffic without changing the function
 
-## 1. The Problem: HBM Round-Trips Kill Performance
+**Outcome:** count data movement, detect a masked-reduction bug, and compare a fused operation with its reference. Use the [CPU and CUDA exercises](labs/README.md).
 
-Every separate kernel must read inputs from HBM (High Bandwidth Memory) and write outputs back. When kernels are chained, this creates redundant memory traffic:
+## 1. Count reads and writes explicitly
 
-```
-Unfused: LayerNorm → GELU → Dropout → Residual Add
+Separate kernels communicate through device memory, but that traffic may be served by caches. “Every intermediate goes all the way to HBM” is an assumption to check, not a universal fact.
 
-  HBM → LayerNorm kernel → HBM
-                           HBM → GELU kernel → HBM
-                                               HBM → Dropout kernel → HBM
-                                                                      HBM → Add kernel → HBM
+Consider GELU, dropout with a fixed externally supplied mask, and a residual add over `N` elements. Ignoring the mask, random-number state and scalar parameters:
 
-HBM reads/writes:  8 total (4 reads + 4 writes)
-Data size:         8 × seq_len × hidden × 2 bytes (BF16)
-
-For seq=2048, hidden=8192, BF16:
-  8 × 2048 × 8192 × 2 = 256 MB of HBM traffic
-
-Fused:
-  HBM → FusedLayerNormGeluDropoutAdd kernel → HBM
-
-HBM reads/writes:  2 total (1 read + 1 write)
-Data:              64 MB of HBM traffic
-
-Speedup:           4× reduction in memory traffic
-```
-
-Fusion is the **most impactful single optimization** for memory-bound GPU kernels. Element-wise operations (add, multiply, activation functions, normalization) are almost always memory-bound — they do very little compute per byte loaded.
-
----
-
-## 2. Arithmetic Intensity and the Roofline
-
-To know whether fusion helps, compute **arithmetic intensity** (AI):
-
-```
-AI = FLOPs / Bytes of HBM traffic
-
-Memory-bound region: AI < Ridge point (H200: ~412 FLOP/Byte for BF16)
-Compute-bound region: AI > Ridge point
-
-Element-wise ops:
-  GELU:     ~8 FLOPs / 2 bytes = 4 FLOP/Byte  → deeply memory-bound
-  LayerNorm: ~10 FLOPs / 2 bytes = 5 FLOP/Byte → deeply memory-bound
-  Add:       ~1 FLOPs / 4 bytes = 0.25 FLOP/Byte → pure memory-bound
-
-GEMM (matrix multiply):
-  1024³ GEMM: 2 GFLOP / 8 MB = 256 FLOP/Byte → compute-bound
-```
-
-Fusing element-wise ops eliminates HBM round-trips, **raising effective AI** from 4 to 16+ FLOP/Byte — much closer to the roofline.
-
----
-
-## 3. Manual Kernel Fusion in CUDA
-
-### Before Fusion (3 Separate Kernels)
-
-```cpp
-// Kernel 1: GELU
-__global__ void gelu_kernel(float* x, float* y, int n) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) {
-        float v = x[i];
-        y[i] = 0.5f * v * (1.0f + tanhf(0.7978845608f * (v + 0.044715f * v * v * v)));
-    }
-}
-
-// Kernel 2: Dropout
-__global__ void dropout_kernel(float* y, float* z, float p, unsigned int seed, int n) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) {
-        curandState state;
-        curand_init(seed, i, 0, &state);
-        float r = curand_uniform(&state);
-        z[i] = (r > p) ? y[i] / (1.0f - p) : 0.0f;
-    }
-}
-
-// Kernel 3: Residual Add
-__global__ void add_kernel(float* z, float* residual, float* out, int n) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) out[i] = z[i] + residual[i];
-}
-
-// Calling them (3 HBM round-trips):
-gelu_kernel<<<grid, block>>>(x, y, n);
-dropout_kernel<<<grid, block>>>(y, z, p, seed, n);
-add_kernel<<<grid, block>>>(z, residual, out, n);
-```
-
-### After Fusion (1 Kernel, 1 HBM Round-Trip)
-
-```cpp
-__global__ void fused_gelu_dropout_add(
-    const float* __restrict__ x,
-    const float* __restrict__ residual,
-    float* __restrict__ out,
-    float dropout_prob,
-    unsigned int seed,
-    int n
-) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i >= n) return;
-
-    // Load once from HBM
-    float v   = x[i];
-    float res = residual[i];
-
-    // GELU in registers (no HBM write)
-    float gelu_val = 0.5f * v * (1.0f + tanhf(0.7978845608f * (v + 0.044715f * v * v * v)));
-
-    // Dropout in registers (no HBM write)
-    curandState state;
-    curand_init(seed, i, 0, &state);
-    float r = curand_uniform(&state);
-    float dropped = (r > dropout_prob) ? gelu_val / (1.0f - dropout_prob) : 0.0f;
-
-    // Residual add in registers (no HBM write)
-    float result = dropped + res;
-
-    // Write once to HBM
-    out[i] = result;
-}
-```
-
-Memory traffic reduced: 3 reads + 3 writes → 2 reads + 1 write = **5× fewer HBM accesses**.
-
----
-
-## 4. Fusion with Triton (Pythonic High-Performance Kernels)
-
-Triton is NVIDIA's Python-based kernel compiler. It produces optimized PTX without writing CUDA C++.
-
-```python
-import triton
-import triton.language as tl
-
-@triton.jit
-def fused_layernorm_gelu_kernel(
-    X_ptr,          # input
-    W_ptr,          # layernorm weight (gamma)
-    B_ptr,          # layernorm bias (beta)
-    OUT_ptr,        # output
-    n_cols,         # hidden dimension
-    eps: tl.constexpr,
-    BLOCK_SIZE: tl.constexpr,
-):
-    # Each program (block) handles one row (one token)
-    row = tl.program_id(0)
-    X_row = X_ptr + row * n_cols
-
-    # Load the entire row into SRAM (shared memory equivalent)
-    offsets = tl.arange(0, BLOCK_SIZE)
-    mask = offsets < n_cols
-    x = tl.load(X_row + offsets, mask=mask, other=0.0)
-
-    # LayerNorm (all in registers/SRAM — no HBM round-trip)
-    mean = tl.sum(x, axis=0) / n_cols
-    x_centered = x - mean
-    var = tl.sum(x_centered * x_centered, axis=0) / n_cols
-    x_norm = x_centered / tl.sqrt(var + eps)
-
-    # Scale and shift
-    w = tl.load(W_ptr + offsets, mask=mask)
-    b = tl.load(B_ptr + offsets, mask=mask)
-    x_scaled = x_norm * w + b
-
-    # GELU (still in registers)
-    # Approximation: GELU(x) ≈ x * sigmoid(1.702 * x)
-    gelu_out = x_scaled * tl.sigmoid(1.702 * x_scaled)
-
-    # One write to HBM
-    tl.store(OUT_ptr + row * n_cols + offsets, gelu_out, mask=mask)
-
-
-def fused_layernorm_gelu(x: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor):
-    M, N = x.shape
-    output = torch.empty_like(x)
-    BLOCK_SIZE = triton.next_power_of_2(N)
-
-    fused_layernorm_gelu_kernel[(M,)](
-        x, weight, bias, output,
-        n_cols=N, eps=1e-5,
-        BLOCK_SIZE=BLOCK_SIZE,
-    )
-    return output
-```
-
----
-
-## 5. torch.compile — Automatic Fusion
-
-`torch.compile` with the Inductor backend **automatically fuses element-wise operations** using Triton under the hood:
-
-```python
-import torch
-
-# Unfused model — PyTorch executes each op as a separate kernel
-def forward_unfused(x, residual, w, b):
-    x = torch.nn.functional.layer_norm(x, [x.size(-1)], w, b)
-    x = torch.nn.functional.gelu(x)
-    x = torch.nn.functional.dropout(x, p=0.1, training=True)
-    x = x + residual
-    return x
-
-# Fused model — torch.compile generates a single Triton kernel
-forward_fused = torch.compile(forward_unfused, mode="max-autotune")
-
-# First call: compiles + fuses (slow ~10-60s)
-y = forward_fused(x, residual, w, b)
-
-# Subsequent calls: single fused Triton kernel
-y = forward_fused(x, residual, w, b)  # 3-5× faster than unfused
-```
-
-To see the generated Triton code:
-
-```python
-import torch._inductor.config as inductor_config
-inductor_config.debug = True   # prints generated Triton kernels to stdout
-torch.compile(fn)(x)
-```
-
----
-
-## 6. FlashAttention: The Most Impactful Fusion in AI
-
-FlashAttention is the canonical example of kernel fusion in AI — it fuses the entire attention computation to avoid materializing the N×N attention matrix in HBM.
-
-### Unfused Attention
-
-```
-Q, K, V ∈ R^(seq × head_dim)
-
-Step 1: S = Q @ K^T              → [seq, seq] in HBM (HUGE for long seq)
-Step 2: P = softmax(S / √d)      → read S from HBM, write P to HBM
-Step 3: O = P @ V                → read P from HBM
-
-HBM for S: seq² × 2 bytes
-seq=8192: 8192² × 2 = 134 MB per head
-64 heads: 8.6 GB per attention layer
-80 layers: 688 GB of attention matrices!
-→ Does not fit in HBM for long contexts
-```
-
-### FlashAttention (Fused)
-
-```
-Process Q, K, V in tiles that fit in SRAM (shared memory):
-
-For each tile of Q:
-  For each tile of K, V:
-    Load tile_Q, tile_K, tile_V into SRAM (fast)
-    Compute partial S_tile = tile_Q @ tile_K^T  (in SRAM)
-    Compute partial softmax with running correction  (in SRAM)
-    Accumulate partial O_tile += softmax × tile_V  (in SRAM)
-
-Write final O to HBM (once per Q tile)
-
-HBM traffic: O(seq × head_dim) instead of O(seq²)
-→ 5-20× less HBM traffic for seq > 1024
-```
-
-```python
-# PyTorch SDPA automatically uses FlashAttention when available
-out = torch.nn.functional.scaled_dot_product_attention(
-    q, k, v,
-    attn_mask=None,
-    dropout_p=0.0,
-    is_causal=True,   # causal mask applied inside fused kernel
-)
-# → Single fused CUDA kernel (FlashAttention 2/3)
-# → No N² HBM allocation
-# → 2-4× faster than naive attention for seq > 1024
-```
-
----
-
-## 7. Common Fusion Patterns in LLM Inference
-
-| Pattern | Unfused Kernels | Fused | Speedup |
+| Step | Reads | Writes | Element transfers |
 |---|---|---|---|
-| QKV projection | Linear + Bias + Split | FusedQKVLinear | 1.5× |
-| Attention | QK matmul + Softmax + AV matmul | FlashAttention | 3–8× |
-| MLP | Gate + SiLU + Mul + Up proj | SwiGLU fused | 2× |
-| LayerNorm + linear | 2 kernels | FusedLinearLayerNorm | 1.4× |
-| Sampling | Logits + TopK + Sample | FusedSampling | 2× |
-| Embedding + RoPE | 2 kernels | FusedEmbeddingRoPE | 1.3× |
+| GELU | input | temporary A | 2N |
+| Dropout | temporary A | temporary B | 2N |
+| Residual add | temporary B + residual | output | 3N |
+| Separate total | | | **7N** |
+| Fused version | input + residual | output | **3N** |
 
----
+For `N=1000`, FP32 payload traffic is 28,000 versus 12,000 bytes: **7/3 ≈ 2.33× less estimated traffic**, not a guaranteed speedup. The residual input must be counted. Actual HBM traffic depends on caching, implementation, mask generation and memory layout.
 
-## 8. Profiling to Find Fusion Opportunities
+Fusion can also increase register pressure, spills, synchronization or duplicated work. The best choice follows from measurement and correctness, not a universal “fusion always wins” rule.
 
-```bash
-# Step 1: Profile with Nsight Systems to see all kernels
-nsys profile python inference.py
-# Open in nsys-ui → GPU rows → find clusters of small kernels
+## 2. Use the appropriate roofline
 
-# Step 2: Use PyTorch profiler to identify bottlenecks
-from torch.profiler import profile, ProfilerActivity
+Arithmetic intensity is operations divided by bytes at a specified memory boundary. State dtype, shape, operation convention and which arrays move. The ridge point is the applicable compute ceiling divided by the applicable bandwidth ceiling.
 
-with profile(
-    activities=[ProfilerActivity.CUDA],
-    record_shapes=True,
-) as prof:
-    model(input)
+For a dense square FP16 GEMM of size 1024, counting two FLOPs per multiply-add, a simplified once-read A/B and once-written C model gives:
 
-# Print top CUDA kernels by self_cuda_time_total
-print(prof.key_averages().table(sort_by="self_cuda_time_total", row_limit=20))
+```text
+FLOPs = 2 × 1024³ = 2,147,483,648
+bytes = 3 × 1024² × 2 = 6,291,456
+intensity ≈ 341.33 FLOP/byte
 ```
 
-**Fusion opportunity signals:**
-- Many small kernels (< 1 ms each) in sequence
-- Same input tensor read by multiple consecutive kernels
-- Element-wise ops between two GEMMs
-- Memory bandwidth near peak but SM compute utilization low
+This excludes reading an existing C, packing, extra workspace and repeated loads. Whether it is compute- or bandwidth-limited depends on the target's relevant dense precision ceiling and achieved traffic. Comparing dense work against a sparse peak without the required sparsity is invalid.
 
----
+## 3. Preserve numerical and stochastic semantics
 
-## 9. Operator Fusion in TensorRT-LLM
+The CPU lab compares separate and fused GELU/dropout/add using the **same explicit dropout decisions**. That isolates fusion from a change in RNG sequence. It checks dropout probabilities in `[0,1)` and shape agreement.
 
-TRT-LLM has a dedicated fusion pass:
+Changing exact GELU into `x*sigmoid(1.702*x)` changes the function. Changing RNG mapping can change individual outputs while preserving a distribution; decide which equivalence your application requires. Training-mode dropout should not silently appear in an inference example.
 
-```bash
-# Enable aggressive fusion during engine build
-trtllm-build \
-    --checkpoint_dir /ckpt \
-    --output_dir /engine \
-    --gemm_plugin bfloat16 \                     # fused GEMM+Bias
-    --gpt_attention_plugin bfloat16 \            # FlashAttention fusion
-    --context_fmha enable \                      # fused context phase attention
-    --use_paged_context_fmha enable \            # paged FlashAttention
-    --strongly_typed                             # type-specific fusion
+The CUDA harness uses an even smaller deterministic pair, affine then ReLU, and a fused equivalent. It compares new inputs and irregular lengths. No speed claim follows from the smaller kernel count alone.
+
+## 4. Mask reductions after the transformation
+
+Suppose a row has values `[1,2,4]`, but the kernel operates on four lanes. Filling the inactive input lane with zero makes the sum correct if you divide by the valid length. It does **not** make the variance reduction correct after subtracting the mean.
+
+```text
+valid mean = 7/3
+incorrect extra variance term = (0 - 7/3)²
 ```
 
-The TRT-LLM engine applies:
-- GEMM + bias fusion
-- Layernorm + linear fusion
-- Attention QKV fusion
-- SwiGLU/GeGLU fusion
-- RoPE embedding fusion
+The padded lane must contribute zero to the centered-square sum as well. The CPU lab reproduces this old error: the first normalized value changes from about `-1.06904` to `-0.72627` when the invalid lane contaminates variance.
 
-Result: **60–80% fewer kernel launches** than PyTorch eager mode.
+A correct Triton-style expression for the reduction is:
 
----
+```python
+# Explanatory fragment: inside a kernel with a valid row and n_cols > 0.
+x = tl.load(X_row + offsets, mask=mask, other=0.0).to(tl.float32)
+mean = tl.sum(x, axis=0) / n_cols
+centered = tl.where(mask, x - mean, 0.0)
+variance = tl.sum(centered * centered, axis=0) / n_cols
+```
 
-## References
+This is a mathematical fragment, not a complete compiled Triton program. A full implementation still needs layout/stride checks, valid launch sizes, parameter loads, output casting and a numerical comparison. See the [official Triton layer-normalization tutorial](https://triton-lang.org/main/getting-started/tutorials/05-layer-norm.html).
 
-- [FlashAttention Paper](https://arxiv.org/abs/2205.14135)
-- [FlashAttention-2 Paper](https://arxiv.org/abs/2307.08691)
-- [OpenAI Triton](https://triton-lang.org/)
-- [torch.compile Fusion](https://pytorch.org/tutorials/intermediate/torch_compile_tutorial.html)
-- [TensorRT Kernel Fusion](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#fusion)
-- [Nsight Compute Roofline](https://docs.nvidia.com/nsight-compute/NsightCompute/index.html#roofline-chart)
+## 5. Compilers may fuse, and may choose not to
+
+Triton is an open-source language/compiler project for parallel kernels, with backend-dependent hardware support. It is not simply “NVIDIA's Python compiler”. A logical Triton tensor does not promise that every element resides in a particular physical memory level.
+
+PyTorch Inductor may fuse supported operations according to device, shapes, layout, scheduling and cost decisions. CPU and GPU paths can differ. `torch.compile` does not promise that LayerNorm, activation, dropout and residual add become one kernel or run a fixed number of times faster.
+
+Use the [actual CPU compiler lab](../../../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/00%20-%20CPU%20Compiler%20Lab/Guide.md) to see a measured example of materialization, lazy fusion and constant folding. That lab found three versus one kernels for its own shapes and pinned tinygrad runtime; the number is evidence about that experiment.
+
+For PyTorch inspection, use supported [compiler debugging tools](https://docs.pytorch.org/docs/stable/torch.compiler_troubleshooting.html) for your release. Preserve a generated-code excerpt and an uninstrumented measurement run.
+
+## 6. FlashAttention changes the attention IO algorithm
+
+For sequence length `N` and head dimension `d`, conventional attention may materialize an `N×N` score/probability array. At `N=8192`, one FP16 array is 134,217,728 bytes = 128 MiB **per head**. Whether arrays from multiple heads/layers are simultaneously live depends on execution and training/storage policy; multiplying by all layers does not automatically describe inference peak memory.
+
+FlashAttention uses tiled attention and online softmax rescaling to avoid materializing the full quadratic matrix. It still performs dense attention's quadratic arithmetic, and its IO complexity depends on tile size and available fast memory. It is inaccurate to claim all HBM traffic becomes simply linear in sequence length for every memory size.
+
+Read the [FlashAttention paper](https://arxiv.org/abs/2205.14135) and [FlashAttention-2](https://arxiv.org/abs/2307.08691). The algorithm is more specific than concatenating three kernels.
+
+PyTorch scaled-dot-product attention dispatches among eligible backends according to device, dtype, shape, mask and other conditions. It does not guarantee FA2 or FA3 for every call. Inspect the selected backend and keep `dropout_p=0.0` explicit for inference where appropriate. See [SDPA documentation](https://docs.pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html).
+
+## 7. Runtime-specific fusion is version-specific
+
+A historical `trtllm-build` plugin command is not a current universal TensorRT-LLM recipe. The project migrated to its PyTorch backend and documents [legacy TensorRT backend removal](https://nvidia.github.io/TensorRT-LLM/latest/legacy/tensorrt-backend-removal.html). Select the runtime release, model support and configuration before discussing which kernels it uses.
+
+Similarly, a split can be a view rather than a launched kernel; RoPE normally transforms query/key representations rather than being an interchangeable fusion with input token embedding. Draw the actual graph and inspect executed work.
+
+## Exercises and completion
+
+1. Run the CPU lab with `N=1003`; explain 28,084 and 12,036 estimated bytes.
+2. Use a five-element row in an eight-lane block and demonstrate the variance-padding failure.
+3. Compare a fixed-mask fused operation against the separate reference. Explain what changes if the RNG mapping differs.
+4. On a GPU, run the harness and then design a timed comparison. Report cache/traffic assumptions separately from measured counters.
+
+Submit the arithmetic, counterexample, changing-input checks and validation level. Continue with [warp specialization](05-Warp-Specialization.md).

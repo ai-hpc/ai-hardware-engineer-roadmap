@@ -14,13 +14,19 @@
 
 > *Build applications on top of large language models — agents, RAG, tool use, GenAI products.*
 
-**Prerequisites:** Module 1 (Neural Networks), Module 2 (Frameworks — understand transformers and PyTorch).
+**Prerequisites:** Python functions, dictionaries, files and basic HTTP. Start with the local workflow below; training a neural network is not required. Lectures 05–06 provide model background when you need it.
 
 **Role targets:** Agentic AI Engineer · GenAI Engineer · AI Engineer
 
 ---
 
 ## Curriculum — recommended learning order
+
+**Executed starting point:** [Local retrieval and durable workflow lab](Local-RAG-Workflow-Lab/Guide.md) uses actual SQLite FTS5, LangGraph and FastAPI without a model account. It includes labelled retrieval failures, source citations, process restarts and crash recovery. The [current MCP SDK lab](MCP%20for%20AI%20Agents/Lecture-05.md) exercises a real stdio server/client.
+
+**A shorter first pass:** complete Lectures 01–04, 08, and 23, then Lab 01. Produce one bounded tool loop, a fixed evaluation set, a failure trace, and a latency/cost report before adding memory, orchestration frameworks, or multiple agents. Compare the agent against a deterministic workflow using the same tools. The other modules become easier when you have a concrete failure to investigate.
+
+**For robot applications:** first read [the planning-agent versus controller example](../../0.%20AI%20and%20Robot%20Learning%20Foundations/02-Evaluation-and-Robot-Learning.md#8-an-agent-is-a-different-control-loop). A valid tool call is a proposed application action; the receiving system must still enforce identity, argument meaning, freshness, and execution limits.
 
 A **theory-first path**: start from what a modern agent *is* in 2026, learn the fundamentals, build the core parts one by one, study a real harness (**OpenClaw**), then build your own (**genie-claw**). Lecture *files* keep their original numbers — this is the recommended **reading order**, not a renumbering. **[→ Flat lecture index](Lectures/README.md)**
 
@@ -366,7 +372,7 @@ For this roadmap, the important takeaway is that **Track B should teach the work
 | [LangGraph Documentation](https://docs.langchain.com/oss/python/langgraph/overview) | Durable, stateful agent workflows, human-in-the-loop, memory, and tracing |
 | [OpenAI Agents SDK](https://openai.github.io/openai-agents-python/) | Agent loops, tools, handoffs, guardrails, sessions, tracing, and MCP integration |
 | [OpenAI API Agents Guide](https://platform.openai.com/docs/guides/agents) | Current OpenAI guidance for code-first agent apps, tools, orchestration, and observability |
-| [Model Context Protocol Specification](https://modelcontextprotocol.io/specification/2025-11-25) | Standard protocol for tools, resources, prompts, hosts, clients, servers, and safety considerations |
+| [Model Context Protocol Specification](https://modelcontextprotocol.io/specification/2026-07-28) | Standard protocol for tools, resources, prompts, hosts, clients, servers, and safety considerations |
 | [Claude Code Overview](https://code.claude.com/docs/en/overview) | Agentic coding workflows, MCP, multi-agent use, and CI patterns |
 | [Claude Code Plugins](https://code.claude.com/docs/en/plugins) | Skills, agents, hooks, MCP servers, plugin structure, and distribution |
 | [Claude Code Repository](https://github.com/anthropics/claude-code) | Public implementation surface, examples, plugins, and project layout |

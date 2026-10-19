@@ -46,7 +46,9 @@ The unit of \(n_i\) matters. Counting frames favors long, high-frequency episode
 
 ## Build the conversion pipeline
 
-**Exercise / pseudocode.** Create two small synthetic sources with intentionally different units, action frames, frequencies, and episode lengths. Use the [shared lab guide](Lab-Guide.md) for runnable normalization and episode-boundary checks.
+Start with the supplied [dataset-to-execution lab](Dataset-and-Execution-Lab.md): its JSON recordings convert camera-frame millimeter deltas and base-frame velocities, preserve causal camera/state selection, fit training-only statistics, and reject episode/session leakage. Run its worked examples before implementing the broader exercise below.
+
+**Independent exercise.** Create two additional small synthetic sources with intentionally different units, action frames, frequencies, and episode lengths. Use the supplied implementation as a reference, then document the new action semantics rather than silently extending its two-dimensional contract.
 
 1. Write adapters to a canonical schema and record a transformation graph. Include source checksum, converter revision, and schema version in the output manifest.
 2. Construct at least one analytically known motion in both source formats. Convert both and compare the recovered physical motion, not merely tensor values.

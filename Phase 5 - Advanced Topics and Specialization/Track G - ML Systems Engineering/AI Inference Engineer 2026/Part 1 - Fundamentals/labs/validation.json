@@ -1,0 +1,46 @@
+{
+  "reviewed_utc": "2026-10-18",
+  "scope": "Actual CPU reference and accounting execution; no pretrained weights, GPU execution, cluster serving, or physical robot test.",
+  "environment": {
+    "platform": "Linux x86_64",
+    "python": "3.12.3",
+    "torch_optional": "2.14.0+cpu"
+  },
+  "runs": [
+    {
+      "command": "python3 -m unittest discover -s . -v",
+      "tests_discovered": 24,
+      "passed": 22,
+      "skipped": 2,
+      "reason": "PyTorch absent in system Python"
+    },
+    {
+      "command": "/tmp/course-pytorch-cpu-venv/bin/python -m unittest discover -s . -v",
+      "tests_discovered": 24,
+      "passed": 24,
+      "skipped": 0
+    }
+  ],
+  "coverage": [
+    "GQA explicit head_dim and integer dimensions",
+    "Per-request page rounding and zero-length storage",
+    "MLA compressed-latent layout accounting",
+    "Quantization partial group and packed odd row",
+    "Roofline units and bound branches",
+    "Cached GQA prefix/chunk equivalence and future independence",
+    "PyTorch SDPA non-square causal-mask counterexample",
+    "Routing destination deduplication and rank/expert loads",
+    "Weighted expert combine and token order",
+    "Exact rejection sampling probability identity across 121 two-token distribution pairs",
+    "Actual toy INT4 quantization: ties-to-even, zero group, calibration clipping, saturation before overflowing ratio rounding"
+  ],
+  "sha256": {
+    "deepseek_v31_config.json": "3e5d192d745758862b0a3e6338ee181991db49933dbbd3185e1bde34944e7bad",
+    "inference_contracts.py": "58b84ccd98584ef7588cb85c05656f59075e9c959d3e9a24c55347fc3dbe93b8",
+    "model_sources.json": "c42a7e4b25f0478c5f957cd9fa2167c34b6782adf4e63202a93dacf2adccfad0",
+    "qwen25_config.json": "14ca217334fe0fd10148413592d68c99eeb33431ed89c1afa130fee560be2a29",
+    "qwen3_moe_config.json": "0ecd5d6fe6f2db6739e4e36ab06b88ebe7bd013ef31b9583f43796059a2b23a4",
+    "test_inference_contracts.py": "c26dcf7bc7a3e15f35231af6ca2d3d8f9c6a950bfe3239d20a20d98ca3eabeb0",
+    "test_torch_attention.py": "4c2e194c2e07be2e3c1ddd87ef45090bd9266c53c2f5694120eb1e7a74f9d28b"
+  }
+}

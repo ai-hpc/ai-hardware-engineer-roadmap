@@ -1,0 +1,52 @@
+{
+  "evidence_kind": "synthetic arithmetic, not measured Jetson power",
+  "boundary": "hypothetical complete system DC input",
+  "samples": [
+    {
+      "seconds": 0,
+      "watts": 6
+    },
+    {
+      "seconds": 1,
+      "watts": 10
+    },
+    {
+      "seconds": 3,
+      "watts": 10
+    },
+    {
+      "seconds": 4,
+      "watts": 6
+    }
+  ],
+  "configuration_a": {
+    "duration_s": 4.0,
+    "energy_j": 36.0,
+    "average_w": 9.0,
+    "attempted": 200,
+    "valid_on_time": 180,
+    "success_fraction": 0.9,
+    "joules_per_valid_on_time_result": 0.2,
+    "idle_baseline_w": 4,
+    "incremental_energy_j": 20.0
+  },
+  "configuration_b": {
+    "duration_s": 4.0,
+    "energy_j": 28.0,
+    "average_w": 7.0,
+    "attempted": 200,
+    "valid_on_time": 100,
+    "success_fraction": 0.5,
+    "joules_per_valid_on_time_result": 0.28
+  },
+  "thermal": {
+    "ambient_c": 35,
+    "power_w": 15,
+    "resistance_c_per_w": 2,
+    "capacity_j_per_c": 40,
+    "time_constant_s": 80,
+    "equilibrium_c": 65,
+    "temperature_after_80_s_c": 53.96361676485673,
+    "temperature_after_240_s_c": 63.50638794896408
+  }
+}

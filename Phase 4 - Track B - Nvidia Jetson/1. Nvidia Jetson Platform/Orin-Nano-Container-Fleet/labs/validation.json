@@ -1,0 +1,13 @@
+{
+  "checked_on": "2026-10-18",
+  "python": "3.12.3",
+  "local_http_tests_passed": 10,
+  "docker_cases_passed": 2,
+  "evidence_kind": "CPU local HTTP and actual Docker; no GPU or Jetson",
+  "files_sha256": {
+    "container_smoke.py": "78c828805d13da9a23fa648ee9eaf18c720f07c77ad632339f4efa0fc0f1905d",
+    "service.py": "3f1a2145832a4f4ae48499c052c88de536588efcdb2ec211805764ecddd15712",
+    "test_service.py": "fd4f1d3165b5eebb12eae3dd66a96070146d35c81ec4eb01e5555bcf1e7d3d86"
+  },
+  "reviewed_utc": "2026-10-18T21:21:09.741517+00:00"
+}

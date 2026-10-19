@@ -1,381 +1,101 @@
-# 02 — Cooperative Groups
+# 02 — Cooperative Groups: define who must participate
 
-## 1. The Problem: CUDA's Synchronization Wall
+**Outcome:** explain the participants, data visibility and launch requirements of a synchronization point. Use the reduction in the [shared lab](labs/README.md), then reason about a grid-wide algorithm.
 
-Traditional CUDA synchronizes only within a thread block:
+## 1. Synchronization has a scope
 
-```
-__global__ void naive_reduction(float* data, float* result) {
-    __shared__ float sdata[256];
-    int tid = threadIdx.x;
-    sdata[tid] = data[blockIdx.x * 256 + tid];
-    __syncthreads();   // only syncs 256 threads in this block
+A barrier coordinates a specified group of threads. It is not simply “wait until the GPU is ready”. Every required participant must reach a valid matching collective, and the data being exchanged must obey the memory rules of that operation.
 
-    // Reduction within block...
-    // But to get the GLOBAL sum, you need another kernel launch!
-}
-```
+| Group or mechanism | Participants | Typical purpose |
+|---|---|---|
+| Thread-block group | Threads in one block | Shared-memory exchange |
+| Fixed tile | A partition of a parent group | Subgroup reduction or shuffle |
+| Coalesced group | Threads coalesced at that point | Work among the current active group |
+| Grid group | Cooperative launch's grid | A multi-phase algorithm across blocks |
+| Same-stream kernel order | Operations submitted in that stream | Cross-kernel dependencies |
 
-The limitation:
+Do not rely on implicit warp lockstep for communication. Independent thread scheduling makes explicit synchronization and valid collective participation essential. A coalesced group gives ranks to currently participating threads; it does not physically pack them into new hardware lanes or guarantee that all logically eligible threads appear in one group.
 
-```
-Thread block size limit: 1024 threads
-GPU SM count: 108 (H100/H200)
-Concurrent threads: 108 × 2048 active = ~220,000 threads
+Source: [Cooperative Groups programming guide](https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/cooperative-groups.html).
 
-To sync ALL threads: you MUST launch a second kernel
-                     which requires CPU involvement + kernel overhead
-```
+## 2. A complete block reduction
 
-**Cooperative Groups** break this wall by providing programmable synchronization at multiple hierarchical levels — within a warp, across a block, and across the entire grid — without leaving the kernel.
+The lab's `block_partial_sum` uses exactly 256 threads per block and 256 shared floats. Each thread writes one value; threads beyond the input tail write zero. All threads reach every block barrier.
 
----
-
-## 2. The Cooperative Groups Hierarchy
-
-```
-GRID (all blocks in a kernel launch)
-│
-├── THREAD BLOCK (256–1024 threads, one SM)
-│   │
-│   ├── WARP (32 threads, execute in lockstep)
-│   │   │
-│   │   └── TILED PARTITION (8, 16, or 32 threads)
-│   │
-│   └── COALESCED GROUP (active threads in a warp)
-│
-└── MULTI-GRID (multiple kernels, rarely used)
+```text
+load or zero -> block barrier
+128 pair additions -> block barrier
+64 pair additions -> block barrier
+...
+1 pair addition -> block barrier
+thread 0 writes the block's sum
 ```
 
-Each level has its own `sync()`, shuffle operations, and metadata.
+The power-of-two block size is a stated precondition of this reduction tree. The mathematical sum is the reference; floating-point reassociation can change rounding. The lab uses small dyadic values so this fixture's sums remain exactly representable.
 
----
+**Worked tail:** input length 257 creates two blocks. Block 0 reduces elements 0–255. Block 1 has one valid element and 255 zeros. No thread exits before the barriers. The host compares every partial sum with an independent scalar calculation.
 
-## 3. Thread Block Group (Drop-in `__syncthreads()` replacement)
+**Fault to avoid:** `if (global >= n) return;` before a later block-wide barrier leaves a partial block with missing participants. Predicating loads/stores while preserving collective participation is the correct structure for this example.
+
+## 3. A shuffle is not a block broadcast
+
+A warp/tile shuffle exchanges registers inside its supported group. `__shfl_sync(..., value, 0)` cannot broadcast thread 0's register across every warp in a 256-thread block. For a block-wide control value, use shared storage and a block barrier, as the finite worker in the lab does.
+
+Fixed 32-lane butterfly reductions need the stated participation and initialized neutral values. A reduction that starts at `group.size()/2` and repeatedly halves is not a general reduction for arbitrary group sizes.
+
+**Counterexample:** for three values `[1,2,4]`, the naive halving loop starts at offset 1 and then stops. The first rank can obtain `1+2=3`, missing the third value. Use a supported library collective for the relevant group/type or a reduction proven for arbitrary size. See [Cooperative Groups collectives](https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/cooperative-groups.html#group-collectives).
+
+Shuffle latency is architecture- and dependency-dependent. There is no universal one-cycle promise or guaranteed superiority over every shared-memory reduction.
+
+## 4. Grid synchronization needs a cooperative launch
+
+A grid barrier can coordinate blocks inside one kernel when the device and launch support it. Query cooperative-launch capability and compute occupancy for the **actual kernel, block size and dynamic shared memory**. Respect the allowed cooperative grid size and ensure all participants follow the matching collective sequence.
+
+Block indices are logical identities, not SM IDs. A grid with one block per SM count does not assign block `i` to SM `i`. Register/shared-memory use and the launch mechanism determine residency constraints.
+
+A normal kernel that spins until every block arrives can deadlock if waiting blocks occupy resources required by blocks that have not yet run. Do not replace a supported grid barrier with a global counter plus a busy-wait and assume it is equivalent.
+
+The lab intentionally uses block synchronization only. Cooperative grid launch and performance need a separate GPU experiment; no grid-wide result is claimed here.
+
+## 5. A second kernel does not require a host round trip
+
+These operations in one stream establish order:
 
 ```cpp
-#include <cooperative_groups.h>
-namespace cg = cooperative_groups;
-
-__global__ void block_sync_example(float* data) {
-    // Get handle to current thread block
-    cg::thread_block block = cg::this_thread_block();
-
-    __shared__ float sdata[1024];
-    int tid = threadIdx.x;
-
-    sdata[tid] = data[blockIdx.x * blockDim.x + tid];
-
-    // Equivalent to __syncthreads() but more readable + composable
-    block.sync();
-
-    // Can also get metadata
-    unsigned size   = block.size();          // blockDim.x * blockDim.y * blockDim.z
-    unsigned rank   = block.thread_rank();   // unique ID within block (0..size-1)
-    dim3     tidx   = block.thread_index();  // = threadIdx
-    dim3     bidx   = block.group_index();   // = blockIdx
-}
+// Schematic: kernels and buffers are supplied by your program.
+phase_one<<<grid, block, 0, stream>>>(input, partial);
+phase_two<<<grid2, block2, 0, stream>>>(partial, output);
 ```
 
-Advantage over raw `__syncthreads()`: the group is a **first-class object** you can pass to functions.
+The second kernel follows the first in that stream. A `cudaDeviceSynchronize()` between them is unnecessary merely to make phase two consume phase one's results. Use explicit dependencies for other streams and a completion mechanism when the host must inspect output. Graph capture can amortize submission of this sequence.
 
-```cpp
-// Pass the sync group to helper functions — impossible with __syncthreads()
-__device__ void reduce_in_block(cg::thread_block& block, float* sdata) {
-    for (int s = block.size() / 2; s > 0; s >>= 1) {
-        if (block.thread_rank() < s)
-            sdata[block.thread_rank()] += sdata[block.thread_rank() + s];
-        block.sync();   // proper sync within the group
-    }
-}
+A grid-synchronized single kernel may help some workloads, but can also restrict occupancy or scheduling. Compare it with a correct multikernel baseline.
+
+## 6. Reduction and scan are different algorithms
+
+A reduction returns one combined value; an inclusive scan returns every prefix. For `[1,2,3,4]`:
+
+```text
+sum:            10
+inclusive scan: 1,3,6,10
+exclusive scan: 0,1,3,6
 ```
 
----
+An up-sweep reduction tree alone leaves intermediate tree values, not all prefixes. A complete scan needs the remaining propagation steps or another correct algorithm. Adding a block prefix to an unfinished local reduction does not turn it into a scan.
 
-## 4. Tiled Partition — Divide a Block into Subgroups
+For a multi-block scan, explain three obligations: each local scan, a scan of block totals, and addition of preceding-block totals. Test non-power-of-two sizes and partial blocks. Use [CCCL/CUB](https://nvidia.github.io/cccl/cub/) as a production baseline before writing a custom scan.
 
-```cpp
-__global__ void tiled_example(float* data) {
-    cg::thread_block block = cg::this_thread_block();
+## 7. Integrating with PyTorch
 
-    // Partition block into groups of 32 (warp-sized)
-    cg::thread_block_tile<32> warp = cg::tiled_partition<32>(block);
+A CUDA extension must check device, dtype, shape/layout and size assumptions; guard the selected device; launch on PyTorch's current stream; check launch errors; and define empty-input behavior. A bare default-stream launch with an unchecked `data_ptr<float>()` is not a general extension.
 
-    // Or partition into groups of 16, 8, 4, or 2
-    cg::thread_block_tile<16> half_warp = cg::tiled_partition<16>(block);
-    cg::thread_block_tile<4>  quad      = cg::tiled_partition<4>(block);
+If a reduction uses atomics into an output scalar, initialize it on a correctly ordered stream. Floating-point atomic order may vary between executions. Choose tolerances and determinism requirements accordingly. Review [PyTorch custom C++/CUDA operators](https://docs.pytorch.org/tutorials/advanced/cpp_custom_ops.html).
 
-    // Each tile syncs independently
-    float val = data[threadIdx.x];
+## Exercise and answers
 
-    // Warp-level reduction using shuffle within tile
-    for (int offset = warp.size() / 2; offset > 0; offset >>= 1) {
-        val += warp.shfl_down(val, offset);
-    }
+1. **Where must the final partial block's inactive threads go?** Through the same barriers, contributing zeros and skipping invalid stores.
+2. **Can a warp shuffle publish a work index to all 256 threads?** No; its scope does not include the other warps.
+3. **Is kernel order in one stream sufficient for a two-stage dependency?** Yes for those stream operations; host inspection and other streams need their own ordering.
+4. **Does an up-sweep tree produce a scan?** No. Check `[1,2,3,4]` to expose the missing prefixes.
 
-    // Only thread 0 of each warp has the full sum
-    if (warp.thread_rank() == 0)
-        atomicAdd(&result, val);   // one atomic per warp (not per thread!)
-}
-```
-
-The tiled partition shuffle is **much faster** than shared memory for warp-level reductions:
-- No `__shared__` allocation
-- No bank conflicts
-- 1 cycle latency (vs 4+ for shared memory)
-
----
-
-## 5. Coalesced Groups — Handle Warp Divergence
-
-When threads in a warp take different paths (diverge), some threads are inactive. Coalesced groups create a group of **only the active threads**:
-
-```cpp
-__global__ void divergent_kernel(float* data, float* result, int n) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= n) return;  // some threads exit early → divergence
-
-    // Get a group of only threads that are still active here
-    cg::coalesced_group active = cg::coalesced_threads();
-
-    float val = data[idx];
-
-    // Reduce across ONLY the active threads in this warp
-    // (no waste from inactive thread slots)
-    for (int offset = active.size() / 2; offset > 0; offset >>= 1) {
-        val += active.shfl_down(val, offset);
-    }
-
-    if (active.thread_rank() == 0) {
-        atomicAdd(result, val);
-    }
-}
-```
-
-Without coalesced groups, warp divergence forces inactive threads to serialize. Coalesced groups **pack active threads** and execute them efficiently.
-
----
-
-## 6. Grid Group — Full Grid Synchronization
-
-The most powerful feature: sync ALL threads across ALL blocks **inside one kernel**.
-
-```cpp
-// Requires special launch: cudaLaunchCooperativeKernel
-#include <cooperative_groups.h>
-namespace cg = cooperative_groups;
-
-__global__ void grid_sync_kernel(float* data, float* partial, float* result) {
-    cg::grid_group grid = cg::this_grid();
-
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-    // Phase 1: every thread computes its local value
-    partial[idx] = compute(data[idx]);
-
-    // === GRID-WIDE SYNCHRONIZATION ===
-    grid.sync();   // all blocks across the entire GPU wait here
-
-    // Phase 2: use results from Phase 1 (now safe, all computed)
-    if (idx == 0) {
-        float total = 0;
-        for (int i = 0; i < gridDim.x * blockDim.x; i++)
-            total += partial[i];
-        *result = total;
-    }
-}
-```
-
-**Without grid sync:** You'd need:
-```
-kernel_phase1<<<grid, block>>>(data, partial);
-cudaDeviceSynchronize();   // CPU round-trip
-kernel_phase2<<<grid, block>>>(partial, result);
-```
-
-**With grid sync:** Single kernel, no CPU involvement, no kernel launch overhead.
-
-### Grid Group Launch (C++)
-
-```cpp
-// MUST use cooperative launch API — not standard <<<grid, block>>>
-void* args[] = {&data, &partial, &result};
-
-// Check device supports cooperative launch
-int supportsCoopLaunch;
-cudaDeviceGetAttribute(&supportsCoopLaunch,
-    cudaDevAttrCooperativeLaunch, device_id);
-assert(supportsCoopLaunch == 1);
-
-// Check max blocks for cooperative launch
-int numBlocksPerSM;
-cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-    &numBlocksPerSM, grid_sync_kernel, blockSize, 0);
-int numSMs;
-cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, device_id);
-int maxBlocks = numBlocksPerSM * numSMs;
-
-// Launch with cooperative API
-cudaLaunchCooperativeKernel(
-    (void*)grid_sync_kernel,
-    dim3(maxBlocks),   // must not exceed max blocks!
-    dim3(blockSize),
-    args,
-    0, stream
-);
-```
-
-**Critical constraint:** Grid sync requires that **all blocks fit on the GPU simultaneously** — you cannot launch more blocks than the GPU can schedule at once.
-
----
-
-## 7. Warp-Level Primitives via Cooperative Groups
-
-Cooperative groups expose warp intrinsics cleanly:
-
-```cpp
-__global__ void warp_ops_demo(float* data) {
-    auto warp = cg::tiled_partition<32>(cg::this_thread_block());
-
-    float val = data[threadIdx.x];
-    int   rank = warp.thread_rank();
-
-    // === SHUFFLE DOWN (reduction) ===
-    // Each thread gets val from thread (rank + offset)
-    float neighbor = warp.shfl_down(val, 16);   // get from thread+16
-    val += neighbor;
-
-    // === SHUFFLE XOR (butterfly reduction) ===
-    // Pairs up threads by XOR of their rank
-    for (int mask = 16; mask > 0; mask >>= 1)
-        val += warp.shfl_xor(val, mask);
-
-    // === BALLOT (which threads satisfy a condition?) ===
-    unsigned active_mask = warp.ballot(val > 0.0f);
-    // active_mask: bit i = 1 if thread i has val > 0
-
-    // === ANY / ALL (warp-wide predicate) ===
-    bool any_positive = warp.any(val > 0.0f);
-    bool all_positive = warp.all(val > 0.0f);
-
-    // === MATCH (find threads with same value) ===
-    unsigned same_val = warp.match_any(val);
-    // same_val: mask of all threads in warp with identical `val`
-}
-```
-
----
-
-## 8. Practical Example: Parallel Prefix Scan with Grid Groups
-
-Prefix scan (cumulative sum) is a fundamental parallel primitive. With grid sync, it can be done in **a single kernel**:
-
-```cpp
-__global__ void prefix_scan(float* data, float* output, float* block_sums, int n) {
-    auto grid  = cg::this_grid();
-    auto block = cg::this_thread_block();
-    auto warp  = cg::tiled_partition<32>(block);
-
-    extern __shared__ float sdata[];
-    int gid = blockIdx.x * blockDim.x + threadIdx.x;
-    int tid = threadIdx.x;
-
-    // Phase 1: Intra-block scan
-    sdata[tid] = (gid < n) ? data[gid] : 0.0f;
-    block.sync();
-
-    // Up-sweep (reduce)
-    for (int stride = 1; stride < blockDim.x; stride <<= 1) {
-        int idx = (tid + 1) * stride * 2 - 1;
-        if (idx < blockDim.x)
-            sdata[idx] += sdata[idx - stride];
-        block.sync();
-    }
-
-    // Save block sum
-    if (tid == blockDim.x - 1)
-        block_sums[blockIdx.x] = sdata[tid];
-
-    // === WAIT FOR ALL BLOCKS TO FINISH PHASE 1 ===
-    grid.sync();   // <-- the key grid-wide sync
-
-    // Phase 2: Only block 0 scans the block_sums array
-    if (blockIdx.x == 0) {
-        // scan block_sums... (single block, no grid sync needed)
-    }
-
-    // === WAIT FOR PHASE 2 ===
-    grid.sync();
-
-    // Phase 3: Add prefix from block_sums to each element
-    float prefix = (blockIdx.x > 0) ? block_sums[blockIdx.x - 1] : 0.0f;
-    if (gid < n)
-        output[gid] = sdata[tid] + prefix;
-}
-```
-
-Before grid sync: this required **three separate kernel launches** with CPU synchronization between them.
-
----
-
-## 9. Cooperative Groups in PyTorch Custom CUDA Extensions
-
-```cpp
-// custom_kernel.cu — used via torch.utils.cpp_extension
-#include <torch/extension.h>
-#include <cooperative_groups.h>
-namespace cg = cooperative_groups;
-
-__global__ void warp_reduce_kernel(
-    const float* __restrict__ input,
-    float* __restrict__ output,
-    int n
-) {
-    auto warp = cg::tiled_partition<32>(cg::this_thread_block());
-    int gid = blockIdx.x * blockDim.x + threadIdx.x;
-
-    float val = (gid < n) ? input[gid] : 0.0f;
-
-    // Warp reduce
-    for (int offset = 16; offset > 0; offset >>= 1)
-        val += warp.shfl_down(val, offset);
-
-    // One atomic per warp
-    if (warp.thread_rank() == 0)
-        atomicAdd(output, val);
-}
-
-torch::Tensor warp_reduce(torch::Tensor input) {
-    auto output = torch::zeros(1, input.options());
-    int n = input.numel();
-    int threads = 256;
-    int blocks  = (n + threads - 1) / threads;
-    warp_reduce_kernel<<<blocks, threads>>>(
-        input.data_ptr<float>(), output.data_ptr<float>(), n
-    );
-    return output;
-}
-```
-
----
-
-## 10. When to Use Each Group Type
-
-| Situation | Use |
-|---|---|
-| Drop-in `__syncthreads()` replacement | `thread_block.sync()` |
-| Warp-level reduction (no shared mem) | `tiled_partition<32>` + `shfl_down` |
-| Sub-warp parallelism (e.g., tree traversal) | `tiled_partition<N>` (N = 4, 8, 16) |
-| Handle divergent threads cleanly | `coalesced_threads()` |
-| Two-phase algorithm without extra kernel | `this_grid().sync()` |
-| Algorithm with broadcast within small group | `tiled_partition<N>.shfl()` |
-| Count/find active threads in warp | `coalesced_threads().size()` |
-
----
-
-## References
-
-- [CUDA Cooperative Groups Programming Guide](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#cooperative-groups)
-- [Cooperative Groups Examples (NVIDIA)](https://github.com/NVIDIA/cuda-samples/tree/master/Samples/3_CUDA_Features/conjugateGradientMultiBlockCG)
-- [Warp-Level Primitives](https://developer.nvidia.com/blog/using-cuda-warp-level-primitives/)
-- [Grid-Synchronization via Cooperative Kernels](https://developer.nvidia.com/blog/cooperative-groups/)
+Submit a participant diagram, known-answer/tail cases, and either GPU results or an explicit compile-only record. Continue with [finite persistent work](03-Persistent-Kernels.md).

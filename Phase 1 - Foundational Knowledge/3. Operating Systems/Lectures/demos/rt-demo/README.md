@@ -6,19 +6,19 @@ Kernel-side topics (interrupts, boot, modules, device tree) are only described i
 
 ## Build and run
 
-From this directory:
+From the repository root, enter this directory:
 
 ```bash
 cd "Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/demos/rt-demo"
 make
-./rt_demo [options]
+./rt_demo
 ```
 
-Without `make`: `gcc -Wall -O2 -pthread -o rt_demo rt_demo.c`
+Without `make`: `gcc -std=c17 -Wall -Wextra -Werror -O2 -pthread -o rt_demo rt_demo.c`
 
-**Options:** `./rt_demo --help` — e.g. `--cpu 2,3`, `--rt` (needs root / `cap_sys_nice`), `--lock-memory` (needs root / `cap_ipc_lock`), `--no-rt`.
+**Options:** `./rt_demo --help`. Choose `--cpu` values from your actual allowed mask (`taskset -pc $$`), not an assumed CPU number. Invalid syntax, a CPU outside that mask, and failed setup requests exit nonzero. `--rt` requests FIFO priority 80 and `--lock-memory` requests memory locking; permissions and resource limits determine success. `--no-rt` clears earlier RT/locking options, so option order is explicit. The default requests neither.
 
-**Trace syscalls:** `strace -e sched_setscheduler,sched_setaffinity,mlockall,gettid,clock_gettime ./rt_demo --rt --cpu 1 2>&1 | head -50`
+**Optional documented trace:** `strace -e sched_setscheduler,sched_setaffinity,mlockall,gettid,clock_gettime ./rt_demo`. `clock_gettime` can use the vDSO without a traced syscall. Trace overhead changes the experiment; this is not a latency measurement.
 
 ## Lecture mapping
 
@@ -37,12 +37,12 @@ Without `make`: `gcc -Wall -O2 -pthread -o rt_demo rt_demo.c`
 ### L5 on a real machine
 
 - **Boot:** `dmesg` at boot; `systemd-analyze`
-- **Modules:** `lsmod`, `modinfo`, `modprobe` (e.g. `loop`)
+- **Modules:** `lsmod`, `modinfo` for read-only inventory; loading a module is a separate target-specific operation
 - **Device tree (ARM):** `/sys/firmware/devicetree/base/` or machine model in boot logs
 
 ## Requirements
 
-Linux or WSL with pthreads and `sched.h`. `--rt` / `--lock-memory` usually require root or the matching capabilities.
+Linux or WSL with pthreads and `sched.h`. `--rt` / `--lock-memory` depend on configured resource limits and capabilities; neither is required for the default exercise.
 
 ## Files
 
@@ -57,6 +57,10 @@ Back to the section hub: **[Operating Systems Guide](../../../Guide.md)**.
 ## Distinguish wakeup latency from real-time guarantees
 
 Run the demo first with its default non-real-time policy on a CPU allowed by your environment. Record the affinity mask, kernel, requested policy, policy actually obtained, and whether memory locking succeeded. Compare an idle run with a bounded background load; a denied scheduling request is an experimental outcome, not a successful RT configuration.
+
+**Executed validation (2026-10-18):** GCC 13.3.0 compiled the C17 source with warnings as errors. Three tests ran the default and obtained-affinity paths, rejected malformed CPU/options, and forced a child-process memory-lock failure with a zero lock limit. No privileged FIFO scheduling was executed. Run them with `python3 -m unittest discover -s ../../../labs -p test_rt_demo.py -v` from this directory. See the [validation record](../../../labs/validation.json).
+
+The worker touches its own small stack buffer before announcing readiness, and the main thread touches an explicit static buffer. Volatile accesses retain those particular writes; they do not synchronize threads or prefault every future call, mapping, or stack page. Memory locking can also make a later thread creation/allocation fail, and that failure is checked.
 
 The supplied demo discards its `clock_gettime` result and has no periodic wakeup schedule; it is an API/synchronization demonstration, not a latency benchmark. As an extension, add timestamp logging outside the hot path and distinguish waiting from work. Changing priority does not remove IRQ, device, or memory contention. This userspace demo cannot validate a robot controller’s worst-case execution time; carry its trace methodology into the DMA and driver lectures.
 

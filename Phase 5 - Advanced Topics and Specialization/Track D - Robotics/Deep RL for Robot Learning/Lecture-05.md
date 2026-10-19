@@ -1,5 +1,7 @@
 # Lecture 05: Actor-Critic, GAE, and Privileged Critics
 
+**First runnable checkpoint:** [CPU return-target lab](CPU-Lab.md). Work a three-transition example before the GPU implementation; it tests termination, truncation, rollout cuts, reset leakage, and the `lambda=1` full-episode limit.
+
 ## Overview
 
 A football team can learn from the final score alone: win, and everything you did was good; lose, and everything was bad. That signal is honest, but it reaches you late and is hopelessly blurry. A good **coach** changes this. The coach watches each play and says "that pass put us in a much better position than I expected," long before the final whistle. The coach can be wrong, but their judgment is immediate and steady.
@@ -34,7 +36,7 @@ Lecture 04 ended with two problems:
 | Return is a sum of many random rewards | Big batches | Replace most of the sum with \(V_\phi\): lower variance, some bias |
 | Group baseline wastes rollouts when all tries agree | Pick better initial states (L12) | Critic still gives non-zero advantages mid-episode, because it compares states |
 
-With a sparse binary success reward and \(\gamma \approx 1\), \(V^\pi(s)\) is **the probability of eventually succeeding from \(s\)** (Lecture 01). That is something you can sanity-check by eye: it should rise when the gripper closes on the bowl and fall when the bowl slips.
+With a single terminal success reward of 1, zero other rewards, and \(\gamma=1\), \(V^\pi(s)\) equals the probability of eventual success for a well-defined episodic task. With \(\gamma<1\), it is a discounted success expectation and depends on when success occurs; repeated success rewards or reward shaping change its meaning again. Use the actual reward contract when interpreting the critic's output.
 
 > **Robot connection.** For π0.5 on a LIBERO layout, a critic that outputs "chance of success from here" turns one sparse 0/1 per episode into a per-chunk signal: this chunk raised the success estimate from 0.4 to 0.7. In simulation the critic can also **peek**. It can take exact object poses, contact flags, and the goal predicate as input, even though π0.5 itself only ever sees cameras, the instruction, and proprioception. The critic is discarded after training, so it is allowed to cheat. Section 6 makes this precise, and it is step 4 of the capstone game plan.
 
@@ -58,7 +60,12 @@ With a sparse binary success reward and \(\gamma \approx 1\), \(V^\pi(s)\) is **
 Two losses, trained together:
 
 * **Critic:** regression. Make \(V_\phi(s_t)\) match a target built from observed rewards (and its own predictions; see Section 3).
-* **Actor:** Lecture 04's policy gradient with the weight replaced by \(\hat A_t\): \(\;\nabla_\theta J \approx \frac{1}{N}\sum_{i,t} \nabla_\theta \log \pi_\theta(a_t^i \mid o_t^i)\, \hat A_t^i\).
+* **Actor:** Lecture 04's policy gradient with the weight replaced by \(\hat A_t\):
+
+    \[
+    \nabla_\theta J \approx \frac{1}{N}\sum_{i,t}
+    \nabla_\theta \log \pi_\theta(a_t^i \mid o_t^i)\, \hat A_t^i.
+    \]
 
 Everything interesting is in **how \(\hat A_t\) is built**.
 
@@ -70,7 +77,7 @@ Everything interesting is in **how \(\hat A_t\) is built**.
 
 | Target for \(V_\phi(s_t)\) | Formula | Bias | Variance |
 |---|---|---|---|
-| **Monte Carlo** | \(\sum_{t' \ge t} \gamma^{t'-t} r_{t'}\) | None, given enough data | High: sums every future random reward |
+| **Monte Carlo** | \(\sum_{t' \ge t} \gamma^{t'-t} r_{t'}\) | Unbiased for complete on-policy episodes under the stated return objective | Often high: includes future reward randomness |
 | **TD(0)** | \(r_t + \gamma V_\phi(s_{t+1})\) | Whatever error \(V_\phi\) has | Low: one random reward plus a smooth estimate |
 | **n-step** | \(\sum_{l=0}^{n-1} \gamma^l r_{t+l} + \gamma^n V_\phi(s_{t+n})\) | Shrinks as \(n\) grows | Grows with \(n\) |
 
@@ -87,10 +94,10 @@ $$
 If \(V = V^\pi\) exactly, then conditioned on \((s_t, a_t)\):
 
 $$
-\mathbb{E}[\delta_t \mid s_t, a_t] = r_t + \gamma\, \mathbb{E}_{s_{t+1}}\big[V^\pi(s_{t+1})\big] - V^\pi(s_t) = Q^\pi(s_t, a_t) - V^\pi(s_t) = A^\pi(s_t, a_t)
+\mathbb{E}[\delta_t \mid s_t, a_t] = \mathbb{E}\big[r_t + \gamma V^\pi(s_{t+1})\mid s_t,a_t\big] - V^\pi(s_t) = Q^\pi(s_t, a_t) - V^\pi(s_t) = A^\pi(s_t, a_t)
 $$
 
-So \(\delta_t\) is a one-sample estimate of the advantage, with only one step of randomness in it. If \(V \ne V^\pi\), it is biased by exactly the critic's error. That is the trade.
+So \(\delta_t\) is a one-sample estimate of the advantage. The expectation includes stochastic rewards as well as next states; a true terminal state has continuation value zero. For critic error \(e(s)=V(s)-V^\pi(s)\), the conditional bias is \(\gamma\mathbb E[e(s_{t+1})\mid s_t,a_t]-e(s_t)\), with the terminal continuation masked out.
 
 ### 3.3 n-step advantages telescope
 
@@ -124,7 +131,9 @@ where \(d_t = 1\) if the episode ended at step \(t\). The critic's regression ta
 |---|---|---|---|
 | 0 | \(\delta_t\) (TD(0)) | The coach completely | Low variance; biased while the critic is bad |
 | 0.9-0.97 | Mostly short-range \(\delta\)'s, decaying | Mostly the coach, checked against real rewards | PPO defaults (0.95 is common) |
-| 1 | \(\sum_l \gamma^l r_{t+l} - V(s_t)\) | Real returns; coach is only a baseline | Unbiased; Lecture 04's variance |
+| 1 | Discounted return minus current value for a complete terminal episode | At a rollout cut, a final bootstrap value remains | Removes intermediate bootstrap dependence, not final-value error at a nonterminal cut; see the CPU lab |
+
+The `lambda=1` row assumes the full episode reaches a true terminal state (or the remaining continuation is known exactly). A finite rollout that bootstraps from an approximate critic still retains that endpoint error. The geometric-mixture formula at `lambda=1` is understood as a limit; substituting 1 into `(1-lambda)` and an infinite sum separately is invalid. The [CPU lab](CPU-Lab.md) checks both the complete-episode and rollout-cut cases.
 
 ### 4.1 The discount γ is a horizon knob
 
@@ -163,12 +172,12 @@ There are **two masks**, and conflating them is the bug:
 * `terminated` decides **whether to bootstrap** with \(V(s_{t+1})\)
 * `terminated or truncated` decides **where the GAE trace stops** (the next row of the buffer belongs to a new episode)
 
-A third trap comes from auto-resetting vector envs. After a done, the returned `obs` is the **first observation of the next episode**, not \(s_{t+1}\). ManiSkill's `ManiSkillVectorEnv` (like Gymnasium's pre-1.0 vector envs) puts the real final observation in `info["final_observation"]`. You must evaluate \(V\) on *that* for truncated envs. Gymnasium 1.x vector envs default to next-step autoreset instead: the done step returns the real final observation, and the following `step()` call performs the reset and its transition must be masked out. Check which mode your vector env uses.
+A third trap comes from **same-step** auto-reset: the returned `obs` is already the next episode's initial observation. The ManiSkill adapter used below exposes a separate final observation; inspect its version and masks before indexing it. Gymnasium's built-in vector environments support next-step, same-step, and disabled autoreset, with next-step as the documented default. In next-step mode, preserve the final observation on the ending step and exclude the following reset-only event from training. Check `metadata["autoreset_mode"]` where available and test your adapter; an `obs` field's meaning cannot be inferred from the word “vector.” [Farama mode guide](https://farama.org/Vector-Autoreset-Mode), [SyncVectorEnv API](https://gymnasium.farama.org/api/vector/sync_vector_env/)
 
 ### 5.2 Other details that move the needle
 
 * **Advantage normalization.** Normalize \(\hat A\) to zero mean and unit std per batch. This is a cheap, reliable learning-rate stabilizer. Note that normalizing re-introduces a batch baseline.
-* **Explained variance** of the critic, \(\mathrm{EV} = 1 - \mathrm{Var}[\hat R - V]/\mathrm{Var}[\hat R]\), is the single most useful critic diagnostic. Near 1 means the critic predicts returns well. Near 0 means it is no better than a constant. Negative means it is actively harmful, and you should check the bootstrapping masks first.
+* **Explained variance** of the critic, \(\mathrm{EV} = 1 - \mathrm{Var}[\hat R - V]/\mathrm{Var}[\hat R]\), compares residual variance with target variance. Negative values flag poor predictions, not a unique cause; inspect masks, inputs, reward scaling, and optimization. It is undefined for zero target variance and unstable near zero. It also ignores a constant prediction offset, so inspect value error and calibration alongside it.
 * **Shared vs separate trunks.** A shared trunk saves one forward pass, but the value loss and policy loss pull the features in different directions and need a relative weight (`vf_coef`). CleanRL's continuous PPO and ManiSkill's state PPO use **separate** networks. For pixel policies, sharing the image encoder is common because the encoder is the expensive part.
 * **Value-loss scale.** With dense rewards, returns can be in the tens or hundreds. Normalize rewards or returns, or the value loss will swamp a shared trunk.
 

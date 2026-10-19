@@ -12,7 +12,7 @@
 
 The circuits inside every AI accelerator — tensor cores, SRAM banks, systolic arrays — are built from the same primitives covered here. This guide takes you from bits to memory hierarchies, with deliberate attention to the representations and building blocks that show up every day in hardware design.
 
-Before diving into the technical building blocks, let's understand the big picture: how a chip idea becomes a physical piece of silicon.
+**Learning route:** use sections 1–4 first if you are new to bits and clocks; section 0 gives manufacturing context, and sections 5–6 connect the circuits to memory and processors. Prerequisites are basic algebra. Plan four 60–90-minute sessions plus the [CPU logic and cost lab](labs/README.md). Produce arithmetic vectors, a timing calculation, and a tested interface before continuing to [HDLs](../Hardware%20Description%20Languages%20%28HDLs%29/Guide.md). This is the digital/architecture layer for RTL, FPGA, embedded, and accelerator engineers.
 
 ---
 
@@ -59,7 +59,7 @@ The full journey from idea to working silicon:
 │  ★ TAPEOUT ★                  "Ship GDSII to foundry"                   │
 │      │                                                                  │
 │      ▼                                                                  │
-│  Fabrication (TSMC etc.)      12–18 weeks for advanced nodes            │
+│  Fabrication                 process-specific manufacturing schedule            │
 │      │                                                                  │
 │      ▼                                                                  │
 │  Packaging & Test             die → package → burn-in → final test      │
@@ -71,16 +71,16 @@ The full journey from idea to working silicon:
 
 ### 0.2 RTL to Gates: Logic Synthesis
 
-You write hardware in Verilog or VHDL — a behavioral description of what each register, MUX, and ALU does. The synthesis tool (Synopsys Design Compiler is the industry standard) maps this to actual logic gates from a **standard cell library** provided by the foundry.
+You write hardware in Verilog or VHDL — a behavioral description of what each register, MUX, and ALU does. A synthesis tool maps supported constructs to cells in the selected **standard cell library**, supplied by a foundry or library provider. FPGA synthesis instead maps to the target device’s logic, registers, memories, and arithmetic resources.
 
 ```
 Your RTL (Verilog):                     Synthesized gates:
 
-  assign y = a & b | c;        →       NAND2 → INV → NOR2 → ...
-                                        (mapped to TSMC N5 cell library)
+  assign y = (a & b) | c;      →       AND2 followed by OR2 (one possible mapping)
+                                        (actual cell choice depends on the selected library)
 
   always @(posedge clk)
-    if (en) q <= d;             →       DFF with enable (EDFCND2)
+    if (en) q <= d;             →       DFF with enable, or DFF plus feedback MUX
 ```
 
 A standard cell library contains hundreds of pre-designed, pre-characterized cells:
@@ -102,7 +102,7 @@ The synthesis tool optimizes for your constraints — typically timing (target c
 
 ### 0.3 Place and Route
 
-After synthesis, you have a netlist: a list of ~billion gates and their connections. Place and route turns this into a physical layout.
+After synthesis, you have a netlist: instances of cells or target primitives and their connections. Its size depends on the design. Place and route turns this into a physical layout.
 
 ```
 Step 1: Floorplanning
@@ -129,169 +129,47 @@ Step 2: Placement
 
 Step 3: Clock Tree Synthesis (CTS)
   Build a balanced tree of clock buffers so CLK arrives
-  at every flip-flop within ~50ps skew
+  at sequential endpoints within the design’s skew/latency constraints
 
 Step 4: Routing
-  Connect all signals using metal layers (M1–M15+ on advanced nodes)
+  Connect signals using the process’s available routing layers
   Lower metals: short local wires
   Upper metals: long global wires, power distribution
 ```
 
-### 0.4 Fabrication at TSMC
+### 0.4 Fabrication, packaging, and yield
 
-Once the GDSII file arrives at the foundry, it goes through photolithography — printing the design layer by layer onto a silicon wafer.
+Fabrication repeats material deposition, patterning, etching, implantation, and other process-specific operations. The process design kit defines the permitted layers and rules. A node name is a technology-family label; it is not a universal transistor dimension or a comparable measured density across vendors. Logic, SRAM, and analog blocks also have different densities.
 
-```
-Wafer cross-section (simplified, TSMC N5):
+Keep a real example separate from a generic drawing. NVIDIA identifies GH100 as a TSMC **4N** design, with **144 SMs in the full architecture**, **132 enabled in H100 SXM5**, and **114 in the PCIe version**. Those are different product configurations. Disabled resources do not prove that every disabled block was defective; power, yield, and product configuration all matter. [NVIDIA Hopper architecture](https://developer.nvidia.com/blog/nvidia-hopper-architecture-in-depth/).
 
-  ══════════  Metal 15 (thick, global power/signal)
-     ...      (13 more metal layers)
-  ──────────  Metal 2
-  ──────────  Metal 1 (thin, local connections)
-  ──────────  Contact layer
-  ▓▓▓▓▓▓▓▓▓  Gate (FinFET or GAA nanosheet at N3/N2)
-  ░░░░░░░░░  Fin / channel
-  ▒▒▒▒▒▒▒▒▒  Silicon substrate (300mm wafer)
+A package connects dies to a board and supplies power, signals, protection, and heat paths. HBM uses vertically stacked memory dies and a wide interface near the accelerator. Fine-pitch package routing supports short, dense interconnects that would be difficult to implement with ordinary PCB routing. This is an engineering tradeoff, not a claim that routing 1,024 signals on any PCB is physically impossible.
 
-Each layer requires:
-  1. Deposit material (metal, oxide, etc.)
-  2. Spin photoresist
-  3. Expose with EUV light through reticle (mask)
-  4. Develop (remove exposed/unexposed resist)
-  5. Etch pattern into material
-  6. Strip remaining resist
-  7. Repeat for next layer (~80-100 mask steps for N5)
-```
+| Technique | What it describes | Question for the design |
+|---|---|---|
+| Wire bonding | Wires between die pads and package | Pin count, parasitics, cost |
+| Flip-chip attachment | Bumps connecting a face-down die | Power delivery and interconnect density |
+| Interposer/package routing | Connections among nearby dies | Bandwidth, distance, assembly yield |
+| Vertical stacking | Dies placed above one another | Thermal path, bonding, test access |
+| Chiplet partitioning | Function divided among several dies | Die-to-die protocol, known-good-die test, total cost |
 
-**Process node comparison (as of 2025–2026):**
+These categories can coexist in one product. Chiplets are not themselves one bonding technology.
 
-| Node     | Foundry      | Transistor type  | Density (MTr/mm²) | Used in               |
-|----------|-------------|------------------|--------------------|------------------------|
-| N7       | TSMC        | FinFET           | ~91                | A100, AMD Zen 2        |
-| N5       | TSMC        | FinFET           | ~171               | H100, Apple M2, Zen 4  |
-| N4P      | TSMC        | FinFET           | ~180               | B100/B200              |
-| N3E      | TSMC        | FinFET           | ~208               | Apple M4, Vera (2026)  |
-| N2       | TSMC (2025) | GAA nanosheet    | ~250+              | Next-gen AI chips       |
-| 20A/18A  | Intel       | RibbonFET (GAA)  | ~200+              | Intel next-gen          |
-| 2nm      | Samsung     | GAA              | ~200+              | Foundry customers       |
+**Worked yield calculation — fictional inputs:** suppose a wafer provides 60 complete candidate dies, wafer-level yield is 80%, and wafer cost is 18,000 currency units. Expected good dies are `60 × 0.8 = 48`; the wafer-cost allocation is `18,000 / 48 = 375` per good die. At 60% yield, it becomes 500. Neither figure includes design, packaging, test, assembly losses, or commercial margin. Actual wafer geometry, defect distribution, and costs must come from the project; these numbers are not an H100 cost estimate.
 
-**FinFET vs GAA (Gate-All-Around):**
+### 0.5 Plan the evidence across the chip flow
 
-```
-FinFET (N7–N3):                     GAA Nanosheet (N2 and below):
+| Stage | Artifact | Question it can answer |
+|---|---|---|
+| Architecture | Workload and bandwidth model | Can the proposed resources plausibly meet the requirement? |
+| RTL verification | Reference model, assertions, tests | Does the described behavior satisfy the tested contract? |
+| Synthesis | Mapped netlist and resource report | How does the tool implement that behavior in the selected library? |
+| Implementation | Placement, routing, timing constraints/report | Does the implemented design meet the constrained timing paths? |
+| Sign-off | Required rule, timing, power-integrity and equivalence checks | Does the design pass the selected checks/corners? |
+| Manufacturing test | Wafer/package test results | Which manufactured devices meet their test limits? |
+| Bring-up | Measured hardware evidence | Does the device function in its intended system? |
 
-      Gate                              Gate (wraps all sides)
-     ┌───┐                            ┌─────────────┐
-     │   │                            │ ┌─────────┐ │
-     │ F │  ← gate wraps             │ │nanosheet│ │  ← gate wraps
-     │ I │     3 sides                │ └─────────┘ │     ALL 4 sides
-     │ N │                            │ ┌─────────┐ │
-     │   │                            │ │nanosheet│ │  (stacked sheets)
-     └─┬─┘                            │ └─────────┘ │
-       │                              └──────┬──────┘
-  ─────┴─────                         ───────┴───────
-   substrate                            substrate
-
-GAA advantage: better electrostatic control → less leakage,
-               higher drive current, better scaling below 3nm
-```
-
-### 0.5 Packaging
-
-The raw die is cut from the wafer and placed into a package that provides:
-- Electrical connections (power, ground, I/O signals)
-- Mechanical protection
-- Heat dissipation path
-
-```
-Modern AI chip packaging (CoWoS — Chip on Wafer on Substrate):
-
-        ┌─── Heat spreader / lid ───┐
-        │                           │
-   ┌────┴──────┬───────┬──────┬─────┴───┐
-   │  HBM      │  GPU  │  HBM │  HBM    │  ← dies on interposer
-   │  stack     │  die  │ stack│  stack   │
-   └───┬────────┴───┬───┴──────┴────┬────┘
-       │   Silicon interposer       │      ← passive routing layer
-   ┌───┴────────────┴───────────────┴────┐
-   │         Organic substrate           │  ← BGA ball grid below
-   └─────────────────────────────────────┘
-                  │││││
-            solder balls → PCB
-
-CoWoS enables:
-  - GPU die + HBM stacks on same interposer (short, wide buses)
-  - 1024-bit HBM interface (impossible with PCB traces)
-  - H100: ~814mm² GPU die + 6× HBM3 stacks on ~2× larger interposer
-```
-
-**Packaging technologies comparison:**
-
-| Package       | Description                              | Used in                    |
-|---------------|------------------------------------------|----------------------------|
-| Wire bond     | Gold wires from die pads to package leads| Low-cost, legacy chips      |
-| Flip-chip     | Solder bumps, die face-down              | CPUs, GPUs (standard)       |
-| 2.5D (CoWoS)  | Multiple dies on silicon interposer     | AI GPUs (H100, MI300X)      |
-| 3D stacking   | Dies stacked vertically with TSVs       | HBM, AMD 3D V-Cache         |
-| Chiplets       | Multiple small dies in one package      | AMD EPYC, Intel Ponte Vecchio|
-
-### 0.6 Testing and Yield
-
-Not every die on a wafer works — defects from particles, lithography errors, and process variation kill some transistors.
-
-```
-300mm wafer with ~100 GPU dies:
-
-  ┌─────────────────────────────┐
-  │   ○ ○ ○ ○ ○ ○ ○ ○ ○        │
-  │  ○ ● ○ ○ ● ○ ○ ○ ○ ○      │    ○ = good die
-  │ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○     │    ● = defective die
-  │  ○ ○ ○ ● ○ ○ ○ ○ ○ ○      │
-  │ ○ ○ ○ ○ ○ ○ ● ○ ○ ○ ○     │    Edge dies = partial/wasted
-  │  ○ ○ ○ ○ ○ ○ ○ ○ ○ ○      │
-  │   ○ ○ ○ ○ ○ ○ ○ ○ ○       │    Yield = good dies / total dies
-  └─────────────────────────────┘
-
-  H100 die: ~814mm²  →  ~60 dies per 300mm wafer
-  At 80% yield → ~48 good dies per wafer
-  Wafer cost at N5: ~$16,000–$20,000
-  Cost per good die: ~$330–$415 (before packaging, test, profit margin)
-```
-
-**Defect tolerance — binning and salvage:**
-
-NVIDIA harvests partially defective dies by disabling broken SMs:
-- H100 SXM: 132 SMs designed, 114 enabled (disable 18 defective ones)
-- This dramatically improves effective yield
-
-**Test flow:**
-
-```
-1. Wafer sort (probe test)    — test each die on wafer, mark bad dies
-2. Die singulation            — cut wafer into individual dies
-3. Packaging                  — bond good dies into packages
-4. Final test (ATE)           — automated test at speed, burn-in
-5. Binning                    — sort by max frequency / power tier
-                                (e.g., RTX 4090 vs 4080 = same die, different bin)
-```
-
-### 0.7 Timeline and Cost
-
-A modern AI chip from architecture to production:
-
-| Phase                    | Duration        | Key deliverable            |
-|--------------------------|-----------------|----------------------------|
-| Architecture & spec      | 3–6 months      | Microarchitecture document |
-| RTL design               | 12–18 months    | Verilog/VHDL codebase      |
-| Verification             | Overlaps RTL    | 60–70% of total effort     |
-| Synthesis + PnR          | 3–6 months      | GDSII layout               |
-| Tapeout → first silicon  | 3–4 months      | Engineering samples (ES)   |
-| Validation & bring-up    | 3–6 months      | Working chips              |
-| **Total**                | **~2–3 years**  | Production silicon         |
-
-**Cost to design a chip at N5:** $300M–$500M+ (including EDA tools, IP licenses, masks, engineering team). This is why only a handful of companies (NVIDIA, AMD, Apple, Google, etc.) design leading-edge chips — the economics require massive volume to amortize the NRE (Non-Recurring Engineering) cost.
-
-> **Why this matters for AI hardware engineers:** understanding the tapeout flow tells you *why* design decisions are made the way they are. When an architect chooses a simpler pipeline over a faster but more complex one, it's often because verification effort scales superlinearly with complexity. When NVIDIA uses the same die for multiple GPU tiers (binning), it's yield economics. When HBM is on an interposer instead of on-package DRAM, it's because the 1024-bit bus is physically impossible with PCB routing. Every section in this guide — from Boolean algebra through MIPS pipelines — is a building block in this flow.
+A passing RTL simulation does not establish timing closure or successful fabrication. A timing report only covers the constraints and paths actually analyzed. Project duration and cost depend on reuse, scope, process, tooling, verification, and manufacturing access; use a real project plan instead of assuming a universal multi-year schedule.
 
 ---
 
@@ -370,7 +248,7 @@ INT32 −5  =  1111 1111 1111 1111 1111 1111 1111 1011
 Floating-point trades the fixed range of integers for a sliding window of precision.
 
 ```
-Value = (−1)^S  ×  1.Mantissa  ×  2^(Exponent − Bias)
+Normal finite value = (−1)^S × (1 + fraction / 2^fraction_bits) × 2^(Exponent − Bias)
 ```
 
 | Format    | Width | Sign | Exponent | Mantissa | Bias | ~Range          | ~Precision |
@@ -378,7 +256,7 @@ Value = (−1)^S  ×  1.Mantissa  ×  2^(Exponent − Bias)
 | FP32      | 32b   | 1    | 8        | 23       | 127  | ±3.4×10^38      | ~7 digits  |
 | FP64      | 64b   | 1    | 11       | 52       | 1023 | ±1.8×10^308     | ~15 digits |
 | FP16      | 16b   | 1    | 5        | 10       | 15   | ±65504          | ~3 digits  |
-| BF16      | 16b   | 1    | 8        | 7        | 127  | same as FP32    | ~2 digits  |
+| BF16      | 16b   | 1    | 8        | 7        | 127  | about ±3.39×10^38 | ~2 digits |
 | FP8 E4M3  | 8b    | 1    | 4        | 3        | 7    | ±448            | ~1 digit   |
 | FP8 E5M2  | 8b    | 1    | 5        | 2        | 15   | ±57344          | ~0.5 digit |
 
@@ -395,7 +273,7 @@ Bit pattern: 0  01111100  01000000000000000000000
              S  exponent  mantissa
 ```
 
-**Special values** (every hardware engineer must know these):
+**FP32 special values** (the exponent values below are specifically FP32):
 
 | Pattern                  | Meaning   |
 |--------------------------|-----------|
@@ -404,7 +282,7 @@ Bit pattern: 0  01111100  01000000000000000000000
 | Exp=255, Mantissa=0      | ±Infinity |
 | Exp=255, Mantissa≠0      | NaN       |
 
-**Rounding modes** (four are standard; round-to-nearest-even is default):
+For ordinary binary floating-point arithmetic, distinguish nearest-even, toward zero, toward positive infinity, and toward negative infinity. The operation/API determines the selected mode. Nearest-even means:
 
 ```
 Exact result  →  nearest representable value
@@ -419,7 +297,7 @@ Modern AI training and inference use reduced-precision formats to fit more data 
 
 ```
 FP32   [S|EEEEEEEE|MMMMMMMMMMMMMMMMMMMMMMM]   32 bits
-BF16   [S|EEEEEEEE|MMMMMMM]                   16 bits  (truncated FP32 mantissa)
+BF16   [S|EEEEEEEE|MMMMMMM]                   16 bits  (shorter significand; conversion has a rounding contract)
 FP16   [S|EEEEE|MMMMMMMMMM]                   16 bits  (different exponent width)
 FP8    [S|EEEE|MMM]  or  [S|EEEEE|MM]          8 bits
 ```
@@ -446,7 +324,7 @@ FP8 use requires a format, scaling, rounding, and overflow contract. E4M3/E5M2 r
 Fixed-point represents Q = integer × 2^(−f) where f is the number of fractional bits.
 
 ```
-Q8.8 format  (8 integer bits, 8 fractional bits, 16 bits total)
+Here Q8.8 means signed 16-bit storage, 8 fractional bits, sign included in the upper 8 bits
 
 Value 3.75:
   Integer part:  3  = 0000 0011
@@ -458,14 +336,14 @@ Stored: 0000 0011  1100 0000  = 0x03C0
 **Quantization** maps floating-point weights to INT8 for efficient inference:
 
 ```
-INT8 = round(FP32_weight / scale)
+q = clamp(round_to_nearest_even(weight / scale), -127, 127)
 scale = max(|weights|) / 127          ← per-tensor
-scale = max(|row|) / 127              ← per-row (better quality)
+scale = max(|row|) / 127              ← optional per-row granularity
 
 Dequantize: FP32 ≈ INT8 × scale
 ```
 
-The multiply-accumulate (MAC) still runs in INT32 (INT8 × INT8 → INT32 accumulate), then the result is scaled back. This is exactly what CUDA's Tensor Core IMMA instructions implement.
+This symmetric example uses zero point 0 and the range −127…127; an all-zero group needs a defined positive scale, such as 1, to avoid division by zero. Per-row scaling can reduce quantization error but adds metadata and kernel requirements; measure its effect. Many INT8 matrix instructions accumulate into INT32, but scaling, bias, overflow, and output requantization remain separate parts of the numerical contract.
 
 ### 1.6 Error Detection and Correction
 
@@ -489,10 +367,11 @@ p1 covers positions 1,3,5,7  (odd positions)
 p2 covers positions 2,3,6,7
 p4 covers positions 4,5,6,7
 
-Syndrome = (check p1)(check p2)(check p4) → 3-bit number = position of error
+Syndrome = check_p1 + 2*check_p2 + 4*check_p4
+Binary display order: (check p4)(check p2)(check p1)
 ```
 
-Hamming(7,4) corrects any single-bit error and detects any double-bit error. Extended Hamming adds a fourth parity bit to detect (not correct) double errors.
+Hamming(7,4) has minimum distance 3: it can correct one error, or detect up to two errors if used only as a detector. A decoder that always corrects a nonzero syndrome can miscorrect a double error. Adding an overall parity bit gives an extended Hamming(8,4) SECDED code: correct a single error and distinguish a double error as uncorrectable. The [CPU lab](labs/README.md) exhaustively checks all 16 messages, 128 single-bit errors, and 448 double-bit errors. Three or more errors are outside that guarantee.
 
 **CRC (Cyclic Redundancy Check)** — treats the data as a polynomial and divides by a generator polynomial:
 
@@ -503,7 +382,7 @@ Receiver: divide received polynomial by G(x) — nonzero remainder means error
 ```
 
 CRC-32 (used in Ethernet, ZIP, PNG) uses G(x) = x^32 + x^26 + x^23 + ... + 1.
-ECC DRAM uses a Hamming-based SECDED (Single Error Correct, Double Error Detect) code across the 64-bit data bus plus 8 ECC bits.
+A familiar memory example protects 64 data bits with 8 check bits using SECDED. Real systems use several ECC organizations; on-die ECC and system-level ECC protect different boundaries. Identify the actual code and protected path before assuming a correction guarantee.
 
 ---
 
@@ -696,7 +575,7 @@ Decoders appear as row/column address decoders in every SRAM and register file.
   Cout S3     S2       S1       S0
 
 Delay: N × t_FA   (linear in word width)
-32-bit: ~32 × 0.5ns = 16ns at 1 GHz  (too slow for the critical path)
+Hypothetical 32-bit carry chain: 32 × 0.5 ns = 16 ns, exceeding a 1 ns budget
 ```
 
 **Carry-Lookahead Adder (CLA)** — compute all carries in parallel:
@@ -710,7 +589,7 @@ C2 = G1 + P1·G0 + P1·P0·C0
 C3 = G2 + P2·G1 + P2·P1·G0 + P2·P1·P0·C0
 C4 = G3 + P3·G2 + P3·P2·G1 + P3·P2·P1·G0 + P3·P2·P1·P0·C0
 
-All four carries computed in 2 gate delays (one AND, one OR).
+The written sum-of-products has two logic levels after G/P generation if arbitrary fan-in gates are assumed. Real fan-in, wiring, buffering, and target carry primitives determine delay; hierarchical carry logic avoids an unbounded gate fan-in assumption.
 ```
 
 **Delay comparison:**
@@ -722,7 +601,7 @@ All four carries computed in 2 gate delays (one AND, one OR).
 | Carry-select        | O(√N)           | O(N)      |
 | Kogge-Stone (tree)  | O(log N)        | O(N log N)|
 
-Modern ALUs use Kogge-Stone or Han-Carlson prefix trees to achieve O(log N) delay with regular, pipeable structure.
+Prefix structures such as Kogge–Stone and Han–Carlson trade logic depth, fan-out, area, and wiring. An FPGA’s dedicated carry chain can outperform a hand-written textbook lookahead network; compare mapped implementations on the same target.
 
 ### 3.3 Multipliers and MAC Units
 
@@ -764,7 +643,7 @@ The MAC is the fundamental operation in matrix multiplication. A systolic array 
 A[i,k] flows right →      B[k,j] flows down ↓
 
 Each PE: acc += A × B, then pass A right and B down.
-After N cycles, PE[i,j] holds C[i,j] = Σ_k A[i,k]×B[k,j].
+With one MAC per cycle and skewed inputs, PE[i,j] receives its first pair at zero-based cycle i+j. For a reduction of K terms, its final MAC is at cycle K−1+i+j. A full M×N tile takes K+M+N−2 cycles through the last MAC; output drain depends on the interface.
 ```
 
 ### 3.4 ALU Design
@@ -792,36 +671,20 @@ A minimal ALU selects among operations via an opcode:
 | Overflow (V) | Signed overflow                  | Signed arithmetic check     |
 | Negative (N) | Result MSB is 1 (negative in 2's C) | Signed comparisons     |
 
-### 3.5 Propagation Delay and Critical Path
+### 3.5 Propagation delay and pipeline accounting
 
-Every gate has a propagation delay t_p — the time from input change to output stable.
+A register-to-register path includes source clock-to-Q, combinational delay, destination setup, and clock timing. Gate count alone is not a routed timing report. A 32-bit adder partitioned into 4-bit blocks has **eight** blocks; using four in a delay calculation accidentally models only 16 bits.
 
-```
-Critical path: the longest delay path from any input to any output.
-Minimum clock period = critical path delay + setup time + clock skew.
+Use this hypothetical timing exercise with zero skew: logic stages take 3 ns, 4 ns, and 2 ns; source clock-to-Q plus destination setup and the selected timing margin total 0.2 ns per registered path.
 
-Example: 32-bit ripple-carry adder
-  t_FA = t_XOR + t_AND + t_OR ≈ 3 × 100ps = 300ps per stage
-  Critical path = 32 × 300ps = 9.6ns  →  max freq ≈ 104 MHz
+| Implementation | Minimum period in this model | Latency | Steady throughput |
+|---|---|---|---|
+| One registered combinational path | `3+4+2+0.2 = 9.2 ns` | 1 cycle = 9.2 ns | 1 result / 9.2 ns |
+| Three registered stages | `max(3,4,2)+0.2 = 4.2 ns` | 3 cycles = 12.6 ns | 1 result / 4.2 ns |
 
-Same adder, 4-bit CLA blocks (4 blocks):
-  CLA block delay ≈ 2 gate delays = 200ps
-  Carry ripple between 4 blocks: 4 × 200ps = 800ps
-  Sum out: 800ps + 300ps ≈ 1.1ns  →  max freq ≈ 900 MHz
-```
+Latency increases by `12.6/9.2 ≈ 1.37×`, while steady throughput increases by `9.2/4.2 ≈ 2.19×`. Three stages does **not** imply three times the original time. Ten independent items take `10 × 9.2 = 92 ns` in the first design and `(10+3−1) × 4.2 = 50.4 ns` in the ideal pipeline, including fill but no stalls.
 
-**Pipelining** cuts the critical path by adding registers mid-path:
-
-```
-Before pipelining (one long combinational path):
-  Input → [Stage A: 3ns] → [Stage B: 4ns] → [Stage C: 2ns] → Output
-  Throughput: 1 result / 9ns  →  ~111 MHz
-
-After pipelining (registers between stages):
-  Input → [A: 3ns] → REG → [B: 4ns] → REG → [C: 2ns] → Output
-  Clock period = max(3, 4, 2) + setup ≈ 4.2ns  →  ~238 MHz
-  Throughput: 1 result / 4.2ns  (latency is 3× longer, throughput ~2.1× better)
-```
+**Check:** one isolated item benefits from the first design’s lower latency. A continuous stream benefits from the second design’s throughput. If an output stalls, the interface must hold data correctly; use the [ready/valid RTL lab](../../../Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/labs/README.md) to test that contract.
 
 ---
 
@@ -855,7 +718,7 @@ Timing:
 | Clock-to-Q     | t_cq      | Time from clock edge to Q valid               |
 | Propagation    | t_p       | Combinational logic delay between DFFs        |
 
-**Setup time violation** (D changes too close to clock edge → Q becomes metastable):
+**Setup/hold violation:** a transition close to the sampling edge can produce metastability or capture the old/new value unpredictably. Metastability is a possible analog outcome, not a guaranteed visible `X` in an RTL simulation.
 
 ```
   CLK:    _____|‾‾‾|_____
@@ -896,10 +759,11 @@ Timing:
   └──────────────────────────────── Q₄ → output
 
   Period: 2⁴ - 1 = 15 (maximal length for this polynomial)
-  Output sequence: 1111, 0111, 1011, 1101, 0110, 1010, 0101, 1010, ...
+  Explicit left-shift recurrence: q_next = {q[2:0], q[3] XOR q[2]}
+  From 1111: 1110, 1100, 1000, 0001, 0010, 0100, 1001, ...
 ```
 
-LFSRs are used in: pseudo-random number generation, BIST (Built-In Self-Test), spread spectrum clocking, CRC hardware, and scrambling in PCIe/USB.
+For that exact recurrence, a nonzero seed cycles through all 15 nonzero states; zero remains zero. Shift direction, bit numbering, polynomial convention, and XOR/XNOR choice must agree. The CPU lab checks the period. LFSRs are useful for test patterns and scramblers, but are not cryptographic random generators.
 
 ### 4.3 Finite State Machines
 
@@ -907,8 +771,8 @@ LFSRs are used in: pseudo-random number generation, BIST (Built-In Self-Test), s
 
 | Type   | Output depends on        | Outputs change    |
 |--------|--------------------------|-------------------|
-| Moore  | State only               | After clock edge  |
-| Mealy  | State AND current inputs | Immediately       |
+| Moore  | State only               | After state changes; combinational decode can still glitch |
+| Mealy  | State AND current inputs | After input/state propagation delay |
 
 **Traffic light FSM (Moore) — 4 states:**
 
@@ -919,13 +783,13 @@ Input:  timer_expired (1 = time to change)
          timer_expired
 GREEN_NS ──────────────► YELLOW_NS
    ↑                          │
-   │                   always │
+   │            timer_expired │
    │                          ▼
 YELLOW_EW ◄──────── GREEN_EW
-              always
+          timer_expired
 ```
 
-**HDL-style state register (synthesizable pattern):**
+**HDL-style excerpt:** declarations, timer, and reset synchronization are omitted. This illustrates state transition logic, not a complete road traffic controller; a real design needs its specified all-red intervals and fault behavior.
 
 ```verilog
 // State register — always sequential
@@ -938,9 +802,9 @@ end
 always @(*) begin
     case (state)
         GREEN_NS:  next_state = timer_expired ? YELLOW_NS : GREEN_NS;
-        YELLOW_NS: next_state = GREEN_EW;
+        YELLOW_NS: next_state = timer_expired ? GREEN_EW : YELLOW_NS;
         GREEN_EW:  next_state = timer_expired ? YELLOW_EW : GREEN_EW;
-        YELLOW_EW: next_state = GREEN_NS;
+        YELLOW_EW: next_state = timer_expired ? GREEN_NS : YELLOW_EW;
         default:   next_state = GREEN_NS;
     endcase
 end
@@ -952,15 +816,17 @@ assign light_ew = (state == GREEN_EW)  ? GREEN  :
                   (state == YELLOW_EW) ? YELLOW : RED;
 ```
 
+The asynchronous reset shown above requires a defined assertion/deassertion contract. Synchronize deassertion in each destination clock domain when using this style. A two-flop synchronizer can reduce metastability propagation for a suitable single-bit level; it does not make an arbitrary multibit bus coherent or guarantee capture of a short pulse. Use a handshake or asynchronous FIFO for those transfer contracts. [AMD reset guidance](https://docs.amd.com/r/2023.1-English/ug1387-acap-hardware-ip-platform-dev-methodology/Synchronous-Reset-vs.-Asynchronous-Reset).
+
 **State encoding strategies:**
 
 | Encoding   | Bits needed | Power | Speed     | Use case                        |
 |------------|-------------|-------|-----------|---------------------------------|
-| Binary     | log₂(N)     | Low   | Moderate  | Area-constrained FPGAs, ASICs   |
-| One-hot    | N           | High  | Fast      | FPGA (abundant flip-flops)      |
-| Gray code  | log₂(N)     | Low   | Moderate  | Reduces glitches in output logic |
+| Binary     | ceil(log₂ N) | Depends on switching/decode | Target-dependent | Compact state representation |
+| One-hot    | N | More registers, often simpler decode | Target-dependent | Useful candidate for FPGA comparison |
+| Gray code  | ceil(log₂ N) | One bit changes only on defined adjacent transitions | Target-dependent | Counters and carefully specified crossings |
 
-> **AI hardware connection:** the control unit inside a GPU SM is a large FSM. The warp scheduler tracks warp state (ready, waiting on memory, waiting on dependency) and transitions each warp on every cycle. Up to 64 warps = 64 simultaneous FSM instances running in parallel.
+> **AI hardware connection:** schedulers track states such as ready, waiting for data, and waiting for dependencies. Such state/control ideas transfer to accelerator design, but a modern SM is not described completely by one textbook FSM; limits and implementation vary by architecture.
 
 ### 4.4 Timing Analysis and Critical Path
 
@@ -969,15 +835,15 @@ assign light_ew = (state == GREEN_EW)  ? GREEN  :
 ```
   REG A → [combo logic, delay t₁] → REG B
 
-  Setup check: t₁ + t_su ≤ t_clk - t_skew
-  (data must arrive before clock arrives at destination minus skew)
+  Define skew = destination-clock arrival − source-clock arrival.
+  Setup: t_cq,max + t_combo,max + t_su ≤ T + skew − setup_uncertainty
 ```
 
 **Hold analysis** — ensure data doesn't change too fast:
 
 ```
-  Hold check: t_cq + t_min_combo ≥ t_h + t_skew
-  (data must stay stable long enough after clock edge)
+  Hold: t_cq,min + t_combo,min ≥ t_h + skew + hold_uncertainty
+  (new data must not reach the destination too soon)
 ```
 
 **Clock skew** — the difference in clock arrival time at two flip-flops:
@@ -1002,8 +868,10 @@ assign light_ew = (state == GREEN_EW)  ? GREEN  :
           ├── AND ──► gated CLK → register bank
   EN  ───┘
 
-  Saves: C_register × V² × f per gated cycle
-  Risk: glitches if EN changes while CLK=1 (use latch-based clock gate)
+  Dynamic power scales approximately as activity × switched_capacitance × V² × f
+  Energy per switched cycle scales as capacitance × V²
+  An ordinary logic AND is a conceptual sketch, not a recommended FPGA clock gate.
+  Use a characterized glitch-free gate/clock primitive and its timing rules.
 ```
 
 ---
@@ -1046,8 +914,8 @@ SRAM stores a bit in a cross-coupled inverter pair (the **6T cell**):
 
 | Property            | Value                                    |
 |---------------------|------------------------------------------|
-| Access time         | 0.5–5 ns (L1: ~1ns, LLC: ~10ns)         |
-| Density             | 6T cell ≈ 120–150 F² (F = feature size) |
+| Access time | Depends on array size, ports, process, and surrounding logic |
+| Density | Cell and peripheral area depend on the process and macro |
 | Power               | Static leakage + dynamic read/write      |
 | Retention           | Holds data as long as VDD applied        |
 | On-chip use         | Registers, caches, scratchpad, FIFOs     |
@@ -1061,12 +929,12 @@ DRAM stores charge on a capacitor — one transistor, one capacitor (1T1C):
         │
        NMOS  ← access transistor (WL controls)
         │
-       CAP   ← ~20–30 fF capacitor
+       CAP   ← stored charge; capacitance is process-dependent
         │
        GND
 
-Charged cap (≥ Vth/2) = logic 1
-Discharged cap (≤ Vth/2) = logic 0
+Reading shares cell charge with a precharged bit line.
+A sense amplifier resolves the small voltage difference and restores the cell.
 ```
 
 **Key differences from SRAM:**
@@ -1074,22 +942,23 @@ Discharged cap (≤ Vth/2) = logic 0
 | Property      | SRAM                    | DRAM                        |
 |---------------|-------------------------|-----------------------------|
 | Cell size     | 6 transistors           | 1 transistor + 1 capacitor  |
-| Density       | Low                     | 4–8× higher than SRAM       |
-| Speed         | ~1–10 ns                | ~50–100 ns (row access)     |
-| Refresh       | Not needed              | Every ~64 ms (capacitor leaks) |
+| Density | Larger bit cell in a comparable process | Compact cell plus specialized capacitor/process |
+| Access behavior | No activate/refresh sequence | Row hits, activation, precharge, and refresh affect timing |
+| Refresh | No periodic refresh while powered | Required interval depends on the part, temperature, and mode |
 | Destructive read | No                   | Yes (must restore after read) |
-| Cost/GB       | ~50–100×  more than DRAM | Baseline                   |
+| Economics | Area/ports/process tradeoffs | High-capacity commodity and specialized products |
 
 **DRAM access sequence:**
 
 ```
-1. Row activate (RAS): open one row (wordline) into row buffer (~45 ns)
-2. Column access (CAS): select columns from row buffer (~15 ns)
+1. Activate: open a row into sense amplifiers; observe the part’s tRCD before access.
+2. Read/write: select columns; read latency and burst timing follow the device mode.
 3. Precharge: close row, precharge bit lines
 4. Refresh: periodically rewrite all rows before charge leaks away
 
-DRAM bandwidth = (bus width × frequency × burst length) / 8
-DDR5-6400: 64-bit × 3200 MT/s × burst-8 = 51.2 GB/s per channel
+Peak payload bandwidth = data_width_bits × transfers_per_second / 8
+DDR5-6400 aggregate 64 data bits: 64 × 6.4e9 / 8 = 51.2e9 B/s = 51.2 GB/s
+One 32-bit subchannel: 25.6 GB/s. Do not multiply by burst length again.
 ```
 
 ### 5.3 HBM — High Bandwidth Memory
@@ -1113,18 +982,19 @@ HBM stacks DRAM dies vertically on silicon interposer, connected via Through-Sil
     ┌─────────────┐   ← GPU/accelerator die
 ```
 
-**HBM vs GDDR6 vs DDR5:**
+Memory comparisons must use the same boundary: one chip, one stack, one channel, one package, or the complete board. A DDR5 DIMM is not one unlimited-capacity “stack,” and a GPU board’s GDDR capacity is not one chip’s capacity.
 
-| Spec             | DDR5-6400   | GDDR6X       | HBM3          |
-|------------------|-------------|--------------|---------------|
-| Bus width/stack  | 64-bit      | 32-bit       | 1024-bit      |
-| Bandwidth/stack  | 51 GB/s     | 96 GB/s      | ~900 GB/s     |
-| Capacity/stack   | Unlimited   | 16–24 GB     | 16–48 GB      |
-| Power efficiency | Moderate    | Moderate     | High          |
-| On-package       | No          | No           | Yes (interposer)|
-| Used in          | CPU systems | Gaming GPUs  | AI GPUs/TPUs  |
+| Organization | Typical physical relationship | What to obtain from its exact specification |
+|---|---|---|
+| DDR interface | Memory devices connected through channels/subchannels | Aggregate data width, transfer rate, rank/channel population |
+| GDDR interface | Several memory packages around a processor | Width/rate per device and populated device count |
+| HBM interface | Stacked DRAM near the processor in an advanced package | Active stacks, channels, per-pin rate, usable capacity |
 
-A100 has 80 GB HBM2e across 5 stacks at ~2 TB/s. H100 SXM uses HBM3 at ~3.35 TB/s. The interconnect between the GPU die and HBM is the single biggest memory bandwidth bottleneck in AI compute.
+For a purely hypothetical 1,024-bit interface at 6.4 Gbit/s per data pin, peak bandwidth is `1024 × 6.4e9 / 8 = 819.2 GB/s`. Four such independent interfaces provide 3,276.8 GB/s before utilization losses. This is arithmetic with stated inputs, not the specification of an unnamed HBM product.
+
+For DDR5, distinguish the 6,400 MT/s data rate from its 3,200 MHz clock and the two 32-bit data subchannels of a conventional 64-data-bit DIMM. Bursts group transfers; they do not multiply an already specified transfers-per-second rate. [Micron DDR5 architecture](https://assets.micron.com/adobe/assets/urn%3Aaaid%3Aaem%3Af1706cdb-4b55-4568-84bc-b7ee42f46236/original/as/ddr5-more-than-a-generational-update-wp.pdf).
+
+Which interface limits an AI workload depends on its data reuse, tensor shapes, cache behavior, precision, compute path, and achieved bandwidth. Neither HBM nor PCIe is universally the bottleneck.
 
 ### 5.4 Flash Memory
 
@@ -1149,36 +1019,33 @@ Erasing: remove electrons from FG → lowers Vt → reads as 1
 
 **Flash cell types by bits per cell:**
 
-| Type | Bits/cell | Voltage levels | Endurance  | Speed  | Use                |
-|------|-----------|---------------|------------|--------|--------------------|
-| SLC  | 1         | 2             | 100K P/E   | Fast   | Enterprise SSD     |
-| MLC  | 2         | 4             | 10K P/E    | Medium | Consumer SSD       |
-| TLC  | 3         | 8             | 1K P/E     | Slower | Bulk storage       |
-| QLC  | 4         | 16            | 300 P/E    | Slow   | Archival, cold data |
+| Type | Bits per cell | Nominal distinguishable levels |
+|---|---|---|
+| SLC | 1 | 2 |
+| MLC in the common two-bit usage | 2 | 4 |
+| TLC | 3 | 8 |
+| QLC | 4 | 16 |
 
-Flash is **not byte-addressable for writes** — writes go to a page (4–16 KB), erasures go to a block (128–512 pages). This asymmetry drives the Flash Translation Layer (FTL) in SSD controllers.
+More levels require distinguishing smaller voltage intervals and influence programming, retention, and error management. Endurance is a property of the actual part, operating conditions, and controller policy; do not substitute a universal cycle count for its datasheet or drive write-endurance rating.
+
+For NAND, programming and erasure have different granularities: the part specifies page/program units and erase blocks. NOR and managed storage interfaces have different contracts. An SSD’s FTL maps logical writes onto its NAND while handling erase, wear, and relocation; host sectors are not a direct map of raw NAND pages.
 
 ### 5.5 Cache Hierarchy
 
 A cache exploits spatial and temporal locality to bridge the speed gap between CPU/GPU registers and main memory.
 
-```
-GPU/CPU Memory Hierarchy (approximate, H100/server class):
+| Resource | Why it is useful | What can limit it |
+|---|---|---|
+| Registers | Values close to arithmetic | Register capacity, ports, dependencies, occupancy |
+| Cache | Reuses recently accessed lines automatically | Misses, conflicts, bandwidth, replacement |
+| Scratchpad/shared memory | Software controls reuse and cooperation | Capacity, banks, synchronization |
+| Main DRAM/HBM | Large working sets | Traffic, latency, controller scheduling |
+| Host/device interconnect | Transfers between address/ownership domains | Link and software path, copies, synchronization |
+| Storage | Persistent datasets and images | I/O size, queueing, filesystem, device latency |
 
-Registers          ~0.2 ns   ~256 KB     per SM (64K 32-bit regs × 108 SMs)
-L1 / Shared mem   ~5 ns     ~228 KB     per SM (configurable split)
-L2 cache          ~50 ns    ~50 MB      on-chip, shared
-HBM3              ~100 ns   ~80 GB      off-chip, on-package
-System DDR5       ~200 ns   ~TBs        off-package
-NVMe SSD          ~100 μs   ~TBs        PCIe storage
+A latency table needs the exact processor, operation, access pattern, hit/miss state, clock, and measurement method. These resources are not interchangeable rows in a universal H100/server timing table.
 
-Bandwidth (rough):
-  Register file   → FPU:         100+ TB/s
-  L1/Shared mem  → register:    ~15 TB/s per SM
-  L2              → SM:          ~12 TB/s total
-  HBM3            → chip:        ~3.35 TB/s
-  PCIe5 x16       → host:        ~64 GB/s
-```
+**Worked cache mapping:** a 1 KiB direct-mapped cache with 64-byte lines has 16 sets. Byte address `0x140` has block number `320/64=5`, set 5, tag 0, offset 0. Address `0x540` has block number 21, set 5, tag 1. Alternating those two lines causes conflict misses in this cache even though their combined data is only 128 bytes. Greater total capacity alone is not the only design variable.
 
 **Cache organization:**
 
@@ -1197,60 +1064,36 @@ Direct-mapped (1-way):     Set-associative (4-way):
 
 | Policy | Evicts                            | Hardware cost |
 |--------|-----------------------------------|---------------|
-| LRU    | Least recently used way           | O(log W) bits per set |
+| Exact LRU | Least recently used way | At least ceil(log₂(W!)) bits to represent every recency ordering |
 | PLRU   | Pseudo-LRU (tree approximation)   | W−1 bits per set |
 | Random | Random way                        | LFSR counter  |
 | FIFO   | Oldest loaded way                 | Pointer per set |
 
-GPU L1 uses a simplified LRU or PLRU. CPU last-level caches often use QLRU (quad-age LRU) at 16-way associativity.
+Replacement behavior is implementation-specific and may adapt to workload. Do not assume a vendor’s undisclosed policy from the cache size or associativity alone.
 
-### 5.6 On-Chip Scratchpad and Tiling
+### 5.6 On-chip scratchpad and tiling
 
-Unlike a cache (hardware-managed, transparent), **shared memory** in GPUs is software-managed SRAM — the programmer explicitly controls what lives there.
+A cache can reuse data automatically; a scratchpad lets software place and share data explicitly. Tiling organizes computation so a loaded value contributes to several outputs before eviction.
 
-**Why tiling matters** — matrix multiply on GPU without tiling:
+For `C[M,N] = A[M,K] × B[K,N]`, counting one multiply and one add as two operations gives `2MNK` FLOPs. Assume FP32 operands, `C = AB` with no old C read, and a deliberately simple traffic model:
 
-```
-Naive: each thread loads A[row, k] and B[k, col] from HBM for every k
+- A scalar output loop issues two operand loads per multiply: `8MNK` bytes plus `4MN` output bytes. These are **logical operand loads**, not necessarily HBM transactions: caches can serve repeated addresses.
+- A `T×T` output tile reuses each loaded A/B value across T outputs. For one reduction chunk of length `Kc`, it performs `2T²Kc` FLOPs and loads `2TKc×4 = 8TKc` bytes. Ignoring output traffic for the moment, intensity is `T/4` FLOP/byte.
+- If M and N divide evenly by T and tiles do not reuse one another’s inputs, traffic is `8MNK/T + 4MN` bytes. Edge tiles require their actual valid dimensions.
 
-For M=N=K=1024, C=A×B:
-  Loads from HBM: M × N × K × 2 (A and B) = 2 × 10⁹ float reads
-  At 3.35 TB/s HBM bandwidth: 2 × 10⁹ × 4B / 3.35TB/s ≈ 2.4 ms
-  Compute at 312 TFLOPS: 2 × 10⁹ FLOPs / 312 TFLOPS ≈ 0.006 ms
-  → memory-bound by 400×
-```
+For a hypothetical machine with a relevant compute ceiling of **100 TFLOP/s** and memory bandwidth of **1 TB/s**, the roofline ridge is `100 FLOP/byte`. A tile of T=16 gives about 4 FLOP/byte; T=128 gives about 32. **Both remain below the ridge** in this model. At intensity 32, the bandwidth ceiling is about 32 TFLOP/s, not 100.
 
-**With tiling (shared memory):**
+The bound is `min(compute_ceiling, bandwidth × intensity)`. It is not a performance prediction: instruction type, occupancy, register pressure, synchronization, cache reuse, and achieved bandwidth matter. Use a compute ceiling for the operations you actually execute, not an unrelated tensor precision or sparse peak. The [tested tiling/dataflow lab](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Labs/Tiling-and-Dataflow.md) calculates edge-tile traffic and wavefront cycles explicitly.
 
-```
-Block size: 16×16 output tile
-  Load tile of A (16×K_chunk) → shared memory    } one time per block
-  Load tile of B (K_chunk×16) → shared memory    }
-  Each thread computes its dot product from shared memory (fast)
+**Bank mapping example:** assume 32 banks, one 32-bit word per bank, and `bank = word_address mod 32`. Lane i reading word i uses different banks. Lane i reading word `2i` uses 16 banks twice: lanes 0 and 16 read different words in bank 0. That conflict can reduce throughput; it does not prove the whole kernel takes exactly twice as long. A supported same-word broadcast is different from different-word collisions.
 
-Arithmetic intensity = FLOPs / bytes from HBM
-  Naive: 2 FLOPs per 8 bytes (FMA = 2 ops, loads A and B) → 0.25 FLOP/byte
-  Tiled: 2 × T FLOPs per (2 × T × 4) bytes → T/4 FLOP/byte (T = tile size)
-  T=16: 4 FLOP/byte
-  T=128: 32 FLOP/byte  →  compute-bound at H100 (312 TFLOPS / 3350 GB/s = 93)
-```
-
-**Shared memory bank conflicts** — 32 banks, each 4 bytes wide; threads in a warp access conflict-free if they hit different banks:
-
-```
-No conflict: thread i accesses address i × 4   (each thread → different bank)
-2-way conflict: threads 0 and 16 both access bank 0 (serialized → 2× slower)
-Broadcast: all threads read same address (one bank, no conflict → hardware broadcasts)
-
-Fix: pad shared memory arrays by one element
-  float tile[16][16+1];   ← +1 padding shifts each row to different bank
-```
+For a warp reading a column of `float tile[32][32]`, row starts map to the same bank. Padding to `[32][33]` changes adjacent row starts by 33 words, spreading them over banks. Padding is tied to the access pattern, data width, and architecture; adding one element to every array is not a universal fix. [CUDA shared-memory access](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#shared-memory-and-memory-banks).
 
 ---
 
 ## 6. MIPS Processor Design
 
-Building a processor from the components in sections 1–5 is the definitive digital design exercise. MIPS is the standard teaching ISA because its fixed 32-bit instruction format maps cleanly onto hardware. We build up from a single-cycle datapath through a 5-stage pipeline — the same pipeline that every modern processor (including GPU shader cores) descends from.
+Building a small processor combines the components in sections 1–5. This section uses a classic MIPS-like 32-bit teaching subset; RISC-V is another common teaching choice. The five-stage design illustrates dependencies and forwarding. It does not describe every CPU/GPU pipeline or implement a complete architectural MIPS machine.
 
 ### 6.1 MIPS ISA Subset
 
@@ -1273,9 +1116,11 @@ J-type (jump):       [opcode 6][address 26]
 | `slt`       | R      | rd = (rs < rt) ? 1 : 0      | `slt $t0, $s1, $s2` |
 | `lw`        | I      | rt = Mem[rs + imm]           | `lw  $t0, 4($s1)`   |
 | `sw`        | I      | Mem[rs + imm] = rt           | `sw  $t0, 4($s1)`   |
-| `beq`       | I      | if (rs == rt) PC += imm<<2  | `beq $s1, $s2, L1`  |
+| `beq`       | I      | if equal: PC = PC+4+(sign_ext(imm)<<2) | `beq $s1, $s2, L1`  |
 | `addi`      | I      | rt = rs + sign_ext(imm)      | `addi $t0, $s1, 10` |
-| `j`         | J      | PC = {PC[31:28], addr, 2'b0}| `j   target`        |
+| `j`         | J      | PC = {(PC+4)[31:28], addr, 2'b0} | `j   target`        |
+
+This teaching subset omits exceptions, privileged state, and architectural delay slots. Classic MIPS `add`/`addi` can trap on signed overflow; if the lab wraps instead, name that difference or use the corresponding nontrapping operation. Loads/stores must specify alignment and byte order.
 
 **Register file — 32 registers, $0 hardwired to zero:**
 
@@ -1367,8 +1212,8 @@ lw critical path:
     200ps    +   150ps    + 200ps +   200ps    +     25ps
   = 775ps  →  max freq ≈ 1.29 GHz
 
-But EVERY instruction — even a simple add (375ps) — takes 775ps.
-  add waste:  775 - 375 = 400ps idle per add
+With these illustrative blocks, add uses 200+150+200+25 = 575 ps.
+It still occupies the 775 ps single-cycle period: 200 ps of unused timing budget.
 ```
 
 This wastes significant time on fast instructions. The solution: pipelining.
@@ -1388,7 +1233,7 @@ Stage 1       Stage 2        Stage 3       Stage 4        Stage 5
   PC+4       rs, rt, imm   ALU result   Mem data       rd ← result
   instr      control sigs  branch addr
 
-Clock period = max(stage delay) + register overhead
+Illustrative clock period = max(stage delay) + register overhead
              = 200ps + 20ps = 220ps  →  max freq ≈ 4.5 GHz
 Throughput = 1 instruction per 220ps (vs 775ps single-cycle → 3.5× faster)
 Latency = 5 × 220ps = 1100ps per instruction (worse, but throughput wins)
@@ -1443,11 +1288,11 @@ Forwarding unit checks: if (EX/MEM.rd == ID/EX.rs) → forward EX/MEM.ALUresult
 
 ```
 lw  $s0, 0($t0)    # data available after MEM (cycle 4)
-add $t2, $s0, $t1  # EX needs $s0 in cycle 3 — too early!
+add $t2, $s0, $t1  # EX would need $s0 at the start of cycle 4 — before load data is ready!
 
 Must stall (insert bubble) for 1 cycle:
 
-Time:      1     2     3     4     5     6
+Time:      1     2     3     4     5     6     7
 lw:       IF    ID    EX    MEM   WB
 add:            IF    ID   stall  EX    MEM    WB
                        ↑          ↑
@@ -1455,7 +1300,7 @@ add:            IF    ID   stall  EX    MEM    WB
                   detected
 ```
 
-The stall costs 1 cycle. Compilers reorder instructions to fill the load-delay slot when possible.
+This particular interlocked pipeline inserts one stall. Instruction scheduling can place independent work between the load and consumer. That is different from an ISA-defined architectural load delay slot.
 
 #### Control Hazards
 
@@ -1471,22 +1316,22 @@ or  ...                 # fetched in cycle 3 — might be wrong path!
 
 | Strategy           | Penalty  | Hardware cost | Description                          |
 |--------------------|----------|---------------|--------------------------------------|
-| Stall (flush)      | 1–2 cycles| Minimal      | Kill wrong-path instructions         |
+| Stall or flush | Depends on resolution stage | Control logic | Wait before issue, or invalidate already-issued wrong-path work |
 | Branch prediction  | 0 if correct | Moderate  | Predict taken/not-taken              |
-| Delayed branch     | 0        | Compiler      | Always execute next instruction (MIPS) |
+| Architectural delay slot | Useful work only if a legal instruction fills it | ISA/compiler constraint | A property of some historical MIPS versions, not this simplified no-delay-slot core |
 | Early branch resolution | 1 cycle | MUX in ID | Move comparison to ID stage          |
 
-**Static prediction:** predict not-taken (sequential fetch). If wrong, flush 1 instruction.
+**Static prediction:** predict not-taken. In this five-stage model with resolution in EX, a taken branch generally invalidates the two younger instructions in ID and IF. The penalty changes if resolution or fetching changes.
 
 **Dynamic prediction (branch history table):**
 
 ```
 1-bit predictor: remember last outcome → predict same
-  Problem: loops always mispredict twice (entering and exiting)
+  A repeatedly invoked multi-iteration loop can mispredict its first taken branch after a previous not-taken exit, then mispredict the exit. Initial state and loop trip count matter.
 
 2-bit saturating counter:
   States: Strongly Taken (11) → Weakly Taken (10) → Weakly Not (01) → Strongly Not (00)
-  Must mispredict twice to switch direction → better loop behavior
+  From a strongly predicted state, two opposite outcomes change the prediction; from a weak state, one does. Update the counter on every observed branch outcome.
 ```
 
 #### Structural Hazards
@@ -1531,8 +1376,8 @@ Pipeline registers store ALL signals needed by later stages:
 **Forwarding unit logic (simplified):**
 
 ```
-// Forward from EX/MEM stage
-if (EX/MEM.RegWrite && EX/MEM.rd != 0 && EX/MEM.rd == ID/EX.rs)
+// Forward an available ALU result from EX/MEM (not a load address).
+if (EX/MEM.RegWrite && !EX/MEM.MemRead && EX/MEM.rd != 0 && EX/MEM.rd == ID/EX.rs)
     ForwardA = EX/MEM.ALUresult
 
 // Forward from MEM/WB stage
@@ -1546,11 +1391,13 @@ if (MEM/WB.RegWrite && MEM/WB.rd != 0 && MEM/WB.rd == ID/EX.rs
 **Hazard detection unit (load-use stall):**
 
 ```
-if (ID/EX.MemRead && (ID/EX.rt == IF/ID.rs || ID/EX.rt == IF/ID.rt))
+if (ID/EX.MemRead && ID/EX.rt != 0
+    && ((decode_reads_rs && ID/EX.rt == IF/ID.rs)
+        || (decode_reads_rt && ID/EX.rt == IF/ID.rt)))
     stall pipeline:
       - IF/ID register holds (re-decode same instruction)
       - insert NOP into ID/EX (bubble)
-      - PC holds (re-fetch same PC+4)
+      - PC holds (do not advance the fetch address)
 ```
 
 ### 6.7 Performance Metrics
@@ -1566,11 +1413,11 @@ Single-cycle:  CPI = 1,  T_clk = 775ps    →  time/instr = 775ps
 Pipelined:     CPI ≈ 1.2 (stalls + flushes), T_clk = 220ps
                →  time/instr = 264ps  →  ~2.9× speedup
 
-Ideal speedup from N-stage pipeline = N (limited by hazard stalls)
-5-stage MIPS: ideal 5×, typical 3–4× in practice
+N is an ideal upper comparison for equally balanced stages with negligible overhead and no stalls.
+For the specified unbalanced 775 ps/220 ps example, the steady-state limit is about 3.52×.
 ```
 
-**CPI breakdown example (gcc on MIPS):**
+**Synthetic CPI accounting example (not a compiler measurement):**
 
 | Component      | CPI contribution |
 |----------------|-----------------|
@@ -1580,7 +1427,7 @@ Ideal speedup from N-stage pipeline = N (limited by hazard stalls)
 | Cache misses    | +0.07         |
 | **Total CPI**   | **1.24**      |
 
-> **AI hardware connection:** GPU shader cores use a much deeper pipeline (20+ stages in modern GPUs) but hide latency through massive thread-level parallelism (TLP) rather than branch prediction. When a warp stalls on a cache miss, the scheduler switches to another ready warp — same principle as pipeline interleaving, but across thousands of threads instead of individual instructions. The MIPS 5-stage pipeline is the conceptual foundation: once you understand forwarding, hazards, and CPI, the GPU's approach is a natural extension.
+> **AI hardware connection:** a GPU scheduler can issue eligible work from another resident warp while one waits on a dependency. This hides some latency if enough independent ready work exists; it does not remove the waiting operation or guarantee full utilization. Avoid assigning a universal pipeline depth to all GPU operations.
 
 ---
 

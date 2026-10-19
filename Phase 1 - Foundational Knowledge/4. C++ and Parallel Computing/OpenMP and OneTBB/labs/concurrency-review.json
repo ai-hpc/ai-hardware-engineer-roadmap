@@ -1,0 +1,438 @@
+{
+  "recorded_at": "2026-10-18T23:46:13.500305+00:00",
+  "purpose": "Independent review: actual oneTBB guide examples and scheduling contracts, not performance measurement",
+  "compiler": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "guide_onetbb_sections_sha256": "49a00ac3507a3468ffc9953d27a20923b89f501f1a4fa681df4b882f5b01c27e",
+  "contracts_sha256": "e22c895508ff723b8ece7ddd4a0877ac2e14ab2523c78cc46383cd5c984a8c18",
+  "onetbb_header_macros": {
+    "TBB_VERSION_PATCH": "0",
+    "TBB_INTERFACE_VERSION": "12110",
+    "TBB_VERSION_MINOR": "11",
+    "TBB_VERSION_MAJOR": "2021"
+  },
+  "runner_sha256": "1d94a7bb56b8b20232c01ac7c763fac31d1fcd5a49d421d7dc17f17a6cff709a",
+  "checks": [
+    {
+      "label": "squaring compile",
+      "argv": [
+        "g++",
+        "-std=c++17",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pthread",
+        "-I/tmp/course-tbb-tools/unpacked/usr/include",
+        "/tmp/course-tbb-guide-yt4u_fj1/squaring.cpp",
+        "-L/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-Wl,-rpath,/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-ltbb",
+        "-o",
+        "/tmp/course-tbb-guide-yt4u_fj1/squaring"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "squaring execute",
+      "argv": [
+        "/tmp/course-tbb-guide-yt4u_fj1/squaring"
+      ],
+      "returncode": 0,
+      "stdout": "result[0]=9  result[N-1]=9\n",
+      "stderr": ""
+    },
+    {
+      "label": "relu compile",
+      "argv": [
+        "g++",
+        "-std=c++17",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pthread",
+        "-I/tmp/course-tbb-tools/unpacked/usr/include",
+        "/tmp/course-tbb-guide-yt4u_fj1/relu.cpp",
+        "-L/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-Wl,-rpath,/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-ltbb",
+        "-o",
+        "/tmp/course-tbb-guide-yt4u_fj1/relu"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "relu execute",
+      "argv": [
+        "/tmp/course-tbb-guide-yt4u_fj1/relu"
+      ],
+      "returncode": 0,
+      "stdout": "out(0,0)   = 0\nout(0,129) = 1\nout(0,255) = 127\n",
+      "stderr": ""
+    },
+    {
+      "label": "mse compile",
+      "argv": [
+        "g++",
+        "-std=c++17",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pthread",
+        "-I/tmp/course-tbb-tools/unpacked/usr/include",
+        "/tmp/course-tbb-guide-yt4u_fj1/mse.cpp",
+        "-L/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-Wl,-rpath,/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-ltbb",
+        "-o",
+        "/tmp/course-tbb-guide-yt4u_fj1/mse"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "mse execute",
+      "argv": [
+        "/tmp/course-tbb-guide-yt4u_fj1/mse"
+      ],
+      "returncode": 0,
+      "stdout": "MSE = 0.0099\n",
+      "stderr": ""
+    },
+    {
+      "label": "allocator compile",
+      "argv": [
+        "g++",
+        "-std=c++17",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pthread",
+        "-I/tmp/course-tbb-tools/unpacked/usr/include",
+        "/tmp/course-tbb-guide-yt4u_fj1/allocator.cpp",
+        "-L/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-Wl,-rpath,/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-ltbbmalloc",
+        "-o",
+        "/tmp/course-tbb-guide-yt4u_fj1/allocator"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "allocator execute",
+      "argv": [
+        "/tmp/course-tbb-guide-yt4u_fj1/allocator"
+      ],
+      "returncode": 0,
+      "stdout": "allocated value=1\n",
+      "stderr": ""
+    },
+    {
+      "label": "inclusive_scan compile",
+      "argv": [
+        "g++",
+        "-std=c++17",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pthread",
+        "-I/tmp/course-tbb-tools/unpacked/usr/include",
+        "/tmp/course-tbb-guide-yt4u_fj1/inclusive_scan.cpp",
+        "-L/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-Wl,-rpath,/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-ltbb",
+        "-o",
+        "/tmp/course-tbb-guide-yt4u_fj1/inclusive_scan"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "inclusive_scan execute",
+      "argv": [
+        "/tmp/course-tbb-guide-yt4u_fj1/inclusive_scan"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "exclusive_scan compile",
+      "argv": [
+        "g++",
+        "-std=c++17",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pthread",
+        "-I/tmp/course-tbb-tools/unpacked/usr/include",
+        "/tmp/course-tbb-guide-yt4u_fj1/exclusive_scan.cpp",
+        "-L/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-Wl,-rpath,/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-ltbb",
+        "-o",
+        "/tmp/course-tbb-guide-yt4u_fj1/exclusive_scan"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "exclusive_scan execute",
+      "argv": [
+        "/tmp/course-tbb-guide-yt4u_fj1/exclusive_scan"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "compaction compile",
+      "argv": [
+        "g++",
+        "-std=c++17",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pthread",
+        "-I/tmp/course-tbb-tools/unpacked/usr/include",
+        "/tmp/course-tbb-guide-yt4u_fj1/compaction.cpp",
+        "-L/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-Wl,-rpath,/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-ltbb",
+        "-o",
+        "/tmp/course-tbb-guide-yt4u_fj1/compaction"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "compaction execute",
+      "argv": [
+        "/tmp/course-tbb-guide-yt4u_fj1/compaction"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "minimum_index compile",
+      "argv": [
+        "g++",
+        "-std=c++17",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pthread",
+        "-I/tmp/course-tbb-tools/unpacked/usr/include",
+        "/tmp/course-tbb-guide-yt4u_fj1/minimum_index.cpp",
+        "-L/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-Wl,-rpath,/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-ltbb",
+        "-o",
+        "/tmp/course-tbb-guide-yt4u_fj1/minimum_index"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "minimum_index execute",
+      "argv": [
+        "/tmp/course-tbb-guide-yt4u_fj1/minimum_index"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "deterministic_reduce compile",
+      "argv": [
+        "g++",
+        "-std=c++17",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pthread",
+        "-I/tmp/course-tbb-tools/unpacked/usr/include",
+        "/tmp/course-tbb-guide-yt4u_fj1/deterministic_reduce.cpp",
+        "-L/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-Wl,-rpath,/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-ltbb",
+        "-o",
+        "/tmp/course-tbb-guide-yt4u_fj1/deterministic_reduce"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "deterministic_reduce execute",
+      "argv": [
+        "/tmp/course-tbb-guide-yt4u_fj1/deterministic_reduce"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "graph compile",
+      "argv": [
+        "g++",
+        "-std=c++17",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pthread",
+        "-I/tmp/course-tbb-tools/unpacked/usr/include",
+        "/tmp/course-tbb-guide-yt4u_fj1/graph.cpp",
+        "-L/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-Wl,-rpath,/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-ltbb",
+        "-o",
+        "/tmp/course-tbb-guide-yt4u_fj1/graph"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "graph execute",
+      "argv": [
+        "/tmp/course-tbb-guide-yt4u_fj1/graph"
+      ],
+      "returncode": 0,
+      "stdout": "square=25  cube=125\n",
+      "stderr": ""
+    },
+    {
+      "label": "indexer compile",
+      "argv": [
+        "g++",
+        "-std=c++17",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pthread",
+        "-I/tmp/course-tbb-tools/unpacked/usr/include",
+        "/tmp/course-tbb-guide-yt4u_fj1/indexer.cpp",
+        "-L/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-Wl,-rpath,/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-ltbb",
+        "-o",
+        "/tmp/course-tbb-guide-yt4u_fj1/indexer"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "indexer execute",
+      "argv": [
+        "/tmp/course-tbb-guide-yt4u_fj1/indexer"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "ordered_pipeline compile",
+      "argv": [
+        "g++",
+        "-std=c++17",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pthread",
+        "-I/tmp/course-tbb-tools/unpacked/usr/include",
+        "/tmp/course-tbb-guide-yt4u_fj1/ordered_pipeline.cpp",
+        "-L/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-Wl,-rpath,/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-ltbb",
+        "-o",
+        "/tmp/course-tbb-guide-yt4u_fj1/ordered_pipeline"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "ordered_pipeline execute",
+      "argv": [
+        "/tmp/course-tbb-guide-yt4u_fj1/ordered_pipeline"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "contracts compile",
+      "argv": [
+        "g++",
+        "-std=c++17",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pthread",
+        "-I/tmp/course-tbb-tools/unpacked/usr/include",
+        "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/OpenMP and OneTBB/concurrency_contracts.cpp",
+        "-L/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-Wl,-rpath,/tmp/course-tbb-tools/unpacked/usr/lib/x86_64-linux-gnu",
+        "-ltbb",
+        "-o",
+        "/tmp/course-tbb-guide-yt4u_fj1/contracts"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "contracts default affinity",
+      "argv": [
+        "/tmp/course-tbb-guide-yt4u_fj1/contracts",
+        "--self-test"
+      ],
+      "returncode": 0,
+      "stdout": "PASS bounded queue: capacity and FIFO\nPASS containers: 24000 protected updates and duplicate inserts\nPASS disjoint nested writes: isolate=0\nPASS disjoint nested writes: isolate=1\nPASS isolate is not a mutex: concurrent regions=2\nPASS cancellation: one committed write, repeated request=false\nPASS all 6 concurrency contracts\n",
+      "stderr": ""
+    },
+    {
+      "label": "contracts one CPU affinity",
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/tmp/course-tbb-guide-yt4u_fj1/contracts",
+        "--self-test"
+      ],
+      "returncode": 0,
+      "stdout": "PASS bounded queue: capacity and FIFO\nPASS containers: 24000 protected updates and duplicate inserts\nPASS disjoint nested writes: isolate=0\nPASS disjoint nested writes: isolate=1\nPASS isolate is not a mutex: concurrent regions=2\nPASS cancellation: one committed write, repeated request=false\nPASS all 6 concurrency contracts\n",
+      "stderr": ""
+    }
+  ],
+  "limitations": [
+    "Some guide fragments need a harness supplying their documented inputs and expected outputs.",
+    "No GPU execution. No ThreadSanitizer claim. One-CPU affinity is an additional progress check, not a proof for every scheduler."
+  ],
+  "all_passed": true
+}

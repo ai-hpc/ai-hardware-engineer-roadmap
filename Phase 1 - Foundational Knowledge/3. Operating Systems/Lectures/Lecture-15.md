@@ -2,15 +2,15 @@
 
 ## Overview
 
-Modern AI systems depend on moving large amounts of data — camera frames, model weights, activations — between CPU, GPU, camera ISP, and storage at high speed. Doing this through the CPU (copying data in software) would be impossibly slow and waste CPU cycles needed for inference. **Direct Memory Access (DMA)** lets hardware engines transfer data autonomously without CPU involvement. The core challenge is ensuring the CPU's caches and the device always see consistent data. The mental model for this lecture is a production pipeline: raw sensor data enters memory, gets processed by multiple hardware engines in sequence, and reaches the inference engine — ideally without a single software copy. For an AI hardware engineer, mastering DMA and the IOMMU is essential for designing zero-copy camera-to-inference pipelines, writing correct PCIe device drivers, and understanding why Jetson's unified memory architecture behaves differently from a discrete GPU.
+Modern AI systems depend on moving large amounts of data — camera frames, model weights, activations — between CPU, GPU, camera ISP, and storage at high speed. CPU copies may consume significant cycles and bandwidth, but their cost must be measured for the actual size and rate. Avoiding a copy is useful only if the replacement path preserves ownership and completion semantics. **Direct Memory Access (DMA)** lets hardware engines transfer payload data without a CPU executing the bulk copy. The core challenge is ensuring the CPU's caches and the device always see consistent data. The mental model for this lecture is a production pipeline: raw sensor data enters memory, gets processed by multiple hardware engines in sequence, and reaches the inference engine — ideally without a single software copy. For an AI hardware engineer, mastering DMA and the IOMMU is essential for designing zero-copy camera-to-inference pipelines, writing correct PCIe device drivers, and understanding why Jetson's unified memory architecture behaves differently from a discrete GPU.
 
 ---
 
 ## DMA: Direct Memory Access
 
-**DMA** allows a device (NIC, NVMe controller, GPU PCIe DMA engine, camera ISP) to transfer data directly to or from system RAM **without CPU participation** in the data path. The CPU programs a **descriptor** specifying source address, destination address, transfer length, and flags; the device executes the transfer autonomously; completion is signaled via an interrupt or a status flag the driver polls.
+**DMA** allows a device (NIC, NVMe controller, GPU PCIe DMA engine, camera ISP) to transfer data directly to or from system RAM without the CPU executing the bulk data copy. The CPU programs a **descriptor** specifying source address, destination address, transfer length, and flags; the device executes the transfer autonomously; completion is signaled via an interrupt or a status flag the driver polls.
 
-Benefits: CPU is freed during bulk transfers; transfer latency overlaps with CPU computation; system throughput increases.
+DMA can overlap transfers with CPU work; actual overlap and throughput depend on the engine, buffers, interconnect, scheduling, and software overhead.
 
 ```
 Without DMA (CPU-copy path):
@@ -51,7 +51,7 @@ Cache Coherency Hazard (DMA write, device→CPU):
 [CPU L1/L2 cache for VA→0x1000] = old stale value  ← BUG if CPU reads here
 
 Solution A (Coherent DMA): hardware coherency fabric or non-cached mapping
-Solution B (Streaming DMA): driver explicitly invalidates cache before CPU reads
+Solution B (Streaming DMA): driver uses the required map/sync/unmap ownership API
 ```
 
 ### Coherent (Consistent) DMA
@@ -65,15 +65,17 @@ Solution B (Streaming DMA): driver explicitly invalidates cache before CPU reads
 
 These are the portable guarantees in the [Linux DMA API HOWTO](https://docs.kernel.org/core-api/dma-api-howto.html); physical contiguity and cacheability must not be inferred from a virtual pointer.
 
-### Streaming (Non-Coherent) DMA
+### Streaming DMA and explicit ownership
 
-CPU uses cached memory; driver **explicitly synchronizes**. This is more complex but allows faster CPU access to the data when the CPU is not sharing the buffer with a device:
+Streaming DMA is an API ownership/mapping model, including on hardware-coherent platforms. Drivers use the required map/unmap or sync calls; the platform decides whether cache maintenance, address translation, or bouncing is needed:
 
 ```c
 /* CPU writes or updates buffer contents, preparing data for device */
-/* dma_map_single flushes (writes back) any cached data covering cpu_ptr, so device sees the latest data in RAM */
+/* The DMA API performs the platform-required mapping/synchronization. */
 dma_addr_t dma = dma_map_single(dev, cpu_ptr, size, DMA_TO_DEVICE);
-/* At this point, the buffer must not be touched by the CPU until dma_unmap_single is called */
+if (dma_mapping_error(dev, dma))
+    return -EIO; /* Reading exercise: enclosing function/error cleanup omitted. */
+/* Do not access the buffer while the device owns this transfer. */
 /* submit descriptor to device hardware to start DMA */
 /* ... device performs DMA read from system RAM into its memory ... */
 /* When DMA completes, tell the kernel DMA transfer is finished and the CPU can safely reuse or modify cpu_ptr */
@@ -125,12 +127,13 @@ Without IOMMU: a device (or compromised driver) can issue DMA to any physical ad
 
 ### IOMMU Groups
 
-An **IOMMU group** is a set of PCIe devices that share the same IOMMU translation hardware, meaning their memory accesses are managed together and **cannot be separated** at the IOMMU level. As a result, all devices in the same group must be treated as a unit when configuring access control—for example, when assigning devices to userspace (such as for passthrough to another software component or user process). It is not possible to give access to only one device in the group while restricting the others; access is always granted to the entire group together.
+An **IOMMU group** is the kernel’s minimum isolation unit for device assignment. Grouping can reflect hardware topology, aliasing, peer-to-peer paths, and isolation capabilities; it does not simply mean the devices use one physical translation engine. Assignment must preserve isolation for the whole group, but that does not mean every device in it must be exposed as a userspace handle. Follow the group/device binding rules of the actual VFIO implementation. [Linux VFIO groups](https://docs.kernel.org/driver-api/vfio.html#groups-devices-and-iommus).
 
 ### Kernel API
 
 ```c
-iommu_map(domain, iova, paddr, size, IOMMU_READ | IOMMU_WRITE);
+/* Concept only: direct IOMMU API signatures change with kernel version. */
+/* Map an IOVA range to physical pages with chosen permissions. */
 iommu_unmap(domain, iova, size);
 ```
 
@@ -138,13 +141,13 @@ These low-level calls are typically used by framework code (DMA subsystem, VFIO)
 
 ### VFIO
 
-**VFIO** (Virtual Function I/O) exposes IOMMU-backed device access to **userspace without a kernel driver**. Used by: DPDK (user-space NIC drivers), SPDK (user-space NVMe), FPGA userspace drivers, KVM GPU passthrough. The VFIO container maps groups to IOMMU domains and allows userspace DMA via `/dev/vfio/N`.
+**VFIO** (Virtual Function I/O) exposes IOMMU-backed device access to **userspace through kernel VFIO drivers and IOMMU-mediated access**. Used by: DPDK (user-space NIC drivers), SPDK (user-space NVMe), FPGA userspace drivers, KVM GPU passthrough. The VFIO container maps groups to IOMMU domains and allows userspace DMA via `/dev/vfio/N`.
 
 ---
 
 ## DMA-BUF Framework
 
-With individual DMA APIs understood, the next challenge is sharing a single DMA buffer between multiple hardware engines — for example, a camera ISP, a GPU inference engine, and a display engine all processing the same frame. Copying the data between each stage would eliminate the bandwidth benefit of DMA entirely. **DMA-BUF** solves this.
+With individual DMA APIs understood, the next challenge is sharing a single DMA buffer between multiple hardware engines — for example, a camera ISP, a GPU inference engine, and a display engine all processing the same frame. Copies can add memory traffic and latency; whether they dominate depends on the workload. **DMA-BUF** solves this.
 
 DMA-BUF is a kernel abstraction for sharing DMA buffers between independent subsystems (CPU, GPU, camera ISP, video encoder, display engine) without copying.
 
@@ -155,23 +158,21 @@ DMA-BUF is a kernel abstraction for sharing DMA buffers between independent subs
 
 ### Lifecycle
 
-```c
-/* Exporter */
-struct dma_buf *buf = dma_buf_export(&exp_info);  /* create exportable buffer */
-int fd = dma_buf_fd(buf, O_CLOEXEC);              /* get a file descriptor handle */
-/* pass fd to importer process via Unix socket */
+**Protocol pseudocode; exact kernel signatures/locking depend on the target version:**
 
-/* Importer */
-struct dma_buf *buf = dma_buf_get(fd);            /* get reference from fd */
-struct dma_buf_attachment *att = dma_buf_attach(buf, importer_dev);  /* attach device */
-struct sg_table *sgt = dma_buf_map_attachment(att, DMA_FROM_DEVICE); /* get sg list */
-/* sgt contains scatter-gather list with IOVAs for importer device */
-dma_buf_unmap_attachment(att, sgt, DMA_FROM_DEVICE);
-dma_buf_detach(buf, att);
-dma_buf_put(buf);
+```text
+exporter creates a dma_buf; check errors and establish its release callback
+exporter creates an fd; handle failure and reference ownership correctly
+transfer descriptor with SCM_RIGHTS when crossing a process boundary
+importer acquires a reference and attaches its device; check each failure
+map the attachment for the direction in which THAT device accesses it
+wait for producer completion and establish required visibility
+submit device work; retain mappings and references while access is outstanding
+after completion/quiescence: unmap, detach, and release importer reference
+release exporter storage only when all required references/accesses are gone
 ```
 
-The fd is a **cross-process, cross-subsystem handle** to the same physical buffer. Passing an fd via a Unix socket lets two separate processes share the same DMA buffer **without any kernel copy**.
+A GPU reading a captured frame normally uses a device-read direction, not an arbitrary `DMA_FROM_DEVICE` copied from a producer example. Each mapping is for its own device. Buffer CPU access may need a separate cache-synchronization protocol, and fences do not automatically implement mutual exclusion. See [DMA-BUF synchronization](https://docs.kernel.org/driver-api/dma-buf.html).
 
 ### Zero-Copy Pipeline
 
@@ -189,139 +190,50 @@ The fd is a **cross-process, cross-subsystem handle** to the same physical buffe
 V4L2 camera driver → DMABUF fd → CUDA importer → inference kernel → display
 ```
 
-No CPU copy at any stage. The fd is passable between processes via `SCM_RIGHTS` on a Unix socket, enabling cross-process zero-copy. Synchronization between producers and consumers uses the DMA fence framework (`dma_fence_wait()`).
+This is a possible compatible-buffer path, not a guarantee for every camera/CUDA/display combination. The fd can be passed using `SCM_RIGHTS`. Establish the supported producer/consumer completion and cache-ownership protocol; a generic fence call does not make arbitrary imports compatible.
 
 ### V4L2 Integration
 
-V4L2 supports DMA-BUF as a memory type (`V4L2_MEMORY_DMABUF`). Userspace passes the DMA-BUF fd in `struct v4l2_buffer.m.fd`. The ISP driver maps the buffer for its DMA engine automatically on `VIDIOC_QBUF`.
+V4L2 supports DMA-BUF as a memory type (`V4L2_MEMORY_DMABUF`). The single-planar API carries an fd in `struct v4l2_buffer.m.fd`; the multi-planar API uses the corresponding plane descriptors. The ISP driver maps the buffer for its DMA engine automatically on `VIDIOC_QBUF`.
 
 > **Key Insight:** DMA-BUF file descriptors are the "passport" of shared hardware buffers. A single fd can be passed across process boundaries, imported by multiple device drivers, and mapped by each device's DMA engine into the device's address space — all without any data movement in system RAM.
 
 ---
 
-## GPU Memory Architecture
+## GPU memory and platform capabilities
 
-With the general DMA framework established, GPU memory management adds one more layer of complexity: GPU VRAM is separate from system DRAM and connected via PCIe, creating a bandwidth bottleneck that must be carefully managed.
+A discrete GPU commonly has separate VRAM, while Jetson's integrated GPU shares physical DRAM with the CPU. Shared physical DRAM does not imply that every pointer is GPU-accessible or that accesses are automatically synchronized. Allocators, mappings, cacheability, and ownership remain distinct.
 
-### VRAM and PCIe BAR
+| Allocation kind | Common CUDA API | Contract to investigate |
+|---|---|---|
+| Device allocation | `cudaMalloc()` | Device access, explicit transfers where needed, lifetime until outstanding uses finish |
+| Pinned host allocation | `cudaMallocHost()` / registration | Host memory resource cost, supported asynchronous transfer/mapping paths |
+| Managed allocation | `cudaMallocManaged()` | Platform-specific managed-memory capabilities, residency and concurrent-access rules |
+| Mapped host allocation | Supported host allocation/registration plus device pointer query | Access over the actual interconnect and required synchronization |
+| External shared buffer | Supported external/graphics/vendor interop | Handle type, allocator, format, import compatibility and fences |
 
-GPU VRAM (GDDR6X on GeForce, HBM2e/HBM3 on datacenter GPUs) is accessed by the CPU through PCIe **Base Address Registers (BAR)**. The GPU exposes a **BAR aperture**; the CPU maps it as uncached MMIO.
+Memory migration granularity is not universally 64 KiB. Some platforms migrate; some support hardware-coherent access; some impose additional restrictions. Check device attributes and the applicable [CUDA for Tegra guidance](https://docs.nvidia.com/cuda/cuda-for-tegra-appnote/index.html).
 
-```
-CPU (System DRAM)                           GPU (VRAM)
-┌──────────────┐         PCIe Bus          ┌──────────────┐
-│   DRAM       │ <─────────────────────>   │   VRAM       │
-│  (CPU DDR5)  │  ~128 GB/s (PCIe 5.0 x16) │  (HBM3)      │
-└──────────────┘                           └──────────────┘
-       │                                         │
-  CPU accesses                           GPU accesses
-  GPU VRAM via                           VRAM directly
-  PCIe BAR                               at 3.35 TB/s
-  (uncached MMIO)                        (H100 HBM3)
-```
+Prefetching can influence residency and move work outside a measured interval where supported. It is not mandatory or useful for every platform, and its return value and stream dependencies matter. API signatures also evolve: CUDA 13.x documentation uses a `cudaMemLocation` destination and flags in `cudaMemPrefetchAsync`, while older lessons often show an integer-device overload. Compile against the selected toolkit and follow its [runtime memory API](https://docs.nvidia.com/cuda/cuda-runtime-api/cuda_runtime_api/group__CUDART__MEMORY.html). This lesson supplies no untested cross-version CUDA wrapper.
 
-- PCIe 5.0 x16 peak bandwidth: ~128 GB/s bidirectional
-- Discrete GPU typically exposes 1/8 of VRAM via the 256 MB or 16 GB BAR (resizable BAR / Above-4G Decoding)
-- NVIDIA NVLink bypasses PCIe for GPU-GPU transfers (600 GB/s on H100 NVLink 4.0)
+For a discrete GPU, a Gen5 x16 link has an encoding ceiling of about 63.02 GB/s in one direction before packet overhead. Summing both directions gives about 126.03 GB/s; that sum cannot be used as a one-way transfer rate. BAR aperture size, Above-4G decoding, and resizable BAR are related platform concepts, not interchangeable terms or a fixed one-eighth-of-VRAM rule. [Lecture 20](Lecture-20.md) develops the route calculation.
 
-### CUDA Memory Types
+On Jetson, do not reduce all allocators to `nvmap`, or assert that an ISP frame is immediately readable by CUDA at full DRAM bandwidth. Use the current supported allocator/import API and [camera buffer protocol](Lecture-18.md). A format conversion or repacking step may still be required even when no CPU copy is used.
 
-| Type | API | Coherent CPU↔GPU? | Notes |
-|------|-----|-------------------|-------|
-| Device memory | `cudaMalloc()` | No | VRAM; fastest for GPU kernels |
-| Pinned host memory | `cudaMallocHost()` | No | DMA-able; faster H2D/D2H transfers |
-| Unified Memory | `cudaMallocManaged()` | Yes (demand migration) | Single pointer, both CPU and GPU |
-| Mapped host memory | `cudaHostGetDevicePointer()` | No | Zero-copy over PCIe; low bandwidth |
+## Worked scatter-gather contract
 
-### CUDA Unified Memory
+Suppose the original scatterlist has 6 entries and `dma_map_sg()` returns 4 mapped DMA segments after merging. Program the device using the **4 mapped segments**, subject to its descriptor limits. Unmap using the **original 6-entry count**, as the DMA API requires. If mapping returns zero, do not submit the transfer. Keep the source pages and mapping valid through device completion.
 
-A **single pointer is valid on both CPU and GPU**. The CUDA driver and OS collaborate to migrate 64KB-granule pages on fault:
-- GPU page fault → migrate from CPU to VRAM
-- CPU page fault → migrate from VRAM to CPU DRAM
+Now suppose an application times out and drops a request ID. That does not stop DMA. A generation counter can reject a stale notification, but only completion or the device's abort/reset/quiescence protocol makes the storage reusable. This is the same ownership principle exercised by the [native SPSC lab](../labs/SPSC-Queue.md), with additional device/cache rules.
 
-```
-cudaMallocManaged() allocation lifecycle:
-                    ┌─────────────────────┐
-                    │  Single virtual ptr │
-                    │  (valid on CPU+GPU) │
-                    └─────────┬───────────┘
-                              │
-              ┌───────────────┴───────────────┐
-              │                               │
-    CPU accesses                      GPU accesses
-    (page fault)                      (page fault)
-              │                               │
-    ┌─────────▼──────┐              ┌─────────▼──────┐
-    │ Migrate to     │              │ Migrate to     │
-    │ CPU DRAM       │              │ GPU VRAM       │
-    └────────────────┘              └────────────────┘
-```
+## Answered checks
 
-`cudaMemPrefetchAsync(ptr, size, device, stream)`: explicit prefetch before access; hides migration latency.
-`cudaMemAdvise()` hints: `cudaMemAdviseSetReadMostly` (replicate across devices), `cudaMemAdviseSetPreferredLocation` (preferred residency).
+**Does coherent allocation remove memory barriers?** No. Coherence and ordering differ. Descriptor fields must become visible before the device observes a valid/ownership flag, according to the platform/device contract.
 
-Production inference code typically uses explicit `cudaMemcpy()` with pinned buffers for **deterministic latency**. Unified Memory is most useful for **rapid prototyping** and memory-constrained models that exceed VRAM.
+**Does `dma_unmap_single()` wait for hardware?** Do not assume so. The driver must establish transfer completion before unmapping and reclaiming the storage.
 
-> **Common Pitfall:** Using `cudaMallocManaged()` in production inference without `cudaMemPrefetchAsync()` causes unpredictable latency spikes at first access. The first kernel invocation triggers page migrations that can stall for milliseconds. Always prefetch Unified Memory regions before the timed inference path begins.
+**Does an IOMMU contain a buggy driver's CPU writes?** No. It restricts device DMA under its configuration, not arbitrary privileged CPU memory accesses. Bypass mappings and shared isolation groups also affect the boundary.
 
-### nvmap on Jetson
+**How many payload bytes are in one tightly packed 1080p RGBA frame?** `1920×1080×4 = 8,294,400` bytes. At 60 fps that is about 0.498 GB/s payload. A CPU copy adds both reads and writes; padded strides or another pixel format change the calculation.
 
-Jetson uses a **unified memory architecture** (CPU and GPU share DRAM). **nvmap** manages carveout (physically contiguous) and IOMMU-mapped allocations for IOMMU-less peripherals:
-
-```
-Jetson Unified Memory Architecture
-┌────────────────────────────────────────────────┐
-│                  Shared DRAM                   │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────┐ │
-│  │ CPU code │  │ GPU code │  │  NVDLA/VIC   │ │
-│  │  & data  │  │  & data  │  │  DMA buffers │ │
-│  └────┬─────┘  └────┬─────┘  └──────┬───────┘ │
-│       │             │               │          │
-│       └─────────────┴───────────────┘          │
-│              All point to same physical         │
-│              pages — no PCIe transfer!          │
-└────────────────────────────────────────────────┘
-```
-
-- NVDLA, VIC, camera ISP, display engine use nvmap buffers
-- `/dev/nvmap` userspace interface; `NVMAP_IOC_ALLOC`, `NVMAP_IOC_SHARE` ioctls
-- CPU and GPU access the same physical pages; no PCIe transfer needed
-
-> **Key Insight:** On Jetson, the distinction between "CPU memory" and "GPU memory" collapses — it is all the same DRAM. This eliminates PCIe transfer cost entirely. A camera frame captured by the ISP is immediately visible to both the CPU and the GPU CUDA kernel at full DRAM bandwidth, without any copy or PCIe transaction.
-
----
-
-## Summary
-
-| DMA type | Cache sync? | IOMMU needed? | API | Use case |
-|----------|------------|--------------|-----|---------|
-| Coherent | No (hardware) | No | `dma_alloc_coherent()` | Descriptor rings, control registers |
-| Streaming single | Yes (explicit) | Optional | `dma_map_single()` | Single-buffer bulk transfers |
-| Streaming SG | Yes (explicit) | Optional | `dma_map_sg()` | NVMe, network scatter-gather |
-| DMA-BUF | Fence-based | Optional | `dma_buf_*` | Cross-device zero-copy pipelines |
-| CUDA Unified | Automatic (driver) | N/A | `cudaMallocManaged()` | Prototype multi-stage inference |
-
-### Conceptual Review
-
-- **Why does DMA require cache synchronization on non-coherent systems?** The CPU caches data in L1/L2/L3. If the CPU writes to a buffer and the device then reads the same physical addresses via DMA, the device may read stale data from DRAM that has not yet been written back from CPU cache. `dma_map_single(DMA_TO_DEVICE)` flushes the cache first.
-
-- **What is the difference between coherent and streaming DMA?** Coherent DMA memory is always in sync between CPU and device — typically because it is mapped uncached or because a hardware coherency fabric keeps it consistent. Streaming DMA uses cached memory for speed but requires explicit `map`/`unmap` calls for synchronization.
-
-- **What does the IOMMU protect against?** A buggy or malicious device that issues DMA to arbitrary physical addresses. The IOMMU limits each device to only the IOVAs explicitly mapped for it. Any access outside those windows causes a fault, logged and the device is stalled.
-
-- **Why can DMA-BUF file descriptors be passed between processes?** A DMA-BUF fd is a kernel file descriptor backed by a reference-counted buffer object. Like any fd, it can be sent via `SCM_RIGHTS` on a Unix socket. The receiving process gets its own fd pointing to the same physical buffer — no copy occurs.
-
-- **When should you prefer `cudaMemcpy` with pinned buffers over Unified Memory?** In production inference where deterministic latency is required. Unified Memory migrations happen lazily on first access, causing unpredictable latency. Pinned buffers with explicit `cudaMemcpyAsync` give deterministic transfer timing.
-
-- **Why does Jetson not need PCIe transfers between CPU and GPU?** Jetson's integrated SoC architecture puts CPU and GPU on the same die sharing the same DRAM. There is no discrete GPU across a PCIe link. CPU and GPU both have direct DRAM access, so "transfer" is simply a virtual address remapping — zero data movement.
-
----
-
-## AI Hardware Connection
-
-- DMA-BUF with `V4L2_MEMORY_DMABUF` enables camera frame→CUDA zero-copy on Jetson; eliminates a full 1080p60 frame copy (~12 MB/frame × 60 = 720 MB/s CPU copy avoided)
-- `dma_alloc_coherent` is the correct API for Zynq PL↔PS AXI DMA command rings and status descriptors where correctness and simplicity outweigh throughput
-- IOMMU (ARM SMMU on Jetson Orin) partitions DRAM access per hardware engine; a malfunctioning NVDLA kernel cannot corrupt VIC or camera ISP buffers outside its mapped IOVA window
-- CUDA Unified Memory with `cudaMemPrefetchAsync` allows prototype inference code to exceed VRAM size by streaming weights through CPU DRAM, at the cost of migration latency
-- Streaming DMA with `DMA_FROM_DEVICE` is the access pattern for NVMe-to-GPU GPUDirect Storage, where NVMe data bypasses CPU cache and lands directly in GPU-accessible pinned memory
-- VFIO enables userspace FPGA DMA drivers that bypass the kernel driver model entirely, useful for low-latency AI accelerator cards requiring sub-microsecond command submission
+**Does using one physical DRAM eliminate all movement?** No. Copies, cache maintenance, format conversions, and memory traffic may still occur. Measure the actual allocation and access path.

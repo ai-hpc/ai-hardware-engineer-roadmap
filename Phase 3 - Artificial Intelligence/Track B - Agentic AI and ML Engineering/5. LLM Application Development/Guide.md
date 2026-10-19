@@ -51,7 +51,7 @@ LLM applications provide several distinct inference workloads:
 
 **Projects:**
 1. Fine-tune Llama-3-8B with QLoRA on a domain-specific Q&A dataset. Evaluate vs base model.
-2. Merge LoRA adapters and export to ONNX for deployment.
+2. Merge a compatible LoRA adapter, compare outputs with the unmerged model, and attempt a supported export path. Record unsupported operators, dynamic shapes, and runtime compatibility; adapter merging alone does not guarantee ONNX support.
 3. Fine-tune `Qwen/Qwen3.5-4B-Base` with Unsloth LoRA, then benchmark base, adapter, merged, and quantized artifacts.
 
 ---
@@ -80,7 +80,7 @@ LLM applications provide several distinct inference workloads:
 
 **Projects:**
 1. Deploy a RAG application with streaming, caching, and cost tracking. Measure tokens/$ efficiency.
-2. Implement semantic caching — cache similar queries to reduce GPU inference calls by 30%+.
+2. Implement semantic caching and measure the actual hit rate, avoided inference calls, answer quality, and latency. Separate tenant/permission scopes and include changed-source and time-sensitive queries; similarity alone does not make a cached answer valid. No fixed percentage improvement is promised.
 
 ---
 
@@ -139,7 +139,9 @@ System prompts help, but they do not replace input filtering, tool constraints, 
 * **Red-team continuously:** adversaries adapt. Test jailbreaks, encoded prompts, multilingual attacks, and indirect prompt injection.
 * **Version policies:** thresholds, blocklists, regex rules, and system prompts should be versioned like code.
 
-### 5.6 Minimal Python Sketch
+### 5.6 A deliberately weak screening baseline
+
+**Exercise, not a security boundary.** This toy detects a few literal patterns. Its false positives and misses are the lesson: matching a word does not establish malicious intent, and failing to match does not establish trust. Authorization must be enforced by the tool or service, using the authenticated user's permissions and validated arguments. Structured JSON also does not confer permission. See [OWASP's prompt-injection guidance](https://cheatsheetseries.owasp.org/cheatsheets/LLM_Prompt_Injection_Prevention_Cheat_Sheet.html), reviewed 2026-10-18.
 
 ```python
 import re
@@ -161,7 +163,7 @@ def keyword_block(text: str) -> bool:
 def detect_jailbreak(text: str) -> bool:
     return any(re.search(pattern, text, re.IGNORECASE) for pattern in JAILBREAK_PATTERNS)
 
-def secure_prompt_pipeline(user_input: str) -> str:
+def toy_screening_baseline(user_input: str) -> str:
     clean = sanitize_unicode(user_input)
 
     if not keyword_block(clean):
@@ -172,10 +174,12 @@ def secure_prompt_pipeline(user_input: str) -> str:
 
     # Then call your moderation service, model, output moderation,
     # and PII redaction steps.
-    return "Safe to continue."
+    return "No toy pattern matched; input remains untrusted."
 ```
 
-The point of the example is the pipeline shape, not the exact classifier choice. In production, replace the placeholders with real moderation services, prompt-attack detectors, and PII tooling.
+**Worked failure:** “Explain how to kill a stalled process” triggers the literal `kill` check although it can be an ordinary systems question. A request with different wording may miss every pattern. Add benign and adversarial examples, annotate expected decisions, and measure both false positives and false negatives. Replacing the patterns with a classifier can improve screening, but does not replace scoped credentials, service-side authorization, isolation, and action validation.
+
+For a robotics planning service, accept only a typed high-level task proposal. Independently check task ID, target frame, units, allowed workspace, and expiry before passing it to the execution system. Keep this application check separate from the robot's controller and hardware safeguards. Begin with [the AI-to-robot control-loop example](../../0.%20AI%20and%20Robot%20Learning%20Foundations/02-Evaluation-and-Robot-Learning.md#8-an-agent-is-a-different-control-loop).
 
 ### 5.7 Tools You Should Know
 

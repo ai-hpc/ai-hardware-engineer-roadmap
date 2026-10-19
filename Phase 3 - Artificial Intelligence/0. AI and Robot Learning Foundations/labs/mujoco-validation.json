@@ -1,0 +1,43 @@
+{
+  "checked_at_utc": "2026-10-18T23:48:38.899578+00:00",
+  "execution": "actual CPU native MuJoCo3.16.0; headless, no GPU/rendering/contact/physical robot",
+  "platform": "CPython3.12.3 Linux x86-64",
+  "mujoco_release_commit": "a892750516336d8358949f4518fcc4fbbd85beae",
+  "release_source": "https://github.com/google-deepmind/mujoco/tree/a892750516336d8358949f4518fcc4fbbd85beae",
+  "install": "10 packages force-reinstalled with --require-hashes --only-binary=:all: from requirements-mujoco.lock; pip check passed",
+  "portable_tests": {
+    "executed": 4,
+    "output": "test_acceleration_and_force_are_separately_bounded (test_mujoco_contract.BridgeContractTests.test_acceleration_and_force_are_separately_bounded) ... ok\ntest_independent_semiimplicit_step (test_mujoco_contract.BridgeContractTests.test_independent_semiimplicit_step) ... ok\ntest_invalid_dynamics_and_fractional_periods (test_mujoco_contract.BridgeContractTests.test_invalid_dynamics_and_fractional_periods) ... ok\ntest_saved_preprocessing_identity_and_rejection (test_mujoco_contract.BridgeContractTests.test_saved_preprocessing_identity_and_rejection) ... ok\n\n----------------------------------------------------------------------\nRan 4 tests in 0.004s\n\nOK\n"
+  },
+  "actual_engine_tests": {
+    "executed": 11,
+    "output": "test_cached_physics_must_match_but_policy_adapter_can_change (test_mujoco_bridge.PhysicsBridgeTests.test_cached_physics_must_match_but_policy_adapter_can_change) ... ok\ntest_engine_limit_operates_even_without_python_clipping (test_mujoco_bridge.PhysicsBridgeTests.test_engine_limit_operates_even_without_python_clipping) ... ok\ntest_entire_matched_trajectory_against_scalar_reference (test_mujoco_bridge.PhysicsBridgeTests.test_entire_matched_trajectory_against_scalar_reference) ... ok\ntest_euler_joint_damping_is_implicit (test_mujoco_bridge.PhysicsBridgeTests.test_euler_joint_damping_is_implicit) ... ok\ntest_mass_adapter_and_force_saturation_change_acceleration (test_mujoco_bridge.PhysicsBridgeTests.test_mass_adapter_and_force_saturation_change_acceleration) ... ok\ntest_nonfinite_policy_action_rejected_before_stepping (test_mujoco_bridge.PhysicsBridgeTests.test_nonfinite_policy_action_rejected_before_stepping) ... ok\ntest_one_step_force_over_mass_and_updated_velocity_position (test_mujoco_bridge.PhysicsBridgeTests.test_one_step_force_over_mass_and_updated_velocity_position) ... ok\ntest_reset_clears_time_controls_external_force_and_state (test_mujoco_bridge.PhysicsBridgeTests.test_reset_clears_time_controls_external_force_and_state) ... ok\ntest_simulator_auto_reset_is_failure_not_success (test_mujoco_bridge.PhysicsBridgeTests.test_simulator_auto_reset_is_failure_not_success) ... WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0000.\n\nWARNING: Nan, Inf or huge value in QVEL at DOF 0. The simulation is unstable. Time = 0.0000.\n\nok\ntest_substeps_change_integration_without_more_policy_calls (test_mujoco_bridge.PhysicsBridgeTests.test_substeps_change_integration_without_more_policy_calls) ... ok\ntest_success_and_sampled_settling_boundary_are_strict (test_mujoco_bridge.PhysicsBridgeTests.test_success_and_sampled_settling_boundary_are_strict) ... ok\n\n----------------------------------------------------------------------\nRan 11 tests in 0.047s\n\nOK\n"
+  },
+  "rollouts": {
+    "cases": 6,
+    "episodes_per_case": 12,
+    "total_episodes": 72,
+    "matched_trace_max_absolute_error": 0.0,
+    "independent_review_reproduction": "all non-timing case results equal",
+    "output": "matched_100ms 12/12 mean_abs_position=0.074149 m force_clips=0\nsubsteps_10ms 12/12 mean_abs_position=0.079345 m force_clips=0\nmass3_wrong_adapter 8/12 mean_abs_position=0.212231 m force_clips=0\nmass3_correct_adapter 12/12 mean_abs_position=0.079345 m force_clips=0\nmass3_force_limited 12/12 mean_abs_position=0.143766 m force_clips=454\ndamping_without_compensation 12/12 mean_abs_position=0.060444 m force_clips=0\nSaved /tmp/course-mujoco-final-results.json\n"
+  },
+  "plotting": "separate /usr/bin/python3 environment, Matplotlib3.6.3; plots retained JSON without physics rerun",
+  "commands": [
+    "python3 policy_lab.py --output /tmp/course-mujoco-policy.json",
+    "/tmp/course-mujoco-venv/bin/python -m pip install --force-reinstall --require-hashes --only-binary=:all: -r requirements-mujoco.lock",
+    "/tmp/course-mujoco-venv/bin/python -m unittest discover -s optional -p test_mujoco_bridge.py -v",
+    "python3 -m unittest discover -s . -p test_mujoco_contract.py -v",
+    "/tmp/course-mujoco-venv/bin/python mujoco_bridge.py --policy /tmp/course-mujoco-policy.json --output /tmp/course-mujoco-final-results.json"
+  ],
+  "source_hashes": {
+    "policy_lab.py": "2861d6aa8600ced6e936cc552159545aa85f14c5f3b6f07dfb45ff7fd353dd9a",
+    "mujoco_bridge.py": "d9d28e438e702bc65145bea6c94d8ff321f1da593def461fbbab5bdb1f62cae5",
+    "test_mujoco_contract.py": "7501290aed6feeffb68b210749791feaa4e52f07b960340d448f9434f55f61bb",
+    "optional/test_mujoco_bridge.py": "c7d5c1f5732fb54669c7d2b941dea3c07617ec4fbbc76e70c5f686c2e358a753",
+    "requirements-mujoco.lock": "9f74962a64b0592550eb6304b4008a656ca4e0958e804e3ba04020870524045d",
+    "plot_mujoco_results.py": "7970ce92d7835e1dbbff8f5b4f79950776e01ffc36a17a2331f4af265095ed9a",
+    "mujoco-results.json": "7ee0a6e0a48867ef6a783d49bb93d2c288cc846cdd121600a20ecaf7d79e1956",
+    "mujoco-policy-report.json": "2e2ae387d8b46ff3c34b89af7e7f51487f28da591cc0b134c442a622ba46128b",
+    "mujoco-results.svg": "dfb754952f0f1b7300adf873a5a0a1b8d36031cd50d7b56ea41d95356cec90d7"
+  }
+}

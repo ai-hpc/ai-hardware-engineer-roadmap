@@ -42,6 +42,10 @@ Every serious decision in LLM inference is a decision about a probability distri
 
 ---
 
+## Start with a checked calculation
+
+Complete the [CPU quality-metrics lab](Lab-01-Masked-Quality-Metrics.md) before grading a real checkpoint. It exposes the masked-token denominator, the distinction between teacher KL and data NLL, and counterexamples to common PPL interpretations.
+
 ## Why this course is structured the way it is
 
 The five lectures walk the master identity from its raw material to its payoff:
@@ -88,7 +92,7 @@ By the end you should be able to:
 The mathematics here is settled (Shannon 1948; Kullback–Leibler 1951). What moves is the **tooling and practice**:
 
 * The quantization-evaluation section (Lecture 05) tracks current practice — llama.cpp's `--kl-divergence` mode and the **January 2026** finding ([arXiv 2601.14277](https://arxiv.org/abs/2601.14277)) that quantization *format* matters more than nominal bit-width, and that intrinsic metrics (PPL, KLD) are necessary but not sufficient — you still validate on downstream benchmarks.
-* RLHF objectives evolve (PPO → DPO → GRPO); the **KL term is the invariant**, and that is what this course teaches.
+* Alignment objectives and configurations differ; identify the KL direction, estimator, coefficient, and normalization when a reference penalty is used.
 * Every lecture closes with a **`## Current as of`** note marking what is timeless math versus 2026 tooling.
 
 ---

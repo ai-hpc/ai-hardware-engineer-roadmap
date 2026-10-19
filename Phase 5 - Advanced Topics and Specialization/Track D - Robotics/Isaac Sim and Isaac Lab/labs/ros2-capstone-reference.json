@@ -1,0 +1,103 @@
+{
+  "scope": "actual ROS 2 localhost transport; scripted action and simulated state fixtures",
+  "python": "3.12.3",
+  "ros_distro": "jazzy",
+  "domain_id": 77,
+  "namespace": "/course_atomic_ba4bf2f565",
+  "clock": "controller monotonic clock echoed by policy",
+  "ttl_ms": 500,
+  "results": [
+    {
+      "case": "fresh",
+      "accepted": true,
+      "age_ns": 1364079,
+      "target": [
+        0.025,
+        0.025,
+        0.025,
+        0.025,
+        0.025,
+        0.025,
+        0.025
+      ]
+    },
+    {
+      "case": "duplicate",
+      "accepted": false,
+      "reason": "no pending observation (duplicate or unsolicited command)",
+      "target": [
+        0.025,
+        0.025,
+        0.025,
+        0.025,
+        0.025,
+        0.025,
+        0.025
+      ]
+    },
+    {
+      "case": "expired",
+      "accepted": false,
+      "reason": "future or expired command",
+      "target": [
+        0.025,
+        0.025,
+        0.025,
+        0.025,
+        0.025,
+        0.025,
+        0.025
+      ]
+    },
+    {
+      "case": "previous_episode",
+      "accepted": false,
+      "reason": "previous or unknown episode",
+      "target": [
+        0.2,
+        0.2,
+        0.2,
+        0.2,
+        0.2,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "case": "mixed_sensor",
+      "accepted": false,
+      "reason": "command does not answer the pending observation",
+      "target": [
+        0.2,
+        0.2,
+        0.2,
+        0.2,
+        0.2,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "case": "invalid_numeric",
+      "accepted": false,
+      "reason": "action must contain finite numbers",
+      "target": [
+        0.2,
+        0.2,
+        0.2,
+        0.2,
+        0.2,
+        0.2,
+        0.2
+      ]
+    }
+  ],
+  "checks_passed": 6,
+  "limitations": [
+    "two nodes in one process",
+    "no Isaac, model inference, actuator or robot",
+    "six cases demonstrate correctness, not latency percentiles or deadlines"
+  ],
+  "protocol_sha256": "b31769d982da83b3a11611e2f5e57f3a0f6656482742ba353cb94034ba014d1d",
+  "script_sha256": "ae0dbf7e933801228f651fe487026d36336b5bcaf11d12fdaeb503284d0d94fd"
+}

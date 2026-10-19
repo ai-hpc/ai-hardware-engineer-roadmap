@@ -1,0 +1,26 @@
+{
+  "recorded_utc": "2026-10-18",
+  "scope": "Synchronous LLVM CPU calls; tiny operation includes Python/FFI overhead. No expected speedup or GPU claim.",
+  "measurements": [
+    {
+      "tile": 1,
+      "compile_seconds": 0.022708117990987375,
+      "median_call_ns": 137.9
+    },
+    {
+      "tile": 4,
+      "compile_seconds": 0.07722033699974418,
+      "median_call_ns": 132.51
+    },
+    {
+      "tile": 8,
+      "compile_seconds": 0.06929665201460011,
+      "median_call_ns": 135.52
+    },
+    {
+      "tile": 16,
+      "compile_seconds": 0.03163549001328647,
+      "median_call_ns": 188.4
+    }
+  ]
+}

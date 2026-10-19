@@ -12,7 +12,7 @@ The inspected repository retains N1.5 and N1.6 histories and identifies N1.7 as 
 
 N1.7's documented change includes a Cosmos-Reason2-2B backbone using Qwen3-VL architecture. The technical article describes a 3B base model and an end-to-end development workflow. Version changes can alter processors and deployment assumptions as well as weights. [NVIDIA technical article, 2026-07-07](https://developer.nvidia.com/blog/develop-humanoid-robot-policies-end-to-end-with-nvidia-isaac-gr00t/).
 
-There is an unresolved public-documentation mismatch: the general-release repository describes Apache-2.0 licensing, while the inspected `nvidia/GR00T-N1.7-3B` card still labels itself EA and links NVIDIA's Open Model License. Record the terms packaged with the exact artifact; this course does not resolve that mismatch by assuming the most permissive description applies everywhere. [Repository](https://github.com/NVIDIA/Isaac-GR00T), [checkpoint card](https://huggingface.co/nvidia/GR00T-N1.7-3B).
+**October 18 source update:** the [pinned repository's license section](https://github.com/NVIDIA/Isaac-GR00T/blob/dac54b313160c201c450f97df0fd74ebd379c892/README.md#license) explicitly separates Apache-2.0 code from NVIDIA Open Model License weights. Its introductory wording is broader, and the [checkpoint card](https://huggingface.co/nvidia/GR00T-N1.7-3B) still labels itself EA. Use the exact artifact's packaged terms and configuration; do not apply a code license to weights or infer the release from a stale label. The [dated update](Current-Update-2026-10-18.md) records the inspected revisions.
 
 ## A policy, a simulator, and a task are different components
 
@@ -34,7 +34,7 @@ Cross-embodiment support means the model has a mechanism for representing differ
 
 ## Worked example: predicting a chunk versus meeting deadlines
 
-Suppose an **illustrative**, single-environment setup has a 60 Hz controller, a 120 Hz physics step, and a policy that predicts 16 actions on each request. Policy p95 latency is 90 ms, including camera transfer. The policy frequency is approximately 11.1 requests/s, but the controller still consumes 60 actions/s. These are different rates.
+Suppose an **illustrative**, single-environment setup has a 60 Hz controller, a 120 Hz physics step, and a policy that predicts 16 actions on each request. Policy p95 latency is 90 ms, including camera transfer. A serial request taking exactly 90 ms corresponds to an interval of about 11.1 requests/s; **the reciprocal of p95 is not measured average throughput**. Request scheduling and concurrency determine the actual rate. The controller still consumes 60 targets/s, and the model's prediction horizon is a separate configuration.
 
 The minimum look-ahead needed merely to cover the p95 inference interval is
 

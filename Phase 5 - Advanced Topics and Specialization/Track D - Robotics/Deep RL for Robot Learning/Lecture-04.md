@@ -33,7 +33,7 @@ By the end you should be able to:
 
 Look at the gradient row. A policy gradient is **behavioral cloning on your own tries, weighted by how well each try went**. Good tries get positive weight (copy them), bad tries get negative weight (push away from them). Every RL post-training method for VLAs in Lecture 11 is a variant of this one idea, including GRPO, which drives most LLM reasoning post-training.
 
-> **Robot connection.** π0.5 already succeeds on most nominal LIBERO layouts. When it fails, typically on a layout where objects were moved, there is no expert on hand to say what it should have done. There is a success check. Policy gradients turn "succeeded / failed on this layout" into a parameter update. In simulation you can go further: restart the **same** table setup several times and compare each try to *that setup's* average. This is the group baseline of Section 5, and it is the same trick chat models use under the name GRPO.
+> **Robot connection.** The upstream `pi05_libero` checkpoint is fine-tuned on LIBERO; its [reported benchmark scores](https://github.com/Physical-Intelligence/openpi/blob/215abfb217dbac7d5f1273282331b9b1866c0479/examples/libero/README.md#results) describe that checkpoint and evaluation, not every π0.5 model or a local reproduction. On a new or perturbed layout, first measure the baseline. A failure may provide a success check without an expert action label. Policy gradients turn "succeeded / failed on this layout" into a parameter update. In simulation you can go further: restart the **same** table setup several times and compare each try to *that setup's* average. This is the group baseline of Section 5, and it is the same trick chat models use under the name GRPO.
 
 ---
 
@@ -148,7 +148,18 @@ $$
 \mathbb{E}\big[\nabla_\theta \log \pi_\theta(a_t \mid s_t)\, r_{t'}\big] = \mathbb{E}_{s_{0:t}, a_{0:t-1}}\Big[ r_{t'} \; \mathbb{E}_{a_t \sim \pi_\theta(\cdot \mid s_t)}\big[\nabla_\theta \log \pi_\theta(a_t \mid s_t)\big] \Big] = 0
 $$
 
-The inner expectation is zero because \(\mathbb{E}_{a \sim \pi}[\nabla \log \pi(a \mid s)] = \int \nabla \pi(a \mid s)\, da = \nabla \int \pi(a \mid s)\, da = \nabla 1 = 0\). Past rewards add zero-mean noise, so drop them:
+The inner expectation is zero because probabilities sum or integrate to one:
+
+\[
+\begin{aligned}
+\mathbb{E}_{a \sim \pi}[\nabla \log \pi(a \mid s)]
+  &= \int \nabla \pi(a \mid s)\, da \\
+  &= \nabla \int \pi(a \mid s)\, da \\
+  &= \nabla 1 = 0.
+\end{aligned}
+\]
+
+Past rewards add zero-mean noise, so drop them:
 
 $$
 \hat g = \frac{1}{N}\sum_i \sum_t \nabla_\theta \log \pi_\theta(a_t^i \mid s_t^i)\, \hat Q_t^i, \qquad \hat Q_t^i = \sum_{t'=t}^{T-1} r_{t'}^i
@@ -174,7 +185,7 @@ $$
 
 This is the return weighted by gradient magnitude. Nobody computes it per parameter in practice. The mean return is the usual cheap approximation, and it captures most of the gain.
 
-**Caveat on "free".** A baseline computed from the same batch, including the sample it is subtracted from, is very slightly correlated with that sample's action. This bias is \(O(1/N)\). The leave-one-out form in Section 5 removes it exactly.
+**Caveat on baselines.** A same-group mean includes the current return. With G conditionally independent samples, its unnormalized score-function expectation is scaled by (G−1)/G; at G=2 this is a factor of one half, not an automatically negligible bias. Leave-one-out removes this dependence. A learned baseline fitted to the same data and std-normalized advantages need their own analysis.
 
 ### 4.3 Variance vs batch size
 
@@ -204,7 +215,7 @@ Why this beats a batch-wide mean on a robot task: different layouts have very di
 
 ### 5.1 The zero-signal problem
 
-With binary success, a group in which every try succeeded, or every try failed, has \(R_i = \bar R\) for all \(i\). **Every advantage is exactly zero and the group contributes no gradient.** Those rollouts were paid for and taught nothing. If the policy's success rate on a layout is \(p\), the probability that a group of \(G\) is informative is \(1 - p^G - (1-p)^G\):
+With binary success, a group in which every try succeeded, or every try failed, has \(R_i = \bar R\) for all \(i\). **Every advantage is exactly zero and the group contributes no gradient.** They provide no reward-relative update under this estimator, but can still inform a critic, regularizer, coverage estimate, or failure analysis. If the policy's success rate on a layout is \(p\), the probability that a group of \(G\) is informative is \(1 - p^G - (1-p)^G\):
 
 | Success rate \(p\) on this layout | \(G=2\) | \(G=4\) | \(G=8\) | \(G=16\) |
 |---|---|---|---|---|
@@ -213,9 +224,9 @@ With binary success, a group in which every try succeeded, or every try failed, 
 | 0.2 or 0.8 | 0.32 | 0.59 | 0.83 | 0.97 |
 | 0.5 | 0.50 | 0.88 | 0.99 | 1.00 |
 
-Two consequences matter for the capstone. First, a strong base policy such as π0.5 on nominal layouts sits near \(p \approx 1\), so **most groups are wasted**. The signal lives on layouts it sometimes fails. Second, a policy that never succeeds learns nothing at all from sparse reward. Lecture 12 turns this into a compute-allocation policy: sample initial states whose success rate is strictly between 0 and 1. For now, **log the fraction of zero-variance groups**. It is a direct measure of wasted rollout compute.
+Two consequences matter for the capstone. First, when a measured baseline has \(p \approx 1\) on a layout, **most groups give zero reward-relative signal**. The signal lives on layouts it sometimes fails. Second, a policy that never succeeds learns nothing at all from sparse reward. Lecture 12 turns this into a compute-allocation policy: sample initial states whose success rate is strictly between 0 and 1. For now, **log the fraction of zero-variance groups**. It is a direct measure of wasted rollout compute.
 
-> **Robot connection: the flow-matching puzzle.** Everything above needs \(\log \pi_\theta(a \mid s)\). For a Gaussian or softmax head it is one line. π0.5's action expert is a **flow-matching** model: it turns noise into a 50-step action chunk by integrating a learned velocity field about ten times. Its exact likelihood requires integrating the divergence of that field along the whole path, which is expensive and noisy to estimate. So "just run REINFORCE on π0.5" is not straightforward. Lecture 11 covers the workarounds (noise injection that makes each denoising step Gaussian, noise-space steering, advantage-weighted regression). The group-baseline machinery you build here carries over unchanged.
+> **Robot connection: the flow-matching puzzle.** Everything above needs \(\log \pi_\theta(a \mid s)\). For a Gaussian or softmax head it is one line. π0.5's action expert is a **flow-matching** model: it turns noise into an action chunk by integrating a learned velocity field. Chunk length and integration steps are separate settings: the [pinned `pi05_libero` configuration](https://github.com/Physical-Intelligence/openpi/blob/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/training/config.py#L744) predicts ten actions, while a base configuration can predict fifty. The continuous-flow likelihood uses a divergence integral; stochastic divergence estimates add noise, and a finite Euler sampler has a different change-of-variables calculation. Lecture 11 explains that distinction. So "just run REINFORCE on π0.5" is not straightforward. Lecture 11 covers the workarounds (noise injection that makes each denoising step Gaussian, noise-space steering, advantage-weighted regression). The group-baseline machinery you build here carries over unchanged.
 
 ---
 
@@ -444,7 +455,7 @@ Commit `pg/` containing:
 
 You can move on when you can:
 
-* derive \(\nabla_\theta J = \mathbb{E}[\sum_t \nabla \log \pi_\theta(a_t \mid s_t)\, R]\) on a whiteboard and point to the line where the dynamics vanish
+* derive the REINFORCE estimator from Section 3 on a whiteboard and point to the line where the dynamics vanish
 * prove in two lines that a state-dependent baseline is unbiased, and say why reward-to-go is a special case of the same identity
 * explain why leave-one-out is unbiased and the plain group mean is a rescaling
 * show your measured relative variance for each estimator and convert the gap into "x times more rollouts"

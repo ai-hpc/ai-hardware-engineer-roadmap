@@ -1,0 +1,985 @@
+{
+  "checked_utc": "2026-10-18T23:35:55.665096+00:00",
+  "scope": "local SDK fixture/stdlib tests; no live provider/Gateway execution",
+  "commands": [
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "labs",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures",
+      "started_utc": "2026-10-18T23:31:41.980821+00:00",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "test_arithmetic (test_tool_contracts.ToolContractTests.test_arithmetic) ... ok\ntest_batch_admission_atomic (test_tool_contracts.ToolContractTests.test_batch_admission_atomic) ... ok\ntest_duplicate_id_across_turns (test_tool_contracts.ToolContractTests.test_duplicate_id_across_turns) ... ok\ntest_duplicate_json_rejected (test_tool_contracts.ToolContractTests.test_duplicate_json_rejected) ... ok\ntest_duplicate_same_batch (test_tool_contracts.ToolContractTests.test_duplicate_same_batch) ... ok\ntest_json_object_and_size (test_tool_contracts.ToolContractTests.test_json_object_and_size) ... ok\ntest_strict_types_and_bounds (test_tool_contracts.ToolContractTests.test_strict_types_and_bounds) ... ok\ntest_unknown_and_extra_fields (test_tool_contracts.ToolContractTests.test_unknown_and_extra_fields) ... ok\n\n----------------------------------------------------------------------\nRan 8 tests in 0.001s\n\nOK\n"
+    },
+    {
+      "command": [
+        "/tmp/course-provider-contracts-venv/bin/python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "labs/optional",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures",
+      "started_utc": "2026-10-18T23:31:42.039798+00:00",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "test_claude_bad_args_return_error (test_provider_sdk.SDKTests.test_claude_bad_args_return_error) ... ok\ntest_claude_duplicate_ids_rejected (test_provider_sdk.SDKTests.test_claude_duplicate_ids_rejected) ... ok\ntest_claude_incomplete_stops (test_provider_sdk.SDKTests.test_claude_incomplete_stops) ... ok\ntest_claude_two_calls_correlated_and_text_joined (test_provider_sdk.SDKTests.test_claude_two_calls_correlated_and_text_joined) ... ok\ntest_claude_unknown_tool (test_provider_sdk.SDKTests.test_claude_unknown_tool) ... ok\ntest_current_anthropic_removes_temperature_parameter (test_provider_sdk.SDKTests.test_current_anthropic_removes_temperature_parameter) ... ok\ntest_current_anthropic_requires_httpx2_transport (test_provider_sdk.SDKTests.test_current_anthropic_requires_httpx2_transport) ... ok\ntest_duplicate_response_call_id_across_turns (test_provider_sdk.SDKTests.test_duplicate_response_call_id_across_turns) ... ok\ntest_refusal_beside_call_stops_before_result_submission (test_provider_sdk.SDKTests.test_refusal_beside_call_stops_before_result_submission) ... ok\ntest_responses_explicit_continuation_is_not_final (test_provider_sdk.SDKTests.test_responses_explicit_continuation_is_not_final) ... ok\ntest_responses_incomplete (test_provider_sdk.SDKTests.test_responses_incomplete) ... ok\ntest_responses_malformed_continuation_fails (test_provider_sdk.SDKTests.test_responses_malformed_continuation_fails) ... ok\ntest_responses_preserves_all_output_and_matches_call (test_provider_sdk.SDKTests.test_responses_preserves_all_output_and_matches_call) ... ok\ntest_responses_refusal (test_provider_sdk.SDKTests.test_responses_refusal) ... ok\ntest_responses_rejects_duplicate_json (test_provider_sdk.SDKTests.test_responses_rejects_duplicate_json) ... ok\ntest_responses_text_continuation_obeys_budget (test_provider_sdk.SDKTests.test_responses_text_continuation_obeys_budget) ... ok\ntest_structured_parse_enforces_local_range (test_provider_sdk.SDKTests.test_structured_parse_enforces_local_range) ... ok\ntest_structured_parse_sdk_generates_output_config (test_provider_sdk.SDKTests.test_structured_parse_sdk_generates_output_config) ... ok\ntest_turn_and_call_limits (test_provider_sdk.SDKTests.test_turn_and_call_limits) ... ok\ntest_unsupported_server_tools_are_not_final_success (test_provider_sdk.SDKTests.test_unsupported_server_tools_are_not_final_success) ... ok\n\n----------------------------------------------------------------------\nRan 20 tests in 0.437s\n\nOK\n"
+    },
+    {
+      "command": [
+        "/tmp/course-provider-contracts-venv/bin/python",
+        "-m",
+        "pip",
+        "check"
+      ],
+      "cwd": "Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures",
+      "started_utc": "2026-10-18T23:31:44.383645+00:00",
+      "exit_code": 0,
+      "stdout": "No broken requirements found.\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/tmp/course-provider-contracts-venv/bin/python",
+        "labs/demo_provider_contracts.py"
+      ],
+      "cwd": "Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures",
+      "started_utc": "2026-10-18T23:31:45.084176+00:00",
+      "exit_code": 0,
+      "stdout": "{\n  \"evidence\": \"real SDKs with local HTTP fixtures; no model execution\",\n  \"packages\": {\n    \"anthropic\": \"1.15.0\",\n    \"openai\": \"3.35.1\",\n    \"httpx\": \"0.28.1\",\n    \"httpx2\": \"2.14.0\",\n    \"pydantic\": \"2.14.1\"\n  },\n  \"runs\": [\n    {\n      \"provider\": \"claude\",\n      \"answer\": \"5\",\n      \"request_bodies\": [\n        {\n          \"max_tokens\": 256,\n          \"messages\": [\n            {\n              \"role\": \"user\",\n              \"content\": \"Add 2 and 3.\"\n            }\n          ],\n          \"model\": \"fixture-model\",\n          \"tools\": [\n            {\n              \"name\": \"add_integers\",\n              \"description\": \"Add two bounded integers.\",\n              \"input_schema\": {\n                \"type\": \"object\",\n                \"properties\": {\n                  \"a\": {\n                    \"type\": \"integer\"\n                  },\n                  \"b\": {\n                    \"type\": \"integer\"\n                  }\n                },\n                \"required\": [\n                  \"a\",\n                  \"b\"\n                ],\n                \"additionalProperties\": false\n              },\n              \"strict\": true\n            }\n          ]\n        },\n        {\n          \"max_tokens\": 256,\n          \"messages\": [\n            {\n              \"role\": \"user\",\n              \"content\": \"Add 2 and 3.\"\n            },\n            {\n              \"role\": \"assistant\",\n              \"content\": [\n                {\n                  \"id\": \"tool-1\",\n                  \"input\": {\n                    \"a\": 2,\n                    \"b\": 3\n                  },\n                  \"name\": \"add_integers\",\n                  \"type\": \"tool_use\"\n                }\n              ]\n            },\n            {\n              \"role\": \"user\",\n              \"content\": [\n                {\n                  \"type\": \"tool_result\",\n                  \"tool_use_id\": \"tool-1\",\n                  \"content\": \"{\\\"ok\\\": true, \\\"sum\\\": 5}\",\n                  \"is_error\": false\n                }\n              ]\n            }\n          ],\n          \"model\": \"fixture-model\",\n          \"tools\": [\n            {\n              \"name\": \"add_integers\",\n              \"description\": \"Add two bounded integers.\",\n              \"input_schema\": {\n                \"type\": \"object\",\n                \"properties\": {\n                  \"a\": {\n                    \"type\": \"integer\"\n                  },\n                  \"b\": {\n                    \"type\": \"integer\"\n                  }\n                },\n                \"required\": [\n                  \"a\",\n                  \"b\"\n                ],\n                \"additionalProperties\": false\n              },\n              \"strict\": true\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"provider\": \"openai\",\n      \"answer\": \"5\",\n      \"request_bodies\": [\n        {\n          \"model\": \"fixture-model\",\n          \"input\": [\n            {\n              \"role\": \"user\",\n              \"content\": \"Add 2 and 3.\"\n            }\n          ],\n          \"max_output_tokens\": 256,\n          \"store\": false,\n          \"tools\": [\n            {\n              \"type\": \"function\",\n              \"name\": \"add_integers\",\n              \"description\": \"Add two bounded integers.\",\n              \"parameters\": {\n                \"type\": \"object\",\n                \"properties\": {\n                  \"a\": {\n                    \"type\": \"integer\"\n                  },\n                  \"b\": {\n                    \"type\": \"integer\"\n                  }\n                },\n                \"required\": [\n                  \"a\",\n                  \"b\"\n                ],\n                \"additionalProperties\": false\n              },\n              \"strict\": true\n            }\n          ]\n        },\n        {\n          \"model\": \"fixture-model\",\n          \"input\": [\n            {\n              \"role\": \"user\",\n              \"content\": \"Add 2 and 3.\"\n            },\n            {\n              \"arguments\": \"{\\\"a\\\":2,\\\"b\\\":3}\",\n              \"call_id\": \"call-1\",\n              \"name\": \"add_integers\",\n              \"type\": \"function_call\",\n              \"id\": \"fc_call-1\",\n              \"status\": \"completed\"\n            },\n            {\n              \"type\": \"function_call_output\",\n              \"call_id\": \"call-1\",\n              \"output\": \"{\\\"ok\\\": true, \\\"sum\\\": 5}\"\n            }\n          ],\n          \"max_output_tokens\": 256,\n          \"store\": false,\n          \"tools\": [\n            {\n              \"type\": \"function\",\n              \"name\": \"add_integers\",\n              \"description\": \"Add two bounded integers.\",\n              \"parameters\": {\n                \"type\": \"object\",\n                \"properties\": {\n                  \"a\": {\n                    \"type\": \"integer\"\n                  },\n                  \"b\": {\n                    \"type\": \"integer\"\n                  }\n                },\n                \"required\": [\n                  \"a\",\n                  \"b\"\n                ],\n                \"additionalProperties\": false\n              },\n              \"strict\": true\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "python3",
+        "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/scripts/check_links.py",
+        "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures"
+      ],
+      "cwd": "Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures",
+      "started_utc": "2026-10-18T23:35:55.632880+00:00",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "\n0 broken link(s)\n"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures"
+      ],
+      "cwd": "Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures",
+      "started_utc": "2026-10-18T23:35:55.665072+00:00",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "syntax": [
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 123,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 134,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 140,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 146,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 153,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 160,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 176,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 183,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 219,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 230,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 236,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 273,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 280,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 286,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 311,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 339,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 345,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 351,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 372,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 386,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 428,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 434,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 452,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 458,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 473,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 523,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 529,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 543,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 556,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 572,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 597,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 628,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 635,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 642,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-04-TokenJuice-Output-Compaction.md",
+      "line": 648,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-05-OpenMeow-App-SDK-Dogfood.md",
+      "line": 75,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-05-OpenMeow-App-SDK-Dogfood.md",
+      "line": 98,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-05-OpenMeow-App-SDK-Dogfood.md",
+      "line": 107,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-05-OpenMeow-App-SDK-Dogfood.md",
+      "line": 130,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-05-OpenMeow-App-SDK-Dogfood.md",
+      "line": 143,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-05-OpenMeow-App-SDK-Dogfood.md",
+      "line": 172,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-05-OpenMeow-App-SDK-Dogfood.md",
+      "line": 243,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-05-OpenMeow-App-SDK-Dogfood.md",
+      "line": 249,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-05-OpenMeow-App-SDK-Dogfood.md",
+      "line": 281,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-05-OpenMeow-App-SDK-Dogfood.md",
+      "line": 327,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-05-OpenMeow-App-SDK-Dogfood.md",
+      "line": 390,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-05-OpenMeow-App-SDK-Dogfood.md",
+      "line": 446,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-05-OpenMeow-App-SDK-Dogfood.md",
+      "line": 487,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-05-OpenMeow-App-SDK-Dogfood.md",
+      "line": 496,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lab-06-Genie-Claw-Capstone.md",
+      "line": 52,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-02.md",
+      "line": 287,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-03.md",
+      "line": 68,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-03.md",
+      "line": 116,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-04.md",
+      "line": 37,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-04.md",
+      "line": 84,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-04.md",
+      "line": 108,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-04.md",
+      "line": 154,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-05.md",
+      "line": 45,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-05.md",
+      "line": 80,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-05.md",
+      "line": 103,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-05.md",
+      "line": 141,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-05.md",
+      "line": 171,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-05.md",
+      "line": 194,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-07.md",
+      "line": 36,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-10.md",
+      "line": 32,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-11.md",
+      "line": 37,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-12.md",
+      "line": 30,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-12.md",
+      "line": 60,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-12.md",
+      "line": 92,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-12.md",
+      "line": 176,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-12.md",
+      "line": 222,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-12.md",
+      "line": 268,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-12.md",
+      "line": 298,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-12.md",
+      "line": 348,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-12.md",
+      "line": 390,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-12.md",
+      "line": 491,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-16.md",
+      "line": 15,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-16.md",
+      "line": 35,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-16.md",
+      "line": 63,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-17.md",
+      "line": 69,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-17.md",
+      "line": 214,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-17.md",
+      "line": 260,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-19.md",
+      "line": 58,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-19.md",
+      "line": 152,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-19.md",
+      "line": 213,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-22.md",
+      "line": 157,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-22.md",
+      "line": 167,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-22.md",
+      "line": 390,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-22.md",
+      "line": 598,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-23.md",
+      "line": 25,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-23.md",
+      "line": 100,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-23.md",
+      "line": 132,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-23.md",
+      "line": 174,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-23.md",
+      "line": 224,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-23.md",
+      "line": 250,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-23.md",
+      "line": 305,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-23.md",
+      "line": 380,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-23.md",
+      "line": 453,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-23.md",
+      "line": 534,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-24.md",
+      "line": 624,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-26.md",
+      "line": 231,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-27.md",
+      "line": 449,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-27.md",
+      "line": 503,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-27.md",
+      "line": 517,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-27.md",
+      "line": 566,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-27.md",
+      "line": 618,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-27.md",
+      "line": 716,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-27.md",
+      "line": 755,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-27.md",
+      "line": 842,
+      "language": "python",
+      "error": null
+    },
+    {
+      "file": "Lecture-28.md",
+      "line": 319,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-28.md",
+      "line": 601,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-36.md",
+      "line": 203,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-36.md",
+      "line": 214,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-36.md",
+      "line": 320,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-36.md",
+      "line": 340,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-36.md",
+      "line": 437,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-36.md",
+      "line": 469,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-36.md",
+      "line": 495,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-36.md",
+      "line": 509,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-36.md",
+      "line": 515,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-36.md",
+      "line": 548,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-36.md",
+      "line": 619,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-38.md",
+      "line": 681,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-38.md",
+      "line": 755,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-38.md",
+      "line": 763,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-38.md",
+      "line": 784,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-38.md",
+      "line": 869,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-38.md",
+      "line": 875,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-38.md",
+      "line": 884,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-39.md",
+      "line": 446,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Lecture-39.md",
+      "line": 1011,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Provider-Contract-Lab.md",
+      "line": 11,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "Provider-Contract-Lab.md",
+      "line": 32,
+      "language": "bash",
+      "error": null
+    },
+    {
+      "file": "README.md",
+      "line": 98,
+      "language": "bash",
+      "error": null
+    }
+  ],
+  "packages": [
+    {
+      "name": "annotated-types",
+      "version": "0.8.0"
+    },
+    {
+      "name": "anthropic",
+      "version": "1.15.0"
+    },
+    {
+      "name": "anyio",
+      "version": "4.15.1"
+    },
+    {
+      "name": "certifi",
+      "version": "2026.10.18"
+    },
+    {
+      "name": "docstring_parser",
+      "version": "0.18.0"
+    },
+    {
+      "name": "h11",
+      "version": "0.16.0"
+    },
+    {
+      "name": "httpcore",
+      "version": "1.0.9"
+    },
+    {
+      "name": "httpcore2",
+      "version": "2.14.0"
+    },
+    {
+      "name": "httpx",
+      "version": "0.28.1"
+    },
+    {
+      "name": "httpx2",
+      "version": "2.14.0"
+    },
+    {
+      "name": "idna",
+      "version": "3.20"
+    },
+    {
+      "name": "jiter",
+      "version": "0.17.0"
+    },
+    {
+      "name": "openai",
+      "version": "3.35.1"
+    },
+    {
+      "name": "opentelemetry-api",
+      "version": "1.45.1"
+    },
+    {
+      "name": "pip",
+      "version": "24.0"
+    },
+    {
+      "name": "pydantic",
+      "version": "2.14.1"
+    },
+    {
+      "name": "pydantic_core",
+      "version": "2.50.1"
+    },
+    {
+      "name": "sniffio",
+      "version": "1.3.1"
+    },
+    {
+      "name": "truststore",
+      "version": "0.10.5"
+    },
+    {
+      "name": "typing_extensions",
+      "version": "4.16.0"
+    },
+    {
+      "name": "typing-inspection",
+      "version": "0.4.4"
+    }
+  ],
+  "lock_sha256": "d80134302e3520374cbd1bb7d898147c24289d08fcfc4ac6fa9ee74d2689b607"
+}

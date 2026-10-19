@@ -1,0 +1,17 @@
+{
+  "review_date": "2026-10-18",
+  "simulator": "Icarus Verilog 12.0",
+  "python_tests_passed": 2,
+  "simulator_variants": 10,
+  "valid_configurations": 4,
+  "invalid_configurations": 5,
+  "detected_mutations": [
+    "off-by-one slot boundary"
+  ],
+  "scope": "local single-clock RTL simulation only; no synthesis, timing, radio synchronization, RF or board test",
+  "sha256": {
+    "slot_gate.sv": "e568cfe57d2eb00bdcd5202cdfe2f455838f28f9d613021d4441545a9ab23ee1",
+    "tb_slot_gate.sv": "7498c9a3c2d690f383629a0f9b4a048a1371824b76ce406f77c7541582001cd5",
+    "test_slot_gate.py": "8414fb410a2c5398d6fabc328c6030b45cb3ab8f9a1b29593b1f74d8930cc91d"
+  }
+}

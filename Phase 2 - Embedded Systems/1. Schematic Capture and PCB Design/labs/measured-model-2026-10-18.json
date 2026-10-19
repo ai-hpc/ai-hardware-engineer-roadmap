@@ -1,0 +1,275 @@
+{
+  "scope": "Executed analytic and numerical model; no hardware waveform measurement",
+  "runs": [
+    {
+      "command": [
+        "/usr/bin/python3",
+        "Phase 2 - Embedded Systems/1. Schematic Capture and PCB Design/labs/circuit_budget.py",
+        "--scenario",
+        "baseline"
+      ],
+      "output": {
+        "scenario": "baseline",
+        "assumptions": {
+          "pullups_ohm": [
+            2200.0
+          ],
+          "resistor_tolerance": 0.05,
+          "rail_min_v": 3.135,
+          "rail_max_v": 3.465,
+          "capacitance_min_pf": 80.0,
+          "capacitance_max_pf": 120.0,
+          "leakage_sink_ua": 0.0,
+          "low_max_v": 0.4,
+          "sink_guarantee_ma": 3.0,
+          "high_required_v": 2.31,
+          "rise_limit_ns": 300.0
+        },
+        "result": {
+          "nominal_parallel_ohm": 2200.0,
+          "resistance_range_ohm": [
+            2090.0,
+            2310.0
+          ],
+          "nominal_rise_ns_no_leakage": 186.40552928518477,
+          "worst_rise_ns": 234.87096689933279,
+          "reaches_70_percent": true,
+          "worst_current_at_low_max_ma": 1.4665071770334928,
+          "worst_high_v": 3.135,
+          "checks": {
+            "rise": true,
+            "sink_guarantee": true,
+            "high_level": true
+          },
+          "passes_model": true
+        }
+      }
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "Phase 2 - Embedded Systems/1. Schematic Capture and PCB Design/labs/circuit_budget.py",
+        "--scenario",
+        "nominal_only"
+      ],
+      "output": {
+        "scenario": "nominal_only",
+        "assumptions": {
+          "pullups_ohm": [
+            3300.0
+          ],
+          "resistor_tolerance": 0.05,
+          "rail_min_v": 3.135,
+          "rail_max_v": 3.465,
+          "capacitance_min_pf": 80.0,
+          "capacitance_max_pf": 120.0,
+          "leakage_sink_ua": 0.0,
+          "low_max_v": 0.4,
+          "sink_guarantee_ma": 3.0,
+          "high_required_v": 2.31,
+          "rise_limit_ns": 300.0
+        },
+        "result": {
+          "nominal_parallel_ohm": 3300.0,
+          "resistance_range_ohm": [
+            3135.0,
+            3465.0
+          ],
+          "nominal_rise_ns_no_leakage": 279.60829392777714,
+          "worst_rise_ns": 352.3064503489992,
+          "reaches_70_percent": true,
+          "worst_current_at_low_max_ma": 0.9776714513556619,
+          "worst_high_v": 3.135,
+          "checks": {
+            "rise": false,
+            "sink_guarantee": true,
+            "high_level": true
+          },
+          "passes_model": false
+        }
+      }
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "Phase 2 - Embedded Systems/1. Schematic Capture and PCB Design/labs/circuit_budget.py",
+        "--scenario",
+        "four_breakouts"
+      ],
+      "output": {
+        "scenario": "four_breakouts",
+        "assumptions": {
+          "pullups_ohm": [
+            2200.0,
+            2200.0,
+            2200.0,
+            2200.0
+          ],
+          "resistor_tolerance": 0.05,
+          "rail_min_v": 3.135,
+          "rail_max_v": 3.465,
+          "capacitance_min_pf": 80.0,
+          "capacitance_max_pf": 120.0,
+          "leakage_sink_ua": 0.0,
+          "low_max_v": 0.4,
+          "sink_guarantee_ma": 3.0,
+          "high_required_v": 2.31,
+          "rise_limit_ns": 300.0
+        },
+        "result": {
+          "nominal_parallel_ohm": 550.0,
+          "resistance_range_ohm": [
+            522.5,
+            577.5
+          ],
+          "nominal_rise_ns_no_leakage": 46.60138232129619,
+          "worst_rise_ns": 58.717741724833196,
+          "reaches_70_percent": true,
+          "worst_current_at_low_max_ma": 5.866028708133971,
+          "worst_high_v": 3.135,
+          "checks": {
+            "rise": true,
+            "sink_guarantee": false,
+            "high_level": true
+          },
+          "passes_model": false
+        }
+      }
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "Phase 2 - Embedded Systems/1. Schematic Capture and PCB Design/labs/circuit_budget.py",
+        "--scenario",
+        "long_cable"
+      ],
+      "output": {
+        "scenario": "long_cable",
+        "assumptions": {
+          "pullups_ohm": [
+            2200.0
+          ],
+          "resistor_tolerance": 0.05,
+          "rail_min_v": 3.135,
+          "rail_max_v": 3.465,
+          "capacitance_min_pf": 160,
+          "capacitance_max_pf": 240,
+          "leakage_sink_ua": 0.0,
+          "low_max_v": 0.4,
+          "sink_guarantee_ma": 3.0,
+          "high_required_v": 2.31,
+          "rise_limit_ns": 300.0
+        },
+        "result": {
+          "nominal_parallel_ohm": 2200.0,
+          "resistance_range_ohm": [
+            2090.0,
+            2310.0
+          ],
+          "nominal_rise_ns_no_leakage": 372.81105857036954,
+          "worst_rise_ns": 469.74193379866557,
+          "reaches_70_percent": true,
+          "worst_current_at_low_max_ma": 1.4665071770334928,
+          "worst_high_v": 3.135,
+          "checks": {
+            "rise": false,
+            "sink_guarantee": true,
+            "high_level": true
+          },
+          "passes_model": false
+        }
+      }
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "Phase 2 - Embedded Systems/1. Schematic Capture and PCB Design/labs/circuit_budget.py",
+        "--scenario",
+        "leakage_fault"
+      ],
+      "output": {
+        "scenario": "leakage_fault",
+        "assumptions": {
+          "pullups_ohm": [
+            3300.0
+          ],
+          "resistor_tolerance": 0.05,
+          "rail_min_v": 3.135,
+          "rail_max_v": 3.465,
+          "capacitance_min_pf": 80.0,
+          "capacitance_max_pf": 120.0,
+          "leakage_sink_ua": 300,
+          "low_max_v": 0.4,
+          "sink_guarantee_ma": 3.0,
+          "high_required_v": 2.31,
+          "rise_limit_ns": 300.0
+        },
+        "result": {
+          "nominal_parallel_ohm": 3300.0,
+          "resistance_range_ohm": [
+            3135.0,
+            3465.0
+          ],
+          "nominal_rise_ns_no_leakage": 279.60829392777714,
+          "worst_rise_ns": null,
+          "reaches_70_percent": false,
+          "worst_current_at_low_max_ma": 0.9776714513556619,
+          "worst_high_v": 2.0955,
+          "checks": {
+            "rise": false,
+            "sink_guarantee": true,
+            "high_level": false
+          },
+          "passes_model": false
+        }
+      }
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "Phase 2 - Embedded Systems/1. Schematic Capture and PCB Design/labs/circuit_budget.py",
+        "--scenario",
+        "baseline",
+        "--waveform-csv",
+        "/tmp/course-i2c-waveform.csv"
+      ],
+      "output": {
+        "scenario": "baseline",
+        "assumptions": {
+          "pullups_ohm": [
+            2200.0
+          ],
+          "resistor_tolerance": 0.05,
+          "rail_min_v": 3.135,
+          "rail_max_v": 3.465,
+          "capacitance_min_pf": 80.0,
+          "capacitance_max_pf": 120.0,
+          "leakage_sink_ua": 0.0,
+          "low_max_v": 0.4,
+          "sink_guarantee_ma": 3.0,
+          "high_required_v": 2.31,
+          "rise_limit_ns": 300.0
+        },
+        "result": {
+          "nominal_parallel_ohm": 2200.0,
+          "resistance_range_ohm": [
+            2090.0,
+            2310.0
+          ],
+          "nominal_rise_ns_no_leakage": 186.40552928518477,
+          "worst_rise_ns": 234.87096689933279,
+          "reaches_70_percent": true,
+          "worst_current_at_low_max_ma": 1.4665071770334928,
+          "worst_high_v": 3.135,
+          "checks": {
+            "rise": true,
+            "sink_guarantee": true,
+            "high_level": true
+          },
+          "passes_model": true
+        },
+        "numerical_rise_ns": 234.75350951877786
+      }
+    }
+  ]
+}

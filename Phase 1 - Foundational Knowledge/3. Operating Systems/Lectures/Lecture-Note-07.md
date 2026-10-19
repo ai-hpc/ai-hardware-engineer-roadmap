@@ -1,121 +1,50 @@
-# Lecture Note 07 (L15, L16): DMA, IOMMU & GPU Memory; NUMA & HPC Optimization
+# Lecture Note 07: DMA Ownership and NUMA Placement
 
-**Combines:** Lecture L15 (DMA, IOMMU & GPU Memory Management) and Lecture L16 (NUMA Topology & HPC Memory Optimization).
+Consolidates [Lecture 15](Lecture-15.md) and [Lecture 16](Lecture-16.md).
 
----
+## Coherence, ordering, completion, and lifetime
 
-## How This Note Is Organized
+These are four different questions:
 
-1. **Part 1 — DMA & IOMMU:** Direct Memory Access; cache coherency (coherent vs streaming); DMA-BUF; IOMMU and security; VFIO; GPU memory and zero-copy.
-2. **Part 2 — NUMA:** Non-uniform memory access; first-touch and placement; memory policies (bind, preferred, interleave); numactl and libnuma; AutoNUMA; multi-GPU and CPU–GPU affinity.
+| Question | Example failure |
+|---|---|
+| Are the latest bytes visible? | CPU reads a stale cache line after device output |
+| Were writes published in the required order? | Device sees descriptor-valid before its address/length |
+| Has the producer finished? | GPU reads while the camera is still writing |
+| Does the storage remain valid? | Timeout handler frees memory before late DMA |
 
----
+A coherent allocation removes the corresponding streaming cache-maintenance requirement; it does not remove ordering or lifetime rules. A streaming mapping uses the DMA API's map/unmap or explicit synchronization transitions, including on coherent hardware. Select the direction from the mapped device's point of view.
 
-# Part 1: DMA, IOMMU & GPU Memory Management
+**Question:** Six scatterlist entries map to four DMA segments. Which count programs hardware, and which count unmaps?
 
-**Context:** Devices move data to/from RAM **without CPU copies**. The CPU must not see **stale data** (cache coherency). The **IOMMU** translates device addresses and restricts access; **DMA-BUF** shares one buffer across CPU, GPU, camera, display.
+**Answer:** Use the four mapped segments for the device and the original six entries for unmapping, according to the DMA API. A zero mapping result is a failure, not permission to submit.
 
----
+## Shared buffers and device isolation
 
-## DMA (Direct Memory Access)
+DMA-BUF exporters own storage; importers attach/map it for their own devices. An fd is not a pointer or universal DMA address. Transfer it using `SCM_RIGHTS` across processes. Compatibility, format/planes/strides, producer completion, cache synchronization, and reuse must all be defined.
 
-- Device (NIC, NVMe, GPU, camera ISP) transfers data to/from system RAM **autonomously**. CPU programs **descriptor** (src, dst, length); device runs transfer; completion via IRQ or poll.
-- **Without DMA:** Device → CPU copy → RAM. **With DMA:** Device → DMA engine → RAM; CPU is free after submitting descriptor.
+An IOMMU group represents the minimum isolation unit for assignment under the platform's capabilities. It does not simply mean devices share one translation engine. An IOMMU does not prevent arbitrary CPU writes by kernel code. VFIO is a kernel-mediated device-access framework, not the absence of a kernel driver.
 
----
+Jetson's integrated CPU/GPU share physical DRAM; that does not make every CPU buffer accessible to CUDA or immediately coherent with a camera. Discrete GPUs have different movement paths. Check the supported allocator/runtime APIs instead of treating `cudaMalloc` as an exportable camera buffer.
 
-## Cache Coherency: Coherent vs Streaming
+## NUMA means topology-dependent cost
 
-- **Coherent DMA:** `dma_alloc_coherent()` — no streaming cache-ownership sync is needed for this mapping, but descriptor ordering and completion still require the device/API contract. Cacheability is platform-dependent.
-- **Streaming DMA:** CPU uses cached memory; driver **synchronizes** explicitly:
-  - **DMA_TO_DEVICE:** CPU prepares data → map/synchronize for the device → device reads.
-  - **DMA_FROM_DEVICE:** Device writes → completion → unmap/synchronize for CPU → CPU reads. Persistent mappings use explicit `dma_sync_*` ownership transitions.
-- **dma_map_sg** / **dma_unmap_sg** for scatter-gather (fragmented buffers). Direction informs platform-specific cache maintenance; do not hard-code a universal flush/invalidate sequence.
+A machine can have multiple NUMA nodes per socket, memory-only nodes, or heterogeneous memory tiers. Remote access often has different latency/bandwidth, but “always twice the latency and half the bandwidth” is not a law. The reported distance matrix is relative policy/topology information, not measured nanoseconds.
 
----
+Inspect `numactl --hardware`, `/sys/devices/system/node/`, and process placement where available. Containers may restrict or virtualize the view. `set_mempolicy()` affects the calling thread's policy; `mbind()` applies policy to a range. Existing pages do not necessarily move just because a policy changes.
 
-## IOMMU (Input-Output MMU)
+Under the relevant default/local policy, first allocation faults influence placement, subject to allowed nodes, fallback, shared mappings, and other rules. Initializing a buffer on one node before workers on another use it can create expensive remote traffic; measure rather than assuming every access is remote or equally costly.
 
-- Sits between devices and memory bus. Translates **IOVA** (I/O Virtual Address) to physical address using per-device/group page tables.
-- **Without IOMMU:** Device can DMA to any physical address (security risk). **With IOMMU:** Only mapped IOVAs are allowed; unmapped access → fault.
-- **Implementations:** Intel VT-d, AMD-Vi, ARM SMMU (Jetson Orin). **IOMMU groups:** Devices behind same translation unit; for VFIO passthrough, whole group is assigned together.
-- Drivers usually use **dma_map_*** which uses IOMMU automatically; low-level `iommu_map`/`iommu_unmap` in framework code.
+**Question:** Does `numa_alloc_onnode()` return prove all pages reside on that node?
 
----
+**Answer:** No. Check errors/warnings and effective placement; policy enforcement, actual faults, permissions, and migration matter.
 
-## DMA-BUF & Zero-Copy Pipeline
+## A controlled placement experiment
 
-- **DMA-BUF:** Kernel abstraction to share one DMA buffer across subsystems (CPU, GPU, camera ISP, display). **Exporter** allocates and exports; **importer** attaches and maps for its device.
-- **Lifecycle:** Exporter creates buffer, gets fd; fd passed (e.g. Unix socket); importer `dma_buf_get(fd)`, `dma_buf_attach`, `dma_buf_map_attachment` → sg_table with IOVAs for that device.
-- **Zero-copy:** V4L2 camera → DMA-BUF fd → CUDA importer → same physical pages for inference → display. No CPU copy; sync via DMA fence (`dma_fence_wait`). V4L2 supports `V4L2_MEMORY_DMABUF`; userspace passes fd in buffer.
+Hold workload, allocation size, thread count, and access pattern constant. Compare a supported local placement against another explicit placement, recording actual pages/CPUs and latency/bandwidth. Change automatic NUMA balancing only in a controlled experiment with permission to modify that host policy; disabling it everywhere is not a universal inference optimization.
 
----
+For GPU jobs, include CPU/GPU/interconnect topology and the memory-access pattern. Binding everything to one node can help locality or overload that node; multi-GPU communication can favor another arrangement.
 
-## GPU Memory & Unified Memory
+**Question:** Does a better NUMA placement prove a real-time deadline?
 
-- Discrete GPU: dedicated VRAM; driver manages allocations and CPU↔GPU copies. **Integrated shared DRAM (e.g. Jetson):** sharing physical memory does not make every CPU allocation GPU-accessible or automatically synchronized. CUDA managed memory and supported shared/imported buffers have separate API contracts.
-- **Resizable BAR (SAM):** GPU BAR1 can cover full VRAM; CPU can address all GPU memory (important for GPUDirect Storage, zero-copy).
-
----
-
-# Part 2: NUMA Topology & HPC Memory Optimization
-
-**Context:** On multi-socket machines, memory attached to socket 0 is **"local"** to CPUs on socket 0 and **"remote"** to socket 1. Remote access has **higher latency and lower bandwidth**; placement of data and threads matters.
-
----
-
-## NUMA Architecture
-
-- Each socket (NUMA node) has **local DRAM** (lower latency, full bandwidth). Access to another node's DRAM goes over **interconnect** (QPI/UPI, Infinity Fabric) — **~2× latency, ~half bandwidth**.
-- **Discovery:** `numactl --hardware`, `lstopo`, `numastat`, `/sys/devices/system/node/nodeN/distance`. Distance matrix: local = 10; remote often 20–40.
-
----
-
-## First-Touch and Placement
-
-- **Default (first-touch):** Page is allocated on the node of the CPU that first **faults** it. If main thread on node 0 initializes a buffer later used only by workers on node 1, every access is remote — silent slowdown.
-- **Fix:** Allocate (and fault) on the same node that will use the data: pin thread to node, set mempolicy, then malloc + memset; or use `numa_alloc_onnode()` / `mbind(..., MPOL_MF_MOVE)` to move pages.
-
----
-
-## Memory Policies & numactl
-
-- **MPOL_DEFAULT:** First-touch. **MPOL_BIND:** Only listed nodes; fail if full. **MPOL_PREFERRED:** Prefer one node; fallback. **MPOL_INTERLEAVE:** Round-robin across nodes (bandwidth-bound).
-- **set_mempolicy** (process); **mbind** (VMA; MPOL_MF_MOVE migrates existing pages).
-- **numactl:** `--cpunodebind=0 --membind=0 ./app` (bind CPU and memory to node 0); `--interleave=all` (interleave); `--preferred=1` (prefer node 1).
-
----
-
-## libnuma & AutoNUMA
-
-- **libnuma:** `numa_node_of_cpu(sched_getcpu())`, `numa_alloc_onnode()`, `numa_bind()`, `numa_set_membind()`, `numa_set_interleave_mask()`.
-- **AutoNUMA:** Kernel migrates "hot" pages to the node of the accessing CPU. Overhead (scan, TLB shootdown, migration); can cause tail latency spikes. **Recommendation:** Disable (`numa_balancing=0`) on RT and latency-sensitive inference; use explicit numactl/mbind.
-
----
-
-## Multi-GPU & CPU–GPU Affinity
-
-- GPUs are attached to **one socket's PCIe root**. CPU↔GPU traffic from the other socket **crosses interconnect**. Use `nvidia-smi topo -m` to see topology; **bind process and memory to the node that owns the GPU(s) used**.
-
----
-
-## Summary Tables
-
-**DMA:** Coherent mappings still need ordering and lifetime control. Streaming mappings use map/unmap or explicit `dma_sync_*` ownership transitions; do not assume identical cache operations on every architecture.
-
-**IOMMU:** IOVA→PA; per-device/group; restricts DMA; VFIO exposes to userspace for passthrough.
-
-**NUMA:** Local vs remote latency/bandwidth; first-touch; bind/preferred/interleave; numactl; disable AutoNUMA for RT.
-
----
-
-## AI Hardware Connection
-
-- **DMA-BUF + V4L2:** Zero-copy camera → GPU; fd over IPC. **Streaming DMA** direction must be correct (TO_DEVICE / FROM_DEVICE) to avoid corruption.
-- **IOMMU:** Security and isolation for GPU/VFIO; required for safe passthrough.
-- **NUMA:** Pin inference and weights to same node as GPU; first-touch on wrong node halves effective bandwidth. **numastat -p** to verify; disable AutoNUMA on inference servers.
-- **Multi-GPU:** Place processes and allocations on the node that owns the target GPU; use topology tools to avoid cross-socket PCIe.
-
----
-
-*Combines Lectures L15, L16 (DMA, IOMMU, GPU Memory; NUMA, HPC Optimization).*
+**Answer:** No. It improves one measured cost under specified conditions. Blocking, scheduling, interrupts, device work, and other interference remain.

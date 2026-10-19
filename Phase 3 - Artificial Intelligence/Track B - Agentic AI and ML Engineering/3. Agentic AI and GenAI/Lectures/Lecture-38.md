@@ -4,11 +4,16 @@
 
 ---
 
+**Source scope:** checked against OpenClaw commit `24aac3c15a01feb1946dad5b212282e78dc3941e` (2026-10-18), whose package version is `2026.10.4`. These are source observations, not an executed Gateway deployment. See [source evidence](Lecture-Source-Evidence.md) for exact files and limitations.
+
+
 An agent runtime becomes a **platform** only when external applications can use it without knowing private internals.
 
 That is the purpose of the **OpenClaw App SDK**.
 
-The App SDK, published as `@openclaw/sdk`, is the public client API for applications that run **outside** the OpenClaw process:
+The source tree contains an App SDK package named `@openclaw/sdk` for applications that run **outside** the OpenClaw process. At the audited revision its manifest says `"private": true`, version `0.0.0-private`, with workspace dependencies. This is a source/workspace integration case study, **not a claim that a stable public npm package is available**. Build against the pinned workspace and test the matching Gateway; the examples were source-checked, not executed here.
+
+Intended consumers include:
 
 - dashboards
 - desktop clients
@@ -108,7 +113,7 @@ This separation matters for **auth, scopes, error handling, lifecycle, and compa
 
 ---
 
-## 3. What ships in `@openclaw/sdk`
+## 3. What exists in the private workspace SDK
 
 The main entry is:
 
@@ -130,7 +135,7 @@ Basic connection example:
 import { OpenClaw } from "@openclaw/sdk";
 
 const oc = new OpenClaw({
-  url: "ws://127.0.0.1:14565",
+  url: "ws://127.0.0.1:18789",
   token: process.env.OPENCLAW_GATEWAY_TOKEN,
   requestTimeoutMs: 30_000,
 });
@@ -409,16 +414,16 @@ The current App SDK approach is explicit:
 | `oc.models` | Model listing and auth status |
 | `oc.tools` | Tool catalog and effective tools |
 | `oc.approvals` | Approval listing and resolution |
-| `oc.tasks` | Explicitly unsupported until Gateway APIs exist |
-| `oc.artifacts` | Explicitly unsupported until artifact RPCs exist |
-| `oc.environments` | Explicitly unsupported until environment RPCs exist |
-| `oc.tools.invoke` | Explicitly unsupported until Gateway tool invocation exists |
+| `oc.tasks` | No exported namespace in the audited client; do not treat this proposed surface as implemented |
+| `oc.artifacts` | `list`, `get`, `download`; requires an artifact query scope |
+| `oc.environments` | `list`, `create`, `status`, `destroy`; `delete` explicitly throws unsupported |
+| `oc.tools.invoke` | Implemented RPC helper with name, arguments, session/agent scope, confirmation and idempotency options |
 
 This is **good API design**.
 
 It prevents **silent fallback** to unsafe defaults.
 
-If a caller passes future-only fields such as workspace, runtime, environment, or approval parameters before the Gateway supports them, the SDK should throw before sending the request.
+Check the exact method and schema instead of classifying every environment/artifact field as future-only. The current `EnvironmentsNamespace.delete` intentionally throws; `destroy` exists. Method existence does not establish that the connected Gateway allows the action or that the caller has the required scope.
 
 That is **safer** than pretending the setting worked.
 
@@ -749,18 +754,18 @@ Practical examples:
 
 ```bash
 openclaw nodes status
-openclaw nodes describe --node <idOrNameOrIp>
-openclaw nodes invoke --node <idOrNameOrIp> --command canvas.eval --params '{"javaScript":"location.href"}'
+openclaw nodes describe --node "${OPENCLAW_NODE:?Set OPENCLAW_NODE to an existing authorized identifier}"
+openclaw nodes invoke --node "${OPENCLAW_NODE:?Set OPENCLAW_NODE to an existing authorized identifier}" --command canvas.eval --params '{"javaScript":"location.href"}'
 ```
 
 Higher-level helpers exist for common media workflows:
 
 ```bash
-openclaw nodes canvas snapshot --node <idOrNameOrIp> --format png
-openclaw nodes camera list --node <idOrNameOrIp>
-openclaw nodes camera snap --node <idOrNameOrIp> --facing front
-openclaw nodes screen record --node <idOrNameOrIp> --duration 10s --fps 10
-openclaw nodes location get --node <idOrNameOrIp>
+openclaw nodes canvas snapshot --node "${OPENCLAW_NODE:?Set OPENCLAW_NODE to an existing authorized identifier}" --format png
+openclaw nodes camera list --node "${OPENCLAW_NODE:?Set OPENCLAW_NODE to an existing authorized identifier}"
+openclaw nodes camera snap --node "${OPENCLAW_NODE:?Set OPENCLAW_NODE to an existing authorized identifier}" --facing front
+openclaw nodes screen record --node "${OPENCLAW_NODE:?Set OPENCLAW_NODE to an existing authorized identifier}" --duration 10s --fps 10
+openclaw nodes location get --node "${OPENCLAW_NODE:?Set OPENCLAW_NODE to an existing authorized identifier}"
 ```
 
 The app-facing lesson:
@@ -778,8 +783,8 @@ The node presents a device identity during connect. The Gateway creates a pairin
 
 ```bash
 openclaw devices list
-openclaw devices approve <requestId>
-openclaw devices reject <requestId>
+openclaw devices approve "${OPENCLAW_REQUEST_ID:?Set OPENCLAW_REQUEST_ID to an existing authorized identifier}"
+openclaw devices reject "${OPENCLAW_REQUEST_ID:?Set OPENCLAW_REQUEST_ID to an existing authorized identifier}"
 openclaw nodes status
 ```
 
@@ -941,7 +946,7 @@ For app developers, the rule is simple:
 
 Direct tool invocation is **powerful and risky**.
 
-A future SDK-facing method could mirror the existing HTTP tool invoke behavior as:
+The following is a design sketch, not the current method signature. The implemented helper is `oc.tools.invoke(name, params)`; use its source schema and Gateway authorization contract. A proposed API could instead look like:
 
 ```text
 tools.invoke
@@ -1158,10 +1163,10 @@ Test these paths:
 - wait deadline expires while run remains active
 - raw event normalization
 - unknown event family
-- unsupported `oc.artifacts.*`
-- unsupported `oc.environments.*`
+- artifact queries missing required scope
+- unsupported `oc.environments.delete`
 - unsupported `oc.tasks.*`
-- unsupported `oc.tools.invoke`
+- denied or malformed `oc.tools.invoke`
 - device model lookup fallback for unknown Apple model identifiers
 - node pairing approval and stale request replacement
 - declared node command allowed versus denied by Gateway policy
@@ -1264,7 +1269,7 @@ SDK surfaces:
 - `oc.runs`
 - `oc.models`
 - `oc.approvals`
-- future `oc.artifacts`
+- current scoped `oc.artifacts`
 - feature-detected node/media events
 
 Why it fits:
@@ -1296,7 +1301,7 @@ SDK surfaces:
 - `Run.events()`
 - `Run.wait()`
 - future `oc.tasks`
-- future `oc.artifacts`
+- current scoped `oc.artifacts`
 
 Why it fits:
 
@@ -1327,8 +1332,8 @@ SDK surfaces:
 - `Run.wait()`
 - `Run.events()`
 - `oc.approvals`
-- future `oc.artifacts`
-- future `oc.tools.invoke` only if tightly policy-gated
+- current scoped `oc.artifacts`
+- current `oc.tools.invoke` only if tightly policy-gated
 
 Why it fits:
 
@@ -1355,7 +1360,7 @@ SDK surfaces:
 
 - `oc.rawEvents()` or normalized SDK node/media events
 - future node-aware helpers
-- future `oc.artifacts`
+- current scoped `oc.artifacts`
 - `oc.approvals` for sensitive actions
 - device model metadata for friendly instance names
 
@@ -1387,9 +1392,9 @@ SDK surfaces:
 - `oc.models`
 - `oc.runs`
 - `oc.approvals`
-- future `oc.environments`
+- current `oc.environments` (except unsupported `delete`)
 - future `oc.tasks`
-- future `oc.artifacts`
+- current scoped `oc.artifacts`
 
 Why it fits:
 

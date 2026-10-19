@@ -1,0 +1,27 @@
+{
+  "reviewed_at_utc": "2026-10-18T22:10:23.648326+00:00",
+  "host": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "node": "v22.22.1",
+  "browser": "Google Chrome 148.0.7778.215",
+  "playwright": "1.64.0",
+  "model_tests": 7,
+  "browser_tests": 4,
+  "browser_output": "test_disconnect_new_session_clears_observation_and_waits (test_browser.BrowserDashboard.test_disconnect_new_session_clears_observation_and_waits) ... ok\ntest_invalid_input_retains_but_does_not_validate_old_reading (test_browser.BrowserDashboard.test_invalid_input_retains_but_does_not_validate_old_reading) ... ok\ntest_mobile_has_no_horizontal_overflow_and_keyboard_focus_visible (test_browser.BrowserDashboard.test_mobile_has_no_horizontal_overflow_and_keyboard_focus_visible) ... ok\ntest_pause_marks_old_value_stale_and_resume_recovers (test_browser.BrowserDashboard.test_pause_marks_old_value_stale_and_resume_recovers) ... ok\n\n----------------------------------------------------------------------\nRan 4 tests in 2.125s\n\nOK\n",
+  "viewports": [
+    [
+      1280,
+      900
+    ],
+    [
+      390,
+      844
+    ]
+  ],
+  "scope": "Actual Node state-model execution and local Chromium interaction; simulated data; no physical display, network or robot control",
+  "sources": {
+    "telemetry.js": "e794a316f2f47e0410d65e9eb42fe76925b7b3cd7f3480c914e93139a641d210",
+    "dashboard.html": "fd905acc1cba41e60b55d1b7d1f6193c037a36ac89eaa17e4d2e51ba2df175a3",
+    "test_telemetry.py": "fba2ef46409363cb3d3bf029a2c1ba158fa5df6e998a342f02d1923b05553692",
+    "optional/test_browser.py": "b1fb90cbbcf5e61fdc6c3f9f09465efb8ceee55b59a0b8ad131e10a2c3b8bb0c"
+  }
+}

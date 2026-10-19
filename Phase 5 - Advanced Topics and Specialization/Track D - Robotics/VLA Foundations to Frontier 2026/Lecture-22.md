@@ -67,7 +67,7 @@ Log a trace ID from camera frame through preprocessing, inference, scheduler acc
 
 Run the [lab guide](Lab-Guide.md). Reproduce the 70 ms example, then vary delays through 0, 20, 70, 140, and 180 ms. Plot usable action count versus delay, with a separate curve for the maximum-age policy. At exactly one action boundary, state the chosen equality convention and test it.
 
-Implement an offline event simulator with two requests completing out of order. Add a reset between submission and completion. The required negative cases are an old epoch, a future-dated observation, a nonfinite command, and a fully expired chunk. Keep rejected messages in the event log; silently discarding them makes diagnosis harder.
+Run the supplied [dataset-to-execution lab](Dataset-and-Execution-Lab.md), which includes out-of-order replies, reset isolation, wrong artifacts/clocks/cadence, nonfinite values, expired chunks, and valid zero commands. Predict its trace before reading it. Then extend its exact-start dispatcher with your chosen interpolation or continuity rule and add an independently calculated fixture. Preserve rejected messages in the event log; silently discarding them makes diagnosis harder.
 
 An advanced lab integrates the state machine with the Isaac adapter from Lecture 20. Inject a fixed 80 ms delay and occasional 200 ms stalls. Compare synchronous pause-during-inference, naive async replacement, and your continuity-aware scheduler. Use the same task starts and label each scheduling policy precisely. No result from a CPU timing fixture demonstrates physical real-time guarantees.
 

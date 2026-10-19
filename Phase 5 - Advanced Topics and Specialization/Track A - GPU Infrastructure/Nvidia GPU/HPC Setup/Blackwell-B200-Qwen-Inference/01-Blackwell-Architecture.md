@@ -13,11 +13,11 @@ A Blackwell GPU, a Grace Blackwell Superchip, and an NVL72 system are different 
 | GB200 Superchip | A Grace CPU coupled to two Blackwell GPUs through NVLink-C2C | HBM-speed access to every CPU memory address |
 | GB200 NVL72 system | 72 GPUs and 36 Grace CPUs in an NVLink domain | One CUDA device or uniform rack-wide memory latency |
 
-The published DGX B200 configuration has **1,440 GB across eight GPUs** (180 GB per GPU), whereas early architecture presentations used 192 GB figures. GB200 has its own platform specifications. Use the actual SKU and runtime-reported free memory in a deployment budget. Do not convert a decimal GB number directly to the same number of GiB. [DGX B200 user guide](https://docs.nvidia.com/dgx/dgxb200-user-guide/introduction-to-dgxb200.html), [GB200 NVL72 specifications](https://www.nvidia.com/en-us/data-center/gb200-nvl72/).
+The published DGX B200 configuration has **1,440 GB across eight GPUs** (180 GB per GPU), whereas early architecture presentations used 192 GB figures. The current GB200 specification lists 372 GB of GPU HBM per two-GPU Superchip (186 GB per GPU) and about 13.4 TB across NVL72. Do not substitute the DGX B200 180 GB figure into that different product. Use the actual SKU and runtime-reported free memory in a deployment budget. Do not convert a decimal GB number directly to the same number of GiB. [DGX B200 user guide](https://docs.nvidia.com/dgx/dgxb200-user-guide/introduction-to-dgxb200.html), [GB200 NVL72 specifications](https://www.nvidia.com/en-us/data-center/gb200-nvl72/).
 
 ## What changes at the kernel level
 
-Blackwell SM100 introduces `tcgen05.mma` operations and Tensor Memory (TMEM) for accumulator storage. This differs from copying a Hopper WGMMA kernel and merely changing its target name. Operand layout, descriptor encoding, synchronization, supported types, and TMEM lifetime all matter. [CUTLASS Blackwell functionality](https://docs.nvidia.com/cutlass/latest/media/docs/cpp/blackwell_functionality.html).
+Blackwell SM100 introduces `tcgen05.mma` operations and Tensor Memory (TMEM) for accumulator storage. This differs from copying a Hopper WGMMA kernel and merely changing its target name. Operand layout, descriptor encoding, synchronization, supported types, and TMEM lifetime all matter. [CUTLASS Blackwell functionality](https://docs.nvidia.com/cutlass/4.8.0/media/docs/cpp/blackwell_functionality.html).
 
 Study one supported CUTLASS GEMM first. Draw its path from global memory through shared memory to matrix computation and output. Identify the producer, consumer, barrier, and buffer owner. Then inspect one measured VLA projection shape: a peak-throughput square matrix may not represent batch-one action inference.
 
@@ -51,3 +51,15 @@ Use the runtime/device-query tools installed with the pinned CUDA stack to recor
 ## Connection to the physical-AI chip
 
 The transferable idea is **explicit placement and data movement**. A custom SoC also has distinct SRAM, external memory, CPU, and DMA domains. Use the GPU baseline to find which traffic matters before choosing SRAM size or adding a matrix unit. The architecture figure in the [AI-chip guide](../../../../Track%20F%20-%20AI%20Chip%20Design/Guide.md#4-compiler-and-accelerator-co-design-one-executable-vertical-slice) shows where the compiler and Linux driver must agree.
+
+
+## Worked boundary check and answer
+
+Suppose each of eight ranks has a 170 GB usable budget. Seven ranks need 160 GB
+and one needs 185 GB. Total demand is 1305 GB, below the total 1360 GB budget, but
+the job still fails on the 185 GB rank. Add rank-local scratch and replicated
+tensors before deciding that aggregate memory is enough.
+
+For NVL72, the advertised 130 TB/s is a system aggregate interconnect figure, not
+one GPU's HBM read bandwidth or the guaranteed bandwidth of a single AllReduce.
+Keep link directionality, topology and benchmark normalization separate.

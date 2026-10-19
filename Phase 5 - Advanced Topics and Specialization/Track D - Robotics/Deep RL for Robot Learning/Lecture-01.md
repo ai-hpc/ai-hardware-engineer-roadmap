@@ -155,7 +155,7 @@ where \(E\) is the number of passes over the data and \(B\) the minibatch size. 
 | Regime | Example | \(t_{\text{env}}\) | \(t_{\text{policy}}\) | \(t_{\text{learn}}\) | Bottleneck |
 |---|---|---|---|---|---|
 | **A. CPU toy** | Gymnasium `CartPole-v1`, MLP, 8 envs | ~µs of physics, ~10-50 µs Python overhead per env step | ~0.1 ms per batched forward (launch-bound) | tiny | **Python + kernel-launch overhead.** The GPU sits idle. |
-| **B. GPU-parallel sim** | ManiSkill3 / Isaac Lab / MJX, 1-4k envs, MLP | one batched GPU step for all envs, ~ms | one batched forward, ~ms | grows with batch | **Learner + GPU memory.** 10⁵-10⁶ env steps/s is common, so data is effectively free. |
+| **B. GPU-parallel sim** | ManiSkill3 / Isaac Lab / MJX, 1-4k envs, MLP | one batched GPU step for all envs, ~ms | one batched forward, ~ms | grows with batch | **Learner + GPU memory.** Throughput depends on scene, rendering, batch, and hardware; data generation still consumes compute. |
 | **C. VLA in sim** | LIBERO + π0.5 (multi-billion params) | sim step on CPU, ~ms | **tens of ms per action chunk** at batch 1; better per sample when batched | backward through a VLA: large | **Policy forward pass.** The simulator is cheap; generating actions is the cost. |
 | **D. Agent in a sandbox** (contrast case) | LLM coding/browsing agent, one container per rollout | a shell command or test run: **seconds to minutes**, plus sandbox boot | LLM generation, seconds per turn | LLM backward | **Rollout latency and its long tail.** Hundreds of thousands of concurrent sandboxes at the largest labs. |
 
@@ -163,7 +163,7 @@ where \(E\) is the number of passes over the data and \(B\) the minibatch size. 
 
 Three consequences follow, and they recur through the whole course:
 
-1. **Sample efficiency ≠ wall-clock efficiency.** In regime B, PPO's on-policy waste doesn't matter — data is free, so the method with the simplest and fastest update wins. In regime C, every sample costs a VLA forward pass, so reusing samples (off-policy, offline, more epochs per batch) becomes valuable.
+1. **Sample efficiency ≠ wall-clock efficiency.** In regime B, cheaper rollouts can favor a simple update, but sample requirements and simulation/rendering costs still matter. In regime C, every sample costs a VLA forward pass, so reusing samples (off-policy, offline, more epochs per batch) becomes valuable.
 2. **Rollouts are inference.** In regime C, RL training is an inference-serving problem in disguise: batch actions across many parallel environments, keep the policy on the GPU, use CUDA Graphs, cut flow-matching steps where accuracy allows. Everything in the [VLA Optimization course](../VLA%20Optimization%20and%20Action-Parity%20Harness/Lecture-01.md) speeds up training too, not only deployment.
 3. **Action chunks are a throughput lever.** If the policy emits a 50-step chunk and you execute \(H\) of those steps before re-planning, the policy runs \(T/H\) times per episode instead of \(T\). For a 300-step episode with \(H = 10\), that is 30 VLA calls instead of 300. (openpi's LIBERO config for π0.5 predicts 10-action chunks and executes 5, so a 300-step LIBERO episode costs 60 calls.) Lecture 13 shows that chunking also shortens the *effective horizon* that errors compound over.
 

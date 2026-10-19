@@ -140,7 +140,7 @@ The easiest explanation is:
 
 Messages with the same bucket label **share context**.
 
-Messages with different bucket labels **stay isolated**.
+Different session keys separate conversation state. They do not, by themselves, isolate shared credentials, tool permissions, files or host administrators.
 
 Examples from the OpenClaw model:
 
@@ -190,6 +190,7 @@ That is why OpenClaw supports DM scope settings like:
 - one shared main session
 - per-peer isolation
 - per-channel-peer isolation
+- per-account-channel-peer isolation for multiple accounts of the same channel type
 
 For a serious product, session scoping is a **security and UX feature**.
 
@@ -266,15 +267,15 @@ This is why session design is a **product tradeoff**, not a default you should i
 
 ## 7. Example config pattern
 
-Here is a simplified OpenClaw-style pattern:
+The current source uses the `agents.entries` map, replacing the older `agents.list` array. This is a configuration fragment; configure channel credentials/access and explicit ownership/fallback behavior separately. At the audited revision, ambiguous unbound traffic is not automatically assigned to the first-listed agent. [Pinned routing contract](https://github.com/openclaw/openclaw/blob/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/channels/channel-routing.md).
 
 ```json5
 {
   agents: {
-    list: [
-      { id: "support", workspace: "~/.openclaw/workspace-support" },
-      { id: "personal", workspace: "~/.openclaw/workspace-personal" }
-    ]
+    entries: {
+      support: { workspace: "~/.openclaw/workspace-support" },
+      personal: { workspace: "~/.openclaw/workspace-personal" }
+    }
   },
   bindings: [
     { match: { channel: "slack", teamId: "T123" }, agentId: "support" },

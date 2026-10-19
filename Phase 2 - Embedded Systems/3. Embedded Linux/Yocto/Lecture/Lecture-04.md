@@ -1,37 +1,55 @@
-# Lecture 4 — Module 2: Architecture in one picture
+# Lecture 4 — Module 2: trace source to target
 
-**Course:** [Yocto guide](../Guide.md) | **Phase 2 — Embedded Linux, Yocto**
+**Course:** [Yocto guide](../Guide.md) · **Previous:** [Lecture 03](Lecture-03.md) · **Next:** [Lecture 05](Lecture-05.md)
 
-**Previous:** [Lecture 03](Lecture-03.md) | **Next:** [Lecture 05 — Module 3](Lecture-05.md)
+Follow one file through the build before editing metadata. The most common beginner confusion is treating compilation, installation into a staging directory, package creation, and image installation as the same event.
 
----
+## A concrete path
 
-## 1. Data flow (mental model)
+```text
+observation-check.c
+  do_fetch / do_unpack    → source becomes available in the work directory
+  do_compile              → target executable
+  do_install              → staged /usr/bin/observation-check under ${D}
+  do_package              → files assigned to runtime packages
+  image do_rootfs         → selected packages installed into the image rootfs
+  boot                    → target can execute /usr/bin/observation-check
+```
 
-**Metadata** in layers (conf/, recipes-*) flows into **BitBake**, which parses recipes plus MACHINE, DISTRO, and images. That produces a **task graph**: fetch, unpack, patch, configure, compile, install, package, then image. Output artifacts include RPM/IPK/DEB packages, rootfs, kernel, bootloader, and SDK.
+`${D}` is a staging root inside the build tree. `install ... ${D}${bindir}` does not install the program into your host's `/usr/bin`. `${bindir}` expresses the target's binary-directory convention.
 
-## 2. Key objects
+A recipe may create several packages: main runtime, debug symbols, development headers, or others. Building the recipe does not automatically add its package to an image. The image must select the package, directly or through runtime dependencies.
 
-- **Recipe (.bb)** — how to build one piece of software (or fetch a binary).
-- **Append file (.bbappend)** — your overlay changes without editing upstream recipes.
-- **Layer** — a folder of metadata + configuration, versioned as a unit.
-- **Image recipe** — defines what packages land on the root filesystem for this product image.
-- **MACHINE** — selects board-specific kernel/bootloader/firmware assumptions.
-- **DISTRO** — policy knobs: libc choices, init system preferences, security posture defaults (varies by distro layer).
+## Which file owns which decision?
 
-## 3. Two configs you touch constantly
+| Object | Its job in this course |
+|---|---|
+| `conf/bblayers.conf` | Tell BitBake which metadata layers are available |
+| `conf/local.conf` | Local build choices such as machine and resource settings |
+| `conf/layer.conf` | Describe a layer's recipe discovery and compatibility |
+| `observation-check_1.0.bb` | Build and install the age-check program |
+| `robot-course-image.bb` | Select the age-check package for the image |
+| `MACHINE` | Select target hardware assumptions |
+| `DISTRO` | Select distribution policy |
 
-- **conf/bblayers.conf** — which layers BitBake is allowed to read.
-- **conf/local.conf** — local machine settings: parallelism, download directory, extra image features, temporary tweaks.
+These are the Scarthgap baseline names. Wrynose's setup tooling can manage configuration fragments and `toolcfg.conf`; the underlying ownership questions still apply.
 
-**Plain English:** bblayers.conf is which rulebooks exist. local.conf is how your laptop or build server applies them.
+## Inspect before running
 
-## 4. Lab 2 — Draw your layer stack
+Open the [supplied recipe](../Labs/meta-robot-course/recipes-apps/observation-check/observation-check_1.0.bb) and [image recipe](../Labs/meta-robot-course/recipes-core/images/robot-course-image.bb). Predict which task changes if you edit the C source versus if you add a package to `IMAGE_INSTALL`.
 
-On paper or a whiteboard, draw **Poky/OE-Core** at the bottom, your **BSP layer** when you have one, and your **product layer** on top. Mark which layer should own kernel tweaks, rootfs packages, systemd units, and version pins.
+After Lecture 5 initializes the environment, these **upstream-documented inspection commands** show effective values:
 
-**Done when:** you can explain where a change should live before you open an editor.
+```bash
+bitbake-getvar -r observation-check S
+bitbake-getvar -r observation-check do_install
+bitbake -c listtasks observation-check
+```
 
----
+They require the layer to have been added in Lecture 6. The [debugging manual](https://docs.yoctoproject.org/5.0.20/dev-manual/debugging.html) explains how to inspect evaluated metadata rather than guessing from one file.
 
-**Previous:** [Lecture 03](Lecture-03.md) | **Next:** [Lecture 05 — Module 3](Lecture-05.md)
+**Self-check:** the executable exists under a recipe's staging root but is absent after boot. Where do you look? **Answer:** check package file assignment, the image's selected package list, and whether you booted the matching rebuilt image. A successful compiler run only established the earliest part of that chain.
+
+**Artifact:** annotate the source-to-target diagram with the exact recipe, package, image, and target paths from your project.
+
+**Previous:** [Lecture 03](Lecture-03.md) · **Next:** [Lecture 05](Lecture-05.md)

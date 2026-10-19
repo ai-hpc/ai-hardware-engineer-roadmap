@@ -81,20 +81,20 @@ API agent
   -> structured JSON responses
 ```
 
+**Historical source snapshot:** [Reflex benchmark revision 3528c2cc](https://github.com/reflex-dev/agent-benchmark/tree/3528c2cc11d561599fa92df0316bbe222b50269f), April 2026. These are the author's reported results, not measurements rerun for this course and not current-model benchmarks.
+
 Result:
 
 | Metric | Vision agent | API agent |
 |---|---:|---:|
-| Steps / calls | 53 ± 13 | 8 ± 0 |
+| Operation count (different units) | 53 ± 13 LLM/browser cycles | 8 ± 0 tool calls |
 | Wall-clock time | 1003s ± 254s | 19.7s ± 2.8s |
 | Input tokens | 550,976 ± 178,849 | 12,151 ± 27 |
 | Output tokens | 37,962 ± 10,850 | 934 ± 41 |
 
-The API path completed in 8 calls every time.
+The source reports **3 Sonnet browser runs and 5 Sonnet API runs**, successful in those samples. The API tool calls correspond to about 14 HTTP requests, so `53/8` is not a ratio of identical operations. Browser input included about 529,176 cache-read tokens on average; raw input-token totals do not directly determine billed dollar cost. The API endpoint-to-tool mapping also involved human engineering.
 
-The vision path **initially missed work** because not all pending reviews were visible on screen. It needed a 14-step UI walkthrough to complete successfully.
-
-That walkthrough is itself **engineering cost**.
+A three-run result is not a stable estimate for all websites or tasks. Reset mutable application state between trials, preserve failures and cache state, and compare success, latency and billed cost on the same task population. This case motivates testing structured tools; it does not prove a universal speedup.
 
 ---
 
@@ -624,9 +624,9 @@ Which path would you trust in production?
 
 - Vision-based computer use is a fallback, not the primary interface for owned systems.
 - The Reflex benchmark measured a large gap: roughly 551k input tokens and 53 steps for vision versus about 12k input tokens and 8 calls for API.
-- The vision path required a 14-step walkthrough to succeed; that prompt is unpaid engineering cost.
+- The small sample and human tool/UI integration work limit generalization; record both when comparing interfaces.
 - The right hierarchy is structured API, CLI/direct execution, DOM/accessibility, then vision.
-- Structured tools are cheaper, faster, more deterministic, easier to secure, and easier to audit.
+- Structured tools expose explicit contracts and often reduce UI overhead; cost, latency, authorization and success still require measurement.
 - OpenClaw's Gateway/tool direction is aligned with this principle.
 - Recurring workflows should graduate from vision exploration into typed, policy-gated tools.
 

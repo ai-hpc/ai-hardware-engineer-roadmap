@@ -28,7 +28,7 @@ High Performance Computing goes beyond single-GPU programming and cluster setup 
 
 ## How to use this track
 
-1. **Start with one correct single-GPU library benchmark.** Add [Phase 5A — GPU Infrastructure](../Track%20A%20-%20GPU%20Infrastructure/Guide.md) when the chosen workload actually needs multiple GPUs or nodes.
+1. **Start with a correct small reference.** CPU-only learners can run the [real two-process collective lab](../Track%20A%20-%20GPU%20Infrastructure/Nvidia%20GPU/HPC%20Setup/NCCL-Deep-Dive/CPU-Collectives-Lab/Guide.md); with CUDA, begin with one single-GPU library benchmark. Add [Phase 5A — GPU Infrastructure](../Track%20A%20-%20GPU%20Infrastructure/Guide.md) when the chosen workload actually needs multiple GPUs or nodes.
 2. **Then [CUDA-X Libraries](CUDA-X%20Libraries/Guide.md)** — the comprehensive reference for every GPU-accelerated library. Organized by category (math, DL, data, vision, communication) with role-based learning paths and hands-on projects.
 
 ## Relationship to other tracks

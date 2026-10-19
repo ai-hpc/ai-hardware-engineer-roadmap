@@ -1,0 +1,16 @@
+{
+  "checked_utc": "2026-10-18T21:08:18.784706+00:00",
+  "python": "3.12.3",
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "scope": "Executed original synthetic grounding tests and new offline episode/action dispatcher. No robot, simulator, foundation-model weights or API.",
+  "test_command": "python3 -m unittest discover -s \"Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/labs\" -p \"test_*.py\"",
+  "exit_code": 0,
+  "test_log": "...............................\n----------------------------------------------------------------------\nRan 31 tests in 0.131s\n\nOK\n",
+  "replay_command": "python3 \"Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/labs/episode_pipeline.py\"",
+  "source_sha256": {
+    "episode_pipeline.py": "dc8e2feeb0547aa1b06ad137d1a491e5c52fadb5dde2b58ba50c288c56d60c0a",
+    "test_episode_pipeline.py": "93b7ec64de2da1448360ffb197c3cc16f2892d37cf32943b1a358d2fa095c8f7",
+    "episode-fixture.json": "d0bad8f8d6dce40b0f26ba5da8fd7db98e8878e46fe01f249d5315a2981cd3b4",
+    "episode-reference.json": "892847a6b09e5d1e5793fbcb2a40f66c3fc9cb18d9a00a42089539e998cac9be"
+  }
+}

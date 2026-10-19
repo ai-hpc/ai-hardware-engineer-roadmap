@@ -1,371 +1,82 @@
-# Lecture 15 — Agent Architecture Patterns
+# Lecture 15 — Agent Patterns with Measurable Stop Conditions
 
 **Course:** [AI Agent Development 2026](../Guide.md) | **Previous:** [Lecture 14](Lecture-14.md) | **Next:** [Lecture 16](Lecture-16.md)
 
----
+**Outcome:** choose a control-flow pattern, enforce a finite budget, and decide success using evidence outside the generated prose.
 
-## Learning Objectives
+## 1. Three patterns
 
-- Understand the major agent design patterns and when to use each
-- Implement ReAct from scratch
-- Know when to use plan-and-execute vs. reactive agents
-- Recognize failure modes and build in safety rails
+| Pattern | What happens | Useful when | Main cost |
+|---|---|---|---|
+| ReAct-style tool loop | Model proposes an action; runtime executes an allowed tool and returns the observation | The next step depends on new evidence | Repeated model calls and changing context |
+| Plan then execute | A proposed dependency graph is validated and executed | Dependencies and intermediate artifacts are useful to inspect | Plan validation and replanning |
+| Critique then revise | A candidate is checked and a bounded revision is attempted | A reliable check can expose a repairable defect | Extra calls; correlated critic mistakes |
 
----
+These describe application control flow. They do not require exposing a model's private reasoning. Request a short action rationale or testable plan where it helps the user, then inspect the actual actions and results.
 
-## 1. Pattern Overview
+## 2. Run a bounded tool loop first
 
-| Pattern | Best for | Weakness |
-|---------|----------|----------|
-| **ReAct** | Open-ended tasks, tool use | Can get stuck in loops |
-| **Plan-and-Execute** | Long multi-step tasks, predictable workflows | Plan goes stale mid-execution |
-| **Reflexion** | Tasks with clear success criteria | Expensive — multiple LLM calls per step |
-| **LATS (Tree Search)** | Optimization, code generation | Very expensive, complex to implement |
+Run the [provider contract lab](Provider-Contract-Lab.md). It uses real Anthropic and OpenAI SDKs with local fixture responses and a genuine bounded integer-addition tool. No API key, web search, GPU or arbitrary code execution is needed.
 
----
+Trace one run:
 
-## 2. ReAct (Reason + Act)
-
-**ReAct** interleaves reasoning and action in a loop: **Thought → Action → Observation → Thought → ...**
-
-This is the foundation of most production agents.
-
-```python
-import anthropic
-import json
-from datetime import datetime
-
-client = anthropic.Anthropic()
-
-REACT_SYSTEM = """You are a research agent. You solve problems by thinking step by step
-and using tools. Work through the problem systematically.
-
-At each step:
-1. Think about what you know and what you need
-2. Decide on the best action (tool call or final answer)
-3. Use the result to inform your next step
-
-Be systematic. Don't guess — use tools to verify."""
-
-# Tools available to the agent
-tools = [
-    {
-        "name": "web_search",
-        "description": "Search the web for current information. Use for facts, recent events, technical specs.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "Search query"}
-            },
-            "required": ["query"]
-        }
-    },
-    {
-        "name": "calculator",
-        "description": "Evaluate mathematical expressions. Use for any arithmetic.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "expression": {"type": "string", "description": "Python math expression, e.g. '1024 * 80 / 1000'"}
-            },
-            "required": ["expression"]
-        }
-    },
-    {
-        "name": "python_repl",
-        "description": "Execute Python code and return output. Use for data processing, analysis.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "code": {"type": "string", "description": "Python code to execute"}
-            },
-            "required": ["code"]
-        }
-    }
-]
-
-def web_search(query: str) -> str:
-    # Mock — in production use SerpAPI, Tavily, or Brave Search
-    return f"[Search results for '{query}': ... mock data ...]"
-
-def calculator(expression: str) -> str:
-    try:
-        result = eval(expression, {"__builtins__": {}}, {})
-        return str(result)
-    except Exception as e:
-        return f"Error: {e}"
-
-def python_repl(code: str) -> str:
-    import io, contextlib
-    buffer = io.StringIO()
-    try:
-        with contextlib.redirect_stdout(buffer):
-            exec(code, {})
-        return buffer.getvalue() or "(no output)"
-    except Exception as e:
-        return f"Error: {type(e).__name__}: {e}"
-
-TOOL_MAP = {"web_search": web_search, "calculator": calculator, "python_repl": python_repl}
-
-class ReActAgent:
-    def __init__(self, max_steps: int = 20):
-        self.max_steps = max_steps
-        self.steps = []
-
-    def run(self, task: str) -> str:
-        messages = [{"role": "user", "content": task}]
-        step = 0
-
-        while step < self.max_steps:
-            step += 1
-            response = client.messages.create(
-                model="your-agent-model-id",
-                max_tokens=2048,
-                system=REACT_SYSTEM,
-                tools=tools,
-                messages=messages
-            )
-
-            messages.append({"role": "assistant", "content": response.content})
-
-            if response.stop_reason == "end_turn":
-                return next(
-                    (b.text for b in response.content if hasattr(b, "text")), ""
-                )
-
-            elif response.stop_reason == "tool_use":
-                tool_results = []
-                for block in response.content:
-                    if block.type == "tool_use":
-                        result = TOOL_MAP[block.name](**block.input)
-                        self.steps.append({
-                            "step": step,
-                            "tool": block.name,
-                            "input": block.input,
-                            "output": result[:200]  # truncate for logging
-                        })
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": result
-                        })
-                messages.append({"role": "user", "content": tool_results})
-
-        return "Agent reached max steps without completing."
-
-agent = ReActAgent(max_steps=15)
-answer = agent.run("What is the memory bandwidth of an H100 SXM5 in GB/s? How many times faster is it than DDR5-5600?")
-print(answer)
-print(f"\nSteps taken: {len(agent.steps)}")
+```text
+user: add 2 and 3
+model fixture: call add_integers(a=2, b=3), call ID c1
+runtime: validate name, exact keys, types, bounds and budget
+runtime: execute Python addition -> {ok: true, sum: 5}
+runtime: return result correlated with c1 using the provider's protocol
+model fixture: final answer "5"
 ```
 
----
+The tool really computes 5; the fixture supplies the final sentence. Therefore the test establishes dispatch/protocol behavior, not a model's ability to select the right tool. Change the arguments to `true` and `3`: Python considers booleans integer subclasses, so the validator deliberately requires exact `int` types.
 
-## 3. Plan-and-Execute
+Do not implement a “safe calculator” with `eval`, even with `__builtins__` removed. Do not call `exec` on generated Python and label it a sandbox. These are interpreter entry points, not containment. Real code execution needs a separate process/environment with resource limits and carefully scoped filesystem/network access.
 
-For complex multi-step tasks, **separate planning from execution**. The **planner** creates a task list; the **executor** works through it.
+## 3. Validate a plan as data
 
-```python
-from dataclasses import dataclass, field
-from enum import Enum
+A model-generated plan is a proposal. Before execution, check a strict schema, unique bounded task IDs, allowed operation names, existing dependencies, absence of cycles, maximum node count and current authorization. Execute a ready node only after its dependencies have verified successful outcomes. A list's presentation order is not necessarily a topological order.
 
-class TaskStatus(Enum):
-    PENDING = "pending"
-    IN_PROGRESS = "in_progress"
-    DONE = "done"
-    FAILED = "failed"
+**Worked plan:**
 
-@dataclass
-class Task:
-    id: int
-    description: str
-    status: TaskStatus = TaskStatus.PENDING
-    result: str = ""
-    depends_on: list[int] = field(default_factory=list)
-
-class PlanAndExecuteAgent:
-    def __init__(self):
-        self.plan: list[Task] = []
-
-    def plan_task(self, goal: str) -> list[Task]:
-        """Generate a structured plan for the goal."""
-        response = client.messages.create(
-            model="your-agent-model-id",
-            max_tokens=1024,
-            system="""Create a numbered execution plan. Return JSON array of tasks.
-Each task: {"id": int, "description": str, "depends_on": [int]}
-Keep tasks atomic — one action each. Maximum 10 tasks.""",
-            messages=[{"role": "user", "content": f"Goal: {goal}"}]
-        )
-
-        raw = response.content[0].text.strip().strip("```json").strip("```")
-        task_dicts = json.loads(raw)
-        return [Task(**t) for t in task_dicts]
-
-    def execute_task(self, task: Task, context: str) -> str:
-        """Execute a single task given accumulated context."""
-        response = client.messages.create(
-            model="your-agent-model-id",
-            max_tokens=1024,
-            system="Execute the given task. Be concise. Return only the result.",
-            tools=tools,
-            messages=[{
-                "role": "user",
-                "content": f"Task: {task.description}\n\nContext from previous steps:\n{context}"
-            }]
-        )
-        # Handle tool use inline
-        messages = [{"role": "user", "content": f"Task: {task.description}\n\nContext:\n{context}"}]
-        while True:
-            response = client.messages.create(
-                model="your-agent-model-id",
-                max_tokens=1024,
-                system="Execute the given task. Be concise. Return only the result.",
-                tools=tools,
-                messages=messages
-            )
-            messages.append({"role": "assistant", "content": response.content})
-            if response.stop_reason == "end_turn":
-                return next((b.text for b in response.content if hasattr(b, "text")), "")
-            elif response.stop_reason == "tool_use":
-                tool_results = []
-                for block in response.content:
-                    if block.type == "tool_use":
-                        result = TOOL_MAP[block.name](**block.input)
-                        tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": result})
-                messages.append({"role": "user", "content": tool_results})
-
-    def run(self, goal: str) -> str:
-        print(f"Planning for: {goal}")
-        self.plan = self.plan_task(goal)
-        print(f"Plan ({len(self.plan)} steps):")
-        for t in self.plan:
-            print(f"  {t.id}. {t.description}")
-
-        context_parts = []
-        for task in self.plan:
-            # Check dependencies
-            deps_done = all(
-                any(t.id == dep and t.status == TaskStatus.DONE for t in self.plan)
-                for dep in task.depends_on
-            )
-            if task.depends_on and not deps_done:
-                task.status = TaskStatus.FAILED
-                task.result = "Dependency failed"
-                continue
-
-            task.status = TaskStatus.IN_PROGRESS
-            context = "\n".join(context_parts)
-            task.result = self.execute_task(task, context)
-            task.status = TaskStatus.DONE
-            context_parts.append(f"Step {task.id} ({task.description}): {task.result}")
-            print(f"  ✓ Step {task.id} done")
-
-        # Final synthesis
-        all_results = "\n".join(context_parts)
-        response = client.messages.create(
-            model="your-agent-model-id",
-            max_tokens=1024,
-            messages=[{
-                "role": "user",
-                "content": f"Goal: {goal}\n\nResults:\n{all_results}\n\nWrite a concise final answer."
-            }]
-        )
-        return response.content[0].text
+```text
+A = retrieve authorized manual passages
+B = identify the applicable firmware revision; depends on A
+C = produce a cited answer; depends on A and B
 ```
 
----
+If A fails, B and C remain blocked. They are not successful merely because a model can produce text. If the plan is listed as C, A, B, a scheduler may still execute A, B, C after validating the graph. If A depends on C, the cycle must be rejected before any action runs.
 
-## 4. Reflexion — Self-Critique Loop
+Store each task's state (`pending`, `running`, `verified_success`, `failed`, `blocked`) and artifact references. Replanning must preserve action IDs already committed, so a retry cannot silently repeat an external write. Use the [executed local RAG/workflow lab](../Local-RAG-Workflow-Lab/Guide.md) for durable state and failure injection.
 
-After completing a task, the agent **evaluates its own output** and retries if needed.
+## 4. Critique is evidence only when the check is meaningful
 
-```python
-def reflexion_agent(task: str, max_retries: int = 3) -> str:
-    """Agent that self-critiques and retries until satisfied."""
-    attempt = ""
+A model critic can identify mistakes, but often shares the generator's blind spots. Separate its suggestion from an independent check: unit assertions for code, labeled answers for extraction, citation support for RAG, or a measured receipt for an action.
 
-    for i in range(max_retries):
-        # Generate attempt
-        attempt_response = client.messages.create(
-            model="your-agent-model-id",
-            max_tokens=1024,
-            messages=[{
-                "role": "user",
-                "content": task if i == 0 else f"{task}\n\nPrevious attempt:\n{attempt}\n\nTry again, fixing the issues."
-            }]
-        )
-        attempt = attempt_response.content[0].text
+Never use `if "PASS" in critique`: “DO NOT PASS” satisfies it. An exact structured decision fixes parsing, but it still does not make the critic correct. Measure false acceptance/rejection against human or task-specific labels.
 
-        # Self-critique
-        critique_response = client.messages.create(
-            model="your-agent-model-id",
-            max_tokens=512,
-            system="You are a strict quality reviewer. Identify any errors, gaps, or improvements needed.",
-            messages=[{
-                "role": "user",
-                "content": f"Task: {task}\n\nAttempt:\n{attempt}\n\nIs this correct and complete? Reply with 'PASS' if good, or list specific issues."
-            }]
-        )
-        critique = critique_response.content[0].text
+A bounded revision algorithm should retain each candidate and its measured score. If no attempt passes the required checks, return a failed/unknown status with the best *measured* candidate if that is useful. Returning the last attempt and calling it “best” is unjustified unless scores show that.
 
-        if "PASS" in critique:
-            print(f"✓ Passed critique on attempt {i+1}")
-            return attempt
+**Example:** attempt scores are 0.7, 0.9, 0.8 and the pass threshold is 0.95. None passes. Candidate 2 is best on this declared metric; candidate 3 is merely last. Choosing the maximum on a tiny development set can overfit, so evaluate the final revision policy on held-out tasks.
 
-        print(f"✗ Attempt {i+1} failed critique: {critique[:100]}...")
+## 5. Budgets must be enforced where work happens
 
-    return attempt  # Return best attempt after max retries
-```
+| Limit | Where to enforce | Common ineffective version |
+|---|---|---|
+| Model turns | Before every model request | Counting only calls to an outer wrapper |
+| Tool calls | Admit the whole proposed batch before dispatch | Checking after the first side effect |
+| Wall time | Deadlines passed through model and tool transports | A timer that logs lateness but never cancels |
+| Money | Reserve a conservative bound, then reconcile actual usage | A `total_cost = 0` field never updated |
+| Output/state size | Provider limit plus response/parser/storage bounds | Truncating text after executing it |
 
----
+A max-turn cap limits one source of work; it does not cap a slow tool, model output cost or asynchronous child work. The teaching adapters set transport timeouts and turn/call limits, but do not claim a hard global deadline or dollar budget. Keep this scope visible when extending them.
 
-## 5. Failure Mode Prevention
+Retries can duplicate effects after a timeout. Correlation IDs match a response to a call; an idempotency key plus durable server-side deduplication protects a logical write across retries. These are different jobs.
 
-| Failure mode | Symptom | Prevention |
-|-------------|---------|-----------|
-| **Infinite loop** | Agent keeps calling same tool | `max_steps` counter |
-| **Tool hallucination** | Model invents tool parameters | Strict schema + `enum` constraints |
-| **Context overflow** | Responses degrade as context grows | Summarize history periodically |
-| **Stale plan** | Plan-and-execute follows outdated plan | Re-plan if environment changes |
-| **Runaway cost** | Hundreds of API calls | Budget limit + step counter |
+## Practice and answers
 
-```python
-class SafeAgentWrapper:
-    def __init__(self, agent_fn, max_steps=20, budget_usd=1.0):
-        self.agent_fn = agent_fn
-        self.max_steps = max_steps
-        self.budget = budget_usd
-        self.total_cost = 0.0
-        self.step_count = 0
-
-    def __call__(self, *args, **kwargs):
-        if self.step_count >= self.max_steps:
-            raise RuntimeError(f"Agent exceeded {self.max_steps} steps")
-        if self.total_cost >= self.budget:
-            raise RuntimeError(f"Agent exceeded ${self.budget:.2f} budget")
-        self.step_count += 1
-        return self.agent_fn(*args, **kwargs)
-```
-
----
-
-## Key Takeaways
-
-1. **ReAct** is the default pattern — simple, effective, handles most tasks
-2. **Plan-and-Execute** for predictable multi-step workflows where you want visibility
-3. **Reflexion** when quality matters more than speed — adds self-correction
-4. Always set `max_steps` and a budget limit — agents can loop indefinitely without them
-5. Log every tool call for debugging — agent failures are hard to diagnose without a trace
-
----
-
-## Exercises
-
-1. Implement a ReAct agent that solves a 3-step data analysis task (fetch data → process → visualize).
-2. Add context compression to `ReActAgent`: after every 5 steps, summarize the conversation history.
-3. Build a `Reflexion` agent for code generation — it runs the code and uses the output/errors as critique.
-
----
-
-**Previous:** [Lecture 14](Lecture-14.md) | **Next:** [Lecture 16](Lecture-16.md)
+1. Run the lab; add a fixture that asks for three tools with a two-call budget. **Expected:** reject the batch before any execution.
+2. Validate the dependency cycle A → B → C → A. **Expected:** reject before running A; do not mark a skipped dependency as complete.
+3. Change a critic response from `PASS` to `NOT PASS`. **Expected:** substring matching fails this test; structured exact validation still needs an independently meaningful criterion.
+4. Compare a direct answer, one tool loop and a critique loop on the same frozen tasks. Report every attempt, success rate, latency and calls per successful task. **There is no predetermined winning pattern.**
+5. Disconnect after a write reaches the server but before the reply arrives. **Expected design:** recover the action receipt using its stable idempotency key; do not infer failure from a missing reply.

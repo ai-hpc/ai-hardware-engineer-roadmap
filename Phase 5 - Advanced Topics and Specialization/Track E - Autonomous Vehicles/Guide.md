@@ -1,99 +1,49 @@
 # Phase 5 — Track E: Autonomous Vehicles
 
-<div class="course-identity autonomous-vehicles" markdown="1">
-<div class="course-identity__icon">AV</div>
-<div markdown="1">
-<p class="course-identity__eyebrow">Track 5E · Autonomous Vehicles</p>
-<p class="course-identity__title">Study production autonomy stacks, perception, prediction, safety, deployment, and vehicle debugging.</p>
-<p class="course-identity__meta">Artifact: AV stack analysis · Measure: sensor timing, model latency, safety constraints</p>
-</div>
-</div>
+Learn how perception, inference, timing and control fit together through a runnable vehicle model, a pinned production reference, and actual CPU neural-network experiments. The first milestones require Python and a CPU; simulator and hardware milestones are separate.
 
+**Before:** Python, basic AI, frames and control from [robotics foundations](../Track%20D%20-%20Robotics/Robotics%20Foundations/README.md). **Roles:** perception, planning, embedded inference and vehicle systems engineers. **Hardware link:** each module produces a requirement about sensor age, memory, numerical semantics or command timing that can inform [AI chip design](../Track%20F%20-%20AI%20Chip%20Design/Guide.md).
 
-**Timeline:** 12–24 months (modules 1–3); 24–48 months with advanced modules (4–5). Module 6 is optional tooling.
+## Start with one coherent project
 
-**Prerequisites:** Phase 3 (**Computer Vision**, **Sensor Fusion**), Phase 4 Track B — Jetson (CUDA, TensorRT, edge deployment). Phase 4 Track C recommended for tinygrad compiler context.
+1. Follow a straight lane with known state and explicit steering units in [Fundamentals](1.%20Fundamentals/Guide.md), then run its [CPU lab](1.%20Fundamentals/Lab-Guide.md).
+2. Reject stale, out-of-order and wrong-frame observations in the [openpilot source/replay lesson](2.%20openpilot%20Reference%20Stack/Replay-Lab.md). Trace corresponding real process boundaries in a fixed upstream snapshot.
+3. Execute tensor operations, gradients, training, checkpoint reload and changing-input JIT inference with [tinygrad 0.14.0](3.%20tinygrad%20for%20Inference/Guide.md). Connect its small output to the same named steering contract.
+4. Add simulation through [CARLA's frame synchronization exercise](1.%20Fundamentals/CARLA-Lab.md), then perception and scenario variation. CARLA execution remains optional and was not available during review.
 
-**Role targets:** ADAS Software Engineer · Autonomous Driving Perception Engineer · Motion Planning Engineer · Functional Safety Engineer · AV Systems Engineer
+The baseline is deliberately small enough to calculate by hand. More ambitious datasets, controllers and runtime integrations build on a known result instead of hiding errors inside a large stack.
 
----
+## Module map
 
-## Overview
+| Module | Concrete first artifact | Initial effort |
+|---|---|---|
+| [1. Fundamentals](1.%20Fundamentals/Guide.md) | Bicycle-model trace, steering-rate check, delayed-observation failure | 3–5 hours |
+| [2. openpilot reference](2.%20openpilot%20Reference%20Stack/Guide.md) | Pinned process/message map and timestamp fault replay | 3–5 hours |
+| [3. tinygrad inference](3.%20tinygrad%20for%20Inference/Guide.md) | Executed CPU operator/model checks, checkpoint and compiler evidence | 6–10 hours |
+| [4. Perception and prediction](4.%20Advanced%20Perception%20and%20Prediction/Guide.md) | Calibrated sensor/trajectory evaluation with held-out scenarios | Multi-session project |
+| [5. Safety and deployment](5.%20Safety%20Standards%20and%20Deployment/Guide.md) | Traceable failure requirement and test outcome | Multi-session project |
+| [6. TRACE32 debugging](6.%20Lauterbach%20TRACE32%20Debug/Guide.md) | Target timing/trace investigation, when equipment exists | Optional professional depth |
 
-This track uses **[openpilot](https://github.com/commaai/openpilot)** (comma.ai) as the primary reference implementation — an open-source, production-deployed ADAS that runs tinygrad for on-device inference. You study a real system end-to-end: camera capture, neural network perception, planning, control, and CAN actuation.
+These are estimates for the named milestones, not promises of job readiness. Advanced perception, platform bring-up and safety engineering require substantially more practice.
 
-The track progresses from fundamentals through the openpilot codebase, then into advanced perception research and safety/deployment standards.
+## Version and evidence boundaries
 
----
+Reviewed on **18 October 2026**:
 
-## Module Map
+| Component | Teaching baseline | What was actually checked |
+|---|---|---|
+| Vehicle/replay model | Repository's standard-library implementation | 14 portable tests and baseline/delay traces |
+| openpilot | Commit `b1e88c2357f07dfc4e0872370b64d97ad606391b`, source version 0.11.3 | Source ownership, rates and submodule identities; full stack not built/run |
+| tinygrad | Released package 0.14.0, hash pinned | CPU inference, gradients, training, JIT and save/reload; bounded real MNIST run |
+| Standalone C runtime | Clang 18.1.3, Linux x86-64 | 12 guarded zero/tail/changing-input cases |
+| CARLA | Tagged release 0.9.16 | Official API review and optional script; no server run |
 
-| # | Module | What you learn | Time |
-|---|--------|---------------|------|
-| **1** | [Fundamentals](1.%20Fundamentals/Guide.md) | CV for driving, planning algorithms, control theory, vehicle dynamics | 3–4 months |
-| **2** | [openpilot Reference Stack](2.%20openpilot%20Reference%20Stack/Guide.md) | Full openpilot architecture: camera pipeline, AGNOS kernel, data flow, forking | 3–4 months |
-| **3** | [tinygrad for Inference](3.%20tinygrad%20for%20Inference/Guide.md) | tinygrad internals: lazy eval, 3 op types, compiler pipeline, backends, custom ops | 3–4 months |
-| **4** | [Advanced Perception and Prediction](4.%20Advanced%20Perception%20and%20Prediction/Guide.md) | Sensors (LiDAR, radar), calibration, BEV perception, trajectory prediction, HD maps, simulation | 6–12 months |
-| **5** | [Safety Standards and Deployment](5.%20Safety%20Standards%20and%20Deployment/Guide.md) | ISO 26262, SOTIF, V2X, HIL testing, shadow mode, scenario-based validation | 3–6 months |
-| **6** | [Lauterbach TRACE32 Debug](6.%20Lauterbach%20TRACE32%20Debug/Guide.md) | In-circuit debug and trace for automotive ECUs (optional professional tooling) | 2–3 months |
+openpilot's pinned tinygrad submodule differs from the standalone PyPI teaching package. Use the upstream checkout's own dependency revisions for an openpilot integration. Its current built-in simulator bridge targets **MetaDrive**; the separate CARLA lab is not advertised as a compatible openpilot bridge. [Pinned bridge documentation](https://github.com/commaai/openpilot/blob/b1e88c2357f07dfc4e0872370b64d97ad606391b/openpilot/tools/sim/README.md).
 
----
+openpilot is an ACC/automated-lane-centering driver-assistance reference with an attentive-driver requirement. The exercises here use source inspection, replay, CPU models and optional local simulation. Their results do not establish road autonomy or release readiness. [Official system scope](https://docs.comma.ai/concepts/safety/).
 
-## Recommended Order
+## What to carry between modules
 
-```
-Module 1 (Fundamentals)
-    ↓
-Module 2 (openpilot) ←→ Module 3 (tinygrad)   [study in parallel or interleaved]
-    ↓
-Module 4 (Advanced Perception)
-    ↓
-Module 5 (Safety & Deployment)
-    ↓
-Module 6 (Lauterbach — optional, for automotive ECU roles)
-```
+Preserve frame convention, capture timestamp/clock epoch, feature order, tensor dtype/layout, normalization, model/checkpoint identity, output units and command limits. A faster model that changes one of those can invalidate the controller comparison. Retain raw samples and failures, not only an average accuracy or FPS.
 
-Modules 2 and 3 reinforce each other: openpilot is the system context, tinygrad is the inference engine inside it. Study them together.
-
----
-
-## Reference Projects Used Throughout
-
-| Project | Module 1 | Module 2 | Module 3 | Module 4 |
-|---------|----------|----------|----------|----------|
-| **[openpilot](https://github.com/commaai/openpilot)** | Lane/object detection context | Full stack: camera→ISP→modeld→planning→CAN | Inference engine inside modeld | Real perception workloads |
-| **[tinygrad](https://github.com/tinygrad/tinygrad)** | — | Runtime for openpilot models | Full compiler + backend study | Custom backend for accelerators |
-| **[CARLA](https://carla.org/)** | Simulation for planning algorithms | Test openpilot in simulation | — | Synthetic data, sensor models |
-
----
-
-## Key Resources
-
-| Resource | URL |
-|----------|-----|
-| openpilot | https://github.com/commaai/openpilot |
-| tinygrad | https://github.com/tinygrad/tinygrad |
-| CARLA Simulator | https://carla.org/ |
-| comma.ai Blog | https://blog.comma.ai/ |
-| nuScenes Dataset | https://www.nuscenes.org/ |
-| Waymo Open Dataset | https://waymo.com/open/ |
-
-## One continuous project through this track
-
-Carry one timestamped perception/control scenario through the modules: baseline controller → process/message trace → compiler-correct inference → sensor perturbation study → failure response → target trace. Keep the observation/action schema fixed while changing one subsystem. This creates an inspectable chain from model error to hardware requirement.
-
-The output for [AI Chip Design](../Track%20F%20-%20AI%20Chip%20Design/Guide.md) is a workload contract: sensor rate and synchronization, tensor shapes and layouts, memory/transfer trace, action units and age limit, control boundary, and recovery policy. Use replay/simulation evidence to design the prototype. Driver-assistance experiments do not establish autonomous road capability. [openpilot safety scope](https://docs.comma.ai/concepts/safety/).
-
-## Practice and assessment
-
-**Entry diagnostic (prerequisite check):** Trace perception, prediction, planning, and control with frames and timestamps. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
-
-1. **Baseline lab:** Evaluate a small recorded or simulated driving scenario against a simple baseline.
-2. **Guided variation:** Perturb timing or sensor availability and inspect failure handling in replay/simulation.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
-
-**Evidence to submit:** Task/trajectory error, latency, collision/constraint outcomes in simulation, and scenario coverage. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+The completed first project includes a baseline, a deliberately failed timing case, recovery, an executed model output check and one independent transfer. Use the [shared completion rubric](../../Learning-Guide.md#completion-rubric). Subsequent modules add evidence to this artifact rather than replacing it with an untested list of tools.

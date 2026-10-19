@@ -1,0 +1,28 @@
+{
+  "checked_utc": "2026-10-18",
+  "nvat_commit": "11b2bfeb42a1158aa08744603ecb239ccb3d2265",
+  "nvat_release": "2026.10.02",
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/NVIDIA/attestation-sdk/11b2bfeb42a1158aa08744603ecb239ccb3d2265/nv-attestation-cli/src/verify_token.cpp",
+      "sha256": "f7e0219301531f14339c6adb9351042e07724ddf1ca79b232edf7f56472b639e",
+      "bytes": 13953
+    },
+    {
+      "url": "https://raw.githubusercontent.com/NVIDIA/attestation-sdk/11b2bfeb42a1158aa08744603ecb239ccb3d2265/nv-attestation-sdk-cpp/src/nv_jwt.cpp",
+      "sha256": "f14654c042ad88f478312b4094d5735eed6a876eeed252fed7d4249b8352750e",
+      "bytes": 12891
+    },
+    {
+      "url": "https://raw.githubusercontent.com/NVIDIA/attestation-sdk/11b2bfeb42a1158aa08744603ecb239ccb3d2265/nv-attestation-sdk-cpp/include/nvat.h.in",
+      "sha256": "2951c04f98219ac215babcce206c7b85952bbe5dbfe32a56c95bfc35043b1dd4",
+      "bytes": 80976
+    },
+    {
+      "url": "https://raw.githubusercontent.com/intel/confidential-computing.tee.dcap/7ed37274294c5dc47bda4cec601bb727be2875e0/QuoteVerification/dcap_quoteverify/inc/sgx_dcap_quoteverify.h",
+      "bytes": 18643,
+      "sha256": "22311e0b4332276c315fdc2f792b28197a3d9a7bfd376246fa5fa3c1bef870ef"
+    }
+  ],
+  "intel_dcap_commit": "7ed37274294c5dc47bda4cec601bb727be2875e0"
+}

@@ -1,0 +1,252 @@
+{
+  "tinygrad": "0.14.0",
+  "python": "3.12.3",
+  "device": "CPU",
+  "beam": 0,
+  "source_sha256": "e916ba19d1cb8abcd87996a19f532a552493c2abe91d3d3a3e39b48fe3cd8513",
+  "lessons": {
+    "intro": {
+      "input": [
+        -1.0,
+        0.0,
+        2.0
+      ],
+      "output": [
+        0.0,
+        1.0,
+        5.0
+      ],
+      "device": "CPU",
+      "dtype": "float32"
+    },
+    "basics": {
+      "shape": [
+        2,
+        3
+      ],
+      "output": [
+        [
+          0.0,
+          1.0,
+          5.0
+        ],
+        [
+          7.0,
+          0.0,
+          3.0
+        ]
+      ],
+      "realization_kernel_count": 1,
+      "transpose_shape": [
+        3,
+        2
+      ],
+      "materialized_transpose": [
+        [
+          -1.0,
+          3.0
+        ],
+        [
+          0.0,
+          -2.0
+        ],
+        [
+          2.0,
+          1.0
+        ]
+      ]
+    },
+    "operations": {
+      "manual_matmul": [
+        [
+          2.0,
+          11.0
+        ],
+        [
+          -3.0,
+          6.0
+        ]
+      ],
+      "matmul": [
+        [
+          2.0,
+          11.0
+        ],
+        [
+          -3.0,
+          6.0
+        ]
+      ],
+      "sum_axis0": [
+        0.0,
+        2.0,
+        5.0
+      ],
+      "row_mean": [
+        2.0,
+        0.3333333432674408
+      ]
+    },
+    "autograd": {
+      "sum_squares_gradient": [
+        4.0,
+        6.0
+      ],
+      "rmsnorm_gradient": [
+        0.6479389667510986,
+        0.9719081521034241,
+        0.3239697217941284
+      ],
+      "finite_difference_max_error": 9.094140374088511e-08,
+      "sgd_losses": [
+        4.0,
+        2.56000018119812,
+        1.6383999586105347,
+        1.0485758781433105,
+        0.6710885167121887,
+        0.429496705532074,
+        0.2748778462409973,
+        0.17592184245586395,
+        0.1125900074839592,
+        0.07205760478973389,
+        0.046116866171360016,
+        0.029514795169234276,
+        0.01888948306441307,
+        0.012089279480278492,
+        0.007737130392342806,
+        0.004951763432472944,
+        0.0031691312324255705,
+        0.0020282482728362083,
+        0.0012980789178982377,
+        0.000830773264169693
+      ],
+      "sgd_weight": [
+        1.976941466331482
+      ],
+      "sgd_hand_formula": "w_t = 2*(1-0.8**t)"
+    },
+    "classifier": {
+      "dataset": "synthetic two-class fixture; not MNIST or driving data",
+      "steps": 40,
+      "training_examples": 4,
+      "test_examples": 2,
+      "first_training_loss": 0.6931471824645996,
+      "final_training_loss": 0.01376222912222147,
+      "test_accuracy": 1.0,
+      "save_reload_max_error": 0.0,
+      "checkpoint_sha256": "8dbd4ec6595cb223fbb2ce8370aa900627803bafef3492be8df79a7cf65fd7c9"
+    },
+    "compiler": {
+      "materialized": {
+        "kernel_count": 3,
+        "output": [
+          0.0,
+          1.399999976158142,
+          4.0
+        ]
+      },
+      "lazy": {
+        "kernel_count": 1,
+        "output": [
+          0.0,
+          1.399999976158142,
+          4.0
+        ]
+      },
+      "changing_input_jit_outputs": [
+        [
+          0.0,
+          1.0,
+          5.0
+        ],
+        [
+          3.0,
+          5.0,
+          7.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          7.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "tensor_ir_root": "WHERE"
+    },
+    "custom_ops": {
+      "rmsnorm": [
+        0.3779643476009369,
+        -0.7559286952018738,
+        1.5118573904037476
+      ],
+      "rmsnorm_max_error": 6.96739488326159e-08,
+      "swiglu": [
+        -0.5378828644752502,
+        0.0,
+        8.80797004699707
+      ],
+      "swiglu_max_error": 7.32781753498557e-07,
+      "causal_attention": [
+        [
+          2.0,
+          3.0
+        ],
+        [
+          3.3395230770111084,
+          1.6604769229888916
+        ],
+        [
+          22.184253692626953,
+          41.159610748291016
+        ]
+      ],
+      "attention_max_error": 5.505137679051586e-07
+    },
+    "model_contract": {
+      "manifest": {
+        "model": "course-linear-steering-v1",
+        "input_names": [
+          "lateral_error_m",
+          "heading_error_rad"
+        ],
+        "input_shape": [
+          1,
+          2
+        ],
+        "dtype": "float32",
+        "output_shape": [
+          1,
+          1
+        ],
+        "output_units": "road_wheel_rad",
+        "frame": "rear_axle_flu",
+        "max_abs_output": 0.35
+      },
+      "inputs": [
+        [
+          1.0,
+          0.1
+        ],
+        [
+          -1.0,
+          -0.1
+        ],
+        [
+          0.0,
+          0.0
+        ]
+      ],
+      "decoded_road_wheel_radians": [
+        -0.12000000476837158,
+        0.12000000476837158,
+        -0.0
+      ],
+      "wrong_units_rejected": true,
+      "learned_driving_quality": "not evaluated; fixed illustrative weights"
+    }
+  }
+}

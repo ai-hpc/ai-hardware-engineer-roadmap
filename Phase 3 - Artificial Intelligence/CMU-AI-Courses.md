@@ -1,285 +1,64 @@
 # Carnegie Mellon University: AI & Vision Courses Reference
 
-A reference of CMU's AI, machine learning, and computer vision courses relevant to the **AI Hardware Engineer Roadmap** — compiled from official course pages and catalogs.
+**Reviewed against official sources: October 18, 2026.** Use these courses to deepen a topic alongside the roadmap's runnable labs. Public notes do not imply enrollment, grading, unrestricted assignment access, or a complete free online course. The term named below identifies the material reviewed; moving course homepages can change next semester.
 
-**Sources:**
-- [07-280 AI & ML I](https://www.cs.cmu.edu/~07280/#schedule)
-- [15-463 Computational Photography](https://graphics.cs.cmu.edu/courses/15-463/2018_fall/)
-- [16-385 Computer Vision Spring 2026 — Lectures](https://16385.courses.cs.cmu.edu/spring2026/lectures)
-- [Szeliski: Computer Vision (2nd ed.)](https://szeliski.org/Book/)
-
----
-
+New to the subject? Start with [AI and robot learning foundations](0.%20AI%20and%20Robot%20Learning%20Foundations/Guide.md). You can train the supplied CPU policy before attempting a university semester's assignments.
 
 ## 1. 07-280: AI & Machine Learning I
 
-**New in Spring 2026** — Replaces 15-281 and 10-315. Foundation for 07-380 AI & ML II.
+The [current course page](https://www.cs.cmu.edu/~07280/) is **Fall 2026**. The 07-280/07-380 sequence replaces the retired 15-281/10-315 courses. It combines search, supervised learning, neural networks, language models, reinforcement learning and ethics; the syllabus includes AlexNet, GPT-2 and AlphaZero implementation assignments. Later Fall assignments were still scheduled work on the review date, not a complete released package.
 
-### Overview
+The [FAQ and prerequisite comparison](https://www.cs.cmu.edu/~07280/#faq) require prior 15-122, linear algebra and mathematical foundations, with probability and Calculus 2 as corequisites. **10-301 is not an automatic substitute** for 07-280 in the AI core or as the prerequisite for 07-380; the FAQ describes an advising pathway for students who already took it.
 
-| Item | Details |
-|------|---------|
-| **Lectures** | Tue + Thu, 11:00 am–12:20 pm, Tepper 1403 |
-| **Recitation** | Friday afternoon (5 sections) |
-| **Instructors** | Nihar Shah, Pat Virtue |
-| **Education Associate** | Brynn Edmunds |
-| **Textbook** | No required textbook; readings from AIMA, Bishop, Daume, Goodfellow, MML, Mitchell, Murphy, KMPA (all online or via CMU Library) |
+**What you can use:** public lecture PDFs, notes and released worksheets. Canvas/Gradescope participation is separate. AIMA and some library-linked readings require access; “online” does not mean every book is freely downloadable. The [public notation guide](https://www.cs.cmu.edu/~07280/notes/Notation_Guide.pdf) is a useful first reading. For enrollment, use the current page's grading, collaboration and submission rules rather than an old copied timetable.
 
-### Course Description
+**Roadmap practice:** after the regression and neural-network material, run [the supplied CPU policy lab](0.%20AI%20and%20Robot%20Learning%20Foundations/Lab-01-CPU-Policy.md). Explain the input vector, prediction, training loss and held-out result. A learned mapping from state to action in this fixture is an imitation-learning exercise; it is not an implementation of AlphaZero or evidence of pretrained robot capability.
 
-Integrated introduction to AI and ML bridging core methods with modern approaches. Students build implementations of landmark systems: **AlexNet**, **GPT-2**, and **AlphaZero**. Covers ethics and responsible AI development.
+## 2. Computer vision before advanced computational photography
 
-### Grading
+Use the term-specific [16-385 Spring 2026 page](https://16385.courses.cs.cmu.edu/spring2026/) and [course information](https://16385.courses.cs.cmu.edu/spring2026/courseinfo). Topics progress from filtering and features through camera geometry, recognition and tracking. The expected background includes programming, linear algebra, calculus and basic probability; computational photography is not listed as a prerequisite. The course page's signup instructions require a code from Canvas, so do not assume every assignment or lecture link is anonymously available. The older `www.cs.cmu.edu/~16385/` landing page identifies itself as **Spring 2020**, not Fall 2024.
 
-| Component | Weight |
-|-----------|--------|
-| Midterm 1 | 15% |
-| Midterm 2 | 15% |
-| Final Exam | 25% |
-| Programming/Written Homework | 30% |
-| Online Homework | 5% |
-| Pre-reading Checkpoints | 5% |
-| Participation (in-class polls) | 5% |
+For a public reading route, use Szeliski's book below and the roadmap's [computer vision course](Track%20A%20-%20Hardware%20and%20Edge%20AI/3.%20Computer%20Vision/Guide.md). Start by tracing one calibrated image point into a camera ray; then study how multiple views constrain depth. Image classification alone does not recover metric position for a robot.
 
-**Grade boundaries (rough):** A >=90%, B 80-90%, C 70-80%, D 60-70%. Not curved.
+### 15-463 / 15-663 / 15-862: Computational Photography
 
-### Prerequisites (Strict)
+The [Fall 2026 course](https://imaging.cs.cmu.edu/15-463/) is an advanced undergraduate/introductory graduate option. Its prerequisites include image computation plus programming and mathematics; 16-385 and graphics are among the listed ways to establish that background. The current offering has **six Python-and-photography assignments** and a final project, replacing the old 2018 description of seven MATLAB assignments. Camera loans and specialist optical equipment are resources for enrolled students.
 
-- **15-122** Principles of Imperative Computation
-- **Probability** (concurrent)
-- **Linear Algebra** (prior)
-- **15-151** or **21-127** Mathematical Foundations (prior)
-- **Calculus 2** (concurrent)
+Study its public imaging material for optics, exposure, HDR, calibration, lightfields and computational sensing. Reading selected image-formation lectures early is helpful; completing the entire course before introductory vision is unnecessary. For independent work, use available image datasets or your own camera and state which acquisition tasks you could actually reproduce. Processing provided images does not demonstrate sensor calibration or construction of a structured-light scanner.
 
-### Schedule (Spring 2026)
+The [Fall 2018 material](https://imaging.cs.cmu.edu/15-463/2018_fall/) remains an archive. Keep the term attached to any assignment or software requirement you reuse.
 
-| Dates | Topic |
-|-------|-------|
-| 1/13 | 1. Introduction |
-| 1/15 | 2. Heuristic Search |
-| 1/20 | 3. Adversarial Search |
-| 1/22 | 4. Constraint Satisfaction Problems |
-| 1/27 | 5. ML Problem Formulation |
-| 1/29 | 6. Decision Trees |
-| 2/3 | 7. Linear Regression |
-| 2/5 | 8. Optimization |
-| 2/10 | 9. Logistic Regression |
-| 2/12 | 10. Feature Engineering and Regularization |
-| 2/17 | 11. Neural Networks |
-| 2/19 | 12. Neural Networks (cont.) |
-| **2/24** | **Midterm Exam 1** |
-| 2/26 | 13. AI Alignment |
-| 3/3, 3/5 | Spring Break |
-| 3/10 | 14. PyTorch, Autograd, Pre-training/Transfer/Fine-tuning |
-| 3/12 | 15. Deep Learning for Computer Vision, GPUs |
-| 3/17 | 16. MLE and Probabilistic Modeling |
-| 3/19 | 17. NLP, Markov Chains, N-grams |
-| 3/24 | 18. Feature Learning, Word Embeddings |
-| 3/26 | 19. NLP: Attention, Position Encoding |
-| 3/31 | 20. Transformers, LLMs |
-| 4/2 | 21. Markov Decision Processes |
-| 4/7 | 22. Reinforcement Learning |
-| 4/9 | Carnival (no class) |
-| 4/14 | 23. Deep Reinforcement Learning |
-| 4/16 | 24. Monte Carlo Tree Search |
-| **4/21** | **Midterm Exam 2** |
-| 4/23 | 25. AI/ML Ethics |
+## 3. Graphics & imaging choices
 
-### Assignments
+| Your question | Useful course direction | Preparation |
+|---|---|---|
+| How are 3D scenes projected and rendered? | Computer Graphics, currently listed as 15-362/15-662 in the photography prerequisites | Programming, vectors and matrices |
+| What can be inferred from an image? | 16-385 Computer Vision | Linear algebra, calculus, probability and programming |
+| How can camera design and processing improve a measurement? | 15-463 Computational Photography | Prior image computation and the relevant physics |
 
-| HW | Type | Due |
-|----|------|-----|
-| HW0 | Online | 1/15 Thu |
-| HW1 | Online, Written, Programming | 1/22 Thu |
-| HW2 | Online, Written, Programming (Search & Games) | 1/29 Thu |
-| HW3 | Online only | 2/5 Thu |
-| HW4 | Written only | 2/12 Thu |
-| HW5 | Mostly Programming | 2/19 Thu |
-| HW6 | Mostly Written | 2/26 Thu |
-| HW7 | Mostly Programming | 3/12 Thu |
-| **HW8** | **Building AlexNet** | 3/19 Thu |
-| HW9 | Online, Written, Programming | 3/26 Thu |
-| HW10 | Online, Written, Programming | 4/2 Thu |
-| **HW11** | **Building GPT-2** | 4/16 Thu |
-| **HW12** | **Building AlphaZero** | 4/23 Thu |
+These are complementary directions, not a mandatory chain of three full courses. See the [current photography prerequisites](https://imaging.cs.cmu.edu/15-463/) for course-number changes and the [SCS catalog](https://coursecatalog.web.cmu.edu/schools-colleges/schoolofcomputerscience/courses/) for formal enrollment requirements.
 
-### Policies
+## 4. Self-study mapping to the roadmap
 
-- **Late days:** 6 total across all assignments; max 2 per assignment
-- **Pre-reading:** Lowest 2 checkpoints dropped
-- **Participation:** >=80% of in-class polls for full credit
-- **Collaboration:** Conceptual discussion allowed; no sharing code/text; generative AI may not be used to generate submissions
-- **Programming partners:** Groups of 2 allowed for programming components only
+This sequence is a recommendation for independent learning, not CMU degree equivalence:
 
-### Comparison: 07-280 vs 10-301
+1. Learn functions, arrays, debugging and basic data structures. Merely knowing Python syntax is not the same preparation as completing 15-122.
+2. Learn vectors/matrices, derivatives, conditional probability and expectations as you use them in [the foundations lessons](0.%20AI%20and%20Robot%20Learning%20Foundations/01-Math-and-Training.md).
+3. Study selected 07-280 notes while training and evaluating the small CPU policy. Keep test examples out of training and model selection.
+4. Study introductory vision, then choose deeper imaging/graphics material if your sensor or perception task needs it.
+5. Connect perception to frames, timing and control through [the robotics course reference](../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/CMU-Robotics-Courses.md).
 
-| 07-280 | 10-301 |
-|--------|--------|
-| Heuristic Search, Adversarial Search, CSPs | — |
-| ML Parallelism/GPU Basics | — |
-| Monte Carlo Tree Search | — |
-| Transformer networks, LLMs | Y |
-| Reinforcement Learning | Y |
-| ML fundamentals (decision trees -> neural nets) | Y |
-| Fulfills AI Major core | Y |
-| Prereq for 07-380 AI & ML II | Y |
+| Engineering outcome | Reading focus | Roadmap artifact |
+|---|---|---|
+| Understand a model before optimizing it | ML formulation, optimization, neural networks | Saved policy and held-out error from the CPU lab |
+| Understand perception failures | Image formation, calibration, recognition | [Vision experiments](Track%20A%20-%20Hardware%20and%20Edge%20AI/3.%20Computer%20Vision/Guide.md) with declared input geometry |
+| Explain stale predictions in a robot loop | Inference plus feedback and observation age | [Timed policy trace](0.%20AI%20and%20Robot%20Learning%20Foundations/Lab-02-Timed-Robot-Loop.md) |
+| Choose an accelerator workload | Model operators and their tensor shapes | [Inference optimization](../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md) with a reference output |
 
----
+CMU's AI or vision syllabus does not by itself establish a Jetson, Holoscan or ROS 2 installation path. Those software integrations belong to the corresponding roadmap labs and their pinned compatibility records.
 
-## 2. 15-463: Computational Photography — Deep Insight Before Computer Vision
+## 5. Szeliski book and additional resources
 
-**Recommended before 16-385 Computer Vision.** Provides foundational understanding of imaging physics, camera pipelines, and computational methods that underpin both graphics and vision.
+Richard Szeliski's [Computer Vision: Algorithms and Applications, second edition](https://szeliski.org/Book/) provides an author-hosted PDF for personal use, corrections and links to related courses. Use its image-formation, geometric-transform and recognition chapters alongside 16-385. It is a reading resource, not an autograder or a replacement for image experiments.
 
-*Source: [15-463 Fall 2018](https://graphics.cs.cmu.edu/courses/15-463/2018_fall/)*
-
-### Overview
-
-| Item | Details |
-|------|---------|
-| **Cross-listing** | 15-463 (undergrad), 15-663 (Master's), 15-862 (PhD) |
-| **Schedule** | Mon + Wed, 12:00-1:20 PM |
-| **Textbook** | [Computer Vision: Algorithms and Applications](http://szeliski.org/Book/) (Szeliski), free online |
-
-### Course Description
-
-Computational photography is the convergence of **computer graphics**, **computer vision**, and **imaging**. It overcomes traditional camera limitations by combining imaging and computation for new ways of capturing, representing, and interacting with the physical world.
-
-Topics: modern image processing pipelines (mobile/DSLR), image/video editing, 3D scanning, coded photography, lightfield imaging, time-of-flight, VR/AR displays, computational light transport. Advanced topics: cameras at light speed, non-line-of-sight imaging, seeing through tissue.
-
-### Prerequisites (one of)
-
-- 18-793 Image and Video Processing
-- **15-462 Computer Graphics**, OR
-- 16-720 Computer Vision, OR
-- **16-385 Computer Vision**
-
-Linear algebra, calculus, programming, and image computation required.
-
-### Grading
-
-| Component | Weight |
-|-----------|--------|
-| 7 Homework Assignments | 70% |
-| Final Project | 25% |
-| Class Participation | 5% |
-
-**Late policy:** 6 free late days total; each additional late day = 10% penalty; max 4 days late per assignment.
-
-### Syllabus (Fall 2018)
-
-| Topic |
-|-------|
-| Introduction |
-| Digital photography pipeline |
-| Pinholes and lenses |
-| Photographic optics and exposure |
-| High dynamic range imaging |
-| Tonemapping and bilateral filtering |
-| Color |
-| Image compositing |
-| Gradient-domain image processing |
-| Focal stacks and lightfields |
-| Deconvolution |
-| Camera models and calibration |
-| Two-view geometry |
-| Radiometry and reflectance |
-| Photometric stereo |
-| Light transport matrices |
-| Computational light transport |
-| Stereo and structured light |
-| Time-of-flight imaging |
-| Non-line-of-sight imaging |
-| Fourier optics |
-| Monte Carlo rendering 101 |
-
-### Assignments
-
-7 homework assignments with **programming (Matlab)** and **photography (DSLR)** components. Final project may use lightfield cameras, ToF cameras, depth sensors, structured light systems.
-
-### Why Before Computer Vision
-
-15-463 builds intuition for **how images are formed** (optics, radiometry, sensors) and **how to process them** (HDR, deconvolution, calibration, stereo). This physical and algorithmic foundation makes 16-385 Computer Vision (detection, recognition, geometry) much easier to grasp.
-
----
-
-## 3. Graphics & Imaging Courses
-
-| Code | Name | Notes |
-|------|------|-------|
-| **15-462** | Computer Graphics | Rendering, transforms, shading — foundation for 15-463 |
-| **15-463** | Computational Photography | Imaging physics, camera pipelines, HDR, lightfields — **deep insight before 16-385** |
-| **16-385** | Computer Vision | Image processing, detection, recognition, geometry-based vision |
-
----
-
-## 4. Self-Study Mapping to Roadmap
-
-For learners following the **AI Hardware Engineer Roadmap**, here is how CMU's AI/vision curriculum aligns:
-
-| Roadmap Phase | CMU Course(s) | Overlap |
-|---------------|---------------|---------|
-| **Phase 3: Neural Networks** | 07-280 (Neural Nets, AlexNet, PyTorch) | Graphs, training, autodiff before Phase 4 Track A/B hardware |
-| **Phase 3: Computer Vision** | **15-463** (Computational Photography) -> 16-385 (Computer Vision) | Imaging physics, camera pipelines, then detection/recognition |
-| **Phase 3: Edge AI** | 07-280 (deployment themes), Jetson-adjacent labs | On-device pipeline, latency/privacy context; pairs with Phase 4 Track B |
-| **Phase 3: Sensor Fusion** | 15-463 (imaging), 16-385 (Vision) | Multi-sensor perception before Phase 4 Jetson integration |
-| **Phase 4 Track B (Jetson)** | 07-280, 16-385, Jetson/Holoscan labs | Models on device, pipelines, latency |
-| **Phase 5: Edge Computing** | 07-280, 16-385, Jetson/Holoscan | Efficient models, streaming, Holoscan |
-| **Phase 5: AI Chip Design** | 07-280 (optimization, GPU/parallel), 16-211 (math) | Parallel compute, linear algebra for accelerators |
-
-### Suggested Self-Study Order (CMU-Inspired, AI focus)
-
-1. **15-122 equivalent** — Imperative programming (C/Python)
-2. **21-120, 21-122, 21-241** — Calculus, linear algebra
-3. **07-280 topics** — Search -> ML -> Neural Nets -> RL -> Transformers
-4. **15-462** (optional) — Computer Graphics — rendering, transforms
-5. **15-463** — **Computational Photography** — imaging physics, camera pipelines, HDR, lightfields *(deep insight before vision)*
-6. **16-385** — Computer vision
-
----
-
-## 5. Additional Resources: Szeliski Book & Related Courses
-
-### Computer Vision: Algorithms and Applications (2nd ed.)
-
-**[https://szeliski.org/Book/](https://szeliski.org/Book/)** — Richard Szeliski, University of Washington (c 2022)
-
-The canonical computer vision textbook. Free PDF download for personal use. Used by 15-463 Computational Photography and many vision courses worldwide. Covers image formation, feature detection, stereo, structure from motion, recognition, and more.
-
-### Related Courses (from [Szeliski Book](https://szeliski.org/Book/))
-
-Additional good sources for computer vision and computational photography, sorted roughly by most recent:
-
-| Course | Institution | Instructor(s) | Term |
-|--------|-------------|---------------|------|
-| [CS5670 Introduction to Computer Vision](https://www.cs.cornell.edu/courses/cs5670/2025sp/) | Cornell Tech | Noah Snavely | Spring 2025 |
-| [6.8300/6.8301 Advances in Computer Vision](https://szeliski.org/Book/) | MIT | Bill Freeman, Antonio Torralba, Phillip Isola | Spring 2023 |
-| [16-385 Computer Vision](http://www.cs.cmu.edu/~16385/) | CMU | Matthew O'Toole | Fall 2024 |
-| [16-385 Computer Vision — Lectures](https://16385.courses.cs.cmu.edu/spring2026/lectures) | CMU | — | Spring 2026 |
-| [CS194-26/294-26 Intro to Computer Vision and Computational Photography](https://szeliski.org/Book/) | Berkeley | Alyosha Efros | Fall 2024 |
-| [15-463, 15-663, 15-862 Computational Photography](https://graphics.cs.cmu.edu/courses/15-463/) | CMU | Ioannis Gkioulekas | Fall 2024 |
-| [CSCI 1430 Computer Vision](https://szeliski.org/Book/) | Brown | James Tompkin | Spring 2025 |
-| [CMPT 412 and 762 Computer Vision](https://szeliski.org/Book/) | Simon Fraser | Yasutaka Furukawa | Fall 2023 |
-| [CS 4476-A / 6476-A Computer Vision](https://szeliski.org/Book/) | Georgia Tech | James Hays | Fall 2022 |
-| [EECS 498.008 / 598.008 Deep Learning for Computer Vision](https://szeliski.org/Book/) | U Michigan | Justin Johnson | Winter 2022 — *outstanding intro to deep learning and visual recognition* |
-| [DS-GA 1008 Deep Learning](https://szeliski.org/Book/) | NYU | Yann LeCun, Alfredo Canziani | Spring 2021 |
-| [Fundamentals and Trends in Vision and Image Processing](https://szeliski.org/Book/) | IMPA | Luiz Velho | Spring 2021 |
-| [CS294-158 Deep Unsupervised Learning](https://szeliski.org/Book/) | UC Berkeley | — | Spring 2020 |
-| [CSCI 497P/597P Introduction to Computer Vision](https://szeliski.org/Book/) | Western Washington | Scott Wehrwein | Spring 2020 |
-| [EECS 504 Foundations of Computer Vision](https://szeliski.org/Book/) | U Michigan | Andrew Owens | Winter 2020 |
-
-*Course links are maintained at [szeliski.org/Book](https://szeliski.org/Book/). Contact the author to add your course.*
-
----
-
-## Links
-
-| Resource | URL |
-|----------|-----|
-| 07-280 AI & ML I | https://www.cs.cmu.edu/~07280/#schedule |
-| 16-385 Computer Vision Spring 2026 Lectures | https://16385.courses.cs.cmu.edu/spring2026/lectures |
-| 15-463 Computational Photography | https://graphics.cs.cmu.edu/courses/15-463/2018_fall/ |
-| **Szeliski: Computer Vision (2nd ed.)** | https://szeliski.org/Book/ |
-
----
-
-*Last updated: February 2025. Course offerings and requirements may change; verify with CMU official sources.*
+The author's course list includes offerings from several universities and years. Follow the actual term page before adopting its software setup or expecting lectures, assignments and solutions to be public. A book homepage is not a direct link to a particular MIT, Berkeley or Michigan course.

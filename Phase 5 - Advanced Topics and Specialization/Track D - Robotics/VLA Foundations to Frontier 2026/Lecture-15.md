@@ -43,13 +43,13 @@ Knowledge insulation studies how to train a continuous action expert while prote
 
 The π₀.₇ preprint extends the study of generalist policies through diverse context conditioning, including performance metadata and subgoal images, and reports cross-embodiment and compositional generalization experiments. It was submitted April 16, 2026 and revised April 24. Treat those as reported experiments with their own datasets and protocols, not a guarantee that arbitrary unseen robots can be controlled. A technical report also does not establish publicly downloadable weights. [π₀.₇, v2](https://arxiv.org/abs/2604.15483v2).
 
-These examples are evidence available by the course cutoff of October 13, 2026. They motivate experiments; the professional skill is identifying which mechanism explains a result and which competing explanation remains untested.
+These examples belong to the October 13, 2026 literature snapshot; see the separately dated [October 18 source update](Current-Update-2026-10-18.md) for the later review. They motivate experiments; the professional skill is identifying which mechanism explains a result and which competing explanation remains untested.
 
 ## Worked example: identical tensors, incompatible robots
 
 Suppose robot A interprets action 0.1 as a 0.1-radian joint delta; robot B interprets 0.1 as a 0.1-meter Cartesian translation. Padding both to length seven leaves the conflict intact. A shared encoder with two explicit heads can model both. A canonical Cartesian representation might work too, but only after converting A using kinematics and defining the controller period.
 
-For a transfer matrix, let \(S_{ij}\) be target \(j\)'s evaluation score after pretraining on source \(i\) and using a fixed adaptation budget. Compare \(S_{ij}\) with training the same architecture from scratch on target \(j\). Hold target demonstrations and compute budget constant. Otherwise a larger data budget can masquerade as positive transfer.
+For a transfer matrix, let \(S_{ij}\) be target \(j\)'s evaluation score after pretraining on source \(i\) and using a fixed adaptation budget. Compare \(S_{ij}\) with training the same architecture from scratch on target \(j\). Hold target demonstrations and **adaptation** compute constant for this particular comparison, and separately disclose the additional source-pretraining data and compute. That tests the value of an already pretrained representation under a fixed adaptation budget. A claim about total training efficiency instead needs a total-compute-matched baseline; those are different questions.
 
 ## Build a controlled transfer study
 

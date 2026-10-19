@@ -1,0 +1,24 @@
+{
+  "checked_at": "2026-10-18",
+  "model_revision": "46a050bec13002ad29ee795c16e61cf4fa3c4a9c",
+  "transformers_revision": "d4804f9d76b8c071b993d813e9e87067b780cbee",
+  "sources": [
+    {
+      "url": "https://huggingface.co/zai-org/GLM-5.3-Flash/resolve/46a050bec13002ad29ee795c16e61cf4fa3c4a9c/config.json",
+      "sha256": "bb8f01c42cb92a52ca72e65afb4d5bd8d11aef083cd210e8de25dfb904f23e9f",
+      "local_snapshot": "checkpoint-config.json",
+      "snapshot_note": "architectures, text_config and vision_config only; quantization configuration omitted"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/huggingface/transformers/d4804f9d76b8c071b993d813e9e87067b780cbee/src/transformers/models/glm5_next/modeling_glm5_next.py",
+      "sha256": "78e23c624010751f1578254145f313db2f3266579a0f9a396a3ff6cb5779f43d",
+      "local_snapshot": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/gittensor-ai-lab/sparkinfer-frontier/58ca63a416bcc866dbf8b8a2605643a51a5b221a/README.md",
+      "sha256": "2e3009901c21653a2372f73b71a40fe3626fa4313d35927204e172937d85a5ae",
+      "local_snapshot": null,
+      "status": "source-reported GPU deployment, not executed here"
+    }
+  ]
+}

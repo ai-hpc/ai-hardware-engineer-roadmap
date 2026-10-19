@@ -1,4 +1,4 @@
-# Jetson Audio Setup and Development - Project Guide
+# Jetson audio: samples, clocks and a working capture path
 
 <div class="course-identity auto-course" style="--course-accent: #7e22ce; --course-accent-rgb: 126, 34, 206;" markdown="1">
 <div class="course-identity__icon">JASA</div>
@@ -9,1249 +9,131 @@
 </div>
 </div>
 
+**Reviewed 18 October 2026.** Learn to describe an audio stream precisely, identify the actual device path, and validate samples before feeding a speech model. The [CPU audio lab](CPU-Audio-Lab.md) runs real NumPy/WAV processing without a microphone. Jetson/codec capture commands below are source-reviewed hardware extensions, not tests executed here.
 
-> **Goal:** Understand Jetson audio well enough to move from "USB audio works" to "I can design and debug a real audio product on Jetson Orin Nano," using NVIDIA's **ALSA + ASoC + APE/AHUB** model.
+**Prerequisites:** binary integers, basic Linux and [peripheral access](../../1.%20Peripheral%20Access/Guide.md). Allow two 60-minute sessions. **Completion artifact:** a known-format WAV, a channel map, a rate/latency calculation and an observed failure from the CPU lab or actual capture.
 
-**Hub:** [Multimedia](../Guide.md)  
-**Primary official source:** [NVIDIA Jetson Linux Developer Guide - Audio Setup and Development](https://docs.nvidia.com/jetson/archives/r38.4/DeveloperGuide/SD/Communications/AudioSetupAndDevelopment.html)  
-**Related local guides:** [Application Development](../../Guide.md) · [ESP32-LyraT I2S Microphone Capture](../ESP32-LyraT-I2S-Mic-Jetson-Orin-Nano/Guide.md) · [Orin Nano GPIO / SPI / I2C / CAN](../../../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-GPIO-SPI-I2C-CAN/Guide.md)
-
----
-
-## 1. Why this course exists
-
-The NVIDIA guide is excellent, but it is written as a **platform reference** for many Jetson boards and many audio paths.
-
-This course is narrower on purpose:
-
-- target board: **Jetson Orin Nano 8GB Developer Kit**
-- product example: **AI smart speaker / voice appliance**
-- learning goal: understand the stack well enough to build and debug audio systems
-
-So instead of treating the official page as one long wall of audio terms, this guide reorganizes it into the questions you actually ask during a project:
-
-- what does Jetson audio look like as a system?
-- which official sections matter for Orin Nano?
-- what should I use first: USB, DP audio, DMIC, or I2S?
-- what has to change in device tree and pinmux?
-- how do I debug "card exists but no sound" properly?
-
-The official NVIDIA guide remains the authoritative low-level reference. This course is the **roadmap version** of that material.
-
----
-
-## 2. The one-sentence mental model
-
-On Jetson, audio is usually:
+## 1. Audio has several different paths
 
 ```text
-app -> ALSA -> ASoC drivers -> ADMAIF/XBAR/I2S/DMIC inside AHUB -> real hardware
+USB microphone → USB audio driver → ALSA PCM → application
+I2S codec → I2S / AHUB routing / ADMAIF → ALSA PCM → application
+application → ALSA HDA device → DisplayPort sink
 ```
 
-If you remember only one thing, remember this:
+USB audio does not pass through Jetson's I2S2/AHUB route. A desktop sound server such as PipeWire may sit above ALSA and add mixing, format conversion and buffering. A working USB microphone therefore does not validate a custom I2S codec, while a broken I2S route does not imply that every audio device is broken.
 
-> Jetson audio is not just "a sound card." It is a **routing fabric** inside the SoC plus a Linux driver model that must be connected correctly before sound can flow.
+ASoC connects the CPU-side interface, codec components and board-specific machine description. A codec's control bus sets registers; the sample bus carries audio. I2C register access is not an audio stream. [Linux ASoC architecture](https://docs.kernel.org/sound/soc/overview.html).
 
-For our smart-speaker product example, the usual paths are:
+## 2. Describe samples, frames and buffers
 
-- **prototype phase**
-  - USB mic array
-  - USB speaker or DP monitor audio
-- **real product phase**
-  - I2S codec or amplifier on the 40-pin header
-  - possibly digital microphones or multichannel external front ends
+A **sample** is one channel's value at one time. A **frame** contains one sample from every channel. Four-channel S16_LE has `4 × 2 = 8` bytes per frame. At 48,000 frames/s, its memory data rate is 384,000 bytes/s.
 
----
+A **period** of 480 frames lasts 10 ms at 48 kHz. A four-period buffer has 40 ms capacity. Capacity is not automatically the current delay: occupancy, application batching, hardware FIFO and sound-server buffering matter. Record negotiated parameters and actual timestamps. [ALSA PCM model](https://www.alsa-project.org/alsa-doc/alsa-lib/pcm.html).
 
-## 3. ASoC Driver for Jetson Products
-
-This is the first big section in NVIDIA's guide, and it is the right place to start.
-
-### What NVIDIA means
-
-NVIDIA uses the standard Linux **ALSA** framework, and then adds Jetson-specific **ASoC** drivers so ALSA can control Jetson's internal audio hardware and any external codecs you attach.
-
-### What that means for you
-
-When you run:
-
-```bash
-aplay sound.wav
-```
-
-you are not talking directly to the hardware.
-
-You are going through:
-
-- ALSA user-space tools and libraries
-- ALSA kernel framework
-- ASoC drivers
-- Jetson's internal audio hardware
-- then finally to the real interface like DP, USB, I2S, or DMIC
-
-### The important subtopics from this section
-
-#### ALSA
-
-ALSA is the standard Linux audio system.
-
-You will touch it with:
-
-- `aplay`
-- `arecord`
-- `amixer`
-
-These are your first tools for discovering what exists and whether basic playback or capture works.
-
-#### DAPM
-
-**Dynamic Audio Power Management** sounds abstract, but the practical meaning is simple:
-
-- ALSA keeps a graph of the audio path
-- only the needed blocks should power on
-- if the path is incomplete, playback or capture will not really happen
-
-That is why "the sound card exists" is not enough. The route must also be valid.
-
-#### Device Tree
-
-Device tree tells Linux:
-
-- which codec exists
-- which I2C or SPI bus controls it
-- which I2S controller is connected
-- what the sound card routing and widgets look like
-
-For Jetson audio work, device tree is not optional. It is part of normal bring-up.
-
-#### ASoC driver
-
-NVIDIA follows the standard ASoC split:
-
-- **platform driver**
-- **codec driver**
-- **machine driver**
-
-That split matters because it tells you where to look when something fails.
-
-### Product-design translation
-
-If you are building an AI smart speaker, this section is basically telling you:
-
-- user-space audio tools are only the top layer
-- the route is dynamic, not hardwired
-- your codec and board description must be correct
-- "works on Linux" does not mean "works on Jetson" unless the ASoC side is also right
-
----
-
-## 4. Audio Hub Hardware Architecture
-
-This is the second big section in NVIDIA's guide, and it is where most people first think, "this is too much."
-
-The simple version is:
-
-> The **APE/AHUB** is Jetson's internal audio engine and routing matrix.
-
-### APE vs AHUB
-
-- **APE**
-  - the dedicated audio processing engine block
-  - lets Jetson do audio work without pushing everything through the CPU in the most naive way
-- **AHUB**
-  - the internal interconnect and module collection used to route and process audio streams
-
-### The AHUB blocks that matter first
-
-You do not need to memorize every module. For Orin Nano product work, start with this list:
-
-| Block | Simple meaning | Why you care |
+| Field | Example | Common error |
 |---|---|---|
-| `ADMAIF` | memory-facing audio port | this is what ALSA exposes as `hw:APE,<n>` |
-| `XBAR` | routing switch | this decides where audio goes inside the SoC |
-| `I2S` | serial audio interface | this is how you talk to many external codecs and amps |
-| `DMIC` | digital mic interface | useful if you use PDM digital microphones |
-| `DSPK` | digital speaker interface | useful for digital speaker paths |
-| `AMX` / `ADX` | combine/split streams | more relevant for TDM or advanced multichannel paths |
-| `SFC` / `ASRC` | sample-rate conversion | useful once clocks and formats stop matching cleanly |
-| `MVC` | gain/volume block | useful for internal gain control use cases |
+| Rate | 48,000 frames/s | Relabel 48 kHz samples as 16 kHz |
+| Channels/order | mic-left, mic-right, reference, unused | Average unrelated or opposite-polarity channels |
+| Container format | signed 16-bit little-endian | Parse as unsigned or wrong byte order |
+| Valid sample bits | 16 or 24 | Confuse valid bits with container or slot width |
+| Interleaving | L0,R0,L1,R1… | Treat stereo bytes as a mono time series |
+| Time | sample index + capture clock mapping | Timestamp callback completion as sample acquisition |
 
-### The picture to keep in your head
+S24_3LE packs 24 bits in three bytes; S32_LE stores four bytes per sample and can carry a signal with fewer valid bits. Interpret alignment/sign extension from the device/driver contract. A filename ending `.wav` does not prove any particular sample format. [Python WAV support](https://docs.python.org/3/library/wave.html).
 
-For a simple playback path:
-
-```text
-WAV file -> ALSA PCM -> ADMAIF1 -> XBAR -> I2S2 -> external codec -> speaker
-```
-
-For a simple capture path:
-
-```text
-mic -> codec -> I2S2 -> XBAR -> ADMAIF1 -> ALSA PCM -> recorded file
-```
-
-### Why this matters for our project
-
-If you are building a smart speaker, you eventually want:
-
-- microphones
-- playback
-- maybe beamforming or multichannel capture
-- maybe sample-rate conversion
-
-The AHUB is the reason Jetson can do those things cleanly, but it also means:
-
-- routes are configurable
-- defaults are not always what you want
-- you must deliberately connect the pieces
-
-### One important official detail
-
-NVIDIA documents that Orin has many internal instances of modules like `I2S`, `DMIC`, and `ADMAIF`, but the **carrier board does not expose all of them**.
-
-That means:
-
-- the SoC may support more than the dev kit exposes
-- board-level access matters
-- you must check the **Board Interfaces** section before planning hardware
-
----
-
-## 5. ASoC Driver Software Architecture
-
-This is where the official doc gets more concrete, and for our course this is the section that explains why `amixer` is so important.
-
-### The software model in plain English
-
-NVIDIA's ASoC design uses:
-
-- **ADMAIF as the platform driver**
-- most AHUB blocks like `I2S`, `XBAR`, `AMX`, `ADX`, `DMIC`, and `Mixer` as codec-like drivers
-- a **machine driver** to register the final sound card
-
-### The three roles
-
-#### Platform driver
-
-This owns the PCM-facing part.
-
-On Jetson, that mainly means **ADMAIF**.
-
-It is the bridge between:
-
-- memory / ALSA PCM buffers
-- and the internal audio routing fabric
-
-This is why NVIDIA maps:
-
-- `ADMAIF1` -> `hw:APE,0`
-- `ADMAIF2` -> `hw:APE,1`
-- and so on
-
-That off-by-one mapping matters a lot in real debugging.
-
-#### Codec driver
-
-On Jetson this means two slightly different things:
-
-- a real external codec, like an I2S audio codec chip
-- internal AHUB modules that behave like ASoC components
-
-These drivers define:
-
-- DAIs
-- widgets
-- routes
-- mixer controls
-
-#### Machine driver
-
-This is the binding layer that turns all the parts into one usable sound card.
-
-If you want the shortest useful definition:
-
-> The machine driver is what makes Linux treat "Jetson audio hardware + codec + routing description" as one sound card.
-
-### Why routes do not just appear by magic
-
-NVIDIA is explicit about this: **XBAR has no useful routing connections by default at boot**.
-
-That means:
-
-- the sound card can exist
-- ALSA PCM nodes can exist
-- and you can still hear nothing
-
-because the path inside AHUB is incomplete.
-
-That is why `amixer` is not a side topic. It is part of normal Jetson audio routing.
-
-### The most important example
-
-This one line means:
+## 3. Inspect the registered devices
 
 ```bash
+cat /proc/asound/cards
+aplay -l
+arecord -l
+aplay -L
+arecord -L
+```
+
+Lowercase `-l` lists hardware devices; uppercase `-L` includes named PCM configurations/plugins. Card indexes can change. Choose a stable card identifier and the actual device/direction. `hw:` requests the hardware format directly; `plughw:` may convert. A convenient converted stream can hide the actual device rate, so record which path was used.
+
+For an actual supported capture device, inspect its hardware parameters and negotiate the rate, channels and format before recording. One source-reviewed example, **only if the device supports stereo 48 kHz PCM16**, is:
+
+```bash
+read -r -p 'ALSA capture PCM (from arecord -L): ' CAPTURE_PCM
+arecord -D "$CAPTURE_PCM" --dump-hw-params -d 1 -r 48000 -c 2 -f S16_LE /tmp/probe.wav
+arecord -D "$CAPTURE_PCM" -d 5 -r 48000 -c 2 -f S16_LE capture.wav
+```
+
+An unsupported-format error is useful information; do not respond by randomly changing all three fields until a file appears. Inspect permissions and current owners if the device is busy. If using PipeWire, inspect `wpctl status` and the negotiated graph rate/quantum; ALSA defaults and sound-server defaults are not necessarily identical. [PipeWire configuration](https://docs.pipewire.org/page_man_pipewire_conf_5.html).
+
+## 4. Match the reference carrier and the installed BSP
+
+Use the [current Jetson compatibility record](../../../Compatibility.md). The checked Jetson Linux 39.2.1 audio reference separates carrier tables. For the Orin NX/Nano reference carrier it lists:
+
+| Path | Reference connector signals |
+|---|---|
+| I2S2 | FS35, SCLK12, DIN38, DOUT40; configure pinmux |
+| Audio master-clock option | Header7; verify actual direction/configuration |
+| I2S4 | M.2 Key E; not a promise that the installed radio exposes audio |
+| HDA | DisplayPort; discover its PCM device |
+
+DMIC3 on header32/16 is listed under **AGX Orin**, not the NX/Nano carrier table. Do not copy that mapping to Orin Nano based on the SoC's internal DMIC instances. [NVIDIA board interfaces](https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/SD/Communications/AudioSetupAndDevelopment.html#board-interfaces).
+
+A custom carrier needs its own schematic and pinmux/device-tree configuration. Orin Nano's reference kit has DisplayPort, not a native HDMI connector or USB-C display output; an adapter is a separate component.
+
+## 5. Configure routing and clocks as separate contracts
+
+An ASoC card can register while its route is incomplete. DAPM tracks connected audio components and powers the active path. Mixer settings, stream state and board routes all affect whether samples flow. [DAPM model](https://docs.kernel.org/sound/soc/dapm.html).
+
+For the NVIDIA APE path, ADMAIF1 corresponds to PCM device0 within the actual APE card. Inspect available controls before using these route examples:
+
+```bash
+amixer -c APE controls
+amixer -c APE cget name='ADMAIF1 Mux'
+# After selecting a configured external I2S2 capture path:
+amixer -c APE cset name='ADMAIF1 Mux' I2S2
+# For the reverse playback route:
 amixer -c APE cset name='I2S2 Mux' ADMAIF1
 ```
 
-"Take the stream coming from `ADMAIF1` and feed it into `I2S2`."
+These commands select internal routes; they do not instantiate a missing codec, provide external clocks or define a complete TDM layout. Newer NVIDIA guidance moves PCM override configuration toward DAI device-tree nodes; old JetPack 6 mixer-control scripts are not universal current recipes. [Versioned NVIDIA audio reference](https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/SD/Communications/AudioSetupAndDevelopment.html).
 
-That is the internal route.
+Designate one driver for each clock. The bit clock shifts data; the frame clock marks audio frames. For four 32-bit TDM slots at 48 kHz:
 
-Then this line:
+`BCLK = 48,000 × 4 × 32 = 6.144 MHz`.
 
-```bash
-aplay -D hw:APE,0 sound.wav
-```
+The application may still store four 16-bit values per frame. Physical wire width and memory representation are different. Codec MCLK requirements depend on that codec and its PLL; never assume MCLK=BCLK. [Linux audio clocking](https://docs.kernel.org/sound/soc/clocking.html).
 
-actually sends data into `ADMAIF1`, which now has somewhere useful to go.
+A three-microphone ADC may transmit four slots. Configure the transport's actual slots/masks, then map the active channels into the application. Asking `arecord -c 3` does not reprogram every codec and link into three-slot TDM. Validate channel identities with a known per-channel stimulus.
 
-### Product-design translation
+## 6. Debug the smallest claim first
 
-For our smart-speaker path, this means:
-
-- if playback is dead, do not only blame the codec
-- if capture is dead, do not only blame the microphones
-- first ask whether the **internal route is complete**
-
----
-
-## 6. High Definition Audio
-
-NVIDIA includes a full **High Definition Audio** section because Jetson devices support HDA-backed display audio.
-
-### What it means on Orin Nano
-
-For the Orin Nano developer kit, this mostly means:
-
-- **DisplayPort audio**
-- exposed through the `HDA` sound card
-
-This is not your smart-speaker production path, but it is a very useful sanity check.
-
-### Why it matters
-
-If you can play audio out through a DP monitor:
-
-- ALSA is alive
-- the board has basic playback working
-- your problem is probably not "Jetson audio is completely broken"
-
-### The practical Orin Nano note
-
-NVIDIA's table maps **Jetson Orin Nano DP single-stream audio** to **PCM device ID `3`** on the `HDA` card.
-
-So a typical command is:
-
-```bash
-aplay -Dhw:HDA,3 sound.wav
-```
-
-But still verify on the real board:
-
-```bash
-cat /proc/asound/cards
-ls /dev/snd/pcmC?D*
-```
-
-because card indexes can move across boots.
-
-### Tailored advice for our roadmap
-
-Use HDA / DP audio as:
-
-- a quick playback sanity test
-- a demo path for kiosk or monitor-attached products
-
-Do **not** treat it as the main path for:
-
-- custom speaker products
-- microphone arrays
-- voice devices
-
-For those, I2S or USB are usually the real routes.
-
----
-
-## 7. USB Audio
-
-This is one of the most important sections for our project, even though it is technically simpler than custom ASoC codec bring-up.
-
-### Why USB audio matters so much
-
-For an AI smart speaker or voice prototype, USB audio is usually the fastest way to unblock:
-
-- microphone capture
-- speaker playback
-- speech pipeline experiments
-- wake word
-- ASR / TTS testing
-
-### The product strategy
-
-Use USB audio first when you want to validate:
-
-- your app stack
-- audio quality expectations
-- latency
-- recording and playback scripts
-
-Then move to I2S when you want:
-
-- custom hardware
-- lower integration cost in production
-- tighter control over codec and amp design
-
-### Typical workflow
-
-Plug in the device, then inspect:
-
-```bash
-cat /proc/asound/cards
-aplay -l
-arecord -l
-```
-
-Then test:
-
-```bash
-aplay -Dhw:<cardID>,<devID> sound.wav
-arecord -Dhw:<cardID>,<devID> -r 48000 -c 2 -f S16_LE test.wav
-```
-
-### Tailored recommendation for our roadmap
-
-If your real target is a local assistant or smart speaker:
-
-1. use a **USB mic array** first
-2. prove your speech stack works
-3. then design the production audio path
-
-That order saves time.
-
----
-
-## 8. Board Interfaces
-
-This is the official section that answers: "Which audio interfaces does my board actually expose?"
-
-For our Orin Nano dev kit path, this is the important part.
-
-### Orin Nano interfaces that matter
-
-| Interface | Audio path | Pinmux needed | Card |
-|---|---|---:|---|
-| 40-pin header | `I2S2` | Yes | `APE` |
-| 40-pin header | `DMIC3` | Yes | `APE` |
-| M.2 Key E | `I2S4` | No | `APE` |
-| DisplayPort | `HDA` | No | `HDA` |
-| USB | USB audio | No | USB card created dynamically |
-
-### What this means in plain language
-
-- **40-pin header**
-  - best path for custom embedded audio hardware
-  - needs pinmux
-- **DMIC3 on the 40-pin header**
-  - interesting if you use direct digital microphones
-  - still not the usual first step for smart-speaker prototyping
-- **M.2 Key E audio**
-  - available in the platform model, but not the usual first path in this roadmap
-- **DisplayPort**
-  - easiest built-in output check
-- **USB**
-  - easiest overall bring-up path
-
-### Product decision table
-
-| If you want to... | Best first choice |
+| Failure | Next evidence |
 |---|---|
-| prove your speech app works | USB mic / USB headset |
-| prove playback basically works | DP monitor audio |
-| build a real speaker product | 40-pin I2S + external codec/amp |
-| explore direct digital mics | 40-pin DMIC path |
+| No card | Driver probe, codec bus, device tree and kernel log |
+| Card exists, all zeros | Route, mute/gain, clock presence, codec ADC configuration |
+| I2S reset/timeout | Clock source and actual BCLK/FS waveform, then driver state |
+| Repeated/pitched samples | Sample rate, word alignment, frame format and channel parsing |
+| XRUN | Buffer occupancy, missed deadlines, competing work and process scheduling |
+| Clicks at chunk boundaries | Filter/resampler state, dropped frames, gain discontinuities |
+| Gradual queue growth | Capture/playback clock mismatch and rate negotiation |
 
----
+Use a logic analyzer/oscilloscope to confirm physical clock/frame timing when available. A DMA byte counter alone cannot measure oscillator accuracy. An internal digital loopback can validate parts of the software route without proving external microphone quality or wiring.
 
-## 9. 40-pin GPIO Expansion Header
+An XRUN is an underrun/overrun, not a request to maximize all clocks automatically. Measure the cause, choose a period/buffer budget, and retest under intended load. Increasing capacity can reduce overruns while increasing sample age.
 
-This is the most important official section for real embedded audio work on Orin Nano.
+## 7. Prepare audio for AI without changing its meaning
 
-### Why this section matters
+A model expecting mono 16 kHz needs explicit channel selection/downmix and proper sample-rate conversion. Keeping every third 48 kHz sample aliases frequencies above 8kHz. Merely changing a WAV header makes one second of audio last three seconds and turns a 1kHz tone into approximately 333Hz.
 
-This is the path you use when your product is no longer just a dev-kit demo.
+The [CPU lab](CPU-Audio-Lab.md) implements a stateful, causal low-pass FIR followed by 3:1 decimation. It preserves filter history and decimation phase across irregular chunks. Resetting either on each callback produces discontinuities or timing drift.
 
-Typical reasons to use it:
+A capture timestamp needs a defined relation to the sample index and hardware/host clock. Linux exposes several audio/system timestamp concepts; a callback's receipt time also includes buffering. At 50 ppm mismatch, two nominally 48 kHz clocks diverge by 1,440 samples, or 30 ms, in 10 minutes. Clock synchronization or adaptive rate correction must be designed rather than inferred from an initially aligned recording. [ALSA timestamping](https://docs.kernel.org/sound/designs/timestamping.html).
 
-- custom codec board
-- dedicated DAC/ADC
-- external amplifier
-- product-specific playback and capture hardware
+For ASR, retain a transcript-labelled evaluation set and report word error rate by microphone, noise, language and distance. Separate capture/endpointing delay from model computation and finalization. A synthetic tone exercise verifies signal plumbing, not speech accuracy. Continue with [Voice AI](../../../../Phase%203%20-%20Artificial%20Intelligence/Track%20A%20-%20Hardware%20and%20Edge%20AI/5.%20Voice%20AI/Guide.md).
 
-### The exposed Orin Nano header audio pins
+## 8. Completion
 
-For the Orin Nano dev kit, NVIDIA documents:
+Run the CPU lab, explain the 6.144 MHz wire clock and30 ms drift calculation, and submit one deliberate wrong-format/rate/channel result. For hardware work, add negotiated PCM parameters, a measured clock/route record, a known stimulus and XRUN logs. Keep the [LyraT integration case](../ESP32-LyraT-I2S-Mic-Jetson-Orin-Nano/Guide.md) scoped to its exact firmware and BSP.
 
-#### I2S2
+**Diagnostic answer:** a correctly sized audible WAV is encouraging, but it does not prove bit-exact transport, correct channel order, zero lost samples, calibrated amplitude or clock accuracy. Each needs an independent reference or measurement.
 
-| Signal | Header pin |
-|---|---:|
-| `FS` | `35` |
-| `SCLK` | `12` |
-| `DIN` | `38` |
-| `DOUT` | `40` |
-| `AUD_MCLK` | `7` |
-
-#### DMIC3
-
-| Signal | Header pin |
-|---|---:|
-| `CLK` | `32` |
-| `DAT` | `16` |
-
-### The first rule: pinmux before debugging
-
-NVIDIA is very clear:
-
-> Audio pins must be configured as **SFIO**, not plain GPIO.
-
-If you skip this, everything downstream gets confusing:
-
-- codec probe may look fine
-- mixer controls may exist
-- and still the bus never toggles on the wires
-
-### Practical bring-up order
-
-#### 1. Choose a codec that makes sense
-
-NVIDIA's advice here is exactly right. Check that the codec:
-
-- matches your interface type
-- supports your sample rates and word sizes
-- has a Linux driver
-- has enough examples or reference setups to make routing understandable
-
-For many projects, a codec with weak Linux support is a bad engineering choice even if the analog specs look good.
-
-#### 2. Confirm the control bus
-
-For the Orin-series 40-pin header, NVIDIA documents the header-exposed I2C controller as:
-
-```text
-0x0c250000
-```
-
-That is usually where your codec control interface lives if the codec is I2C-controlled.
-
-#### 3. Confirm the I2S controller
-
-For the Orin-series 40-pin header, NVIDIA documents the header-exposed I2S controller as:
-
-```text
-0x02901100
-```
-
-The I2S node must be enabled with:
-
-```dts
-status = "okay";
-```
-
-#### 4. Use the correct DAI link
-
-For the Orin-series 40-pin header, NVIDIA documents the relevant DAI link instance as:
-
-```text
-&i2s2_dap
-```
-
-That is the link you normally override or extend in device tree for a custom codec on the 40-pin header.
-
-#### 5. Configure the sound node
-
-This is the part most people underestimate.
-
-The `sound` node must describe:
-
-- widgets
-- routes
-- codec link
-- clocking assumptions
-- I2S mode
-
-### The most common custom-card failure pattern
-
-This is the usual sequence:
-
-1. codec node exists
-2. I2S node exists
-3. card registers
-4. audio still fails
-
-Why?
-
-Because the route is incomplete, or the DAI link/clocking settings are wrong.
-
-### Clocking decision you must make
-
-NVIDIA describes two common ways to provide codec clocking:
-
-- codec has its **own oscillator**
-- codec uses **`AUD_MCLK`** from Jetson
-
-This is a board design decision, not just a software setting.
-
-### Master vs slave
-
-NVIDIA also calls out a classic bring-up trap:
-
-- codec as I2S master
-- codec as I2S slave
-
-If the codec is master, Jetson depends on external clocks arriving correctly.
-If the codec is slave, Jetson must drive the clocking.
-
-This choice shows up later when resets fail or buses look dead.
-
-### Why this matters for our smart-speaker example
-
-If you later build:
-
-- custom amplifier board
-- speaker output stage
-- local microphone frontend
-
-this section becomes the center of the whole product.
-
----
-
-## 10. HD Audio Header
-
-This is one of the official big sections, but for our roadmap it needs a very blunt note.
-
-### Official scope
-
-NVIDIA says this section applies to:
-
-- **Jetson AGX Orin**
-- **Jetson Thor**
-
-not to Jetson Orin Nano dev kit.
-
-### What that means for us
-
-For our Orin Nano course:
-
-- understand that the section exists
-- understand that it is a different board interface family
-- then mostly ignore it unless you move to AGX-class hardware
-
-### Why keep it in the course at all
-
-Because when you read the official doc, you should not be confused by seeing a major audio section that does not match your board.
-
-So the roadmap translation is:
-
-> On **Orin Nano**, the **HD Audio Header** section is background knowledge, not your main implementation path.
-
-For us, the important audio hardware paths are still:
-
-- USB
-- DP / HDA
-- 40-pin I2S / DMIC
-
----
-
-## 11. Usage and Examples
-
-This is where NVIDIA's guide becomes practical. We will keep the same spirit, but narrow it to the flows that matter first on Orin Nano.
-
-### Step 1: inspect what the board actually registered
-
-Always begin here:
-
-```bash
-cat /proc/asound/cards
-aplay -l
-arecord -l
-ls /dev/snd/pcmC?D*
-```
-
-Why:
-
-- card indexes can move
-- USB cards appear dynamically
-- `APE` and `HDA` are easier to reason about once you see the live board state
-
-### Step 2: understand the card names
-
-On Orin-family boards you usually care about:
-
-- `HDA`
-  - display audio
-- `APE`
-  - Jetson internal audio engine and AHUB paths
-- vendor/model-specific USB names
-  - whatever your USB device reports
-
-### Step 3: use the simplest playback path first
-
-#### DisplayPort playback
-
-NVIDIA maps Orin Nano DP single-stream playback to HDA device ID `3`.
-
-So the normal test is:
-
-```bash
-aplay -Dhw:HDA,3 sound.wav
-```
-
-This is a great first sanity check.
-
-#### USB playback and capture
-
-```bash
-aplay -Dhw:<cardID>,<devID> sound.wav
-arecord -Dhw:<cardID>,<devID> -r 48000 -c 2 -f S16_LE cap.wav
-```
-
-This is the right place to validate:
-
-- ASR input
-- TTS output
-- full-duplex app behavior
-
-### Step 4: move to `APE` only when you mean to use Jetson's internal routing
-
-For `APE`, remember the mapping:
-
-- `ADMAIF1` -> `hw:APE,0`
-- `ADMAIF2` -> `hw:APE,1`
-
-### The first `I2S2` examples that matter
-
-#### Playback
-
-```bash
-amixer -c APE cset name="I2S2 Mux" ADMAIF1
-aplay -D hw:APE,0 sound.wav
-```
-
-#### Capture
-
-```bash
-amixer -c APE cset name="ADMAIF1 Mux" I2S2
-arecord -D hw:APE,0 -r 48000 -c 2 -f S16_LE cap.wav
-```
-
-#### Internal loopback
-
-```bash
-amixer -c APE cset name="I2S2 Mux" "ADMAIF1"
-amixer -c APE cset name="ADMAIF1 Mux" "I2S2"
-amixer -c APE cset name="I2S2 Loopback" "on"
-aplay -D hw:APE,0 sound.wav &
-arecord -D hw:APE,0 -r 48000 -c 2 -f S16_LE loopback.wav
-```
-
-This loopback case is one of the best debug tools in the whole stack.
-
-It helps answer:
-
-- is the internal routing alive?
-- does `I2S2` power up?
-- is the problem outside the SoC rather than inside it?
-
-### Product example: 3x analog `IM73A135` microphones with `ES7210`
-
-This is the kind of example that helps the whole guide become concrete.
-
-Assume your product is:
-
-- a **Jetson Orin Nano**
-- a **3-microphone far-field capture board**
-- **analog microphones** such as the analog version of `IM73A135`
-- an external **audio ADC / codec** such as `ES7210`
-- Jetson connected to the codec through:
-  - `I2S2` for digital audio
-  - `I2C` for codec control
-
-The mental model is:
-
-```text
-analog microphone
-  -> analog voltage
-  -> ES7210 ADC
-  -> I2S/TDM digital stream
-  -> Jetson I2S2
-  -> AHUB / ADMAIF
-  -> ALSA capture device
-  -> ASR / beamforming / recording app
-```
-
-The key difference from a **digital microphone** design is simple:
-
-- a **digital mic** already outputs digital audio, often `PDM`
-- an **analog mic** outputs an analog waveform
-- so you need an **ADC stage**
-
-In this example, `ES7210` is the ADC stage.
-
-#### What each part is doing
-
-| Part | Job in the system |
-|---|---|
-| `IM73A135` analog mic | turns sound pressure into analog voltage |
-| `ES7210` | digitizes microphone signals and frames them as digital audio |
-| `I2S2` on Jetson | carries the digital audio stream into the SoC |
-| `AHUB` / `ADMAIF1` | routes that stream to ALSA |
-| your app | records, streams, beamforms, or feeds ASR |
-
-#### Why this is a useful Jetson example
-
-This example is realistic for:
-
-- AI smart speakers
-- voice appliances
-- local assistants
-- embedded meeting-room devices
-- robotics voice interfaces
-
-It also matches a common product pattern:
-
-- **analog microphone array on a custom board**
-- **external multichannel ADC**
-- **Jetson only sees digital audio**
-
-That is the right way to think about the boundary:
-
-> Jetson does not read the analog microphones directly. Jetson reads the **codec's digital output**.
-
-#### Hardware view
-
-At a system level you would usually have:
-
-- microphone bias / power for each analog mic
-- analog routing from each mic into `ES7210`
-- `MCLK`, `BCLK`, `LRCLK`, and `DOUT` or equivalent digital audio lines between `ES7210` and Jetson
-- `I2C` control lines so Jetson can configure codec registers
-- clean analog grounding and layout, because analog microphones are much more sensitive to board noise than digital interfaces
-
-If you use **3 microphones** with a **4-channel codec**, that is still normal.
-
-Typical product choices are:
-
-- leave one channel unused
-- reserve one channel for future expansion
-- use one channel for a reference input or different analog source
-
-#### Software view
-
-From Linux and ASoC's point of view, the flow is:
-
-1. the codec driver for `ES7210` is instantiated
-2. the machine driver binds Jetson `I2S2` to that codec
-3. the route inside Jetson moves data between `I2S2` and `ADMAIF`
-4. ALSA exposes a capture PCM node
-5. `arecord` or your app reads the samples
-
-So your debugging layers become:
-
-```text
-analog mic hardware
-  -> codec power and clocks
-  -> codec driver probe
-  -> I2C control path
-  -> I2S data path
-  -> AHUB route
-  -> ALSA capture
-  -> application
-```
-
-#### A device-tree shape to keep in your head
-
-The exact DTS for a real board depends on:
-
-- your carrier board
-- your pinmux
-- exact `I2S` instance
-- clock master/slave decisions
-- whether the codec is using plain `I2S` or a multichannel `TDM` mode
-- your machine driver binding
-
-So the example below is **illustrative**, not drop-in production DTS:
-
-```dts
-&i2s2 {
-    status = "okay";
-};
-
-&i2c1 {
-    es7210: audio-codec@40 {
-        compatible = "everest,es7210";
-        reg = <0x40>;
-        status = "okay";
-    };
-};
-
-sound {
-    compatible = "nvidia,tegra186-audio-graph-card";
-    status = "okay";
-
-    dais = <&i2s2_port>;
-
-    audio-routing =
-        "Mic Jack", "MIC1",
-        "Mic Jack", "MIC2",
-        "Mic Jack", "MIC3";
-};
-```
-
-What you should learn from this example is not the exact property names.
-
-What matters is the structure:
-
-- Jetson `I2S2` must exist
-- the codec must probe on `I2C`
-- the sound card must bind the CPU DAI and codec DAI
-- routing must describe how capture widgets connect
-
-#### The first capture route to try
-
-Once the codec is actually probed and the sound card exists, the first Jetson-side route to think about is:
-
-```bash
-amixer -c APE cset name="ADMAIF1 Mux" "I2S2"
-```
-
-That means:
-
-> take audio coming in from `I2S2` and send it to `ADMAIF1`, which ALSA exposes as `hw:APE,0`
-
-Then the first capture test is:
-
-```bash
-arecord -D hw:APE,0 -r 48000 -c 3 -f S16_LE test-3mic.wav
-```
-
-If your codec is outputting 4 channels instead of 3, then test the real channel count:
-
-```bash
-arecord -D hw:APE,0 -r 48000 -c 4 -f S16_LE test-4ch.wav
-```
-
-That detail matters because the codec format and the capture command must agree.
-
-#### A practical bring-up sequence
-
-For this exact analog-mic design, the lowest-risk bring-up order is:
-
-1. verify the codec probes on `I2C`
-2. verify the sound card appears
-3. verify `I2S2` route into `ADMAIF1`
-4. record raw multichannel audio
-5. confirm each microphone channel is alive
-6. only then add beamforming, VAD, wake-word, or ASR
-
-That order is important.
-
-Do **not** start with far-field DSP claims like:
-
-- echo cancellation
-- beamforming
-- speaker tracking
-- wake-word tuning
-
-until you have already proven:
-
-- clocks are correct
-- channels are not swapped
-- sample rate is correct
-- gain is reasonable
-- the raw recording is clean
-
-#### What usually breaks first
-
-For this kind of design, the most common early failures are:
-
-- codec never probes on `I2C`
-- wrong pinmux for `I2S2`
-- wrong clock direction or frame format
-- wrong channel count
-- wrong ALSA route
-- analog front-end noise from layout or power
-- gain staging problems that make recordings seem "dead" even when the path is alive
-
-That is why the right debug question is not only:
-
-> "Does `arecord` run?"
-
-but also:
-
-> "Do I have clean, correctly ordered, correctly clocked channels?"
-
-#### How to explain this to yourself simply
-
-Use this one-line summary:
-
-> Analog microphones need a codec or ADC to become digital audio. Jetson then treats that codec like any other external audio front end connected over `I2S`.
-
-That is the core idea.
-
-If you keep that model in your head, the guide's ASoC, AHUB, routing, and device-tree pieces stop feeling random.
-
-### Which official examples should you postpone
-
-The NVIDIA guide also shows:
-
-- hostless AHUB routing
-- TDM capture
-- AMX / ADX
-- SFC / ASRC
-- MVC
-
-These are important, but not first-bring-up topics for our smart-speaker path.
-
-Use them later when:
-
-- stereo is stable
-- clocks are stable
-- codec routing is proven
-- you truly need multichannel or rate conversion
-
-### Smart-speaker tailored workflow
-
-If your real goal is an AI speaker product, the cleanest order is:
-
-1. DP or USB playback sanity check
-2. USB mic array capture
-3. full speech app validation
-4. custom I2S output board
-5. custom capture board or multichannel front end
-
-That is the lowest-risk path.
-
----
-
-## 12. Troubleshooting
-
-This section should be used like a decision tree, not as a bag of random commands.
-
-### Problem A: no sound cards found
-
-Start with:
-
-```bash
-cat /proc/asound/cards
-dmesg | grep "ASoC"
-```
-
-#### If you see missing source or sink widgets
-
-NVIDIA's guide points to the usual causes:
-
-- codec driver not enabled in kernel
-- codec never instantiated
-- wrong I2C pinmux or wrong I2C bus
-- bad `sound-name-prefix` / DAI prefix mismatch
-
-The most useful check is:
-
-```bash
-cat /sys/kernel/debug/asoc/components
-```
-
-If your codec is not there, stop debugging mixer settings. The codec is not alive yet.
-
-#### If you see "CPU DAI not registered"
-
-This usually means the I2S/DAI side was not instantiated correctly.
-
-Again, the correct reaction is:
-
-- inspect the live device tree
-- inspect the component list
-- verify the `i2s@...` node and link instance
-
-Not:
-
-- keep trying different `aplay` commands
-
-### Problem B: sound card exists, but sound is not audible or not recorded
-
-This is one of the most common states on Jetson.
-
-Follow this order.
-
-#### 1. Check whether the DAPM path completes
-
-Enable tracing:
-
-```bash
-for i in `find /sys/kernel/debug/tracing/events -name "enable" | grep snd_soc_`; do
-  echo 1 | sudo tee "$i" >/dev/null
-done
-
-sudo cat /sys/kernel/debug/tracing/trace_pipe | grep '\*'
-```
-
-What you want:
-
-- a complete route from source to sink
-- widgets turning on when playback or capture starts
-
-If the path is incomplete, no amount of optimism will make the audio work.
-
-#### 2. Verify pinmux
-
-If you are using the 40-pin header:
-
-- pins must be SFIO
-- not plain GPIO
-
-If pinmux is wrong, the software may look fine while the wires stay dead.
-
-#### 3. Verify the DT status
-
-Check that the relevant interface is enabled:
-
-```bash
-dtc -I fs -O dts /proc/device-tree >/tmp/dt.log
-```
-
-Then inspect the real flashed tree, not only your source files.
-
-#### 4. Probe the signals
-
-If you are on I2S:
-
-- check `FS`
-- check `BCLK`
-- check whether they are actually present when the stream starts
-
-At this point, a scope or logic analyzer is better than more guessing.
-
-### Problem C: I2S software reset failed
-
-NVIDIA documents this as a classic sign that the interface clock is not really active.
-
-This usually happens when:
-
-- the codec is supposed to provide bit clock
-- but that external clock never arrives
-
-So the real question is not "why did reset fail?"
-It is:
-
-> Who is supposed to be the clock master, and is that clock actually there?
-
-### Problem D: XRUN during playback or capture
-
-An XRUN means the producer and consumer of the audio buffer are not keeping up.
-
-On Jetson, NVIDIA suggests checking system performance first.
-
-Practical actions:
-
-- run max clocks mode
-- avoid slow filesystem paths during testing
-- use RAM-backed capture/playback files if needed
-- increase buffer size only after confirming the issue is really latency-related
-
-For first audio debugging, XRUNs often mean:
-
-- too much system load
-- bad storage path
-- timing assumptions that are too aggressive
-
-### Problem E: pops and clicks
-
-NVIDIA points out that this usually means audio data starts moving before the codec has cleanly powered up or down.
-
-The official debug knob is:
-
-```bash
-echo 10 | sudo tee /sys/kernel/debug/asoc/APE/dapm_pop_time
-```
-
-This delays the transition to reduce startup/shutdown artifacts.
-
-### The best troubleshooting mindset
-
-Do not debug Jetson audio in this order:
-
-1. random mixer command
-2. random mixer command
-3. another random mixer command
-
-Debug in this order:
-
-1. card registration
-2. codec instantiation
-3. DAI / interface enablement
-4. DAPM route completion
-5. signal presence on real pins
-6. performance or clock-quality issues
-
-That order is how you stay sane.
-
----
-
-## 13. What matters most for our project
-
-If your real target is an **AI smart speaker** or **voice appliance**, here is the condensed course outcome.
-
-### What to use first
-
-- **USB mic array**
-  - easiest speech prototype path
-- **USB speaker or DP audio**
-  - easiest playback sanity path
-
-### What to use later
-
-- **40-pin I2S2**
-  - production-minded playback path
-- **40-pin DMIC3**
-  - possible direct digital mic experiments
-- **advanced AHUB blocks**
-  - later once the basic path is proven
-
-### What to ignore for now
-
-- **HD Audio Header**
-  - not an Orin Nano path
-- **advanced AMX / ADX / hostless examples**
-  - useful later, not first week material
-
-### The "finished" understanding
-
-You are in good shape when you can explain:
-
-- why `APE`, `HDA`, and USB are different
-- why Jetson audio needs routing, not just a device node
-- why the 40-pin header path needs pinmux and DT work
-- why `ADMAIF1` maps to `hw:APE,0`
-- why DAPM is often the difference between "card exists" and "audio works"
-- why USB is the right first step for voice prototyping, but not always the right production interface
-
-That is the point where you are doing real Jetson audio engineering, not just command-line poking.
-
----
-
-## 14. References
-
-- [NVIDIA Jetson Linux Developer Guide - Audio Setup and Development](https://docs.nvidia.com/jetson/archives/r38.4/DeveloperGuide/SD/Communications/AudioSetupAndDevelopment.html)
-- [ALSA Project](https://www.alsa-project.org/)
-- [ASoC DAPM documentation](https://www.kernel.org/doc/html/latest/sound/soc/dapm.html)
-- [Jetson Expansion Header configuration](https://docs.nvidia.com/jetson/archives/r38.4/DeveloperGuide/HR/ConfiguringTheJetsonExpansionHeaders.html)
-
-
-## Integration lab: Does an audio buffer represent the time the model thinks it does?
-
-Play a known tone or click sequence and capture it through the chosen ALSA path. Verify channels, sample format, sample rate, period size, and timestamps before adding resampling or inference.
-
-**Acceptance evidence:** Compare duration/frequency against the reference and count XRUNs under load. Pass a WAV plus preprocessing contract; an intelligible recording alone does not validate timing.
-
-**Continue:** take this artifact to [5. ML and AI](../../5.%20ML%20and%20AI/Guide.md). Explain which assumption from this course the next engineer must preserve.
+The [source review record](labs/source-evidence-2026-10-18.json) retains checked URLs, download hashes and the pinned LyraT board source. These checks validate source provenance; hardware stages remain unexecuted.

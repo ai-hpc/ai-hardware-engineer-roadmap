@@ -12,7 +12,7 @@ Specify input-length distribution, output-length distribution, arrival rate/burs
 
 TensorRT-LLM, vLLM, and other engines change quickly. For each candidate save a release/commit or container digest, exact model revision, quantization format, GPU architecture, backend, and documented feature support. Confirm the actual kernel path and numerical results with a small run before a load test. A claim that one engine is universally fastest is not a selection method.
 
-Use the maintained [TensorRT-LLM quantization matrix](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/features/quantization.md) and the selected release's configuration documentation. CUDA Graphs, prefix caching, and chunked prefill are workload-dependent options; vLLM's [graph design](https://docs.vllm.ai/en/v0.18.2/design/cuda_graphs/) describes supported modes. Record the mode actually used.
+Use the maintained [TensorRT-LLM quantization matrix](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/features/quantization.md) and the selected release's configuration documentation. CUDA Graphs, prefix caching, and chunked prefill are workload-dependent options; the pinned vLLM 0.32.0 [graph design](https://github.com/vllm-project/vllm/blob/5df63a7203cdb9328d824a27b682e77c7b9928be/docs/design/cuda_graphs.md) describes supported modes. Record the mode actually used.
 
 ## Admission control prevents queueing from hiding overload
 
@@ -50,3 +50,23 @@ Run these experiments on an isolated service with saved test inputs:
 Cloud chat goodput and a local robot control deadline are different objectives. For a VLA deployment, replace token-only metrics with observation-to-action age, valid action rate, action horizon, stale-action rejection, task success, and energy per completed task. A network outage must not leave old policy outputs looking current. Keep the deterministic controller and its deadline policy visible in the [physical-AI SoC design](../../../../Track%20F%20-%20AI%20Chip%20Design/Guide.md).
 
 **Final artifact:** one deployment dossier connecting hardware inventory → checkpoint format → memory budget → runtime/kernel path → placement → quality/load/recovery results. It should let another learner reproduce the decision and see its limits.
+
+
+## Worked goodput calculation and answer
+
+A synthetic 10-second run offers 100 requests. Ten are rejected, five time out,
+and 85 complete; 70 of those completions satisfy every declared latency/quality
+gate. Completion rate is 8.5 requests/s, successful SLO-compliant goodput is
+**7 requests/s**, and the compliant fraction of offered requests is **70%**.
+Reporting only the 85 completed requests would hide overload. Token goodput needs
+a stated weighting rule because long responses otherwise dominate the metric.
+
+For robot actions, count timely valid actions with the correct observation and
+request identity. A fast response to a stale observation does not count as a
+success. Keep the response deadline independent of whether a low-level kernel
+passes its microbenchmark.
+
+**Independent transfer:** repeat the calculation if two compliant responses are
+duplicates of requests already counted. For a request-level objective, unique
+compliant completions fall to 68 and goodput to **6.8 requests/s**. Define the
+request ID/retry contract before instrumenting the service.

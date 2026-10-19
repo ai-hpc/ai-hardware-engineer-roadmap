@@ -29,6 +29,12 @@ This is the course that makes you dangerous in a real ML role. Most engineers ca
 
 ---
 
+## A first pass you can finish
+
+Read Lectures 01–04 alongside the [CPU robot-stop training lab](../../../2.%20Deep%20Learning%20Frameworks/PyTorch/CPU-Robot-Stop-Lab/Guide.md). Run the fixed experiment, inspect one error by hand, then read Lecture 06 and apply its sensor-bias variation. Continue to tuning and compression only after you can explain why the held-out examples did not select the model. Save an experiment report as the artifact that later lectures improve.
+
+**Self-check:** may normalization use all rows before splitting? Can a failed shift test prove the distributions identical? Can pruning half the weights guarantee twice the speed? **Answers:** no; fit preprocessing on training only; a test can lack power; speed depends on representation, kernels, and the measured workload. These are distinct failure modes, not reasons to abandon measurement.
+
 ## Why this course is structured the way it is
 
 A research course optimizes for the model. A *practical* course optimizes for the moment the model meets reality — and reality attacks in a fixed order:
@@ -75,7 +81,7 @@ By the end you should be able to:
 
 * Stand up a **data pipeline** from acquisition through cleaning, transformation, and feature engineering, and name the failure mode each stage guards against.
 * Pick an **evaluation metric and validation scheme** that match the problem (imbalanced classes, time-ordered data, small data) instead of defaulting to accuracy + a random split.
-* **Detect and correct distribution shift** — distinguish covariate shift from label shift, run a two-sample test to know it's happening, and apply importance weighting to fix it.
+* **Investigate distribution shift** — distinguish covariate/label-shift assumptions, interpret two-sample evidence, and test whether importance weighting helps when support and conditional-distribution assumptions hold.
 * Run **hyperparameter search and deep-network tuning** deliberately, and explain why NAS faded while transfer learning won.
 * **Compress a model** with pruning, quantization, and distillation to hit a target latency/memory/energy budget, and report the accuracy tradeoff with numbers — the skill that connects this course to the rest of the roadmap.
 * Reason about **fairness criteria** (and why you can't satisfy all of them at once) and produce a basic **explanation** of a model's prediction.
@@ -98,7 +104,7 @@ You are done with this course when you can take **one dataset and one model end 
 
 * Acquire it, clean it, engineer features, and justify each transformation.
 * Validate it with a scheme that survives scrutiny — and state the metric *before* you look at the score.
-* Probe it for distribution shift and show whether train and production are the same distribution.
+* Probe it for distribution shift, report test power/limitations, and compare actual task performance on the shifted sample.
 * Tune it, then **compress it to a deployment budget** and report tokens/s (or latency) and accuracy at each rung.
 * Say one honest sentence about its fairness and one about why it made a given prediction.
 

@@ -1,0 +1,38 @@
+{
+  "checked_utc": "2026-10-18T22:23:38.842012+00:00",
+  "sources": [
+    {
+      "url": "https://gofastmcp.com/getting-started/upgrading/from-fastmcp-2",
+      "resolved_url": "https://gofastmcp.com/getting-started/upgrading/from-fastmcp-2",
+      "status": 200,
+      "bytes": 957727,
+      "sha256": "73cf4dc638bede17cd6d2d435b4b8d0e4cdc6a30c45ea3a3922dd031af61618f"
+    },
+    {
+      "url": "https://gofastmcp.com/getting-started/upgrading/from-fastmcp-3",
+      "resolved_url": "https://gofastmcp.com/getting-started/upgrading/from-fastmcp-3",
+      "status": 200,
+      "bytes": 820154,
+      "sha256": "7c2de60ad99e34d8364e9967569c517ca1e00908c657f95f60a8c0f68e2573c8"
+    },
+    {
+      "url": "https://py.sdk.modelcontextprotocol.io/get-started/",
+      "resolved_url": "https://py.sdk.modelcontextprotocol.io/get-started/",
+      "status": 200,
+      "bytes": 50889,
+      "sha256": "fae6be34c513d2e0d26cfeda68404086aac42d660ac418d65c78e76c90fd8409"
+    },
+    {
+      "url": "https://py.sdk.modelcontextprotocol.io/migration/",
+      "resolved_url": "https://py.sdk.modelcontextprotocol.io/migration/",
+      "status": 200,
+      "bytes": 483554,
+      "sha256": "8e86d26707705d9787d6f3cc71ba4095c1d18f3dc658b63c564e7eac8924544d"
+    }
+  ],
+  "repository_revision": {
+    "repo": "modelcontextprotocol/python-sdk",
+    "revision": "2af9e3089ac66b35c1550c500aae86a82efb1e17",
+    "date": "2026-10-17T13:54:35Z"
+  }
+}

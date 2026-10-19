@@ -1,0 +1,2 @@
+# Install a CPU PyTorch wheel first, as described in Lecture-01.md.
+sionna==2.2.0

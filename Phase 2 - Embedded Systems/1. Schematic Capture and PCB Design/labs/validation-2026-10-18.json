@@ -1,0 +1,26 @@
+{
+  "checked_utc": "2026-10-18T22:28:40.759424+00:00",
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "command": [
+    "/usr/bin/python3",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "Phase 2 - Embedded Systems/1. Schematic Capture and PCB Design/labs",
+    "-v"
+  ],
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "test_bad_units_or_integration_settings_rejected (test_circuit_budget.CircuitTests.test_bad_units_or_integration_settings_rejected) ... ok\ntest_independent_tolerance_corners_enclosed (test_circuit_budget.CircuitTests.test_independent_tolerance_corners_enclosed) ... ok\ntest_leakage_can_prevent_threshold_crossing (test_circuit_budget.CircuitTests.test_leakage_can_prevent_threshold_crossing) ... ok\ntest_nominal_math_and_parallel_loading (test_circuit_budget.CircuitTests.test_nominal_math_and_parallel_loading) ... ok\ntest_nominal_success_does_not_cover_tolerance (test_circuit_budget.CircuitTests.test_nominal_success_does_not_cover_tolerance) ... ok\ntest_numerical_waveform_converges_to_analytic (test_circuit_budget.CircuitTests.test_numerical_waveform_converges_to_analytic) ... ok\ntest_probe_loading_changes_rise_but_not_sink (test_circuit_budget.CircuitTests.test_probe_loading_changes_rise_but_not_sink) ... ok\n\n----------------------------------------------------------------------\nRan 7 tests in 0.005s\n\nOK\n",
+  "file_sha256": {
+    "test_circuit_budget.py": "b630f1032b4e21a47f0b7619cd8487b78f808ca326d28cd47509e0029ab0412e",
+    "circuit_budget.py": "61010d2da504607bdfce29d149172628a69e35b151a1b03a3f573a21bf0fb10c"
+  },
+  "not_executed": [
+    "physical board measurements",
+    "EDA or SPICE execution",
+    "actual audio/model/network/robot operation",
+    "real-time latency measurement"
+  ]
+}

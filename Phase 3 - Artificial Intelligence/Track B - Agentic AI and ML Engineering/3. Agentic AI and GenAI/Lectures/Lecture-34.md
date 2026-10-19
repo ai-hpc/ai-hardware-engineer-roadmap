@@ -155,7 +155,9 @@ not every message sender or device should be **trusted automatically**.
 
 In plain English:
 
-> pairing is the explicit approval step that turns an unknown actor into an allowed actor
+> pairing grants a particular identity/device a defined access scope
+
+A paired DM sender is not automatically a Gateway administrator; an approved node is not authorized for every command. Enforce the effective role, scopes and tool/action permissions after authentication. Default behavior is channel-specific, and one trusted Gateway is not an adversarial multi-tenant security boundary. See the [pinned access-control source](https://github.com/openclaw/openclaw/blob/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/gateway/security/access-control.md).
 
 That is a very useful general pattern for agent products.
 

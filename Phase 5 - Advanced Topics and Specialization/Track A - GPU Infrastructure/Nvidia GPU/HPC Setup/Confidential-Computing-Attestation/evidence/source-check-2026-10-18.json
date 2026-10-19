@@ -1,0 +1,148 @@
+{
+  "checked_utc": "2026-10-18T23:10:28.242409+00:00",
+  "sources": [
+    {
+      "url": "https://cc-enabling.trustedservices.intel.com/intel-tdx-enabling-guide/",
+      "final_url": "https://cc-enabling.trustedservices.intel.com/intel-tdx-enabling-guide/01/introduction/",
+      "status": 200,
+      "bytes": 49007,
+      "sha256": "b5a49d3b879b296ab5c66a2fda39a3507d28bead2208e4a91f5291e0d249496d",
+      "complete": true
+    },
+    {
+      "url": "https://cc-enabling.trustedservices.intel.com/intel-tdx-enabling-guide/07/trust_domain_at_runtime/",
+      "final_url": "https://cc-enabling.trustedservices.intel.com/intel-tdx-enabling-guide/07/trust_domain_at_runtime/",
+      "status": 200,
+      "bytes": 90262,
+      "sha256": "9329ccbdf42ee2f075eb4914783f185fb127d8b8f1024c8a5d51ce862cff4619",
+      "complete": true
+    },
+    {
+      "url": "https://cdrdv2.intel.com/v1/dl/getContent/733575",
+      "final_url": "https://cdrdv2-public.intel.com/867568/intel-tdx-module-base-spec-348549008.pdf",
+      "status": 200,
+      "bytes": 3925541,
+      "sha256": "279c15f4ab861fa15d14e45fdaa8b149250f9ec67707913eed1c829f1ba28030",
+      "complete": true
+    },
+    {
+      "url": "https://cryptography.io/en/46.0.5/hazmat/primitives/asymmetric/ed25519/",
+      "final_url": "https://cryptography.io/en/46.0.5/hazmat/primitives/asymmetric/ed25519/",
+      "status": 200,
+      "bytes": 44471,
+      "sha256": "b4c04ed9205dfa22231e63cdbebf750b1bfdd0f633cc5543bcb14fc43c5c4e6b",
+      "complete": true
+    },
+    {
+      "url": "https://docs.nvidia.com/attestation/attestation-client-tools-sdk/latest/migration_guide.html",
+      "final_url": "https://docs.nvidia.com/attestation/attestation-client-tools-sdk/latest/migration_guide.html",
+      "status": 200,
+      "bytes": 63220,
+      "sha256": "3fa3e7ed0117881678243caf488472d00d060651b2de4fcce8e5f98299288a42",
+      "complete": true
+    },
+    {
+      "url": "https://docs.nvidia.com/attestation/cloud-services/latest/nras/nras_introduction.html",
+      "final_url": "https://docs.nvidia.com/attestation/cloud-services/latest/nras/nras_introduction.html",
+      "status": 200,
+      "bytes": 19032,
+      "sha256": "7cc27b4d9c8a9526cc731634e8eed5e66794225c02f5de3592a197e4b790f52e",
+      "complete": true
+    },
+    {
+      "url": "https://docs.nvidia.com/attestation/nv-attestation-sdk-cpp/2.0.0/api/group__attestation__result__verification.html",
+      "final_url": "https://docs.nvidia.com/attestation/nv-attestation-sdk-cpp/2.0.0/api/group__attestation__result__verification.html",
+      "status": 200,
+      "bytes": 39494,
+      "sha256": "7a7669c091bc4e8045cc282ab06510e44aa69c22aa15121e18c3867bbdbb7f44",
+      "complete": true
+    },
+    {
+      "url": "https://docs.nvidia.com/attestation/nv-attestation-sdk-cpp/2.0.0/sdk-cli/command-reference.html",
+      "final_url": "https://docs.nvidia.com/attestation/nv-attestation-sdk-cpp/2.0.0/sdk-cli/command-reference.html",
+      "status": 200,
+      "bytes": 65110,
+      "sha256": "50bffd7c47aa610cff7b25e9b50973b17e8858bafaaad344830ce206eac336fe",
+      "complete": true
+    },
+    {
+      "url": "https://docs.nvidia.com/confidential-computing/",
+      "final_url": "https://docs.nvidia.com/nvtrust/index.html",
+      "status": 200,
+      "bytes": 147692,
+      "sha256": "1a806ac35d59eb4f29468aac3f921cc6637ca9265ed064389674f78c976686aa",
+      "complete": true
+    },
+    {
+      "url": "https://docs.nvidia.com/datacenter/cloud-native/confidential-containers/latest/overview.html",
+      "final_url": "https://docs.nvidia.com/datacenter/cloud-native/confidential-containers/latest/overview.html",
+      "status": 200,
+      "bytes": 47338,
+      "sha256": "dc587adeaad7609aaf51f69057af6beacbf71dffb762958550ee313b0ab18ca2",
+      "complete": true
+    },
+    {
+      "url": "https://docs.nvidia.com/nvidia-secure-ai-with-blackwell-and-hopper-gpus-whitepaper.pdf",
+      "final_url": "https://docs.nvidia.com/nvidia-secure-ai-with-blackwell-and-hopper-gpus-whitepaper.pdf",
+      "status": 200,
+      "bytes": 1609788,
+      "sha256": "71b58cf8c9e0d89724845f1889126a91b2764c96460806499c3e3df53d2a81d2",
+      "complete": true
+    },
+    {
+      "url": "https://download.01.org/intel-sgx/latest/dcap-latest/linux/docs/Intel_TDX_DCAP_Quoting_Library_API.pdf",
+      "final_url": "https://download.01.org/intel-sgx/latest/dcap-latest/linux/docs/Intel_TDX_DCAP_Quoting_Library_API.pdf",
+      "status": 200,
+      "bytes": 1706344,
+      "sha256": "01c7e01d4f424df58cab6c07d15a02a98726873a81985f5cad6243636f9c024b",
+      "complete": true
+    },
+    {
+      "url": "https://github.com/NVIDIA/attestation-sdk/releases/tag/2026.10.02",
+      "final_url": "https://github.com/NVIDIA/attestation-sdk/releases/tag/2026.10.02",
+      "status": 200,
+      "bytes": 203242,
+      "sha256": "77089eb5e26718bd8348fb4f482ca4226f67abd6e110d820cd35a8ca262adb40",
+      "complete": true
+    },
+    {
+      "url": "https://github.com/intel/confidential-computing.tee.dcap/blob/7ed37274294c5dc47bda4cec601bb727be2875e0/QuoteVerification/dcap_quoteverify/inc/sgx_dcap_quoteverify.h",
+      "final_url": "https://github.com/intel/confidential-computing.tee.dcap/blob/7ed37274294c5dc47bda4cec601bb727be2875e0/QuoteVerification/dcap_quoteverify/inc/sgx_dcap_quoteverify.h",
+      "status": 200,
+      "bytes": 419139,
+      "sha256": "319b418192b6e44c8759a20372dabe58a511499858e071df5c0ee210ded4e0de",
+      "complete": true
+    },
+    {
+      "url": "https://portal.trustauthority.intel.com/eat_profile.html",
+      "final_url": "https://portal.trustauthority.intel.com/eat_profile.html",
+      "status": 200,
+      "bytes": 34668,
+      "sha256": "a919896995658fe755cdee67e40f6878d1f4a9df0b2b1b2902e5ea930158a209",
+      "complete": true
+    },
+    {
+      "url": "https://www.intel.com/content/www/us/en/developer/articles/community/runtime-integrity-measure-and-attest-trust-domain.html",
+      "error": "HTTP Error 403: Forbidden",
+      "browser_tool_content": "Successfully opened and inspected on 2026-10-18; direct HTTP access restricted."
+    },
+    {
+      "url": "https://www.intel.com/content/www/us/en/developer/tools/trust-domain-extensions/documentation.html",
+      "error": "HTTP Error 403: Forbidden",
+      "browser_tool_content": "Successfully opened and inspected on 2026-10-18; direct HTTP access restricted."
+    },
+    {
+      "url": "https://www.intel.com/content/www/us/en/download/738875/intel-trust-domain-extension-intel-tdx-module.html",
+      "error": "HTTP Error 403: Forbidden",
+      "browser_tool_content": "Successfully opened and inspected on 2026-10-18; direct HTTP access restricted."
+    },
+    {
+      "url": "https://www.rfc-editor.org/rfc/rfc9334",
+      "final_url": "https://www.rfc-editor.org/info/rfc9334/",
+      "status": 200,
+      "bytes": 1015311,
+      "sha256": "c9a906aa9685d730ce40ea1cfd1b8acf999e3a835232fd9a3119961a19087eca",
+      "complete": true
+    }
+  ]
+}

@@ -4,7 +4,7 @@
 
 Lecture 01 used the Core Experimental API to drop cubes, and Lecture 02 used its backends to read poses. This lecture covers the API itself. It is the base API for Isaac Sim 6.x. The classic `isaacsim.core.api` (`World`, `SimulationContext`, `DynamicCuboid`, `SingleArticulation`) is deprecated, and most code you will find online still uses it.
 
-The experimental API is shaped around one hardware fact: **a Python call has a fixed cost, and that cost is roughly the same whether the call moves one number or ten thousand.** So every wrapper is batched, takes regex paths, broadcasts its inputs, and returns Warp arrays on the simulation device. Used that way, Python overhead stays flat as the scene grows. Used like the classic API (one object per prim, `.numpy()` on everything), it is just as slow as before. This lecture teaches the design, the lifecycle (`SimulationManager`, `RenderingManager`, callbacks), articulation control, and Warp ↔ PyTorch interop, ports a classic script line by line, and then measures per-call overhead and copy cost on your card.
+Batched calls amortize interpreter and dispatch overhead across many objects. The operation still performs work that scales with array size, selected prims, copies, and backend behavior; batching does not make runtime constant. The wrappers accept path patterns and batched inputs, and return Warp arrays. A per-prim loop or repeated `.numpy()` readback can lose much of the benefit. This lecture teaches the design, the lifecycle (`SimulationManager`, `RenderingManager`, callbacks), articulation control, and Warp ↔ PyTorch interop, ports a classic script line by line, and then measures per-call overhead and copy cost on your card.
 
 By the end you should be able to:
 
@@ -40,7 +40,7 @@ A training or control loop does the same few things every step: read state, comp
 4. **`indices=` selects prims, `dof_indices=` selects joints.** Both are optional, both accept arrays, and both avoid Python loops.
 5. **Warp outputs on the simulation device.** Getters return `wp.array`s on the device the physics runs on (the wrapper picks it up from `SimulationManager` when it is created and again when physics starts). Convert explicitly when you need torch or NumPy (§5).
 6. **Selectable backends.** `use_backend("tensor" | "usd" | "usdrt" | "fabric")` (Lecture 02). Each method documents the backends it supports, and the first one listed is the default.
-7. **Engine-agnostic.** The same wrappers sit on PhysX or Newton tensors, so code written against them survives an engine switch (Lecture 05).
+7. **Shared interface across supported engines.** Wrappers can dispatch to PhysX or Newton tensors, but supported properties, ordering, contact behavior, and view lifetime can differ. An engine switch requires the contract checks in Lecture 05.
 
 Shapes you will see constantly:
 

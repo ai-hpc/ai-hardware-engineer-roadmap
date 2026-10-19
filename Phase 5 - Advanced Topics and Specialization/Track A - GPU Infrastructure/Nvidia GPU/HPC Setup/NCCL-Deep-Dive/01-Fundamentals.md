@@ -16,7 +16,9 @@ NCCL is a **library of collective communication primitives** optimized specifica
 └───────────────────┴────────────────┘
 ```
 
-NCCL automatically detects the GPU topology and picks the **optimal communication path** (NVLink vs PCIe vs InfiniBand) without you having to specify it.
+NCCL detects eligible topology and transport paths and applies its selection heuristics. Verify the detected path and performance; automatic selection is not a proof of global optimality. cuDNN is a compute library, not a required communication layer; UCX/libfabric depend on the selected network plugin.
+
+Start with the [executed CPU collectives lab](CPU-Collectives-Lab/Guide.md) to learn the semantics before requiring GPUs. Source review: 2026-10-18.
 
 ## 2. The Five Core Collective Operations
 
@@ -38,7 +40,7 @@ After AllReduce (sum):
   GPU3: [18, 12, 16, 20]
 ```
 
-In distributed training: each GPU computes local gradients → AllReduce averages them → all GPUs take the same optimizer step → model stays synchronized.
+In distributed training: each GPU computes local gradients → SUM AllReduce combines them and the framework averages them → all GPUs take the same optimizer step → model stays synchronized.
 
 ```python
 import torch.distributed as dist
@@ -51,12 +53,13 @@ local_grad = compute_gradient(...)   # shape [hidden, hidden]
 dist.all_reduce(local_grad, op=dist.ReduceOp.SUM)
 local_grad /= dist.get_world_size()
 
-# Now all GPUs have the same averaged gradient
-optimizer.step()
+# This is a conceptual gradient tensor example. An optimizer only updates
+# registered parameters whose .grad fields contain the intended gradients.
+# Do not add this manual reduction on top of default DDP reduction.
 ```
 
 **When it's called:** After every backward pass in DDP training.
-**Data moved:** Full gradient tensor, twice (reduce then broadcast).
+**Data moved:** depends on the algorithm. An ideal N-rank ring sends `2(N−1)/N` times the gradient payload per rank. DDP can overlap bucket reductions with backward.
 
 ---
 
@@ -95,8 +98,8 @@ Before:
 
 After Reduce to GPU0 (sum):
   GPU0: [9, 12]   ← result
-  GPU1: [3,  4]   ← unchanged
-  GPU2: [5,  6]   ← unchanged
+  GPU1: unspecified after Reduce; do not consume as a result
+  GPU2: unspecified after Reduce; do not consume as a result
 ```
 
 ```python
@@ -138,7 +141,7 @@ dist.all_gather(full_embedding, local_shard)
 
 ### ReduceScatter — Reduce then Distribute (ZeRO's Core Op)
 
-The inverse of AllGather. Each GPU contributes a full tensor; each receives a **reduced shard**.
+Each rank contributes a full tensor; each receives a **reduced shard**. It is not a mathematical inverse of AllGather: reduction loses information about the separate inputs.
 
 ```
 Before (each GPU has the full gradient):
@@ -187,7 +190,7 @@ After AllToAll:
 
 ## 3. NCCL Data Types
 
-NCCL supports all standard ML data types:
+Common NCCL data types include the following. Additional low-precision types and supported operations depend on the installed version; do not infer support for every framework dtype:
 
 | NCCL Type | PyTorch Equivalent | Size |
 |---|---|---|
@@ -218,8 +221,10 @@ tp_group = dist.new_group(ranks=tp_ranks)
 dp_group = dist.new_group(ranks=dp_ranks)
 
 # Now you can communicate within each group separately
-dist.all_reduce(tensor, group=tp_group)   # only among GPU 0,1,2,3
-dist.all_reduce(tensor, group=dp_group)   # only between GPU 0 and 4
+if rank in tp_ranks:
+    dist.all_reduce(tensor, group=tp_group)
+if rank in dp_ranks:
+    dist.all_reduce(tensor, group=dp_group)
 ```
 
 This is how Megatron-LM runs **TP, PP, and DP in parallel** — each uses a different NCCL communicator.
@@ -227,8 +232,9 @@ This is how Megatron-LM runs **TP, PP, and DP in parallel** — each uses a diff
 ## 5. Synchronous vs Asynchronous Operations
 
 ```python
-# Synchronous (blocking): waits for operation to complete
-dist.all_reduce(tensor)  # returns only when all GPUs have the result
+# Default CUDA behavior establishes the documented stream dependency;
+# host return does not mean every device operation is physically finished.
+dist.all_reduce(tensor)
 
 # Asynchronous (non-blocking): returns immediately, operation runs in background
 handle = dist.all_reduce(tensor, async_op=True)
@@ -240,10 +246,10 @@ other_computation()
 handle.wait()
 ```
 
-Async operations are critical for **overlapping compute and communication** — a 30–60% training speedup in well-tuned systems.
+Async work enables overlap only with independent operations. CUDA stream ordering and handle completion must be respected; measure end-to-end benefit rather than assuming a fixed speedup.
 
 ## References
 
 - [NCCL Developer Guide](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/)
 - [PyTorch Distributed Overview](https://pytorch.org/docs/stable/distributed.html)
-- [NCCL API Reference](https://docs.nvidia.com/deeplearning/nccl/api-guide/index.html)
+- [NCCL API Reference](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/api.html)

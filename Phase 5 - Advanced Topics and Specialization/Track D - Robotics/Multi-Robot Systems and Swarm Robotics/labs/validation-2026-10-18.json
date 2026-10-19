@@ -1,0 +1,19 @@
+{
+  "verified_utc": "2026-10-18T22:19:31.884397+00:00",
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3",
+  "portable_command": "python3 -m unittest discover -s labs -p 'test_*.py' -v",
+  "portable_tests_passed": 16,
+  "portable_output": "test_capability_constraints_and_incomplete_greedy (test_coordination.AllocationTests.test_capability_constraints_and_incomplete_greedy) ... ok\ntest_greedy_is_not_global_optimum (test_coordination.AllocationTests.test_greedy_is_not_global_optimum) ... ok\ntest_invalid_costs (test_coordination.AllocationTests.test_invalid_costs) ... ok\ntest_disconnected_agent_does_not_join_consensus (test_coordination.ConsensusTests.test_disconnected_agent_does_not_join_consensus) ... ok\ntest_duplicate_edge_and_nonfinite_rejected (test_coordination.ConsensusTests.test_duplicate_edge_and_nonfinite_rejected) ... ok\ntest_gain_one_swaps_without_convergence (test_coordination.ConsensusTests.test_gain_one_swaps_without_convergence) ... ok\ntest_simultaneous_update_preserves_average (test_coordination.ConsensusTests.test_simultaneous_update_preserves_average) ... ok\ntest_goal_is_occupied_after_short_path_ends (test_coordination.ReservationTests.test_goal_is_occupied_after_short_path_ends) ... ok\ntest_independent_shortest_paths_collide_and_joint_plan_avoids_it (test_coordination.ReservationTests.test_independent_shortest_paths_collide_and_joint_plan_avoids_it) ... ok\ntest_invalid_path_grid_start_and_horizon (test_coordination.ReservationTests.test_invalid_path_grid_start_and_horizon) ... ok\ntest_narrow_corridor_cannot_swap (test_coordination.ReservationTests.test_narrow_corridor_cannot_swap) ... ok\ntest_opposite_edges_conflict_without_vertex_overlap (test_coordination.ReservationTests.test_opposite_edges_conflict_without_vertex_overlap) ... ok\ntest_priority_failure_is_not_proof_no_joint_solution_exists (test_coordination.ReservationTests.test_priority_failure_is_not_proof_no_joint_solution_exists) ... ok\ntest_reservation_rejection_does_not_mutate_table (test_coordination.ReservationTests.test_reservation_rejection_does_not_mutate_table) ... ok\ntest_start_at_goal_must_leave_if_reserved_later (test_coordination.ReservationTests.test_start_at_goal_must_leave_if_reserved_later) ... ok\ntest_zero_horizon_only_allows_existing_goal (test_coordination.ReservationTests.test_zero_horizon_only_allows_existing_goal) ... ok\n\n----------------------------------------------------------------------\nRan 16 tests in 0.002s\n\nOK\n",
+  "reference_output": "coordination-reference.json",
+  "additional_executed_records": [],
+  "scope": "Synthetic teaching input. Native records distinguish actual library/middleware/TCP execution from model-only checks. No physical robot or sensor execution.",
+  "sha256": {
+    "Coordination-Lab.md": "7222fe3839544c3d0df802750b4bb1406e11a24c89fb68e79ac00dd18dc2b42a",
+    "Lecture-01.md": "75e9c25fe9d221ae699bbb7de5a6c5490d55e17ca852909a909d58b1370a0f6b",
+    "labs/coordination-reference.json": "f6b58951e1ce9b17b5d6b62cd0cf822d7a3b435b323214fda46ecd55662287dd",
+    "labs/coordination.py": "d1b6df44367dc9b03fb5b7bfd73d2dd5a5d0e93c5db8e0f7e48418d76c20a4d4",
+    "labs/source-review-2026-10-18.json": "1ce7d2a0ae7eed0bc09c2ec59bcb9550256beb2e7e24611ebc4be7b051e837aa",
+    "labs/test_coordination.py": "6c319191b12c087cd5ac88e2c06699016586d90b51edc30b930788e35e5adecc"
+  }
+}

@@ -1,302 +1,103 @@
-# GUI
+# Robot interfaces: show what is known, fresh and actionable
 
-<div class="course-identity auto-course" style="--course-accent: #16a34a; --course-accent-rgb: 22, 163, 74;" markdown="1">
-<div class="course-identity__icon">GUI</div>
-<div markdown="1">
-<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
-<p class="course-identity__title">Specialized course identity for GUI.</p>
-<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
-</div>
-</div>
+**Goal:** build a small operator view that preserves units, observation age, connection state and failure information. **Pace:** three 60–90-minute sessions. Start with the [interactive CPU dashboard lab](CPU-Dashboard-Lab.md); it needs only a browser and uses simulated data.
 
+A dashboard can keep displaying a plausible distance after its sensor disconnects. A useful interface makes that difference visible: “last valid distance 1.2 m, captured 800 ms ago” is more informative than a green label saying “running.” This lesson connects presentation to the actual data contract.
 
-**Phase 4 — Track B — Module 5.3** · Application Development
+## 1. Run the complete interface first
 
-> **Focus:** Build graphical user interfaces for **Jetson Orin Nano 8GB** products — from lightweight embedded UIs (LVGL, framebuffer) through Qt desktop applications to web-based dashboards. Covers display setup, touch input, and GPU-accelerated rendering.
+Open the [observation dashboard](labs/dashboard.html). The standalone HTML and [JavaScript model](labs/telemetry.js) contain no external libraries, network calls or actuator controls. The local simulation emits a distance every 100 ms and uses a teaching freshness deadline of 250 ms.
 
-**Hub:** [5. Application Development](../Guide.md)
+Pause samples. The last valid distance stays visible, but capture age increases and the state becomes stale. Inject an invalid sample while paused; it must not turn the last value fresh again. Disconnect and reconnect; the new session clears the old observation before accepting new input.
 
----
+![The CPU observation dashboard, showing distance, capture age and stream state](labs/dashboard-desktop.png)
 
+The lab has seven tests that execute the actual JavaScript model in Node and four actual Chromium interaction tests, including a 390-pixel viewport. Those checks validate the teaching interface. They do not establish physical sensor behavior, a Jetson display stack or an actuator safety function.
 
-## 1. Display setup on Jetson
+## 2. Choose the display path that actually exists
 
-### Output interfaces
+The Orin Nano developer kit exposes **DisplayPort**. Its USB-C connector is data-only and does not carry DisplayPort/HDMI; the kit does not provide a native HDMI connector. A custom carrier must use a supported, correctly designed display path. A display interface listed for another Jetson family is not evidence that it is exposed on your module/carrier. [NVIDIA hardware layout](https://docs.nvidia.com/jetson/orin-nano-devkit/user-guide/latest/hardware_layout.html).
 
-| Interface | Use case | Notes |
-|-----------|----------|-------|
-| **HDMI** | Development, desktop display | Up to 4K@60 on Orin Nano |
-| **DisplayPort** | High-res monitors | Alt-mode via USB-C on some carriers |
-| **eDP** | Embedded LCD panels | Requires carrier board support |
-| **LVDS** (via bridge) | Industrial panels | Needs HDMI/DP-to-LVDS bridge IC |
-| **DSI** | Small MIPI displays | Limited support on Orin Nano |
+Separate physical output, kernel/display driver, compositor/window system, toolkit and application. Diagnose them in that order. A working headless browser screenshot proves application rendering in that environment; it does not prove that a panel, cable, touch controller or target GPU display path works.
 
-### Resolution and timing
+On a running desktop, inspect the session rather than replacing it blindly:
 
 ```bash
-# List connected displays and modes
-xrandr
-
-# Set resolution
-xrandr --output HDMI-0 --mode 1920x1080 --rate 60
-
-# For headless (virtual framebuffer)
-export DISPLAY=:0
-Xvfb :0 -screen 0 1920x1080x24 &
+printf '%s\n' "${XDG_SESSION_TYPE:-unknown}"
 ```
 
----
+`xrandr` is an X11 tool; its view in an Xwayland session is not a universal description of physical outputs. Use the tools and documentation matching the selected Jetson BSP and compositor. Do not assume every JetPack release ships the same default desktop/display configuration.
 
-## 2. Framebuffer (Linux)
+Direct framebuffer access is not just writing width×height×4 bytes. Pixel format, line stride, virtual offsets, mapping size, ownership and the active display stack matter. The old “write zeroes through tr to make a red screen” pattern does not implement a correct framebuffer pixel format. Prefer a supported toolkit or DRM/compositor path appropriate to the product.
 
-Direct framebuffer access for simple graphics without a display server.
+## 3. Select a toolkit by the integration requirement
 
-```bash
-# Check framebuffer device
-ls /dev/fb*
-cat /sys/class/graphics/fb0/virtual_size
+| Approach | Useful fit | Questions to resolve |
+| --- | --- | --- |
+| Browser interface | Local/remote dashboards, familiar layout/accessibility tools | Data transport, authentication, reconnects, resource budget, kiosk lifecycle |
+| Qt Widgets/Quick | Native application and embedded interaction | Target Qt build, platform plugin, graphics backend, deployment/licensing |
+| Lightweight embedded toolkit | Constrained/simple panel interface | Supported display/input backend, memory, rendering and event integration |
+| Direct graphics/DRM work | Specialized rendering requirements | Buffer/display ownership, synchronization and the complete target driver contract |
 
-# Write solid color to screen (red)
-dd if=/dev/zero bs=4 count=$((1920*1080)) | \
-    tr '\0' '\xff\x00\x00\xff' > /dev/fb0
+Qt's platform plugins include Wayland, EGLFS and LinuxFB, with availability depending on the build. Wayland uses a compositor; EGLFS provides a different fullscreen arrangement; LinuxFB renders through the framebuffer with software limitations. Selecting `-platform eglfs` is not a guarantee that an arbitrary Qt package and Jetson graphics stack support that backend. [Qt embedded Linux documentation](https://doc.qt.io/qt-6/embedded-linux.html).
 
-# Display an image (using fbi)
-sudo apt install fbi
-sudo fbi -T 1 -d /dev/fb0 image.png
-```
+Pin the Qt/application/toolchain combination that the target supports. Avoid obsolete `qt5-default` package instructions or downloading an x86 desktop Qt kit as if it were automatically an aarch64 Jetson SDK. A real cross-build needs the matching target libraries/sysroot, target compiler, host build tools and correct dependency discovery. Copying two directories from a target is not a complete cross-compilation design.
 
-### When to use framebuffer
+The browser lab gives a complete CPU route while target-specific toolkit installation remains a separate choice. Its learning outcomes apply to a native Qt view too.
 
-- **Splash screen** during boot (before X/Wayland starts)
-- **Minimal status display** on small screens (no window manager needed)
-- **Kiosk mode** with a single full-screen application
+## 4. Define the view model before drawing widgets
 
----
+A view model converts validated observations and system state into what the user sees. It should distinguish at least:
 
-## 3. X11 and Wayland
+- no observation yet;
+- fresh valid observation;
+- stale last valid observation;
+- invalid input received;
+- disconnected transport;
+- new session after reconnect/reset.
 
-JetPack ships with X11 (Xorg) by default. Wayland (via Weston) is available but less tested on Jetson.
+The lab's `create`, `receive`, `disconnect` and `view` functions implement those transitions. A message includes session, sequence, capture time and distance in metres. The model rejects nonfinite/out-of-range values, old sequence values, unexpected sessions and invalid time relationships. Accepted values are copied into an immutable sample so a producer cannot change the displayed observation by mutating its old object.
 
-```bash
-# Check current display server
-echo $XDG_SESSION_TYPE
+**Worked time example:** a sample was captured at 100 ms, received at 300 ms and displayed at 350 ms on the same clock. Capture age is 250 ms; time since receipt is only 50 ms. Subtracting receipt time would hide 200 ms of already-known delivery delay. The lab treats exactly 250 ms as fresh and a greater age as stale; choose and document the actual product's rule.
 
-# Start X11 manually (headless or remote)
-startx
+For a remote source, the browser's monotonic clock and the device's timestamp generally have different origins. Do not subtract them directly. Establish a clock relationship, carry a justified age/uncertainty estimate, or display local time since receipt with that narrower label. The [network lab](../2.%20Network%20and%20Connectivity/Localhost-Network-Lab.md) explains why RTT is also not automatically one-way observation age.
 
-# For Weston (Wayland)
-sudo apt install weston
-weston-launch
-```
+## 5. Keep data arrival separate from rendering
 
-### GPU acceleration
+A sensor may produce 200 samples/s while a display renders 60 frames/s and the operator needs a slower status view. Preserve the data required by logging/control separately, then choose a bounded presentation policy. Rendering every intermediate event can build a queue and make the view increasingly old.
 
-NVIDIA's L4T drivers provide GPU-accelerated OpenGL ES and EGL for both X11 and Wayland. Verify:
+In the lab, the source runs every 100 ms and the view refreshes every 50 ms. Age is recomputed from the current monotonic clock even when no new sample arrives. It is not reset by repainting the same value. Browser scheduling and background-tab throttling can delay the refresh; this display policy is not a hard real-time interlock.
 
-```bash
-glxinfo | grep "OpenGL renderer"
-# Should show "NVIDIA Tegra" or similar
-```
+Retain a bounded history with explicit axis meaning. The example graph shows the last 30 valid samples **in sample order**, not a uniformly timed physical trajectory. If time intervals vary and timing matters, use capture time on the x-axis and show gaps. A smooth line can otherwise disguise missing observations.
 
----
+Keep long inference, disk access and blocking communication off the UI event loop. In a native application, deliver data through the toolkit's supported thread/message mechanism and keep widget access in its required thread. In a browser, use asynchronous transport and appropriate workers for costly computations. Both designs still need bounded queues and cancellation/reconnect behavior.
 
-## 4. Getting started with Qt
+## 6. Separate requested, acknowledged and observed state
 
-Qt is the most mature framework for embedded Linux GUIs with GPU acceleration.
+For a read-only dashboard, displaying observations is enough. An operator command interface has additional states: requested, accepted/rejected by the authoritative service, in progress, completed and timed out. Do not immediately change a device indicator to “stopped” merely because a button was clicked.
 
-### Install Qt on Jetson
+Commands need an identity, authorization, parameter units/ranges, expiry and an acknowledgement tied to the correct session/request. Retrying after a lost acknowledgement must not accidentally execute a one-time action twice. The localhost network lab demonstrates that protocol issue using a harmless counter.
 
-```bash
-# Qt 5 (from JetPack/Ubuntu repos)
-sudo apt install qt5-default qtcreator
+A graphical stop button, a browser connection and a green status are not substitutes for the independently designed controller/interlock behavior required by the robot. The teaching dashboard intentionally has only local simulation controls so the observation exercise can be understood and tested without implying physical actuation.
 
-# Or Qt 6 (build from source or use Conan/aqt)
-pip install aqtinstall
-aqt install-qt linux desktop 6.6.0
-```
+## 7. Make failures readable and accessible
 
-### Minimal Qt application
+Use text as well as color for state. Keep units adjacent to values, show whether a value is last-known, and avoid displaying a missing measurement as numeric zero. Preserve error reason and session identity so a learner can explain the transition.
 
-```cpp
-// main.cpp
-#include <QApplication>
-#include <QLabel>
+Provide meaningful button names, keyboard focus and sufficient touch targets. Announce status changes to assistive technology without replacing the same live-region text on every repaint. The lab updates its live status only when the text changes; rapidly updating numeric age is separate.
 
-int main(int argc, char *argv[]) {
-    QApplication app(argc, argv);
-    QLabel label("Device Status: Running");
-    label.setFont(QFont("Arial", 24));
-    label.show();
-    return app.exec();
-}
-```
+Test narrow screens, enlarged text, long device names, disconnected state and absent data. A large desktop screenshot alone is insufficient. The [mobile screenshot](labs/dashboard-mobile.png) and actual viewport check document the example's behavior at 390 pixels; other devices and accessibility needs remain worth testing for a product.
 
-```bash
-# Build
-qmake -project
-qmake
-make
+## 8. Test the model and the rendered interface
 
-# Run with EGLFS (no window manager, direct GPU)
-./app -platform eglfs
-```
+The JavaScript tests check capture-age boundaries, stale input, bad numbers, duplicate/old sessions, disconnect/reset, recovery after valid data and source-object mutation. These tests execute the same file the browser loads.
 
-### Qt platform plugins for embedded
+The browser checks click the actual buttons, advance a controlled clock, verify state/value changes, check disabled controls and inspect horizontal overflow. They also fail on JavaScript page errors. Read the [lab](CPU-Dashboard-Lab.md) for exact commands and evidence. A screenshot records appearance; interaction assertions test behavior.
 
-| Plugin | Use case |
-|--------|----------|
-| **eglfs** | Full-screen, no window manager, direct GPU rendering (recommended for kiosk) |
-| **linuxfb** | Framebuffer, no GPU acceleration |
-| **wayland** | Wayland compositor |
-| **xcb** | X11 window system |
+For a target extension, add boot/startup, display/touch configuration, compositor restart, network loss, long-run memory use and application restart tests. Exercise the interface while the actual inference/camera workload competes for CPU/GPU/memory. Preserve which checks ran on a workstation and which ran on the Jetson.
 
----
+## 9. Completion exercise
 
-## 5. Qt cross-compilation for Jetson
+Extend the lab with one additional observation, such as a temperature or model-result confidence. Define its unit/range, capture time, validity and display label. Add a test showing that a disconnected source cannot refresh it, and explain whether its deadline should match distance.
 
-For faster build cycles, cross-compile Qt apps on an x86 host targeting ARM64.
-
-### Toolchain setup
-
-```bash
-# Install cross-compiler
-sudo apt install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-
-# Sysroot: copy target libraries from Jetson
-rsync -avz jetson:/usr/lib/aarch64-linux-gnu/ sysroot/usr/lib/
-rsync -avz jetson:/usr/include/ sysroot/usr/include/
-```
-
-### CMake toolchain file
-
-```cmake
-set(CMAKE_SYSTEM_NAME Linux)
-set(CMAKE_SYSTEM_PROCESSOR aarch64)
-set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
-set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
-set(CMAKE_SYSROOT /path/to/sysroot)
-```
-
----
-
-## 6. LVGL (Lightweight Graphics Library)
-
-LVGL is ideal for small screens and resource-constrained displays — runs on framebuffer without a window manager.
-
-### Setup on Jetson
-
-```bash
-git clone https://github.com/lvgl/lv_port_linux_frame_buffer.git
-cd lv_port_linux_frame_buffer
-mkdir build && cd build
-cmake ..
-make -j$(nproc)
-./main   # renders to /dev/fb0
-```
-
-### When to use LVGL vs Qt
-
-| Criteria | LVGL | Qt |
-|----------|------|-----|
-| **Screen size** | Small (< 7") | Any |
-| **Complexity** | Simple dashboards, status screens | Complex multi-page apps |
-| **Memory** | < 1 MB RAM for UI | 50+ MB |
-| **GPU** | Not required (CPU rendering) | Benefits from GPU |
-| **Touch** | Built-in driver support | Built-in |
-| **Styling** | CSS-like themes | QSS, QML |
-
----
-
-## 7. Web-based UI
-
-Serve a web interface from the Jetson — accessible from any device with a browser.
-
-### Architecture
-
-```
-Jetson (backend: Flask/FastAPI + frontend: React/Vue/plain HTML)
-  │
-  └─ Browser on phone/laptop → http://jetson-edge.local:8080 (example mDNS hostname)
-```
-
-### Advantages for embedded products
-
-- **No display hardware needed** on the device itself
-- **Cross-platform** — works from any browser
-- **Easy to update** — ship new HTML/JS via OTA without reflashing
-- Frameworks: Flask + HTMX (simple), FastAPI + React (full SPA)
-
----
-
-## 8. Touch screen setup and calibration
-
-### Capacitive touch (I2C)
-
-Most modern embedded displays use capacitive touch connected via I2C. The kernel driver appears as an input device:
-
-```bash
-# List input devices
-cat /proc/bus/input/devices
-
-# Test touch events
-sudo apt install evtest
-sudo evtest /dev/input/eventN
-```
-
-### Calibration (if needed)
-
-```bash
-# Install xinput_calibrator (X11)
-sudo apt install xinput-calibrator
-xinput_calibrator
-
-# For tslib (non-X11)
-sudo apt install tslib
-export TSLIB_TSDEVICE=/dev/input/eventN
-ts_calibrate
-ts_test
-```
-
-### Device tree for touch controller
-
-Add the touch controller I2C device in your carrier's device tree:
-
-```dts
-&i2c1 {
-    touch@38 {
-        compatible = "edt,edt-ft5406";
-        reg = <0x38>;
-        interrupt-parent = <&gpio>;
-        interrupts = <IRQ_PIN IRQ_TYPE_EDGE_FALLING>;
-    };
-};
-```
-
----
-
-## 9. Projects
-
-- **Status kiosk:** Build a Qt EGLFS application that shows real-time GPU temperature, inference FPS, and network status on a 7" HDMI display.
-- **LVGL dashboard:** Display sensor readings (I2C temperature + CAN data) on a small SPI/I2C display using LVGL on framebuffer.
-- **Web config portal:** Build a Flask + HTMX web interface for your Jetson edge device that shows device status and allows Wi-Fi configuration from a phone browser.
-
----
-
-## 10. Resources
-
-| Resource | Description |
-|----------|-------------|
-| **Qt Documentation** (doc.qt.io) | Official Qt framework docs, EGLFS platform guide |
-| **LVGL** (lvgl.io) | Lightweight graphics library, Linux framebuffer port |
-| **Weston/Wayland** | Wayland compositor for embedded Linux |
-| **xinput_calibrator** | Touch screen calibration tool for X11 |
-| **tslib** | Touch screen library for non-X11 environments |
-
-
-## Integration lab: Does the dashboard consume or conceal the timing budget?
-
-Render live inference status through a bounded queue with capture time and result age visible. Deliberately slow the UI consumer; verify that it cannot block sensing or inference.
-
-**Acceptance evidence:** Show dropped UI updates instead of growing memory indefinitely. Submit a trace comparing headless and displayed operation and verify that a disconnected sensor is visibly invalid.
-
-**Continue:** take this artifact to [5. Application Development](../Guide.md). Explain which assumption from this course the next engineer must preserve.
+**Answer key:** a frozen numeric value can remain useful if explicitly labeled last-known; repainting does not create freshness; reconnect should establish a new session; a received acknowledgement is not the same as observing completed physical action; and a passing browser test does not validate the electrical display or robot controller.

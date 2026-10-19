@@ -1,4 +1,4 @@
-# Non-Contact Multi-Sensor Monitoring on Edge — Project Guide
+# RGB/depth and thermal preparation: geometry, timing and signal evidence
 
 <div class="course-identity auto-course" style="--course-accent: #7e22ce; --course-accent-rgb: 126, 34, 206;" markdown="1">
 <div class="course-identity__icon">NCMS</div>
@@ -9,202 +9,86 @@
 </div>
 </div>
 
+**Reviewed 18 October 2026.** This project teaches camera/depth alignment and temporal signal analysis. Its supplied code is an offline RGB/depth viewer plus small synthetic signal tests. It does not measure a physiological variable, provide a medical monitor, or demonstrate live thermal fusion.
 
-> **Goal:** Build a non-contact monitoring device that fuses RGB/Depth and thermal cameras, extracts micro-fluctuation signals (0.8–3 Hz) from thermal data, and runs the full pipeline in real time on an edge device (e.g. Raspberry Pi or Jetson), with optional IoT integration (BLE, MQTT).
+Prerequisites: the [camera/time fusion lab](../../../../Phase%203%20-%20Artificial%20Intelligence/Track%20A%20-%20Hardware%20and%20Edge%20AI/4.%20Sensor%20Fusion/Camera-Time-Fusion-Lab/Guide.md), image coordinates and elementary frequency analysis. Begin with the [implemented CPU exercise](phase1/README.md); no external video download is required for its tests.
 
----
+## 1. Define the measurement before choosing a filter
 
-## Overview (3 sentences)
+A thermal camera may supply radiometric measurements, raw sensor counts or a colorized display image. These have different meanings. Automatic gain, palette mapping, exposure changes and nonuniformity corrections can create temporal variations that are unrelated to scene temperature. Retain raw values, timestamp/clock metadata and the camera's calibration information.
 
-**How to achieve the goal:** Calibrate and align a dual-camera setup (RGB/Depth + thermal) so ROIs can be mapped between streams with sub-pixel accuracy; run an EVM- or FFT-based DSP pipeline to extract and bandpass-filter thermal micro-fluctuations in the 0.8–3 Hz band and validate SNR on pre-recorded, synchronized datasets. Deploy the pipeline on edge hardware with optimized NumPy/SciPy (or equivalent) so all processing runs locally in real time without cloud offload. In Phase 2, add synchronized audio capture and IoT (BLE provisioning, MQTT streaming) for live multi-modal monitoring.
+A 0.8–3 Hz passband is a selected analysis band, not proof of the source of a signal. Motion, lighting, camera processing and sampling artifacts can produce energy there. This course validates a synthetic sinusoid and demonstrates an alias; it does not infer heart rate, blood flow or temperature from that band alone.
 
----
+## 2. Map a point through the cameras
 
+For a distortion-corrected RGB pixel `p=[u,v,1]` with **axial** depth `Z`, its RGB camera point is
 
-## 1. Device and Sensors
+\[
+X_R=ZK_R^{-1}p.
+\]
 
-The system is a **non-contact monitoring device**: it observes and analyzes the subject remotely without physical contact.
+If the depth is radial distance along the ray instead, normalize the ray before multiplying by that distance. Distinguish these definitions in the source format.
 
-### Sensor array
+Given a calibrated transform from RGB to thermal,
 
-| Component | Role |
-|----------|------|
-| **RGB/Depth camera** | Color images + depth (distance). Used to reconstruct 3D positions and define ROIs (e.g. hand, face). |
-| **Thermal camera** | Temperature across the scene. Target: detect **small, localized temperature fluctuations** that may correspond to physiological signals (blood flow, micro-movements). |
-| **Audio capture** | Synchronized with video/thermal for multi-modal analysis and event alignment. |
+\[
+X_T=R_{T\leftarrow R}X_R+t_{T\leftarrow R},\qquad
+p_T\sim K_TX_T.
+\]
 
-- **Heterogeneity:** RGB/Depth and thermal have **different FOVs, resolutions, and physical alignment**. A core task is mapping a region of interest from one feed to the other (e.g. “this hand in RGB” → “these pixels in thermal”).
+Check positive thermal-camera depth, image bounds and occlusion. Apply the thermal lens model or use consistently rectified images. A 2-D homography works for its plane/pure-rotation assumptions; it is not a general depth-independent RGB-to-thermal mapping.
 
----
+A rectangular RGB ROI need not remain a rectangle after projection. Background depth inside a box can project onto unrelated thermal pixels. Use a depth-valid object mask or explicitly state the approximation; the median depth of an entire face/person box is only a summary, not a calibrated surface reconstruction.
 
-## 2. Key Technical Challenges
+The [actual PnP/fusion lab](../../../../Phase%203%20-%20Artificial%20Intelligence/Track%20A%20-%20Hardware%20and%20Edge%20AI/4.%20Sensor%20Fusion/Camera-Time-Fusion-Lab/Guide.md) provides projected points, known camera geometry and timestamp tests. Use it to check transform directions before connecting a second sensor. [OpenCV calibration conventions](https://docs.opencv.org/4.13.0/d9/d0c/group__calib3d.html).
 
-### A. Multi-camera sensor fusion
+## 3. Treat timestamps as data
 
-- **Problem:** Two heterogeneous sensors (RGB/Depth + thermal) with different fields of view, resolutions, and mounting.
-- **Goal:** Map an ROI from one camera to the other. Example: detect a hand in RGB/Depth and know the **exact corresponding pixels** in the thermal image so thermal analysis is done on the right region.
-- **Requirements:**
-  - **Extrinsic calibration:** Rotation and translation between the two camera frames (rig or hand–eye style).
-  - **Intrinsic calibration:** Per-camera lens distortion and intrinsics (e.g. with a checkerboard or dedicated calibration target).
-  - **Sub-pixel accuracy:** Physiological thermal signals are subtle; alignment must be precise enough that ROI boundaries and sampling are stable.
+Same frame index and same nominal FPS do not prove synchronized sensors. Record exposure/capture timestamps, arrival timestamps, clock identity and estimated offset/drift. A frame available at processing time can still be too old for an ROI.
 
-### B. Micro-fluctuation detection in thermal data
+For offline paired videos, the supplied viewer assumes aligned frame indices and checks matching FPS, resolution and paired end-of-stream. That catches some file mismatches but cannot recover unrecorded capture offsets. For live RGB/thermal work, select or interpolate observations using a justified causal timing model and define a maximum age.
 
-- **Target band:** **0.8 Hz – 3 Hz** — very small, sub-pixel-level temporal variations. May correspond to:
-  - Pulses or blood flow
-  - Minor muscle movements
-  - Minute environmental or sensor noise
-- **Requirements:**
-  - **Eulerian Video Magnification (EVM) or similar:** Amplify small temporal changes in the thermal video so they become measurable.
-  - **Bandpass filtering:** Restrict analysis to 0.8–3 Hz to reject DC drift and higher-frequency noise.
-  - **SNR optimization:** Thermal cameras are noisy; extracting such small fluctuations needs careful pipeline design (filtering, windowing, averaging, possibly spatial pooling over ROI).
+## 4. Understand the optional external RGB-D dataset
 
-### C. Edge computing constraints
+The [SJTU Free-Viewpoint RGB-D dataset repository](https://github.com/sjtu-medialab/Free-Viewpoint-RGB-D-Video-Dataset) supplies camera parameters and a disparity-to-depth expression. The inspected revision is `29dfe32d83094bd08deba0f4831d77ca459fcead`; its current citation is Guo et al., IEEE Transactions on Multimedia, 2024. It contains no thermal stream for this exercise.
 
-- **All processing must run locally** on a small device (e.g. Raspberry Pi, Jetson Nano).
-- Implications:
-  - **No cloud offload** for heavy compute.
-  - **Real-time capable** algorithms (bounded latency per frame or per buffer).
-  - **Efficient implementations:** Optimize NumPy/SciPy (or C/Cython) so FFT, filtering, and EVM run within the frame budget; consider fixed-point or reduced precision if needed.
+The source formula is equivalent to
 
----
+\[
+Z(p)=\frac{32504}{(p/255)(32504/40-32504/150)+32504/150}.
+\]
 
-## 3. Phase 1: Offline Pipeline
+`p=0` maps to 150 and `p=255` to 40 in the dataset's depth units. The inspected README does not establish a metre conversion in that formula. The previous course's automatic centimetre interpretation was therefore removed. Supply a verified `--units-to-meters` scale only when a dataset-specific statement or independent calibration supports it; otherwise retain “dataset units”.
 
-Validate the full signal chain on **pre-recorded, synchronized** datasets before moving to live hardware.
+Do not infer byte versus normalized encoding from the current frame's maximum. A byte image containing only value 1 is a dark encoded image, not a normalized image at full scale. The fixed function requires the encoding explicitly. Compressed display video can also change grayscale values; use original depth data when quantitative precision matters.
 
-1. **Input:** Pre-recorded, time-synchronized videos from RGB/Depth and thermal cameras (and optionally audio).
-2. **Calibration and alignment:**
-   - Compute intrinsic and extrinsic matrices for both cameras.
-   - Implement ROI mapping: given an ROI in RGB/Depth (e.g. from detection or 3D), project or warp to the thermal image so the same physical region is selected in thermal.
-3. **Thermal micro-fluctuation analysis:**
-   - For each ROI in thermal space, run a temporal pipeline:
-     - EVM (or similar) to amplify small changes.
-     - Bandpass filter (0.8–3 Hz).
-     - Optional: FFT or power spectral density to confirm energy in band.
-   - **Validate SNR:** Ensure the hardware and pipeline yield a sufficient signal-to-noise ratio to reliably detect the target micro-signals.
-4. **Output:** Clean frequency-domain (or filtered time-domain) data demonstrating that 0.8–3 Hz micro-fluctuations can be extracted and that the setup is suitable for Phase 2.
+In `paras.txt`, `world_position` is camera centre `C` and the projection is `Xc=R(Xw-C)`. OpenCV's translation in `Xc=RXw+t` is therefore `t=-RC`. Confusing those quantities moves the camera incorrectly. The first inspected block has `camera_id 0`; video filename numbering starts at `camera01`, so keep record index and file naming distinct.
 
-### Phase 1 dataset: camera01 only (Free-Viewpoint RGB-D Video Dataset)
+The code loads calibration; it does not estimate calibration from video. It rejects incomplete records, duplicate IDs, nonfinite values and improper rotations. It rejects points at or behind the camera plane rather than hiding invalid division with a small epsilon.
 
-For Phase 1, use **only camera01** from the Free-Viewpoint RGB-D Video Dataset. This gives a single, synchronized RGB + depth stream so you can implement and validate the RGB/Depth side of the pipeline (calibration, ROI definition, temporal alignment) without multi-view complexity.
+## 5. Extract a synthetic frequency correctly
 
-**Files (local)**
+For uniformly sampled data at rate `fs`, frequency-bin spacing is `fs/N=1/T`. A 20-second record sampled at 20 Hz has 400 samples and 0.05 Hz bin spacing. A 1.2 Hz tone lies on a bin in this case. The supplied function removes the mean, applies a Hann window, computes a real FFT and finds the largest in-band peak.
 
-| File | Role |
-|------|------|
-| `Free-Viewpoint-RGB-D-Video-Dataset-main/camera01-rgb.mp4` | RGB video (1920×1080, synchronized). |
-| `Free-Viewpoint-RGB-D-Video-Dataset-main/camera01-depth.mp4` | Per-frame depth video (same resolution); depth encoded as grayscale; convert to metric depth (see below). |
-| `Free-Viewpoint-RGB-D-Video-Dataset-main/Camera Parameters/` | Intrinsics and extrinsics for all 12 cameras; use **camera 1** (COLMAP camera ID `1`, or the first 5-line block in `paras.txt`). |
+This peak picker does not establish an amplitude-calibrated power spectral density, physiological identity or a confidence interval. A window changes amplitude normalization. Zero-padding can interpolate a plotted spectrum but does not add independent information or improve the fundamental record-length resolution.
 
-**Camera01 calibration**
+An 8 Hz tone sampled at 10 Hz aliases to 2 Hz. The actual test demonstrates that it falls inside the chosen 0.8–3 Hz band. Post-sampling filtering cannot distinguish that alias from a real 2 Hz tone; anti-alias filtering and adequate acquisition rate must come before sampling.
 
-- **COLMAP:** In `Camera Parameters/sparse/cameras.txt`, camera ID **1** is camera01 (PINHOLE, 1920×1080; params: fx, fy, cx, cy). Extrinsics per frame are in `images.txt` / `images.bin` (image names or IDs map to camera ID 1 for camera01).
-- **paras.txt:** First 5 lines = camera01: resolution, K_matrix (fx, fy, cx, cy), R_matrix (3×3), world_position (t). Projection: `Xp = K * R * (Xw - t)`.
+The implementation rejects irregular timestamps, constants and a band touching/exceeding Nyquist. For real irregular data, use a documented resampling or nonuniform spectral method, retain gaps, and measure the effect. Averaging FPS silently is not a valid repair for arbitrary dropped frames.
 
-**Depth conversion (from dataset README)**
+## 6. Plan the thermal extension as a new experiment
 
-Depth video frames are grayscale 0–255. Convert to metric depth (e.g. mm or m) with:
+Use a controlled target with a known temperature variation or reference measurement before a human subject. Record sensor response, sampling, missing frames, drift and motion. Estimate uncertainty and compare a null/control condition. If analyzing people, a separate validated protocol and reference measurement are required; an RGB-D replay cannot validate a thermal or physiological claim.
 
-```text
-fB = 32504
-mindepth, maxdepth = 40, 150
-maxdisp, mindisp = fB/mindepth, fB/maxdepth
-depth = fB / (gray/255 * (maxdisp - mindisp) + mindisp)
-```
+Eulerian magnification can make a temporal variation more visible, but it also amplifies noise and motion artifacts. It does not recover information below the sensor's usable resolution. Choose a raw-signal baseline before adding magnification or a neural model.
 
-Use the same frame index for `camera01-rgb.mp4` and `camera01-depth.mp4` so RGB and depth stay synchronized.
+For edge deployment, measure capture-to-result latency, queue age, DSP window duration, memory and sustained thermal behavior. A 20-second analysis window is not a 20 ms measurement even if its FFT computes in 20 ms.
 
-**Phase 1 code:** The folder [phase1/](phase1/README.md) provides Python code for **camera calibration** (load `paras.txt`), **real-time object detection** (face + person via OpenCV), and **depth calculation** per detection ROI. Run: `python phase1/run_pipeline.py` (see [phase1/README.md](phase1/README.md)).
+## 7. Completion exercise and answers
 
-**Phase 1 workflow with camera01**
+Run the [ten actual CPU tests](phase1/README.md), explain the byte-value-1 regression, and compare the known-tone/alias examples. Draw the two-camera transform and annotate every unit and timestamp. If using real data, retain provenance and scale evidence separately.
 
-1. **Load** `camera01-rgb.mp4` and `camera01-depth.mp4`; align by frame index.
-2. **Load** camera01 intrinsics (and extrinsics if needed) from `Camera Parameters`.
-3. **Define ROIs** in RGB (e.g. face, hand via detection or manual box); optionally back-project to 3D using depth and intrinsics.
-4. **Temporal pipeline:** When you add thermal later, you will map these ROIs to the thermal image. For camera01 alone, validate ROI stability over time and depth-based masking.
-5. **Thermal:** Not in this dataset; use another source or Phase 2 live capture for 0.8–3 Hz micro-fluctuation and EVM/bandpass/SNR.
-
-**Dataset summary (camera01 only)**
-
-| Aspect | camera01 (this dataset) | Phase 1 use |
-|--------|--------------------------|-------------|
-| **RGB** | ✓ `camera01-rgb.mp4`, 1920×1080 | Single-view ROI and alignment |
-| **Depth** | ✓ `camera01-depth.mp4`, COLMAP-derived, post-processed | 3D ROI, scale, occlusion; convert with formula above |
-| **Calibration** | ✓ Camera 1 in `Camera Parameters/sparse` or `paras.txt` | Intrinsics (and extrinsics for future thermal rig) |
-| **Thermal** | ✗ None | Add via other dataset or Phase 2 |
-| **Citation** | Guo et al., MMSys 2022; see also README in dataset folder | — |
-
-**Source:** [Free-Viewpoint RGB-D Video Dataset](https://medialab.sjtu.edu.cn/post/free-viewpoint-rgb-d-video-dataset/) (SJTU); academic, non-commercial. Full dataset has 12 views and 14 sequences; for this project, Phase 1 uses only the camera01 pair above.
-
----
-
-## 4. Phase 2: Live and IoT Integration
-
-If Phase 1 shows reliable micro-signal extraction:
-
-1. **Deploy on live hardware:** Run the same calibration and DSP pipeline on the edge device in real time (live RGB/Depth + thermal streams).
-2. **Audio:** Add synchronized audio capture so events can be aligned across vision, thermal, and sound.
-3. **IoT integration:**
-   - **BLE provisioning:** Pair and configure the device with other systems (e.g. phone app, gateway) over Bluetooth Low Energy.
-   - **MQTT:** Stream extracted signals or summaries in real time for dashboards, logging, or cloud backup.
-4. **Goal:** A fully operational device that captures and processes multi-modal signals (RGB, depth, thermal, audio) with precise alignment and optional real-time streaming, all on the edge.
-
----
-
-## 5. Why It’s Advanced
-
-- **Real-time multi-sensor fusion:** Few systems combine RGB/Depth and thermal with live, aligned processing on small devices.
-- **Micro-signal extraction:** Sub-pixel thermal fluctuation detection in the 0.8–3 Hz band is at the intersection of physiology, signal processing, and computer vision.
-- **Edge + IoT:** Combines CV, calibration, DSP, and embedded/IoT (BLE, MQTT) under strict latency and resource limits.
-
----
-
-## 6. Main Application
-
-**Contactless baby / child vital monitoring** — the primary target use case for this project. Devices in this category (e.g. [iBaby Labs i20](https://ibabylabs.com/)) provide **contactless breathing and heart rate monitoring** so caregivers can track a baby’s vitals while they sleep—without wearables, clips, or skin contact.
-
-- **Breathing rate:** Inferred from chest/abdomen micro-motion (e.g. optical flow or subtle intensity changes in RGB/thermal over an ROI). The 0.8–3 Hz band and EVM-style amplification align with respiratory rates.
-- **Heart rate:** Inferred from **remote PPG (rPPG)** or analogous optical sensing: tiny, periodic changes in skin tone or thermal signature caused by blood pulsation are captured by the camera and processed (bandpass, phase analysis) to derive pulse. No contact required; works with night vision in low light.
-- **Edge + AI:** An on-device NPU or CPU runs real-time contactless analysis of heart rate, breathing, and micro-movements; alerts (e.g. safe zone, face cover) and insights (sleep quality, mood cues) can be sent to a phone app. BLE/Wi‑Fi and optional cloud sync support parental dashboards and peace of mind.
-- **Why it fits this project:** The same technical stack—multi-sensor (RGB/Depth + thermal) fusion, ROI alignment, micro-fluctuation extraction (0.8–3 Hz), and edge deployment—directly supports building a baby/child monitor that offers “invisible care, visible peace”: continuous vital monitoring without disrupting sleep or requiring wearables.
-
----
-
-## 7. Other Possible Applications
-
-Other uses of a non-contact, multi-sensor (RGB/Depth + thermal) device that extracts micro-fluctuations (0.8–3 Hz) on the edge:
-
-| Domain | Application |
-|--------|-------------|
-| **Vital signs (adult)** | Contactless heart rate / pulse and respiration from facial or body ROIs; care homes, hospitals, or home monitoring where skin sensors are undesirable. |
-| **Stress & arousal** | Thermal and subtle motion in face/body; 0.8–3 Hz band for physiological rhythms. Driver drowsiness, workplace wellness, mental load. |
-| **Sleep & rest** | Non-contact breathing and movement during sleep; thermal in low light; edge + MQTT for dashboards or caregivers. |
-| **Fall & activity** | RGB/Depth for pose and fall detection; thermal for robustness in dark/clutter; edge alerts (e.g. elderly living alone). |
-| **Industrial & security** | Thermal for presence, overheating, or anomalies; RGB/Depth for occupancy and 3D; edge for privacy and latency. |
-| **Research & physiology** | Lab/field studies with synced RGB, depth, thermal, audio; export or MQTT for analysis. |
-| **Accessibility & assistive tech** | Hands-free vital/state monitoring for users who cannot wear sensors; BLE/MQTT to apps or caregivers. |
-
----
-
-## 8. Resources
-
-- **Phase 1 RGB/Depth data:** Use **camera01 only**: `camera01-rgb.mp4` and `camera01-depth.mp4` in `Free-Viewpoint-RGB-D-Video-Dataset-main/`, with calibration in `Camera Parameters/`. Dataset: [Free-Viewpoint RGB-D Video Dataset](https://medialab.sjtu.edu.cn/post/free-viewpoint-rgb-d-video-dataset/) (SJTU). See [Phase 1 dataset: camera01 only](#phase-1-dataset-camera01-only-free-viewpoint-rgb-d-video-dataset).
-- **Eulerian Video Magnification (EVM)** — original paper and implementations for amplifying subtle temporal changes in video.
-- **Multi-camera calibration:** OpenCV camera calibration, stereo/rig calibration; thermal–RGB alignment (e.g. FLIR/opencv thermal examples).
-- **Bandpass filtering / FFT:** SciPy signal processing (butter, filtfilt, fft, welch PSD) for 0.8–3 Hz and SNR estimation.
-- **Edge:** NumPy/SciPy optimization; Raspberry Pi or Jetson performance tuning; optional Cython or C for hot loops.
-- **IoT:** BLE (e.g. BlueZ, bleak); MQTT (e.g. paho-mqtt) for streaming.
-
----
-
-*Back to [Edge AI Optimization — Projects](../Guide.md#14-projects).*
-
-
-## Integration lab: Can a monitoring model distinguish missing evidence from a normal event?
-
-Define observable events and labels before selecting a model. Evaluate fixed replay clips with subject/session-separated splits, including occlusion, empty frames, and missing sensor input.
-
-**Acceptance evidence:** Report false positives/negatives, detection delay, and invalid-input behavior. Do not turn a non-contact research signal into a clinical measurement without the necessary validation.
-
-**Continue:** take this artifact to [phase1](phase1/README.md). Explain which assumption from this course the next engineer must preserve.
+1. **Does grayscale zero always mean missing depth?** No. In this source mapping it means the far endpoint; any validity mask must come from the source convention.
+2. **Does matching FPS prove synchronization?** No. It does not establish capture offset, drift or dropped-frame identity.
+3. **Why does the viewer avoid a metre label by default?** The inspected source formula alone does not establish physical scale.
+4. **Does a strong 1.2 Hz peak prove a biological source?** No. The measured quantity and reference protocol must establish interpretation.

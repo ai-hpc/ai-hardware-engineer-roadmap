@@ -261,7 +261,7 @@ These directly scale the IMU terms in Kalibr's cost function.
 Wrong values → poor calibration convergence or wrong result.
 ```
 
-### Allan Variance Method (Correct Way)
+### Allan deviation: fit the noise terms you actually model
 
 ```bash
 # Step 1: Record IMU at rest for 2+ hours (the longer the better)
@@ -271,7 +271,7 @@ Wrong values → poor calibration convergence or wrong result.
 ros2 bag record -o imu_static_2h /imu/data
 
 # Convert to ROS1 bag (allan_variance_ros uses ROS1)
-# Or use the ROS2-compatible fork: github.com/ori-drs/allan_variance_ros
+# ori-drs/allan_variance_ros is a ROS 1/catkin tool; it is not a ROS 2 fork.
 
 # Step 2: Install allan_variance_ros
 cd ~/kalibr_ws/src
@@ -280,13 +280,11 @@ catkin build allan_variance_ros
 
 # Step 3: Run Allan variance computation
 rosrun allan_variance_ros allan_variance \
-    [path_to_bag] \
-    [imu_topic]   \
-    [output_dir]
+    /path/to/folder_containing_bag \
+    /path/to/sensor_config.yaml
 
 # Step 4: Plot Allan deviation to find noise floor and bias instability
-rosrun allan_variance_ros plot_allan_variance \
-    [output_dir]/allan_variance.csv
+rosrun allan_variance_ros analysis.py --data allan_variance.csv
 ```
 
 ### Reading the Allan Deviation Plot
@@ -344,7 +342,7 @@ gyroscope_noise_density:      0.00003
 gyroscope_random_walk:        0.000001
 ```
 
-### Rough Estimates (Without Allan Variance)
+### Datasheet values and their limits
 
 If you cannot run 2-hour static test, use manufacturer datasheets:
 
@@ -357,14 +355,11 @@ import math
 gyro_noise_deg = 0.005    # °/s/√Hz from datasheet
 gyr_n = gyro_noise_deg * math.pi / 180   # → rad/s/√Hz = 8.7e-5
 
-# Datasheet: gyro bias instability = 2 °/hr
-gyro_bias_deg_hr = 2.0
-# bias random walk ≈ bias_instability / sqrt(3600) (rough approximation)
-gyr_w = (gyro_bias_deg_hr / 3600) * math.pi / 180 / math.sqrt(3600)
-
+# A bias-instability specification is NOT a bias random-walk density.
+# Do not divide it by an arbitrary sqrt(time) to invent gyr_w.
+# Fit a declared bias process from Allan-deviation data or obtain that parameter
+# from the manufacturer's noise model, then validate on a held-out recording.
 print(f"gyr_n: {gyr_n:.2e}")
-print(f"gyr_w: {gyr_w:.2e}")
-# Use these as starting points, then tune if calibration fails to converge
 ```
 
 ---
@@ -677,12 +672,11 @@ kalibr_calibrate_imu_camera \
     --cam     camchain-camera_calib.yaml \
     --imu     imu_mpu6050.yaml \
     --target  aprilgrid_6x6.yaml \
-    --bag-freq 20.0 \
-    --time-calibration
+    --bag-freq 20.0
 
-# --time-calibration: estimate time offset between camera and IMU (important!)
+# Temporal calibration is enabled by default in the checked upstream CLI.
 # --show-extraction: visualize corner detection (add for debugging)
-# Remove --time-calibration if IMU and camera are hardware-synchronized (e.g., via trigger)
+# --no-time-calibration disables it; first verify synchronization/exposure timestamps.
 
 # For multiple cameras + IMU
 kalibr_calibrate_imu_camera \
@@ -690,8 +684,7 @@ kalibr_calibrate_imu_camera \
     --cam     camchain-multicam.yaml \
     --imu     imu.yaml \
     --target  aprilgrid_6x6.yaml \
-    --bag-freq 20.0 \
-    --time-calibration
+    --bag-freq 20.0
 ```
 
 ### Camera-IMU Calibration Output
@@ -711,9 +704,9 @@ cam0:
   - [ 0.00914,  0.01540,  0.99984, -0.00745]
   - [ 0.00000,  0.00000,  0.00000,  1.00000]
 
-  timeshift_cam_imu: -0.0040   # seconds: IMU is 4ms ahead of camera timestamp
-  #                              Positive = camera leads IMU
-  #                              Negative = IMU leads camera
+  timeshift_cam_imu: -0.0040   # seconds, defined by t_imu = t_cam + shift
+  # Example: camera time 10.000 corresponds to IMU time 9.996.
+  # Use this equation instead of ambiguous "leads/lags" wording.
 ```
 
 ### Understanding T_cam_imu
@@ -728,9 +721,10 @@ To go the other direction (point in camera frame → IMU frame):
   p_imu = T_imu_cam × p_cam
 
 In practice, you need:
-  - VIO (VINS-Mono, OKVIS, ORB-SLAM3): T_cam_imu directly
+  - VIO: inspect the specific configuration; packages differ in transform direction.
   - BEVFusion: needs T_cam_lidar AND T_imu_lidar (from LiDAR-IMU calib)
-  - ROS2 TF tree: publish T_cam_imu as a static transform
+  - ROS2 TF: for parent imu and child camera optical frame, publish T_imu_cam.
+    T_cam_imu instead maps IMU coordinates into camera coordinates.
 ```
 
 ```python
@@ -754,7 +748,7 @@ T_cam_imu, dt, K_params, dist = load_cam_imu_calib(
 T_imu_cam = np.linalg.inv(T_cam_imu)
 
 print(f"Camera-IMU rotation:\n{T_cam_imu[:3,:3]}")
-print(f"Camera-IMU translation: {T_cam_imu[:3,3]*100:.2f} cm")
+print("Camera-IMU translation (cm):", np.round(T_cam_imu[:3, 3] * 100, 2))
 print(f"Time offset: {dt*1000:.2f} ms (camera relative to IMU)")
 ```
 
@@ -952,7 +946,11 @@ T_lidar_imu = load_lidar_imu_calib('lidar_imu_calib.yaml')  # from LI-Calib or s
 T_imu_lidar = np.linalg.inv(T_lidar_imu)
 T_cam_lidar = T_cam_imu @ T_imu_lidar
 
-# In BEVFusion config:
+```
+
+The following is a **schematic calibration manifest**, not a drop-in config for every BEVFusion implementation. Map it into the chosen loader and verify the transform direction.
+
+```yaml
 data:
   cameras:
     CAM_FRONT:
@@ -1007,7 +1005,7 @@ Camera.k2:  0.067
 Camera.p1:  0.001
 Camera.p2:  0.000
 
-# IMU-Camera extrinsic (T_bc = T_cam_imu in Kalibr notation)
+# IMU/body-from-camera extrinsic: T_bc = inverse(T_cam_imu) when b is the IMU frame
 Tbc: !!opencv-matrix
    rows: 4
    cols: 4
@@ -1023,24 +1021,7 @@ IMU.Frequency:  400
 
 ### Openpilot / comma.ai
 
-Openpilot uses camera calibration for its perception model. The intrinsic matrix is embedded in the model's normalization layer, but for custom hardware you provide it via:
-
-```python
-# In openpilot params (simplified)
-from common.params import Params
-import json, numpy as np
-
-K = np.array([
-    [461.629,   0,     362.680],
-    [  0,     460.152, 246.049],
-    [  0,       0,       1    ]
-])
-
-Params().put('CalibrationParams', json.dumps({
-    'rpyCalib': [0.0, 0.0, 0.0],   # roll, pitch, yaw offset from Kalibr extrinsic
-    'wideCameraOnly': False,
-}))
-```
+Openpilot's calibration and model preprocessing are application-specific. `CalibrationParams` is not a generic JSON store for camera intrinsics, and a Kalibr YAML cannot be installed by inventing parameter keys. A custom camera requires the selected openpilot revision's sensor configuration, intrinsic/warp conventions, calibration serialization, and model input contract. Inspect the [official source](https://github.com/commaai/openpilot) at a pinned revision and validate recorded-image preprocessing against that revision before attempting a hardware integration. This course does not claim a custom-camera integration was executed.
 
 ---
 
@@ -1075,7 +1056,7 @@ Symptom:  Camera-IMU calibration fails to converge
 Cause:    Irregular IMU timestamps (USB latency, poor driver)
 Fix:      - Check with: rostopic hz /imu/data (should be stable ±1%)
           - Use hardware-timestamped IMU (SPI/I2C directly, not USB)
-          - Add --time-calibration flag (Kalibr estimates the offset)
+          - Temporal calibration is enabled by default; inspect --no-time-calibration and --timeoffset-padding in your pinned CLI
           - If jitter > 1ms: fix the IMU driver or hardware first
 ```
 
@@ -1146,7 +1127,7 @@ Starting from a Jetson Orin Nano with a CSI camera (IMX219) and an MPU6050 IMU:
 2. Print and mount a 6×6 AprilGrid on foam board, measure tagSize
 3. Record camera intrinsic bag → run `kalibr_calibrate_cameras`
 4. Record camera-IMU bag → run `kalibr_calibrate_imu_camera`
-5. Validate: reprojection error < 0.5px, timeshift < 30ms
+5. Validate: reprojection error < 0.5px, time shift stable across held-out motions and inside the configured optimization range
 
 ### Project 2: Stereo Camera Calibration
 Calibrate a stereo pair (two CSI cameras or USB webcams). Compare results with OpenCV's `stereoCalibrate`. Measure the baseline (distance between cameras) with calipers and verify Kalibr's estimated translation matches within 2mm.
@@ -1211,3 +1192,11 @@ Write a Python script that:
 **Build and challenge:** Fit on one trajectory and validate on another. Verify transform direction, units, clock convention, and timestamp preservation through any bag conversion.
 
 **Pass forward:** Calibration YAML, held-out residuals, and provenance for the fusion pipeline. Continue with [the connected course](../BEVFusion/Guide.md) and keep the artifact in the [Physical AI Design Studio](../../../../Physical-AI-Design-Studio.md).
+
+## Numerical checks before using calibration
+
+Kalibr's continuous white measurement noise density scales to per-sample standard deviation as `sigma_sample = sigma_density / sqrt(dt)` under its sampling/filtering assumptions. Bias random-walk increments instead scale as `sigma_bias_step = sigma_bias_density * sqrt(dt)`. At 200 Hz (`dt=0.005`), a gyro density of `8.73e-5 rad/s/√Hz` corresponds to approximately `0.00123 rad/s` per sample. These two square-root scalings go in opposite directions. Downsampling/filtering can change the assumptions; do not copy a datasheet number without its bandwidth convention.
+
+A board dimension error changes metric scale without necessarily increasing reprojection error. Run the [known-scale CPU experiment](../Camera-Time-Fusion-Lab/Guide.md) before interpreting a subpixel residual as physical accuracy. Noise YAMLs above are illustrative values, not calibrated specifications for every device bearing that sensor name.
+
+**Sources checked 2026-10-18:** [Kalibr IMU noise model](https://github.com/ethz-asl/kalibr/wiki/IMU-Noise-Model), [transform/time YAML definitions](https://github.com/ethz-asl/kalibr/wiki/yaml-formats), [actual calibration CLI](https://github.com/ethz-asl/kalibr/blob/master/aslam_offline_calibration/kalibr/python/kalibr_calibrate_imu_camera), [Allan-variance tool usage](https://github.com/ori-drs/allan_variance_ros). This review checked source arguments and conventions; it did not run a physical Kalibr calibration or validate the example device noise values.

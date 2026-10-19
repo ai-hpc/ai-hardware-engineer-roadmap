@@ -8,7 +8,7 @@ Use this sequence after the introductory lectures. It adds deliberate debugging,
 
 ## Version and hardware contract
 
-Reference documentation checked **2026-10-13**: [Isaac Sim 6.1 requirements](https://docs.isaacsim.omniverse.nvidia.com/6.1.0/installation/requirements.html) and [Isaac Lab v3.0.0-EA installation](https://isaac-sim.github.io/IsaacLab/v3.0.0-EA/source/setup/installation/index.html). Use a resolved Isaac Lab commit and its lockfile, simulator version/image digest, driver, task/asset revision, physics backend, and renderer. A release branch can change after this course was written.
+Reference documentation and selected source contracts rechecked **2026-10-18**; use the [compatibility record](Compatibility.md) for current 6.2 versus the named 6.1/EA baseline: [Isaac Sim 6.1 requirements](https://docs.isaacsim.omniverse.nvidia.com/6.1.0/installation/requirements.html) and [Isaac Lab v3.0.0-EA installation](https://isaac-sim.github.io/IsaacLab/v3.0.0-EA/source/setup/installation/index.html). Use a resolved Isaac Lab commit and its lockfile, simulator version/image digest, driver, task/asset revision, physics backend, and renderer. A release branch can change after this course was written.
 
 Full Isaac Sim workflows need a compatible RTX system. An 8 GB card is an experimental reduced path, below the documented 16 GB minimum, not a supported baseline for all labs. Kit-less training is a separate path with different features; passing it does not validate Isaac Sim rendering or ROS integration.
 
@@ -28,6 +28,8 @@ The existing Lecture 01 contains setup notes. Preserve your installation record 
 | [21 — Language-guided robotics capstone](Lecture-21.md) | Asynchronous language planner plus bounded robot skills | Trace, rejection tests, closed-loop results | Recorded-event replay |
 
 ## CPU exercises supplied here
+
+The [expanded CPU simulation lab](Simulation-CPU-Lab.md) adds actual Newton physics, OpenUSD composition, six real ROS replay outcomes, a separate-process TorchScript adapter fixture, scalar system identification, and paired outcome analysis. Use its measured/raw results and explicit optional dependency instructions before running a full simulator.
 
 From this course directory:
 

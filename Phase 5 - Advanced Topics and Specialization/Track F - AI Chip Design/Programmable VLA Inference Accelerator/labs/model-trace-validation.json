@@ -1,0 +1,30 @@
+{
+  "checked_at": "2026-10-18T23:30:31.641071+00:00",
+  "scope": "actual CPU export/profile of trained scalar synthetic action model; no hardware performance result",
+  "tests_passed": 5,
+  "tests_skipped": 0,
+  "torch": "2.14.0+cpu",
+  "python": "3.12.3",
+  "commands": [
+    "python labs/trace_action_model.py --checkpoint /tmp/course-action-generation-final/flow-7.pt --output /tmp/course-action-hardware-trace",
+    "python -m unittest discover -s labs -p test_trace_action_model.py -v"
+  ],
+  "local_files": {
+    "trace_action_model.py": "7c936e8ac80e73f5730da073adac3b86b41bdda8d4e55e28e6f3d8f55d8f6035",
+    "test_trace_action_model.py": "919f43f0859c8c376922343bd6b8ce7cc723748b922aff7866f42ccee93edcdb",
+    "model-trace-results.json": "cfdc4cab03d21f67746d40b585621a4e948760f6b1a0e6422979079b74a4b4d8"
+  },
+  "review_findings": [
+    "Batch-one probes now change all three categories; rolling a single label did not test category dependence",
+    "Every changed-input probe also runs on the serialized/reloaded graph",
+    "Counts and tile ratios independently checked; no accelerator, DRAM traffic, SRAM residency or runtime guarantee inferred"
+  ],
+  "export_probes_per_batch": 12,
+  "reload_probes_per_batch": 12,
+  "max_export_and_reload_error": 0.0,
+  "checkpoint_sha256": "dbc22af6fa57b9d5adc37acf8a3d1a54b368cdaa1797ffd51d8e06b129ad1a58",
+  "action_source_hashes": {
+    "action_generation.py": "b0f20589a6bedcea992fab5514f4b320191ea0ce1b78eec6afef010e2160a81b",
+    "action_math.py": "612238a6a4826820ac43a3e747c6df837f58b6aa9499156d7003c0e9b6171ccc"
+  }
+}

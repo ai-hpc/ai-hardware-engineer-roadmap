@@ -1,0 +1,23 @@
+{
+  "verified_utc": "2026-10-18T22:19:31.602077+00:00",
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3",
+  "portable_command": "python3 -m unittest discover -s labs -p 'test_*.py' -v",
+  "portable_tests_passed": 7,
+  "portable_output": "test_accounting_no_duplicate_or_lost_identity (test_backlog.BacklogTests.test_accounting_no_duplicate_or_lost_identity) ... ok\ntest_equal_arrival_and_completion_has_declared_order (test_backlog.BacklogTests.test_equal_arrival_and_completion_has_declared_order) ... ok\ntest_invalid_configuration (test_backlog.BacklogTests.test_invalid_configuration) ... ok\ntest_known_fifo_ages (test_backlog.BacklogTests.test_known_fifo_ages) ... ok\ntest_latest_only_cannot_fix_slow_inference (test_backlog.BacklogTests.test_latest_only_cannot_fix_slow_inference) ... ok\ntest_latest_pending_does_not_preempt_current_job (test_backlog.BacklogTests.test_latest_pending_does_not_preempt_current_job) ... ok\ntest_worker_faster_than_producer_has_no_backlog (test_backlog.BacklogTests.test_worker_faster_than_producer_has_no_backlog) ... ok\n\n----------------------------------------------------------------------\nRan 7 tests in 0.001s\n\nOK\n",
+  "reference_output": "backlog-reference.json",
+  "additional_executed_records": [
+    "qos-reference.json"
+  ],
+  "scope": "Synthetic teaching input. Native records distinguish actual library/middleware/TCP execution from model-only checks. No physical robot or sensor execution.",
+  "sha256": {
+    "Integration-Lab.md": "04bd97815908209c76811c4eea4cbaa2341957ce85bed715b06fedbf5c512f22",
+    "Lecture-01.md": "6c19e9efbd7f1c57874cf0c6bcf6e364ca13d232a8e4191c16d385c349ae4f85",
+    "labs/backlog-reference.json": "fb2c22b31f10996ce29435daab48f7f1c1048c10b821e2ed2ebd2bb158791626",
+    "labs/backlog.py": "62715563edea3bdabf16a60ce0ff42ae8e264780936c236df79156d0b3744834",
+    "labs/qos-reference.json": "b3ae8c5003b6faa7e5eb4bc1186df4f1053aa12dd47472da5a5a9956e1b34f97",
+    "labs/qos_ros2.py": "85d5a6f48bfeb52a4c089104ec98fe0948c4f7b521bf80d7018c335751c3da93",
+    "labs/source-review-2026-10-18.json": "704ad7e26383e0e129ddd4270381ed4656f145f625571fe0308531fcb628eae0",
+    "labs/test_backlog.py": "2e2412389f202a6bf84a443cf675dcfc05856db55bca65320e735746eb6e65da"
+  }
+}

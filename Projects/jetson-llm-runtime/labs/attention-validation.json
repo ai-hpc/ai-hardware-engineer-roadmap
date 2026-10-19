@@ -1,0 +1,143 @@
+{
+  "verified_utc": "2026-10-18T22:34:35.568882+00:00",
+  "scope": "Actual CPU oracle/pool address checks and CUDA compilation only. No attention kernel execution or pretrained generation.",
+  "host": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "compiler": "c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+  "nvcc": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2026 NVIDIA Corporation\nBuilt on Tue_Sep_01_08:45:21_PDT_2026\nCuda compilation tools, release 13.4, V13.4.92\nBuild cuda_13.4.r13.4/compiler.38855100_0\n",
+  "compile": [
+    {
+      "command": [
+        "c++",
+        "-std=c++17",
+        "-O1",
+        "-g",
+        "-fsanitize=address,undefined",
+        "-fno-omit-frame-pointer",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-I",
+        "tests/cuda_stub",
+        "-I",
+        "include",
+        "tests/test_attention_reference.cpp",
+        "src/memory/kv_cache.cpp",
+        "-o",
+        "/tmp/course-runtime-attention-asan"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+        "-std=c++17",
+        "-arch=sm_87",
+        "-O2",
+        "-I",
+        "include",
+        "tests/test_attention.cu",
+        "src/kernels/attention.cu",
+        "-o",
+        "/tmp/course-runtime-attention-parity"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/tmp/course-cuda-toolchain-venv/lib/python3.12/site-packages/nvidia/cu13/bin/nvcc",
+        "-std=c++17",
+        "-arch=sm_87",
+        "-O2",
+        "-I",
+        "include",
+        "-c",
+        "src/engine/decode.cu",
+        "-o",
+        "/tmp/course-runtime-decode-review.o"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "sanitized_cpu": {
+    "command": [
+      "/tmp/course-runtime-attention-asan"
+    ],
+    "exit_code": 0,
+    "stdout": "attention CPU oracle: 13 fixtures x 5 tile sizes passed; known answers, negative-float counterexample, actual pool offset logic and invalid shapes passed\nCUDA execution: not performed by this CPU test\n",
+    "stderr": ""
+  },
+  "cuda_execution": {
+    "command": [
+      "/tmp/course-runtime-attention-parity"
+    ],
+    "exit_code": 77,
+    "stdout": "",
+    "stderr": "SKIP: no usable CUDA device/driver; attention kernel parity not executed\n"
+  },
+  "portable_unittest": {
+    "command": [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "labs",
+      "-p",
+      "test_attention_contracts.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "test_native_decode_scratch_reservation_reuse_and_failures (test_attention_contracts.AttentionContracts.test_native_decode_scratch_reservation_reuse_and_failures) ... ok\ntest_native_oracle_layout_and_negative_score_counterexample (test_attention_contracts.AttentionContracts.test_native_oracle_layout_and_negative_score_counterexample) ... ok\n\n----------------------------------------------------------------------\nRan 2 tests in 2.607s\n\nOK\n"
+  },
+  "sha256": {
+    "src/kernels/attention.cu": "dc5be779763b9cb04acba6a5196214fa885ab8a314d4fd9317f02b97602bd378",
+    "src/engine/decode.cu": "66b72705ea0958b69f5df9cba57167e6ae9308a1941904070b4935a1ea3b3840",
+    "src/memory/kv_cache.cpp": "076932548a7221272d1cbf70389741ecacc3a6eeee6a527e2c9d0a3aba74db84",
+    "include/jllm_kernels.h": "c9a10918a269597a2e16ec1aadf84fa6cc26cbfec2c62dc2d5648db14b3dd5f3",
+    "include/jllm_attention_layout.h": "cb1baed0b3b880a19c4ce5368bb93978a759e46ea5818fabf24573927858e81b",
+    "include/jllm_memory.h": "8062da6d7bb5ba0f0140562242132fc14eb6389e15fb4f7f17464126b2704c9f",
+    "include/jllm_decode_memory.h": "556870316384d0130f6ba869575d8a6609f232dc2db9eeb48ffc0ced014876ee",
+    "include/jllm_engine.h": "1a74180603dfb88b6c73fc8e3e234fb0c8a65f0885d14e3b223e9bb0556e2ac0",
+    "src/memory/pool.cpp": "40c372511517635e3195935dfad85007a4d051f1cc05891b3b0e447d8c24acee",
+    "src/engine/model.cpp": "b16214d9a609cc2aeabd67ff25a1a31f29054048ed30283c678ec9e32987d8c1",
+    "tests/test_decode_scratch.cpp": "82cd28a3b108776154c7aab60305940ac1cf09b8eaabb693329640430e1fa9f7",
+    "tests/attention_reference.h": "e5036fd0ca2a1c317fd7cb8845eee50ec5d96bcbb82123724886c097491c3b32",
+    "tests/test_attention.cu": "3728442945ff09037328b110086d3d81abf26a24b8b35a98499e0e0808314c4c",
+    "tests/test_attention_reference.cpp": "bb8adb5753160ce006019090eb50311fa4d1b504cfa17b3aba46990252f9c449",
+    "tests/cuda_stub/cuda_runtime.h": "9ffe706aaba431a92a1953da79bafe5a80aa022bac0839de1bc5dd87ec4656a3",
+    "labs/test_attention_contracts.py": "7fe11739c06f919869f0f5124f7902ebbe740a2aec745495e7504026a2e28c32",
+    "labs/Attention-Layout-Lab.md": "e747dc958a48a715d4183ef6d0c1eb23d4c033f57fd12d238e6dbb739a1c4a1d",
+    "CMakeLists.txt": "5424e0bc71e144993f133e95090575b8b5a2bd2fcb63162ba6575c61c1dbcb50",
+    "docs/memory.md": "17e5510564a652591dd9af24d385e1db4d5890b28b59fb12a8c4c0e825b6fb03",
+    "docs/kernels.md": "64b549f164fc115a03e423067b99a5034c81132f278fdb2d963efee33fec06e0",
+    "TESTING.md": "0ac2407e2634f79432726d2d54f4d3b9722c4d0c58bd2a2f6a39fe2f968500d6"
+  },
+  "binary_sha256": {
+    "/tmp/course-runtime-attention-asan": "ebf8d0733d14d1c4337e96ff2fefe23b5373be3befdc8818c88b7fc633b8939b",
+    "/tmp/course-runtime-attention-parity": "abf37f98984782b95c65a8c5d94a2c7da21fe2582c20683226ecac9f75072497",
+    "/tmp/course-runtime-decode-review.o": "f9219590abf3829f01862bf208169ae57a7c70a4d90715169d5165d6a74e799d"
+  },
+  "native_release_and_sanitized_ctest": {
+    "release": {
+      "chunk_id": "8478f6",
+      "wall_time_seconds": 3.37e-06,
+      "exit_code": 0,
+      "original_token_count": 527,
+      "output": "[ 42%] Built target test_sampling\n[ 46%] Building CXX object CMakeFiles/test_memory_contracts.dir/tests/test_memory_contracts.cpp.o\n[ 50%] Built target test_tokenizer\n[ 53%] Building CXX object CMakeFiles/test_allocator_contracts.dir/tests/test_allocator_contracts.cpp.o\n[ 57%] Linking CXX executable test_memory_contracts\n[ 61%] Building CXX object CMakeFiles/test_allocator_contracts.dir/src/memory/pool.cpp.o\n[ 61%] Built target test_memory_contracts\n[ 65%] Building CXX object CMakeFiles/test_allocator_contracts.dir/src/memory/kv_cache.cpp.o\n[ 69%] Building CXX object CMakeFiles/test_attention_reference.dir/tests/test_attention_reference.cpp.o\n[ 73%] Linking CXX executable test_allocator_contracts\n[ 73%] Built target test_allocator_contracts\n[ 76%] Building CXX object CMakeFiles/test_decode_scratch.dir/tests/test_decode_scratch.cpp.o\n[ 80%] Building CXX object CMakeFiles/test_decode_scratch.dir/src/memory/pool.cpp.o\n[ 84%] Linking CXX executable test_decode_scratch\n[ 84%] Built target test_decode_scratch\n[ 88%] Linking CXX executable benchmark_cpu\n[ 92%] Built target benchmark_cpu\n[ 96%] Building CXX object CMakeFiles/test_attention_reference.dir/src/memory/kv_cache.cpp.o\n[100%] Linking CXX executable test_attention_reference\n[100%] Built target test_attention_reference\nInternal ctest changing into directory: /tmp/course-runtime-attention-build\nTest project /tmp/course-runtime-attention-build\n    Start 1: sampling\n1/6 Test #1: sampling .........................   Passed    0.01 sec\n    Start 2: memory_contracts\n2/6 Test #2: memory_contracts .................   Passed    0.01 sec\n    Start 3: allocator_cpu_shim\n3/6 Test #3: allocator_cpu_shim ...............   Passed    0.01 sec\n    Start 4: attention_cpu_oracle\n4/6 Test #4: attention_cpu_oracle .............   Passed    0.01 sec\n    Start 5: decode_scratch_cpu_contract\n5/6 Test #5: decode_scratch_cpu_contract ......   Passed    0.01 sec\n    Start 6: gguf_tokenizer_contracts\n6/6 Test #6: gguf_tokenizer_contracts .........   Passed    3.24 sec\n\n100% tests passed, 0 tests failed out of 6\n\nTotal Test time (real) =   3.33 sec\n"
+    },
+    "sanitized": {
+      "chunk_id": "71a643",
+      "wall_time_seconds": 3.45e-06,
+      "exit_code": 0,
+      "original_token_count": 545,
+      "output": "[ 34%] Built target test_sampling\n[ 38%] Built target gguf-inspect\n[ 42%] Linking CXX executable test_tokenizer\n[ 46%] Building CXX object CMakeFiles/test_memory_contracts.dir/tests/test_memory_contracts.cpp.o\n[ 50%] Built target test_tokenizer\n[ 53%] Building CXX object CMakeFiles/test_allocator_contracts.dir/tests/test_allocator_contracts.cpp.o\n[ 57%] Linking CXX executable test_memory_contracts\n[ 57%] Built target test_memory_contracts\n[ 61%] Building CXX object CMakeFiles/test_attention_reference.dir/tests/test_attention_reference.cpp.o\n[ 65%] Building CXX object CMakeFiles/test_allocator_contracts.dir/src/memory/pool.cpp.o\n[ 69%] Building CXX object CMakeFiles/test_allocator_contracts.dir/src/memory/kv_cache.cpp.o\n[ 73%] Linking CXX executable test_allocator_contracts\n[ 76%] Building CXX object CMakeFiles/test_attention_reference.dir/src/memory/kv_cache.cpp.o\n[ 76%] Built target test_allocator_contracts\n[ 80%] Building CXX object CMakeFiles/test_decode_scratch.dir/tests/test_decode_scratch.cpp.o\n[ 84%] Linking CXX executable test_attention_reference\n[ 84%] Built target test_attention_reference\n[ 88%] Building CXX object CMakeFiles/test_decode_scratch.dir/src/memory/pool.cpp.o\n[ 92%] Linking CXX executable benchmark_cpu\n[ 96%] Linking CXX executable test_decode_scratch\n[ 96%] Built target test_decode_scratch\n[100%] Built target benchmark_cpu\nInternal ctest changing into directory: /tmp/course-runtime-cpu-sanitize\nTest project /tmp/course-runtime-cpu-sanitize\n    Start 1: sampling\n1/6 Test #1: sampling .........................   Passed    0.26 sec\n    Start 2: memory_contracts\n2/6 Test #2: memory_contracts .................   Passed    0.04 sec\n    Start 3: allocator_cpu_shim\n3/6 Test #3: allocator_cpu_shim ...............   Passed    0.05 sec\n    Start 4: attention_cpu_oracle\n4/6 Test #4: attention_cpu_oracle .............   Passed    0.18 sec\n    Start 5: decode_scratch_cpu_contract\n5/6 Test #5: decode_scratch_cpu_contract ......   Passed    0.03 sec\n    Start 6: gguf_tokenizer_contracts\n6/6 Test #6: gguf_tokenizer_contracts .........   Passed   13.50 sec\n\n100% tests passed, 0 tests failed out of 6\n\nTotal Test time (real) =  14.10 sec\n"
+    }
+  }
+}

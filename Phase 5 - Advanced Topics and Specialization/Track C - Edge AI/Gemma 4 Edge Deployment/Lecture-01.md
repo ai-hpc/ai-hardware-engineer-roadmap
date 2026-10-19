@@ -10,7 +10,7 @@ A configuration can change under `main`. Resolve and save an immutable revision 
 
 ## 2. Audit the actual configuration
 
-Save `config.json` from your selected revision locally, then run this metadata-only exercise:
+Start with the [supplied configuration and executable CPU checks](README.md#start-with-the-supplied-cpu-exercises). To inspect another selected revision, save its `config.json` locally and run this metadata-only exercise:
 
 ```python
 import collections
@@ -30,7 +30,7 @@ print(json.dumps({k: text.get(k) for k in keys}, indent=2))
 print("layer_types", dict(collections.Counter(text.get("layer_types", []))))
 ```
 
-For the inspected [E2B configuration](https://huggingface.co/google/gemma-4-E2B-it/blob/main/config.json), local and full-attention layers have different head dimensions; cache-sharing metadata also exists. This invalidates a universal `2 × layers × heads × head_dim × context` estimate applied without checking model implementation and runtime allocation. Compare metadata with actual KV tensors or runtime cache logs.
+For the inspected [E2B configuration](https://huggingface.co/google/gemma-4-E2B-it/blob/3e22461f65e89153144f8adb70e3b8c2cc9845a7/config.json), local and full-attention layers have different head dimensions; cache-sharing metadata also exists. This invalidates a universal `2 × layers × heads × head_dim × context` estimate applied without checking model implementation and runtime allocation. Compare metadata with actual KV tensors or runtime cache logs.
 
 ## 3. Work through cache growth
 
@@ -60,3 +60,9 @@ For decode, `bytes touched per token / sustained bandwidth` is a lower bound und
 ## Lab and acceptance
 
 Submit the config hash, layer-type counts, a cache estimate at three contexts, and measured cache allocation if a runtime is available. Explain every discrepancy larger than a predeclared tolerance using reservation, sharing, dtype, or workspace evidence. Without hardware, submit the metadata/math result and leave measurement cells **not run**. Pass the accepted memory budget into Lecture 02.
+
+## Source-checked architecture details
+
+The pinned E2B config has 28 sliding and seven full-attention layers, local head dimension 256, global head dimension 512, one KV head, and `num_kv_shared_layers=20`. Its `attention_k_eq_v` flag is **false**. Do not apply a family-level description of unified global K/V to this checkpoint without checking its exact implementation. Shared projections also do not automatically prove that post-normalization/rotation cache buffers alias.
+
+The executed Transformers 5.20.1 metadata inspection finds KV projections/ownership in layers 0–14; layers 15–34 reuse matching attention-type state from providers 13 and 14. Temporary shared state, retained sliding cache, full cache and allocator reservation are different objects. This is why the supplied payload calculator requires explicit physical allocation names instead of deriving a purported exact Gemma cache size from the layer count alone. See the [implementation inspection](labs/transformers_meta.py) and [result](labs/meta-reference.json).

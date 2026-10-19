@@ -1,0 +1,45 @@
+{
+  "review_date_utc": "2026-10-18",
+  "host": {
+    "distribution": "Ubuntu 24.04.4",
+    "architecture": "x86_64",
+    "python": "3.12.3",
+    "compiler": "GCC 13.3.0"
+  },
+  "poky": {
+    "url": "https://git.yoctoproject.org/poky",
+    "tag": "yocto-5.0.20",
+    "commit": "64e69ed23703f6358ec431d3f5f1f8483f974cae"
+  },
+  "bitbake_version": "2.8.1",
+  "machine": "qemux86-64",
+  "distro": "poky",
+  "checks": {
+    "native_tests_passed": 7,
+    "upstream_parser_tests_passed": 14,
+    "recipes_parsed": 922,
+    "targets": 1880,
+    "skipped": 47,
+    "parse_errors": 0,
+    "completed_recipe_tasks": [
+      "do_recipe_qa",
+      "do_fetch",
+      "do_unpack"
+    ]
+  },
+  "not_run": [
+    "target_compile",
+    "target_package",
+    "image_build",
+    "sdk_build",
+    "qemu_boot",
+    "physical_board_boot"
+  ],
+  "inputs_sha256": {
+    "meta-robot-course/conf/layer.conf": "31aa6b1c60ec7af1ed042d06eee37b94f4b455edbcd5b28df7e424a7c2218a85",
+    "meta-robot-course/recipes-core/images/robot-course-image.bb": "8c5f78a8463295db0f8e8a2ae84fccc43df9238c6d9d93cdadd07f7d04443b81",
+    "meta-robot-course/recipes-apps/observation-check/observation-check_1.0.bb": "f6229e041645d9eecbd84fb2b092d48412f63957f8224d345e5118b5639b491b",
+    "meta-robot-course/recipes-apps/observation-check/files/LICENSE": "f299df5bc330439bfc955963c958595083121e292ad7a73f07d92260d38fb871",
+    "meta-robot-course/recipes-apps/observation-check/files/observation-check.c": "180d4503ce4592866ac2ff85d750eaadb4dc518b7873875f195f3eeeeecc74cf"
+  }
+}

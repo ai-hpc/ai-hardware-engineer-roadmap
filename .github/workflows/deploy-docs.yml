@@ -19,7 +19,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,38 +32,36 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
+        run: python3 -m pip install -r requirements-docs.txt
+
+      - name: Check source links before publication
+        run: python3 scripts/check_links.py
+
+      - name: Install native lab dependencies
         run: |
-          pip install mkdocs-material==9.7.* \
-                      mkdocs-redirects \
-                      pymdown-extensions \
-                      pillow \
-                      cairosvg
+          sudo apt-get update
+          sudo apt-get install --yes g++ clang lld qemu-user cmake iverilog libtbb-dev ocl-icd-opencl-dev pocl-opencl-icd ffmpeg python3-gi gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 gstreamer1.0-plugins-base device-tree-compiler nodejs
+
+      - name: Check CPU labs before publication
+        # Optional frameworks remain explicit skips in the saved result record.
+        run: POCL_MAX_PTHREAD_COUNT=2 /usr/bin/python3 scripts/run_portable_checks.py --json /tmp/portable-checks.json
+
+      - name: Retain executed and skipped check results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-cpu-checks
+          path: /tmp/portable-checks.json
+          if-no-files-found: warn
 
       - name: Prepare docs directory
-        run: |
-          mkdir -p docs
-          # Copy all markdown, assets, and images into docs/
-          rsync -av --include='*/' \
-                    --include='*.md' \
-                    --include='*.png' \
-                    --include='*.jpg' \
-                    --include='*.jpeg' \
-                    --include='*.svg' \
-                    --include='*.gif' \
-                    --include='*.py' \
-                    --include='*.css' \
-                    --include='robots.txt' \
-                    --include='llms.txt' \
-                    --exclude='.git' \
-                    --exclude='.github' \
-                    --exclude='docs' \
-                    --exclude='_site' \
-                    --exclude='mkdocs.yml' \
-                    --exclude='*.html' \
-                    ./ docs/
+        run: bash scripts/prepare_docs.sh
+
+      - name: Check published source links
+        run: python3 scripts/check_links.py docs
 
       - name: Build site
-        run: mkdocs build --site-dir /tmp/_site
+        run: mkdocs build --strict --site-dir /tmp/_site
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -74,7 +72,7 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: build
     steps:
       - name: Deploy to GitHub Pages

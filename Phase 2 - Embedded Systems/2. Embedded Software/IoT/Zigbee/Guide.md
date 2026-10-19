@@ -91,7 +91,7 @@ Do not memorize commands first. Build the mental model first.
 - [Silicon Labs Zigbee Fundamentals - The Zigbee Stack](https://docs.silabs.com/zigbee/8.2.1/zigbee-fundamentals/05-the-zigbee-stack)
 - [Silicon Labs Zigbee Security - Concepts](https://docs.silabs.com/zigbee/9.0.0/zigbee-security/02-concepts)
 - [ESP Zigbee SDK introduction](https://docs.espressif.com/projects/esp-zigbee-sdk/en/latest/esp32c6/introduction.html)
-- [ESP Zigbee NCP guide](https://docs.espressif.com/projects/esp-zigbee-sdk/en/latest/esp32c6/user-guide/ncp.html)
+- [ESP Zigbee NCP guide](https://docs.espressif.com/projects/esp-zigbee-sdk/en/release-v1.0/esp32c6/user-guide/ncp.html)
 
 ---
 

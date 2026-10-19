@@ -108,6 +108,16 @@ That is why Zigbee work is **real embedded-systems engineering** and not just wi
 
 ---
 
+## Calculate the sleep/latency tradeoff
+
+For an idealized sleepy child polling every two seconds, a command arriving uniformly between polls waits between approximately zero and two seconds for the next poll, averaging one second before other delays. This is an illustrative scheduling model, not a delivery guarantee: buffering limits, missed polls, retries, parent loss and application processing add delay or loss. A 100 ms response requirement is incompatible with this simple two-second polling policy.
+
+Treat commissioning as a state transition with a bounded join window, explicit identity/security policy and a visible result. Test rejected onboarding as well as accepted onboarding. A shared network key protects a network boundary; it does not give each joined device unlimited application authority. Keep provisioning keys and production packet captures out of public lab artifacts.
+
+OTA transport and executable-image authenticity are separate. A downloaded Zigbee OTA image still needs the selected platform's image validation, boot/recovery policy and version policy. Test an interrupted transfer and a failed trial image before relying on an unattended update. Changing network settings or erasing persistence during recovery can also strand a device, so preserve/restore state according to the stack's documented process.
+
+**Answer check:** Does a sleepy sensor's radio current alone predict battery life? No. Integrate processing, sensing, polls, transmissions, retries, sleep current and regulator losses across time. Does encrypted traffic prove an update is authorized? No. Evaluate the firmware trust chain and signing/version checks separately.
+
 ## Lab
 
 Take one hypothetical product:

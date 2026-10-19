@@ -1,0 +1,35 @@
+{
+  "scope": "meta-device parameter/implementation inspection only; no model or cache tensors allocated",
+  "torch": "2.14.0+cpu",
+  "transformers": "5.20.1",
+  "unique_parameters": 5104297504,
+  "component_parameters": {
+    "vision_tower": 167364608,
+    "language_model": 4628569344,
+    "audio_tower": 304824608,
+    "embed_vision": 1179648,
+    "embed_audio": 2359296
+  },
+  "kv_owner_layers": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14
+  ],
+  "shared_state_provider_layers": [
+    13,
+    14
+  ],
+  "implementation_sha256": "d42819dd9a2e5627da35a056e44b3c4c7b778e11c2067dcdd8312ee17ddc52f3"
+}

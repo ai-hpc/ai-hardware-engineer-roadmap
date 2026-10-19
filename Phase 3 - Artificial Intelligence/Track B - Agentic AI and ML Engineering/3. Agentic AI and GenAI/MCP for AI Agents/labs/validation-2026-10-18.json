@@ -1,0 +1,69 @@
+{
+  "checked_utc": "2026-10-18T22:23:38.842012+00:00",
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "environment": {
+    "python": "3.12.3",
+    "sqlite": "3.45.1",
+    "packages": {
+      "anyio": "4.15.1",
+      "sse-starlette": "3.5.0",
+      "attrs": "26.1.0",
+      "h11": "0.16.0",
+      "uvicorn": "0.54.0",
+      "starlette": "1.9.0",
+      "pycparser": "3.11",
+      "jsonschema-specifications": "2025.9.1",
+      "httpx2": "2.14.0",
+      "python-multipart": "0.0.32",
+      "pip": "24.0",
+      "PyJWT": "2.15.1",
+      "referencing": "0.37.0",
+      "mcp-types": "2.3.0",
+      "click": "8.5.0",
+      "httpcore2": "2.14.0",
+      "cffi": "2.1.1",
+      "mcp": "2.3.0",
+      "typing_extensions": "4.16.0",
+      "pydantic_core": "2.50.1",
+      "rpds-py": "2026.9.1",
+      "truststore": "0.10.5",
+      "cryptography": "50.0.2",
+      "pydantic": "2.14.1",
+      "typing-inspection": "0.4.4",
+      "annotated-types": "0.8.0",
+      "jsonschema": "4.26.0",
+      "idna": "3.20",
+      "opentelemetry-api": "1.45.1"
+    }
+  },
+  "checks": [
+    {
+      "command": [
+        "/tmp/course-mcp-v2-venv/bin/python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/MCP for AI Agents/labs/optional",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "test_actual_memory_discovery_tool_and_structured_output (test_mcp_v2.MCPTests.test_actual_memory_discovery_tool_and_structured_output) ... Executing <Task pending name='Task-2' coro=<MCPTests.test_actual_memory_discovery_tool_and_structured_output() running at /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/MCP for AI Agents/labs/optional/test_mcp_v2.py:11> wait_for=<Future pending cb=[Task.task_wakeup()] created at /tmp/course-mcp-v2-venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py:1007> cb=[_run_until_complete_cb() at /usr/lib/python3.12/asyncio/base_events.py:182] created at /usr/lib/python3.12/asyncio/runners.py:100> took 0.112 seconds\nExecuting <Task pending name='Task-2' coro=<MCPTests.test_actual_memory_discovery_tool_and_structured_output() running at /home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/MCP for AI Agents/labs/optional/test_mcp_v2.py:11> wait_for=<Future pending cb=[Task.task_wakeup()] created at /usr/lib/python3.12/asyncio/base_events.py:449> cb=[_run_until_complete_cb() at /usr/lib/python3.12/asyncio/base_events.py:182, <1 more>, WorkerThread.stop()] created at /usr/lib/python3.12/asyncio/runners.py:100> took 0.372 seconds\nok\ntest_actual_stdio_subprocess_transport (test_mcp_v2.MCPTests.test_actual_stdio_subprocess_transport) ... execute program '/tmp/course-mcp-v2-venv/bin/python': <_UnixSubprocessTransport pid=831750 running stdin=<_UnixWritePipeTransport fd=7 idle bufsize=0> stdout=<_UnixReadPipeTransport fd=8 polling>>\n<_UnixReadPipeTransport fd=8 polling> was closed by peer\n<_UnixSubprocessTransport pid=831750 running stdin=<_UnixWritePipeTransport closed fd=7 closed> stdout=<_UnixReadPipeTransport closed fd=8 closed>> exited with return code 0\nok\ntest_execution_rejects_invalid_types_and_bounds (test_mcp_v2.MCPTests.test_execution_rejects_invalid_types_and_bounds) ... Tool 'millimeters_to_meters' rejected arguments: ['value_mm']\nTool 'millimeters_to_meters' rejected arguments: ['value_mm']\nTool 'millimeters_to_meters' rejected arguments: ['value_mm']\nTool 'millimeters_to_meters' rejected arguments: ['value_mm']\nTool 'move_robot' failed: 'Unknown tool: move_robot'\nok\ntest_resource_and_prompt_remain_data (test_mcp_v2.MCPTests.test_resource_and_prompt_remain_data) ... ok\n\n----------------------------------------------------------------------\nRan 4 tests in 4.967s\n\nOK\n"
+    }
+  ],
+  "artifact_sha256": {
+    "optional/test_mcp_v2.py": "605e554ff92d6f1263572f7475e3407d6a382670161c5c160c17a243295765c3",
+    "requirements-linux-cpu-py312.txt": "45b54543db3f0421da8c1382dd99e4368e6a6e3fc42b26660d03730630485be7",
+    "server_v2.py": "d66f0d3fca2c26f533b64d35ef05a8895cb1cf5b2323638f61df31888e2d17d6"
+  },
+  "not_executed": [
+    "provider LLM requests",
+    "GPU inference",
+    "remote MCP HTTP/OAuth",
+    "production authentication, TLS, load or cancellation tests"
+  ],
+  "scope": "Synthetic local fixtures; no real robot specifications or generalization claim."
+}

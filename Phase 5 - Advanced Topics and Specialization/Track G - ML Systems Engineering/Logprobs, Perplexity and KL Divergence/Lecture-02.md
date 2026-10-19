@@ -18,7 +18,7 @@ By the end of this lecture you should be able to:
 
 * Define **surprise** `−log p(x)` and **entropy** `H(p) = E_p[−log p]` as expected surprise, and explain why the uniform distribution maximizes entropy and a peaked distribution minimizes it.
 * Define **cross-entropy** `H(p,q) = −Σ p log q`, give its optimal-coding interpretation, and prove that `H(p,q) ≥ H(p)` always.
-* Show that for next-token prediction the data distribution is one-hot, so the cross-entropy loss **collapses to the mean negative log-likelihood** `mean_t[−log q(x_t | x_<t)]` — the number in your logs.
+* Show that for next-token prediction each observed hard target is represented as one-hot, so the cross-entropy loss **collapses to the mean negative log-likelihood** `mean_t[−log q(x_t | x_<t)]` — the number in your logs.
 * State and explain the **master identity** `H(p,q) = H(p) + D_KL(p ‖ q)`, and identify entropy as the **floor** the loss can never beat.
 * Convert a loss in nats to perplexity, and read a training/eval curve in terms of irreducible vs. closable error.
 
@@ -65,7 +65,7 @@ Entropy assumes you know the true distribution `p` and built the optimal code fo
   H(p, q) = E_p[−log q] = − Σ_x p(x) log q(x)
 ```
 
-**The coding interpretation.** An optimal prefix code for `q` assigns symbol `x` a codeword of length `−log q(x)` nats (this is the Kraft–Shannon optimal length for a source whose probabilities are `q`). If symbols truly came from `q`, the expected length would be `H(q)`. But they come from `p`, so the expected description length is `Σ_x p(x) · [−log q(x)] = H(p, q)`. You are paying for a code tuned to the *wrong* distribution. Every place where `q` underestimates a symbol that `p` makes common, you pay a long codeword often; every place `q` overestimates a rare symbol, you waste short codewords on events that rarely happen.
+**The coding interpretation.** The ideal description length for a symbol under `q` is `−log2 q(x)` bits. An individual binary prefix code uses integer lengths, so this is not generally an exact codeword length. Block/arithmetic coding approaches the expected rate. Averaging the ideal lengths over symbols drawn from `p` gives cross-entropy; using a mismatched `q` adds KL relative to the ideal rate for `p`.
 
 **Why `H(p, q) ≥ H(p)` always.** The cross-entropy can never beat the entropy: the best possible code is the one matched to the true distribution. The shortfall is exactly the KL divergence (Lecture 04 proves `H(p,q) − H(p) = D_KL(p ‖ q) ≥ 0` via Gibbs' inequality), but the bound itself is intuitive — you cannot describe a source for fewer nats than its own entropy, so coding for any `q ≠ p` can only cost more. Equality holds **iff** `q = p` everywhere `p` has support. This single inequality is why training has a floor, which §4 makes precise.
 
@@ -102,7 +102,7 @@ So at a single position the cross-entropy **is** the negative log-likelihood of 
 
 This is why "cross-entropy loss," "negative log-likelihood," and "the language-modeling loss" are three names for the same number. (Note the one-hot is the *empirical* `p`; the *true* `p` for a position is generally soft — many tokens could plausibly continue — and that gap is what entropy in §4 captures. Distillation, Lecture 05, replaces the one-hot with a teacher's soft `p`.)
 
-**Teacher forcing and shifted labels.** During training the model predicts position `t` while conditioning on the *ground-truth* prefix `x_<t` rather than its own past samples — this is **teacher forcing**. Mechanically it means the targets are the inputs **shifted by one**: `logits[:, :-1]` predicts `labels[:, 1:]`. Padding and prompt tokens are excluded with an ignore index so they contribute zero to the mean. Every position is scored in parallel against the single token that actually followed.
+**Teacher forcing and shifted labels.** During training the model predicts position `t` while conditioning on the *ground-truth* prefix `x_<t` rather than its own past samples — this is **teacher forcing**. Mechanically it means the targets are the inputs **shifted by one**: `logits[:, :-1]` predicts `labels[:, 1:]`. Padding is excluded with an ignore index. Prompt tokens are excluded only for objectives that score completions; ordinary language-model pretraining usually scores text throughout. Divide by the number of included targets after shifting. Every position is scored in parallel against the single token that actually followed.
 
 The PyTorch identity below is the whole §3 in code — `F.cross_entropy` on logits is *exactly* the mean of the gathered `−log_softmax` at the true tokens:
 
@@ -156,9 +156,9 @@ The algebra is one line — split the log inside KL and recognize the two pieces
   ⇒  H(p, q) = H(p) + D_KL(p ‖ q),     with  D_KL(p ‖ q) ≥ 0.
 ```
 
-Read physically: **your loss is the data's own entropy plus the distance from your model to the data.** Training can only ever move the second term. No amount of optimization, scale, or data drives the loss below `H(p)` — that is the **floor**, the genuine ambiguity in language (many tokens can legitimately follow "The capital of France is"). When a loss curve flattens, you are watching `D_KL(p ‖ q) → 0` while `H(p)` sits underneath unmoved. A model that reached loss `= H(p)` would be *perfect* — it would assign exactly the data's true conditional probabilities — and `D_KL(p ‖ q) = 0` is the only way to get there.
+Read physically: **your loss is the data's own entropy plus the distance from your model to the data.** Training can only ever move the second term. No amount of optimization, scale, or data drives the loss below `H(p)` — that is the **floor**, the genuine ambiguity in language (many tokens can legitimately follow "The capital of France is"). A plateau does not establish `D_KL(p ‖ q) → 0`: model capacity, optimization, finite data, or a distribution shift can leave a substantial gap. The population identity does not make true conditional entropy observable from one finite validation set. A model that reached loss `= H(p)` would be *perfect* — it would assign exactly the data's true conditional probabilities — and `D_KL(p ‖ q) = 0` is the only way to get there.
 
-This reframes every downstream technique in the course as a campaign against one specific KL term. Quantization adds a `D_KL(p_fp16 ‖ q_int4)` you want small (Lecture 05); distillation minimizes `D_KL(p_teacher ‖ q_student)` directly (Lecture 05); the RLHF penalty bounds `D_KL(q_tuned ‖ q_base)` to stop the policy drifting. The identity is the same; only the two distributions change.
+Quantization grading can measure `D_KL(p_reference ‖ q_quant)` on common prefixes. That is distinct from the change in held-out data NLL: `E_data[log p_reference − log q_quant]`. These become equal only when the token expectation is taken under the reference distribution. Distillation may directly minimize teacher KL; alignment may use a policy KL regularizer. Always name both distributions and the averaging population.
 
 ---
 
@@ -166,23 +166,23 @@ This reframes every downstream technique in the course as a campaign against one
 
 Your loss is in **nats per token**. The single most useful reflex is to exponentiate it: because `PPL = exp(H(p, q)) = exp(mean NLL)` (derived in full in Lecture 03), the loss and the perplexity are the same information in two units.
 
-| Loss (nats) | `PPL = e^loss` | Informal reading for an LLM |
-|---|---|---|
-| `0.0` | `1.0` | perfect / degenerate — only if the data were deterministic |
-| `1.0` | `≈ 2.72` | implausibly low for open-domain text; suspect a leak or trivial data |
-| `2.0` | `≈ 7.39` | strong modern LLM territory on held-out general text |
-| `3.0` | `≈ 20.1` | a smaller or undertrained model |
-| `5.0` | `≈ 148` | near-random for a small vocab; something is wrong |
-| `ln V` | `V` | uniform over the vocab — the untrained-model sanity check |
+| Mean NLL (nats/token) | `PPL = exp(mean NLL)` |
+|---|---:|
+| `0` | `1` |
+| `1` | `2.718` |
+| `2` | `7.389` |
+| `3` | `20.086` |
+| `5` | `148.413` |
+| `ln V` | `V` |
 
-A loss of **2.0 nats ↔ PPL ≈ 7.4**: the model is, on average, as uncertain as if it were choosing uniformly among ~7.4 equally likely next tokens (the "effective branching factor" of Lecture 03). The last row is the cheapest diagnostic you have — a freshly initialized model should print loss `≈ ln V` (e.g. `ln 128000 ≈ 11.76`), because an untrained softmax is roughly uniform; if your first step is far below `ln V`, your labels are leaking; far above it and your logits or loss masking are broken.
+These are mathematical conversions, not universal quality bands. Compare the same text, tokenizer, masking, and context policy. A uniform predictor gives `ln V`; random initialization need not produce uniform logits. A deviation from `ln V` is a diagnostic to investigate, not proof of leakage or a broken loss.
 
 Two reporting conventions to keep straight:
 
 * **Per-token vs. per-sequence.** The printed loss is almost always the **per-token** mean (`reduction='mean'` divides by the token count). A *per-sequence* sum (`reduction='sum'` then divide by batch) is sensitive to sequence length and is the wrong thing to compare across runs with different `seq_len`. Always confirm the denominator before comparing two curves; a "lower loss" that merely used shorter sequences is an artifact.
 * **What "good" looks like is relative.** Absolute loss is only meaningful against a *fixed tokenizer and dataset*. Two models with different tokenizers spread the same text across different numbers of tokens, so their per-token losses are not comparable — the fix is **bits-per-byte**, normalizing to the underlying UTF-8 bytes (Lecture 03). Until then, treat raw cross-entropy as comparable only *within* a tokenizer family.
 
-> **2026 update:** fused / chunked cross-entropy is now the default path for large-vocab training rather than an optimization you reach for — Liger-Kernel's fused-linear-cross-entropy and **cut-cross-entropy** (which avoids ever materializing the `[tokens × vocab]` logit matrix) ship in mainstream training stacks, routinely cutting peak activation memory by multiple GB at 128k–256k vocab and removing the loss tensor as a sequence-length bottleneck. On the reporting side, **bits-per-byte** (loss converted to `log2` and divided by bytes per token) has become the preferred headline for tokenizer-independent comparison; raw per-token nats are increasingly treated as an internal training signal rather than a cross-model metric (forward-ref Lecture 03).
+> **Implementation note, checked 2026-10-18:** fused linear/cross-entropy implementations can avoid materializing full-vocabulary logits. Availability and memory savings depend on the framework, shape, dtype, and kernel. See the primary [Cut Cross-Entropy implementation](https://github.com/apple/ml-cross-entropy). Choose the reporting unit explicitly; bits-per-byte provides a common text denominator, while token NLL remains useful under a fixed tokenizer.
 
 ---
 

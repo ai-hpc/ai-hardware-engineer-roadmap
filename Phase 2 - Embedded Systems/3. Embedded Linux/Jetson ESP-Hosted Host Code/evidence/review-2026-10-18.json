@@ -1,0 +1,23 @@
+{
+  "reviewed_at": "2026-10-18",
+  "legacy_revision": "ce36dec9294988e598f04e84c9d28092ca9e9786",
+  "files_downloaded_and_hash_verified": 8,
+  "executed": [
+    "bash -n jetson_orin_nano_init.sh",
+    "bash jetson_orin_nano_init.sh --help"
+  ],
+  "source_findings": [
+    "allocation failure returns ERR_PTR while direct caller uses if(wdev)",
+    "free_netdev precedes writes through netdev_priv pointer in error cleanup",
+    "HCI receive hands skb to core then legacy caller reads skb data and length",
+    "HCI registration failure frees hdev while adapter retains pointer",
+    "boot-event TLV loop reads header/payload without local complete-length checks"
+  ],
+  "not_executed": [
+    "kernel module build/load",
+    "device unbind",
+    "Jetson/ESP firmware or RF",
+    "failure injection into a kernel",
+    "validation of a complete upstream patch"
+  ]
+}

@@ -1,237 +1,44 @@
-# Openpilot Pipeline — Flow Diagram
+# openpilot flow: predictions, controls and transport
 
-End-to-end data flow in **openpilot** (comma.ai), from camera input to CAN actuation. Based on the actual process layout in the [commaai/openpilot repository](https://github.com/commaai/openpilot).
-
----
-
-## High-Level Pipeline
-
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│  camerad    │───▶│   modeld   │───▶│  plannerd   │───▶│ controlsd  │───▶│   pandad    │
-│  (camera)   │    │  (tinygrad) │    │  radard     │    │  (lat+long) │    │   (CAN)     │
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
-                          │                    │
-                          │                    └── radarState (lead vehicle)
-                          └── modelV2 (lanes, plan, pose)
-```
-
----
-
-## Process-Level Flow (Openpilot)
-
-```mermaid
-flowchart TB
-    subgraph SENSORS["📷 Sensors"]
-        CAM[camerad<br/>Road + driver cameras]
-        RADAR[Radar CAN<br/>optional, per car]
-        IMU[IMU / GPS<br/>locationd]
-    end
-
-    subgraph PERCEPTION["🔍 Perception (modeld)"]
-        VISION[driving_vision_tinygrad.pkl]
-        POLICY[driving_policy_tinygrad.pkl]
-        VISION --> POLICY
-    end
-
-    subgraph DM["👁️ Driver Monitoring"]
-        DMODEL[dmonitoringmodeld]
-        DMON[dmonitoringd]
-        DMODEL --> DMON
-    end
-
-    subgraph LOCALIZATION["📍 Localization"]
-        CALIB[calibrationd]
-        LOC[locationd]
-        PARAMS[paramsd]
-        TORQUE[torqued]
-    end
-
-    subgraph PLANNING["📐 Planning"]
-        RADARD[radard<br/>lead vehicle tracking]
-        PLANNERD[plannerd<br/>LongitudinalPlanner, LDW]
-    end
-
-    subgraph CONTROL["🎛️ Control"]
-        CONTROLS[controlsd<br/>LatControl + LongControl]
-    end
-
-    subgraph ACTUATION["⚙️ Actuation"]
-        CARD[card<br/>Car interface]
-        PANDAD[pandad<br/>CAN bus]
-    end
-
-    CAM --> PERCEPTION
-    CAM --> DM
-    RADAR --> RADARD
-    IMU --> LOCALIZATION
-
-    PERCEPTION --> |modelV2| PLANNERD
-    PERCEPTION --> |modelV2| CONTROLS
-    LOCALIZATION --> |livePose, liveCalibration| CONTROLS
-    RADARD --> |radarState| PLANNERD
-    PLANNERD --> |longitudinalPlan| CONTROLS
-    DM --> |driverMonitoringState| CONTROLS
-
-    CONTROLS --> |carControl| CARD
-    CARD --> PANDAD
-```
-
----
-
-## Message Flow (cereal)
+This diagram describes the source snapshot pinned in the [module guide](Guide.md). It omits many management, monitoring, calibration and UI paths so that the principal data boundaries remain readable. It is not a complete deployment architecture.
 
 ```mermaid
 flowchart LR
-    subgraph modeld
-        FRAME[VisionIpc<br/>camera frames]
-        MDL[modelV2]
-        FRAME --> MDL
-    end
-
-    subgraph plannerd
-        RADAR[radarState]
-        PLAN[longitudinalPlan]
-        MDL --> PLAN
-        RADAR --> PLAN
-    end
-
-    subgraph controlsd
-        CC[carControl]
-        PLAN --> CC
-        MDL --> CC
-        POSE[livePose] --> CC
-        DMS[driverMonitoringState] --> CC
-    end
-
-    subgraph pandad
-        CAN[CAN messages]
-        CC --> CAN
-    end
+  C["camerad: image buffers + acquisition metadata"] --> V["VisionIPC frame transport"]
+  V --> M["modeld: preparation + inference + decoding"]
+  M --> P["plannerd: longitudinal planning"]
+  M --> CT["controlsd: lateral / longitudinal control"]
+  P --> CT
+  CS["carState / vehicle parameters"] --> P
+  CS --> CT
+  CT --> CC["carControl"]
+  CC --> CI["card + vehicle interface"]
+  CI --> S["sendcan"]
+  S --> PD["pandad / panda transport"]
+  PD --> SC["vehicle-specific independent checks"]
 ```
 
----
+The last stages describe responsibilities, not an assertion that the safety checks occur in one particular host process. Follow the pinned panda/opendbc implementation and hardware path to establish where each check runs.
 
-## modeld: Perception Detail
+## Read each arrow as a contract
 
-```mermaid
-flowchart TB
-    subgraph INPUT
-        VIPC[VisionIpcClient<br/>road camera frames]
-        WARP[get_warp_matrix<br/>calibration]
-    end
+| Arrow | Key question | Consequential mistake |
+|---|---|---|
+| Camera → frame transport | Which frame, acquisition interval and buffer lifetime? | Reusing an overwritten image while preserving its old metadata |
+| Frame → model | Which warp, calibration, history and dtype/layout? | Correct weights applied to the wrong preprocessing |
+| Model → plan/controller | What are the output units and valid time horizon? | Interpreting curvature as wheel angle |
+| Plan → controller | Does the current state still match the plan start? | Following a feasible but obsolete trajectory |
+| Controller → interface | Which normalized/physical actuator fields and bounds? | Treating torque request as a universal angle |
+| Interface → transport/checks | Which platform encoding, counters and independent limits? | Assuming the application publisher is the only enforcement layer |
 
-    subgraph TINYGRAD["tinygrad models"]
-        VISION[driving_vision<br/>lane lines, pose, road edges]
-        POLICY[driving_policy<br/>plan: velocity, curvature]
-        VISION --> POLICY
-    end
+`modelV2` has a nominal 20 Hz service rate in the reviewed snapshot. `controlsd` and `card` run 100 Hz loops. Multiple control updates per model prediction are expected; they do not create new perception observations. Other messages and calibration/state updates have their own clocks and rates.
 
-    subgraph OUTPUT["modelV2"]
-        LANES[laneLines]
-        EDGES[roadEdges]
-        POSE[pose]
-        PLAN[position / velocity / acceleration]
-        ACTION[desiredCurvature, desiredAcceleration]
-    end
+## Walk one signed value
 
-    VIPC --> INPUT
-    WARP --> INPUT
-    INPUT --> TINYGRAD
-    TINYGRAD --> OUTPUT
-```
+An illustrative curvature of `-0.1/m` means a rightward curve under a forward/left convention. An ideal 2.8 m wheelbase bicycle would require `atan(-0.28)≈-0.273 rad` at the road wheels. The selected vehicle controller and interface still need their own mapping and constraints. The diagram does not justify sending that floating-point value directly as a CAN field.
 
-**modeld outputs** (from `fill_model_msg`, `parse_model_outputs`):
-- Lane lines, road edges, lane line probabilities
-- Pose (road transform, device pose)
-- Plan (position, velocity, acceleration over time)
-- Action (desired curvature, desired acceleration, shouldStop)
-- FCW (forward collision) probabilities
+## Exercise
 
----
+Pick one source line that publishes `modelV2`, one that publishes `carControl`, and one that publishes `sendcan`. Record the producer, input validity checks and relevant timestamp. Then inspect a subscriber and explain how it detects a missing or stale producer. Complete the [replay fault lesson](Replay-Lab.md) before claiming any property of the full stack.
 
-## plannerd → controlsd
-
-```mermaid
-flowchart LR
-    subgraph plannerd
-        LONG[LongitudinalPlanner]
-        LDW[LaneDepartureWarning]
-        LONG --> longitudinalPlan
-        LDW --> driverAssistance
-    end
-
-    subgraph controlsd
-        LAT[LatControl<br/>Angle / PID / Torque]
-        LONG_CTRL[LongControl]
-        LAT --> actuators
-        LONG_CTRL --> actuators
-    end
-
-    modelV2 --> plannerd
-    radarState --> plannerd
-    longitudinalPlan --> controlsd
-    modelV2 --> controlsd
-```
-
-**plannerd** subscribes: `modelV2`, `carState`, `radarState`, `controlsState`, `liveParameters`  
-**plannerd** publishes: `longitudinalPlan`, `driverAssistance`
-
-**controlsd** subscribes: `modelV2`, `longitudinalPlan`, `livePose`, `liveCalibration`, `carState`, `driverMonitoringState`  
-**controlsd** publishes: `carControl` (actuators)
-
----
-
-## controlsd → CAN
-
-```mermaid
-flowchart LR
-    subgraph controlsd
-        CC[carControl]
-        STEER[steer]
-        GAS[gas]
-        BRAKE[brake]
-    end
-
-    subgraph card
-        CI[CarInterface]
-    end
-
-    subgraph pandad
-        CAN[CAN]
-    end
-
-    CC --> CI
-    CI --> CAN
-```
-
----
-
-## Openpilot-Specific Notes
-
-| Aspect | Openpilot |
-|--------|-----------|
-| **Sensors** | Camera(s) primary; radar optional (car-dependent) |
-| **Perception** | End-to-end NN (vision + policy) in modeld; no explicit 2D/3D detection |
-| **Planning** | Plan from model; plannerd adds longitudinal (ACC, lead follow) and LDW |
-| **Control** | LatControl (angle/PID/torque), LongControl; vehicle-specific via opendbc |
-| **Inference** | tinygrad (driving_vision, driving_policy, dmonitoring) |
-| **Messaging** | cereal (capnp) over IPC |
-
----
-
-## Process → Source Map
-
-| Process | Path |
-|---------|------|
-| camerad | `system/camerad/` — [camerad Guide](camerad/Guide.md) |
-| modeld | `selfdrive/modeld/modeld.py` |
-| dmonitoringmodeld | `selfdrive/modeld/dmonitoringmodeld.py` |
-| dmonitoringd | `selfdrive/monitoring/dmonitoringd.py` |
-| locationd | `selfdrive/locationd/locationd.py` |
-| calibrationd | `selfdrive/locationd/calibrationd.py` |
-| radard | `selfdrive/controls/radard.py` |
-| plannerd | `selfdrive/controls/plannerd.py` |
-| controlsd | `selfdrive/controls/controlsd.py` |
-| card | `selfdrive/car/card.py` |
-| pandad | `selfdrive/pandad/` |
+Pinned source: [modeld](https://github.com/commaai/openpilot/blob/b1e88c2357f07dfc4e0872370b64d97ad606391b/openpilot/selfdrive/modeld/modeld.py), [plannerd](https://github.com/commaai/openpilot/blob/b1e88c2357f07dfc4e0872370b64d97ad606391b/openpilot/selfdrive/controls/plannerd.py), [controlsd](https://github.com/commaai/openpilot/blob/b1e88c2357f07dfc4e0872370b64d97ad606391b/openpilot/selfdrive/controls/controlsd.py), [card](https://github.com/commaai/openpilot/blob/b1e88c2357f07dfc4e0872370b64d97ad606391b/openpilot/selfdrive/car/card.py).

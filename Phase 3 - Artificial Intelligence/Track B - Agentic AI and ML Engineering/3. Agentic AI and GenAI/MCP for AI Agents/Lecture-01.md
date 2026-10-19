@@ -2,6 +2,10 @@
 
 **Collection:** [MCP for AI Agents](README.md) | **Previous:** [← Course index](README.md) | **Next:** [Lecture 02](Lecture-02.md)
 
+
+**Protocol scope:** the detailed wire/SDK examples below teach the `2025-11-25` compatibility contract. Start with the [current 2026-07-28 protocol lesson](Protocol-2026-07-28.md) for new implementations; do not relabel an old handshake or reverse-request example as current.
+
+
 ---
 
 Every agent you build eventually hits the same wall. The model is smart enough; the demo works; then someone asks it to read from Postgres, file an issue in GitHub, and check the on-call rotation in PagerDuty — and you spend the next two weeks writing glue. Each tool has its own auth, its own payload shape, its own error semantics, and you hand-wire all of it into your one agent. Then a second team builds a second agent and writes the *same* glue again, because your integration lived inside your harness and nobody can reuse it. That is the integration tax the agent era ran into, and it is the problem the **Model Context Protocol (MCP)** was created to remove.
@@ -16,7 +20,7 @@ This first lecture makes the case for *why a protocol*, not yet how to build one
 
 1. Quantify the **M×N integration explosion** and explain precisely how MCP collapses it to **M + N**.
 2. State what MCP standardizes — a **JSON-RPC 2.0 wire protocol** for discovering and invoking a server's tools, resources, and prompts — and what it deliberately does *not* (a framework or an agent).
-3. Recount the **adoption timeline and spec revisions** (Nov 2024 launch → 2025-03-26 → 2025-06-18 → 2025-11-25 stable → 2026-07-28 RC) and explain why a protocol wins on **network effects** once everyone speaks it.
+3. Recount the **adoption timeline and spec revisions** (Nov 2024 launch → 2025-03-26 → 2025-06-18 → 2025-11-25 stable → 2026-07-28 revision) and explain why a protocol wins on **network effects** once everyone speaks it.
 4. Decide, for a given system, **when MCP wins** over plain function calling and when plain function calling is the right call.
 5. Sketch the **host / client / server** model and name the **six primitives** and the actor that controls each, forward-referencing Lectures 02–04.
 
@@ -91,8 +95,8 @@ A protocol is only worth standardizing on if it wins, and MCP's trajectory is th
 | **Nov 2024** | Anthropic open-sources MCP; first spec, stdio transport, the core primitives. |
 | **2025-03-26** | Adds **Streamable HTTP** transport and an **authorization** framework (OAuth); deprecates the legacy HTTP+SSE transport. |
 | **2025-06-18** | Spec revision refining the protocol surface (elicitation, structured tool output, security guidance). |
-| **2025-11-25** | **Latest stable revision** — what you pin production work to today. |
-| **2026-07-28** | **Release candidate**: a stateless core, **MCP Apps** (server-rendered UI), a **Tasks** extension for long-running work, and tighter OAuth alignment. |
+| **2025-11-25** | **Historical handshake-based revision** — still relevant for compatibility. |
+| **2026-07-28** | **Current revision, verified 2026-10-18**: a stateless core, **MCP Apps** (server-rendered UI), a **Tasks** extension for long-running work, and tighter OAuth alignment. |
 
 Across that window the protocol went from "interesting thing one lab published" to industry default. **OpenAI, Google DeepMind, and Microsoft** all adopted MCP through 2025 — when the three other largest model and platform vendors back a competitor's protocol, that is not politeness, it is recognition that a shared standard is worth more than a proprietary one. The scale numbers track the adoption: the `mcp` PyPI package now does **~97M downloads a month**, and the official registry passed **2,000 servers**.
 
@@ -138,4 +142,4 @@ The capabilities a connection carries are the **six primitives**, split by direc
 
 ## Current as of
 
-This lecture is current as of **June 2026** and pins to the **2025-11-25** stable MCP specification — the revision to target for production work today. The protocol remains built on JSON-RPC 2.0 with the host/client/server architecture and six primitives described above; the adoption and scale figures (cross-vendor adoption by OpenAI, Google DeepMind, and Microsoft; ~97M monthly `mcp` downloads; 2,000+ registry servers) reflect early-2026 reporting. Watch the **2026-07-28 release candidate**, which introduces a stateless core, MCP Apps (server-rendered UI), a Tasks extension for long-running work, and tighter OAuth alignment — none of which changes the M×N argument or the mental model here, but which will shape the transport and deployment lectures. Treat SDK surfaces as snapshots and verify against your installed version; the protocol facts above are the stable ground.
+The original June-2026 examples target `2025-11-25`. Reviewed 2026-10-18: **2026-07-28 is current**, with a different request, result, subscription, and retry contract. Use the [current lesson and official sources](Protocol-2026-07-28.md) before implementing or migrating. SDK snippets here have not been executed against the new revision; retained benchmark numbers are historical references, not local measurements.

@@ -6,6 +6,8 @@ This is a **complete reference answer** for Lab 1: one plausible embedded produc
 
 **Note:** Exact `MACHINE` strings, layer names, and recipe names depend on your **vendor BSP** and **Yocto branch**. Always confirm against the BSP README and the release you pinned. For deep Jetson + Yocto production practice on this roadmap, see **Phase 4 Track B** (*Orin-Nano-Yocto-BSP-Production*).
 
+**Current support note, reviewed 2026-10-18:** NVIDIA introduced official Jetson Yocto support with JetPack 7.2, including validated recipes/reference images and contributions to OE4T. Follow the [NVIDIA support announcement](https://developer.nvidia.com/blog/deploy-agentic-ready-ai-at-the-edge-with-memory-efficiency-in-nvidia-jetpack-7-2/) and its linked BSP release instructions for a board-specific combination. This does not make the course's Scarthgap/QEMU teaching layer a validated Jetson image; the board's matching layer series and release manifest still decide compatibility.
+
 ---
 
 ## 1. Target hardware
@@ -187,7 +189,7 @@ You will add entries such as `meta`, `meta-poky`, `meta-oe`, **BSP meta**, **met
 
 ```
 inherit core-image
-IMAGE_INSTALL:append = "your-runtime-packages"
+IMAGE_INSTALL:append = " your-runtime-packages"
 ```
 
 Name the image `yourproduct-image.bb` and `bitbake yourproduct-image` when the stack is wired.
@@ -206,32 +208,24 @@ The sections above are the **what**. This section is the **how**: a realistic or
 
 **Pipeline:** host setup → clone Poky → `oe-init-build-env` → add layers → `local.conf` → product layer → image recipe → (optional) app recipe → kernel/DT tweaks → WIC/OTA wiring → `bitbake` → deploy → vendor flash tools.
 
-### 1. Host setup and get Poky
+### 1. Select a supported BSP baseline and initialize the workspace
 
-**Install build dependencies** (Ubuntu is common; names differ on other distros). Cross-check the **Yocto System Requirements** page for your release.
+**Status:** this board-specific workflow is a design/integration exercise; it has not been built or flashed in the course review. Begin with the tested native and metadata route in [Lecture 5](Lecture-05.md) and the [supplied small package](../Labs/README.md).
 
-```bash
-sudo apt update
-sudo apt install -y gawk wget git diffstat unzip texinfo gcc build-essential \
-  chrpath socat cpio python3 python3-pip python3-pexpect xz-utils debianutils \
-  iputils-ping python3-git python3-jinja2 libegl1-mesa libsdl1.2-dev pylint xterm
+For a Jetson product, choose the exact upstream/BSP manifest combination documented by the board-support maintainers. Record every resolved commit and the matching host requirements. Do not select an EOL series merely because an older tutorial used it. The [official release page](https://www.yoctoproject.org/development/releases/) and the BSP compatibility documentation answer different questions; both matter.
+
+Use this workspace layout for the relative paths below:
+
+```text
+work/
+  poky/
+  build/
+  meta-openembedded/
+  meta-tegra/
+  meta-rauc/
 ```
 
-**Clone Poky** at a **named branch or tag** that matches your BSP (example branch name only):
-
-```bash
-git clone git://git.yoctoproject.org/poky
-cd poky
-git checkout kirkstone   # example only — use BSP-required revision
-```
-
-**Start a build shell** (creates or uses `build/`):
-
-```bash
-source oe-init-build-env build
-```
-
-From here, paths like `../meta-tegra` assume sibling directories next to `poky/`, not inside `build/`.
+After fetching the compatible pinned repositories, initialize from `work/` using `source poky/oe-init-build-env build`. You will then be in `work/build/`, so `../meta-tegra` correctly names the sibling layer. Host package installation must follow the **selected release's** official requirements rather than a frozen package list from another Ubuntu release.
 
 ### 2. Add layers (example stack)
 
@@ -308,7 +302,7 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 
 inherit core-image
 
-# Use :append (Kirkstone+). Only list packages that exist in your configured layers.
+# Use current override syntax for the selected supported release. List existing packages only.
 IMAGE_INSTALL:append = " \
     python3 \
     openssh-sshd \

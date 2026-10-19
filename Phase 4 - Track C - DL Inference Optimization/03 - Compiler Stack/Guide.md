@@ -20,6 +20,8 @@
 
 Kernels (02) are either hand-written or compiler-generated. This unit covers how compilers represent the model (IR), decide fusion and placement (scheduling), and emit code (codegen). You need this to co-design with frameworks and to add or tune backends.
 
+**CPU entry:** complete the [first compiler experiment](../00%20-%20CPU%20Compiler%20Lab/Guide.md) to inspect actual generated code without a GPU. Its optional tinygrad runner is pinned separately from its standard-library correctness tests.
+
 ---
 
 ## 1. Intermediate representation (IR)
@@ -52,7 +54,7 @@ Kernels (02) are either hand-written or compiler-generated. This unit covers how
 ## Resources
 
 * [tinygrad](https://github.com/tinygrad/tinygrad) — IR, scheduler, BEAM, backends.
-* [TVM Documentation](https://tvm.apache.org/docs/) — TIR, AutoTVM, BYOC.
+* [TVM Documentation](https://tvm.apache.org/docs/) — Relax, TensorIR, and external integrations; [MetaSchedule](https://tvm.apache.org/docs/deep_dive/tensor_ir/tutorials/meta_schedule.html) for the documented tuning path. Pin the release before copying namespaces; AutoTVM/Relay examples are historical workflows.
 * [MLIR Tutorial](https://mlir.llvm.org/docs/Tutorials/) — Dialects and lowering.
 
 ---

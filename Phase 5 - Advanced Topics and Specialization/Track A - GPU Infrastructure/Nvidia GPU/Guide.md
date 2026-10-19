@@ -21,7 +21,9 @@
 
 **HPC** = high-performance computing: solving problems that need massive compute and memory by using many machines (or many GPUs) working together. In AI, "HPC" usually means **large-scale training** and **high-throughput inference** on GPU clusters, not single workstations.
 
-**Why Nvidia GPUs?** Nvidia GPUs are the dominant hardware for training and deploying large models. They offer the best-supported software stack: **CUDA** (programming model and runtime), **cuDNN** and **CUTLASS** (high-performance kernels — cuDNN for conv/RNN/attention; CUTLASS for customizable GEMM, matrix multiply, and epilogue fusion used by frameworks and custom kernels), **TensorRT** (inference optimization and deployment), and **NCCL** (multi-GPU collectives). Add the fastest inter-GPU links (NVLink, NVSwitch) and the architectures (Hopper, Blackwell) that ML frameworks target first, and you see why AI infrastructure and kernel-level optimization work almost always involves Nvidia GPUs in data centers.
+**Why this stack?** CUDA, cuDNN, CUTLASS, TensorRT and NCCL provide a widely used application-to-hardware path. NVIDIA's platform-specific features make useful case studies in kernel execution, memory placement and distributed communication. Compare other platforms with the same workload and numerical contract rather than assuming a universal performance ranking.
+
+**CPU starting point:** the [two-process Gloo/DDP lab](HPC%20Setup/NCCL-Deep-Dive/CPU-Collectives-Lab/Guide.md) runs without GPUs and shows why correct gradient normalization precedes cluster tuning. GPU-specific recipes are labeled by execution evidence and version.
 
 **What this track covers:**
 

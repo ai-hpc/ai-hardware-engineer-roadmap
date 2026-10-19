@@ -18,7 +18,7 @@
 
 ## Why AMD GPU
 
-AMD's Instinct GPUs (MI300X, MI300A, MI350) are the primary alternative to Nvidia for AI training and inference at scale. Understanding both ecosystems makes you more versatile and valuable — especially as cloud providers (Azure, Oracle, Meta) deploy AMD hardware alongside Nvidia.
+AMD Instinct is another major accelerator ecosystem for AI/HPC. Study one named device and a matching ROCm release; CPU/GPU memory organization, supported kernels and numerical formats differ between generations. Source review: 2026-10-18. No AMD hardware execution is claimed in this guide.
 
 ---
 
@@ -39,10 +39,16 @@ AMD's Instinct GPUs (MI300X, MI300A, MI350) are the primary alternative to Nvidi
 
 ---
 
+### Compare generations without mixing memory organizations
+
+MI300X has 192 GB HBM3; MI325X has 256 GB HBM3E; MI350X/MI355X use CDNA4 with 288 GB HBM3E and advertised 8 TB/s local-memory bandwidth. MI300A is an APU with CPU and GPU components sharing a different platform organization. These are named case studies, not a claim that they are the newest available products. Partition modes can change the logical devices visible to software, so record the actual mode. [AMD architecture](https://rocmdocs.amd.com/en/latest/reference/gpu-arch/mi350.html), [MI350X specification](https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/product-briefs/amd-instinct-mi350x-gpu-brochure.pdf).
+
+**Worked check:** 8×288 GB is 2,304 GB nominal across GPUs. A 400 GB allocation does not fit on one 288 GB device merely because the node aggregate is larger. It needs a supported sharding/offload strategy, whose communication and workspace are additional.
+
 ## 2. ROCm Software Stack
 
 * **ROCm (Radeon Open Compute):**
-    * Open-source GPU compute platform. ROCm 6+ for MI300X.
+    * Open-source GPU compute platform. Use the exact GPU/OS/framework compatibility matrix for a pinned release; an old “ROCm 6+” minimum does not establish current package compatibility.
     * Kernel driver (`amdgpu`), runtime (`hip-runtime`), compiler (`amd-clang`).
 * **HIP (Heterogeneous-computing Interface for Portability):**
     * CUDA-like API for AMD GPUs. `hipMalloc`, `hipMemcpy`, `hipLaunchKernelGGL`.
@@ -53,9 +59,9 @@ AMD's Instinct GPUs (MI300X, MI300A, MI350) are the primary alternative to Nvidi
     * **RCCL** (ROCm Communication Collectives Library) — AMD's NCCL equivalent for multi-GPU.
     * **Composable Kernel (CK)** — AMD's equivalent to CUTLASS for custom GEMM/attention kernels.
 * **Profiling:**
-    * **rocProfiler** / **rocTracer** — kernel-level profiling.
-    * **Omniperf** — roofline analysis, occupancy, memory throughput (like Nsight Compute).
-    * **Omnitrace** — timeline profiling (like Nsight Systems).
+    * **ROCprofiler-SDK / rocprofv3** — current tracing/profiling workflow; legacy rocprofiler/roctracer examples need a version boundary.
+    * **ROCm Compute Profiler (`rocprofiler-compute`, formerly Omniperf)** — roofline, occupancy and memory analysis.
+    * **ROCm Systems Profiler** — system/application timeline profiling; identify older Omnitrace recipes as historical.
 
 ---
 
@@ -68,11 +74,11 @@ AMD's Instinct GPUs (MI300X, MI300A, MI350) are the primary alternative to Nvidi
     * CUDA warps have 32 lanes; AMD wave size depends on the target. Use `warpSize` and a sufficiently wide lane mask for reduction, ballot, and shuffle code.
     * LDS bank count and access phases depend on architecture and instruction width. MI300/CDNA3 uses 32 banks, so “AMD has 64 banks” is not a portable rule. [AMD LDS guidance](https://rocm.docs.amd.com/projects/HIP/en/latest/understand/performance_optimization.html).
     * Memory coalescing rules differ slightly.
-    * No direct equivalent to Nvidia Tensor Cores — use Matrix Cores via `rocWMMA` or CK.
+    * AMD Matrix Cores serve a similar matrix-acceleration purpose; instruction shapes, formats and programming interfaces differ. Use supported `rocWMMA`, CK or compiler/library paths.
 * **Framework support:**
     * PyTorch: native ROCm support (`torch.cuda` works on AMD via HIP).
     * TensorFlow, JAX: ROCm backends available.
-    * TVM, ONNX Runtime: ROCm execution providers.
+    * Compiler/runtime support is project- and release-specific. TVM targets and ONNX Runtime execution providers are different interfaces; verify maintained AMD support for the exact version instead of assuming an old ROCm provider remains available.
     * vLLM, TensorRT-LLM alternatives for AMD: vLLM + ROCm, AMD Inference Server.
 
 ---
@@ -81,7 +87,7 @@ AMD's Instinct GPUs (MI300X, MI300A, MI350) are the primary alternative to Nvidi
 
 * **Infinity Fabric:**
     * Intra-node GPU-to-GPU interconnect. Bandwidth and topology compared to NVLink.
-    * MI300X: 896 GB/s aggregate fabric bandwidth per GPU.
+    * MI300X: 896 GB/s aggregate bidirectional fabric bandwidth per GPU; shared across links/peers, not a per-peer guarantee.
 * **RCCL:**
     * All-reduce, all-gather, reduce-scatter on AMD GPUs.
     * Tuning for MI300X topology and Infinity Fabric.
@@ -115,7 +121,8 @@ AMD's Instinct GPUs (MI300X, MI300A, MI350) are the primary alternative to Nvidi
 * [HIP Programming Guide](https://rocm.docs.amd.com/projects/HIP/en/latest/)
 * [Composable Kernel](https://github.com/ROCm/composable_kernel)
 * [HIPIFY](https://rocm.docs.amd.com/projects/HIPIFY/en/latest/)
-* [Omniperf](https://rocm.docs.amd.com/projects/omniperf/en/latest/)
+* [ROCprofiler-SDK](https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/latest/)
+* [ROCm Compute Profiler](https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/)
 * [AMD Instinct MI300X](https://www.amd.com/en/products/accelerators/instinct/mi300/mi300x.html)
 
 ---
@@ -123,7 +130,7 @@ AMD's Instinct GPUs (MI300X, MI300A, MI350) are the primary alternative to Nvidi
 ## Projects
 
 1. **HIPIFY a CUDA kernel** — Take your CUDA matmul or vector-add kernel from Phase 1 §4. Convert to HIP using `hipify-clang`. Run on a supported AMD GPU; a ROCm container packages userspace and does not emulate an AMD GPU. Compare output and performance.
-2. **Profile with Omniperf** — Profile a PyTorch model on ROCm. Generate a roofline plot. Identify compute-bound vs memory-bound layers.
+2. **Profile with ROCm Compute Profiler** — Profile a PyTorch model on ROCm. Generate a roofline plot. Identify compute-bound vs memory-bound layers.
 3. **RCCL benchmark** — Run RCCL all-reduce across multiple AMD GPUs. Compare bandwidth and latency with NCCL on equivalent Nvidia hardware.
 4. **Triton on AMD** — Write a Triton fused kernel (e.g., layer norm + residual). Run on both Nvidia (CUDA) and AMD (ROCm). Compare generated code and performance.
 5. **CK custom GEMM** — Use Composable Kernel to implement a custom GEMM with epilogue fusion (bias + activation). Benchmark against rocBLAS.

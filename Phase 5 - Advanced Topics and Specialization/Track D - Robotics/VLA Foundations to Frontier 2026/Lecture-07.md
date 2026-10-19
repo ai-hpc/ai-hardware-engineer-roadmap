@@ -39,6 +39,8 @@ $$
 
 where \(M\) encodes which pairs may interact. The transformer formulation is established in [Attention Is All You Need](https://arxiv.org/abs/1706.03762). For robotics, the mask is part of the causal contract: a predicted action must not attend to future observations unavailable at execution.
 
+An all-masked query needs an explicit rule: ordinary softmax of a row of negative infinities is undefined. Reject the invalid query or use a documented zero-output path, and exclude nonexistent targets from the loss. Test the chosen behavior rather than relying on a kernel-specific accident.
+
 A padding mask and a causal mask solve different problems. Padding marks nonexistent entries. Causality prevents access to future information. A history frame at the start of an episode may be absent; duplicating the current image is a modeling decision, not automatically equivalent to masking a missing frame.
 
 ## Worked example: visual context grows quickly
@@ -67,7 +69,7 @@ Reducing each image to 64 tokens changes the context to 424 tokens. It also disc
 
 Freezing an encoder avoids storing gradients for its parameters and can avoid retaining its internal training graph when no upstream trainable component needs that gradient. It does not eliminate its forward-pass compute or output storage. If a trainable image transform sits before it, gradients through the encoder may still be required.
 
-Caching encoder features can help repeated offline training on fixed images. It becomes invalid when crops, augmentation, camera calibration, or encoder weights change. For online control, a cached old feature is an old observation. Reusing it must obey the same age limit as reusing the old image.
+Caching encoder features can help repeated offline training on fixed images. It becomes invalid when crops, augmentation, camera calibration, encoder weights, or model mode/state change. Freezing parameters does not disable dropout or freeze running normalization statistics. Use a controlled evaluation-mode encoder for deterministic feature caches; a cached stochastic training realization changes the training procedure. For online control, a cached old feature is an old observation. Reusing it must obey the same age limit as reusing the old image.
 
 Language embeddings can often be reused while the instruction remains unchanged, but only if the architecture's conditioning path permits it. Caching a representation after joint visual-language attention would also cache the old visual context.
 
@@ -79,7 +81,7 @@ Construct a tiny attention example with four observation tokens, two padding pos
 
 Use distinct marker values for each token. Perturb a masked future token by a large amount; the action output should remain unchanged within numerical tolerance. Perturb an allowed past token; at least one deliberately constructed query should change. This negative/positive pair is stronger than inspecting a triangular matrix visually.
 
-For guided variation, swap camera order while keeping camera identifiers fixed, then while changing identifiers too. Explain which transformation should preserve meaning. For independent transfer, design a cache key that includes encoder revision, preprocessing revision, image identity, and augmentation seed for offline data. Show a collision that would occur if one field were omitted.
+For guided variation, swap image contents while keeping camera identifiers in their original slots: this mislabels the views. Then move each image together with its identifier. The latter preserves the image/identity pairing, but does not guarantee equal model outputs: absolute positions, masks, and a trained slot-order convention may still matter. Require parity only when the complete architecture and preprocessing contract make that reordering equivalent. For independent transfer, design a cache key that includes encoder revision, preprocessing revision, image identity, and augmentation seed for offline data. Show a collision that would occur if one field were omitted.
 
 Collect tensor sizes, mask-violation count, masked perturbation error, and execution time for the tiny attention operation. Stop after the two context budgets and three mask fixtures. Submit the calculator, mask visualization, perturbation results, and an explicit list of assumptions.
 

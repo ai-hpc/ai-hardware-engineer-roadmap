@@ -1,458 +1,89 @@
-# Phase 5 — Track C: Edge AI
+# Track C: Edge AI you can measure and explain
 
-<div class="course-identity edge-ai" markdown="1">
-<div class="course-identity__icon">EDGE</div>
-<div markdown="1">
-<p class="course-identity__eyebrow">Track 5C · Edge AI</p>
-<p class="course-identity__title">Deploy AI under real device constraints: sensors, latency, memory, power, thermals, and updates.</p>
-<p class="course-identity__meta">Artifact: edge AI case study · Measure: latency, power, memory, reliability</p>
-</div>
-</div>
+**Reviewed 18 October 2026.** Learn to deploy models under memory, latency, sensor, power and update constraints. Start on a CPU, then carry the same contracts and measurements to a supported device. You do not need to buy hardware to complete the numerical and replay exercises.
 
+**Prerequisites:** [Python and systems foundations](../../Start-Here.md), [AI workloads](../../Phase%203%20-%20Artificial%20Intelligence/Guide.md), and basic matrix/probability calculations. For device deployment, add [embedded systems](../../Phase%202%20-%20Embedded%20Systems/Guide.md) and the relevant platform course. Use the [learning guide](../../Learning-Guide.md) to predict, run, explain one failure, and review after two days and one week.
 
-> Design, optimize, deploy, and operate AI systems on constrained hardware where latency, memory, power, thermals, sensors, and reliability matter.
+![Camera, GPU preprocessing, inference, and CPU validation share DRAM but transfer buffer ownership through completion fences.](../../Assets/illustrations/deployment-edge/memory-ownership.png)
 
-**Layer mapping:** L1-L5. This track connects edge workloads, model optimization, inference runtimes, embedded Linux, sensor pipelines, accelerators, and product deployment.
+Shared DRAM does not remove format conversion, access cost, or synchronization. A fast inference kernel can still produce a stale result if input collection and queues are slow.
 
-**Role targets:** Edge AI Engineer · Embedded AI Engineer · Jetson Engineer · TinyML Engineer · Robotics Perception Engineer · Edge Inference Optimization Engineer
+## Begin with three short experiments
 
-**Prerequisites:** [Phase 2 — Embedded Systems](../../Phase%202%20-%20Embedded%20Systems/Guide.md), [Phase 3 — AI Workloads](../../Phase%203%20-%20Artificial%20Intelligence/Guide.md), and preferably [Phase 4 Track B — NVIDIA Jetson](../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md).
+| Session | Run and learn | Required output |
+|---|---|---|
+| 1: memory and shapes, 60–90 min | [Edge LLM inference lab](Edge%20LLM%20Inference%20Internals/Lecture-01.md) | projection table, weight/KV budget, eight passing checks |
+| 2: model output contracts, 60–90 min | [Tool-dispatch evaluation](Agent%20Tool-Dispatch%20Evaluation%20with%20BFCL/Lecture-01.md) | a passing report and a deliberately failing report; ten checks |
+| 3: streaming and distribution shift, 60–90 min | [Wireless receiver lab](AI-Driven%20Wireless%20Communication/Lecture-01.md) | measured BER, changed-channel failure and lossless windowing; nine checks |
 
-**What comes after:** [ML Systems Engineering](../Track%20G%20-%20ML%20Systems%20Engineering/Guide.md), [Robotics](../Track%20D%20-%20Robotics/Guide.md), [Autonomous Vehicles](../Track%20E%20-%20Autonomous%20Vehicles/Guide.md), or [AI Chip Design](../Track%20F%20-%20AI%20Chip%20Design/Guide.md).
+All three required paths use the Python standard library. The wireless lesson also includes an actually executed Sionna 2.2.0/PyTorch CPU example. Follow its optional environment instructions separately.
 
----
+These are tests of mechanisms. They do not establish pretrained model quality or target-device performance. Each lesson states exactly what executed and what remains an optional hardware experiment.
 
+## Choose a specialization route
 
-![Camera, GPU preprocessing, inference, and CPU action validation share one DRAM budget but exchange ownership using completion fences.](../../Assets/illustrations/deployment-edge/memory-ownership.png)
+| Route | Lessons | What you learn to preserve |
+|---|---|---|
+| Small/large language-model inference | [Qwen six-lesson course](Qwen%20Inference%20Optimization/README.md) and [CPU lab](Qwen%20Inference%20Optimization/Lab-Guide.md) | checkpoint shapes, positions, scales, cache state, parallel reductions, performance workload |
+| Current multimodal edge-model deployment | [Gemma 4 six-lesson course](Gemma%204%20Edge%20Deployment/README.md) | total versus effective weights, local/global attention, physical cache sharing, processor and assistant pairing |
+| Radio/stream processing | [Wireless course](AI-Driven%20Wireless%20Communication/Lecture-01.md) | sample order, signal/noise conventions, radio deadlines and network-control interfaces |
+| Camera/robot perception | [Jetson platform](../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md) and [robotics foundations](../Track%20D%20-%20Robotics/Guide.md) | sensor formats, timestamps, frames, observation age and controller boundaries |
+| MCU inference | [Embedded systems](../../Phase%202%20-%20Embedded%20Systems/Guide.md) and [inference optimization](../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/Guide.md) | static memory, supported operators, input quantization and measured cycle/energy budget |
 
-*Read the arrows as ownership transfers. Shared DRAM alone does not remove format conversions, copies, or synchronization.*
+The Qwen route supplies 14 portable checks plus a current Transformers 5.20.1 CPU/cache exercise. The Gemma route supplies seven cache/metadata checks plus executed meta-device architecture inspection. Model weights and target accelerators are optional extensions, with explicit validation limits.
 
-## Why This Track Exists
+## Build a complete system in eight steps
 
-Edge AI is not "cloud inference on a smaller box." The system has different constraints:
+### 1. Write a workload contract
 
-- limited memory
-- limited power
-- thermal throttling
-- sensor timing
-- camera/audio preprocessing
-- local reliability requirements
-- intermittent network access
-- update and rollback risk
-- hardware-specific runtimes and accelerators
+Choose one task: local tool selection, object detection from recorded frames, keyword recognition, or radio demapping. Define input schema, sampling/capture rate, expected output, task metric, memory limit, and maximum acceptable result age. Give every dimension and timestamp a unit.
 
-The core engineering question is:
+**Worked timing example:** an observation is captured at 1,000 ms, inference completes at 1,070 ms, and its consumer uses it at 1,180 ms. Computation may be only 40 ms, but observation age is **180 ms**. A 150 ms validity limit rejects it. Improving inference by 10 ms while adding a 30 ms queue worsens age by 20 ms.
 
-```text
-Can this model meet the product requirement on this device under real power,
-thermal, memory, sensor, and latency constraints?
-```
+### 2. Establish a simple reference
 
-This track teaches you to answer that with measurements.
+Use a known algorithm or an unoptimized model with fixed inputs. In the wireless lab this is an analytic matched detector. In the dispatcher lab it is an exact fixture response and local simulator. In the model routes it is a pinned configuration and supported numerical implementation. A smaller random model can test interfaces but cannot establish pretrained task quality.
 
----
+Keep training/calibration and held-out evaluation separate. Split sensor data by recording/session/environment where adjacent samples are correlated. Save at least one case that fails when you intentionally change the input contract.
 
-## Course Outcomes
+### 3. Budget memory and movement
 
-By the end, you should be able to:
+List weights, KV/state, activations, scratch, sensor buffers, runtime, OS and reserve. Separate resident bytes from bytes touched per inference. Count scale metadata and mixed formats. For shared buffers, count each physical allocation once and document ownership; a shared address does not remove synchronization requirements.
 
-- choose an edge model architecture for a target device
-- compress and quantize models without guessing
-- deploy through TensorRT, ONNX Runtime, LiteRT/TFLite, TFLM, or a vendor runtime
-- profile latency, memory, throughput, power, and thermals
-- build camera, audio, and sensor-to-model pipelines
-- reason about CPU/GPU/DLA/NPU/DSP partitioning
-- design OTA, rollback, telemetry, and fleet update flows
-- explain when edge inference should stay local and when it should offload
+**Worked capacity example:** two 1,920×1,080 RGB8 frame buffers use `2*1920*1080*3=12,441,600` bytes before alignment. At 30 frames/s, one copy of the RGB payload moves 186.624 MB/s. An NV12 or RAW pipeline has different formats and strides; recompute from its actual layout.
 
----
+### 4. Choose one supported runtime path
 
-## Course Map
+Check model architecture, operations, quantization layout, modality processor, CPU architecture, accelerator, driver/BSP and runtime version together. Start with one correct inference before comparing runtimes. TensorRT, ONNX Runtime, LiteRT, TFLM and vendor backends have different contracts; “supports 4-bit” is not enough.
 
-<div class="lecture-map" markdown>
+For Jetson, use the maintained [compatibility matrix](../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/Compatibility.md). Current datacenter package versions are not automatically supported on JetPack. For a model conversion, retain source and output hashes, converter version and preprocessing/template settings.
 
-| Unit | Focus | Artifact |
-|------|-------|----------|
-| 1 | Edge constraints and platform selection | target-device decision memo |
-| 2 | Efficient model architectures | model comparison benchmark |
-| 3 | Compression and quantization | PTQ/QAT/precision tradeoff report |
-| 4 | Runtime deployment | reproducible runtime deployment |
-| 5 | TinyML and MCU inference | constrained-memory inference demo |
-| 6 | Sensor pipelines | camera/audio/sensor pipeline benchmark |
-| 7 | Power, thermal, and reliability | long-run stability report |
-| 8 | Fleet and product operation | OTA/telemetry/rollback design |
+### 5. Connect a bounded sensor or replay pipeline
 
-</div>
+Preserve capture timestamps, sequence IDs, coordinate frames, sample formats and partial windows. Define queue capacity and overflow policy. A latest-frame queue can suit a perception task; dropping arbitrary samples can break a signal decoder. Restarted producers need an epoch so old data cannot masquerade as fresh output.
 
----
+Use recorded or synthetic inputs first. Report drops and stale-result rejections along with successful work. A classifier's confidence or generated JSON does not by itself authorize a robot movement; the robotics course defines the additional action contract.
 
-## Unit 1: Edge Constraints And Platform Selection
+### 6. Optimize one measured cost
 
-### Learn
+Separate preprocessing, inference, postprocessing, queueing and transfer. Test one change while preserving task inputs and quality evaluation. Examples include a supported lower-precision representation, a fused projection, a smaller image budget, bounded buffering or a different batch size.
 
-- MCU versus MPU versus edge GPU versus dedicated accelerator
-- latency, throughput, memory, power, thermals, cost, and enclosure constraints
-- TOPS versus useful throughput
-- model size versus activation/KV-cache/runtime memory
-- sensor bandwidth and preprocessing cost
-- local-only versus edge/cloud hybrid deployment
+Report latency distributions and workload, not only average FPS. Batching can improve completed throughput while increasing one request's wait. A source-derived roofline estimate is a hypothesis; a measured trace decides whether it explains the result.
 
-### Build It
+### 7. Test sustained behavior and recovery
 
-Pick one target product:
+On actual hardware, record power mode, temperature, clocks, memory and background load during a sustained workload. Distinguish cold startup from steady state. Inject an input gap, oversized request, expired result and restart. Check that the next request receives the right state and buffer contents.
 
-- wake-word speaker
-- smart camera
-- robot perception module
-- industrial anomaly detector
-- local LLM appliance
-- battery-powered wildlife camera
+Without hardware, run the numerical/replay failure cases and label power, thermal and target timing as **not run**. Do not replace those measurements with a vendor TOPS number.
 
-Create a target-device decision memo comparing at least three platforms:
+### 8. Package and update the artifact
 
-- Jetson Orin Nano/NX/AGX
-- Raspberry Pi + accelerator
-- Coral Edge TPU
-- Hailo
-- Qualcomm/Android device
-- STM32/nRF/ESP32-class MCU
+Save model/processor/config hashes, runtime compatibility, input/output schemas and health checks. Define how a version is admitted, how a failed update is detected, and how a known-good version is restored. A process restart test is not a boot-slot rollback test. Use the platform course for device-specific OTA and storage procedures.
 
-### Measure It
+A deployment decision should state the accepted workload and the evidence that supports it. If a configuration fails, retain its result and explain whether quality, memory, timing, compatibility or recovery caused rejection.
 
-- memory budget
-- latency target
-- power budget
-- sensor bandwidth
-- model size
-- expected update cadence
+## Finish with a reproducible case study
 
-### Ship It
+Submit the workload contract, code/configuration, passing and deliberately failing cases, raw results and source/package identities. Include separate columns for **executed**, **calculated**, and **not run**. Hardware-dependent claims need a named device and workload; the CPU route can finish with a rigorous numerical/replay case study and an explicit device experiment plan.
 
-A platform-selection memo that explains why one device fits the workload better than the alternatives.
-
----
-
-## Unit 2: Efficient Model Architectures
-
-### Learn
-
-- MobileNet, EfficientNet, EfficientDet, EfficientViT, MobileViT, FastViT
-- YOLO family and real-time detection tradeoffs
-- lightweight transformers
-- keyword spotting models
-- tiny segmentation and pose models
-- distilled LLMs and adapter-based local models
-- hardware-aware neural architecture search
-
-### Build It
-
-Benchmark three model families on the same task and device:
-
-- detector: YOLO variant versus EfficientDet-style model
-- classifier: MobileNetV3 versus EfficientNet-Lite versus FastViT
-- audio: DS-CNN versus small transformer or conformer
-- local LLM: quantized small model variants
-
-### Measure It
-
-- accuracy or task metric
-- latency
-- throughput
-- peak memory
-- power
-- model size
-- preprocessing and postprocessing cost
-
-### Ship It
-
-A model-selection report with an accuracy/latency/power table and a clear recommendation.
-
----
-
-## Unit 3: Compression And Quantization
-
-### Learn
-
-- FP16, BF16, INT8, INT4, mixed precision
-- post-training quantization
-- quantization-aware training
-- calibration datasets
-- per-tensor versus per-channel quantization
-- pruning and structured sparsity
-- distillation
-- LLM quantization methods such as AWQ, GPTQ, SmoothQuant, and GGUF quant families
-- accuracy recovery and regression testing
-
-### Build It
-
-Take one model through at least two compression paths:
-
-1. baseline precision
-2. PTQ
-3. QAT or calibrated INT8
-4. optional INT4 or LLM quantization path
-
-### Measure It
-
-- task accuracy before/after
-- latency before/after
-- memory before/after
-- power before/after
-- layer-level fallback to higher precision
-
-### Ship It
-
-A quantization report that explains what changed, what broke, and which precision you would ship.
-
----
-
-## Unit 4: Runtime Deployment
-
-### Learn
-
-- TensorRT engine building and calibration
-- ONNX export and graph cleanup
-- ONNX Runtime execution providers
-- LiteRT/TFLite delegates
-- TFLite Micro arena allocation
-- TensorRT DLA offload on Jetson
-- `trtexec`, Nsight Systems, and runtime profiling
-- deployment packaging and versioning
-
-### Build It
-
-Deploy the same model through two runtimes where possible:
-
-- PyTorch eager baseline
-- ONNX Runtime
-- TensorRT
-- LiteRT/TFLite
-- TFLite Micro
-- vendor accelerator runtime
-
-### Measure It
-
-- cold start
-- warm latency
-- throughput
-- peak memory
-- model load time
-- engine build time
-- CPU/GPU/DLA utilization
-
-### Ship It
-
-A reproducible runtime deployment with exact conversion commands, runtime commands, and benchmark output.
-
----
-
-## Unit 5: TinyML And MCU Inference
-
-### Learn
-
-- Cortex-M class constraints
-- SRAM and flash budgeting
-- TFLite Micro arena allocation
-- CMSIS-NN and DSP kernels
-- fixed-point arithmetic
-- duty cycling and always-on sensing
-- MCU OTA model updates
-- drift and local adaptation limits
-
-### Build It
-
-Build one MCU-scale inference demo:
-
-- keyword spotting
-- gesture recognition from IMU
-- vibration anomaly detection
-- low-resolution person detection
-- environmental anomaly detection
-
-### Measure It
-
-- arena size
-- flash size
-- inference latency
-- active and sleep power
-- battery-life estimate
-- false positive/false negative behavior
-
-### Ship It
-
-A constrained-memory inference demo with firmware, model artifact, and power or latency measurements.
-
----
-
-## Unit 6: Sensor Pipelines
-
-### Learn
-
-- camera ingest: MIPI CSI-2, USB, GigE, V4L2
-- ISP pipeline: RAW, debayer, denoise, tone map, resize, color convert
-- audio pipeline: I2S, ALSA, VAD, keyword spotting, ASR
-- GStreamer and DeepStream
-- multi-stream inference
-- tracking and postprocessing
-- zero-copy paths and buffer ownership
-
-### Build It
-
-Build one end-to-end sensor pipeline:
-
-- camera -> preprocess -> detection -> tracking -> output
-- microphone -> VAD -> feature extraction -> keyword/ASR -> output
-- IMU -> filtering -> model -> anomaly/event output
-
-### Measure It
-
-- sensor-to-output latency
-- preprocessing time
-- inference time
-- postprocessing time
-- dropped frames or audio underruns
-- memory copies
-- CPU/GPU utilization
-
-### Ship It
-
-A sensor-to-model pipeline report with a latency breakdown and at least one zero-copy or copy-reduction improvement.
-
----
-
-## Unit 7: Power, Thermal, And Reliability
-
-### Learn
-
-- thermal throttling
-- nvpmodel/jetson_clocks-style power modes
-- DVFS
-- battery budgeting
-- watchdogs
-- model health checks
-- long-run stability testing
-- offline behavior and recovery
-
-### Build It
-
-Run a long-duration edge inference test:
-
-- fixed workload
-- realistic sensor input or replayed stream
-- power/thermal logging
-- automatic restart on failure
-- basic telemetry
-
-### Measure It
-
-- sustained latency
-- sustained throughput
-- temperature
-- throttling events
-- power draw
-- memory growth
-- crash or restart behavior
-
-### Ship It
-
-A stability report that says what the device can sustain, not only what it can do for one benchmark run.
-
----
-
-## Unit 8: Fleet And Product Operation
-
-### Learn
-
-- OTA model and software updates
-- rollback and A/B slots
-- device telemetry
-- model/version compatibility
-- privacy and local data retention
-- edge/cloud routing
-- monitoring drift and field failures
-- secure boot and signed artifacts at a systems level
-
-### Build It
-
-Design a deployment plan for a small fleet:
-
-- model packaging
-- rollout stages
-- rollback trigger
-- telemetry schema
-- health checks
-- failure triage
-
-### Measure It
-
-- update time
-- rollback time
-- telemetry volume
-- offline recovery behavior
-- version compatibility checks
-
-### Ship It
-
-An edge AI operations plan that another engineer could use to ship the model to devices safely.
-
----
-
-## Featured Deep Dives
-
-Use these lectures as the technical core for LLM and wireless-oriented edge work:
-
-- [Edge LLM Inference Internals](Edge%20LLM%20Inference%20Internals/Lecture-01.md)
-- [Qwen Inference Optimization](Qwen%20Inference%20Optimization/README.md)
-- [Gemma 4 Edge Deployment](Gemma%204%20Edge%20Deployment/README.md) — PDL pipeline, interleaved attention KV math, speculative decode, and multimodal VLM on Jetson Orin/Thor
-- [Agent Tool-Dispatch Evaluation with BFCL](Agent%20Tool-Dispatch%20Evaluation%20with%20BFCL/Lecture-01.md) — measure whether a quantized edge LLM still calls the right tool
-- [AI-Driven Wireless Communication](AI-Driven%20Wireless%20Communication/Lecture-01.md)
-
----
-
-## Capstone
-
-Build an edge AI system that includes:
-
-- real sensor or replayed production-like input
-- optimized model
-- runtime deployment
-- latency and throughput benchmark
-- memory report
-- power or thermal report
-- health checks
-- update or rollback plan
-
-Good capstone examples:
-
-- Jetson multi-camera detection and tracking system
-- local LLM runtime with memory and thermal controls
-- MCU keyword spotter with power budget
-- industrial anomaly detector with OTA model updates
-- multimodal robot perception node
-
-The capstone is complete when another engineer can reproduce the deployment and understand the constraints that shaped the design.
-
----
-
-## Exit Criteria
-
-You are ready to claim edge AI specialization when you can:
-
-- select hardware from workload requirements
-- quantize and deploy a model with measured tradeoffs
-- profile an edge inference runtime end to end
-- build a sensor-to-model pipeline
-- explain power and thermal behavior under sustained load
-- design update, rollback, and telemetry paths
-- ship a reproducible edge AI benchmark or case study
-
-**Study method:** use the [shared lesson cycle and completion rubric](../../Learning-Guide.md) with this course's existing labs. Predict first, test one variation, retain a failure case, and revisit the self-check after two days and one week.
-
-
-## Integration lab: Which deployment constraint should change the hardware design?
-
-Select a replayable physical-AI workload and allocate memory, latency, power, sensing, and wireless budgets. Compare one baseline and one optimized implementation under the same observation/action contract.
-
-**Acceptance evidence:** Submit a resource ledger and Pareto comparison with quality included. Carry the dominant operator, buffer lifetime, and communication bottleneck into the SoC proposal.
-
-**Continue:** take this artifact to [vla-deploy-jetson](../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/5.%20Application%20Development/5.%20ML%20and%20AI/vla-deploy-jetson/Guide.md). Explain which assumption from this course the next engineer must preserve.
+A useful capstone is one well-explained system: an offline tool dispatcher with measured quantization quality, a timestamped camera perception replay, a bounded radio classifier, or an MCU keyword pipeline. Carry its timing/memory/schema contract into [robotics](../Track%20D%20-%20Robotics/Guide.md), [autonomous vehicles](../Track%20E%20-%20Autonomous%20Vehicles/Guide.md), or [ML systems engineering](../Track%20G%20-%20ML%20Systems%20Engineering/Guide.md).

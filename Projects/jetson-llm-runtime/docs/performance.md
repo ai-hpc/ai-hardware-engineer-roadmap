@@ -1,178 +1,68 @@
-# Performance
+# Performance: calculate a bound, then measure a workload
 
-## Hardware Specs (Orin Nano Super)
+This checkout has **no measured Jetson model throughput, temperature or energy result**. Its executable benchmark measures CPU parsing and sampling components. Keep that scope in every report.
 
-| Spec | Value |
-|------|-------|
-| GPU TOPS (INT8) | 67 |
-| DLA TOPS (INT8) | ~10 |
-| Total TOPS | ~77 |
-| Memory | 8 GB LPDDR5 |
-| Bandwidth | 102 GB/s |
-| CUDA cores | 1024 (16 SMs × 64) |
-| Tensor Cores | 32 |
-| Power modes | 7W / 10W / 15W / 25W |
-| Ridge point | 0.66 OP/byte |
+## 1. Reproduce the available measurement
 
-## Why LLM Decode is Bandwidth-Bound
-
-LLM autoregressive decode generates one token at a time. Each token requires reading the **entire** weight matrix from DRAM:
-
-```
-Llama 3.2 3B INT4 — one decode step:
-
-  Weight read:    1.5 GB from DRAM
-  Compute:        6 GFLOP (3B × 2 ops)
-  Time to read:   1.5 GB / 102 GB/s = 14.7 ms
-  Time to compute: 6 GFLOP / 67 TOPS = 0.09 ms
-
-  → 99.4% of time is reading weights
-  → Compute utilization: 0.6%
-  → Theoretical max: ~68 tokens/sec (bandwidth-limited)
-```
-
-Smaller model = fewer bytes to read = more tokens/sec. Quantization directly translates to throughput.
-
-## Expected Performance
-
-### TinyLlama 1.1B (Q4_K_M, 669 MB) — Test Model
-
-| Metric | 25W mode | 15W mode |
-|--------|----------|----------|
-| Prompt eval (512 tok) | ~200 tok/s | ~120 tok/s |
-| Decode (128 tok) | ~65 tok/s | ~40 tok/s |
-| Peak memory | ~2.5 GB | ~2.5 GB |
-| Peak temperature | <60°C | <55°C |
-
-### Llama 3.2 3B (Q4_K_M, 1.8 GB) — Target Model
-
-| Metric | 25W mode | 15W mode |
-|--------|----------|----------|
-| Prompt eval (512 tok) | ~65 tok/s | ~40 tok/s |
-| Decode (128 tok) | ~25 tok/s | ~15 tok/s |
-| Peak memory | ~4 GB | ~4 GB |
-| Peak temperature | <70°C | <60°C |
-
-### Phi-4 Mini 3.8B (Q4_K_M, 2.3 GB) — Stress Test
-
-| Metric | 25W mode |
-|--------|----------|
-| Prompt eval (512 tok) | ~50 tok/s |
-| Decode (128 tok) | ~20 tok/s |
-| Peak memory | ~4.5 GB |
-
-*All values are estimates. Actual performance depends on thermal design, context length, and prompt content.*
-
-## Profiling
-
-### Nsight Systems — Timeline Profile
+From this project directory:
 
 ```bash
-./scripts/profile.sh models/tinyllama.gguf
-# Creates: profile_YYYYMMDD_HHMMSS.nsys-rep
+./scripts/test_plan.sh /tmp/jllm-course
+./scripts/bench.sh /tmp/jllm-course
 ```
 
-Shows:
-- Kernel-by-kernel timeline
-- Memory transfer timing
-- CPU-GPU synchronization points
-- Kernel launch overhead
+The benchmark uses an 832-byte fixture, 100 parses per batch, 30 sampling operations per batch and seven batches. Synthetic logits have vocabulary size 32,000; sampling uses temperature 0.7, top-k 40, top-p 0.9 and seed 7.
 
-### Key Metrics to Watch
+The retained [example JSON](../labs/benchmark-example.json) reports median batch means of **14.20659 microseconds per parse** and **2904.6041 microseconds per sample** on the shared x86 review host. These are observations, not targets for your computer. The tiny file is cache-resident, so this does not measure storage bandwidth. Batch means cannot establish individual-operation p99 latency.
+
+**Check:** is the reciprocal of sample time a model's tokens/s? No: there is no transformer forward pass, KV update or model in this measurement.
+
+## 2. Count actual encoded bytes
+
+A dense M-by-K matrix-vector operation performs approximately `2*M*K` operations. Weight bytes depend on the encoding, including metadata.
+
+The local Q4_K structure stores 256 weights in **144 bytes**: 128 bytes of nibbles plus 16 bytes of scale/minimum metadata. This is 4.5 bits per weight. The FP16 payload for the same count is 512 bytes, giving a storage ratio of `512/144 ≈ 3.56`. Neither an exact 4x reduction nor a 3.56x speedup follows automatically.
+
+Illustrative bound: assume 1.8 GB of weights must be read from DRAM per decode step and those reads sustain 60 GB/s. Reading alone requires at least `1.8/60 = 0.03 s`, an upper bound of about 33.3 steps/s before other work. Both numbers are assumptions, not local measurements.
+
+Batching, cache reuse, sparsity, active experts, activation/KV traffic and decoding work change the model. Quantization also changes quality. Use actual active bytes rather than assuming every architecture reads every advertised parameter each step.
+
+## 3. Keep the compute roof consistent
+
+Do not divide FP32/FP16 operations by a sparse INT8 TOPS figure. Match arithmetic type, sparsity convention, accumulation and instruction path.
+
+Orin Nano 8 GB has eight SMs, 1,024 CUDA cores, 32 Tensor Cores and no DLA. Query device properties and active clocks/power mode. Use the [platform course](../../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/1.%20Nvidia%20Jetson%20Platform/Guide.md) for a matched BSP/toolchain, rather than stale constants in an example header.
+
+```text
+arithmetic intensity = operations / bytes at the measured memory level
+attainable rate <= min(compute roof, bandwidth roof * arithmetic intensity)
+```
+
+This ceiling does not identify the actual bottleneck. Dependencies, launch overhead, synchronization and insufficient parallelism can leave a workload below both roofs.
+
+## 4. Define latency boundaries
+
+| Metric | Boundary |
+|---|---|
+| Queue delay | Accepted request to processing start |
+| Tokenization | Text to token IDs |
+| Prefill | Full prompt processing under a stated cache convention |
+| Time to first token | Request arrival to first emitted token |
+| Decode intervals | Time between subsequent emitted tokens |
+| End-to-end latency | Request arrival to completed response |
+
+The experimental engine's prefill timer excludes the final prompt-token forward pass. It is therefore not a complete prefill or TTFT measurement. Fix the boundary before comparing with another engine.
+
+## 5. Profile a validated executable
+
+The optional wrapper accepts a workload that already works:
 
 ```bash
-nsys stats profile.nsys-rep
+./scripts/profile.sh /tmp/jllm-profile-run1 -- /absolute/path/to/validated-program its-arguments
 ```
 
-Expected output:
-```
-Kernel                              Time%    Calls
-────────────────────────────────────────────────────
-jllm::gemv_q4_kernel               38.2%    312
-jllm::flash_attention_decode_kernel 28.1%    156
-jllm::fused_rmsnorm_residual_kernel 11.4%    312
-jllm::swiglu_kernel                  7.8%    156
-jllm::rope_kernel                    4.2%    312
-jllm::vec_add_kernel                 3.1%    312
-other                                7.2%    ...
-```
+It needs Nsight Systems and a new output prefix. No trace was captured in this review. A trace explains waits and activity; it does not establish numerical correctness.
 
-### Benchmark Script
+Report model/input hashes, prompt/output lengths, cache state, batch/concurrency, software versions, clocks, power mode, temperature, warmup, repetitions and dispersion. Compare identical inputs and quality thresholds before claiming an optimization. Integrate measured power over the task to obtain joules per completed task; watts alone are not energy.
 
-```bash
-./scripts/bench.sh models/tinyllama.gguf
-```
-
-Records:
-- System state (power mode, GPU freq, RAM, temperature)
-- Short generation (128 tokens): tok/s
-- Long generation (256 tokens): tok/s
-- Memory profile during inference (RSS every second)
-- Temperature during inference
-
-## Optimization Targets
-
-### Level 1: Fused Kernels (Done)
-
-| Operation | Without fusion | With fusion | Saving |
-|-----------|---------------|-------------|--------|
-| RMSNorm + residual | 3 kernels, 6 DRAM ops | 1 kernel, 3 DRAM ops | 2× |
-| SwiGLU | 2 kernels, 4 DRAM ops | 1 kernel, 2 DRAM ops | 2× |
-| Dequant + GEMV | 2 kernels, 2× bandwidth | 1 kernel, 1× bandwidth | 3.5× |
-
-### Level 2: Tile Size Tuning (Done)
-
-| Parameter | Desktop GPU (H100) | Orin Nano | Why different |
-|-----------|-------------------|-----------|---------------|
-| GEMV block | 256 threads | 128 threads | Fewer SMs, less occupancy pressure |
-| Attention tile | 128 KV tokens | 64 KV tokens | 48 KB shared (not 228 KB) |
-| GEMM tile | 128×128 | 64×64 | Less shared memory per SM |
-
-### Level 3: CUDA Graphs (Implemented)
-
-Captures decode step as a graph, replays with single `cudaGraphLaunch()`.
-Saves ~1 ms per step from kernel launch overhead.
-
-### Level 4: Future Optimizations
-
-| Optimization | Expected gain | Effort |
-|-------------|---------------|--------|
-| Tensor Core WMMA for prefill | 2–3× prefill speed | 2 days |
-| Persistent kernels (stay resident on SM) | 10–20% decode | 3 days |
-| Custom memory allocator (bypass CUDA) | 5% less overhead | 2 days |
-| INT4 KV cache (not just INT8) | 2× more context | 1 day |
-| Speculative decoding with draft model | 1.5–3× tok/s | 3 days |
-
-## Roofline Analysis
-
-```
-TFLOPS
-  │
-  │                    ──── 67 TOPS peak (INT8)
-  │                 ╱
-  │              ╱
-  │           ╱
-  │        ╱  ← slope = 102 GB/s bandwidth
-  │     ╱
-  │  ╱
-  └───────────────── Arithmetic Intensity (OP/byte)
-        ↑
-  ridge = 0.66
-
-  LLM decode AI ≈ 0.5 OP/byte → severely left of ridge → bandwidth-bound
-  Prefill GEMM AI ≈ 50+ OP/byte → right of ridge → compute-bound
-```
-
-All decode optimizations must reduce bandwidth (quantization, fusion, caching).
-Prefill optimizations should maximize Tensor Core utilization.
-
-## Power Efficiency
-
-| Model | Tokens/sec | Power (W) | Tokens/Joule |
-|-------|-----------|-----------|-------------|
-| TinyLlama 1.1B @ 25W | ~65 | 25 | 2.6 |
-| TinyLlama 1.1B @ 7W | ~20 | 7 | 2.9 |
-| Llama 3.2 3B @ 25W | ~25 | 25 | 1.0 |
-| Llama 3.2 3B @ 7W | ~8 | 7 | 1.1 |
-
-*7W mode is more power-efficient (tokens/joule) despite being slower.*
+**Finish:** reproduce and label the CPU JSON, derive the Q4_K storage ratio, and explain why neither is pretrained-model throughput. Use the [testing lesson](testing.md) to define the next experiment's correctness gate.

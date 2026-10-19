@@ -37,7 +37,7 @@ $$
 |---|---|---|---|---|---|
 | Informative groups, \(G = 8\) | ~8% | ~57% | > 99% | ~57% | ~8% |
 
-The curve is symmetric. A layout the policy almost always solves is exactly as useless for learning as one it never solves. The per-episode reward variance \(p(1-p)\) peaks at \(p = 0.5\), and that is where policy-gradient signal lives. Call layouts with \(0 < p < 1\) **goldilocks** layouts. With sparse binary rewards, only goldilocks layouts carry gradient signal.
+The zero-variance probability is symmetric for independent binary trials at a fixed initial condition. Groups near p=0.5 are more likely to contain mixed outcomes, but reward variance alone does not determine gradient signal-to-noise or learning value. All-success groups can still inform a critic or regularizer; all-failure groups can expose missing exploration. Keep broad evaluation coverage when adapting the training sampler.
 
 Random exploration does not fix the \(p \approx 0\) end. If success needs \(n\) roughly independent "right moves" (reach, align, close gripper, lift, move, release) and dithering gets each one right with probability \(q\), then \(p \approx q^n\), which falls exponentially with task length. Adding Gaussian noise to a 7-D action rarely produces a deliberate grasp.
 
@@ -187,7 +187,7 @@ Under GRPO with binary rewards, solved tasks drop out of the *gradient* automati
 * **Hindsight is learner-side and cheap if vectorized.** Relabeling and reward recomputation are tensor ops on the replay sample. Store episodes contiguously on the GPU, plus achieved goals, so relabeling never touches the host. The extra cost shows up in replay memory (full episodes, not single transitions).
 * **State resets are a simulator feature.** Demo-state curricula need save/restore of the full simulator state. ManiSkill3 exposes `get_state_dict` / `set_state_dict` (with per-env indexing). On a real robot this is the expensive part, which is why curricula are a simulation advantage.
 * **Multi-task GPU sims cost memory.** A GPU-parallel sim instance usually holds one task type. Training on \(m\) tasks means \(m\) instances (memory scales with \(m\)) or time-slicing between them. Per-task evaluation multiplies evaluation cost by \(m\) at fixed confidence (Lecture 13).
-* **Sampler bookkeeping is free.** A success table over 10⁴ seeds is a few kB, so there is no excuse to sample uniformly.
+* **Sampler bookkeeping is usually small compared with rollouts.** A table over 10⁴ seeds needs storage for estimates and counts, but the important cost is estimating success reliably. Uniform sampling remains a useful baseline and preserves a known target distribution; an adaptive sampler changes exposure and needs explicit accounting.
 
 ---
 
@@ -259,20 +259,19 @@ Plot `back` vs iteration. The run is finished when `back` reaches the full demo 
 
 Use your [Lecture 07](Lecture-07.md) SAC on `PushCube-v1`, sparse. Find which entries of the flat state observation hold the goal position and which hold the cube position by reading the task's observation code in the ManiSkill source, and take the success threshold from the task's `evaluate`. Store fixed-length episodes on the GPU:
 
-```python
-# explore/her.py  — obs: (E, T+1, D), act: (E, T, A), ach: (E, T+1, 3) cube xyz per step
-def sample_her(obs, act, ach, n_eps, B, goal_idx, eps, p_relabel=0.8):
-    T, dev = act.shape[1], act.device
-    e = torch.randint(0, n_eps, (B,), device=dev)
-    t = torch.randint(0, T, (B,), device=dev)
-    o, o2, a = obs[e, t].clone(), obs[e, t + 1].clone(), act[e, t]
-    fut = t + 1 + (torch.rand(B, device=dev) * (T - t)).long()       # t' in [t+1, T]
-    g = torch.where((torch.rand(B, device=dev) < p_relabel)[:, None], ach[e, fut], o[:, goal_idx])
-    o[:, goal_idx], o2[:, goal_idx] = g, g
-    # PushCube's evaluate() tests xy distance only (goal z ≠ cube-centre z): compare xy, with its threshold.
-    r = ((ach[e, t + 1, :2] - g[:, :2]).norm(dim=-1) < eps).float()
-    return o, a, r, o2                                      # treat time-limit ends as truncation: always bootstrap
+```text
+PLANNED GOAL-RELABELLING ADAPTER — task-specific implementation required
+sample a transition inside one recorded episode using its actual final observation
+choose an achieved future goal from that same episode, or retain the original goal
+rebuild both observations through the task's goal adapter
+    (including relative positions, distances, and all other goal-derived features)
+recompute reward AND any goal-dependent termination under the relabeled task
+preserve true non-goal terminal events and the original time-limit/truncation meaning
+return observation, action, reward, next_observation, terminated, truncated
 ```
+
+Changing only flat goal-coordinate entries is correct only if no other observation features depend on the goal. Relabeling can change whether goal attainment terminates the task; it cannot justify always bootstrapping. For an external time-limit truncation of a continuing task, bootstrap from the actual final observation; true termination still stops it. Derive this contract from the pinned task implementation and exercise the [CPU termination checks](CPU-Lab.md) before using the relabeled replay in SAC.
+
 
 Compare SAC with `p_relabel = 0` (plain) vs `0.8` (HER). Plot success vs env steps and the fraction of sampled transitions with \(r = 1\).
 

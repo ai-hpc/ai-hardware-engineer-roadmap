@@ -1,0 +1,98 @@
+{
+  "reviewed_utc": "2026-10-18",
+  "scope": "Selected primary API implementations inspected, plus release/requirements sources cited directly in lessons. Hashes identify downloaded source snapshots, not simulator execution.",
+  "sources": [
+    {
+      "url": "https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/source/isaaclab/isaaclab/assets/articulation/articulation.py",
+      "sha256": "be6a3e97b5f385e1d66e04b60d245776b39ace320d1e5612fc89778a981cb7f2",
+      "bytes": 1227
+    },
+    {
+      "url": "https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/source/isaaclab/isaaclab/envs/direct_rl_env.py",
+      "sha256": "f7947ade0e544b81bb062640a68edd668f1edc08dd2951bb9176e25c04a694ae",
+      "bytes": 37533
+    },
+    {
+      "url": "https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/source/isaaclab/isaaclab/sim/simulation_context.py",
+      "sha256": "c3c17f084bc21ddfd80649f8179a6aa916d857a1dcaa1cc1c7f2b7c3945936b2",
+      "bytes": 51889
+    },
+    {
+      "url": "https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/source/isaaclab/test/install_ci/uv_pip/test_uv_pip_install_isaaclab_isaacsim_imports_simulation_context.py",
+      "sha256": "b6dd7c4b006cee63121fbacf5f916fb50b893759043c0c2234cf058ca7d1821e",
+      "bytes": 4868
+    },
+    {
+      "url": "https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/source/isaaclab/test/sim/test_simulation_context.py",
+      "sha256": "d22fa860eb7d19ee69fb2909df96b5219763ef8da34998e1d0ca1216acb1f827",
+      "bytes": 40353
+    },
+    {
+      "url": "https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/source/isaaclab_rl/isaaclab_rl/entrypoints/backends/cli_args_rsl_rl.py",
+      "sha256": "e747b71df081c54b22f53ae33bb3678e6e2e43bf469493464827c5bb31fb26d5",
+      "bytes": 3362
+    },
+    {
+      "url": "https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/source/isaaclab_rl/isaaclab_rl/entrypoints/common.py",
+      "sha256": "c0cbbab6df6591a84b2bbecc101a23684859694433b7bf0ec6cdb4b246eba7f0",
+      "bytes": 51824
+    },
+    {
+      "url": "https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/source/isaaclab_tasks/isaaclab_tasks/core/cabinet/cabinet_env_cfg.py",
+      "sha256": "b1436ad2be274595d87673f8a053c7f328e5f97de4b204748167e0b210f7cb47",
+      "bytes": 10774
+    },
+    {
+      "url": "https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/source/isaaclab_tasks/isaaclab_tasks/core/cartpole/agents/rsl_rl_ppo_cfg.py",
+      "sha256": "0a63e95cebcad54072e25f4c90c665854f23dfcf2dafe273c1f9dbf3752d6175",
+      "bytes": 4936
+    },
+    {
+      "url": "https://github.com/isaac-sim/IsaacLab/blob/ae37b028ea415c91ea2bc32609efcd759ed2b974/source/isaaclab_tasks/isaaclab_tasks/core/cartpole/cartpole_direct_env.py",
+      "sha256": "cebca15c26df471707d9a2c905738acb9c2abe69113d656d4281e0a8daf928b4",
+      "bytes": 8087
+    },
+    {
+      "url": "https://github.com/isaac-sim/IsaacSim/blob/v6.1.0/source/extensions/isaacsim.core.experimental.prims/python/impl/articulation.py",
+      "sha256": "bcd995ff8951f3a8f0c29a6ea6a332e92649333dcccd5db75d72cb43c6d3c82b",
+      "bytes": 240250
+    },
+    {
+      "url": "https://github.com/isaac-sim/IsaacSim/blob/v6.1.0/source/extensions/isaacsim.core.experimental.prims/python/impl/rigid_prim.py",
+      "sha256": "6e3e0304a29f6f707feac8d588939d20b30b4ce42a3765d468ae4d8aa050f2e9",
+      "bytes": 92088
+    },
+    {
+      "url": "https://github.com/isaac-sim/IsaacSim/blob/v6.1.0/source/extensions/isaacsim.core.rendering_manager/python/impl/rendering_manager.py",
+      "sha256": "1026b3e904b9ca0c53d19b69cefa7779f70f7f54795cd0822849161feadea285",
+      "bytes": 15829
+    },
+    {
+      "url": "https://github.com/isaac-sim/IsaacSim/blob/v6.1.0/source/extensions/isaacsim.core.simulation_manager/python/impl/physx_scene.py",
+      "sha256": "e88f3d79c29b3c7cff01881873c387ac8eeaa4da64688cc7b9b19b7b6fc5b1ec",
+      "bytes": 20402
+    },
+    {
+      "url": "https://github.com/isaac-sim/IsaacSim/blob/v6.1.0/source/extensions/isaacsim.core.simulation_manager/python/impl/simulation_manager.py",
+      "sha256": "e5c5905af049b27d4cdbacea6ee3c76213be5e26ac5d6d227a8e18b0453dc4f4",
+      "bytes": 84138
+    },
+    {
+      "url": "https://github.com/isaac-sim/IsaacLab-Arena/blob/main/README.md",
+      "snapshot_sha256": "dbbd220d40910238ae38cb49ba7f67553e43a448fccfaa6d5bff44a6aaa0acd8",
+      "note": "Moving README inspected for compatibility table; review date below."
+    },
+    {
+      "url": "https://github.com/astral-sh/uv/blob/main/crates/uv-cli/src/lib.rs",
+      "snapshot_sha256": "1b60306729dbe8c7ef9346ab32102ef67345f19b6b4a8d424c3101bd613a6c51",
+      "note": "Comma-delimited --extra is explicitly supported; no false correction made."
+    }
+  ],
+  "release_sources": [
+    "https://docs.isaacsim.omniverse.nvidia.com/6.2.0/overview/release_notes.html",
+    "https://github.com/isaac-sim/IsaacLab/releases/tag/v3.0.0-EA",
+    "https://github.com/newton-physics/newton/blob/v1.5.2/README.md",
+    "https://github.com/NVIDIA/warp/blob/v1.16.0/README.md",
+    "https://openusd.org/release/api/class_usd_stage.html"
+  ]
+}

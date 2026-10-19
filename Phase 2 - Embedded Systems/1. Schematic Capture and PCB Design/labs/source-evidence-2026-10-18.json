@@ -1,0 +1,46 @@
+{
+  "checked_utc": "2026-10-18T22:28:40.759424+00:00",
+  "method": "Primary-source HTTP GET snapshot; source content reviewed independently. Source availability does not validate hardware.",
+  "sources": [
+    {
+      "url": "https://www.nxp.com/docs/en/user-guide/UM10204.pdf",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "url": "https://www.ti.com/lit/an/slva689/slva689.pdf",
+      "resolved_url": "https://www.ti.com/lit/an/slva689a/slva689a.pdf?ts=1792290778951",
+      "status": 200,
+      "bytes": 382608,
+      "sha256": "84da7d3745364e881a72914ca609e93132c356dcc0a0461de483fa27a8669e7b"
+    },
+    {
+      "url": "https://www.ti.com/lit/an/spra953d/spra953d.pdf",
+      "resolved_url": "https://www.ti.com/lit/an/spra953d/spra953d.pdf",
+      "status": 200,
+      "bytes": 599442,
+      "sha256": "8ab81b5a351132ae8ab049d984e7cc72f1eb3dd3e4d9d8e063be6fcd841080a9"
+    },
+    {
+      "url": "https://docs.kicad.org/10.0/en/getting_started_in_kicad/getting_started_in_kicad.html",
+      "resolved_url": "https://docs.kicad.org/10.0/en/getting_started_in_kicad/getting_started_in_kicad.html",
+      "status": 200,
+      "bytes": 158011,
+      "sha256": "c22a3d8caf65860d93e19fb5558c6bd516f34f326dd5c2b647f93b10efd133f7"
+    },
+    {
+      "url": "https://docs.kicad.org/10.0/en/eeschema/eeschema.html",
+      "resolved_url": "https://docs.kicad.org/10.0/en/eeschema/eeschema.html",
+      "status": 200,
+      "bytes": 1048260,
+      "sha256": "a08f88331fa4b76e768ab51a5a58dcc9b3fc871920262f1fe07cb68502ddc987"
+    },
+    {
+      "url": "https://community.nxp.com/pwmxy87654/attachments/pwmxy87654/nxp-designs/931/1/UM10204.pdf",
+      "resolved_url": "https://community.nxp.com/pwmxy87654/attachments/pwmxy87654/nxp-designs/931/1/UM10204.pdf",
+      "status": 200,
+      "bytes": 750958,
+      "sha256": "dc91f00f65584e06ef36e26c93bf9d91a95fb3c8a1830a9223e53caf678b36af",
+      "note": "NXP-authored Rev7 PDF hosted on NXP community; main docs URL returned404 to direct GET."
+    }
+  ]
+}

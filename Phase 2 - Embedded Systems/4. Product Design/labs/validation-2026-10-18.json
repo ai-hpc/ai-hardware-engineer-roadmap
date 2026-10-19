@@ -1,0 +1,26 @@
+{
+  "checked_utc": "2026-10-18T22:28:40.759424+00:00",
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "command": [
+    "/usr/bin/python3",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "Phase 2 - Embedded Systems/4. Product Design/labs",
+    "-v"
+  ],
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "test_cancel_does_not_allow_delayed_result_to_resurrect_task (test_product_contract.ProductTests.test_cancel_does_not_allow_delayed_result_to_resurrect_task) ... ok\ntest_deadline_exact_boundary_and_duplicate_result (test_product_contract.ProductTests.test_deadline_exact_boundary_and_duplicate_result) ... ok\ntest_demo_matches_product_claims (test_product_contract.ProductTests.test_demo_matches_product_claims) ... ok\ntest_frames_bounded_and_input_contract_strict (test_product_contract.ProductTests.test_frames_bounded_and_input_contract_strict) ... ok\ntest_local_timer_is_independent_of_mute_and_network (test_product_contract.ProductTests.test_local_timer_is_independent_of_mute_and_network) ... ok\ntest_mute_clears_queue_and_pending_voice_result (test_product_contract.ProductTests.test_mute_clears_queue_and_pending_voice_result) ... ok\ntest_network_attachment_is_not_readiness (test_product_contract.ProductTests.test_network_attachment_is_not_readiness) ... ok\ntest_prior_boot_token_cannot_match_reused_sequence (test_product_contract.ProductTests.test_prior_boot_token_cannot_match_reused_sequence) ... ok\n\n----------------------------------------------------------------------\nRan 8 tests in 0.001s\n\nOK\n",
+  "file_sha256": {
+    "product_contract.py": "665449bf238817bc52e36c677557afd9f4b4f04c5bb3c7a7663ada87025a65af",
+    "test_product_contract.py": "1e153a0a4f4ddbf23921d4153c76884c251f008e711f9abc13d5983195b3a455"
+  },
+  "not_executed": [
+    "physical board measurements",
+    "EDA or SPICE execution",
+    "actual audio/model/network/robot operation",
+    "real-time latency measurement"
+  ]
+}

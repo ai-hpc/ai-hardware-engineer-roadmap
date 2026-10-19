@@ -2,13 +2,17 @@
 
 **Collection:** [MCP for AI Agents](README.md) | **Previous:** [← Lecture 07](Lecture-07.md) | **Next:** [Course index](README.md)
 
+
+**Protocol scope:** the detailed wire/SDK examples below teach the `2025-11-25` compatibility contract. Start with the [current 2026-07-28 protocol lesson](Protocol-2026-07-28.md) for new implementations; do not relabel an old handshake or reverse-request example as current.
+
+
 ---
 
 Everything to this point has been about *one* server: write it (Lecture 05), serve it remotely with OAuth 2.1 (Lecture 06), and threat-model it (Lecture 07). Production is a different animal, because in production you do not run one server — you run twenty. A real agent platform reaches a filesystem server, a GitHub server, a Postgres server, three internal SaaS wrappers, a Playwright server, and whatever a product team stood up last week. The moment you have more than a handful, two problems dominate everything else: **how do you put them all behind one trustworthy front door**, and **how do you keep their combined tool surface from drowning the model**.
 
 This lecture is the operations manual for that world. We cover **composition and proxying** — chaining servers and aggregating many behind one endpoint — and the **MCP gateway** that centralizes auth, policy, rate-limiting, and observability so each server does not reinvent them. We cover the **tool-context budget**: the unglamorous, decisive fact that dumping 200 tools into a model's context degrades its tool selection and inflates every request's token cost, and the namespacing/filtering/curation that fixes it. We cover the **official registry** as the place servers are published and discovered, the **trust signals** that decide whether you actually install one, and the **observability** you must wire around every MCP call. We close with **MCPMark** — the evaluation that tells you whether an agent-plus-server combination is production-ready rather than demo-ready — and a **capstone** that ties the whole course into one shippable artifact.
 
-Like every lecture in this course, the facts pin to the **2025-11-25** stable spec, and the final section details what the **2026-07-28 release candidate** changes — because the stateless core, MCP Apps, and the Tasks extension reshape exactly the deployment story this lecture is about.
+Like every lecture in this course, the facts pin to the **2025-11-25** historical spec, and the final section details what the **2026-07-28 current revision** changes — because the stateless core, MCP Apps, and the Tasks extension reshape exactly the deployment story this lecture is about.
 
 ---
 
@@ -21,7 +25,7 @@ By the end of this lecture you should be able to:
 - Publish to and discover from the **official MCP registry**, and read the **trust signals** that justify installing a third-party server (tying back to Lecture 07).
 - Specify what to **log per MCP call** and connect it to the evaluation/observability discipline of [`../Lectures/Lecture-23.md`](../Lectures/Lecture-23.md).
 - Interpret an **MCPMark** result and use it to decide whether an agent+server combination is production-ready.
-- Describe what the **2026-07-28 RC** unlocks — stateless core, MCP Apps, Tasks, tighter OAuth/OIDC — and execute the course **capstone** against concrete acceptance criteria.
+- Describe what the **2026-07-28 revision** unlocks — stateless core, MCP Apps, Tasks, tighter OAuth/OIDC — and execute the course **capstone** against concrete acceptance criteria.
 
 ---
 
@@ -151,7 +155,7 @@ A server that passes MCP Inspector and answers a happy-path question is a *demo*
 
 MCPMark is an expert-curated benchmark of **127 tasks** spanning **Notion, GitHub, Postgres, Filesystem, and Playwright** — real systems, not toy stubs. Its defining characteristic is depth: the tasks average **16.2 turns** and **17.4 tool calls** each, and they are deliberately constructed so that an agent must **chain operations, read intermediate state, and recover from failure** to succeed. A task is not "call one tool"; it is "navigate a real workspace to a goal," and the scoring rewards getting there, including after a wrong turn.
 
-That design is exactly why it predicts production behavior. The 16-turn average means MCPMark stresses the very things Sections 2 and 4 are about — whether the agent can still select correctly deep into a long context, whether tool latency compounds into an unusable wall-clock, and whether a failed call is a dead end or a recoverable step. A single-shot tool-calling benchmark cannot see any of that.
+That design exercises useful operational behaviors, but benchmark performance does not by itself establish production readiness for a different task distribution. The 16-turn average means MCPMark stresses the very things Sections 2 and 4 are about — whether the agent can still select correctly deep into a long context, whether tool latency compounds into an unusable wall-clock, and whether a failed call is a dead end or a recoverable step. A single-shot tool-calling benchmark cannot see any of that.
 
 Use it as a **go/no-go gate**, not a vanity number. Concretely:
 
@@ -163,20 +167,9 @@ MCPMark sits inside the broader benchmark ladder catalogued in [`../Lectures/Lec
 
 ---
 
-## 6. The 2026 roadmap: the 2026-07-28 release candidate
+## 6. Current protocol and compatibility
 
-The **2026-07-28 release candidate** is the largest revision since MCP launched, and it changes the production story this whole lecture describes. Four pieces matter, each unlocking something concrete.
-
-| RC feature | What it is | What it unlocks for production |
-| --- | --- | --- |
-| **Stateless core** | A core protocol mode that carries no required per-session server state | Scale on ordinary HTTP / serverless — any instance handles any request, no sticky routing, no shared session store; the gateway fleet becomes trivially horizontal |
-| **MCP Apps** | Server-rendered **interactive UIs**, not just text/data results | A tool can return a real UI surface (a form, a chart, a confirmation widget) the host renders — richer than a JSON blob, with the human-in-the-loop interaction inline |
-| **Tasks extension** | First-class **long-running / async** work | A tool can kick off work that outlives one request — a long migration, a crawl, a build — and the agent polls/awaits completion instead of holding a connection open |
-| **Tighter OAuth/OIDC** | Closer alignment with standard OAuth 2.1 / OIDC | Cleaner integration with enterprise identity providers; the Lecture 06 auth story gets more standard and less bespoke at the gateway |
-
-Two of these resolve tensions raised earlier in the course. The **stateless core** is the answer to the scaling friction Lecture 02 flagged — a per-session-stateful server needs affinity or a shared store, and the stateless mode removes the requirement entirely, which is what makes a gateway-fronted fleet cheap to scale. The **Tasks** extension closes the gap between "a tool call returns in seconds" and "real work takes minutes" — without it, long jobs force you to fake async with polling tools and external state.
-
-Alongside the spec RC, the official **`mcp` SDK is heading to v2** (in beta through 2026), so the FastMCP surfaces from Lecture 05 will shift. Treat all of this as **forthcoming until the RC is ratified**: build against **2025-11-25** today, and design your gateway and servers so that adopting the stateless core and Tasks later is a configuration change, not a rewrite.
+Read the [2026-07-28 protocol lesson](Protocol-2026-07-28.md) before this capstone. The revision is current, and migration changes initialization, metadata, result types, reverse interactions, subscriptions, and recovery. SDK support must be verified separately. Keep an explicitly versioned compatibility route for older peers; do not promise that migration is only a configuration change.
 
 ---
 
@@ -214,4 +207,4 @@ If you can do all seven, you have built the thing this course exists to teach: n
 
 ## Current as of
 
-This lecture is current as of **June 2026**, pinned to the latest stable MCP specification, **2025-11-25** — the revision to build production servers and gateways against today. The scale figures (the official registry passing **2,000+ servers**, the `mcp` package at ~97M monthly downloads) and the **MCPMark** specification (**127 tasks** across Notion/GitHub/Postgres/Filesystem/Playwright, averaging **16.2 turns / 17.4 tool calls**, rewarding failure recovery) reflect early-2026 reporting; re-pull MCPMark's task list and scoring before you cite a number in a review. The **2026-07-28 release candidate** is the largest revision since launch — a **stateless core** (scale on ordinary HTTP/serverless without session affinity), **MCP Apps** (server-rendered interactive UIs), a **Tasks** extension (long-running/async work), and tighter **OAuth/OIDC** alignment — and the official **`mcp` SDK is heading to v2** (beta through 2026); treat all of these as forthcoming until the RC is ratified, and design so adopting them is configuration, not rewrite. Transport status: **stdio** and **Streamable HTTP** are current; **HTTP+SSE** has been deprecated since **2025-03-26**. Gateway products, registry tooling, and SDK surfaces move release-to-release — treat any code here as a snapshot and verify against your installed versions; the protocol and benchmark facts above are the stable ground.
+The original June-2026 examples target `2025-11-25`. Reviewed 2026-10-18: **2026-07-28 is current**, with a different request, result, subscription, and retry contract. Use the [current lesson and official sources](Protocol-2026-07-28.md) before implementing or migrating. SDK snippets here have not been executed against the new revision; retained benchmark numbers are historical references, not local measurements.

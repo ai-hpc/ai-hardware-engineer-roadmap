@@ -1,440 +1,64 @@
-# camerad — Openpilot Camera Pipeline
+# Camera pipeline: preserve pixels, time and ownership
 
-<div class="course-identity auto-course" style="--course-accent: #ea580c; --course-accent-rgb: 234, 88, 12;" markdown="1">
-<div class="course-identity__icon">COCP</div>
-<div markdown="1">
-<p class="course-identity__eyebrow">Deep Dive · Specialization</p>
-<p class="course-identity__title">Specialized course identity for camerad — Openpilot Camera Pipeline.</p>
-<p class="course-identity__meta">Artifact: specialization case study · Measure: performance, reliability, role fit</p>
-</div>
-</div>
+**Before:** [openpilot process map](../Guide.md), basic image formats and memory layout. **Time:** 60–90 minutes. **Artifact:** a frame contract and a source-supported latency/layout calculation. **Validation:** pinned source inspected and layout arithmetic executed; no comma camera or ISP hardware was run.
 
+## 1. Start from an acquired frame
 
-> **Goal:** Understand how openpilot captures, processes, and delivers camera frames to the perception stack. camerad is the first process in the pipeline: raw sensor → ISP → VisionIpc → modeld.
+A sensor integrates light over an interval, emits pixels through a camera interface, and an ISP produces a usable image. The application receives a buffer and metadata. “Frame arrived” is not the same event as exposure start, exposure end or inference completion.
 
----
+In the reviewed [camera metadata](https://github.com/commaai/openpilot/blob/b1e88c2357f07dfc4e0872370b64d97ad606391b/openpilot/system/camerad/cameras/camera_common.h), `FrameMetadata` includes frame ID, request ID, start/end timestamps and processing time. The Qualcomm camera path publishes acquisition metadata alongside camera state and passes image buffers through VisionIPC. Read the producer before deciding which timestamp represents the observation used by your model.
 
+The source contains OX03C10 and OS04C10 sensor implementations. Their presence does not establish that every comma device generation uses the same sensor, resolution, ISP graph or configuration. Hardware identity belongs in the recorded experiment, not in an unversioned sensor table.
 
-## 1. Overview
+## 2. Read the actual source path
 
-**camerad** is a native C++ process that:
+| File at the pinned snapshot | Question to answer |
+|---|---|
+| `openpilot/system/camerad/main.cc` | Where does the process enter the camera loop? |
+| `openpilot/system/camerad/cameras/camera_qcom2.cc` | Which event signals progress, and how is metadata published? |
+| `openpilot/system/camerad/cameras/spectra.cc` | How are the Qualcomm request/ISP resources configured? |
+| `openpilot/system/camerad/cameras/camera_common.cc` | How are frame buffers created and sent? |
+| `openpilot/system/camerad/cameras/nv12_info.py` | What are stride, aligned plane heights and allocation size? |
+| `openpilot/system/camerad/sensors/sensor.h` and sensor implementations | What exposure/register/layout constraints belong to each sensor? |
 
-- Captures frames from up to **three cameras** (wide road, road, driver)
-- Runs them through the **Qualcomm Spectra ISP** (Image Signal Processor)
-- Publishes **YUV frames** via **VisionIpc** (shared memory IPC)
-- Publishes **FrameData** (metadata) via cereal messaging
-- Implements **auto exposure (AE)** to adapt to lighting
+The reviewed event loop uses `VIDIOC_DQEVENT` and Qualcomm request-manager events. A generic webcam `VIDIOC_DQBUF → publish` diagram is not an accurate account of this path. V4L2/media concepts still help, but the actual ioctls and ownership come from this driver integration. [Pinned camera loop](https://github.com/commaai/openpilot/blob/b1e88c2357f07dfc4e0872370b64d97ad606391b/openpilot/system/camerad/cameras/camera_qcom2.cc).
 
-**Location:** `openpilot/system/camerad/`
+## 3. Work the NV12 allocation instead of guessing it
 
-**Entry point:** `main.cc` → `camerad_thread()` (pinned to CPU core 6)
+For an even width/height, tightly packed NV12 has an 8-bit full-resolution Y plane and interleaved UV samples at half width and half height. Its logical payload is `1.5 × width × height` bytes. That does **not** establish an ISP allocation's row stride or total size.
 
----
+The pinned `get_nv12_info(1928,1208)` returns:
 
-## 2. Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              camerad                                         │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  Sensor (I2C)     │  CSI/MIPI    │  IFE (Image Front End)  │  BPS (optional)  │
-│  OX03C10/OS04C10 │  → RAW       │  Demosaic, CCM, Gamma   │  Downscale        │
-│                  │              │  Vignetting correction  │  (driver cam)     │
-└─────────────────────────────────────────────────────────────────────────────┘
-         │                                    │
-         ▼                                    ▼
-   Exposure control                    YUV output
-   (AE algorithm)                      VisionIpc buffers
-         │                                    │
-         └────────────────┬───────────────────┘
-                          ▼
-                   FrameData (cereal)
-                   frame_id, timestamps, gain, exposure
+```text
+stride = 2048 bytes
+aligned Y height = 1216 rows
+aligned UV height = 608 rows
+buffer size = 4,804,608 bytes
+logical tight payload = 3,493,536 bytes
 ```
 
-**Three cameras (comma 3X):**
+The extra bytes include row/plane alignment and additional padding in this source's allocation policy. They are not extra visible pixels. The [exact helper](https://github.com/commaai/openpilot/blob/b1e88c2357f07dfc4e0872370b64d97ad606391b/openpilot/system/camerad/cameras/nv12_info.py) aligns width to 128, Y height to 32 and UV height to 16, then applies its additional buffer padding. These values were calculated by executing that pinned Python helper, not by capturing a device buffer.
 
-| Camera | Stream | Role | Focal length |
-|--------|--------|------|--------------|
-| **Wide road** | `VISION_STREAM_WIDE_ROAD` | Wide FoV, peripheral | 1.71 mm |
-| **Road** | `VISION_STREAM_ROAD` | Main driving view | 8.0 mm |
-| **Driver** | `VISION_STREAM_DRIVER` | Driver monitoring (DMS) | 1.71 mm |
+**Worked indexing:** with a declared stride of 2048, Y pixel `(x=10,y=3)` is at offset `3×2048+10=6154` from the Y plane start. Using width 1928 as the stride would read offset 5794, 360 bytes too early. For UV, you also need the actual UV plane offset and subsampling convention. Never infer the offset from logical height when the plane height is aligned.
 
----
+**Exercise:** make a 4×2 logical Y image inside an 8-byte row stride, fill row padding with 255 and valid pixels with 10. Compute the mean over valid pixels (10), then over all allocated Y bytes (132.5). Explain why a normalization step that averages padding can alter the model even though the image dimensions are correct.
 
-## 3. Camera Configuration
+## 4. Exposure is a delayed control loop
 
-Defined in `cameras/hw.h`:
+The pinned `CameraState::set_camera_exposure` comments and bookkeeping account for a three-frame command-to-effect delay in that camera path. At a hypothetical 20 frames/s, three frames correspond to 150 ms. That is an exposure-response model, not a measurement of camera-to-actuator latency and not a guarantee for every sensor configuration.
 
-```cpp
-// Wide: fisheye, peripheral
-WIDE_ROAD_CAMERA_CONFIG = {
-  .camera_num = 0,
-  .stream_type = VISION_STREAM_WIDE_ROAD,
-  .focal_len = 1.71,
-  .publish_name = "wideRoadCameraState",
-  .output_type = ISP_IFE_PROCESSED,
-};
+Trace which stored exposure value is paired with the newly measured image statistic. Pairing the new command with pixels produced under an older command introduces a feedback-model error. Aggressive gain tuning can then oscillate or saturate despite a correct arithmetic update.
 
-// Road: main forward-facing, narrow FoV
-ROAD_CAMERA_CONFIG = {
-  .camera_num = 1,
-  .stream_type = VISION_STREAM_ROAD,
-  .focal_len = 8.0,
-  .publish_name = "roadCameraState",
-  .vignetting_correction = true,
-  .output_type = ISP_IFE_PROCESSED,
-};
+For a replay study, retain frame ID, exposure/gain settings, target/measured grey fraction and acquisition timestamps. Plot delayed command versus observed brightness. Account for saturation and scene changes before attributing every brightness change to the controller. The upstream algorithm is more specific than a generic “PI controller” label.
 
-// Driver: cabin-facing
-DRIVER_CAMERA_CONFIG = {
-  .camera_num = 2,
-  .stream_type = VISION_STREAM_DRIVER,
-  .focal_len = 1.71,
-  .publish_name = "driverCameraState",
-  .output_type = ISP_BPS_PROCESSED,  // BPS for extra processing
-};
-```
+## 5. Shared memory still needs a lifetime rule
 
-**Python intrinsics** (for modeld warp, calibration): `common/transformations/camera.py`
+A consumer may hold a reference to an image while the producer wants to reuse storage. The contract must say when reuse is allowed and how the consumer detects a newer generation. A pointer plus a timestamp is not sufficient if the pixels can be overwritten independently.
 
-- Road: 1928×1208, focal 2648 px (OX) or 1344×760, focal ~1142 px (OS)
-- Wide: 1928×1208, focal 567 px
-- Driver: same as wide
+Draw: producer owns buffer → completes acquisition/processing → publishes buffer identity and metadata → consumer finishes required reads → storage becomes reusable. Establish the actual implementation's behavior from VisionIPC source rather than assuming this drawing supplies its protocol. Image warp, normalization, accelerator upload and history stacking can still allocate or copy data after IPC.
 
----
+**Fault exercise:** copy metadata from frame `k`, but pair it with pixels from `k+1` in a replay fixture. Which checks detect it? A finite-value check will not. A frame/generation contract or controlled fixture with distinct per-frame content can.
 
-## 4. Hardware Stack
+## Completion
 
-### Sensors
-
-| Sensor | Device | Resolution | Notes |
-|--------|--------|------------|-------|
-| **OX03C10** | comma 3X (tici/tizi) | 1928×1208 | OmniVision, 3 MP |
-| **OS04C10** | comma 3X (mici) | 2688×1520 | OmniVision, 4 MP |
-| **AR0231** | Legacy (neo) | 1164×874 | Aptina |
-
-**Sensor interface:** I2C for register control (exposure, gain, init). MIPI CSI for image data.
-
-**Files:** `sensors/ox03c10.cc`, `sensors/os04c10.cc`, `sensors/sensor.h`
-
-### Qualcomm Spectra ISP
-
-- **IFE** (Image Front End): demosaic, color correction (CCM), gamma, vignetting
-- **BPS** (Bayer Processing Segment): used for driver camera (extra downscale/processing)
-- **CDM** (Camera Data Mover): DMA, buffer management
-- **CSIPHY**: MIPI CSI physical layer
-
-**Kernel:** Linux V4L2 (Video4Linux2), `CAM_REQ_MGR` (Request Manager) for frame synchronization.
-
-### V4L2: Linux Kernel Camera API
-
-**V4L2** (Video4Linux2) is the standard Linux kernel API for video capture, output, and codecs. camerad uses V4L2 to drive the Qualcomm Spectra ISP and receive processed frames.
-
-#### What V4L2 Provides
-
-| Concept | Description |
-|---------|-------------|
-| **Device nodes** | `/dev/video0`, `/dev/video1`, … — one per capture/output device. camerad opens `/dev/video0` (sync device) for the request manager. |
-| **Media Controller** | Models the pipeline: sensor → CSI → IFE → BPS → video node. Used to discover and link entities. |
-| **Request API** | One *request* = one frame through the pipeline. Sensor capture, IFE, BPS all tied to the same request for synchronization. |
-| **Buffer flow** | `VIDIOC_QBUF` enqueue empty buffer → hardware fills it → `VIDIOC_DQBUF` dequeue filled buffer. |
-
-#### camerad's V4L2 Flow
-
-```
-1. Open /dev/video0 (sync/request manager device)
-2. Media Controller: discover sensor, IFE, BPS entities; configure links
-3. VIDIOC_REQBUFS: allocate capture buffers (YUV output)
-4. VIDIOC_QUERYBUF: get buffer addresses for mmap()
-5. VIDIOC_QBUF: enqueue buffers into the pipeline
-6. VIDIOC_STREAMON: start streaming
-7. poll(fd, POLLPRI): wait for frame-done event
-8. VIDIOC_DQEVENT: dequeue event (frame completed)
-9. processFrame() → YUV ready → sendFrameToVipc()
-10. VIDIOC_QBUF: re-enqueue buffer for next frame
-```
-
-#### Key ioctls Used by camerad
-
-| ioctl | Purpose |
-|-------|---------|
-| `VIDIOC_REQBUFS` | Allocate buffer queue (memory-mapped or DMA) |
-| `VIDIOC_QUERYBUF` | Get buffer info (offset, length) for mmap |
-| `VIDIOC_QBUF` | Enqueue buffer for capture |
-| `VIDIOC_DQBUF` | Dequeue filled buffer (alternatively, events can signal completion) |
-| `VIDIOC_DQEVENT` | Dequeue async event (e.g. frame done) — used with Request API |
-| `VIDIOC_STREAMON` / `VIDIOC_STREAMOFF` | Start/stop streaming |
-| `VIDIOC_S_FMT` | Set pixel format (e.g. NV12) |
-| `VIDIOC_S_PARM` | Set frame rate |
-
-#### Event-Driven Model
-
-camerad uses **event-driven** capture, not blocking `DQBUF`:
-
-- `poll(fd, POLLPRI)` — wait until a frame-done event is available
-- `VIDIOC_DQEVENT` — dequeue the event; payload indicates which request/frame completed
-- Process the frame, re-enqueue buffers, then poll again
-
-`POLLPRI` (priority/exceptional condition) is set when an event is pending. This avoids busy-waiting and integrates cleanly with the Request API.
-
-#### CAM_REQ_MGR (Qualcomm Request Manager)
-
-On Qualcomm platforms, **CAM_REQ_MGR** is a kernel component that:
-
-- **Synchronizes** sensor capture with ISP (IFE, BPS) — one request ties them together
-- **Queues requests** — each request carries buffers and controls for the whole pipeline
-- **Signals completion** — when the pipeline finishes a frame, an event is queued for userspace
-
-Without the Request API, sensor and ISP could run out of sync (e.g. wrong exposure applied to a frame). The Request API guarantees: *this* sensor frame → *this* IFE config → *this* output buffer.
-
-#### Device Layout (Qualcomm Spectra)
-
-| Device | Role |
-|--------|------|
-| `/dev/video0` | Sync/request manager — camerad polls here for frame-done events |
-| `/dev/media0` | Media controller — pipeline topology (sensor ↔ IFE ↔ BPS) |
-| Subdevs (e.g. `/dev/v4l-subdev*`) | Sensor, IFE, BPS as separate entities; configured via media controller |
-
-#### Debugging V4L2
-
-```bash
-# List video devices and capabilities
-v4l2-ctl --list-devices
-
-# List supported formats
-v4l2-ctl -d /dev/video0 --list-formats-ext
-
-# Media controller: show pipeline
-media-ctl -d /dev/media0 -p
-```
-
-**References:** [V4L2 API (kernel.org)](https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/v4l2.html), [VIDIOC_QBUF/VIDIOC_DQBUF](https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/vidioc-qbuf.html), [V4L2 poll()](https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/func-poll.html)
-
----
-
-## 5. ISP Pipeline
-
-```
-Sensor (RAW Bayer) → CSI → IFE → [BPS for driver] → YUV (NV12)
-```
-
-**Output format:** NV12 (Y plane + interleaved UV plane). Standard format for vision/ML.
-
-**Buffer flow:**
-
-1. `SpectraMaster` initializes `/dev/video0`, sync, ISP, ICP
-2. `SpectraCamera` per camera: sensor init, IFE config, BPS config (driver only), link devices
-3. `CameraBuf` allocates raw (optional) and YUV buffers
-4. `VisionIpcServer` creates shared-memory buffers for consumers (modeld, etc.)
-5. On V4L2 frame event: `handle_camera_event` → `processFrame` → `sendFrameToVipc` + publish FrameData
-
----
-
-## 6. Auto Exposure (AE)
-
-camerad implements **software AE** (no sensor AEC). Goal: keep a target region at ~12.5% grey (median luminance).
-
-**Algorithm** (`camera_qcom2.cc`):
-
-1. **Measure:** `calculate_exposure_value()` bins luminance in an AE rectangle, returns median grey fraction
-2. **Target:** `target_grey_fraction` ≈ 0.125, scaled by scene brightness (darker → lower target)
-3. **Control loop:** PI-like update with ~3-frame latency (sensor register buffering)
-4. **Optimizer:** Brute-force over `(exposure_time, analog_gain)` to minimize `getExposureScore` (EV error)
-5. **DC gain:** High conversion gain for low light; hysteresis to avoid flicker
-
-**AE rectangles** (per camera, in pixel coords):
-
-- Wide: `{96, 400, 1734, 524}` — lower part of frame
-- Road: `{96, 160, 1734, 986}` — most of frame
-- Driver: `{96, 242, 1736, 906}` — face region
-
-**Exposure params:** `exposure_time` (µs), `analog_gain`, `dc_gain_enabled`. Sent to sensor via I2C.
-
----
-
-## 7. VisionIpc
-
-**VisionIpc** = shared-memory IPC for video frames. Avoids copies; modeld reads directly from shared buffers.
-
-**Server (camerad):**
-
-```cpp
-VisionIpcServer v("camerad");
-v.create_buffers_with_sizes(stream_type, VIPC_BUFFER_COUNT, width, height, yuv_size, stride, uv_offset);
-// ...
-vipc_server->send(cur_yuv_buf, &extra);  // on each frame
-```
-
-**Client (modeld):**
-
-```python
-from msgq.visionipc import VisionIpcClient, VisionStreamType
-vipc = VisionIpcClient("camerad", 0, VisionStreamType.VISION_STREAM_ROAD)
-# vipc.recv() → frame buffer
-```
-
-**Stream types:** `VISION_STREAM_WIDE_ROAD`, `VISION_STREAM_ROAD`, `VISION_STREAM_DRIVER`
-
-**Buffer count:** 18 (`VIPC_BUFFER_COUNT`). Allows producer/consumer to run at different rates.
-
----
-
-## 8. Data Flow
-
-```
-V4L2 poll(POLLPRI) on video0
-    │
-    ▼
-VIDIOC_DQEVENT (frame done)
-    │
-    ├─► handle_camera_event()
-    │       │
-    │       ├─► processFrame() → YUV ready
-    │       │
-    │       ├─► sendFrameToVipc() → VisionIpc send
-    │       │
-    │       ├─► calculate_exposure_value() → grey_frac
-    │       │
-    │       ├─► set_camera_exposure() → I2C exposure registers
-    │       │
-    │       └─► pm->send("roadCameraState", FrameData)
-    │
-    └─► (next frame)
-```
-
-**FrameData** (cereal): `frameId`, `timestampSof`, `timestampEof`, `integLines`, `gain`, `measuredGreyFraction`, `targetGreyFraction`, `exposureValPercent`, `sensor`, `processingTime`.
-
----
-
-## 9. Source Map
-
-**Local path (in this roadmap):** `openpilot/system/camerad/` under the Autonomous Driving folder.
-
-| Component                     | Path                                                    | Meaning / Responsibility (including file name meaning)                                                                                     |
-|-------------------------------|---------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|
-| Main loop                     | `system/camerad/main.cc`                               | Main entry point; runs `main()` and pins process to CPU/core; launches camerad main thread.                                               |
-| Camera state, AE (qcom2: Qualcomm Gen2) | `system/camerad/cameras/camera_qcom2.cc`               | Camera state logic and auto-exposure (AE); "qcom2" refers to Qualcomm 2nd-Gen ISP platform (used in Snapdragon SoCs). Manages pipeline and event handling for these ISPs. |
-| Camera buffer, VIPC send      | `system/camerad/cameras/camera_common.cc`              | Camera buffer ring management and Vision IPC (Interprocess Communication) data sending. "common" means shared/common camera logic (not platform- or sensor-specific).     |
-| ISP (IFE, BPS, CDM: Image Signal Processor, Bayer processing, Camera Data Mover) | `system/camerad/cameras/spectra.cc`, `cdm.cc`          | Qualcomm "Spectra" is the ISP subsystem. IFE = Image Front End (captures/initial process), BPS = Bayer Processing Segment, CDM = Camera Data Mover (DMA/HW offload management). These files initialize and operate the ISP. |
-| Sensor drivers                | `system/camerad/sensors/ox03c10.cc`, `os04c10.cc`      | Sensor-specific drivers: `ox03c10` and `os04c10` are image sensor model names (OmniVision OX03C10 & OS04C10). Each file contains initialization, I2C register access, and sensor settings. |
-| Camera config (hw: hardware)  | `system/camerad/cameras/hw.h`                          | Camera hardware and configuration header. "hw" stands for "hardware": defines types, capabilities, and constants for different cameras used.                          |
-| Intrinsics (Python)           | `common/transformations/camera.py`                     | Camera intrinsic/extrinsic parameters and transformations, projection and rectification logic, written in Python. Used for geometric camera model math. |
-| VisionIpc                     | `msgq/visionipc/`                                      | VisionIPC (Inter-Process Communication) framework directory: shared memory and message-passing (server/client) for image/frame data transport between processes.        |
-
----
-
-## 10. Code Walkthrough — Every Piece
-
-Use the **local openpilot clone** at `../openpilot/system/camerad/` (relative to this Guide). Read in this order:
-
-### Entry Point
-
-| File | What it does |
-|------|---------------|
-| **main.cc** | `main()` → pins process to CPU 6 → calls `camerad_thread()`. No RT priority (isolcpus used). |
-
-### Configuration
-
-| File | What it does |
-|------|---------------|
-| **cameras/hw.h** | `CameraConfig` struct: `camera_num`, `stream_type`, `focal_len`, `publish_name`, `output_type` (IFE vs BPS). Defines `WIDE_ROAD_CAMERA_CONFIG`, `ROAD_CAMERA_CONFIG`, `DRIVER_CAMERA_CONFIG`, `ALL_CAMERA_CONFIGS`. |
-
-### Core Loop & AE (Qualcomm)
-
-| File | What it does |
-|------|---------------|
-| **cameras/camera_qcom2.cc** | `camerad_thread()`: init `SpectraMaster`, create `CameraState` per config, start sensors, **poll** `video0_fd` for `POLLPRI` → `VIDIOC_DQEVENT` → `handle_camera_event()` → `sendState()`. `CameraState`: holds `SpectraCamera`, exposure params, AE rect. `set_camera_exposure()`: PI-like control, brute-force over (exp_t, gain_idx), DC gain hysteresis, I2C via `sensors_i2c()`. `set_exposure_rect()`: AE rectangles per camera (wide/road/driver). |
-
-### Buffer & VIPC
-
-| File | What it does |
-|------|---------------|
-| **cameras/camera_common.h** | `CameraBuf`: `vipc_server`, `stream_type`, `cur_buf_idx`, `cur_frame_data`, `cur_yuv_buf`, `camera_bufs_raw`. `FrameMetadata`: frame_id, request_id, timestamps. Declares `camerad_thread()`, `calculate_exposure_value()`, `get_raw_frame_image()`, `open_v4l_by_name_and_index()`. |
-| **cameras/camera_common.cc** | `CameraBuf::init()`: allocates raw buffers (if BPS), creates VIPC buffers. `sendFrameToVipc()`: gets YUV buf, sets `VisionIpcBufExtra`, calls `vipc_server->send()`. `calculate_exposure_value()`: bins Y luminance in `ae_xywh`, returns median/256. `open_v4l_by_name_and_index()`: scans `/sys/class/video4linux/` for subdev name, opens `/dev/v4l-subdevN`. |
-
-### ISP (Spectra)
-
-| File | What it does |
-|------|---------------|
-| **cameras/spectra.h** | `SpectraMaster`: `video0_fd`, `cam_sync_fd`, `isp_fd`, `icp_fd`, `MemoryManager`. `SpectraCamera`: sensor, IFE/BPS config, `handle_camera_event()`, `camera_open()`, `sensors_init/start/i2c()`, `config_ife()`, `config_bps()`, `enqueue_frame()`. `SpectraBuf`: mmap'd DMA buffer. |
-| **cameras/spectra.cc** | `SpectraMaster::init()`: opens `/dev/video0`, sync, ISP, ICP. `SpectraCamera`: sensor probe, IFE/BPS setup, link devices, request queue. `handle_camera_event()`: validates event, calls `processFrame()`, re-enqueues. CDM (Camera Data Mover) setup. |
-| **cameras/cdm.cc**, **cdm.h** | CDM programs for IFE/BPS: DMA descriptors, striping. |
-| **cameras/ife.h** | IFE (Image Front End) register layouts, LUTs. |
-| **cameras/bps_blobs.h** | BPS (Bayer Processing Segment) binary blobs / config. |
-| **cameras/nv12_info.h**, **nv12_info.py** | NV12 layout (stride, uv_offset) for different resolutions. |
-
-### Sensors
-
-| File | What it does |
-|------|---------------|
-| **sensors/sensor.h** | `SensorInfo`: frame dimensions, exposure limits, analog gains, DC gain, CCM, gamma LUT, linearization, vignetting. `OX03C10`, `OS04C10` subclasses: `getExposureRegisters()`, `getExposureScore()`, `getSlaveAddress()`. |
-| **sensors/ox03c10.cc** | OX03C10 init, exposure register writes, I2C slave addr. |
-| **sensors/ox03c10_registers.h** | Register addresses for OX03C10. |
-| **sensors/os04c10.cc** | OS04C10 init, `ife_downscale_configure()`, exposure. |
-| **sensors/os04c10_registers.h** | Register addresses for OS04C10. |
-
-### Other
-
-| File | What it does |
-|------|---------------|
-| **snapshot.py** | Utility to capture a frame (for debugging). |
-| **SConscript** | Build rules for camerad. |
-| **test/** | `test_camerad.py`, `debug.sh`, `stress_restart.sh`, `test_ae_gray.cc` — tests and debug scripts. |
-
-### Reading Order (Suggested)
-
-1. **main.cc** — entry
-2. **hw.h** — config
-3. **camera_common.h** + **camera_common.cc** — buffers, VIPC, AE measurement
-4. **sensor.h** — sensor interface
-5. **camera_qcom2.cc** — main loop, AE control, `camerad_thread()`
-6. **spectra.h** + **spectra.cc** — ISP init, `handle_camera_event`, `processFrame`
-7. **ox03c10.cc** / **os04c10.cc** — sensor-specific init and exposure
-
----
-
-## 11. Key Concepts
-
-| Concept | Description |
-|---------|-------------|
-| **NV12** | YUV 4:2:0: Y plane full res, UV interleaved half res. Common for ISP output and ML. |
-| **VisionIpc** | Zero-copy frame sharing via shared memory. Server creates buffers; clients subscribe by stream type. |
-| **FrameData** | Cereal message with frame metadata. Used for sync (frame_id, timestamps) and AE debugging. |
-| **ISP** | Image Signal Processor. Converts RAW Bayer → demosaic → color correct → gamma → YUV. |
-| **AE** | Auto exposure. Software loop: measure luminance → compute desired EV → set sensor exposure/gain. |
-| **V4L2** | Video4Linux2 — Linux kernel API for video capture. Device nodes (`/dev/video*`), ioctls (QBUF/DQBUF), Request API. |
-| **Request Manager** | V4L2 CAM_REQ_MGR: ties sensor capture to ISP pipeline. One request = one frame through the pipeline. |
-| **QBUF/DQBUF** | V4L2 buffer exchange: QBUF enqueue empty buffer, DQBUF dequeue filled buffer. |
-
----
-
-## Further Reading
-
-- **Local openpilot camerad:** `../openpilot/system/camerad/` (relative to this Guide)
-- **V4L2 API:** [kernel.org V4L2 documentation](https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/v4l2.html) — device nodes, ioctls, buffer flow, Request API
-- **Trace the pipeline:** Start at `camerad_thread()` in `camera_qcom2.cc`, follow `handle_camera_event` → `processFrame` → `sendFrameToVipc`
-- **modeld consumption:** `selfdrive/modeld/modeld.py` — `VisionIpcClient` for `VISION_STREAM_ROAD` (and wide if used)
-- **Calibration:** `common/transformations/camera.py`, `get_warp_matrix` for model input warp
-
-## Frame ownership and age lab
-
-Treat the sensor models, register values, CPU affinity, and source paths in this walkthrough as revision-specific examples. Record the actual device and commit before copying them. Trace one buffer from allocation through camera completion, publication, GPU consumption, and reuse; shared memory alone does not prove that every preprocessing stage avoids a copy.
-
-Compute `observation_age = action_consumption_time − sensor_capture_time` using timestamps converted into the same clock domain. A sequence number detects loss or reordering but cannot substitute for time. On a bench or recorded stream, introduce a dropped frame and a slow consumer; verify that stale frames are detected and buffers are not reused while the GPU still reads them.
-
-**Handoff:** a frame-lifecycle diagram and measured copy/latency budget for the [tinygrad inference module](../../3.%20tinygrad%20for%20Inference/Guide.md). These define the future SoC's camera DMA, synchronization, and memory-ownership requirements.
-
-## Practice and assessment
-
-**Entry diagnostic (prerequisite check):** Explain capture timestamp, buffer lifetime, pixel format, and consumer synchronization. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
-
-1. **Baseline lab:** Trace one recorded camera buffer through conversion and model input.
-2. **Guided variation:** Test a format/stride mismatch and a dropped-frame sequence in replay.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
-
-**Evidence to submit:** Image correctness, frame continuity, copy count, latency, and buffer ownership. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+Submit the 6154-byte offset calculation, the padding contamination example, the exposure-delay pairing and a buffer-lifetime diagram. Carry the original acquisition timestamp into the [replay gate](../Replay-Lab.md). For kernel/process implications continue with [AGNOS](../agnos/Guide.md).

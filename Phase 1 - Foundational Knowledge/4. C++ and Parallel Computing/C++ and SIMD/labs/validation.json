@@ -1,0 +1,35 @@
+{
+  "review_date": "2026-10-18",
+  "host": "x86_64",
+  "compiler": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "clang": "Ubuntu clang version 18.1.3 (1ubuntu1)",
+  "command": "python3 -m unittest discover -s . -p 'test_*.py' -v",
+  "tests_passed": 11,
+  "skipped": 0,
+  "native_execution": [
+    "scalar reference 784 shapes",
+    "AVX2 784 lengths/offsets with exact bounds",
+    "shuffle/permute/hadd/reduction",
+    "sign-bit blend selection",
+    "FMA rounding",
+    "conversion rounding",
+    "NaN and signed zero",
+    "ASan/UBSan",
+    "missing-tail mutant rejected",
+    "half-reversal mutant rejected"
+  ],
+  "compile_only": [
+    "AArch64 sum_four: two FADDP instructions",
+    "AArch64 truncate_four: FCVTZS"
+  ],
+  "not_validated": [
+    "ARM runtime execution",
+    "performance and power",
+    "all CPUs and compiler versions"
+  ],
+  "source_sha256": {
+    "test_simd.py": "34cdb1a53a930ff0061b9c69b7bdbf4e18dddd4e5f068d2ac6439b498ce7bed7",
+    "neon_contracts.cpp": "7da8f6322746cce7bf000dd9c42317bf67af99fd597f7cff270fdf16ab7d4e78",
+    "simd_contracts.cpp": "3390ae6cd0077caa448295cfa671f376b604e3ee312b6f3768f0709b01e6789c"
+  }
+}

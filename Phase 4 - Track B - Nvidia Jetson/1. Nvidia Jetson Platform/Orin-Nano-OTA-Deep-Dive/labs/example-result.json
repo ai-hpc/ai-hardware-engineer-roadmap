@@ -1,0 +1,40 @@
+{
+  "evidence_kind": "temporary-file teaching protocol, not Jetson boot execution",
+  "failed_trials": [
+    {
+      "boot_id": 1,
+      "slot": "B",
+      "version": 2,
+      "sha256": "0cf81b0ce1d41941f37657415a69ca563e54402f39aed3e126ed7189e7e5f2e1",
+      "trial": true
+    },
+    {
+      "boot_id": 2,
+      "slot": "B",
+      "version": 2,
+      "sha256": "0cf81b0ce1d41941f37657415a69ca563e54402f39aed3e126ed7189e7e5f2e1",
+      "trial": true
+    }
+  ],
+  "fallback": {
+    "boot_id": 3,
+    "slot": "A",
+    "version": 1,
+    "sha256": "c39c33817cc3ab2d8041783436694b4726553c00c7571de986e8dfe257ecf41b",
+    "trial": false
+  },
+  "successful_trial": {
+    "boot_id": 4,
+    "slot": "B",
+    "version": 2,
+    "sha256": "0cf81b0ce1d41941f37657415a69ca563e54402f39aed3e126ed7189e7e5f2e1",
+    "trial": true
+  },
+  "final_boot": {
+    "boot_id": 5,
+    "slot": "B",
+    "version": 2,
+    "sha256": "0cf81b0ce1d41941f37657415a69ca563e54402f39aed3e126ed7189e7e5f2e1",
+    "trial": false
+  }
+}

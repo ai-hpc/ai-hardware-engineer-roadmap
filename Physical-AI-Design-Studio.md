@@ -2,6 +2,11 @@
 
 Build one coherent system while studying the roadmap: a vision-language-action policy that completes a defined task, a measured inference path, a compiler that lowers part of that path, and an accelerator prototype integrated with Linux and wireless. Every course contributes an artifact that the next course can use.
 
+This is an integration project after the introductory experiments. If both AI and
+robotics are new, complete the [beginner sequence](Start-Here.md#follow-a-short-learning-sequence)
+first. Its cart is a small preparation exercise; completing it does not complete
+the manipulation or model-to-chip gates below.
+
 Start with **simulated tabletop manipulation**: observe an object, interpret a short instruction, and place it in a specified region. Choose a released policy with a supported embodiment and document any adaptation. A drone variant can use a simulator and a bounded waypoint/trajectory interface; its state estimator and local flight controller remain separate from language planning.
 
 The first complete result is a reproducible software or FPGA prototype. A fabricated ASIC additionally needs physical implementation, sign-off, fabrication, packaging, board integration, and bring-up. Label evidence by the stage actually completed.
@@ -46,6 +51,8 @@ Write a one-page contract before selecting the chip:
 
 First make a tiny tensor program numerically correct. Then load a usable policy artifact and record the complete preprocessing-to-action path. Separate training, calibration, validation, and final test data; split robot data by episode or collection condition so adjacent frames do not leak across partitions.
 
+**Start on a CPU:** the [small-policy lab](Phase%203%20-%20Artificial%20Intelligence/0.%20AI%20and%20Robot%20Learning%20Foundations/Lab-01-CPU-Policy.md) teaches training, held-out episodes, saving and reloading without installing an ML framework. For generative action heads, the [action-generation lab](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/VLA%20Foundations%20to%20Frontier%202026/Action-Generation-Lab.md) trains small diffusion and flow networks on a known distribution. Its category labels are not language understanding, and its scalar samples are not a manipulation policy. Use these small experiments to learn the mechanics before replacing them with your task's observation/action model.
+
 **Build:** a frozen reference runner, a small golden-input set, tensor/operator inventory, and checkpoint/normalization manifest. Include action denormalization and embodiment adaptation in the reference, not as undocumented postprocessing.
 
 **Challenge:** swap a camera channel or normalization statistic and verify that the input checks or quality evaluation detect the error. Low text perplexity does not establish correct robot actions.
@@ -59,6 +66,10 @@ First make a tiny tensor program numerically correct. Then load a usable policy 
 [![Local robot loop with observation timestamps, inference, freshness checks, controller, and a separate optional network planner](Assets/illustrations/learning-path/robot-loop.svg)](Assets/illustrations/learning-path/robot-loop.svg)
 
 *Follow one observation through the loop. Where does its age get checked? [Download PNG](Assets/illustrations/learning-path/robot-loop.png).*
+
+**Practice the timing contract first:** the [timed robot-loop lab](Phase%203%20-%20Artificial%20Intelligence/0.%20AI%20and%20Robot%20Learning%20Foundations/Lab-02-Timed-Robot-Loop.md) reruns Gate 2's small cart training procedure once, then holds those learned weights fixed across explicit processing and transport queues. It does not read the saved JSON policy; the MuJoCo bridge below does. Compare FIFO and freshness policies on the same episodes. It models observation age and applied commands; it does not require or emulate Isaac physics.
+
+For actual CPU-engine dynamics before a larger scene, the [MuJoCo bridge](Phase%203%20-%20Artificial%20Intelligence/0.%20AI%20and%20Robot%20Learning%20Foundations/Lab-03-CPU-Physics.md) reuses the same policy and checks mass-to-force conversion, physics substeps, reset state and simulator warnings. Its sliding cart has no contacts or image observations; those remain additional model and validation work.
 
 **Build:** a versioned scene, reproducible reset, observation/action adapter, paired evaluation episodes, and a timeline with sensor capture, policy start/end, validation, and action consumption. Keep simulation time and host wall time separate. Report both task outcomes and runtime behavior.
 
@@ -79,6 +90,8 @@ Profile preprocessing, vision encoder, backbone, action head, state, transfers, 
 The [DeepSeek V4.1 Flash NVFP4 course](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20G%20-%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/README.md) teaches checkpoint packing, sparse compute, state, placement, and runtime compatibility at a very different scale. The [official model card](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash) describes a multimodal text-output model; using it as a robot policy requires additional action modeling and validation. Transfer its applicable format and systems lessons to the selected VLA, or study it as an optional remote planner.
 
 **Exit:** one accepted optimization, or a well-supported explanation of why a candidate failed. Export the actual hot operator shapes, traffic, precision/error budgets, and timing requirements to Gate 5.
+
+**A complete small handoff:** the [model-to-hardware lab](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Programmable%20VLA%20Inference%20Accelerator/Model-to-Hardware-Lab.md) reloads the flow checkpoint trained in Gate 2's action-generation lab. It exports the actual network, checks changed inputs after saving/reloading the export, profiles CPU operator calls, and derives operation counts and tile occupancy. The full solver stays in Python; measured CPU time and hypothetical accelerator tiles are reported separately. This provides a reproducible Gate 4 artifact even before a large VLA or accelerator is available.
 
 **Accelerator handoff:** use the [memory-residency study](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Programmable%20VLA%20Inference%20Accelerator/Lecture-04.md) to separate capacity from repeated traffic, and the [fresh-action scheduling lab](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Programmable%20VLA%20Inference%20Accelerator/Lecture-07.md) to test whether a faster policy also reacts sooner.
 
@@ -149,4 +162,4 @@ For every headline number, label it **measured**, **analytical estimate**, **rep
 
 Use a short repeated cycle: predict an outcome, work a numerical example, build the smallest baseline, vary one assumption, explain the evidence, and return later to reconstruct the reasoning without notes. At each handoff, answer: **what does the next layer need that my current artifact does not yet specify?**
 
-The [course-by-course review](Curriculum-Reviews/README.md) records what was inspected and improved. The [learning guide](Learning-Guide.md) supplies the common rubric and hardware access routes. Original teaching figures and regeneration instructions are in [the illustration catalog](Assets/illustrations/learning-path/README.md).
+The [current curriculum review](Curriculum-Review.md) records what was inspected and improved; the [earlier course-by-course ledger](Curriculum-Reviews/README.md) retains historical review evidence. The [learning guide](Learning-Guide.md) supplies the common rubric and hardware access routes. Original teaching figures and regeneration instructions are in [the illustration catalog](Assets/illustrations/learning-path/README.md).

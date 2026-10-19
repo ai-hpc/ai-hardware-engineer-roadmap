@@ -1,346 +1,84 @@
-# 05 — NCCL in Multi-Node GPU Clusters
+# 05 — Multi-node collectives without rank mistakes
 
-## 1. The Two-Level Communication Problem
+**Outcome:** draw the physical paths, launch exactly one worker per GPU, and distinguish per-rank from per-node traffic. Prerequisite: [bandwidth accounting](02-Algorithms-and-Bandwidth.md). Source review: 2026-10-18. This chapter's GPU, network and scheduler exercises require an allocated cluster and were not executed here.
 
-A single node with 8x H200 communicates at NVLink speeds (900 GB/s). Adding a second node introduces a fundamentally slower link between them.
+## Name the topology before choosing parallelism
 
-```
-Node 0 (8x H200):                    Node 1 (8x H200):
-  GPU0 ──┐                              GPU8 ──┐
-  GPU1 ──┤                              GPU9 ──┤
-  GPU2 ──┤  NVLink 900 GB/s             GPU10──┤  NVLink 900 GB/s
-  GPU3 ──┤  (intra-node)                GPU11──┤  (intra-node)
-  GPU4 ──┤                              GPU12──┤
-  GPU5 ──┤                              GPU13──┤
-  GPU6 ──┤                              GPU14──┤
-  GPU7 ──┘                              GPU15──┘
-          │                                    │
-          └────────── InfiniBand HDR ──────────┘
-                      200 Gb/s = 25 GB/s
-                      (inter-node)
+An HGX H200 node has a fast switched GPU fabric; external NICs connect nodes. The advertised 900 GB/s NVLink figure is aggregate **bidirectional per GPU**. HDR 200 Gb/s means up to **25 GB/s one-way per port** before overhead; NDR 400 Gb/s means up to 50 GB/s. Number of NICs, GPU–NIC locality, fabric oversubscription and competing traffic determine usable node bandwidth. Adding ports does not guarantee a proportional application speedup.
 
-Speed ratio: NVLink / IB = 900 / 25 = 36×
+Record `nvidia-smi topo -m`, `ibstat`, `ibv_devinfo` and network/fabric configuration. ConnectX-7 is an NDR-capable generation, not inherently an HDR-only adapter. Link rate is the negotiated rate across adapter, switch and cable. Use the system supplier's supported driver/firmware installation procedure rather than a truncated historical download URL.
 
-→ Inter-node bandwidth is the critical bottleneck for multi-node training
-```
+## Hierarchy moves work; it does not erase node traffic
 
----
+One possible hierarchy is local reduce-scatter, cross-node AllReduce of corresponding shards, then local all-gather. NCCL's actual algorithm is version/topology dependent; this is a useful model, not a promised trace.
 
-## 2. Hierarchical AllReduce
+For **two nodes with eight GPUs each**, every rank starts with S bytes. A local reduce-scatter leaves eight S/8 shards per node. Each corresponding pair exchanges its S/8 partial result. Each participating rank sends S/8 across the network in the ideal two-node reduction; the eight ranks together send **S per node**, not S/8. Eight independent NICs may parallelize this; one shared NIC remains a node-level bottleneck. Generalize the cross-node ring volume to `2(K−1)S/(K×G)` per rank for K nodes and G local shards, assuming that particular hierarchy.
 
-NCCL automatically uses hierarchical AllReduce when mixing NVLink and network:
+**Check:** with S=1 GB and eight shards, each rank exchanges 125 MB; all ranks in a node exchange 1 GB outgoing total. A single 25 GB/s NIC needs at least 40 ms for that outgoing data, ignoring overhead and local collectives.
 
-```
-Step 1: Intra-node Reduce-Scatter (NVLink, fast)
-  Each node reduces its 8 GPUs' gradients to per-GPU shards
+## GPUDirect RDMA and SHARP are capabilities to verify
 
-  Node0: [G0, G1, G2, G3, G4, G5, G6, G7] → Node0 GPU0 holds G0_reduced
-                                            → Node0 GPU1 holds G1_reduced
-                                            → ...
+GPUDirect RDMA allows a compatible NIC to access GPU memory without staging the payload through host memory. The CPU still initializes, registers and controls work, and the data still follows the actual PCIe/NVLink topology. A nonzero `ibv_devinfo dm_size` does **not** prove GPU-memory RDMA. Kernel peer-memory or supported DMA-BUF paths, driver versions, container access and topology matter. Save NCCL transport logs and run a supported GPU-memory RDMA test. [NVIDIA GPUDirect RDMA](https://docs.nvidia.com/cuda/gpudirect-rdma/), [NCCL troubleshooting](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/troubleshooting.html).
 
-Step 2: Inter-node AllReduce (InfiniBand, slow but minimized)
-  Only N/world_size fraction of data crosses IB
+SHARP can perform supported reductions in the network; NVLink reduction hardware is a related but different local-fabric path. Selecting `NCCL_ALGO=CollNetDirect` alone does not install a network plugin, configure a SHARP manager or provision compatible switches. Establish a working default baseline, then compare eligible offload configurations with the same operation and data. Do not promise a fixed 50% reduction in time. [NVIDIA SHARP documentation](https://docs.nvidia.com/networking/display/sharpv3150).
 
-  Node0 GPU0 ↔ Node1 GPU0: exchange G0_reduced shards
-  Node0 GPU1 ↔ Node1 GPU1: exchange G1_reduced shards (in parallel)
-  ...
+## Launch with torchrun
 
-Step 3: Intra-node AllGather (NVLink, fast)
-  Reconstruct full reduced gradient on all GPUs within each node
-
-Total data sent over IB = S × N_nodes / (N_nodes × N_gpus) × 2 = S × 2 / N_gpus
-For 2 nodes × 8 GPUs: IB carries only 2/8 = 25% of gradient data
-```
-
-This hierarchy is why NCCL achieves nearly optimal bandwidth even with mixed interconnects.
-
----
-
-## 3. InfiniBand Setup
-
-### Hardware Requirements
-
-| Component | Specification | Notes |
-|---|---|---|
-| HCA | Mellanox ConnectX-7, HDR 200 Gb/s | One per GPU recommended |
-| Switch | Mellanox Quantum-2 (NDR 400 Gb/s) or Quantum (HDR 200 Gb/s) | Fat-tree topology |
-| Cables | QSFP112 (NDR) or QSFP56 (HDR) | Length matters for signal integrity |
-| Topology | Fat-tree, Dragonfly, or Torus | Fat-tree most common |
-
-### Software Installation
+Example: two nodes, eight GPUs each. Both run the same script from [chapter 4](04-Configuration-and-Tuning.md), which selects CUDA device using `LOCAL_RANK`. Replace `node0.example` with an address reachable by both nodes.
 
 ```bash
-# Install MLNX_OFED (Mellanox OpenFabrics Enterprise Distribution)
-wget https://www.mellanox.com/downloads/ofed/MLNX_OFED-23.10-3.2.2.0/...
-./mlnxofedinstall --all --without-fw-update
+# On node 0:
+torchrun --nnodes=2 --nproc-per-node=8 --node-rank=0 \
+    --master-addr=node0.example --master-port=29500 nccl_smoke.py
 
-# Verify installation
-ibstat          # shows HCA status and port info
-ibv_devinfo     # InfiniBand device details
-ib_write_bw     # bandwidth test
-
-# Check IB link speed
-ibstat | grep -A2 "Port 1"
-# State: Active
-# Physical state: LinkUp
-# Rate: 200 Gb/s  ← HDR
+# On node 1:
+torchrun --nnodes=2 --nproc-per-node=8 --node-rank=1 \
+    --master-addr=node0.example --master-port=29500 nccl_smoke.py
 ```
 
-### GPUDirect RDMA — GPU Memory Directly Over InfiniBand
+There are 16 global ranks, local ranks 0–7 on each node, and one worker per GPU. The correct SUM output is `16×17/2=136` everywhere. Port reachability proves rendezvous connectivity only; inspect the payload transport separately.
 
-Without GPUDirect RDMA:
-```
-GPU HBM → CPU RAM (PCIe) → NIC buffer (PCIe) → IB cable → NIC → CPU RAM → GPU HBM
-         ← PCIe copy →  ← CPU involvement →  ← PCIe copy →
-Latency: 2 PCIe transfers + CPU processing = ~10 µs extra
-```
+## Slurm: one launcher per node
 
-With GPUDirect RDMA:
-```
-GPU HBM → IB cable → GPU HBM
-          ↑ direct DMA ↑
-No CPU involved, no PCIe double-copy
-Latency reduction: ~5 µs, bandwidth: full IB speed to GPU memory
-```
-
-```bash
-# Enable GPUDirect RDMA
-export NCCL_NET_GDR_LEVEL=5   # enable for all GPU-IB distances
-export NCCL_IB_HCA=mlx5_0     # specify HCA connected closest to GPU (check with nvidia-smi topo)
-
-# Verify GPUDirect is working
-nv_peer_mem status   # should show "Module is loaded"
-# or
-ibv_devinfo -d mlx5_0 | grep dm_size  # non-zero = GPUDirect works
-
-# Test with NCCL tests across nodes
-mpirun -np 16 \
-    -H node0:8,node1:8 \
-    -x NCCL_NET_GDR_LEVEL=5 \
-    -x NCCL_IB_HCA=mlx5_0 \
-    -x NCCL_DEBUG=INFO \
-    ./build/all_reduce_perf -b 1G -e 8G -f 2 -g 1
-```
-
----
-
-## 4. SHARP — In-Network Computing
-
-SHARP (Scalable Hierarchical Aggregation and Reduction Protocol) moves the AllReduce computation **into the InfiniBand switch itself**, reducing GPU and network load.
-
-```
-Without SHARP:
-  Node0 GPU → IB switch → Node1 GPU → AllReduce in GPU → back over IB
-  Data travels full round-trip
-
-With SHARP:
-  Node0 GPU → IB switch → (AllReduce computed inside switch) → each GPU gets result
-  Data travels half the distance, reduction done in-switch
-```
-
-### SHARP Performance Gains
-
-```
-AllReduce of 1 GB across 16 nodes (128 GPUs):
-
-Without SHARP: 1 GB × 2(N-1)/N × 1/IB_BW = 1 GB × 1.98 / 25 GB/s = 79 ms
-With SHARP:    ~40 ms (50% reduction, especially for small-medium message sizes)
-```
-
-### SHARP Configuration
-
-```bash
-# SHARP requires: MLNX_OFED with SHARP support + Mellanox Quantum switch
-
-# Enable SHARP in NCCL
-export NCCL_ALGO=CollNetDirect   # use SHARP-based CollNet algorithm
-# or
-export NCCL_ALGO=CollNetChain
-
-# Verify SHARP is active
-export NCCL_DEBUG=INFO
-# Look for: "NCCL INFO Using SHARP" in output
-
-# SHARP works best for: 1 KB - 128 MB messages, small-medium clusters
-# For very large messages (>1 GB): Ring AllReduce still better due to switch memory limits
-```
-
----
-
-## 5. Multi-Node Launch Patterns
-
-### torchrun (Elastic Distributed Training)
-
-```bash
-# Node 0 (master):
-torchrun \
-    --nnodes=4 \                          # 4 nodes total
-    --nproc_per_node=8 \                  # 8 GPUs per node
-    --node_rank=0 \                       # this node's rank
-    --master_addr=192.168.1.100 \         # node 0 IP
-    --master_port=29500 \
-    train.py
-
-# Nodes 1, 2, 3 (identical, change --node_rank):
-torchrun \
-    --nnodes=4 \
-    --nproc_per_node=8 \
-    --node_rank=1 \                       # 1 for node 1, 2 for node 2, etc.
-    --master_addr=192.168.1.100 \
-    --master_port=29500 \
-    train.py
-```
-
-### MPI Launch (for nccl-tests and HPC workflows)
-
-```bash
-# Using OpenMPI
-mpirun \
-    -np 32 \                             # 32 total processes (4 nodes × 8 GPUs)
-    --host node0:8,node1:8,node2:8,node3:8 \
-    -x NCCL_DEBUG=INFO \
-    -x NCCL_IB_HCA=mlx5_0 \
-    -x NCCL_NET_GDR_LEVEL=5 \
-    -bind-to none \                      # don't pin to CPU cores (GPU-heavy workload)
-    ./build/all_reduce_perf -b 1G -e 8G -f 2 -g 1
-```
-
-### Slurm + torchrun (HPC Cluster)
+A common error launches eight Slurm tasks **each spawning eight torchrun children**, producing 64 workers per node. Use one Slurm task per node when torchrun spawns the local GPU workers. The partition, GPU resource syntax and CPU allocation are site-specific.
 
 ```bash
 #!/bin/bash
-# sbatch script: train_job.sh
-#SBATCH --nodes=4
-#SBATCH --ntasks-per-node=8
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:8
-#SBATCH --time=48:00:00
-#SBATCH --partition=gpu-cluster
-
-# Export NCCL settings
-export NCCL_IB_HCA=mlx5_0,mlx5_1
-export NCCL_NET_GDR_LEVEL=5
-export NCCL_IB_TC=106
-export NCCL_DEBUG=WARN
-export NCCL_TIMEOUT=600
-
-# Get master address from Slurm node list
-export MASTER_ADDR=$(scontrol show hostname "$SLURM_NODELIST" | head -1)
+#SBATCH --cpus-per-task=16
+#SBATCH --time=00:10:00
+set -euo pipefail
+export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 export MASTER_PORT=29500
-
-srun torchrun \
-    --nnodes=$SLURM_NNODES \
-    --nproc_per_node=$SLURM_NTASKS_PER_NODE \
-    --master_addr=$MASTER_ADDR \
-    --master_port=$MASTER_PORT \
-    --node_rank=$SLURM_NODEID \
-    train.py
-
-# Submit: sbatch train_job.sh
+srun --ntasks="$SLURM_NNODES" --ntasks-per-node=1 bash -c '
+    exec torchrun --nnodes="$SLURM_NNODES" --nproc-per-node=8 \
+        --node-rank="$SLURM_NODEID" --master-addr="$MASTER_ADDR" \
+        --master-port="$MASTER_PORT" nccl_smoke.py
+'
 ```
 
----
+The single-quoted command expands `SLURM_NODEID` inside each remote task. Choose a job-unique rendezvous endpoint according to site policy when nodes are shared. Follow site GPU binding/visibility rules. [torchrun](https://docs.pytorch.org/docs/stable/elastic/run.html), [Slurm srun](https://slurm.schedmd.com/srun.html).
 
-## 6. Multi-Node Communication Optimization
+## MPI nccl-tests uses a different launcher
 
-### Minimize Inter-Node Traffic
-
-```
-Principle: keep as much communication as possible on NVLink (intra-node)
-
-Strategy for 3D Parallelism across nodes:
-  TP (tensor parallel): keep WITHIN a node (NVLink, frequent small all-reduces)
-  PP (pipeline parallel): split ACROSS nodes (IB, infrequent large activation tensors)
-  DP (data parallel): split ACROSS nodes (IB, one all-reduce per step, large)
-
-Example: 2 nodes × 8 GPUs = 16 GPUs total
-  TP=8 (within each node), PP=2 (one stage per node), DP=1
-  → Only pipeline activations cross IB (much smaller than gradient all-reduce)
-```
-
-```python
-# Megatron-LM 3D parallel setup for 2 nodes
-# Node 0: GPU 0-7 = stage 0 of pipeline, fully tensor-parallel
-# Node 1: GPU 8-15 = stage 1 of pipeline, fully tensor-parallel
-
-# torchrun launch:
-torchrun \
-    --nnodes=2 \
-    --nproc_per_node=8 \
-    pretrain_gpt.py \
-    --tensor-model-parallel-size 8 \     # TP=8, stays within node
-    --pipeline-model-parallel-size 2 \  # PP=2, crosses nodes
-    --data-parallel-size 1              # DP=1
-```
-
-### Gradient Compression for Slow Inter-Node Links
-
-```python
-# PowerSGD: low-rank gradient approximation
-from torch.distributed.algorithms.ddp_comm_hooks import powerSGD_hook as powerSGD
-
-state = powerSGD.PowerSGDState(
-    process_group=dist.get_world_group(),
-    matrix_approximation_rank=16,   # lower = more compression, less quality
-    start_powerSGD_iter=100,         # start compression after 100 iters (warmup)
-    warm_start=True,
-)
-model.register_comm_hook(state, powerSGD.powerSGD_hook)
-
-# Compression ratio: 8192×8192 matrix (536 MB) → rank-16 approx:
-# U: 8192×16 + V: 8192×16 = 4 MB → 134× compression
-# Typical loss in quality: < 0.5% on perplexity
-```
-
-### Gradient Accumulation to Amortize Communication
-
-```python
-# Accumulate gradients over multiple microbatches before AllReduce
-# This reduces communication frequency at the cost of more memory
-
-GRAD_ACCUM_STEPS = 8   # accumulate 8 microbatches before AllReduce
-
-optimizer.zero_grad()
-for step, batch in enumerate(dataloader):
-    # Only sync every GRAD_ACCUM_STEPS
-    with model.no_sync() if (step % GRAD_ACCUM_STEPS != GRAD_ACCUM_STEPS - 1) else nullcontext():
-        loss = model(**batch).loss / GRAD_ACCUM_STEPS
-        loss.backward()
-
-    if (step + 1) % GRAD_ACCUM_STEPS == 0:
-        # AllReduce fires here — effective batch size is 8× larger
-        optimizer.step()
-        optimizer.zero_grad()
-```
-
----
-
-## 7. Benchmarking Multi-Node NCCL
+Build nccl-tests with `MPI=1` and a compatible MPI development installation. This example starts 16 MPI ranks, each controlling one GPU (`-g 1`). A standalone `-g 1` without MPI measures only one participant and is not an inter-node test.
 
 ```bash
-# 2-node AllReduce benchmark (16 GPUs)
-mpirun -np 16 -H node0:8,node1:8 \
-    -x NCCL_NET_GDR_LEVEL=5 \
-    -x NCCL_IB_HCA=mlx5_0 \
-    ./build/all_reduce_perf -b 8M -e 4G -f 2 -g 1
-
-# Expected results (H200 × 16, IB HDR):
-# size     algbw    busbw
-# 8 MB     12 GB/s  22 GB/s   ← small: latency bound
-# 256 MB   22 GB/s  41 GB/s   ← medium
-# 4 GB     24 GB/s  45 GB/s   ← large: approaches IB peak (~25 GB/s unidirectional)
-
-# Test latency for small ops (important for inference)
-./build/all_reduce_perf -b 8 -e 4096 -f 2 -g 1
-# Target: < 10 µs for 8-byte messages (control messages in inference serving)
+make -j MPI=1 CUDA_HOME=/usr/local/cuda NCCL_HOME=/usr
+mpirun -np 16 --host node0:8,node1:8 -x NCCL_DEBUG=INFO \
+    ./build/all_reduce_perf -b 8M -e 256M -f 2 -g 1 -n 20 -w 5
 ```
 
----
+Use your cluster's MPI launcher, CPU binding and environment policy; record them. Ensure matching binaries/libraries and device permissions on all nodes. Increase message size only after correctness and memory checks. [nccl-tests build and launch options](https://github.com/NVIDIA/nccl-tests).
 
-## References
+## Make communication savings explicit
 
-- [NCCL Hierarchical AllReduce](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/p2p.html)
-- [SHARP User Manual](https://docs.mellanox.com/display/sharpmanual)
-- [GPUDirect RDMA Documentation](https://docs.nvidia.com/cuda/gpudirect-rdma/)
-- [PyTorch Elastic Training](https://pytorch.org/docs/stable/elastic/run.html)
-- [Slurm GPU Scheduling](https://slurm.schedmd.com/gres.html)
-- [InfiniBand Trade Association](https://www.infinibandta.org/)
+Tensor parallelism usually has frequent intra-layer communication; keeping its group within a fast local fabric is a useful starting hypothesis. Pipeline parallelism transfers activations and backward gradients at stage boundaries; microbatch count, bubble time and activation size matter. Data parallelism synchronizes gradient buckets, not necessarily a single call. Experts add routing/dispatch traffic. Draw the groups and calculate bytes before assigning ranks.
+
+Gradient accumulation can reduce synchronization frequency. DDP's `no_sync()` must enclose the **forward and backward** of unsynchronized microbatches. Synchronize the final microbatch, scale the total loss by the actual sample/token count, then step once. A short final accumulation group must not be divided by the nominal full group size. Different numbers of steps across ranks require an explicit uneven-input strategy; do not silently skip collectives. The [CPU lab](CPU-Collectives-Lab/Guide.md) demonstrates the related unequal-batch normalization error.
+
+PowerSGD approximates gradients and can change training. For an 8192×8192 FP32 matrix: dense storage is 268.4 MB; rank-16 factors contain 262,144 numbers = 1.049 MB, a 256× **factor-storage** ratio. Error feedback, residual storage, additional reductions and convergence affect actual savings. A storage ratio is not a guaranteed communication or time speedup.
+
+**Assessment:** produce a 2-node rank map, show why the Slurm script creates 16 rather than 128 workers, calculate both per-rank and per-node traffic, and submit logs proving which network transport the real job used. A CPU-only submission can complete the algebra and Gloo correctness lab while marking cluster measurements unexecuted.

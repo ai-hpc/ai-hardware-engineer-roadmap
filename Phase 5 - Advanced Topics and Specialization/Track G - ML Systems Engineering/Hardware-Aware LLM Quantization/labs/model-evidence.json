@@ -1,0 +1,290 @@
+{
+  "checked_utc": "2026-10-18",
+  "scope": "metadata and model cards only; no model weights downloaded or executed",
+  "models": [
+    {
+      "model": "gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090",
+      "revision": "5b7a687fc8211a5d631c8ca6a593dd37eb26ce33",
+      "last_modified": "2026-09-10T01:49:07.000Z",
+      "source_files": [
+        {
+          "path": "README.md",
+          "url": "https://huggingface.co/gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090/resolve/5b7a687fc8211a5d631c8ca6a593dd37eb26ce33/README.md",
+          "sha256": "25b2f1c644cb051a0eaaa302074c25b397b6f70581cde33ce2c319b1c5f45655",
+          "bytes": 28646
+        },
+        {
+          "path": "config.json",
+          "url": "https://huggingface.co/gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090/resolve/5b7a687fc8211a5d631c8ca6a593dd37eb26ce33/config.json",
+          "sha256": "62dad33f5c64fedc1826a39f248d91b3ab4734ebdcd0a9981b548073e996d0b2",
+          "bytes": 13167
+        },
+        {
+          "path": "model.safetensors.index.json",
+          "url": "https://huggingface.co/gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090/resolve/5b7a687fc8211a5d631c8ca6a593dd37eb26ce33/model.safetensors.index.json",
+          "sha256": "28b9c74b60f4e75914845e119e5b6d0f74574373e8d0f99f8af227583cbbf78c",
+          "bytes": 236508
+        }
+      ],
+      "configuration": {
+        "hidden_size": 5120,
+        "vocab_size": 248320,
+        "num_hidden_layers": 64,
+        "num_key_value_heads": 4,
+        "head_dim": 256,
+        "layer_types": [
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention"
+        ],
+        "mtp_num_hidden_layers": 0,
+        "linear_num_value_heads": 48,
+        "linear_key_head_dim": 128,
+        "linear_value_head_dim": 128
+      },
+      "model_type": "qwen3_5",
+      "quantization_config_present": true,
+      "index": {
+        "total_tensor_bytes": 17915815528,
+        "shards": [
+          "model-00001-of-00002.safetensors",
+          "model-00002-of-00002.safetensors"
+        ],
+        "mtp_named_tensors": 0,
+        "output_head_keys": [
+          "lm_head.input_scale",
+          "lm_head.weight",
+          "lm_head.weight_scale",
+          "lm_head.weight_scale_2"
+        ]
+      }
+    },
+    {
+      "model": "gittensor-model-hub/Qwen3.8-27B-DSpark-NVFP4",
+      "revision": "eba1ac5a66c74902eaa95a4000a7c5eda96d8e95",
+      "last_modified": "2026-08-19T11:54:02.000Z",
+      "source_files": [
+        {
+          "path": "README.md",
+          "url": "https://huggingface.co/gittensor-model-hub/Qwen3.8-27B-DSpark-NVFP4/resolve/eba1ac5a66c74902eaa95a4000a7c5eda96d8e95/README.md",
+          "sha256": "627ec88ab4f0b3a87f2574136b83c19c2dd43a0f77a2186401835eb35522ad18",
+          "bytes": 10793
+        },
+        {
+          "path": "config.json",
+          "url": "https://huggingface.co/gittensor-model-hub/Qwen3.8-27B-DSpark-NVFP4/resolve/eba1ac5a66c74902eaa95a4000a7c5eda96d8e95/config.json",
+          "sha256": "82fd961b632c629736902d9d4fdd3258dee1080f557cf86298cac063a514a0cf",
+          "bytes": 2828
+        }
+      ],
+      "configuration": {
+        "hidden_size": 5120,
+        "vocab_size": 248320,
+        "num_hidden_layers": 5,
+        "num_key_value_heads": 8,
+        "head_dim": 128,
+        "layer_types": [
+          "full_attention",
+          "full_attention",
+          "full_attention",
+          "full_attention",
+          "full_attention"
+        ]
+      },
+      "model_type": "qwen3",
+      "quantization_config_present": true
+    },
+    {
+      "model": "Qwen/Qwen3.8-27B",
+      "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "last_modified": "2026-08-14T15:00:01.000Z",
+      "source_files": [
+        {
+          "path": "README.md",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B/resolve/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/README.md",
+          "sha256": "57e4bdb258ee1a7d2635c5174ebd4e56abe392505cdb5f8bbb356b0dc4293641",
+          "bytes": 65012
+        },
+        {
+          "path": "config.json",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B/resolve/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/config.json",
+          "sha256": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+          "bytes": 4312
+        },
+        {
+          "path": "model.safetensors.index.json",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B/resolve/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/model.safetensors.index.json",
+          "sha256": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+          "bytes": 112216
+        }
+      ],
+      "configuration": {
+        "hidden_size": 5120,
+        "vocab_size": 248320,
+        "num_hidden_layers": 64,
+        "num_key_value_heads": 4,
+        "head_dim": 256,
+        "layer_types": [
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention"
+        ],
+        "mtp_num_hidden_layers": 1,
+        "linear_num_value_heads": 48,
+        "linear_key_head_dim": 128,
+        "linear_value_head_dim": 128
+      },
+      "model_type": "qwen3_5",
+      "quantization_config_present": false,
+      "index": {
+        "total_tensor_bytes": 55562855904,
+        "shards": [
+          "model-00001-of-00018.safetensors",
+          "model-00002-of-00018.safetensors",
+          "model-00003-of-00018.safetensors",
+          "model-00004-of-00018.safetensors",
+          "model-00005-of-00018.safetensors",
+          "model-00006-of-00018.safetensors",
+          "model-00007-of-00018.safetensors",
+          "model-00008-of-00018.safetensors",
+          "model-00009-of-00018.safetensors",
+          "model-00010-of-00018.safetensors",
+          "model-00011-of-00018.safetensors",
+          "model-00012-of-00018.safetensors",
+          "model-00013-of-00018.safetensors",
+          "model-00014-of-00018.safetensors",
+          "model-00015-of-00018.safetensors",
+          "model-00016-of-00018.safetensors",
+          "model-00017-of-00018.safetensors",
+          "model-00018-of-00018.safetensors"
+        ],
+        "mtp_named_tensors": 15,
+        "output_head_keys": [
+          "lm_head.weight"
+        ]
+      }
+    }
+  ]
+}

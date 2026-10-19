@@ -1,0 +1,42 @@
+{
+  "reviewed_at": "2026-10-18",
+  "python": "3.12.3",
+  "framework": "torch 2.14.0+cpu",
+  "portable_tests": 10,
+  "framework_tests": 8,
+  "executed": [
+    "120-step three-coefficient nonlinear CPU MoE training",
+    "three-coefficient capacity-factor 0.5 variation",
+    "saved weights reloaded with exact probe parity",
+    "two-process CPU Gloo top-two unequal-batch dispatch/combine",
+    "two-process CPU Gloo skewed dispatch including empty partition",
+    "two-process CPU Gloo with an entirely idle expert",
+    "two-process CPU Gloo with an empty source batch that still receives expert work",
+    "19 tests passed; distributed integration test launches four real two-process jobs"
+  ],
+  "not_executed": [
+    "GPU/NCCL",
+    "distributed MoE backward",
+    "long-context language-model training",
+    "cluster performance or failure recovery"
+  ],
+  "files": {
+    "capacity-run.json": "6b0fe9864ed1c818ddbdeab6c4779d72fa91fa2998b88f7d1e07221135a6d067",
+    "dispatch-empty-expert-run.json": "6e1450d67ffe0870c8276499682e1ece2fd3285f7525b140eb41ee905a659a71",
+    "dispatch-empty-source-run.json": "a1771655f477509ef824b011cded9785f0f6cf5a4e6f2d651e8a11eceb73132a",
+    "dispatch-run.json": "a52ec038d51e36fd26bacd8a5792429f04d9ea57b2e82c8911423b3365ffe53e",
+    "dispatch-skew-run.json": "a4dd84461521457f76e42521240fe8baf7b963b609859885413127d9eefbee41",
+    "dispatch_gloo.py": "297a09a7b5636de01eff96642d7d26a0dab97b018811d18c1488c4952585b512",
+    "ledger.py": "38d2673be481443207194aa35778b47f3478347fcc00deddcd63adebab46d64e",
+    "requirements-torch.txt": "c3adb4c578bd9b2d87cde60a3207a6271b703ad1d8d586ebfc18ea12a43769d9",
+    "sources.json": "0ffdd86e89bc58ee778b737fc91961f85bbc6e773131a842e07f5d2326b64c69",
+    "test_dispatch.py": "87ac024760fce8fac28d7802baf3a8e039e027b0372d6f404cf16288f5e04570",
+    "test_ledger.py": "41d2b9d8292a967b7389805af0b36515394a8d239ff453f716919f2ccdb3b4d3",
+    "test_moe.py": "0d91873d4252dc42d7d29485316f409ae8acaa0c06f409db35a28b7fc39c99d3",
+    "tiny_moe.py": "07390666180ebf62efc0fa0192f21f89d1734df8f3e6082c30127e2ee94279c0",
+    "training-run.json": "53d755dde8f5b1609e211063b7d7f886d164ff2cdfa5e58d28a2aba5b3089ce9"
+  },
+  "distributed_integration_tests": 1,
+  "total_tests": 19,
+  "independent_review": "capacity decimal arithmetic, finite/shape contracts, independent gate admission oracle, whole empty-source/idle-expert Gloo tests"
+}

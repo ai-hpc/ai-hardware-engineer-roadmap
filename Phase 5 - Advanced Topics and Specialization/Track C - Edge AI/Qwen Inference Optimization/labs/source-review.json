@@ -1,0 +1,28 @@
+{
+  "ggml/include/ggml.h": {
+    "url": "https://raw.githubusercontent.com/ggml-org/llama.cpp/master/ggml/include/ggml.h",
+    "sha256": "475beaa7e959be8c383279d9ce9d5191f37426e6b338270cfb12b26a798129d3"
+  },
+  "ggml/src/ggml-common.h": {
+    "url": "https://raw.githubusercontent.com/ggml-org/llama.cpp/master/ggml/src/ggml-common.h",
+    "sha256": "0061131b615c5721fc88a78feeb22c1f8c450f1c2646a317d80796a653bf595c"
+  },
+  "docs/build.md": {
+    "url": "https://raw.githubusercontent.com/ggml-org/llama.cpp/master/docs/build.md",
+    "sha256": "97a58a014be2386c149a4c754003cdb2b480e484049477758fa933774d77049b"
+  },
+  "tools/llama-bench/README.md": {
+    "url": "https://raw.githubusercontent.com/ggml-org/llama.cpp/master/tools/llama-bench/README.md",
+    "sha256": "147d63dc5a1b257dd776a62f1da56dd85da5ae6556616de4e94b2dc0b7fdb49b"
+  },
+  "Qwen/Qwen3-4B-Instruct-2507": {
+    "revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+    "url": "https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507/resolve/cdbee75f17c01a7cc42f958dc650907174af0554/config.json",
+    "sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba"
+  },
+  "Qwen/Qwen2.5-72B-Instruct": {
+    "revision": "495f39366efef23836d0cfae4fbe635880d2be31",
+    "url": "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct/resolve/495f39366efef23836d0cfae4fbe635880d2be31/config.json",
+    "sha256": "14ca217334fe0fd10148413592d68c99eeb33431ed89c1afa130fee560be2a29"
+  }
+}

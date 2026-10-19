@@ -1,0 +1,210 @@
+{
+  "fifo": {
+    "model": "one non-preemptive worker; deterministic arrivals; no middleware/network",
+    "samples": 20,
+    "period_ms": 20,
+    "service_ms": 50,
+    "latest_only": false,
+    "completed": [
+      {
+        "sequence": 0,
+        "capture_ms": 0,
+        "complete_ms": 50,
+        "age_ms": 50
+      },
+      {
+        "sequence": 1,
+        "capture_ms": 20,
+        "complete_ms": 100,
+        "age_ms": 80
+      },
+      {
+        "sequence": 2,
+        "capture_ms": 40,
+        "complete_ms": 150,
+        "age_ms": 110
+      },
+      {
+        "sequence": 3,
+        "capture_ms": 60,
+        "complete_ms": 200,
+        "age_ms": 140
+      },
+      {
+        "sequence": 4,
+        "capture_ms": 80,
+        "complete_ms": 250,
+        "age_ms": 170
+      },
+      {
+        "sequence": 5,
+        "capture_ms": 100,
+        "complete_ms": 300,
+        "age_ms": 200
+      },
+      {
+        "sequence": 6,
+        "capture_ms": 120,
+        "complete_ms": 350,
+        "age_ms": 230
+      },
+      {
+        "sequence": 7,
+        "capture_ms": 140,
+        "complete_ms": 400,
+        "age_ms": 260
+      },
+      {
+        "sequence": 8,
+        "capture_ms": 160,
+        "complete_ms": 450,
+        "age_ms": 290
+      },
+      {
+        "sequence": 9,
+        "capture_ms": 180,
+        "complete_ms": 500,
+        "age_ms": 320
+      },
+      {
+        "sequence": 10,
+        "capture_ms": 200,
+        "complete_ms": 550,
+        "age_ms": 350
+      },
+      {
+        "sequence": 11,
+        "capture_ms": 220,
+        "complete_ms": 600,
+        "age_ms": 380
+      },
+      {
+        "sequence": 12,
+        "capture_ms": 240,
+        "complete_ms": 650,
+        "age_ms": 410
+      },
+      {
+        "sequence": 13,
+        "capture_ms": 260,
+        "complete_ms": 700,
+        "age_ms": 440
+      },
+      {
+        "sequence": 14,
+        "capture_ms": 280,
+        "complete_ms": 750,
+        "age_ms": 470
+      },
+      {
+        "sequence": 15,
+        "capture_ms": 300,
+        "complete_ms": 800,
+        "age_ms": 500
+      },
+      {
+        "sequence": 16,
+        "capture_ms": 320,
+        "complete_ms": 850,
+        "age_ms": 530
+      },
+      {
+        "sequence": 17,
+        "capture_ms": 340,
+        "complete_ms": 900,
+        "age_ms": 560
+      },
+      {
+        "sequence": 18,
+        "capture_ms": 360,
+        "complete_ms": 950,
+        "age_ms": 590
+      },
+      {
+        "sequence": 19,
+        "capture_ms": 380,
+        "complete_ms": 1000,
+        "age_ms": 620
+      }
+    ],
+    "dropped": [],
+    "max_capture_to_complete_ms": 620
+  },
+  "latest_pending": {
+    "model": "one non-preemptive worker; deterministic arrivals; no middleware/network",
+    "samples": 20,
+    "period_ms": 20,
+    "service_ms": 50,
+    "latest_only": true,
+    "completed": [
+      {
+        "sequence": 0,
+        "capture_ms": 0,
+        "complete_ms": 50,
+        "age_ms": 50
+      },
+      {
+        "sequence": 2,
+        "capture_ms": 40,
+        "complete_ms": 100,
+        "age_ms": 60
+      },
+      {
+        "sequence": 5,
+        "capture_ms": 100,
+        "complete_ms": 150,
+        "age_ms": 50
+      },
+      {
+        "sequence": 7,
+        "capture_ms": 140,
+        "complete_ms": 200,
+        "age_ms": 60
+      },
+      {
+        "sequence": 10,
+        "capture_ms": 200,
+        "complete_ms": 250,
+        "age_ms": 50
+      },
+      {
+        "sequence": 12,
+        "capture_ms": 240,
+        "complete_ms": 300,
+        "age_ms": 60
+      },
+      {
+        "sequence": 15,
+        "capture_ms": 300,
+        "complete_ms": 350,
+        "age_ms": 50
+      },
+      {
+        "sequence": 17,
+        "capture_ms": 340,
+        "complete_ms": 400,
+        "age_ms": 60
+      },
+      {
+        "sequence": 19,
+        "capture_ms": 380,
+        "complete_ms": 450,
+        "age_ms": 70
+      }
+    ],
+    "dropped": [
+      1,
+      3,
+      4,
+      6,
+      8,
+      9,
+      11,
+      13,
+      14,
+      16,
+      18
+    ],
+    "max_capture_to_complete_ms": 70
+  }
+}

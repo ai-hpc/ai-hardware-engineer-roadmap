@@ -2,6 +2,10 @@
 
 **Collection:** [MCP for AI Agents](README.md) | **Previous:** [← Lecture 05](Lecture-05.md) | **Next:** [Lecture 07](Lecture-07.md)
 
+
+**Protocol scope:** the detailed wire/SDK examples below teach the `2025-11-25` compatibility contract. Start with the [current 2026-07-28 protocol lesson](Protocol-2026-07-28.md) for new implementations; do not relabel an old handshake or reverse-request example as current.
+
+
 ---
 
 Up to now every server you built ran as a local subprocess: Claude Desktop (or MCP Inspector) launched your Python process, piped JSON-RPC over its stdin/stdout, and trusted it implicitly because it was *your* process on *your* machine. That model is perfect for a single user with a server on their own laptop, and it is the entire reason `stdio` exists. But the moment you want one server to back many users — a hosted GitHub server, an internal data tool your whole team's agents reach, a SaaS product that exposes MCP — the subprocess model collapses. Nobody is going to launch your process; they are going to send it an HTTP request from the other side of the internet.
@@ -51,7 +55,7 @@ One URL, two possible response shapes, chosen per request by the server. The cli
 
 **The deprecated transport — do not build on it.** The original two-endpoint **HTTP+SSE** transport has been **deprecated since spec revision 2025-03-26**. It still appears in older servers and tutorials. Name it only so you recognize and avoid it: **do not build new servers on HTTP+SSE.** Streamable HTTP is the supported remote transport.
 
-**The 2026 direction — stateless.** The sticky-session model above (a server holds per-session state keyed by `Mcp-Session-Id`) makes horizontal scaling awkward: every request for a session must reach the node that holds its state, so you need sticky load balancing. The **2026-07-28 release candidate** pushes a **stateless** core, so servers can run on ordinary HTTP infrastructure and serverless platforms without sticky sessions — any node can serve any request. Track it as the direction of travel; the 2025-11-25 stable spec is what you build against today.
+**Current revision — stateless requests.** In `2026-07-28`, the protocol no longer uses `Mcp-Session-Id`. Explicit handles identify state spanning requests. The older session example above is compatibility material; use the [current request and retry lesson](Protocol-2026-07-28.md) for a new server. Removing protocol sessions does not remove application-level storage or coordination.
 
 ---
 
@@ -135,9 +139,9 @@ Note the `Accept` header on every request lists **both** `application/json` and 
 
 ## 3. Why remote needs auth
 
-A `stdio` server is reachable by exactly one party: the user who launched it. Its security boundary is the operating system. There is nothing to authenticate, because the OS already decided who you are when it let you start the process — the server runs with the user's **ambient, local credentials** and trusts them.
+A `stdio` server normally communicates through pipes inherited from its launching client. The HTTP OAuth transport profile does not apply to that pipe. However, the launcher still must trust the executable and constrain its OS permissions/environment; downstream services may require credentials, and individual operations still need application authorization. Local transport does not mean every model-proposed action is authorized. See the [executed SDK v2 lesson](Lecture-05.md).
 
-A remote Streamable HTTP server has no such boundary. The instant you bind it to a public address, *anyone who can reach the URL can POST to it.* And MCP servers are not read-only data feeds — they expose **tools**, which **do things**: query a database, hit a downstream API on the caller's behalf, send a message, move money. An unauthenticated MCP endpoint is a remote-code-execution surface wearing a JSON-RPC costume.
+A remote Streamable HTTP server has no such boundary. The instant you bind it to a public address, *anyone who can reach the URL can POST to it.* And MCP servers are not read-only data feeds — they expose **tools**, which **do things**: query a database, hit a downstream API on the caller's behalf, send a message, move money. An exposed endpoint offers whatever capabilities its handlers implement. Unauthenticated access can therefore disclose data or trigger effects; it is not automatically arbitrary code execution if the server exposes no such capability.
 
 The naive fix — a shared API key in an environment variable, checked on each request — fails for a multi-user server in the ways shared secrets always fail:
 
@@ -145,7 +149,7 @@ The naive fix — a shared API key in an environment variable, checked on each r
 - **The server ends up holding everyone's secret.** If the server needs to act on a downstream service per user, a single shared key means it impersonates *all* users to that service — a confused-deputy waiting to happen (Section 5, and [Lecture 07](Lecture-07.md)).
 - **Distribution and rotation are unsolved.** Getting a long-lived secret safely into every client, and rotating it after a leak, is exactly the problem OAuth was built to retire.
 
-So MCP does not invent its own auth. For the HTTP transport it adopts **OAuth 2.1**, the modern, security-hardened profile of OAuth — short-lived bearer tokens, mandatory PKCE, no implicit grant — and assigns each party a standard OAuth role. (`stdio` servers, with their local boundary, **skip all of this** — see Section 6.)
+So MCP does not invent its own auth. For the HTTP transport it adopts **OAuth 2.1**, the modern, security-hardened profile of OAuth — short-lived bearer tokens, mandatory PKCE, no implicit grant — and assigns each party a standard OAuth role. (`stdio` uses a different local launch/credential boundary rather than the HTTP OAuth flow; see Section 6.)
 
 ---
 
@@ -161,7 +165,7 @@ The three roles:
 | **MCP server** | Your Streamable HTTP server | **OAuth 2.0 Resource Server** | Advertises *where* to get tokens; validates the `Bearer` token on every request |
 | **Authorization Server (IdP)** | A **separate** service (Auth0, Entra, Keycloak, …) | **Authorization Server** | Authenticates the user and **issues** access tokens |
 
-The MCP server's job shrinks to two things: **tell clients where its Authorization Server lives**, and **validate incoming tokens**. It never sees the user's password and never mints a token. That separation is what makes MCP auth composable — you front your server with whatever IdP your org already uses.
+The MCP server's job shrinks to two things: **tell clients where its Authorization Server lives**, and **validate incoming tokens**. The resource-server role validates access tokens; the authorization-server role issues them. These are logically distinct responsibilities, even if an organization deploys them in related infrastructure. Validate issuer, audience/resource, expiry and scopes rather than treating possession of any bearer string as authorization.
 
 **Advertising the Authorization Server — RFC 9728.** A client arriving at your server does not know which IdP to use. The MCP server **MUST** implement **RFC 9728 Protected Resource Metadata (PRM)** — a small JSON document that names the Authorization Server(s) that issue tokens for this resource, served at a well-known URI.
 
@@ -298,4 +302,4 @@ On a missing or malformed token, respond `401 Unauthorized` **with the `WWW-Auth
 
 ## Current as of
 
-June 2026 — pinned to the **2025-11-25** stable MCP specification revision. Key dates referenced: the legacy two-endpoint **HTTP+SSE** transport has been **deprecated since 2025-03-26** (do not build on it); the **Resource Server / Authorization Server split** and the OAuth 2.1 + RFC 9728 + RFC 8707 authorization model landed in the **2025-06** revision. The **2026-07-28 release candidate** moves the core toward a **stateless** design so Streamable HTTP servers scale on ordinary HTTP and serverless infrastructure without sticky sessions. Treat SDK surfaces (FastMCP `run(transport=...)` / ASGI mounting) and IdP integration details as snapshots and verify against your installed `mcp` package version and your Authorization Server's current metadata.
+The original June-2026 examples target `2025-11-25`. Reviewed 2026-10-18: **2026-07-28 is current**, with a different request, result, subscription, and retry contract. Use the [current lesson and official sources](Protocol-2026-07-28.md) before implementing or migrating. SDK snippets here have not been executed against the new revision; retained benchmark numbers are historical references, not local measurements.

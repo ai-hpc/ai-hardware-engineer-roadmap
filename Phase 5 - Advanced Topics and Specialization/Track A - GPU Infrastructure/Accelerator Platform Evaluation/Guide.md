@@ -63,19 +63,17 @@ Three important rules:
 
 ---
 
-## Executive summary
+## Start with a supported workload, not a vendor ranking
 
-| Platform | Where it is strongest | Where it is weakest | Best fit |
-|---|---|---|---|
-| **NVIDIA GPU** | Broadest framework support, strongest low-level tooling, best-known multi-node playbooks, fastest path for custom CUDA and production inference | Usually the most expensive path, supply and cluster availability can be painful, easy to overspend on premium systems | Teams that need the least friction across PyTorch, TensorFlow, JAX, Triton, vLLM, custom kernels, and mixed workloads |
-| **AMD GPU** | Large memory per accelerator, increasingly credible PyTorch and vLLM stack, more open tooling, strong value when supported models fit ROCm well | Still more workload qualification, more version-skew risk, fewer "default safe" recipes than CUDA ecosystems | Teams optimizing memory-heavy LLM serving or training and willing to do more stack validation |
-| **Google accelerators (TPU)** | Strong pod-scale training story, high performance/TCO for XLA-native workloads, excellent JAX fit, mature Google-operated fleet model | Most opinionated stack, more cloud and compiler coupling, less portable operational model, dynamic-shape mistakes are expensive | Teams already aligned to JAX/XLA or large regular training jobs on Google Cloud |
+Review date: 2026-10-18. Platform claims in this guide are evaluation hypotheses; no cross-vendor benchmark was run for this update. Availability, exact SKU, software support and prices must be checked for the proposed deployment.
 
-Short version:
+| Candidate | First compatibility question | Evidence needed for a decision |
+|---|---|---|
+| NVIDIA CUDA GPU | Does the pinned runtime/model/kernel support this architecture and precision? | Quality, latency/goodput, rank memory, GPU/network traces and total deployment cost |
+| AMD ROCm GPU | Does the exact GPU/OS/framework combination support the required operators and collectives? | The same task metrics, actual selected kernels and port/qualification effort |
+| Google TPU | Does the supported JAX/PyTorch-XLA execution and shape/sharding strategy fit the workload? | The same task metrics, compilation/amortization, placement and current cloud cost |
 
-- If you want the highest probability of a smooth production path across many workloads, choose **NVIDIA**.
-- If you want an increasingly serious alternative and memory footprint is a first-class constraint, shortlist **AMD**.
-- If your team is already XLA-shaped and your jobs are large, regular, and Google Cloud-native, **TPU** can be the best economic and scaling choice.
+A named GPU's extra memory may avoid a shard; a familiar software stack may reduce engineering time. Neither observation establishes a universal fastest or cheapest platform. Fix quality and service constraints, permit each platform's supported implementation, and disclose precision/batching differences.
 
 ---
 
@@ -292,15 +290,15 @@ When those are good, TPU scale is excellent. When they are not, the failure is u
 
 | Area | NVIDIA | AMD | Google accelerators |
 |---|---|---|---|
-| **Kernel / timeline profiling** | Nsight Systems, Nsight Compute | Omniperf, Omnitrace, rocProfiler | XProf, XLA traces, TensorBoard integrations |
+| **Kernel / timeline profiling** | Nsight Systems, Nsight Compute | ROCm Compute Profiler, ROCm Systems Profiler, ROCprofiler-SDK | XProf, XLA traces, TensorBoard integrations |
 | **Collective debugging** | NCCL logs, topology tools, DCGM ecosystem | RCCL logs and ROCm tooling | Megascale stats, XProf multislice analysis |
 | **Framework-level debugging** | Deep PyTorch and TensorRT ecosystem support | PyTorch ROCm support improving, but more workload-dependent | JAX/XLA and PyTorch/XLA metrics are central |
 | **Operator lowering / compiler visibility** | Strong for CUDA kernels and common framework stacks | Improving, but less broad for edge cases | Very strong if you are willing to reason in XLA/HLO terms |
 
 Practical conclusion:
 
-- **NVIDIA** has the best all-around debugging ergonomics.
-- **AMD** has credible tools, but fewer engineers are fluent in them.
+- **NVIDIA:** test whether Nsight/framework tools expose your actual bottleneck and support the target device.
+- **AMD:** include team familiarity and the supported ROCm profiler version in the porting experiment.
 - **TPU** has powerful compiler and profiling visibility, but the mental model is more specialized.
 
 ---
@@ -370,7 +368,7 @@ It often loses on:
 - cloud instance price
 - availability pressure for top-end systems
 
-If engineer time is expensive and deployment speed matters, NVIDIA often still has the best total economics.
+Include measured engineering/qualification time in the economic comparison; hardware price alone does not establish total cost.
 
 ### AMD
 
@@ -512,7 +510,7 @@ This is the point most teams skip. It is also where the real platform difference
 
 ### AMD
 
-- [ROCm PyTorch training documentation](https://rocm.docs.amd.com/en/develop/how-to/rocm-for-ai/training/benchmark-docker/pytorch-training.html)
+- [ROCm 6.4 PyTorch training baseline](https://rocm.docs.amd.com/en/docs-6.4.0/how-to/rocm-for-ai/training/benchmark-docker/pytorch-training.html)
 - [ROCm PyTorch inference documentation](https://rocm.docs.amd.com/en/docs-6.4.0/how-to/rocm-for-ai/inference/pytorch-inference-benchmark.html)
 - [RCCL documentation](https://rocm.docs.amd.com/projects/rccl/en/docs-6.2.0/)
 - [Omniperf documentation](https://rocm.docs.amd.com/projects/omniperf/en/docs-6.2.0/what-is-omniperf.html)

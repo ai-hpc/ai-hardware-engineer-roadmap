@@ -162,6 +162,8 @@ Produce a **profiling hypothesis log** for your own deployment: one row per regi
 
 ## Current as of
 
+**Reviewed October 18, 2026.** [Pinned config, upstream code and CPU evidence](CPU-Hybrid-State-Lab.md#sources-and-execution-boundary) identify what was checked. Hardware capacity and throughput remain deployment-specific.
+
 * **Timeless:** the per-operator roofline lower bound, the critical-path-not-summed-capability argument, the general disaggregation pattern and its capacity-planning trap.
 * **Deployment-specific:** the "PCIe Gen4, no P2P, 8× RTX 5090" topology is this course's named case study — re-derive the exposed-versus-overlapped communication analysis for any different interconnect (NVLink, InfiniBand) before reusing this module's conclusions about where communication becomes a bottleneck.
 

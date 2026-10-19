@@ -1,0 +1,15 @@
+{
+  "checked_on": "2026-10-18",
+  "python": "3.12.3",
+  "native_dt_tests_passed": 6,
+  "dtc": "1.7.0",
+  "evidence_kind": "actual dtc/libfdt; no hardware overlay or Jetson kernel execution",
+  "files_sha256": {
+    "course_module.c": "09f9f5bc8365e1919393eeeab870da7860db63f749aad19c184a8e12b451fb42",
+    "board.dts": "07b1636002afad1600aee15d7c09b40b2f9b10283a9504167a380cb630f5e064",
+    "Makefile": "093d712b1dfee93d47c20a5ef9f211dfddca6cfa576af5215a5be969577f8a61",
+    "test_device_tree.py": "33a196f89d9babfd91d0fa444697adcc53f2060cb12a3415daa038b53f93541c",
+    "sensor-overlay.dts": "78544dbde8e1aec68816e2195c2ad216292ba7a6ca1f567b4d684334e9892643",
+    "device_tree_lab.py": "b73c6ca2ab8f4775f3ec25a6b7e0338d2738766b0e2b89697cac2e0d4474a97c"
+  }
+}

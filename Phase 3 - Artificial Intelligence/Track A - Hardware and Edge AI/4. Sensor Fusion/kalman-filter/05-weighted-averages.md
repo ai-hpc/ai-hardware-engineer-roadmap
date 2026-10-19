@@ -66,6 +66,8 @@ You measure the length of a table:
 
 Which measurement should you trust more? Measurement 2! It has lower uncertainty.
 
+These sensor-fusion formulas assume unbiased observations of the same quantity with independent errors and known variances. Here `±` denotes one standard deviation. Correlated measurements need their joint covariance; an arbitrary confidence score is not a variance.
+
 ## Weights from Uncertainty
 
 Here's the key insight: **Lower uncertainty = Higher weight**
@@ -136,7 +138,7 @@ The Kalman filter uses something called **Kalman Gain** (K) to decide how much t
 
 ### Formula
 ```
-K = Prediction Uncertainty ÷ (Prediction Uncertainty + Measurement Uncertainty)
+K = Prediction Variance ÷ (Prediction Variance + Measurement Variance)
 ```
 
 ### What K Means
@@ -254,7 +256,7 @@ The uncertainty decreased! We're more certain after combining information.
 
 ### Key Insight
 
-**Combining information always reduces uncertainty!**
+**Independent, unbiased measurements with correctly specified variances can reduce uncertainty.** Correlation and bias require a different model; duplicating one observation does not create new information. See [lesson 12](12-process-measurement-noise.md).
 
 Even if both sources are uncertain, combining them makes you more certain.
 

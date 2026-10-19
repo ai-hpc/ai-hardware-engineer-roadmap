@@ -1,0 +1,21 @@
+{
+  "reviewed_utc": "2026-10-18T22:19:52.660763+00:00",
+  "sources": [
+    {
+      "source_url": "https://github.com/stephane/libmodbus/blob/master/src/modbus-tcp.c",
+      "git_blob_sha": "e84dc60281a98646f5085b692d24b54b76ad2740",
+      "immutable_blob_api": "https://api.github.com/repos/stephane/libmodbus/git/blobs/e84dc60281a98646f5085b692d24b54b76ad2740",
+      "download_sha256": "c7932a1c7a80762bf96d4b7b4303b263d65daa18a40b6ef5c45285f97a69d13f",
+      "bytes": 26944,
+      "status": "retrieved"
+    },
+    {
+      "source_url": "https://github.com/pymodbus-dev/pymodbus/blob/v3.16.1/pymodbus/client/mixin.py",
+      "git_blob_sha": "d54534731e344331b102722449d20b30434610ef",
+      "immutable_blob_api": "https://api.github.com/repos/pymodbus-dev/pymodbus/git/blobs/d54534731e344331b102722449d20b30434610ef",
+      "download_sha256": "2c71579aa7cdfad2f2961a10f6b8fd3487c0f22e15c9867aa7ede3742fbb4a0c",
+      "bytes": 40147,
+      "status": "retrieved"
+    }
+  ]
+}

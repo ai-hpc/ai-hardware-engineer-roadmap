@@ -28,8 +28,8 @@ By the end you should be able to:
 
 | Where | Quantity | Role |
 |---|---|---|
-| PPO / TRPO ([L06](Lecture-06.md)) | \(\mathrm{KL}(\pi_{\text{old}} \,\Vert\, \pi_\theta)\) | Step-size limit |
-| KL leash to π0.5 ([L06](Lecture-06.md), [L11](Lecture-11.md)) | \(\mathrm{KL}(\pi_\theta \,\Vert\, \pi_{\text{ref}})\) | Keep general skills, don't game the scorer |
+| PPO / TRPO ([L06](Lecture-06.md)) | \(\mathrm{KL}(\pi_{\text{old}} \,\Vert\, \pi_\theta)\) | Change diagnostic or approximate trust-region constraint; PPO clipping alone does not bound it |
+| KL leash to π0.5 ([L06](Lecture-06.md), [L11](Lecture-11.md)) | \(\mathrm{KL}(\pi_\theta \,\Vert\, \pi_{\text{ref}})\) | Discourage drift on evaluated observations; verify retained skills and reward validity separately |
 | SAC ([L07](Lecture-07.md)) | \(\mathcal{H}(\pi(\cdot \mid s))\) | Exploration, robustness to critic errors |
 | VAE / diffusion / flow heads ([L03](Lecture-03.md)) | ELBO, KL to prior | Training generative action models |
 | Exploration bonuses ([L12](Lecture-12.md)) | Novelty, mutual information | Curiosity, skill discovery |
@@ -69,7 +69,13 @@ $$
 
 ### 2.3 Derivation 2: the exact gap
 
-Jensen tells you there is a gap but not how big it is. Expand \(\log p_\theta(x, z) = \log p_\theta(z \mid x) + \log p_\theta(x)\) inside the ELBO:
+Jensen tells you there is a gap but not how big it is. Expand the joint log probability:
+
+\[
+\log p_\theta(x, z) = \log p_\theta(z \mid x) + \log p_\theta(x).
+\]
+
+Substitute that identity inside the ELBO:
 
 $$
 \log p_\theta(x) = \mathcal{L}(\theta, q) + \mathrm{KL}\big(q(z) \,\Vert\, p_\theta(z \mid x)\big)
@@ -129,13 +135,13 @@ A diffusion model (Ho et al. 2020) is a **hierarchical VAE with a fixed encoder*
 
 Flow matching (Lecture 03) is trained by direct regression on a velocity field, not by maximizing an ELBO. With Gaussian probability paths it is closely related to diffusion training under a different time weighting. So "π0.5's action expert is a cousin of the VAE" holds in the precise sense: noise in, many small learned denoising steps, a Gaussian latent at the start.
 
-The cousin has one property that matters a great deal for RL. A deterministic flow ODE *does* define an exact density, through the instantaneous change of variables:
+The cousin has one property that matters a great deal for RL. A sufficiently regular invertible continuous flow ODE defines a density through instantaneous change of variables; this identity is not automatically the exact density of a finite Euler sampler:
 
 $$
 \frac{d}{dt} \log p_t(x_t) = -\operatorname{tr}\!\left( \frac{\partial v_\theta(x_t, t)}{\partial x_t} \right)
 $$
 
-Evaluating \(\log \pi(a \mid s)\) means integrating the trace of a 350×350 Jacobian (a 50×7 chunk) along the whole path, or approximating it with stochastic trace estimators — every time PPO or GRPO asks for a log-prob. That is the "flow policies have no cheap log-likelihood" problem that [Lecture 11](Lecture-11.md) works around.
+For the continuous flow, evaluating \(\log \pi(a \mid s)\) involves integrating a Jacobian trace along the path, possibly using stochastic trace estimates. A 50×7 mathematical action space would give a 350×350 Jacobian; actual chunk dimensions depend on the configuration. This continuous-density expression is not automatically the exact density of a finite Euler sampler, which has discrete Jacobian determinants and invertibility conditions. That is the "flow policies have no cheap log-likelihood" problem that [Lecture 11](Lecture-11.md) works around.
 
 ---
 
@@ -153,13 +159,19 @@ $$
 
 ### 4.2 The derivation (Levine 2018)
 
-Define backward messages \(\beta_t(s,a) = p(\mathcal{O}_{t:T} \mid s_t = s, a_t = a)\), and let \(Q = \alpha \log \beta\) and \(V = \alpha \log \beta(s)\). With a uniform action prior, the message recursion becomes
+Define backward messages \(\beta_t(s,a) = p(\mathcal{O}_{t:T} \mid s_t = s, a_t = a)\), and let \(Q = \alpha \log \beta\) and \(V = \alpha \log \beta(s)\). For a finite action set or a bounded action domain with a proper uniform prior, absorbing its constant normalization into the value convention, the finite-horizon message recursion becomes
 
 $$
 V(s) = \alpha \log \int \exp\!\big( Q(s,a)/\alpha \big) \, da, \qquad \pi(a \mid s) = \exp\!\big( (Q(s,a) - V(s))/\alpha \big)
 $$
 
-\(V\) is a **soft maximum** (log-sum-exp). As \(\alpha \to 0\) it becomes \(\max_a Q\), and the policy becomes greedy, which recovers ordinary RL. Exact inference has one flaw: its backup is \(Q = r + \alpha \log \mathbb{E}_{s'}[\exp(V(s')/\alpha)]\), which is **optimistic about the dynamics**. It answers "what happened, given that I succeeded?", which assumes lucky transitions. The fix is variational: choose \(q(\tau) = p(s_0)\prod_t p(s_{t+1} \mid s_t,a_t)\, \pi(a_t \mid s_t)\), keep the true dynamics fixed, and maximize the ELBO. That ELBO is (up to constants and the factor \(\alpha\))
+\(V\) is a **soft maximum** (log-sum-exp). As \(\alpha \to 0\) it becomes \(\max_a Q\), and the policy becomes greedy, which recovers ordinary RL. Exact inference has one flaw: its backup is \(Q = r + \alpha \log \mathbb{E}_{s'}[\exp(V(s')/\alpha)]\), which is **optimistic about the dynamics**. It answers "what happened, given that I succeeded?", which assumes lucky transitions. The fix is variational. Choose
+
+\[
+q(\tau) = p(s_0)\prod_t p(s_{t+1} \mid s_t,a_t)\, \pi(a_t \mid s_t),
+\]
+
+keep the true dynamics fixed, and maximize the ELBO. That ELBO is (up to constants and the factor \(\alpha\))
 
 $$
 \mathbb{E}_{q}\Big[ \sum_t r(s_t,a_t) + \alpha \, \mathcal{H}(\pi(\cdot \mid s_t)) \Big]
@@ -231,7 +243,7 @@ Defenses, roughly in order of cost:
 
 ## 7. Robot connection
 
-For π0.5 on LIBERO, the simulator's success predicate is free and exact, so you do not need a learned reward for the capstone. But you need this lecture's tools in three places: the **KL leash** that protects general skills (an ELBO-style trade-off between reward and staying near the prior), the **entropy** that keeps exploration alive, and the honest question of **what the score actually measures**. A hidden test that moves objects is, in effect, a held-out audit of whatever shortcut your training signal allowed. A policy that learned "move the gripper to where the plate usually is" satisfies a sloppy detector and fails the moved-plate test.
+For LIBERO experiments, the simulator provides an inexpensive success predicate, so a learned reward is optional. The predicate still needs an implementation and semantic audit; it is not an exact oracle for every intended behavior. Reference regularization, exploration, and held-out perturbation evaluation address different problems and should be measured separately.
 
 ---
 

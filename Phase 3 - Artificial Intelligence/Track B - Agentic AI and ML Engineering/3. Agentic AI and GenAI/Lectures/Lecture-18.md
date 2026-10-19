@@ -4,6 +4,8 @@
 
 ---
 
+**Current review: 18 October 2026.** The sandbox path is available in both Python and TypeScript SDKs. A manifest describes initial workspace contents; it is not, by itself, an OS access-control policy. The selected sandbox provider and its configuration establish isolation. No hosted sandbox or provider-model run is claimed in this lesson. Start with the [executed local restart/crash lab](../Local-RAG-Workflow-Lab/Guide.md) to learn the state and idempotency mechanisms before adding a provider. [Current sandbox guide](https://developers.openai.com/api/docs/guides/agents/sandboxes).
+
 **Agent runtime infrastructure** is becoming product infrastructure.
 
 The important signal in OpenAI's April 2026 Agents SDK update is **not only that the SDK can call tools**.
@@ -453,7 +455,7 @@ OpenAI Agents SDK:
 - sandbox-aware orchestration
 - OpenAI model alignment
 - OpenAI tool primitives
-- Python-first release for new sandbox features
+- Python and TypeScript sandbox implementations; check feature parity for the selected version
 - managed API pricing and tool usage
 
 OpenClaw Gateway:
@@ -509,7 +511,7 @@ MCP integration
 secrets separation
 ```
 
-If an agent platform lacks these, it is probably a **prototype or a narrow wrapper**.
+Select these facilities from the task requirements. A read-only classification service can be production-ready without shell access or a persistent workspace. Adding execution capabilities increases the boundary you must manage.
 
 Production users will expect:
 
@@ -577,7 +579,7 @@ durability:
   can resume after interruption?
 
 sandbox safety:
-  can it only access mounted files?
+  does actual access obey the provider's declared mount and isolation policy?
 
 tool correctness:
   did shell/apply_patch calls match policy?
@@ -605,7 +607,7 @@ Example test:
 5. Serialize state.
 6. Resume in a fresh sandbox.
 7. Verify final patch, logs, and artifacts.
-8. Confirm no files outside the manifest were read.
+8. Verify that access follows the provider's actual filesystem/mount policy; a manifest lists initial contents and does not itself deny access to every other file.
 ```
 
 That is the right level of test for the new baseline.
@@ -734,7 +736,7 @@ Task passes only if:
 
 ## References
 
-- OpenAI, "The next evolution of the Agents SDK": [https://openai.com/index/the-next-evolution-of-the-agents-sdk/](https://openai.com/index/the-next-evolution-of-the-agents-sdk/)
+- OpenAI Agents SDK overview: [current SDK guide](https://developers.openai.com/api/docs/guides/agents/sdk)
 - OpenAI Agents SDK guide: [https://developers.openai.com/api/docs/guides/agents](https://developers.openai.com/api/docs/guides/agents)
 - OpenAI Sandbox Agents guide: [https://developers.openai.com/api/docs/guides/agents/sandboxes](https://developers.openai.com/api/docs/guides/agents/sandboxes)
 - OpenAI Results and state guide: [https://developers.openai.com/api/docs/guides/agents/results](https://developers.openai.com/api/docs/guides/agents/results)

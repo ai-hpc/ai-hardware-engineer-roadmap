@@ -2,13 +2,17 @@
 
 **Collection:** [MCP for AI Agents](README.md) | **Previous:** [← Lecture 01](Lecture-01.md) | **Next:** [Lecture 03](Lecture-03.md)
 
+
+**Protocol scope:** the detailed wire/SDK examples below teach the `2025-11-25` compatibility contract. Start with the [current 2026-07-28 protocol lesson](Protocol-2026-07-28.md) for new implementations; do not relabel an old handshake or reverse-request example as current.
+
+
 ---
 
 Lecture 01 framed *why* the Model Context Protocol exists: Anthropic open-sourced MCP in November 2024 to replace bespoke, per-integration glue code with one wire protocol that any LLM application can speak to any capability provider. This lecture is about the *shape* of that protocol — the three roles it defines, the message framing it borrows from JSON-RPC 2.0, and the connection lifecycle that every MCP session walks through from `initialize` to shutdown.
 
 The mental model worth fixing before anything else: MCP is a **client-server protocol with a strict 1:1 connection rule**. A single application — the Host — can talk to many servers at once, but it does so by running one Client per server, and each Client holds exactly one connection to exactly one Server. There is no fan-out inside a single Client, no shared socket, no multiplexing of two servers over one Client. Once you internalize that the Host is a *fleet of Clients* rather than a single connection manager, the rest of the architecture falls out cleanly.
 
-Everything in this lecture pins to the latest stable spec, **2025-11-25**. Where behavior is versioned — capability negotiation, transports, the protocol-version handshake — I name the spec revision, because MCP's wire contract has changed materially across revisions and "it depends on the version" is the correct senior-engineer answer more often than not.
+Everything in this lecture pins to the historical **2025-11-25** contract. Where behavior is versioned — capability negotiation, transports, the protocol-version handshake — I name the spec revision, because MCP's wire contract has changed materially across revisions and "it depends on the version" is the correct senior-engineer answer more often than not.
 
 ---
 
@@ -20,7 +24,7 @@ By the end of this lecture you should be able to:
 - Read and write the three JSON-RPC 2.0 message types (request, response, notification) and identify which fields each carries.
 - Explain capability negotiation: how Host and Server advertise features in `initialize` and why an undeclared capability is never invoked.
 - Walk the full connection lifecycle — `initialize` → `notifications/initialized` → operation → shutdown — and describe protocol-version negotiation.
-- Articulate why an MCP session is logically stateful, why that complicates horizontal scaling, and how the 2026-07-28 RC stateless core changes the picture.
+- Articulate why an MCP session is logically stateful, why that complicates horizontal scaling, and how the 2026-07-28 revision stateless core changes the picture.
 
 ---
 
@@ -201,7 +205,7 @@ An MCP session is **logically stateful**. The `initialize` handshake establishes
 
 That statefulness is the natural model for a long-lived connection, but it complicates **horizontal scaling**. If session state lives in the memory of one server instance, then every request for that session must land on that same instance — sticky routing — or the state must be externalized to a shared store that all instances consult. Both are real operational costs: sticky routing fights load balancers and complicates failover; a shared store adds latency and a new dependency. For a high-fan-out deployment serving many agents, a per-session-stateful server is a scaling bottleneck.
 
-This is the gap the **2026-07-28 release candidate** addresses with a **STATELESS core**. The RC defines a core protocol mode that carries no required per-session server state, which lets a server scale on ordinary HTTP infrastructure — any instance can handle any request because there is no session memory to be sticky to. (The same RC also adds the MCP Apps and Tasks extensions, layered on top of that stateless core.) Note the transport history here: MCP's two transports are **stdio** and **Streamable HTTP** (with `Mcp-Session-Id` sessions); the older **HTTP+SSE** transport has been **deprecated since 2025-03-26**. The stateless core is the next step in that arc — moving the protocol toward deployments that don't need session affinity at all.
+The current `2026-07-28` revision removes the required initialization/session contract described above. Every request supplies version/capability metadata, and application state travels through explicit handles. See the [worked current request](Protocol-2026-07-28.md); this changes failure handling as well as scaling. A persistent network connection alone no longer establishes protocol session or conversation identity.
 
 Whichever mode you run, the architectural constant is the same: **the Host mediates everything between the model and the servers.** The model never speaks to a server directly. The Host receives the model's intent, routes it through the appropriate Client to the right Server, applies its approval UX, and feeds results back to the model. That mediation role — the Host as the single point that owns the model, the user, the keys, and the trust boundary — is exactly the agent-harness pattern developed in the companion lecture, [`../Lectures/Lecture-02.md`](../Lectures/Lecture-02.md): MCP is one concrete realization of a harness standing between an LLM and the outside world.
 
@@ -209,4 +213,4 @@ Whichever mode you run, the architectural constant is the same: **the Host media
 
 ## Current as of
 
-This lecture is current as of **June 2026**, pinned to the latest stable MCP specification, **2025-11-25**. The **2026-07-28 release candidate** introduces a **stateless core** (allowing servers to scale on ordinary HTTP without per-session affinity), along with the MCP Apps and Tasks extensions; treat those as forthcoming until the RC is ratified. Transport status as of this writing: **stdio** and **Streamable HTTP** are current; **HTTP+SSE** has been deprecated since **2025-03-26**.
+The original June-2026 examples target `2025-11-25`. Reviewed 2026-10-18: **2026-07-28 is current**, with a different request, result, subscription, and retry contract. Use the [current lesson and official sources](Protocol-2026-07-28.md) before implementing or migrating. SDK snippets here have not been executed against the new revision; retained benchmark numbers are historical references, not local measurements.

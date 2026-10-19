@@ -30,6 +30,8 @@ Every decision in the 8-layer stack is driven by workload requirements. If you s
 
 ## Structure: Core + Two Tracks
 
+**New to AI or robot learning?** Begin with [AI and Robot Learning Foundations](0.%20AI%20and%20Robot%20Learning%20Foundations/Guide.md). It teaches the needed math with worked answers, then trains and evaluates a small robot policy using only Python and a CPU. Use its ten-minute diagnostic to skip material you already understand.
+
 **Modules 1–2** are mandatory for everyone. Then you choose **Track A**, **Track B**, or both.
 
 ```

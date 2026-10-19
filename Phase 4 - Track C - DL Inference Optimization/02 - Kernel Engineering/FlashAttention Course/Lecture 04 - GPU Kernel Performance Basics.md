@@ -1,162 +1,44 @@
-# Lecture 4 — GPU Kernel Performance Basics
+# Lecture 4 — GPU execution concepts without invented latency constants
 
-**Parent:** [FlashAttention Course](Guide.md)
+**Course:** [FlashAttention](Guide.md) · **Reviewed:** 18 October 2026
 
-**One-line purpose:** Cover the strict minimum of GPU performance hardware (memory hierarchy, warps, tensor cores, occupancy, coalescing) needed to read FlashAttention source code without getting lost.
+**Goal:** identify the hardware resource behind a kernel design choice. **Artifact:** a memory/ownership diagram and, when hardware is available, a validated microbenchmark report.
 
-**Prerequisites:** Lectures 1–3. Basic CUDA from Phase 4 Track B.
+## 1. Treat capacity and latency differently
 
-**Artifact:** Nsight Compute reports for a coalesced vs uncoalesced copy kernel and a warp-shuffle reduction microbenchmark.
+H100's SM has 64K 32-bit registers (256 KiB of register storage), with a 228 KB shared-memory capacity and a per-block limit described in NVIDIA's guide. Registers do not have zero latency or unlimited bandwidth. Shared-memory bandwidth is not an arbitrary “30 TB/s per SM” constant. Use [NVIDIA's Hopper tuning guide](https://docs.nvidia.com/cuda/hopper-tuning-guide/index.html) for limits and measure workload-dependent latency separately.
 
----
+Global memory is device-addressable storage; L2 caches accesses; shared memory enables explicit block cooperation; registers hold thread-local values subject to allocation limits. Spills can turn a register-heavy design into additional memory traffic. A fused attention kernel can reread K/V even though it never stores the full score matrix.
 
-## Why it matters
+## 2. Understand warps, synchronization and occupancy
 
-The FlashAttention codebase is dense with CUDA primitives — `__shfl_xor_sync`, shared-memory bank patterns, register tile sizes, `cp.async`, WGMMA descriptors. If those words are noise to you, you cannot read the kernel; you are reading a foreign language. This lecture is the dictionary.
+A warp contains 32 threads, but modern independent thread scheduling means code must obey the documented synchronization rules. A shuffle mask names participating lanes; all lanes required by a collective must participate consistently. A full mask in a partially active warp is not a universal safe reduction.
 
-You do not need to write GEMM from scratch. You do need to know what each layer of memory costs, how warps and tensor cores execute, and what the common failure modes are.
+Occupancy is the ratio of resident active warps to the architectural maximum. Registers, shared memory, block size and other limits constrain it. Higher occupancy can hide latency; it is not an optimization objective that supersedes useful work or locality.
 
----
+For a shuffle reduction exercise, either launch complete warps and give inactive data lanes a neutral value, or use a correct active-lane protocol. Initialize reduction outputs before any atomic accumulation. Repeated launches without clearing an atomic output do not produce independent correctness or timing samples.
 
-## Mental model
+## 3. Compare equal work when studying coalescing
 
-### Memory hierarchy on a modern NVIDIA GPU
+A strided kernel that only copies every 32nd element performs less work than a dense copy. It cannot support a fair “same-size copy is 20 times slower” conclusion.
 
-| Level | Size (Hopper SXM) | Latency | Bandwidth | Who owns it |
-|------|--------------------|---------|-----------|-------------|
-| HBM (global) | 80 GB | ~400-500 ns | ~3.35 TB/s | device-wide |
-| L2 | 50 MB | ~150-200 ns | ~12 TB/s | device-wide, partitioned |
-| Shared / L1 | 228 KB / SM | ~30 ns | ~30 TB/s per SM | per thread block |
-| Registers | 64 K × 32-bit / SM | 0 (compiler-managed) | unbounded | per thread |
+A better experiment visits all N elements in both variants. One assigns contiguous indices to neighboring threads; another applies a bijective index permutation to thread assignments while still copying `y[index] = x[index]`. Verify every output element and count useful bytes identically. Document cache state and address alignment before interpreting transaction efficiency.
 
-The whole point of a high-performance kernel is to stage data so that the inner loop only touches registers and shared memory, and HBM is touched once per element. FlashAttention is built exactly around this principle.
+For an aligned warp of 32 float loads, contiguous addresses span 128 bytes; scattered addresses may touch many more memory sectors. Exact transaction rules depend on the operation and architecture. Read the [CUDA best-practices memory guidance](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html) rather than treating one 128-byte region as one universal HBM transaction.
 
-### Warps and the SM
+## 4. Distinguish instruction families
 
-- A **warp** is 32 threads that execute the same instruction in lockstep (SIMT). All performance reasoning is "what does the warp do this cycle."
-- An **SM** (Streaming Multiprocessor) runs many warps concurrently. Hopper SM has 128 KB of register file and 228 KB shared/L1.
-- **Occupancy** = how many warps are resident on an SM. Higher occupancy hides memory latency but costs registers per thread. FlashAttention deliberately keeps occupancy modest (e.g. 2–4 warps per block, blocks per SM = 1–2) because per-thread register tiles are large.
+- Warp-level MMA instructions use architecture-specific shapes and data types. One mnemonic does not imply a universal cycle count.
+- Hopper WGMMA coordinates a warpgroup and supports asynchronous matrix operations with their synchronization rules.
+- TMA handles multidimensional transfers using descriptors and barriers. It does not make movement or synchronization free.
+- Blackwell `tcgen05` operations and tensor memory introduce another programming model; they are not simply Hopper WGMMA renamed.
 
-### Coalescing
+C++ CuTe is a template-based layout library. Python CuTeDSL is a separate programming interface. Lecture 09 places them in the correct FA3/FA4 source families. [PTX instruction reference](https://docs.nvidia.com/cuda/parallel-thread-execution/).
 
-When the 32 threads of a warp issue loads that hit a contiguous 128-byte region of HBM, the hardware combines them into one transaction. If the addresses scatter, each thread triggers its own transaction and bandwidth collapses. Rule of thumb: lay out tensors in `[batch, head, seq, dim]` order (NHWC-like) so the fastest-changing axis matches the warp's thread index.
+## 5. Measurement assignment and answers
 
-### Shared-memory bank conflicts
+If hardware is available, report exact device/toolkit/compiler, launch geometry, useful bytes, verified output, warmup, samples and profiler metrics. Keep input allocation and initialization outside the timed kernel region unless the experiment explicitly includes them. An asynchronous launch needs an event or synchronization boundary before its duration is meaningful.
 
-Shared memory is organised into 32 banks of 4-byte words. If two threads in the same warp read different addresses in the same bank, the access serialises. FlashAttention avoids this by carefully padding shared-memory tiles (`+8` or `+1` on the inner dimension) and by using the `ldmatrix` / `stmatrix` instructions on Hopper.
+**No GPU route:** draw the ownership/lifetime of one Q tile, one K/V tile and the running softmax statistics from the CPU lab. Explain where a two-stage pipeline needs an extra buffer and where a producer must wait before reusing it.
 
-### Tensor cores
-
-Tensor cores execute small fixed-shape matmuls per warp / warpgroup in one instruction:
-
-- **HMMA** (Volta/Turing/Ampere): one warp issues `m16n8k16` fp16/bf16 MMA → 256 FMA in ~8 cycles.
-- **WGMMA** (Hopper): one **warpgroup** (4 warps = 128 threads) issues an asynchronous `m64n{N}k16` MMA against shared memory descriptors.
-- **TCGen5** (Blackwell): tensor cores now operate at warpgroup-cluster scale with FP4/FP6 support.
-
-FlashAttention is a tensor-core engine wrapped in softmax glue. Most of the runtime is in MMA instructions. The rest is the rescale + exponentials around them.
-
-### Warp shuffles
-
-`__shfl_sync`, `__shfl_xor_sync`, etc. let threads in a warp read each other's registers in 1 cycle — no shared memory needed. Used for warp-level reductions (`m`, `ℓ` in the softmax recurrence) and for swizzling MMA inputs.
-
-### `cp.async` and TMA
-
-- `cp.async` (Ampere+) issues a DMA from HBM to shared memory that the warp can wait on later, overlapping with compute.
-- **TMA** (Hopper) is the same idea at coarser granularity: a single instruction copies a multi-dimensional tile from HBM to shared memory, the whole warp / warpgroup gets it for free, and you commit/wait on a barrier.
-
-FA2 leans on `cp.async`. FA3 leans on TMA. The reason FA3 is faster is largely about overlapping these copies with the MMA so the math units never stall.
-
----
-
-## Build it
-
-Two microbenchmarks. Both ship as standalone CUDA files in your course working directory.
-
-### 1. Coalesced vs uncoalesced copy
-
-```cpp
-// coalesce.cu
-__global__ void copy_coalesced(const float* __restrict__ x, float* __restrict__ y, int n) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx < n) y[idx] = x[idx];
-}
-
-__global__ void copy_strided(const float* __restrict__ x, float* __restrict__ y, int n, int stride) {
-    int idx = (blockIdx.x * blockDim.x + threadIdx.x) * stride;
-    if (idx < n) y[idx] = x[idx];
-}
-```
-
-Run both at `n = 2^24`. The coalesced one should hit ~85–90% of HBM peak. The strided one (e.g. `stride = 32`) should drop by 10–20×. Compare under `ncu --metrics gpu__time_duration.sum,dram__bytes.sum`.
-
-### 2. Warp-shuffle reduction
-
-```cpp
-// warp_reduce.cu
-__inline__ __device__ float warp_sum(float v) {
-    for (int off = 16; off > 0; off >>= 1)
-        v += __shfl_down_sync(0xffffffff, v, off);
-    return v;
-}
-
-__global__ void rowsum_via_shuffle(const float* x, float* out, int n) {
-    int row = blockIdx.x;
-    int tid = threadIdx.x;
-    float acc = 0.f;
-    for (int j = tid; j < n; j += blockDim.x) acc += x[row * n + j];
-    acc = warp_sum(acc);
-    if ((tid & 31) == 0) atomicAdd(&out[row], acc);
-}
-```
-
-This is structurally the same code FlashAttention uses to reduce `m` and `ℓ` across threads of a warp before broadcasting back. Time it against a naive shared-memory reduction; on Hopper the shuffle version should be ~2× faster for warp-local accumulators.
-
----
-
-## Use it in the real stack
-
-In `flash-attention/csrc/flash_attn/src/`:
-
-- `softmax.h`: search for `quad_shfl_xor_sync` / `Allreduce` — these are the warp shuffles that compute `m` and `ℓ` reductions inside a warp.
-- `block_info.h` and `kernel_traits.h`: `kBlockM`, `kBlockN`, `kNWarps`, `kStages` — the tile sizes, warps per block, and `cp.async` stage count.
-- `mask.h` and `softmax.h` again: the rescale-and-add update of `tOrO` after each `tOrP` — this is the FP register-level realisation of the recurrence from Lecture 2.
-
-Pick one CUDA file and annotate, in your own notes, where each of these is happening. Do not move on to Lecture 5 until you can point at the MMA call, the shuffle reduce, and the `cp.async` issue / commit / wait in real source.
-
----
-
-## Measure it
-
-Standard Nsight Compute metrics worth memorising:
-
-| Metric | Meaning |
-|--------|---------|
-| `sm__throughput.avg.pct_of_peak_sustained_elapsed` | Overall SM utilisation |
-| `dram__bytes.sum` | HBM traffic |
-| `lts__t_sectors.sum` | L2 traffic |
-| `sm__warps_active.avg.pct_of_peak_sustained_active` | Achieved occupancy |
-| `smsp__inst_executed_pipe_tensor_op_hmma.sum` | Tensor-core HMMA instructions |
-| `smsp__sass_average_data_bytes_per_sector_mem_global.pct` | Coalescing efficiency |
-
-For your two microbenchmarks, report at minimum: kernel time, achieved HBM bandwidth, achieved occupancy. For the warp-shuffle reduction, also report tensor-core instruction count (should be zero — it is a pure CUDA-core kernel).
-
----
-
-## Ship it
-
-Drop into `flash-attn-course/`:
-
-1. `coalesce.cu` and a `coalesce_bench.txt` with the two kernel times and bandwidths.
-2. `warp_reduce.cu` and a `reduce_bench.txt` comparing shuffle vs shared-memory reduce.
-3. A one-page Markdown cheat sheet mapping each term in the FlashAttention kernel (`tOrO`, `tOrP`, `tOrS`, `cp.async.commit_group`, `__shfl_xor_sync`, `wgmma.mma_async`) to a one-sentence explanation in your own words.
-
-If you have those three, you are ready for Lecture 5.
-
----
-
-## Related pages
-
-- [Lecture 3 — FlashAttention-1 algorithm](Lecture%2003%20-%20FlashAttention-1%20Algorithm.md)
-- [Lecture 5 — Repo anatomy and Python / CUDA API](Lecture%2005%20-%20Repo%20Anatomy%20and%20Python%20CUDA%20API.md)
-- NVIDIA Nsight Compute docs: <https://docs.nvidia.com/nsight-compute/>
-- PTX ISA: <https://docs.nvidia.com/cuda/parallel-thread-execution/>
+**Answer check:** a low occupancy result is not automatically a defect; a large live tile may improve reuse. A clean source compilation is not evidence of correct synchronization or GPU speed. The course's supplied CPU tests establish math/contract behavior, not those hardware outcomes.

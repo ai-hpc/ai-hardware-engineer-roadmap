@@ -1,263 +1,90 @@
-# 04 — Memory Management on 8x H200
+# 04 — Count memory by ownership and lifetime
 
-## 1. Memory Budget Planning
+**Outcome:** calculate a per-rank training/inference budget and explain an out-of-memory event. Source review: 2026-10-18. Capacity examples are arithmetic; no H200 run is claimed.
 
-### Training Memory Breakdown (per GPU, Mixed Precision BF16)
+## Parameters are a count, bytes are a separate quantity
 
+Let P be the **number of parameters**. In one common mixed-precision Adam configuration:
+
+| State | Bytes per parameter |
+|---|---:|
+| BF16 working weights | 2 |
+| BF16 gradients | 2 |
+| FP32 master weights | 4 |
+| FP32 first/second moments | 8 |
+| Total persistent training state | **16** |
+
+Other optimizers/implementations may omit a separate master copy or retain gradients/parameters differently. Record the actual policy. For P=70 billion, 16P is **1,120 GB**, before activations and workspace. Perfectly sharding these states eight ways leaves **140 GB per GPU**, already near the nominal 141 GB capacity. This does not establish that full 70B Adam training fits on eight H200s.
+
+Full sharding divides the sharded states; it does **not** divide all local activations by the data-parallel world size. A better planning expression is:
+
+`rank_peak = sharded_persistent_state + local_activations + live_gathered_parameters + gradients/buffers + workspace + reserve`.
+
+Count only the non-overlapping portion of buffers when avoiding double counting, and take the maximum over time and ranks. [ZeRO](https://arxiv.org/abs/1910.02054), [FSDP2 controls](https://docs.pytorch.org/docs/2.14/distributed.fsdp.fully_shard.html).
+
+## KV cache: use KV heads and actual retained tokens
+
+For a conventional full-attention cache:
+
+`bytes = 2 × layers × KV_heads × head_dim × retained_tokens_across_sequences × bytes_per_element`.
+
+The first 2 counts keys and values. Query-head count is not KV-head count for grouped-query attention. With 80 layers, 8 KV heads, head dimension 128, 8,192 tokens for each of 32 sequences, and BF16, the total is **85.899 GB decimal (80 GiB)** before metadata. The old 42 GB figure omitted a factor of two.
+
+```python
+def kv_bytes(layers, kv_heads, head_dim, tokens, sequences, element_bytes=2):
+    dimensions = (layers, kv_heads, head_dim, tokens, sequences, element_bytes)
+    if any(not isinstance(v, int) or v <= 0 for v in dimensions):
+        raise ValueError("all dimensions must be positive integers")
+    return 2 * layers * kv_heads * head_dim * tokens * sequences * element_bytes
+
+assert kv_bytes(80, 8, 128, 8192, 32) == 85899345920
 ```
-Model parameters:     P bytes    (BF16 = 2 bytes/param)
-Gradients:            P bytes    (BF16)
-Optimizer states:     4P bytes   (FP32 copies for AdamW: params + m + v)
-Activations:          A bytes    (depends on sequence length, batch size)
-─────────────────────────────────────────────────────────────────────────
-Total (no ZeRO):      6P + A
 
-With ZeRO-3 (8 GPUs): (6P + A) / 8  per GPU
-```
+Dividing this by TP assumes the implementation partitions KV heads/cache evenly. Some configurations replicate KV heads, and sliding-window, latent-attention, hybrid recurrent or compressed-cache models use different formulas. Use the checkpoint and runtime's actual cache layout.
 
-For a 70B model:
-- P = 70B × 2 bytes = 140 GB
-- Optimizer = 70B × 12 bytes = 840 GB
-- Total without ZeRO = 980 GB → needs ZeRO-3
-- With ZeRO-3 across 8 GPUs: ~123 GB per GPU ✓
+Paged allocation reduces unused reserved slots, but still has block slack, metadata, reservations and runtime policies. For block size 16, a 200-token sequence needs `ceil(200/16)=13` blocks (208 slots); a 3,800-token sequence needs 238 blocks (3,808 slots). No fixed 2–4× concurrency improvement follows. Supported block sizes depend on backend/kernel/version. [PagedAttention paper](https://arxiv.org/abs/2309.06180).
 
-### Inference Memory Breakdown
-
-```
-Weights:          W bytes  (FP16 = 2 bytes/param)
-KV Cache:         K bytes  (2 × layers × heads × head_dim × seq_len × batch × 2)
-CUDA workspace:   ~2 GB
-Activations:      ~batch × seq × hidden × 2 bytes
-─────────────────────────────────────────────────────────────────────────
-Total:            W + K + overhead
-```
-
-## 2. HBM3e Memory Allocation Strategy
+## Measure allocator and device memory separately
 
 ```python
 import torch
 
-def get_memory_stats(device=0):
-    t = torch.cuda.get_device_properties(device).total_memory / 1e9
-    r = torch.cuda.memory_reserved(device) / 1e9
-    a = torch.cuda.memory_allocated(device) / 1e9
-    print(f"Total: {t:.1f} GB | Reserved: {r:.1f} GB | Allocated: {a:.1f} GB | Free: {t-r:.1f} GB")
-
-# Monitor before and after model load
-get_memory_stats()
-model = load_model()
-get_memory_stats()
-```
-
-### CUDA Memory Pool Configuration
-
-```python
-# Prevent memory fragmentation with expandable segments
-import torch
-torch.cuda.memory.set_per_process_memory_fraction(0.95)  # leave 5% for CUDA runtime
-
-# Configure memory allocator
-torch.cuda.set_per_process_memory_fraction(0.95, device=0)
-
-# Environment variable approach (before import torch)
-# PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:512
-```
-
-```bash
-# For vLLM — controls how much GPU memory the KV cache pool uses
-export VLLM_GPU_MEMORY_UTILIZATION=0.90
-```
-
-## 3. KV Cache Deep Dive
-
-### KV Cache Size Formula
-
-```python
-def kv_cache_size_gb(
-    num_layers: int,
-    num_kv_heads: int,
-    head_dim: int,
-    max_seq_len: int,
-    max_batch_size: int,
-    dtype_bytes: int = 2,  # FP16 = 2, FP8 = 1
-) -> float:
-    # 2 for K and V
-    total_bytes = 2 * num_layers * num_kv_heads * head_dim * max_seq_len * max_batch_size * dtype_bytes
-    return total_bytes / 1e9
-
-# Llama-3 70B: 80 layers, 8 GQA kv-heads, head_dim=128
-kv = kv_cache_size_gb(
-    num_layers=80,
-    num_kv_heads=8,         # GQA reduces from 64 heads to 8 KV heads
-    head_dim=128,
-    max_seq_len=8192,
-    max_batch_size=32,
-)
-print(f"KV Cache: {kv:.1f} GB")  # ~42 GB with FP16
-```
-
-### Grouped Query Attention (GQA) Memory Savings
-
-| Attention Type | KV Heads | KV Cache Size | Used By |
-|---|---|---|---|
-| MHA | 64 | 100% | GPT-3, early transformers |
-| GQA | 8 | 12.5% | Llama-3, Mistral |
-| MQA | 1 | 1.6% | PaLM, Falcon |
-
-GQA is the best trade-off: near-MHA quality at much lower KV memory cost.
-
-## 4. PagedAttention (vLLM)
-
-```
-Traditional KV cache allocation:
-  Max sequence length is pre-allocated, even if unused.
-
-  Seq A (actual 200 tokens, allocated 4096): [200 used ][3896 wasted]
-  Seq B (actual 3800 tokens, allocated 4096): [3800 used][296 wasted ]
-
-  → ~30–50% GPU memory waste → fewer concurrent sequences
-
-PagedAttention:
-  Memory divided into fixed-size "blocks" (16 tokens per block by default)
-
-  Seq A: [Block 3][Block 7][Block 12]   (only 13 blocks used)
-  Seq B: [Block 0][Block 1]...[Block 237] (238 blocks used)
-
-  Blocks are allocated on demand, freed immediately when sequence ends
-  → Near-zero waste → 2-4× more concurrent sequences
-```
-
-```python
-# Tune block size for your workload
-llm = LLM(
-    model="...",
-    block_size=16,              # 16 tokens per block (default)
-    # 32 tokens/block = higher throughput, less flexibility
-    # 8 tokens/block = more flexibility, more metadata overhead
-)
-```
-
-## 5. Activation Checkpointing Trade-offs
-
-```
-Without checkpointing:
-  Forward pass saves ALL activations for backward.
-  Memory = O(layers × batch × seq × hidden)
-
-With checkpointing (every k layers):
-  Forward pass saves only checkpoint activations.
-  Backward recomputes k layers when needed.
-  Memory = O((layers/k) × batch × seq × hidden)
-  Compute overhead = ~33% extra forward passes
-
-For H200 (large memory): checkpoint only when nearing OOM
-```
-
-```python
-# Selective checkpointing — only checkpoint expensive ops
-import torch.utils.checkpoint as cp
-
-class TransformerLayer(nn.Module):
-    def forward(self, x):
-        # Only checkpoint the attention (expensive memory-wise)
-        attn_out = cp.checkpoint(self.attention, x, use_reentrant=False)
-        # Don't checkpoint MLP (cheaper to store)
-        return self.mlp(attn_out)
-```
-
-## 6. CPU Offloading Strategy
-
-For H200, CPU offloading is rarely needed for 70B inference. But for training very large models:
-
-```python
-# DeepSpeed CPU offloading for optimizer states
-{
-  "zero_optimization": {
-    "stage": 3,
-    "offload_optimizer": {
-      "device": "cpu",
-      "pin_memory": true,        # pinned memory for fast H2D
-      "buffer_count": 4,         # prefetch buffers
-      "fast_init": false
-    },
-    "offload_param": {
-      "device": "none"           # H200: keep params on GPU
+def memory_report(device=0):
+    free, total = torch.cuda.mem_get_info(device)
+    return {
+        "device_total_GB": total / 1e9,
+        "device_free_GB": free / 1e9,
+        "torch_allocated_GB": torch.cuda.memory_allocated(device) / 1e9,
+        "torch_reserved_GB": torch.cuda.memory_reserved(device) / 1e9,
+        "torch_peak_allocated_GB": torch.cuda.max_memory_allocated(device) / 1e9,
     }
-  }
-}
 ```
 
-### Bandwidth Requirement for CPU Offload
+`total − torch_reserved` is not true free device memory: other processes, libraries and contexts allocate memory too. Reserved minus allocated can reflect useful cached blocks, not necessarily pathological fragmentation. Reset peak stats at a defined boundary and record initialization, first iteration and steady-state peaks separately.
 
-```
-CPU RAM ↔ GPU: PCIe 5.0 x16 = ~64 GB/s (H200 host)
-NVLink C2C (GH200): 900 GB/s (no PCIe bottleneck)
+Allocator settings have tradeoffs and backend/version support constraints. A per-process allocation fraction is a limit, not a guarantee that the remainder is enough for all other allocations. For vLLM pass its documented `gpu_memory_utilization` argument/CLI flag; do not assume an undocumented `VLLM_GPU_MEMORY_UTILIZATION` environment variable is honored. [PyTorch memory semantics](https://docs.pytorch.org/docs/2.14/notes/cuda.html#memory-management), [vLLM engine arguments](https://docs.vllm.ai/en/latest/configuration/engine_args/).
 
-With PCIe 5.0: for a 70B model optimizer (840 GB FP32),
-  full round-trip = 840 GB / 64 GB/s = ~13 seconds per update step
-  → CPU offload is a LAST RESORT for PCIe-attached systems
-```
+## Checkpointing and offloading trade work for space
 
-## 7. Memory Profiling Tools
+Activation checkpointing stores selected boundaries and recomputes intermediates during backward. The saving depends on what was retained, checkpoint granularity and attention implementation. “Checkpoint expensive ops” is ambiguous: expensive-to-recompute operations may be better saved, while large cheap intermediates may be better recomputed. Validate gradients, RNG behavior and step time; there is no universal 33% overhead.
 
-```bash
-# PyTorch memory snapshot (detailed allocation trace)
-import torch.cuda.memory as mem
+Optimizer CPU offload can keep optimizer moments on the CPU and transfer gradients/updated parameters, rather than copying every moment array across PCIe each step. Derive transfers from that implementation's schedule. PCIe Gen5 x16 has about 64 GB/s theoretical one-way throughput; a bidirectional total or Grace-Hopper C2C figure cannot be substituted into a one-way copy calculation. Host memory bandwidth, pinned buffers, CPU optimizer time and overlap can dominate. [DeepSpeed configuration](https://www.deepspeed.ai/docs/config-json/).
+
+## Inspect a snapshot at the failure boundary
+
+This diagnostic uses PyTorch's private snapshot API, which must be checked against the installed version:
+
+```python
+import torch
 
 torch.cuda.memory._record_memory_history(max_entries=100000)
-# ... run workload ...
-mem.memory._dump_snapshot("mem_snapshot.pickle")
-
-# Visualize at: https://pytorch.org/memory_viz
+# Run the small reproducer here, including its failing allocation if possible.
+torch.cuda.memory._dump_snapshot("memory_snapshot.pickle")
+torch.cuda.memory._record_memory_history(enabled=None)
 ```
 
-```bash
-# Nsight Systems — system-level memory timeline
-nsys profile \
-    --trace=cuda,nvtx,osrt \
-    --gpu-metrics-device=all \
-    --output=mem_profile \
-    python train.py
+A PyTorch allocator snapshot does not include every library allocation. Pair it with device telemetry and all-rank context. Do not assume NCCL always consumes a fixed 300 MB. [PyTorch memory visualization](https://docs.pytorch.org/docs/2.14/torch_cuda_memory.html).
 
-# Nsight Compute — per-kernel memory analysis
-ncu --metrics l1tex__t_bytes,dram__bytes \
-    --target-processes all \
-    python train.py
-```
+**Exercise:** a model has 10 GB weights, 8 GB cache, 2 GB workspace and 3 GB reserve. Quantizing only weights to 2.5 GB changes 23 GB to 15.5 GB, a **32.6%** total reduction, not 75%. Then double cache use: total becomes 23.5 GB. Explain why “quantization guarantees the larger batch fits” fails.
 
-```bash
-# nvidia-smi memory monitoring during training
-watch -n 1 nvidia-smi --query-gpu=index,memory.used,memory.free,utilization.gpu \
-    --format=csv,noheader,nounits
-```
-
-## 8. OOM Debugging Checklist
-
-```
-1. Check reserved vs allocated:
-   torch.cuda.memory_reserved()  >> torch.cuda.memory_allocated() ?
-   → Memory fragmentation: set PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-
-2. Unexpected allocations:
-   → Use torch.cuda.memory_snapshot() to find surprise allocations
-
-3. Gradient accumulation with DDP:
-   → with model.no_sync(): inside accumulation loop prevents premature all-reduce
-
-4. KV cache growing unbounded (inference):
-   → Set max_model_len and max_num_seqs limits in vLLM
-   → Check for missing attention mask / infinite generation loops
-
-5. NCCL broadcast allocations:
-   → NCCL uses ~300 MB per GPU; account for this in memory budget
-
-6. torch.compile memory increase:
-   → First iteration may OOM during graph compilation; use smaller batch for warmup
-```
-
-## References
-
-- [PyTorch Memory Management](https://pytorch.org/docs/stable/notes/cuda.html#memory-management)
-- [ZeRO Memory Optimization Paper](https://arxiv.org/abs/1910.02054)
-- [vLLM PagedAttention Paper](https://arxiv.org/abs/2309.06180)
-- [Reducing Activation Recomputation in Large Transformer Models](https://arxiv.org/abs/2205.05198)
+**Exit artifact:** a byte-accurate state table, a lifetime timeline, and the maximum measured rank peak. If hardware is unavailable, submit the checked arithmetic and an explicit list of unmeasured allocations.

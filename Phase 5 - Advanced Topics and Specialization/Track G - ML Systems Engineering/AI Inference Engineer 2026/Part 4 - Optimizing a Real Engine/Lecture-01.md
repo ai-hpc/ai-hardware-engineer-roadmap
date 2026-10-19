@@ -1,5 +1,8 @@
 # Part 4 · Lecture 01 — The Workload, the Baseline, and the Ladder
 
+**Practice:** [CPU source lab](CPU-Source-Lab.md). Historical GPU results are source reports; use the **Answers** after attempting the self-check.
+
+
 ## Overview
 
 Before any optimization, three questions have to be answered concretely: **what is the workload**, **what are you being compared against**, and **where are you now**. Get any of them wrong and every number you produce afterwards is decoration.
@@ -16,26 +19,26 @@ Part 3 Lecture 01 taught how to read an MoE model card. Kimi K3 is that exercise
 
 | | |
 |---|---|
-| Parameters | **2.8T** total, typed `2.8T.A50B` by the reference implementation (~50B active) |
+| Parameters | **2.8T** total, **104B activated** in the official model card; legacy `2.8T.A50B` implementation label is not authoritative |
 | Layers | **93** — **24 MLA** (full attention) + **69 KDA** (linear, recurrent) |
 | Hidden / vocab | 7168 / 163,840 |
 | Context | 1,048,576 |
 | MoE | **896 routed experts**, top-16, **2 shared** · latent MoE at **3584**, expert FFN 3072 |
 | Attention (full) | **MLA** — `q_lora 1536`, `kv_lora 512`, **NoPE-only**, sigmoid output gate |
 | Attention (linear) | **KDA** — 96 heads × 128, conv kernel 4, full-rank gate, `gate_lower_bound −5.0` |
-| Activation | `situ` replaces SwiGLU everywhere (`β 4.0`, linear `β 25.0`) |
+| Activation | SiTU nonlinearity in the gated FFN (`β 4.0`, linear `β 25.0`) |
 | Extras | cross-layer residual attention, `block_size 12` |
-| Vision | MoonViT-3d — 27 layers, 1024 wide, non-square fused QKV, patch 14 |
+| Vision | MoonViT-V2 in the official card; the pinned implementation describes its encoder as MoonViT-3d |
 
 Four things in that table change the systems problem qualitatively, and each is a *different* lesson from the dense-70B and 671B-MoE cases in Parts 2 and 3.
 
-**896 experts is past the mainstream limit.** Upstream `llama.cpp` asserts `n_expert <= LLAMA_MAX_EXPERTS`, and the cap is 512. The model does not load slowly — it does not load. §3 is about what that does to the idea of a baseline.
+**896 experts exceeded the selected historical baseline's limit.** The case-study fork raises a 512-expert cap to 1024. This describes that pinned engine history, not a current limit of all mainstream runtimes. The model does not load slowly — it does not load. §3 is about what that does to the idea of a baseline.
 
 **The hybrid attention stack has two cost curves, not one.** 24 MLA layers grow a KV cache with context; 69 KDA layers carry fixed-size recurrent state. Optimizing one does nothing for the other, and a profile that averages over layers hides which is which. This is the Mamba/hybrid architecture family from [MLSys Deep Dives Lecture 04](../../MLSys%20Deep%20Dives/Lecture-04.md), but as an engineering constraint rather than a survey entry.
 
-**The routed experts live in a down-projected space.** `expert_latent_length` is **3584**, not `hidden_size` 7168. Size the expert GEMMs off hidden and every one of them is wrong by 2×. It is also why the tensor-parallel all-reduce is 3584-wide — [Lecture 07](Lecture-07.md).
+**The routed experts live in a down-projected space.** `expert_latent_length` is **3584**, not `hidden_size` 7168. Use hidden width for an expert input/output axis and that axis is wrong by 2×; the separate FFN intermediate width remains 3072. It is also why the tensor-parallel all-reduce is 3584-wide — [Lecture 07](Lecture-07.md).
 
-**Top-16 of 896 is aggressive sparsity.** ~50B active from 2.8T is a 56:1 ratio. That is *good* for arithmetic and *bad* for weight-read locality: sixteen experts per token, drawn from 896, means the dispatch pattern is close to random access over 531 GiB.
+**Top-16 of 896 is aggressive sparsity.** 104B active from 2.8T is about a 26.9:1 total/active ratio. Routed expert traffic depends on the selected experts and quantized tensor layout; top-16 alone does not imply uniformly random access. Measure routing correlation and per-rank load.
 
 ### 1.1 Three traps that produce fluent garbage
 
@@ -54,7 +57,7 @@ The repository documents these as configuration traps, and all three share one p
 
 3.  Routed experts are in a DOWN-PROJECTED space.
     expert_latent_length 3584,  NOT hidden_size 7168.
-    Size expert GEMMs off hidden -> wrong by exactly 2x, everywhere.
+    Using hidden width for the routed expert input/output axis doubles that axis incorrectly; the FFN intermediate axis remains 3072.
 ```
 
 A compile error costs you an hour. A silently wrong `full_attn_layers` costs you a week of benchmarking a model that is not the model.
@@ -65,9 +68,11 @@ A compile error costs you an hour. A silently wrong `full_attn_layers` costs you
 
 ### 2.1 Hopper, on purpose
 
-The project's stated position: **H200 is the target, not a stepping stone to Blackwell.** The reasoning is availability rather than peak FLOPs — 141 GB per card, eight cards, **1128 GiB** of HBM, on hardware rentable this afternoon and by a wide margin the cheapest per GB of HBM. A runtime that only pays off on B200/B300 is a runtime almost nobody can run.
+The historical target is eight H200 SXM GPUs. The advertised capacity is **141 GB per GPU**; eight times that is 1128 **GB**, not 1128 GiB. For an allocation budget, use the actual byte count returned by CUDA and convert by 2³⁰ for GiB. Availability and rental prices change, so this course does not infer today's cheapest node from an August choice.
 
-That is a defensible engineering choice and worth contrasting with Part 3, which targets GB200/GB300 NVL72 because *that* is where trillion-parameter MoE serving lands at scale. Both are right for their scope. The lesson is that "which hardware" is a product decision that then constrains every kernel you write — `sm_90` has no FP4 and no TE2, so the precision floor here is integer quantization, not microscaling.
+Hopper lacks Blackwell's native FP4 tensor-core path. That does **not** prohibit FP4/low-bit storage: software may unpack to supported compute types. Storage format, arithmetic instructions, and library version are separate choices. This case uses GGUF integer quantization; it is not evidence that all low-bit formats have the same cost.
+
+The model table follows the [pinned official K3 model card](https://huggingface.co/moonshotai/Kimi-K3/blob/c5d1dd4c428bd1ce8b88c5044f3b6ccde9e3b721/README.md) and [config](https://huggingface.co/moonshotai/Kimi-K3/blob/c5d1dd4c428bd1ce8b88c5044f3b6ccde9e3b721/config.json). Its 104B activated count supersedes the engine's legacy A50B label.
 
 ### 2.2 The quant ladder, and the difference between "default" and "target"
 
@@ -77,6 +82,8 @@ That is a defensible engineering choice and worth contrasting with Part 3, which
 | UD-IQ2_XXS | 662 | ✅ | 84.1% |
 | **UD-Q2_K_XL** *(accuracy target)* | **802** | ✅ not yet run | **90.4%** |
 | UD-Q4_K_XL | 1407 | ❌ | — |
+
+These are the repository's historical quantization-size/quality claims. The percentages lack a reproduced evaluation dataset in this course; they are not general task-accuracy rates or a guarantee that a quant fits at every context. Parity against the same quantized weights is separate from quality relative to the original model.
 
 Two distinct claims, and the repo keeps them separate on purpose:
 
@@ -89,15 +96,15 @@ The trap this creates is a *measurement* trap, and the fix is worth stealing. IQ
 
 ### 2.3 All weights in HBM, enforced
 
-553 GiB across 8 cards is ~123 GiB resident per card against 141 GB available. That is tight, and the temptation under pressure is to let a little spill. The harness refuses: `kimi_k3_check_fits` rejects a partially-offloaded configuration rather than running one, and it **prices the KV cache in** rather than assuming flat headroom (27 GiB at 1M context).
+553 / 8 = **69.125 GiB**, an ideal equal share of the file payload. It is not the observed allocation. The source reports roughly **123 GiB resident per rank**; replication, unpacked representations, scratch, and state need a separate allocation inventory. Even the simple 531 GiB sharded + 22 GiB replicated model gives 531/8 + 22 = **88.375 GiB per rank**, before other allocations. That is tight, and the temptation under pressure is to let a little spill. The harness refuses: `kimi_k3_check_fits` rejects a partially-offloaded configuration rather than running one, and it **prices the KV cache in** rather than assuming flat headroom (27 GiB **per rank** for 24×576×2 bytes/token at 1,048,576 tokens; other cache layouts differ).
 
-The reason is reproducibility, not purity. A partially-offloaded run's speed depends on host RAM speed, PCIe contention, and page-cache state — none of which are in your commit. It is not a slower number; it is a *different measurement* wearing the same units.
+The benchmark policy excludes offload. Offload can be reproducible, but requires a different declared configuration including host memory, PCIe traffic, residency, and cache state. A precheck based on file sizes cannot prove runtime fit: measure peak allocated/resident bytes per GPU.
 
 ---
 
 ## 3. Why the baseline is a fork — and what to do when nothing can run your model
 
-Every other model in this engine's family is benchmarked against `ggml-org/llama.cpp` at a pinned commit. K3 cannot be: upstream asserts `n_expert <= 512` and **there is no upstream number to compare against.**
+Every other model in this engine's family is benchmarked against `ggml-org/llama.cpp` at a pinned commit. The selected historical upstream revision could not load K3 at its 512-expert cap, so this record uses a fork; it makes no claim that current upstream still lacks support.
 
 This is a real and under-discussed situation. The honest options are:
 
@@ -117,7 +124,7 @@ The project took the last and built the machinery. The reference is [`unslothai/
 
 ### 3.1 The provenance problem, and a fix worth copying
 
-A PR head on someone else's fork is not immutable. It can be force-pushed. And because the pin is a PR ref, **GitHub refuses fetch-by-sha** — you cannot simply ask for the commit you want.
+A PR head on someone else's fork is not immutable. It can be force-pushed. Fetch-by-SHA availability depends on reachability and server policy. This harness fetches the PR ref and checks its resolved SHA; it does not rely on the ref being immutable.
 
 The harness fetches the *ref*, then **asserts** it resolves to the pinned commit. A force-push therefore **fails the run** instead of quietly moving the baseline underneath every future comparison.
 
@@ -153,7 +160,7 @@ When the scored context was corrected to a real 131,072:
 | llama.cpp | 18.32 | 18.44 | ~0% |
 | sparkinfer-k3, as first measured | 10.34 | **1.00** | **−90%** |
 
-llama.cpp keeps a compressed MLA cache (`kv_lora` 512, f16) and holds its rate essentially flat with depth. SparkInfer reduced over 576 f32 values per token in a kernel with **one block per head** — so its cost grew with depth while the reference's did not.
+Both representations are compressed latent MLA caches. The earlier SparkInfer path used 576 F32 values and one block per head, while the reference used a smaller F16 representation and different parallelization. The reference curve is nearly flat over these measured workloads; this does not make full attention constant-cost in context length.
 
 **Scoring at 64 hid an 18× gap behind a 1.8× one, and pointed the incentive at a context nobody runs.** That single sentence is the reason [Lecture 02](Lecture-02.md) comes before every optimization lecture in this part, and the reason [Lecture 06](Lecture-06.md) exists at all.
 
@@ -173,9 +180,9 @@ Here it is, in order, at the real 131,072-token scored context:
    llama.cpp on the same box, same weights, throughout:  18.4435
 ```
 
-Seventeen recorded advances. Read three things off that sequence:
+Seventeen values, hence **sixteen transitions** in the displayed sequence. Read three things off that sequence:
 
-**There is no 60× change in it.** The largest single step is the first (4.5×) and the second (2.0×); after that the biggest is 16.06 → 17.46 at +8.7%, and most are 3–12%. The 60× is a *product*, not a discovery. This is the single most important structural fact about real optimization work and the reason the reward system pays marginal gains.
+**There is no 60× change in it.** The first two transitions are 4.53× and 2.00×; the next, 9.04 → 16.06, is another **77.7%**. Later large steps include 22.12 → 26.09 (**17.9%**). The 60× is a *product*, not a discovery. This is the single most important structural fact about real optimization work and the reason the reward system pays marginal gains.
 
 **It crosses the reference around 18.88.** Everything before that is catching up; everything after is a lead. The tier system changes character at that crossing — see [Lecture 02 §4](Lecture-02.md).
 
@@ -195,7 +202,7 @@ The frontier is measured on `main` after a merge; a PR's own claim is a separate
 | [#96](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/96) | `l` | 2-D MoE sharding — expert groups × FFN band (**+12.1%**) | [L07](Lecture-07.md) |
 | [#107](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/107) | `l` | warp-budget projection tier, banded LM head, one-rendezvous all-reduce (**+15.9%**) | [L04](Lecture-04.md), [L07](Lecture-07.md) |
 | [#114](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/114) | `l` | overlap independent work inside each decode layer — 41.31 → 47.00 | [L08](Lecture-08.md) |
-| [#127](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/127) | `xl` | widen the decode path's small-grid launches — 48.87 → 59.26 | [L04](Lecture-04.md) |
+| [#127](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/127) | `xl` | widen small-grid launches **and depth-gated approximate expert skipping** — 48.87 → 59.26 | [L04](Lecture-04.md) |
 
 Note which families appear: **attention shape** (three of the four `xl`s), **launch geometry**, **graph residency**, **quantized projection paths**, and **expert sharding**. Not one of them is "a better matmul." That distribution is the actual curriculum of Lectures 04–08.
 
@@ -224,7 +231,7 @@ The reason for the switch, from the contribution guide: decode was the right thi
 
 Both rows belong in the headline. An engine that reports only the row it wins is doing marketing; the interesting engineering question — what is left — lives in the row it loses.
 
-Note also that 99.68 is **real but unsealed**: no eval round has measured it, so the pinned frontier deliberately holds at 69.02, the last attested value. That distinction between *measured* and *attested* is the subject of [Lecture 02](Lecture-02.md).
+Note also that 99.68 is **author-reported but unsealed**: no eval round has measured it, so the pinned frontier deliberately holds at 69.02, the last attested value. That distinction between *measured* and *attested* is the subject of [Lecture 02](Lecture-02.md).
 
 ---
 
@@ -237,8 +244,9 @@ Because gains multiply, the intuition most engineers carry into optimization wor
    twenty changes, each  +5%          1.05^20  =  2.7x
    ONE change of +200%, then nothing              3.0x
 
-   the seventeen recorded decode advances, compounded:
-       1.00 -> 46.48   =   46x        (mean step ~ +25%, median ~ +7%)
+   the sixteen displayed decode transitions, compounded:
+       1.00 -> 46.48   =   46.48x
+       arithmetic mean +40.14%; median +10.39%; geometric mean +27.12%
 ```
 
 Two consequences for how you spend a month:
@@ -246,7 +254,7 @@ Two consequences for how you spend a month:
 * **A 5% win that ships beats a 40% win that does not.** Seven 5% wins is 1.41×; the 40% you never finished is 1.0×.
 * **The reward system has to pay marginal gains, or it pays for nothing.** This is why the case-study repo pays `delta / frontier` rather than rank: "copy the leader + ε" pays ≈ ε. Any incentive that rewards *position* rather than *increment* funds the twentieth reimplementation of the first optimization.
 
-And one consequence for how you *report* a month: the honest form of "we got 60×" is the ladder, not the ratio. The ratio is unfalsifiable; the ladder can be audited row by row, which is why it is the artifact this part asks you to produce.
+And one consequence for how you *report* a month: the honest form of "we got 60×" is the ladder, not the ratio. The ratio can be checked against its endpoints; the ladder additionally lets us audit attribution row by row, which is why it is the artifact this part asks you to produce.
 
 ---
 
@@ -273,7 +281,16 @@ Pass criterion: a one-page `SHAPE.md` in your artifact repo, committed **before*
 3. A colleague's baseline is a pinned PR branch on a third-party fork. Name two ways that baseline can silently change, and the assertion that catches each.
 4. The llama.cpp reference pin was corrected 16.7026 → 18.4435, making every awarded tier ~9.4% smaller. Nobody's code changed. Argue for or against retroactively re-scoring the already-merged PRs.
 5. An engine reports "3.26× faster than the reference." What are the four questions you ask before believing it applies to your deployment?
-6. Why does pinning an IQ1_S measurement into a quant-unqualified baseline slot understate future gains *permanently*, rather than just once?
+6. Why does pinning an IQ1_S measurement into a quant-unqualified baseline slot bias future gains until the slot is corrected, rather than just once?
+
+## Answers
+
+1. Counting only three routed-expert matrices per expert and 92 MoE layers gives `92×16×3×3584×3072×0.2 = 9.724 GB/token` at a hypothetical uniform 1.6 bits/weight. An ideal 38.4 TB/s aggregate bound is about 3949 tok/s. It omits scales, non-expert traffic, cache state, imbalance, and heterogeneous formats; it is not an attainable target or proof that memory is irrelevant. A bound below a trustworthy measurement means at least one modeling assumption is wrong.
+2. Depth-dependent work becomes important; profile attention/cache work first. The four numbers do not identify the specific kernel or prove that the reference has constant-cost attention.
+3. The PR ref can move: assert its full SHA. Weight artifacts can be re-uploaded: verify the manifest and every shard hash, not just names/counts.
+4. Correct the ledger transparently while retaining the original result and denominator. Whether to change historical rewards is a governance policy, not a mathematical consequence; do not silently rewrite provenance.
+5. Ask which model/quantization, input/context/batch and approximation settings, hardware/runtime, and measurement boundary/reference produced the ratio. Check whether the prefix was real or synthetic.
+6. Every later comparison reading the mislabeled slot inherits its wrong meaning until repaired. The bias is not literally permanent, and quantization size alone does not guarantee which engine is faster.
 
 ---
 
@@ -301,5 +318,5 @@ SparkInfer-K3 at `7689cc7`; reference `unslothai/llama.cpp` PR #48 @ `efc8bc38`;
 
 ## Next
 
-* Next: [Lecture 02 — The scoreboard: a benchmark that cannot be gamed](Lecture-02.md)
+* Next: [Lecture 02 — The scoreboard: a benchmark designed to resist gaming](Lecture-02.md)
 * Up: [Part 4 — Optimizing a Real Engine](README.md)

@@ -1,0 +1,16 @@
+{
+  "reviewed_utc": "2026-10-18T21:01:14.076730+00:00",
+  "tests_passed": 11,
+  "actual_crypto_tests": 6,
+  "openssl": "3.0.13",
+  "python": "3.12.3",
+  "source_sha256": {
+    "test_signed_update.py": "d1a8d9038e98b05353a690e2bc5594f2b10f0e7bf1d0121f5678e1b904296f51",
+    "signed_update.py": "e376ddfd81715b81939ef958e8a339e4bb6d768be5cfebaeba1d57f5ffcb3e06"
+  },
+  "limits": [
+    "local synthetic artifact only",
+    "no trusted hardware counter",
+    "no disk encryption, fuse provisioning, device boot, or installation"
+  ]
+}

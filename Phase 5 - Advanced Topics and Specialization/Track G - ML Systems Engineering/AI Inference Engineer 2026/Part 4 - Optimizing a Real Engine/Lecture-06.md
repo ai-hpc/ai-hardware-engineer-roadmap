@@ -1,10 +1,13 @@
 # Part 4 · Lecture 06 — Attention at 128k: Split Over Context, Split Over Heads
 
+**Practice:** [CPU source lab](CPU-Source-Lab.md). Historical GPU results are source reports; use the **Answers** after attempting the self-check.
+
+
 ## Overview
 
 This is where the 18× gap lived.
 
-At context 64 the engine was 1.8× behind the reference. At 131,072 it was **18× behind** — 1.01 tok/s against 18.44 — and the reference's rate was essentially *flat* across that whole range. All of that divergence was one kernel: `attn_mla` consumed **69.2% of decode at 128k**, and it was structured in a way that could not scale with depth.
+At context 64 the engine was 1.8× behind the reference. At 131,072 it was **18× behind** — 1.01 tok/s against 18.44 — and the reference's rate was essentially *flat* across that whole range. A major contributor was one kernel: `attn_mla` consumed **69.2% of decode at 128k**, and it was structured in a way that could not scale with depth.
 
 Three pull requests took it from 1.01 to 15.93 tok/s — **15.8×** — with no change to the mathematics of attention. Each one found a different axis to parallelize:
 
@@ -31,9 +34,9 @@ The original `mla_decode_attn_kernel` gave **each of 96 heads a single thread bl
    time per layer ∝ n_ctx,  with 27% of the GPU idle throughout
 ```
 
-Two independent defects stacked. **Occupancy**: 96 blocks on 132 SMs, and no arrangement of 96 fills 132. **Serial depth**: every block's runtime grows linearly with context, because the sequence dimension is walked rather than parallelized.
+Two independent defects stacked. **Grid coverage**: 96 blocks on 132 SMs, and no arrangement of 96 fills 132. **Serial depth**: every block's runtime grows linearly with context, because the sequence dimension is walked rather than parallelized.
 
-The reference engine did not have this problem because it kept a *compressed* MLA cache (`kv_lora` 512, f16) and a kernel that parallelizes over depth. Hence the flat curve. This is precisely the divergence [Lecture 03 §5](Lecture-03.md) says to look for: **your candidate's cost grows with a dimension the reference's does not.**
+Both engines use compressed latent MLA state. The reference uses a smaller F16 layout and different kernels. Its nearly flat measured curve does not make its attention complexity independent of context. This is precisely the divergence [Lecture 03 §5](Lecture-03.md) says to look for: **your candidate's observed cost grows much more strongly over the measured range.**
 
 ### 1.1 The number that names the bug
 
@@ -74,21 +77,22 @@ Each block runs the same online softmax over a **contiguous** slice of the conte
    m   = max_i  m_i
    l   = Σ_i    l_i  · exp(m_i − m)
    acc = Σ_i    acc_i · exp(m_i − m)
+   output = acc / l    # acc_i is an UNNORMALIZED weighted value sum
 ```
 
 This is the online-softmax rescaling of FlashAttention, applied *across blocks* rather than across tiles within a block. Each partial carries its own running max `m_i` and normalizer `l_i`; the merge rescales every partial to a common maximum before summing. It is exact up to floating-point reassociation.
 
 Six implementation decisions in that PR, each worth naming because each closes a real failure:
 
-**Contiguous slices, not strided.** *"Contiguous rather than strided so each block's cache walk stays sequential for the prefetcher."* Strided assignment would give perfect load balance and destroy locality. At batch 1 over a 302 MB cache, locality wins.
+**Contiguous slices, not strided.** *"Contiguous rather than strided so each block's cache walk stays sequential for the prefetcher."* Strided assignment can trade spatial locality for balance depending on thread mapping and memory layout; verify actual transactions rather than assuming every strided layout is worse. At batch 1 over a 302 MB cache, locality wins.
 
-**The output projection moves into the combine.** `wv_b` needs the *merged* latent, so it cannot run per-slice. Recognizing which downstream op is a function of the combined result — rather than of each partial — is the part of split-K that is easy to get wrong.
+**The output projection moves into the combine.** This implementation applies `wv_b` to the normalized merged latent. Because the projection is linear, a mathematically valid alternative can project appropriately weighted partials before the merge, but must preserve the common softmax normalization and usually costs more work. Recognizing which downstream op is a function of the combined result — rather than of each partial — is the part of split-K that is easy to get wrong.
 
 **Gate the split below a threshold.** Split only above `kMlaSplitMinCtx` (4096): *"below it the combine pass and extra global round trip cost more than the parallelism buys, and the un-split kernel stays the one the numeric test pins."* A split adds a kernel launch and a round trip through global memory. At short context those exceed the parallelism gained.
 
-**Per-device scratch, not one global allocation.** The bug this prevents is worth quoting in full because it is a *tensor-parallel* trap, not an attention one: *"a single static pointer is allocated by whichever rank arrives first and then dereferenced by the other seven on devices it does not belong to."* Eight ranks, eight devices, one `static` pointer — and seven ranks reading memory that belongs to another device.
+**Per-device scratch, not one global allocation.** The bug this prevents is worth quoting in full because it is a *tensor-parallel* trap, not an attention one: *"a single static pointer is allocated by whichever rank arrives first and then dereferenced by the other seven on devices it does not belong to."* Eight ranks, eight devices, one `static` pointer — and seven ranks potentially using an allocation from the wrong device. A per-device buffer is still insufficient for overlapping requests unless its stream/event ownership and lifetime prevent concurrent reuse.
 
-**Empty slices must be neutral, not `NaN`.** When `n_ctx < splits`, some slices have no work. They set `l = 0, m = -1e30` so their `exp(m_i − m)` contributes zero. Left uninitialized, `exp(-inf - -inf)` gives `NaN`, and one `NaN` in the merge poisons the token.
+**Empty slices need an explicit contract.** The historical kernel uses `l=0, m=-1e30`. A finite sentinel is only safe under an appropriate score-range contract; extreme valid scores can defeat it. A robust merge ignores zero-count/zero-denominator partials and handles the all-empty/all-masked case explicitly, avoiding `exp(-inf - -inf)`. Test tail slices and exceptional inputs.
 
 **Shared memory is `O(key_length + kv_lora + tile)`, never `O(n_ctx)`.** This matters because [PR #33](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/33) had just fixed a bug where the kernel *"sized dynamic shared memory by context length"* — which is why *"MLA decode attention silently stops launching past ~11.7k context."* Shared memory per block has a hard cap; any allocation that scales with context has a context at which the launch fails. See §5.3 and [Lecture 10 §4.4](Lecture-10.md).
 
@@ -112,9 +116,9 @@ And then the pleasant surprise:
 
 > *It happens to land **~4× more accurate** at n_ctx=20000 (relL2 3.734e-07 vs 1.607e-06), because **per-slice partials are effectively pairwise summation**.*
 
-Summing 131,072 terms sequentially into one f32 accumulator accumulates rounding error roughly as `O(n)`. Summing them in 64 independent partials and then combining is a two-level tree — the error term drops toward `O(log n)`. **Splitting for parallelism gives you pairwise summation for free.**
+Summing 131,072 terms sequentially into one f32 accumulator accumulates rounding error roughly as `O(n)`. With S sequential partials and a sequential combine, the summation path length is approximately n/S + S, not log₂(n). A fully balanced binary reduction has logarithmic depth. Softmax rescaling adds further rounding operations; compare measured error and numerical bounds separately.
 
-> **When you split a long reduction, expect accuracy to improve, not degrade.** If it degrades, your combine is wrong. This is a useful sanity check on any split-K implementation, and it inverts the instinct that "not bit-identical" means "worse."
+> **Splitting can improve error bounds, but does not guarantee a smaller error for every input.** A worse fixture can result from legal reassociation; validate against a higher-precision reference before diagnosing an incorrect combine. This is a useful sanity check on any split-K implementation, and it inverts the instinct that "not bit-identical" means "worse."
 
 ---
 
@@ -135,7 +139,7 @@ The profile is presented with a phase that the PR *does not touch*:
 
 > *"**`attn_kda` is the control.** This PR does not touch it, and across a separate build and run it moved by 0.07%. **One phase falling 6.8× while its neighbour sits still is what distinguishes a real effect from a harness artefact.**"*
 
-If a rebuild, a driver change, or box drift were responsible for the improvement, *everything* would move. A neighbouring phase that reproduces to 0.07% across separate builds and runs establishes that the harness is stable and the effect is localized.
+Different kernels can respond differently to clock, cache, compiler, or driver changes. A stable control phase strengthens localization but does not prove every confounder absent. A neighbouring phase that reproduces to 0.07% across separate builds and runs establishes that the harness is stable and the effect is localized.
 
 > **Steal this.** Every profile comparison should name a phase you did not touch and report it. It costs nothing and it is the difference between "this phase got faster" and "this run was faster."
 
@@ -152,7 +156,7 @@ The context sweep includes rows the PR cannot affect, and the author uses them a
    ctx 128k  990.98 → 220.94 ms   +349%
 ```
 
-> *"Read the 128 and 4k rows as neutral, not as wins. Below `kMlaSplitMinCtx` the split path is gated off and **both builds run the same code**, so the 2.2% at ctx 128 is a direct measurement of this node's run-to-run spread. That puts the noise floor near 2%, which makes the 4k row (+1.1%) **not a result.** The claims worth scoring are 8k and 128k, which are 9× and 200× that floor."*
+> *"Read the 128 and 4k rows as neutral, not as wins. Below `kMlaSplitMinCtx` the split path is gated off and **both builds run the same code**, so the 2.2% at ctx 128 is one observation of this node's run-to-run spread. That puts the noise floor near 2%, which makes the 4k row (+1.1%) **not a result.** The claims worth scoring are 8k and 128k, which are 9× and 200× that floor."*
 
 This is a genuinely elegant trick. A gated-off code path gives you an **A/A test embedded inside your A/B test**: same binary, same command, same box, identical code, so any difference is pure measurement noise. You get your noise floor from the same run that produces your result, on the same hardware, at the same moment.
 
@@ -160,7 +164,7 @@ Then the same discipline is applied *against* the author's own change. The launc
 
 > *"so the honest claim is 'no measurable cost', not '0.8% cost'."*
 
-A number smaller than your noise floor is not a small number. It is *no number*. Reporting it as 0.8% would overstate the precision of the measurement in the direction that makes the author look careful — which is still overstating it.
+An effect smaller than the observed spread is unresolved by that sample; repeated paired measurements can improve precision. Reporting it as 0.8% would overstate the precision of the measurement in the direction that makes the author look careful — which is still overstating it.
 
 ### 3.3 Reasoning when the tool is unavailable
 
@@ -178,9 +182,9 @@ A number smaller than your noise floor is not a small number. It is *no number*.
        parallelism like this."
 ```
 
-Two moves: **act on what competing hypotheses agree about**, and **let the outcome discriminate between them.** A bandwidth-limited kernel does not get 4.5× faster from more blocks — the bytes are the bytes. Getting 4.5× from parallelism alone is itself the evidence that the kernel was latency- and occupancy-limited.
+The intervention supports the hypothesis that the old kernel exposed too little useful parallelism. It does **not** eliminate bandwidth as a limiting resource: more blocks can improve achieved bandwidth, memory-level parallelism, and cache behavior. Neither 96/132 grid coverage nor an end-to-end speedup is a resident-warp occupancy measurement.
 
-> **A missing profiler is not a blocked investigation.** Find the intervention every candidate explanation predicts will help, do it, and use the magnitude of the response to identify which explanation was right.
+When performance counters are unavailable, report this as a supported hypothesis. Record the before/after kernel shape, cache layout, elapsed time, and missing measurements; avoid claiming that all competing memory explanations have been disproved.
 
 ---
 
@@ -196,13 +200,13 @@ This is the same reuse-versus-occupancy tension as [Lecture 05 §2.3](Lecture-05
 | **12** | **133.9** | 125 | 2 |
 | 16 | 149.9 | 148 | **1** |
 
-> *why 12 heads per block and not more: 16 **halves traffic again and loses to occupancy**.*
+> *why 12 heads per block and not more: 16 **reduces nominal cache passes by 25% versus 12 and loses on elapsed time**.*
 
-Sixteen heads per block reads the cache 6 times per layer instead of 8 — strictly less memory traffic — and is **12% slower**, because 148 registers per thread means only **one block resident per SM** instead of two. With one block per SM there is nothing to overlap its memory latency against.
+Sixteen heads per block reads the cache 6 times per layer instead of 8 — strictly less memory traffic — and is **12% slower**, because 148 registers per thread means only **one block resident per SM** instead of two. One block may still contain many independent warps; reduced residency can nevertheless reduce latency hiding.
 
-This is the register-pressure cliff, and it is a *step function*, not a gradient. Occupancy is `floor(registers_per_SM / registers_per_block)`; crossing a threshold halves your resident blocks in one step. Sweeping 8 → 12 → 16 and reporting registers alongside the timing is what makes the mechanism visible rather than mysterious.
+This is the register-pressure cliff, and it is a *step function*, not a gradient. A simplified register-only resident-block bound is `floor(registers_per_SM / registers_per_block)`; actual occupancy also includes allocation granularity, warp, thread, shared-memory, and block limits; crossing a threshold halves your resident blocks in one step. Sweeping 8 → 12 → 16 and reporting registers alongside the timing is what makes the mechanism visible rather than mysterious.
 
-> **Steal this.** When tuning a tile or batch width, report **register count and blocks-per-SM** next to each timing. The optimum is almost always the largest tile that stays on the current side of an occupancy step — and you can compute where that step is from `-Xptxas -v` instead of discovering it by sweeping.
+> **Steal this.** When tuning a tile or batch width, report **register count and blocks-per-SM** next to each timing. The largest tile before an occupancy step is a useful candidate, not a universal optimum — and you can compute where that step is from `-Xptxas -v` instead of discovering it by sweeping.
 
 ### 4.1 Attributing a stacked change
 
@@ -237,7 +241,8 @@ Head-sharding divides `n_head` by `tp_size`. The attention grid is `n_head × sp
 
 ```text
    BEFORE shard:  96 heads × S splits   →  plenty of blocks
-   AFTER  shard:  12 heads × S splits   →  64 blocks. starved.
+   AFTER  shard:  head count shrinks; inspect the actual batched-head grid.
+                 12 × an integer S cannot equal 64; the simple formula omits batching.
    FIX: budget the cap on the PRODUCT, so S grows as n_head shrinks.
 ```
 
@@ -273,7 +278,7 @@ And the guard immediately earned its place, catching a bug in the very PR that i
 
 > *An error inside NCCL's collective, naming a layer with nothing wrong with it, pointing nowhere near the faulting kernel.*
 
-CUDA errors are **sticky**: an error raised by one launch is returned by the *next* API call that checks. Without per-phase polling, the first thing to check is the collective — so a broken attention kernel at layer 5 is reported as an all-reduce failure at layer 33. Per-phase polling converts a misleading error into a located one.
+CUDA APIs may report earlier asynchronous failures. `cudaGetLastError()` retrieves/clears the host thread's last-error state and detects launch setup failures, but does not wait for a kernel. Device execution faults require checking completion at suitable stream/event synchronization boundaries. Some execution failures leave the context unusable. Per-phase checks help localize faults; they do not make every asynchronous error immediately visible.
 
 > **In a long chain of unchecked async launches, the error surfaces at the first checkpoint, not the fault.** The value of frequent polling is not detection — it is *localization*.
 
@@ -295,7 +300,7 @@ So the author ran `compare_logits.py` at 128k across all 8 ranks — the numbers
 
 > *"The gate runs at n_ctx 4, below `kMlaSplitMinCtx`, so it takes the same per-head kernel main takes — **which is what makes it a bit-identity check on the projection, `attn_res_mix` and KDA changes, all of which do run there.**"*
 
-The same PR touched changes that *do* execute at short context. So the gate reporting `mean_kld` equal to `main` **to the last digit** (`0.0040455027115537685`) is a genuine bit-identity proof — of the subset it reaches. Knowing precisely which of your changes a gate validates, and claiming exactly that much, is better than either ignoring the gate or over-claiming it.
+The same PR touched changes that execute at short context. Equal printed `mean_kld` values are agreement of one aggregate metric, **not** proof of byte-identical logits. Different distributions can have the same KL; compare the actual arrays for a byte-identity claim. Knowing precisely which of your changes a gate validates, and claiming exactly that much, is better than either ignoring the gate or over-claiming it.
 
 **#57 and #63 — extend the tests to reach the unreachable path.**
 
@@ -360,14 +365,27 @@ Pass criterion: a committed depth curve for both engines, a measured noise floor
 
 1. A kernel launches 96 blocks, each walking `n_ctx` positions serially, on a 132-SM GPU. Name the two independent defects and say which one explains the *slope* of the depth curve.
 2. MLA compresses KV to one shared latent per position. Explain how a one-block-per-head kernel converts that advantage into a 96× penalty.
-3. Derive the split-attention combine from the online-softmax recurrence. Why must the output projection run *after* the merge rather than per slice?
+3. Derive the split-attention combine from the online-softmax recurrence. Where does normalization occur, and under what conditions could a linear projection instead be applied to weighted partials?
 4. Your split path is not bit-identical and is *more* accurate than the unsplit version at long context. Explain, and say what it would mean if it were less accurate.
 5. You measure +2.2% at a context where your new code path is gated off. What have you measured, and what does it imply about a +1.1% result elsewhere in the same table?
-6. `ncu` is unavailable. You have two hypotheses — bandwidth-bound and latency-bound. Describe the intervention that is justified under both, and how its outcome tells you which was right.
+6. `ncu` is unavailable. You have two hypotheses — bandwidth-bound and latency-bound. Describe the intervention that is justified under both, and what its outcome supports, and which explanations remain unresolved.
 7. 16 heads per block reads the cache less than 12 and is 12% slower. Give the mechanism and the two numbers you would report to prove it.
 8. Head-sharding cuts per-rank attention work 8× and yields less than 8×. Give two reasons, one of which is not the collective.
 9. A CUDA error from a bad attention launch at layer 5 is reported as an all-reduce failure at layer 33. Explain the mechanism and the fix.
 10. Your test for a split-merge invariant has passed since it was written. Describe the one addition that would tell you whether it can fail at all.
+
+## Answers
+
+1. Limited grid coverage and a long per-block context walk; the latter directly explains increasing work with depth. Actual occupancy still needs resource measurements.
+2. There can be 96 logical reads of the shared latent. This is not automatically 96× HBM traffic or runtime, because caches and scheduling may reuse data.
+3. Merge maxima, rescale each unnormalized numerator and denominator, then divide the merged numerator by its denominator. A shared linear projection can commute with a correctly weighted merge; applying it after merging usually avoids repeated work.
+4. Shorter reduction paths can reduce error, but legal reassociation can improve or worsen individual inputs. Compare with high precision; a worsening result alone does not prove a bug.
+5. You observed control-path variation. The 1.1% result is unresolved by those samples; repeated paired runs can improve precision.
+6. Expose more independent work while keeping arithmetic/bytes controlled. Improvement supports insufficient parallelism, but can also improve achieved bandwidth or caching; it does not uniquely identify a mechanism.
+7. Increased registers can reduce resident blocks. Report compiler resources, actual block dimensions/residency, and elapsed time; 16 versus 12 heads reduces nominal passes by 25%, not 50%.
+8. Added collectives and a smaller per-rank grid; unchanged replicated work and packing can also limit scaling.
+9. CUDA work is asynchronous, so later APIs may report earlier failures. Check launch status immediately and completion at explicit stream/event synchronization boundaries; use sanitizer tools for device faults. `cudaGetLastError` alone does not prove successful execution.
+10. Inject a known bad normalization, slice omission, or permutation and require the invariant test to fail, including empty/tail slices.
 
 ---
 

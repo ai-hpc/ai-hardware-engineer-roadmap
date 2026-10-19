@@ -1,0 +1,24 @@
+{
+  "catalog_sha256": "94a4baa516767517533e54da6ed1f3af552e8f542212cfc62d9105dae9020064",
+  "outputs": {
+    "simple": [
+      "[{\"arguments\":{\"a\":2,\"b\":3},\"name\":\"add\"}]"
+    ],
+    "selection": [
+      "[{\"arguments\":{\"level\":60,\"room\":\"office\"},\"name\":\"set_level\"}]"
+    ],
+    "parallel": [
+      "[{\"arguments\":{\"a\":1,\"b\":2},\"name\":\"add\"},{\"arguments\":{\"a\":3,\"b\":4},\"name\":\"add\"}]"
+    ],
+    "mixed": [
+      "[{\"arguments\":{\"level\":80,\"room\":\"kitchen\"},\"name\":\"set_level\"},{\"arguments\":{\"a\":8,\"b\":9},\"name\":\"add\"}]"
+    ],
+    "none": [
+      "[]"
+    ],
+    "turns": [
+      "[{\"arguments\":{\"level\":30,\"room\":\"office\"},\"name\":\"set_level\"}]",
+      "[{\"arguments\":{\"level\":60,\"room\":\"office\"},\"name\":\"set_level\"}]"
+    ]
+  }
+}

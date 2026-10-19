@@ -1,0 +1,119 @@
+{
+  "checked_utc": "2026-10-18T23:49:21.636520+00:00",
+  "python": "3.12.3",
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "portable_tests": 4,
+  "cryptographic_tests": 19,
+  "hardware_attestation": false,
+  "vendor_commands_executed": false,
+  "runs": [
+    {
+      "command": [
+        "/usr/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        ".",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/labs",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "test_duplicate_and_noncanonical_values (test_binding.TranscriptTests.test_duplicate_and_noncanonical_values) ... ok\ntest_length_ambiguity_removed (test_binding.TranscriptTests.test_length_ambiguity_removed) ... ok\ntest_order_and_full_field_binding (test_binding.TranscriptTests.test_order_and_full_field_binding) ... ok\ntest_resource_bound (test_binding.TranscriptTests.test_resource_bound) ... ok\n\n----------------------------------------------------------------------\nRan 4 tests in 0.000s\n\nOK\n"
+    },
+    {
+      "command": [
+        "/tmp/course-attestation-venv/bin/python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "optional",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/labs",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "test_all_device_expiries_rechecked_at_authorization (test_crypto_binding.CryptoBindingTests.test_all_device_expiries_rechecked_at_authorization) ... ok\ntest_attacker_controlled_signing_key (test_crypto_binding.CryptoBindingTests.test_attacker_controlled_signing_key) ... ok\ntest_authentic_bad_policy (test_crypto_binding.CryptoBindingTests.test_authentic_bad_policy) ... ok\ntest_caller_mutation_cannot_change_authenticated_authorization (test_crypto_binding.CryptoBindingTests.test_caller_mutation_cannot_change_authenticated_authorization) ... ok\ntest_claim_expiry_during_verification_does_not_consume_challenge (test_crypto_binding.CryptoBindingTests.test_claim_expiry_during_verification_does_not_consume_challenge) ... ok\ntest_claim_not_before_rechecked_after_clock_moves_backward (test_crypto_binding.CryptoBindingTests.test_claim_not_before_rechecked_after_clock_moves_backward) ... ok\ntest_claim_time_and_schema (test_crypto_binding.CryptoBindingTests.test_claim_time_and_schema) ... ok\ntest_concurrent_single_authorization (test_crypto_binding.CryptoBindingTests.test_concurrent_single_authorization) ... ok\ntest_expiry_boundary_and_future (test_crypto_binding.CryptoBindingTests.test_expiry_boundary_and_future) ... ok\ntest_failure_does_not_consume_pending_challenge (test_crypto_binding.CryptoBindingTests.test_failure_does_not_consume_pending_challenge) ... ok\ntest_full_cpu_binding_checked (test_crypto_binding.CryptoBindingTests.test_full_cpu_binding_checked) ... ok\ntest_mixed_sessions_same_authority (test_crypto_binding.CryptoBindingTests.test_mixed_sessions_same_authority) ... ok\ntest_multi_device_inventory (test_crypto_binding.CryptoBindingTests.test_multi_device_inventory) ... ok\ntest_possession_failure (test_crypto_binding.CryptoBindingTests.test_possession_failure) ... ok\ntest_round_trip_and_replay (test_crypto_binding.CryptoBindingTests.test_round_trip_and_replay) ... ok\ntest_signature_is_not_computation_truth (test_crypto_binding.CryptoBindingTests.test_signature_is_not_computation_truth) ... ok\ntest_tamper_signed_payload (test_crypto_binding.CryptoBindingTests.test_tamper_signed_payload) ... ok\ntest_transcript_substitution (test_crypto_binding.CryptoBindingTests.test_transcript_substitution) ... ok\ntest_valid_signed_wrong_binding (test_crypto_binding.CryptoBindingTests.test_valid_signed_wrong_binding) ... ok\n\n----------------------------------------------------------------------\nRan 19 tests in 0.141s\n\nOK\n"
+    },
+    {
+      "command": [
+        "/tmp/course-attestation-venv/bin/python",
+        "binding_lab.py",
+        "--output",
+        "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/evidence/cpu-run-2026-10-18.json"
+      ],
+      "cwd": "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/labs",
+      "exit_code": 0,
+      "stdout": "{\n  \"hardware_attestation\": false,\n  \"cases\": [\n    {\n      \"case\": \"valid\",\n      \"result\": {\n        \"accepted\": true,\n        \"model\": \"166fe0094fb0afb104b2d11e3b9d2d65a9959b6b984b00d2cbdedc1a2c25ea37\",\n        \"devices\": [\n          \"gpu-demo-0\"\n        ],\n        \"hardware_attestation\": false,\n        \"scope\": \"locally signed teaching fixtures\"\n      }\n    },\n    {\n      \"case\": \"replay\",\n      \"rejected\": \"unknown-or-consumed-challenge\"\n    },\n    {\n      \"case\": \"tampering\",\n      \"rejected\": \"signature\"\n    },\n    {\n      \"case\": \"authentic-disallowed-debug\",\n      \"rejected\": \"policy\"\n    },\n    {\n      \"case\": \"authentic-wrong-session\",\n      \"rejected\": \"binding\"\n    },\n    {\n      \"case\": \"expired-challenge\",\n      \"rejected\": \"challenge-time\"\n    },\n    {\n      \"case\": \"wrong-session-key\",\n      \"rejected\": \"possession\"\n    },\n    {\n      \"case\": \"missing-gpu\",\n      \"rejected\": \"device-inventory\"\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/tmp/course-attestation-venv/bin/python",
+        "-m",
+        "pip",
+        "check"
+      ],
+      "cwd": "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/labs",
+      "exit_code": 0,
+      "stdout": "No broken requirements found.\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/scripts/check_links.py",
+        "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation"
+      ],
+      "cwd": "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/labs",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "\n0 broken link(s)\n"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation"
+      ],
+      "cwd": "/home/speedy/ai-hpc/ai-hardware-engineer-roadmap/Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/labs",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "source_files": [
+    {
+      "file": "labs/binding.py",
+      "sha256": "c5c8bc8ffc8318a1f0f29cca23264fa906d247ee1e71148170cf8317e47225fb"
+    },
+    {
+      "file": "labs/binding_lab.py",
+      "sha256": "ca63928387f1e70d56c284fc4ca543342e5ffefd13859392dd4448cae252454e"
+    },
+    {
+      "file": "labs/optional/test_crypto_binding.py",
+      "sha256": "d27502704cc50c7bec96f57f92f56fe55ef60592f4f05e0bb6da0c1785ce23b0"
+    },
+    {
+      "file": "labs/requirements-cpu.lock",
+      "sha256": "b415faa3f6571a4ba59197f9b22e5018b7e6ed11ce62e28eb5f7e16c0b33cbd7"
+    },
+    {
+      "file": "labs/test_binding.py",
+      "sha256": "33426cd35e4802c1dcce931177ba943fc6caa15ed36fb51a7681cb144345cbba"
+    },
+    {
+      "file": "labs/wheel-evidence.json",
+      "sha256": "806755f933cbe738e9c580a161b4b1c62440ca3266993d38074f65b3290d75ca"
+    }
+  ]
+}

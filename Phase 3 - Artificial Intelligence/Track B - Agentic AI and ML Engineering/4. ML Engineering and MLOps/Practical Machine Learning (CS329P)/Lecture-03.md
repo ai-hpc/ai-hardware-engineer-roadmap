@@ -89,7 +89,7 @@ Trees are built **top-down and greedily**. Start at the root with all examples a
 | Criterion | Target type | Maximize |
 |---|---|---|
 | **Variance reduction** | Continuous | Drop in target variance after the split |
-| **Information gain** (`1 − entropy`) | Categorical | Reduction in entropy (disorder) |
+| **Information gain** | Categorical | Parent entropy minus sample-weighted child entropies |
 | **Gini impurity** (`1 − Σ pᵢ²`) | Categorical | Reduction in impurity |
 
 All examples at a node participate in choosing its split. The tree stops when a node is pure, too small, or hits a depth limit.
@@ -214,7 +214,7 @@ Then train with **cross-entropy loss**, which compares the predicted distributio
    H(y, ŷ) = − Σᵢ yᵢ · log ŷᵢ = − log ŷ_y
 ```
 
-The elegance: cross-entropy only penalizes the *true* class's predicted probability, so the model stops wasting effort pushing wrong-class logits to any particular value as long as they stay below the right one. Crucially, **softmax regression is still a linear model** — the decision is made on a linear transformation of the input, since `argmaxᵢ ŷᵢ = argmaxᵢ oᵢ`. The softmax is just a smooth, differentiable stand-in for the non-differentiable argmax. The two-class special case of this is **logistic regression**, the most widely deployed classifier in industry.
+The elegance: one-hot cross-entropy is `−log p_true`, but softmax couples all logits: each logit gradient is `p_i − y_i`. Merely ranking the correct class first is not enough; confidence still affects loss. Crucially, **softmax regression is still a linear model** — the decision is made on a linear transformation of the input, since `argmaxᵢ ŷᵢ = argmaxᵢ oᵢ`. The softmax is just a smooth, differentiable stand-in for the non-differentiable argmax. The two-class special case of this is **logistic regression**, the most widely deployed classifier in industry.
 
 ```python
 # Softmax classification head: a dense layer + cross-entropy
@@ -329,12 +329,12 @@ The whole lecture compresses to one decision: match the model family to the *str
 
 | Data type | First choice | Why | Fallback |
 |---|---|---|---|
-| **Tabular** (rows × columns, mixed types) | **Gradient-boosted trees** (XGBoost / LightGBM) | Native mixed types, no preprocessing, beats deep nets on structured data | Random Forest; linear/logistic for a fast interpretable baseline |
+| **Tabular** (rows × columns, mixed types) | **Gradient-boosted trees** (XGBoost / LightGBM) | Strong tabular baseline; encoding, missing-value handling, and supported types depend on implementation | Random Forest; linear/logistic for a fast interpretable baseline |
 | **Images / video** | **CNN** (ResNet, MobileNet) or a vision Transformer | Locality + parameter sharing match image structure | Pretrained backbone as a feature extractor ([L09](Lecture-09.md)) |
 | **Text / language** | **Transformer** (pretrained LLM) | All-pairs attention captures long-range dependence | Linear/logistic on TF-IDF for a cheap, strong baseline |
 | **Time series / sequences** | **Transformer** or **RNN/LSTM** | Need sequential or long-range structure | GBT on lagged/windowed features is shockingly strong |
 | **Audio** | **CNN** on spectrograms or audio **Transformer** | Spectrograms are images; attention for long context | — |
-| **Small data / need interpretability** | **Linear / logistic regression** or a single tree | Few parameters resist overfitting; the model *is* its own explanation | Regularized linear; shallow tree |
+| **Small data / need interpretability** | **Linear / logistic regression** or a single tree | Compact baseline; coefficients depend on scaling, collinearity, and model assumptions | Regularized linear; shallow tree |
 
 Two rules of thumb sit on top of the table. First, **always fit a simple baseline before a complex model** — a regularized linear model or a Random Forest is fast, hard to get wrong, and tells you whether your problem is even tractable and whether the fancy model is earning its complexity (Lecture 04 makes this measurable). Second, **let the data's structure pick the family** before you tune anything: structure → family → model → hyperparameters, in that order.
 
@@ -349,3 +349,6 @@ Two rules of thumb sit on top of the table. First, **always fit a simple baselin
 Written June 2026. The **original CS329P content** — the learning-type taxonomy, the `model + loss + optimization` decomposition, the tree progression (decision tree → Random Forest → boosting), the linear-to-softmax-to-MLP build-up, and the MLP/CNN/RNN architectures with their data-structure motivations — is taught first because it remains the correct working mental model and maps one-to-one onto the 2021 slides. The **refresh layer** flags what moved since: gradient-boosted trees' continued reign over tabular data, the displacement of RNNs by **Transformers** across CV/NLP/audio (with the proper treatment deferred to Lecture 08), the **foundation-model** workflow that turned "train a model" into "fine-tune or prompt a pretrained one" (Lecture 09), and the **branchy-CPU vs. dense-GEMM-accelerator** hardware split that the original slides did not address but that drives Phase 5. Where 2021 framing is dated, the original is presented before the update; nothing is silently rewritten.
 
 *Adapted from [Stanford CS329P](https://c.d2l.ai/stanford-cs329p) — Huang, Li & Smola, CC-BY-SA-4.0.*
+
+
+**Worked loss check:** for a true positive class, probabilities 0.51 and 0.99 both classify correctly at threshold 0.5, but their cross-entropies are about 0.673 and 0.0101 nats. Accuracy and probabilistic loss answer different questions. The [CPU lab](../../../2.%20Deep%20Learning%20Frameworks/PyTorch/CPU-Robot-Stop-Lab/Guide.md) reports both and passes raw logits, rather than pre-softmaxed probabilities, into PyTorch cross-entropy. Reviewed 2026-10-18.

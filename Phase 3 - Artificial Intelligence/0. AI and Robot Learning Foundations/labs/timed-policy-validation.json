@@ -1,0 +1,40 @@
+{
+  "review_date": "2026-10-18",
+  "python": "3.12.3",
+  "new_tests_passed": 18,
+  "combined_foundations_tests_passed": 28,
+  "skipped": 0,
+  "scope": "Actual CPU training and numerical simulation; no physical robot, measured inference timing or network",
+  "tested": [
+    "independent two-step dynamics answer",
+    "capture/transport/inference timeline",
+    "capture-relative expiry over whole held interval",
+    "duplicate does not renew expiry",
+    "wrong session/future/backward timestamps",
+    "nonfinite rejection",
+    "paired initial conditions and episode partitions",
+    "bounded FIFO can still apply stale observations",
+    "latest-only pending work",
+    "sensor outage fallback and recovery",
+    "over-budget inference rejected",
+    "trained policy end-to-end scenarios",
+    "simultaneous arrival/completion selection with hand-calculated state",
+    "accepted-at-deadline results never applied",
+    "applied-command identity/interval metrics",
+    "all existing scenario outcomes reproduced exactly after instrumentation"
+  ],
+  "source_sha256": {
+    "policy_lab.py": "2861d6aa8600ced6e936cc552159545aa85f14c5f3b6f07dfb45ff7fd353dd9a",
+    "timed_policy_lab.py": "e5a0dc6b52fe3cd0d0d882940619d356f888213243a68e70d9361bed3770a828",
+    "test_timed_policy.py": "ca409a1281001e964358dcac597a3b752b8881b535d62dd1815df5dd51eb9b38",
+    "plot_timed_policy.py": "4e64346dc9df2e7ae49c0ee9e65b6fe708325fe3b0ef71e0a55207a956f1fd90"
+  },
+  "unvalidated": [
+    "physical dynamics and actuator response",
+    "physical safety",
+    "real sensor or inference latency",
+    "generalization beyond this synthetic fixture"
+  ],
+  "independent_review_utc": "2026-10-18T22:36:37.520019+00:00",
+  "summary_sha256": "a24adf80d9cb0b965c701b7ac4e7610f6e654a97f8c433646d9fafc7342c429f"
+}

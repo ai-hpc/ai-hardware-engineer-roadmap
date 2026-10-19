@@ -8,6 +8,10 @@ edit_uri: edit/main/
 
 docs_dir: docs
 
+validation:
+  links:
+    anchors: warn
+
 theme:
   name: material
   custom_dir: overrides
@@ -312,10 +316,13 @@ extra_javascript:
 nav:
   - Home:
     - Overview: README.md
+    - Start Here — First Robot and AI Experiments: Start-Here.md
+    - Beginner Reading Aid: Beginner-Reading-Aid.md
     - Physical AI Design Studio: Physical-AI-Design-Studio.md
     - How to Learn: Learning-Guide.md
     - Curriculum Review: Curriculum-Review.md
-    - Course-by-Course Review:
+    - Earlier Course Reviews:
+      - October 13–14 Expansion: Curriculum-Review-2026-10-13-and-14.md
       - Review Scope: Curriculum-Reviews/README.md
       - Foundations and Embedded: Curriculum-Reviews/foundations-embedded.md
       - Models, Robotics, and ML Systems: Curriculum-Reviews/models-robotics-mlsys.md
@@ -337,13 +344,18 @@ nav:
   - "P1–2 · Foundations":
     - Phase 1 — Digital Foundations:
       - Overview: Phase 1 - Foundational Knowledge/Guide.md
+      - Numbers, Shapes, and Bytes Lab: Phase 1 - Foundational Knowledge/Labs/Numbers-Shapes-and-Bytes.md
       - Digital Design:
         - Guide: Phase 1 - Foundational Knowledge/1. Digital Design and Hardware Description Languages/Guide.md
         - Fundamentals: Phase 1 - Foundational Knowledge/1. Digital Design and Hardware Description Languages/Digital Design Fundamentals/Guide.md
+        - Digital Logic CPU Lab: Phase 1 - Foundational Knowledge/1. Digital Design and Hardware Description Languages/Digital Design Fundamentals/labs/README.md
         - HDLs: Phase 1 - Foundational Knowledge/1. Digital Design and Hardware Description Languages/Hardware Description Languages (HDLs)/Guide.md
       - Computer Architecture: Phase 1 - Foundational Knowledge/2. Computer Architecture and Hardware/Guide.md
       - Operating Systems:
         - Guide: Phase 1 - Foundational Knowledge/3. Operating Systems/Guide.md
+        - SPSC Queue CPU Lab: Phase 1 - Foundational Knowledge/3. Operating Systems/labs/SPSC-Queue.md
+        - Build a BPF Tracer: Phase 1 - Foundational Knowledge/3. Operating Systems/labs/BPF-Build-Lab.md
+        - OS Review and Evidence: Phase 1 - Foundational Knowledge/3. Operating Systems/Review-Matrix.md
         - Lectures:
           - "01: Introduction": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-01.md
           - "02": Phase 1 - Foundational Knowledge/3. Operating Systems/Lectures/Lecture-02.md
@@ -383,17 +395,22 @@ nav:
       - C++ & Parallel Computing:
         - Guide: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/Guide.md
         - C++ and SIMD: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/C++ and SIMD/Guide.md
+        - Native SIMD correctness lab: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/C++ and SIMD/labs/README.md
         - OpenMP and oneTBB: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/OpenMP and OneTBB/Guide.md
         - CUDA and SIMT: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/CUDA and SIMT/Guide.md
         - ROCm and HIP: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/ROCm and HIP/Guide.md
         - OpenCL and SYCL: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/OpenCL and SYCL/Guide.md
+        - Execute OpenCL on a CPU: Phase 1 - Foundational Knowledge/4. C++ and Parallel Computing/OpenCL and SYCL/labs/README.md
 
     # ── Phase 2 ─────────────────────────────────────────────────
     - Phase 2 — Embedded Systems:
       - Overview: Phase 2 - Embedded Systems/Guide.md
+      - Observation Freshness Lab: Phase 2 - Embedded Systems/Labs/Observation-Freshness.md
       - Schematic & PCB: Phase 2 - Embedded Systems/1. Schematic Capture and PCB Design/Guide.md
+      - Circuit Tolerances CPU Lab: Phase 2 - Embedded Systems/1. Schematic Capture and PCB Design/CPU-Circuit-Lab.md
       - Embedded Software:
         - Guide: Phase 2 - Embedded Systems/2. Embedded Software/Guide.md
+        - Framed Telemetry C Lab: Phase 2 - Embedded Systems/2. Embedded Software/labs/Framed-Telemetry.md
         - Espressif:
           - Guide: Phase 2 - Embedded Systems/2. Embedded Software/Espressif/Guide.md
           - Arduino-ESP32 Lectures:
@@ -415,6 +432,7 @@ nav:
         - IoT:
           - Guide: Phase 2 - Embedded Systems/2. Embedded Software/IoT/Guide.md
           - OpenThread: Phase 2 - Embedded Systems/2. Embedded Software/IoT/OpenThread/Guide.md
+          - OpenThread CPU Simulation: Phase 2 - Embedded Systems/2. Embedded Software/IoT/OpenThread/labs/CPU-Simulation.md
           - Zigbee:
             - Guide: Phase 2 - Embedded Systems/2. Embedded Software/IoT/Zigbee/Guide.md
             - Lectures:
@@ -428,6 +446,7 @@ nav:
         - Guide: Phase 2 - Embedded Systems/3. Embedded Linux/Guide.md
         - Jetson ESP-Hosted Host Code:
           - Guide: Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Guide.md
+          - Source Reading and Ownership Lab: Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Source-Reading-Lab.md
           - Lectures:
             - Overview: Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Lecture/README.md
             - "01": Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Lecture/Lecture-01.md
@@ -437,6 +456,7 @@ nav:
             - "05": Phase 2 - Embedded Systems/3. Embedded Linux/Jetson ESP-Hosted Host Code/Lecture/Lecture-05.md
         - Yocto:
           - Guide: Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Guide.md
+          - Build a Robot Observation Package: Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Labs/README.md
           - Lectures:
             - Overview: Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/README.md
             - "01": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lecture-01.md
@@ -458,6 +478,7 @@ nav:
             - "Lab: Edge AI Camera": Phase 2 - Embedded Systems/3. Embedded Linux/Yocto/Lecture/Lab-01-Worked-Example-Edge-AI-Camera.md
       - Product Design:
         - Guide: Phase 2 - Embedded Systems/4. Product Design/Guide.md
+        - Product State and Cancellation Lab: Phase 2 - Embedded Systems/4. Product Design/CPU-Product-Contract-Lab.md
         - Lectures:
           - Overview: Phase 2 - Embedded Systems/4. Product Design/Lecture/README.md
           - "01": Phase 2 - Embedded Systems/4. Product Design/Lecture/Lecture-01.md
@@ -469,6 +490,13 @@ nav:
   - "P3–4 · AI Systems":
     - Phase 3 — AI:
       - Overview: Phase 3 - Artificial Intelligence/Guide.md
+      - 0. AI and Robot Learning Foundations:
+        - Guide: Phase 3 - Artificial Intelligence/0. AI and Robot Learning Foundations/Guide.md
+        - Math and Training: Phase 3 - Artificial Intelligence/0. AI and Robot Learning Foundations/01-Math-and-Training.md
+        - Evaluation and Robot Learning: Phase 3 - Artificial Intelligence/0. AI and Robot Learning Foundations/02-Evaluation-and-Robot-Learning.md
+        - CPU Policy Lab: Phase 3 - Artificial Intelligence/0. AI and Robot Learning Foundations/Lab-01-CPU-Policy.md
+        - Timed Robot Loop Lab: Phase 3 - Artificial Intelligence/0. AI and Robot Learning Foundations/Lab-02-Timed-Robot-Loop.md
+        - CPU Physics Engine Lab: Phase 3 - Artificial Intelligence/0. AI and Robot Learning Foundations/Lab-03-CPU-Physics.md
       - 1. Neural Networks:
         - Guide: Phase 3 - Artificial Intelligence/1. Neural Networks/Guide.md
         - "Transformer Fundamentals": Phase 3 - Artificial Intelligence/1. Neural Networks/Transformer Fundamentals/Lecture-01.md
@@ -476,11 +504,13 @@ nav:
         - Guide: Phase 3 - Artificial Intelligence/2. Deep Learning Frameworks/Guide.md
         - micrograd: Phase 3 - Artificial Intelligence/2. Deep Learning Frameworks/micrograd/Guide.md
         - PyTorch: Phase 3 - Artificial Intelligence/2. Deep Learning Frameworks/PyTorch/Guide.md
+        - Train and Export a Robot Stop Classifier: Phase 3 - Artificial Intelligence/2. Deep Learning Frameworks/PyTorch/CPU-Robot-Stop-Lab/Guide.md
         - tinygrad: Phase 3 - Artificial Intelligence/2. Deep Learning Frameworks/tinygrad/Guide.md
       - "Track A: Hardware & Edge AI":
         - 3. Computer Vision: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/3. Computer Vision/Guide.md
         - 4. Sensor Fusion:
           - Guide: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/Guide.md
+          - Camera and Time Fusion Lab: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/Camera-Time-Fusion-Lab/Guide.md
           - Kalibr: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/Kalibr/Guide.md
           - BEVFusion: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/BEVFusion/Guide.md
           - MOT: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/multi-object-tracking/Guide.md
@@ -497,6 +527,18 @@ nav:
             - "09: Tracking Moving Object": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/09-tracking-moving-object.md
             - "10: Matrix Form": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/10-matrix-form.md
             - "11: Multidimensional KF": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/11-multidimensional-kf.md
+            - "12 \u2014 Process noise and measurement noise": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/12-process-measurement-noise.md
+            - "13 \u2014 A complete Kalman update, with numbers": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/13-complete-algorithm.md
+            - "14 \u2014 Extended Kalman filter: linearize the right function": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/14-extended-kalman-filter.md
+            - "15 \u2014 Unscented Kalman filter: propagate a set of representative points": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/15-unscented-kalman-filter.md
+            - "16 \u2014 Error-state filtering: small corrections around a nominal pose": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/16-error-state-kalman-filter.md
+            - "17 \u2014 MSCKF: use a feature track without keeping every landmark": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/17-multi-state-constraint-filter.md
+            - "18 \u2014 Kalman smoothing: use later information to revise an earlier estimate": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/18-kalman-smoothing.md
+            - "19 \u2014 Outlier rejection: test a residual against its uncertainty": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/19-outlier-rejection.md
+            - "20 \u2014 Numerical implementation: preserve the meaning of covariance": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/20-numerical-implementation.md
+            - "21 \u2014 Integrate an estimator into a robot observation pipeline": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/21-real-world-integration.md
+            - "Common estimation mistakes and how to diagnose them": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/common-mistakes.md
+            - "Executable estimation templates": Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/implementation-templates.md
             - 6D Kalman Explained: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/6d-kalman-explained.md
             - Cheat Sheet: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/4. Sensor Fusion/kalman-filter/cheat-sheet.md
         - 5. Voice AI: Phase 3 - Artificial Intelligence/Track A - Hardware and Edge AI/5. Voice AI/Guide.md
@@ -506,6 +548,8 @@ nav:
           - Guide: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Guide.md
           - Lectures:
             - Index: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/README.md
+            - "CPU Provider Protocol Lab": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Provider-Contract-Lab.md
+            - "Lecture Source Evidence": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-Source-Evidence.md
             - "01: The Modern AI Agent in 2026: What Changed": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-01.md
             - "02: What Is an AI Agent Harness? The Runtime Around the Model": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-02.md
             - "03: Building Agents I: Foundations (Model, Tools, Instructions)": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-03.md
@@ -536,7 +580,7 @@ nav:
             - "28: Runtime Strategy for Agent Systems: Node, Bun, Rust, and Edge Packaging": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-28.md
             - "29: Agentic SDLC: Explore Fast, Ship Safely": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-29.md
             - "30: Production Deployment": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-30.md
-            - "31: OpenClaw Case Study: Why Real Agents Need a Gateway": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-31.md
+            - "31: OpenClaw Case Study: When a Gateway Helps": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-31.md
             - "32: OpenClaw Case Study: Channels, Routing, and Session Design": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-32.md
             - "33: OpenClaw Case Study: Multi-Agent Isolation, Workspaces, and Memory": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-33.md
             - "34: OpenClaw Case Study: Operating and Securing a Persistent Agent System": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lecture-34.md
@@ -552,11 +596,13 @@ nav:
             - "Lab 01: Research Agent": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-01-Research-Agent.md
             - "Lab 02: Multi-Agent Pipeline": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-02-Multi-Agent-Pipeline.md
             - "Lab 03: Production RAG": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-03-Production-RAG.md
+            - Local Retrieval and Workflow Lab: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Local-RAG-Workflow-Lab/Guide.md
             - "Lab 04: TokenJuice Output Compaction": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-04-TokenJuice-Output-Compaction.md
             - "Lab 05: OpenMeow App SDK Dogfood": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-05-OpenMeow-App-SDK-Dogfood.md
             - "Lab 06: Capstone — Build genie-claw": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/Lectures/Lab-06-Genie-Claw-Capstone.md
           - "MCP for AI Agents":
             - Overview: Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/MCP for AI Agents/README.md
+            - "Protocol update: 2026-07-28": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/MCP for AI Agents/Protocol-2026-07-28.md
             - "01: Why MCP Exists — The M×N Problem": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/MCP for AI Agents/Lecture-01.md
             - "02: Architecture & Lifecycle — Host, Client, Server": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/MCP for AI Agents/Lecture-02.md
             - "03: Core Primitives — Tools, Resources, Prompts": Phase 3 - Artificial Intelligence/Track B - Agentic AI and ML Engineering/3. Agentic AI and GenAI/MCP for AI Agents/Lecture-03.md
@@ -589,30 +635,44 @@ nav:
     - Phase 4 — Deployment:
       - "Track A: Xilinx FPGA":
         - 1. FPGA Development: Phase 4 - Track A - Xilinx FPGA/1. Xilinx FPGA Development/Guide.md
+        - Streaming RTL Lab: Phase 4 - Track A - Xilinx FPGA/1. Xilinx FPGA Development/labs/README.md
         - 2. Zynq UltraScale+: Phase 4 - Track A - Xilinx FPGA/2. Zynq UltraScale+ MPSoC/Guide.md
         - 3. Advanced FPGA: Phase 4 - Track A - Xilinx FPGA/3. Advanced FPGA Design/Guide.md
         - 4. HLS: Phase 4 - Track A - Xilinx FPGA/4. High-Level Synthesis (HLS)/Guide.md
+        - HLS Integer Arithmetic Lab: Phase 4 - Track A - Xilinx FPGA/4. High-Level Synthesis (HLS)/labs/README.md
         - 5. Runtime & Drivers: Phase 4 - Track A - Xilinx FPGA/5. Runtime and Driver Development/Guide.md
         - 6. Projects: Phase 4 - Track A - Xilinx FPGA/6. Projects/Wireless-Video-FPGA.md
+        - RTL Time Gate Lab: Phase 4 - Track A - Xilinx FPGA/6. Projects/labs/README.md
       - "Track B: NVIDIA Jetson":
         - 1. Jetson Platform:
           - Guide: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Guide.md
+          - Choose a Compatible Software Stack: Phase 4 - Track B - Nvidia Jetson/Compatibility.md
           - CUDA Programming: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-CUDA-Programming/Guide.md
           - Camera ISP & Sensor Bring-Up: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Camera-ISP-Sensor-Bringup/Guide.md
+          - "RAW Camera CPU Lab": Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Camera-ISP-Sensor-Bringup/labs/README.md
           - Container Fleet: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Container-Fleet/Guide.md
+          - "Container Lifecycle CPU Lab": Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Container-Fleet/labs/README.md
           - DLA Deep Dive: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-DLA-Deep-Dive/Guide.md
           - GPIO / SPI / I2C / CAN: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-GPIO-SPI-I2C-CAN/Guide.md
+          - Sensor Protocol CPU Lab: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-GPIO-SPI-I2C-CAN/labs/README.md
           - Kernel Internals: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Kernel-Internals/Guide.md
+          - "Device Tree and Module CPU Lab": Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Kernel-Internals/labs/README.md
           - Memory Architecture: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Memory-Architecture/Guide.md
           - OTA Deep Dive: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-OTA-Deep-Dive/Guide.md
+          - "Interrupted Update CPU Lab": Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-OTA-Deep-Dive/labs/README.md
           - Power & Thermal: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Power-Thermal/Guide.md
+          - "Energy and Thermal CPU Lab": Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Power-Thermal/labs/README.md
           - RT Linux Deep Dive: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-RT-Linux-Deep-Dive/Guide.md
+          - "Linux Timing Lab": Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-RT-Linux-Deep-Dive/labs/README.md
           - Real-Time Inference: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Real-Time-Inference/Guide.md
           - Rootfs & A/B Redundancy: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Rootfs-and-AB-Redundancy/Guide.md
           - Security: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Security/Guide.md
+          - "Signed Artifact CPU Lab": Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Security/labs/README.md
           - TensorRT: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Tensor/Guide.md
           - Video Codec & DeepStream: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Video-Codec-DeepStream/Guide.md
+          - "CPU Video Lab": Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Video-Codec-DeepStream/labs/README.md
           - Yocto BSP Production: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Yocto-BSP-Production/Guide.md
+          - Jetson BitBake Metadata Lab: Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-Yocto-BSP-Production/Metadata-Lab.md
         - 2. Carrier Board: Phase 4 - Track B - Nvidia Jetson/2. Custom Carrier Board Design and Bring-Up/Guide.md
         - 3. L4T Customization:
           - Guide: Phase 4 - Track B - Nvidia Jetson/3. L4T Customization/Guide.md
@@ -622,21 +682,33 @@ nav:
           - T23x Deployment: Phase 4 - Track B - Nvidia Jetson/3. L4T Customization/T23x-Deployment.md
           - Deployment: Phase 4 - Track B - Nvidia Jetson/3. L4T Customization/Deployment.md
         - 4. FSP Firmware: Phase 4 - Track B - Nvidia Jetson/4. FSP (Firmware Support Package) Customization/Guide.md
+        - Firmware Protocol CPU Lab: Phase 4 - Track B - Nvidia Jetson/4. FSP (Firmware Support Package) Customization/labs/README.md
         - 5. App Development:
           - Guide: Phase 4 - Track B - Nvidia Jetson/5. Application Development/Guide.md
           - Peripheral Access: Phase 4 - Track B - Nvidia Jetson/5. Application Development/1. Peripheral Access/Guide.md
           - Network & Connectivity:
             - Guide: Phase 4 - Track B - Nvidia Jetson/5. Application Development/2. Network and Connectivity/Guide.md
+            - Localhost Network Lab: Phase 4 - Track B - Nvidia Jetson/5. Application Development/2. Network and Connectivity/Localhost-Network-Lab.md
             - ESP32-C6 ESP-Hosted over SPI: Phase 4 - Track B - Nvidia Jetson/5. Application Development/2. Network and Connectivity/ESP32-C6-ESP-Hosted-SPI-Jetson-Orin-Nano.md
             - ESP32-C6 OpenThread RCP: Phase 4 - Track B - Nvidia Jetson/5. Application Development/2. Network and Connectivity/ESP32-C6-OpenThread-RCP-Jetson-Orin-Nano.md
             - ESP32-C6 Zigbee NCP: Phase 4 - Track B - Nvidia Jetson/5. Application Development/2. Network and Connectivity/ESP32-C6-Zigbee-NCP-Jetson-Orin-Nano.md
           - GUI: Phase 4 - Track B - Nvidia Jetson/5. Application Development/3. GUI/Guide.md
+          - Interactive Dashboard CPU Lab: Phase 4 - Track B - Nvidia Jetson/5. Application Development/3. GUI/CPU-Dashboard-Lab.md
           - Multimedia:
             - Guide: Phase 4 - Track B - Nvidia Jetson/5. Application Development/4. Multimedia/Guide.md
             - Audio Setup & Development: Phase 4 - Track B - Nvidia Jetson/5. Application Development/4. Multimedia/Jetson-Audio-Setup-and-Development/Guide.md
+            - CPU Audio Lab: Phase 4 - Track B - Nvidia Jetson/5. Application Development/4. Multimedia/Jetson-Audio-Setup-and-Development/CPU-Audio-Lab.md
             - ESP32-LyraT I2S Mic Capture: Phase 4 - Track B - Nvidia Jetson/5. Application Development/4. Multimedia/ESP32-LyraT-I2S-Mic-Jetson-Orin-Nano/Guide.md
           - ML & AI:
             - Guide: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/Guide.md
+            - ONNX Export and Quantization CPU Lab: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/cpu-export-quantization/Guide.md
+            - Runtime Source and CPU Contracts: Projects/jetson-llm-runtime/labs/README.md
+            - Attention Layout and Scratch Lab: Projects/jetson-llm-runtime/labs/Attention-Layout-Lab.md
+            - Runtime Memory and Ownership: Projects/jetson-llm-runtime/docs/memory.md
+            - Runtime Kernel Contracts: Projects/jetson-llm-runtime/docs/kernels.md
+            - Runtime Testing: Projects/jetson-llm-runtime/docs/testing.md
+            - Runtime Performance: Projects/jetson-llm-runtime/docs/performance.md
+            - Runtime Serving Exercise: Projects/jetson-llm-runtime/docs/server.md
             - Small Object Detection: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/small-object-detection-jetson/Guide.md
             - TAO Toolkit: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/tao-toolkit/Guide.md
             - Non-Contact Monitoring: Phase 4 - Track B - Nvidia Jetson/5. Application Development/5. ML and AI/non-contact-monitoring-edge/Guide.md
@@ -644,14 +716,17 @@ nav:
           - ROS 2: Phase 4 - Track B - Nvidia Jetson/5. Application Development/6. ROS2/Guide.md
         - 6. Security & OTA: Phase 4 - Track B - Nvidia Jetson/6. Security and OTA/Guide.md
         - 7. Manufacturing: Phase 4 - Track B - Nvidia Jetson/7. Compliance and Manufacturing/Guide.md
+        - Factory Records CPU Lab: Phase 4 - Track B - Nvidia Jetson/7. Compliance and Manufacturing/labs/README.md
         - 8. Runtime & Drivers: Phase 4 - Track B - Nvidia Jetson/8. Runtime and Driver Development/Guide.md
       - "Track C: DL Inference Optimization":
         - Guide: Phase 4 - Track C - DL Inference Optimization/Guide.md
+        - Start with a CPU Compiler Lab: Phase 4 - Track C - DL Inference Optimization/00 - CPU Compiler Lab/Guide.md
         - 01 Graph & Ops: Phase 4 - Track C - DL Inference Optimization/01 - Graph and Operator Optimization/Guide.md
         - 02 Kernel Engineering:
           - Overview: Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/Guide.md
           - "FlashAttention Course":
             - "Overview": Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Guide.md
+            - CPU Attention Lab: Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/CPU-Attention-Lab.md
             - "01 Attention Bottleneck & Roofline": Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 01 - Attention Bottleneck and Roofline.md
             - "02 Online Softmax & Correctness": Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 02 - Online Softmax and Numerical Correctness.md
             - "03 FlashAttention-1 Algorithm": Phase 4 - Track C - DL Inference Optimization/02 - Kernel Engineering/FlashAttention Course/Lecture 03 - FlashAttention-1 Algorithm.md
@@ -693,6 +768,7 @@ nav:
             - 05 Performance Optimization: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/05-Performance-Optimization.md
             - 06 Benchmarks & Validation: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/8x-H200-Training-Inference/06-Benchmarks-and-Validation.md
           - CUDA Advanced Optimization:
+            - Correctness Lab: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/labs/README.md
             - Overview: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/README.md
             - 01 CUDA Graphs: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/01-CUDA-Graphs.md
             - 02 Cooperative Groups: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/CUDA-Advanced-Optimization/02-Cooperative-Groups.md
@@ -709,12 +785,15 @@ nav:
             - 06 Disaggregated Storage: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/GPUDirect-Storage/06-Disaggregated-Storage.md
           - Confidential Computing & Hardware Attestation:
             - Overview: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/README.md
+            - CPU Cryptographic Binding Lab: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/CPU-Binding-Lab.md
+            - Current Source Evidence: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/Source-Evidence.md
             - 01 Intel TDX Attestation Chain: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/01-Intel-TDX-Attestation-Chain.md
             - 02 NVIDIA CC Attestation Chain: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/02-NVIDIA-CC-Attestation-Chain.md
             - 03 Dual-Vendor Claim Binding & Verification: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/03-Dual-Vendor-Claim-Binding-and-Verification.md
             - 04 Confidential Inference Protocol: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Confidential-Computing-Attestation/04-Confidential-Inference-Protocol.md
           - "Long-Context MoE Foundation Training":
             - "Overview": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/README.md
+            - "CPU Training and Dispatch Lab": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/CPU-Training-Lab.md
             - "01 Long-Context Bottlenecks": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/01-Long-Context-Bottlenecks.md
             - "02 Long-Context Attention": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/02-Long-Context-Attention.md
             - "03 Position Encoding": Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/Long-Context-MoE-Foundation-Training/03-Position-Encoding.md
@@ -734,6 +813,7 @@ nav:
             - 05 Benchmarks: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/L40S-x12-Inference/05-Benchmarks.md
           - NCCL Deep Dive:
             - Overview: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/README.md
+            - Distributed Training CPU Lab: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/CPU-Collectives-Lab/Guide.md
             - 01 Fundamentals: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/01-Fundamentals.md
             - 02 Algorithms & Bandwidth: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/02-Algorithms-and-Bandwidth.md
             - 03 Framework Integration: Phase 5 - Advanced Topics and Specialization/Track A - GPU Infrastructure/Nvidia GPU/HPC Setup/NCCL-Deep-Dive/03-Framework-Integration.md
@@ -754,6 +834,7 @@ nav:
       - "Lecture: AI-Driven Wireless Communication": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/AI-Driven Wireless Communication/Lecture-01.md
       - "Qwen Inference Optimization":
         - Overview: Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/README.md
+        - Qwen Shape and Cache CPU Lab: Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/Lab-Guide.md
         - "01: Qwen Architecture Deep Dive": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/Lecture-01.md
         - "02: Quantizing Qwen3-4B to Q4": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/Lecture-02.md
         - "03: Decode Optimization on Jetson": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Qwen Inference Optimization/Lecture-03.md
@@ -770,13 +851,36 @@ nav:
         - "06: MTP with Gemma 4 E2B": Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/Gemma 4 Edge Deployment/Lecture-06.md
     - "Track D: Robotics":
       - Guide: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Guide.md
+      - Robotics Foundations:
+        - Overview: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Robotics Foundations/README.md
+        - Frames and Timestamps: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Robotics Foundations/Lecture-01.md
+        - Kinematics: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Robotics Foundations/Lecture-02.md
+        - Feedback Control: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Robotics Foundations/Lecture-03.md
+        - Perception and Estimation: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Robotics Foundations/Lecture-04.md
+        - Motion Planning: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Robotics Foundations/Lecture-05.md
+        - ROS 2 Integration: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Robotics Foundations/Lecture-06.md
+        - CPU Lab Guide: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Robotics Foundations/Lab-Guide.md
+        - Real ROS 2 Integration Lab: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Robotics Foundations/ROS2-Lab.md
+      - Robot Dynamics and Task Execution:
+        - Overview: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Robot Dynamics and Task Execution/README.md
+        - Dynamics and Actuator Limits: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Robot Dynamics and Task Execution/Lecture-01-Dynamics.md
+        - LQR and Constrained MPC: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Robot Dynamics and Task Execution/Lecture-02-LQR-and-MPC.md
+        - Trajectory Execution: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Robot Dynamics and Task Execution/Lecture-03-Trajectory-Execution.md
+        - Grasp and Task Success: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Robot Dynamics and Task Execution/Lecture-04-Grasp-and-Task-Success.md
+        - CPU Lab Guide: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Robot Dynamics and Task Execution/Lab-Guide.md
       - CMU Robotics Courses: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/CMU-Robotics-Courses.md
       - "Lecture: Perception & AI": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Advanced Perception and AI for Robotics/Lecture-01.md
+      - Capture Time and Tracking Lab: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Advanced Perception and AI for Robotics/Tracking-Lab.md
       - "Lecture: Advanced ROS": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Advanced Robot Operating System/Lecture-01.md
+      - ROS QoS and Queue Lab: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Advanced Robot Operating System/Integration-Lab.md
       - "Lecture: Industrial & Embedded": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Industrial and Embedded Robotics/Lecture-01.md
+      - Industrial Protocol Integration Lab: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Industrial and Embedded Robotics/Integration-Lab.md
       - "Lecture: Multi-Robot & Swarm": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Multi-Robot Systems and Swarm Robotics/Lecture-01.md
+      - Fleet Coordination Lab: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Multi-Robot Systems and Swarm Robotics/Coordination-Lab.md
       - "Special Course: Isaac Sim and Isaac Lab":
         - Overview: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/README.md
+        - Current Releases and Compatibility: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Compatibility.md
+        - Simulation and ROS CPU Lab: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Simulation-CPU-Lab.md
         - "01: The Isaac Stack and Your First Simulation": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-01.md
         - "02: USD for Roboticists": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-02.md
         - "03: The Core Experimental API": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-03.md
@@ -802,6 +906,7 @@ nav:
         - "21: Language-Guided Robotics Capstone": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Isaac Sim and Isaac Lab/Lecture-21.md
       - "Special Course: Deep RL for Robot Learning":
         - Overview: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/README.md
+        - CPU Lab — Returns, Resets, and PPO: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/CPU-Lab.md
         - "01: The RL Problem and the Rollout Engine": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-01.md
         - "02: Imitation Learning: BC and DAgger": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-02.md
         - "03: Modern Imitation: Chunks and Flow Matching": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Deep RL for Robot Learning/Lecture-03.md
@@ -820,6 +925,9 @@ nav:
       - "Professional Course: VLA Foundations to Frontier 2026":
         - Overview: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/README.md
         - Laboratory Guide: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lab-Guide.md
+        - October 18 Source Update: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Current-Update-2026-10-18.md
+        - Dataset and Execution Lab: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Dataset-and-Execution-Lab.md
+        - Diffusion and Flow CPU Lab: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Action-Generation-Lab.md
         - Notation and Glossary: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Reference.md
         - "History and Representations":
           - "01: What a VLA policy is": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Lecture-01.md
@@ -866,13 +974,17 @@ nav:
           - Frontier Research: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Sources-Frontier.md
       - "Special Course: VLA Optimization & Action-Parity Harness":
         - Overview: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/README.md
+        - CPU Action-Parity Lab: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/CPU-Action-Parity-Lab.md
         - "01: VLA Optimization for Real-Time Control": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/Lecture-01.md
         - "02: The Action-Parity Harness": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/Lecture-02.md
     - "Track E: Autonomous Vehicles":
       - Guide: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/Guide.md
       - 1. Fundamentals: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/1. Fundamentals/Guide.md
+      - CPU Vehicle and Timing Lab: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/1. Fundamentals/Lab-Guide.md
+      - CARLA Frame Synchronization: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/1. Fundamentals/CARLA-Lab.md
       - 2. openpilot:
         - Guide: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/2. openpilot Reference Stack/Guide.md
+        - Source and Replay Contracts: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/2. openpilot Reference Stack/Replay-Lab.md
         - Flow Diagram: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/2. openpilot Reference Stack/flow-diagram.md
         - AGNOS: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/2. openpilot Reference Stack/agnos/Guide.md
         - camerad: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/2. openpilot Reference Stack/camerad/Guide.md
@@ -888,9 +1000,11 @@ nav:
       - 6. Lauterbach: Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/6. Lauterbach TRACE32 Debug/Guide.md
     - "Track F: AI Chip Design":
       - Guide: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Guide.md
+      - "CPU Lab: Tiling, Dataflow, and MLIR": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Labs/Tiling-and-Dataflow.md
       - "Professional Course: Programmable VLA Inference Accelerator":
         - Overview: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/README.md
         - Laboratory Guide: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Lab-Guide.md
+        - Model to Hardware CPU Lab: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Model-to-Hardware-Lab.md
         - "01: Design Brief and Baselines": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Lecture-01.md
         - "02: Workload Atlas and Trace Contract": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Lecture-02.md
         - "03: Programmable Tensor and Vector Tiles": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Lecture-03.md
@@ -904,9 +1018,18 @@ nav:
         - Hardware Evidence: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Sources-Hardware.md
         - Model and Research Evidence: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Programmable VLA Inference Accelerator/Sources-Models.md
       - RISC-V AI Chip Design and Market: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/RISC-V-AI-Chip-Design-and-Market/Guide.md
+      - RISC-V Vector Execution Lab: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/RISC-V-AI-Chip-Design-and-Market/labs/README.md
       - "Agentic Chip Design 2026":
         - Guide: Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Agentic Chip Design 2026/Guide.md
         - "01: Why Agents for Chip Design": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Agentic Chip Design 2026/Lectures/Lecture-01.md
+        - "Lecture 02 — From specification to implementation evidence": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Agentic Chip Design 2026/Lectures/Lecture-02.md
+        - "Lecture 03 — Generate RTL from a bounded contract": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Agentic Chip Design 2026/Lectures/Lecture-03.md
+        - "Lecture 04 — Measure generation and repair fairly": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Agentic Chip Design 2026/Lectures/Lecture-04.md
+        - "Lecture 05 — Test the checker with deliberate RTL faults": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Agentic Chip Design 2026/Lectures/Lecture-05.md
+        - "Lecture 06 — Build a bounded propose–check–repair loop": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Agentic Chip Design 2026/Lectures/Lecture-06.md
+        - "Lecture 07 — Optimize area and timing without losing function": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Agentic Chip Design 2026/Lectures/Lecture-07.md
+        - "Lecture 08 — Budget latency and cost per accepted design": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Agentic Chip Design 2026/Lectures/Lecture-08.md
+        - "Lecture 09 — Capstone: a reproducible RTL repair study": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Agentic Chip Design 2026/Lectures/Lecture-09.md
       - Lectures:
         - "01": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Lectures/Lecture-01.md
         - "02": Phase 5 - Advanced Topics and Specialization/Track F - AI Chip Design/Lectures/Lecture-02.md
@@ -917,6 +1040,7 @@ nav:
       - Guide: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Guide.md
       - "Logprobs, Perplexity & KL Divergence":
         - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Logprobs, Perplexity and KL Divergence/README.md
+        - Masked Quality Metrics Lab: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lab-01-Masked-Quality-Metrics.md
         - "01: Logprobs — What a Model Emits": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-01.md
         - "02: Entropy, Cross-Entropy & NLL": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-02.md
         - "03: Perplexity — The Exponential of Confusion": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-03.md
@@ -924,15 +1048,16 @@ nav:
         - "05: Quantization, Distillation, RLHF & Spec Decode": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Logprobs, Perplexity and KL Divergence/Lecture-05.md
       - "MLSys Deep Dives":
         - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/README.md
-        - "01: MLSys as the Economic-Value Layer": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-01.md
-        - "02: The Kernel-Language Explosion (Triton, cuTile, TileLang)": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-02.md
-        - "03: Compilers & Runtimes (TVM, Mojo, TensorRT, TileRT)": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-03.md
-        - "04: Beyond the Dense Transformer (Mamba, SSMs, Hybrids)": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-04.md
-        - "05: The 2026 Frontier (Qwen3, Nemotron Ultra, MiMo, DeepSeek)": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-05.md
-        - "06: Making Decode Fast (EAGLE-3, DFlash, Flash kernels)": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-06.md
-        - "07: Edge & Physical-AI Frontier + Capstone": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-07.md
+        - "01: Useful Work and Cost": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-01.md
+        - "02: Kernel Languages and Correctness": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-02.md
+        - "03: Compilers and Runtime Scheduling": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-03.md
+        - "04: Recurrent State and Hybrid Models": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-04.md
+        - "05: Inspect an Executable Model": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-05.md
+        - "06: Speculative Decoding": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-06.md
+        - "07: Robot Deadlines and Capstone": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/MLSys Deep Dives/Lecture-07.md
       - "GLM-5.3-Flash Architecture Mastery":
         - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/README.md
+        - CPU Hybrid-State Lab: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/CPU-Hybrid-State-Lab.md
         - "01: The Exact Model": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/Lecture-01.md
         - "02: MoE — Capacity, Work, and Traffic": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/Lecture-02.md
         - "03: KDA I — The Delta-Rule Recurrence": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/Lecture-03.md
@@ -947,6 +1072,8 @@ nav:
         - "Capstone: The KDA-First Mastery Ladder": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/GLM-5.3-Flash Architecture Mastery/Lecture-12.md
       - "Hardware-Aware LLM Quantization":
         - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/README.md
+        - CPU Quantization Lab: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/CPU-Quantization-Lab.md
+        - Pinned Source Evidence: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Source-Evidence.md
         - "01: Inference Physics": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Lecture-01.md
         - "02: Quantization Mathematics (NVFP4)": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Lecture-02.md
         - "03: Blackwell Hardware — What sm_120 Accelerates": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Lecture-03.md
@@ -962,6 +1089,7 @@ nav:
         - "Capstone: TurboQuant": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/Hardware-Aware LLM Quantization/Lecture-13.md
       - "TVM Deep Dives":
         - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/README.md
+        - Native LLVM and Relax Lab: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/labs/README.md
         - "01: The TVM Stack & Compilation Flow": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/Lecture-01.md
         - "02: TensorIR & the Schedule Space": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/Lecture-02.md
         - "03: Auto-Tuning — AutoTVM → Ansor → MetaSchedule": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/TVM Deep Dives/Lecture-03.md
@@ -972,6 +1100,7 @@ nav:
         - "Refresh Log": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/REFRESH-LOG.md
         - "Part 1 — Fundamentals":
           - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/README.md
+          - CPU Inference Contracts Lab: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/labs/README.md
           - "01: The 2026 Inference Engineer's Mental Model": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-01.md
           - "02: Transformer Execution — Tokens to Bits": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-02.md
           - "03: Roofline, Bandwidth, Memory Hierarchy": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 1 - Fundamentals/Lecture-03.md
@@ -995,6 +1124,7 @@ nav:
           - "05: Production MoE Serving": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 3 - MoE at Blackwell/Lecture-05.md
         - "Part 4 — Optimizing a Real Engine":
           - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/README.md
+          - Upstream CPU Source Lab: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/CPU-Source-Lab.md
           - "01: The Workload, the Baseline, the Ladder": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-01.md
           - "02: The Scoreboard — A Benchmark That Cannot Be Gamed": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-02.md
           - "03: Diagnosis — Launch, Bandwidth, or Comm?": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-03.md
@@ -1007,6 +1137,7 @@ nav:
           - "10: Silently Wrong": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 4 - Optimizing a Real Engine/Lecture-10.md
         - Part 5 — DeepSeek V4.1 Flash NVFP4:
           - Overview: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/README.md
+          - October 18 Release Verification: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/Release-Update-2026-10-18.md
           - Lab Tools: Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/labs/README.md
           - "01: Checkpoint Identity and Compatibility": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/Lecture-01.md
           - "02: Execution and Memory Budgets": Phase 5 - Advanced Topics and Specialization/Track G - ML Systems Engineering/AI Inference Engineer 2026/Part 5 - DeepSeek V4.1 Flash NVFP4/Lecture-02.md
@@ -1021,6 +1152,9 @@ nav:
   - "P6 · Careers":
     - Overview: Phase 6 - Interview Preparation/README.md
     - Roles & Market: Roles and Market Analysis.md
+    - Robotics AI Engineer: Phase 6 - Interview Preparation/2. Robotics AI Engineer/README.md
+    - Embedded and Edge AI Engineer: Phase 6 - Interview Preparation/3. Embedded and Edge AI Engineer/README.md
+    - Compiler and Accelerator Engineer: Phase 6 - Interview Preparation/4. Compiler and Accelerator Engineer/README.md
     - "MLSys Engineer":
       - Guide: Phase 6 - Interview Preparation/1. MLSys Engineer/README.md
       - "01: Inference Systems Q&A": Phase 6 - Interview Preparation/1. MLSys Engineer/01-Inference-Systems-QA.md

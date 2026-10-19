@@ -1,5 +1,7 @@
 # AI Inference Engineer 2026 — Special Course
 
+**Latest source update:** [October 18 release check](Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/Release-Update-2026-10-18.md) distinguishes the new official V4.1 Flash 1017 weights from the earlier NVFP4 case. Its metadata comparison ran locally; model serving and conversion quality did not.
+
 <div class="course-identity mlsys" markdown="1">
 <div class="course-identity__icon">INF</div>
 <div markdown="1">

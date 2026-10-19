@@ -1,0 +1,40 @@
+{
+  "review_date": "2026-10-18",
+  "scope": "Real RISC-V machine-code execution under QEMU user emulation; no physical hardware timing",
+  "tools": {
+    "clang": "Ubuntu clang version 18.1.3 (1ubuntu1)",
+    "lld": "Ubuntu LLD 18.1.3 (compatible with GNU linkers)",
+    "qemu": "qemu-riscv64 version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)"
+  },
+  "tests_passed": 4,
+  "skipped": 0,
+  "same_binary_vlen_bits": [
+    128,
+    256,
+    512
+  ],
+  "length_offset_cases_per_configuration": 784,
+  "fixed_eight_increment_mutant": {
+    "128": "rejected",
+    "256": "passes this emulator configuration",
+    "512": "rejected"
+  },
+  "full_width_tail_mutant": "rejected at all three widths",
+  "assembly_verified": [
+    "vsetvli",
+    "vle32.v",
+    "vadd.vv",
+    "vse32.v"
+  ],
+  "source_sha256": {
+    "rvv_contract.c": "de80cf6568f98892ff6230a4973e80d20a28cc22ddf6ff20df2037f1356a0e69",
+    "test_rvv.py": "101bf6a8d938dfdb3904155ade0fbad6aa2933a1c92208e96abd84641b4d8cf5"
+  },
+  "not_validated": [
+    "physical chip correctness",
+    "cycle counts or performance",
+    "power and energy",
+    "board peripherals or BSP",
+    "vendor matrix extensions"
+  ]
+}

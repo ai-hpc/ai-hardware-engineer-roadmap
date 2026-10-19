@@ -1,214 +1,59 @@
-# Tinygrad Projects
+# Executed tinygrad CPU projects
 
-Hands-on projects for the [tinygrad learning guide](../Guide.md). Work through them in order — each builds on the previous.
+Use [the guide's pinned setup](../Guide.md#1-begin-with-a-function-you-can-calculate): Python 3.11+, tinygrad **0.14.0**, and Clang for the tested Linux CPU route. All commands below start at the repository root. The short numbered scripts call the readable shared [course implementation](course.py), so each lesson uses the same environment, dtype and numerical checks.
 
-## Setup
-
-```bash
-# Install tinygrad (editable from source — recommended)
-git clone https://github.com/tinygrad/tinygrad
-cd tinygrad
-pip install -e ".[dev]"
-cd -
-
-# Or from pip (stable)
-pip install tinygrad
-
-# Verify
-python3 -c "from tinygrad import Tensor; print(Tensor([1,2,3]).numpy())"
-```
-
-## Debug Environment Variables
-
-These unlock tinygrad's internals. Use them constantly while working through the projects.
-
-| Command | Purpose |
-|---------|---------|
-| `DEBUG=1 python3 script.py` | Show kernel count and timing per `.realize()` |
-| `DEBUG=2 python3 script.py` | Show kernel names and output shapes |
-| `DEBUG=3 python3 script.py` | Print generated kernel source code (C/CUDA/MSL) |
-| `DEBUG=4 python3 script.py` | Dump full UOp IR at every optimization stage |
-| `VIZ=1 python3 script.py` | Open browser-based computation graph visualizer |
-| `BEAM=2 python3 script.py` | Enable BEAM search kernel auto-tuning |
-| `NOOPT=1 python3 script.py` | Disable all algebraic rewrites (baseline comparison) |
-| `CLANG=1 python3 script.py` | Force CPU/Clang backend (readable C output) |
-
----
-
-## Project 1: Tensor Basics and Lazy Evaluation
-
-**File:** `01_tensor_basics.py`
-
-What you learn:
-- All tensor factory methods and their shapes/dtypes
-- Why tinygrad doesn't compute until `.realize()` or `.numpy()`
-- Op fusion — multiple Python ops compiled into a single GPU kernel
-- How to inspect the execution schedule before running
+## 1. Run the finite progression
 
 ```bash
-python3 01_tensor_basics.py
-DEBUG=1 python3 01_tensor_basics.py     # see that the fused path uses 1 kernel
-DEBUG=3 python3 01_tensor_basics.py     # read the generated C for the fused kernel
+/tmp/course-tinygrad-venv/bin/python "Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/projects/course.py" all --output /tmp/tinygrad-course.json
+/tmp/course-tinygrad-venv/bin/python -m unittest discover -s "Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/labs" -p "test_*.py" -v
 ```
 
-**Key question to answer:** How many kernels does `(a + b).relu().sum()` produce? Why?
+The default makes no dataset/model download. It runs tensor operations, gradients, a tiny synthetic classifier, checkpoint reload, compiler/JIT checks, custom operations and a steering-output contract. The reviewed environment passed all **13** tests: seven mathematical references plus six actual framework tests. Ordinary Python without tinygrad still runs the seven references and explicitly skips the optional framework class.
 
----
+| Script / lesson | Predict before running | Change after it passes |
+|---|---|---|
+| [00 intro](00_intro.py) | Affine/ReLU of `[-1,0,2]` is `[0,1,5]` | Include a negative value whose output clips |
+| [01 tensor basics](01_tensor_basics.py) | Transpose `[2,3]` becomes `[3,2]` | Materialize and compare an odd-shaped transpose |
+| [02 operation types](02_op_types.py) | Matmul output `[[2,11],[-3,6]]` | Change inner dimension to 5 and retain a scalar oracle |
+| [03 autograd](03_autograd.py) | Gradient `[4,6]`; SGD `w_20=2(1-.8^20)` | Compare RMSNorm gradients at new smooth values |
+| [04 classifier](04_mnist.py) | Initial two-class zero-logit loss is `ln(2)` | Add a hidden layer and separate validation data |
+| [05 compiler](05_compiler_pipeline.py) | Realization may change materialization/kernel count | Change input values during JIT replay |
+| [06 custom operations](06_custom_ops.py) | Causal first output equals first value vector | Change only a future token and test earlier outputs |
+| `course.py model_contract` | `[1,.1] → -.12` road-wheel radians | Introduce and reject wrong declared units |
 
-## Project 2: The Three Op Types
+The numbered files support `--output`. For example, replace `course.py all` in the first command with `03_autograd.py` to run one lesson.
 
-**File:** `02_op_types.py`
-
-What you learn:
-- ElementwiseOps: independent per-element — trivially fuse
-- ReduceOps: dimension-collapsing — analyze dependencies and observe fusion
-- MovementOps: zero-copy via ShapeTracker
-- How matmul decomposes to expand + multiply + sum
+## 2. Run the explicit real-data extension
 
 ```bash
-python3 02_op_types.py
-DEBUG=1 python3 02_op_types.py
+/tmp/course-tinygrad-venv/bin/python "Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/projects/04_mnist.py" --mnist --steps 40 --output /tmp/tinygrad-mnist.json
 ```
 
-**Experiment:** compare a view with its contiguous materialization and a consuming reduction. Record when a kernel or copy is introduced instead of assuming all movement is free.
+This downloads/caches MNIST through the pinned loader. It uses 512 train and 256 test images, 32-example batches and a linear classifier; it is not the full dataset benchmark. The reviewed result was loss **2.302599 → 0.502533**, test accuracy **202/256**, and exact output parity after save/reload. See [the recorded run](../evidence/mnist-cpu-2026-10-18.json).
 
----
+No hidden MNIST download occurs in the default synthetic exercise. `--steps` is bounded to 1–500. Small step counts may intentionally fail the training-progress expectation; such a failure needs interpretation, not a relabeled success.
 
-## Project 3: Autograd from Scratch
-
-**File:** `03_autograd.py`
-
-What you learn:
-- How `.backward()` computes gradients via reverse-mode autodiff
-- Verifying gradients analytically (sum of squares, sigmoid, etc.)
-- Numerical gradient checking with finite differences
-- Training a small MLP to overfit XOR
+## 3. Inspect compilation separately
 
 ```bash
-python3 03_autograd.py
+COURSE_TINYGRAD_DEBUG=4 /tmp/course-tinygrad-venv/bin/python "Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/projects/05_compiler_pipeline.py" > /tmp/tinygrad-compiler-trace.txt 2>&1
 ```
 
-**Key exercise:** Implement the numerical gradient checker yourself. Apply it to any custom op you write in Project 6.
+The runner fixes `DEV=CPU` and `BEAM=0`. Do not substitute old `CLANG=1`, `DEVICE=CLANG` or `.schedule()` examples from another release. Debug levels and tuning controls are version-specific; inspect the generated trace rather than assuming a level dumps every IR pass.
 
----
+The [recorded CPU report](../evidence/tinygrad-cpu-2026-10-18.json) contains three versus one executed model kernels for this tiny expression and four changing-input JIT results. It makes no throughput or latency claim. `NOOPT` is not a universal switch that disables every mathematical rewrite.
 
-## Project 4: Training MNIST
-
-**File:** `04_mnist.py`
-
-What you learn:
-- Full training loop: data → forward → loss → backward → optimizer step
-- tinygrad's `nn` module: `Conv2d`, `BatchNorm`, `Linear`
-- `safe_save` / `safe_load` for model persistence
-- Profiling with `DEBUG=1` and BEAM search
+## 4. Compile a standalone runtime with guarded buffers
 
 ```bash
-python3 04_mnist.py
-BEAM=2 python3 04_mnist.py              # auto-tune kernels
-DEBUG=1 python3 04_mnist.py             # profile kernel counts per step
+python3 "Phase 5 - Advanced Topics and Specialization/Track E - Autonomous Vehicles/3. tinygrad for Inference/projects/07_custom_backend.py" --output /tmp/standalone-runtime.json
 ```
 
-**Target:** >98% test accuracy in 5 epochs.
+[Project 7](07_custom_backend.py) needs Clang and the Python standard library on Linux. It creates a temporary C shared library and binds an explicit function signature. Output elements start as NaNs; guard values surround the result. This catches missing stores and simple tail overwrites while testing sizes 0,1,3,31,33,257 with two inputs each. [Recorded 12-case result](../evidence/c-runtime-2026-10-18.json).
 
----
+Its filename preserves the original project link, but the implemented milestone is a standalone runtime. There is no fictitious tinygrad device registration and no accelerator performance result. **Transfer:** add a non-square row-major matmul entry point, explicit dimensions and guarded output; compare with scalar Python before adding timing. A full framework backend is the next separate integration.
 
-## Project 5: Inspecting the Compiler
+## 5. Submit one evidence bundle
 
-**File:** `05_compiler_pipeline.py`
-
-What you learn:
-- Schedule generation: which ops get fused into which kernels
-- UOp tree structure: the IR nodes that represent computation
-- Algebraic rewrites: `x*1→x`, `log(exp(x))→x`, constant folding
-- Kernel count patterns for common ML ops (attention, layernorm, conv)
-- BEAM search: how tinygrad auto-tunes kernel tiling
-
-```bash
-python3 05_compiler_pipeline.py
-VIZ=1   python3 05_compiler_pipeline.py     # graph browser
-DEBUG=4 python3 05_compiler_pipeline.py     # full IR dump
-NOOPT=1 python3 05_compiler_pipeline.py     # see unoptimized kernels
-BEAM=4  python3 05_compiler_pipeline.py     # enable kernel tuning
-```
-
-**Deep dive:** Run `DEBUG=4 CLANG=1` and read the IR stages for a softmax. Identify where the reduction and the normalization division are scheduled.
-
----
-
-## Project 6: Custom Operations
-
-**File:** `06_custom_ops.py`
-
-What you learn:
-- Building GELU, Swish, Mish, RMSNorm, LayerNorm from tinygrad primitives
-- Scaled dot-product attention (with causal masking) from primitives
-- Gradient verification for custom ops
-- Fusion impact: fused vs unfused implementation of the same op
-
-```bash
-python3 06_custom_ops.py
-DEBUG=1 python3 06_custom_ops.py    # count kernels for each op
-DEBUG=3 python3 06_custom_ops.py    # see the generated kernels
-```
-
-**Challenge:** Implement Flash Attention's tiled softmax using tinygrad primitives. Verify it matches the naive implementation numerically.
-
----
-
-## Project 7: Custom Backend
-
-**File:** `07_custom_backend/backend.py`
-
-What you learn:
-- The three components every tinygrad backend implements: Allocator, Compiler, Runner
-- How memory is managed at the device level
-- How generated C source is compiled to a .so and executed
-- How to benchmark your backend vs the built-in CLANG backend
-
-```bash
-python3 07_custom_backend/backend.py              # run tests
-python3 07_custom_backend/backend.py benchmark    # benchmark vs CLANG
-```
-
-**Extension:** Add OpenMP parallelism to the element-wise loop in the generated C. Measure speedup on your CPU's core count.
-
----
-
-## Learning Path
-
-```
-01 Basics → 02 Op Types → 03 Autograd → 04 MNIST → 05 Compiler → 06 Custom Ops → 07 Backend
-  (3h)         (3h)           (4h)         (4h)        (6h)           (6h)            (12h)
-```
-
-Total: ~38 hours of focused work. Return to earlier projects with `DEBUG=4` and `VIZ=1` after completing later ones — you'll see much more.
-
----
-
-## Further Reading
-
-- [Guide.md](../Guide.md) — full learning guide with theory for each topic
-- tinygrad-notes.md — overview and core philosophy (see tinygrad source repo)
-- hacking-tinygrad.md — code snippets for internals (see tinygrad source repo)
-- [tinygrad source](https://github.com/tinygrad/tinygrad) — read `tinygrad/tensor.py` and `tinygrad/runtime/ops_clang.py`
-- [abstractions.py](https://github.com/tinygrad/tinygrad/blob/master/docs/abstractions.py) — annotated architecture walkthrough
-
-## Carry one result from tensors to the backend
-
-Use the same fixed matmul inputs for Projects 2, 5, and 7. Add a non-square case, a dimension not divisible by a tile size, and a transposed input. Compare values before timing, and write down accumulation dtype and tolerances.
-
-The backend project should first consume a documented buffer/layout contract and return the reference result. Then measure compile time, warm execution, transfers, and synchronization separately. Do not use MNIST accuracy to prove every operator or backend path correct. Export the tested shape set, generated code, and unsupported cases as the first input to [AI Chip Design](../../../Track%20F%20-%20AI%20Chip%20Design/Guide.md).
-
-## Practice and assessment
-
-**Entry diagnostic (prerequisite check):** Trace a tensor expression into operations, scheduling, and generated execution. If this is unfamiliar, use the prerequisite material above or the [roadmap diagnostics](../../../../Learning-Guide.md#diagnose-before-reading) before starting the lab.
-
-1. **Baseline lab:** Follow one matmul or reduction through the pinned tinygrad source and compare with a reference.
-2. **Guided variation:** Change shape/layout and inspect the resulting schedule and kernel choices.
-3. **Independent transfer:** repeat the method on a new input or configuration and explain where your original assumptions stop applying.
-
-**Evidence to submit:** Source commit, correctness, kernel count, compile/warmup time, execution latency, and memory. Keep raw results and reproduction steps; distinguish measured results from estimates or work not run.
-
-**Self-check:** Which observation would disprove your explanation of the result? Identify a competing explanation and the smallest experiment that separates them. A passing answer names a concrete predicted difference, not only another tool to try.
-
-**Exit criteria:** reproduce the baseline, demonstrate the negative/variation check, and meet the [shared completion rubric](../../../../Learning-Guide.md#completion-rubric). Use the [lesson cycle](../../../../Learning-Guide.md#a-repeatable-lesson-cycle) for retrieval practice and spaced review.
+Include predictions, test output, package/compiler identity, the JSON report and one failing semantic variation. Explain whether a result was mathematical, actual CPU execution, compiled C execution or an unexecuted extension. A lower loss, fewer kernels, and a valid command are three different observations; connect them with their own checks.

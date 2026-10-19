@@ -12,3 +12,6 @@ site/
 # Python lab and tooling caches
 __pycache__/
 *.py[cod]
+
+# Optional local runtime CMake output
+Projects/jetson-llm-runtime/build*/

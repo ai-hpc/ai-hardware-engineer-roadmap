@@ -93,8 +93,8 @@ A single perception accuracy percentage does not establish vehicle safety: the o
     * Regulatory requirements by region (US, EU, China).
 
 **Projects:**
-* Build a simple HIL test rig that injects synthetic camera frames into an ADAS perception node. Validate detection accuracy across day/night/fog scenarios.
-* Deploy an experimental perception algorithm in shadow mode alongside a baseline. Collect and analyze disagreements to identify algorithmic weaknesses.
+* Start with a software-in-the-loop replay that injects synthetic frames into a perception process. Call the extension HIL only when a named physical target ECU participates, with documented I/O timing and simulator interfaces.
+* Compare an experimental perception algorithm with a baseline in offline replay or a local simulator. Collect disagreements and ground-truth outcomes; disagreement alone does not identify which model is correct.
 * Create an OpenSCENARIO scenario for a pedestrian crossing at an intersection. Run it in CARLA with your Module 1 controller.
 
 ---
@@ -123,6 +123,8 @@ For a teaching lane-following system, distinguish: (a) a corrupted sensor messag
 A HARA exercise produces a reasoned assignment for a **safety goal**, not an ASIL label for an entire neural network. Keep the evidence chain explicit: hazard → goal → requirement → monitor/fallback → test result. ISO 26262 and ISO 21448 have different scopes; consult the actual project-applicable standards for compliance work. [ISO 26262 scope](https://www.iso.org/standard/68383.html), [ISO 21448 scope](https://www.iso.org/standard/77490.html).
 
 Use replay or simulation for the baseline, and call a test HIL only when real target hardware participates in the loop. A classroom simulation report does not certify a road vehicle. Pass the monitor's timestamps and failure trace to [Module 6](../6.%20Lauterbach%20TRACE32%20Debug/Guide.md) or the SoC controller testbench.
+
+**Worked available artifact:** use the [executed delayed-observation scenario](../1.%20Fundamentals/Lab-Guide.md). The teaching requirement rejects acquisition age above 150 ms; a 200 ms delay produces 156 stale observations after four missing ticks. Its chosen fallback brings speed to zero, but the lane-following task fails because lateral error remains 1 m. Record detection/response behavior and task outcome separately. This exercises one stated requirement; it does not establish that the fallback is appropriate for a real road situation.
 
 ## Practice and assessment
 

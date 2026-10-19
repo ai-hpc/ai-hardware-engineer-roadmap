@@ -1,0 +1,531 @@
+{
+  "schema": "course_episode_fixture/v1",
+  "provenance": "Original deterministic teaching fixture; not an RLDS or LeRobot export. Tiny RGB markers illustrate record alignment, not visual learning.",
+  "sources": {
+    "camera_deltas": {
+      "mode": "interval_delta",
+      "unit": "mm",
+      "frame": "camera_xy",
+      "period_us": 20000,
+      "rotation_to_base": [
+        [
+          0,
+          -1
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "interpolation": "constant_velocity_within_interval"
+    },
+    "base_velocities": {
+      "mode": "velocity",
+      "unit": "m/s",
+      "frame": "base_xy",
+      "period_us": 40000,
+      "rotation_to_base": [
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "interpolation": "constant_velocity_within_interval"
+    }
+  },
+  "episodes": [
+    {
+      "id": "train-a",
+      "session": "morning",
+      "origin": "synthetic-recorder/train-a",
+      "split": "train",
+      "source": "camera_deltas",
+      "clock": "simulation_us",
+      "terminal": true,
+      "instruction": "move in base positive y",
+      "frames": [
+        {
+          "id": 0,
+          "capture_us": 0,
+          "ready_us": 0,
+          "clock": "simulation_us",
+          "rgb_2x2": [
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 1,
+          "capture_us": 15000,
+          "ready_us": 25000,
+          "clock": "simulation_us",
+          "rgb_2x2": [
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 2,
+          "capture_us": 35000,
+          "ready_us": 36000,
+          "clock": "simulation_us",
+          "rgb_2x2": [
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 3,
+          "capture_us": 39000,
+          "ready_us": 70000,
+          "clock": "simulation_us",
+          "rgb_2x2": [
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 4,
+          "capture_us": 55000,
+          "ready_us": 90000,
+          "clock": "simulation_us",
+          "rgb_2x2": [
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "time_us": 0,
+          "state_base_m": [
+            0.0,
+            0.0
+          ],
+          "action": [
+            10,
+            0
+          ],
+          "is_last": false
+        },
+        {
+          "time_us": 20000,
+          "state_base_m": [
+            0.0,
+            0.01
+          ],
+          "action": [
+            0,
+            0
+          ],
+          "is_last": false
+        },
+        {
+          "time_us": 40000,
+          "state_base_m": [
+            0.0,
+            0.01
+          ],
+          "action": [
+            10,
+            0
+          ],
+          "is_last": false
+        },
+        {
+          "time_us": 60000,
+          "state_base_m": [
+            0.0,
+            0.02
+          ],
+          "action": [
+            10,
+            0
+          ],
+          "is_last": false
+        },
+        {
+          "time_us": 80000,
+          "state_base_m": [
+            0.0,
+            0.03
+          ],
+          "action": null,
+          "is_last": true
+        }
+      ]
+    },
+    {
+      "id": "train-b",
+      "session": "afternoon",
+      "origin": "synthetic-recorder/train-b",
+      "split": "train",
+      "source": "base_velocities",
+      "clock": "simulation_us",
+      "terminal": true,
+      "instruction": "move in base positive y",
+      "frames": [
+        {
+          "id": 0,
+          "capture_us": 0,
+          "ready_us": 0,
+          "clock": "simulation_us",
+          "rgb_2x2": [
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 1,
+          "capture_us": 15000,
+          "ready_us": 25000,
+          "clock": "simulation_us",
+          "rgb_2x2": [
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 2,
+          "capture_us": 35000,
+          "ready_us": 36000,
+          "clock": "simulation_us",
+          "rgb_2x2": [
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 3,
+          "capture_us": 39000,
+          "ready_us": 70000,
+          "clock": "simulation_us",
+          "rgb_2x2": [
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 4,
+          "capture_us": 55000,
+          "ready_us": 90000,
+          "clock": "simulation_us",
+          "rgb_2x2": [
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "time_us": 0,
+          "state_base_m": [
+            0.0,
+            0.0
+          ],
+          "action": [
+            0,
+            0.5
+          ],
+          "is_last": false
+        },
+        {
+          "time_us": 40000,
+          "state_base_m": [
+            0.0,
+            0.02
+          ],
+          "action": [
+            0,
+            0
+          ],
+          "is_last": false
+        },
+        {
+          "time_us": 80000,
+          "state_base_m": [
+            0.0,
+            0.02
+          ],
+          "action": null,
+          "is_last": true
+        }
+      ]
+    },
+    {
+      "id": "test-c",
+      "session": "next-day",
+      "origin": "synthetic-recorder/test-c",
+      "split": "test",
+      "source": "camera_deltas",
+      "clock": "simulation_us",
+      "terminal": true,
+      "instruction": "move in base positive y",
+      "frames": [
+        {
+          "id": 0,
+          "capture_us": 0,
+          "ready_us": 0,
+          "clock": "simulation_us",
+          "rgb_2x2": [
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 1,
+          "capture_us": 15000,
+          "ready_us": 25000,
+          "clock": "simulation_us",
+          "rgb_2x2": [
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 2,
+          "capture_us": 35000,
+          "ready_us": 36000,
+          "clock": "simulation_us",
+          "rgb_2x2": [
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 3,
+          "capture_us": 39000,
+          "ready_us": 70000,
+          "clock": "simulation_us",
+          "rgb_2x2": [
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 4,
+          "capture_us": 55000,
+          "ready_us": 90000,
+          "clock": "simulation_us",
+          "rgb_2x2": [
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0,
+            255,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "time_us": 0,
+          "state_base_m": [
+            0.0,
+            0.0
+          ],
+          "action": [
+            100,
+            0
+          ],
+          "is_last": false
+        },
+        {
+          "time_us": 20000,
+          "state_base_m": [
+            0.0,
+            0.1
+          ],
+          "action": [
+            100,
+            0
+          ],
+          "is_last": false
+        },
+        {
+          "time_us": 40000,
+          "state_base_m": [
+            0.0,
+            0.2
+          ],
+          "action": [
+            100,
+            0
+          ],
+          "is_last": false
+        },
+        {
+          "time_us": 60000,
+          "state_base_m": [
+            0.0,
+            0.30000000000000004
+          ],
+          "action": [
+            100,
+            0
+          ],
+          "is_last": false
+        },
+        {
+          "time_us": 80000,
+          "state_base_m": [
+            0.0,
+            0.4
+          ],
+          "action": null,
+          "is_last": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "reviewed_utc": "2026-10-18T21:26:26.917369+00:00",
+  "python": "3.12.3",
+  "tests_passed": 9,
+  "single_error_cases": 128,
+  "double_error_cases": 448,
+  "evidence_kind": "CPU reference logic and exact rational calculations; no hardware execution",
+  "source_sha256": {
+    "logic_and_costs.py": "1be7fb412fe042755d220468a73d21be6ab16979638d525efc7cf77abd828dd2",
+    "test_logic_and_costs.py": "d3847dc64cbd1498762ff3c7282a269464351350fb5fd462abd066c62657a1af"
+  }
+}

@@ -1,341 +1,138 @@
-# Module 04 — Model Anatomy: Finding the Bytes That Matter
+# Module 04 — Model Anatomy: Count the Stored Bytes, Then Model the Traffic
 
-**Collection:** [Hardware-Aware LLM Quantization](README.md) | **Previous:** [← Module 03](Lecture-03.md) | **Next:** [Module 05 →](Lecture-05.md)
+**Collection:** [Hardware-Aware LLM Quantization](README.md) | **Previous:** [Previous lesson](Lecture-03.md) | **Next:** [Next lesson](Lecture-05.md)
 
----
+Your task is to separate three quantities: serialized tensor bytes, resident device
+memory, and bytes transferred during an operation. They answer different questions.
+A model index can establish the first. Runtime allocation measurements establish
+the second. Execution traces and hardware counters are needed for the third.
 
-[Module 01](Lecture-01.md) claimed that checkpoint size and per-token traffic are different quantities. This module builds the instrument that separates them — the **per-token byte ledger** — and then uses it to reverse-engineer an entire model's architecture from four published numbers.
+## 1. Start from the actual architecture
 
-This is the module that turns the framework into arithmetic you can run on any checkpoint in an afternoon.
+Read [the pinned source evidence](Source-Evidence.md) before interpreting a model
+name. The official Qwen3.8-27B configuration specifies hidden size **5120**, vocabulary
+**248320**, and **64** language layers: **16 full-attention** and **48 linear-attention**.
+It is a dense-parameter hybrid model; “dense” does not mean every layer stores a
+full sequence of K/V vectors. The community NVFP4 target retains this architecture
+but removes its built-in MTP head. DSpark is a **separate five-layer drafter**.
 
----
-
-## Learning objectives
-
-By the end of this module you should be able to:
-
-1. Classify every tensor in a checkpoint into one of four traffic classes.
-2. Build a per-token byte ledger and predict batch-1 decode throughput from it.
-3. Reconstruct a model's hidden dimension, vocabulary, and parameter split from its byte inventory.
-4. Explain why the ledger changes when speculation or multimodality is enabled.
-5. Identify the highest-opportunity tensor in a checkpoint without running an experiment.
-
----
-
-## 1. The four traffic classes
-
-Every tensor in an LLM checkpoint belongs to exactly one of these:
+The BF16 input embedding matrix would contain:
 
 ```text
-   ┌─────────────────────────────────────────────────────────────────────────┐
-   │ CLASS A — STREAMED                                                       │
-   │   Read in full, every forward pass. THE decode critical path.            │
-   │   → MLP weights, attention projections, lm_head, per-layer norms         │
-   │   Optimization target: YES. This is where tok/s lives.                   │
-   ├─────────────────────────────────────────────────────────────────────────┤
-   │ CLASS B — GATHERED                                                        │
-   │   Resident in full, indexed sparsely. Capacity cost, ~no traffic cost.   │
-   │   → input embedding table                                                 │
-   │   Optimization target: only if VRAM-constrained.                          │
-   ├─────────────────────────────────────────────────────────────────────────┤
-   │ CLASS C — CONDITIONAL                                                     │
-   │   Traffic depends on SERVING CONFIG, not on the checkpoint.               │
-   │   → vision/audio towers, MTP or draft heads, LoRA adapters                │
-   │   Optimization target: depends. Ledger it twice — enabled and disabled.  │
-   ├─────────────────────────────────────────────────────────────────────────┤
-   │ CLASS D — STATE                                                           │
-   │   Not in the checkpoint at all. Grows with context and batch.             │
-   │   → KV cache, workspace, activation buffers                               │
-   │   Optimization target: dominant at long context (Module 09).             │
-   └─────────────────────────────────────────────────────────────────────────┘
+248320 × 5120 = 1,271,398,400 elements
+× 2 bytes = 2,542,796,800 bytes = 2.543 GB = 2.368 GiB
+one gathered row = 5120 × 2 = 10,240 bytes
 ```
 
-The mistake the ledger prevents is treating a Class B or C tensor as though it were Class A because it is large. **Size determines class membership not at all.**
+Its dimensions cannot be inferred uniquely from its byte count. For example,
+`155200 × 8192` gives the same element count. An earlier version of this lesson
+selected the wrong factorization by assuming a familiar tokenizer size. Inspect
+`vocab_size`, `hidden_size`, `tie_word_embeddings`, the tensor shape and the loader.
+Equal input/output matrix sizes also do not prove that weights are untied.
 
----
+**Self-check:** can an API's total model size reveal the number of attention heads?
+**Answer:** no; many architectures and precision mixtures fit one scalar size.
+Record unknowns instead of manufacturing a configuration.
 
-## 2. Reconstructing a model from its bytes
+## 2. Build a storage ledger from real serialized tensors
 
-Take the case-study checkpoint. Published facts, and nothing else:
+For ordinary safetensors entries, `data_offsets[1] - data_offsets[0]` is the payload
+length. Sum each stored tensor once. Packed FP4 weights may appear as byte arrays;
+the dtype of that array does not mean each logical weight consumes one byte.
+Scale tensors, padding, auxiliary tensors and unquantized exclusions are separate.
+A dtype-to-bytes table with an unknown-type default of 2 silently miscounts them.
+
+Use the index to enumerate **all shards**, then their headers to count actual
+payload offsets. Do not load model weights simply to count them. The supplied
+[CPU lab](CPU-Quantization-Lab.md) checks a compact metadata inventory offline;
+it deliberately does not claim to have inspected every safetensors payload.
+
+For the pinned community target, `model.safetensors.index.json` reports
+**17,915,815,528 tensor bytes across two shards**. That is **17.916 GB / 16.685 GiB**.
+It excludes file headers and is not a measured GPU allocation. Its key list includes
+`lm_head.weight_scale` and `lm_head.weight_scale_2`, and no MTP tensor names.
+A config flag plus names is evidence of intended export structure, not proof that
+a particular engine correctly executes it.
+
+A useful ledger has these columns:
+
+| Group | Stored bytes | Loaded bytes | Invocations | Expected access | Evidence |
+|---|---:|---:|---:|---|---|
+| Language projections | from headers | measured | each relevant layer | dense or selected experts | shapes, trace |
+| Input embedding | from headers | measured | per input token | gathered rows | tied/shared storage checked |
+| Output projection | from headers | measured | requested logits | vocabulary projection | pruning/fusion checked |
+| Vision encoder | from headers | measured | image/video encoding | conditional | request type |
+| Drafter | separate artifact | measured | speculative steps | own weights and state | draft configuration |
+| KV/recurrent state | absent from weights | measured | request lifetime | architecture dependent | Module 09 |
+
+A tensor's traffic class is a property of the **execution path**. Shared tensors,
+MoE routing, prefix reuse, offloading and repeated kernels prevent an exclusive
+name-only classification from being a complete analyzer. Unknown tensor names
+should require review, not silently be classified as always streamed.
+
+## 3. A worked historical estimate, with its limits
+
+The community target card describes an earlier **18.80 GiB**, **81.6 tok/s** build.
+These are publisher-reported historical numbers, not measurements from this course
+or the current 17.916 GB artifact. Their branch identities are recorded in the
+source evidence when available; copying today's model ID is not reproducing that run.
+
+Suppose, for an **illustrative inventory**, resident tensors total 20.19 GB,
+including a 2.54 GB gathered embedding, an inactive 0.92 GB vision tower and an
+inactive 0.85 GB draft component. Subtracting them gives about **15.88 GB of
+candidate streamed weights**. Then:
 
 ```text
-   resident weights      :  18.80 GiB
-   BF16 remaining        :   6.91 GB  (33.6 % of checkpoint)
-   of which:  embeddings :   2.54 GB
-              lm_head    :   2.54 GB
-              vision     :   0.92 GB
-              MTP head   :   0.85 GB
-   decode throughput     :  81.6 tok/s
+15.88 GB/token × 81.6 token/s = 1295.8 GB/s
+1295.8 / 1792 = 72.3% of the RTX 5090's advertised bandwidth
 ```
 
-**Step 1 — normalize units.** `18.80 GiB × 1024³ / 10⁹ = 20.19 GB`.
+This is **estimated required weight bytes per second**, not measured DRAM
+utilization. It omits activations, state, rereads and cache effects, and its inputs
+may not describe the historical run exactly. It cannot prove that a 27% speedup
+is available or that launch overhead is the bottleneck. A low estimate is a
+reason to profile and refine the model.
 
-**Step 2 — the residual is the quantized body.**
+## 4. Rank candidates under explicit assumptions
+
+With `B=15.88 GB`, reducing a 2.54 GB output projection to 1.27 GB predicts
+`15.88 / 14.61 = 1.087×` speed **if achieved bandwidth and other costs stay fixed**.
+Reducing it to `2.54 × 0.5625/2 ≈ 0.714 GB` predicts `1.130×`.
+These are sensitivity calculations. The current community target already has a
+quantized output head, so neither is a fresh optimization for that artifact.
+
+Quantizing embeddings removes far fewer directly accessed bytes per token than
+quantizing an equally sized dense output head. It can nevertheless improve
+capacity, avoid offload, change cache behavior or enable a larger batch. Thus it
+is a useful control, not an operation guaranteed to change throughput by zero.
+
+## 5. Change the ledger when the workload changes
+
+For speculation, count **one cycle** first:
 
 ```text
-   20.19 GB (total)  −  6.91 GB (BF16)  =  13.28 GB  in NVFP4
+B_cycle ≈ B_target_verify(K+1) + sum(B_draft_step_j) + state/temporary traffic
+bytes per emitted token ≈ B_cycle / mean_tokens_emitted_per_cycle
 ```
 
-**Step 3 — convert bytes to parameters** using bits-per-weight from [Module 02](Lecture-02.md) (NVFP4 = 0.5625 B/param, BF16 = 2 B/param):
-
-| Group | Bytes | ÷ B/param | **Parameters** |
-|---|---:|---:|---:|
-| Transformer body (NVFP4) | 13.28 GB | 0.5625 | **23.61 B** |
-| Embeddings (BF16) | 2.54 GB | 2.0 | 1.270 B |
-| lm_head (BF16) | 2.54 GB | 2.0 | 1.270 B |
-| Vision tower (BF16) | 0.92 GB | 2.0 | 0.460 B |
-| MTP head (BF16) | 0.85 GB | 2.0 | 0.425 B |
-| Norms / misc | 0.06 GB | 2.0 | 0.030 B |
-| **Total** | **20.19 GB** | | **27.06 B** |
-
-**27.06 B parameters.** The checkpoint reconstructs to a 27 B model to within 0.2 %, from byte counts alone. The internal consistency is the proof that the ledger is correct.
-
-**Step 4 — infer the architecture.** Embeddings and `lm_head` are the same size, so the model has **untied** input/output embeddings, and each is `vocab × d_model = 1.270 B`. Solving for plausible hidden sizes:
-
-```text
-   d_model = 8192   →  vocab ≈ 155,000     ← consistent with a ~152–156 K Qwen-family tokenizer
-   d_model = 5120   →  vocab ≈ 248,000     ← implausibly large
-   d_model = 4096   →  vocab ≈ 310,000     ← implausible
-```
-
-So: **`d_model ≈ 8192`, `vocab ≈ 155 K`, untied embeddings, ~23.6 B params in the transformer body.** All of it derived from four numbers and the bits-per-weight table.
-
-> This is a genuinely useful skill. You will constantly face checkpoints whose configs you cannot inspect (a competitor's release, a quantized artifact, a service you only see through an API). The byte inventory tells you most of what you need.
-
----
-
-## 3. The per-token byte ledger
-
-Now the ledger that actually predicts throughput. **Text-only decode, speculation disabled, short context:**
-
-| Tensor group | Bytes | Class | Read per token | Why |
-|---|---:|---|---:|---|
-| Transformer body | 13.28 GB | **A** | **13.28 GB** | every weight participates |
-| lm_head | 2.54 GB | **A** | **2.54 GB** | full vocab projection |
-| Norms / misc | 0.06 GB | **A** | **0.06 GB** | per-layer, tiny but streamed |
-| Embeddings | 2.54 GB | B | **~16 KB** | one row: `8192 × 2 B` |
-| Vision tower | 0.92 GB | C | **0** | no image in the request |
-| MTP head | 0.85 GB | C | **0** | speculation disabled |
-| KV cache | — | D | small at short ctx | Module 09 |
-| | | | | |
-| **`B_token`** | | | **≈ 15.88 GB** | |
-
-```text
-   resident  20.19 GB   ─────▶   B_token  15.88 GB
-                                  │
-                    4.31 GB (21 %) of the checkpoint is NEVER
-                    fetched during a text-only decode step
-```
-
-**Validate against the measurement:**
-
-```text
-   BW_achieved  =  15.88 GB × 81.6 tok/s  =  1296 GB/s  =  72.3 % of 1792 GB/s
-```
-
-Compare with the naive calculation that uses resident bytes:
-
-```text
-   naive :  20.19 GB × 81.6  =  1647 GB/s  =  91.9 %   ← wrong; charges for 4.31 GB never read
-   real  :  15.88 GB × 81.6  =  1296 GB/s  =  72.3 %   ← correct
-```
-
-The engineering conclusions are opposite:
-
-| If utilization is… | Then the binding constraint is… | And the next move is… |
-|---|---|---|
-| 92 % | bytes | quantize more |
-| **72 %** | **kernel / launch / scheduling** | **profile the kernels first** |
-
-```text
-   headroom at CONSTANT bytes:
-        1650 GB/s (92 % of peak)  ÷  15.88 GB  =  103.9 tok/s
-        measured                                =   81.6 tok/s
-                                                   ─────────────
-        available without removing one bit      =  +22.3 tok/s  (+27 %)
-```
-
-**Twenty-two tokens per second are sitting in kernel efficiency, not in bits.** That is the ledger earning its keep — it redirected the entire optimization effort.
-
----
-
-## 4. Ranking the targets
-
-With the ledger built, the opportunity framework from [Module 01](Lecture-01.md) becomes arithmetic. Each candidate's ceiling is bounded by its share of `B_token`:
-
-| Candidate | Traffic | Share of `B_token` | Native path? | Max possible gain |
-|---|---:|---:|---|---:|
-| **`lm_head` BF16 → FP8** | 2.54 GB | **16.0 %** | yes | **+8.7 %** |
-| `lm_head` BF16 → NVFP4 | 2.54 GB | 16.0 % | yes | +13.4 % |
-| Embeddings BF16 → FP8 | 16 KB | 0.0001 % | yes | **+0.0 %** |
-| Vision BF16 → NVFP4 | 0 | 0 % | yes | **+0.0 %** |
-| Body NVFP4 → INT3 | 13.28 GB | 83.6 % | **no** | negative (Module 03) |
-
-Working the top candidate through the throughput equation, holding achieved bandwidth at the measured 1296 GB/s:
-
-```text
-   lm_head 2.54 GB → 1.27 GB (FP8)     B_token: 15.88 → 14.61 GB
-        1296 / 14.61  =  88.7 tok/s          (+8.7 %)
-
-   lm_head 2.54 GB → 0.71 GB (NVFP4)   B_token: 15.88 → 14.05 GB
-        1296 / 14.05  =  92.2 tok/s          (+13.0 %)
-```
-
-And the contrast that makes the point:
-
-```text
-   Embeddings are the SAME SIZE as lm_head (2.54 GB each).
-   Quantizing embeddings :  +0.0 %  throughput,  −1.27 GB VRAM
-   Quantizing lm_head    :  +8.7 %  throughput,  −1.27 GB VRAM
-
-   Identical tensors. Identical capacity win. ~150,000× difference in traffic.
-```
-
-If you take one table from this course, take that one.
-
----
-
-## 5. The ledger changes when the config changes
-
-The same checkpoint has **different ledgers** under different serving configurations. This is why Class C exists.
-
-### With speculation enabled (the DSpark build)
-
-Measured: **155.75 tok/s at acceptance length 2.886.** The target model now runs once per *accepted group*, not once per token:
-
-```text
-   target forward passes/s  =  155.75 / 2.886  =  53.97 passes/s
-```
-
-Each target pass streams the full `B_token`, and the MTP head runs `K` times per cycle to produce the draft:
-
-| Draft depth `K` | Traffic (GB/s) | % of peak |
-|---:|---:|---:|
-| 2 | 946 | 52.8 % |
-| 3 | 991 | 55.3 % |
-| 4 | 1037 | 57.9 % |
-
-```text
-   traffic  =  53.97 × ( 15.88  +  K × 0.85 )   GB/s
-                        └ target ┘   └ MTP ┘
-```
-
-**Bandwidth utilization *drops* from 72 % to ~55 % when speculation is enabled.** That is not a regression — it is exactly what speculation does: it amortizes one weight-read across ~2.9 emitted tokens. But it has a sharp consequence:
-
-> In the speculative configuration the model is **no longer bandwidth-bound.** It sits at ~55 % of peak, which means further weight quantization has **diminishing returns**, and the dominant levers become **acceptance length** ([Module 10](Lecture-10.md)) and **kernel/launch efficiency** ([Module 03](Lecture-03.md)).
-
-This is the kind of conclusion the ledger produces and intuition does not. The same model, same weights, same GPU — and the correct optimization strategy inverts depending on whether speculation is on.
-
-### With an image in the request
-
-The vision tower moves from Class C to Class A for the prefill pass: `+0.92 GB` of traffic, once per image, not per token. It never enters the decode ledger. **Quantizing the vision tower improves image-prefill latency and VRAM, and never improves tok/s** — precisely as [Module 01](Lecture-01.md) claimed.
-
----
-
-## 6. Build the analyzer
-
-A ledger you compute by hand once is a note. A ledger you can regenerate is a tool.
-
-```python
-"""Per-token byte ledger for a safetensors checkpoint."""
-import json, re
-from collections import defaultdict
-from safetensors import safe_open
-
-BYTES_PER_PARAM = {  # see Module 02
-    "BF16": 2.0, "F16": 2.0, "F32": 4.0,
-    "F8_E4M3": 1.0, "F8_E5M2": 1.0,
-    "NVFP4": 0.5625,   # 4 bits + 8-bit E4M3 scale per 16 elements
-    "MXFP4": 0.5312,   # 4 bits + 8-bit E8M0 scale per 32 elements
-}
-
-# Class A = streamed every token. Class B/C/D never enter B_token by default.
-CLASS_RULES = [
-    (r"vision|visual|image_encoder",           "C_vision"),
-    (r"mtp|draft|eagle|medusa",                "C_speculative"),
-    (r"embed_tokens|wte|tok_embeddings",       "B_gathered"),
-    (r"lm_head|output\.weight",                "A_streamed"),
-    (r"layers\.\d+\.",                         "A_streamed"),
-    (r"norm|ln_f",                             "A_streamed"),
-]
-
-def classify(name: str) -> str:
-    for pattern, cls in CLASS_RULES:
-        if re.search(pattern, name):
-            return cls
-    return "A_streamed"          # conservative default: assume it is on the hot path
-
-def ledger(path: str, d_model: int, spec_enabled=False, draft_depth=0):
-    by_class = defaultdict(float)
-    with safe_open(path, framework="pt") as f:
-        for name in f.keys():
-            sl = f.get_slice(name)
-            n = 1
-            for d in sl.get_shape():
-                n *= d
-            bpp = BYTES_PER_PARAM.get(sl.get_dtype(), 2.0)
-            by_class[classify(name)] += n * bpp
-
-    resident = sum(by_class.values())
-    b_token  = by_class["A_streamed"] + d_model * 2      # + one gathered embedding row
-    if spec_enabled:
-        b_token += by_class["C_speculative"] * draft_depth
-
-    return {
-        "resident_GB":  resident / 1e9,
-        "resident_GiB": resident / 1024**3,
-        "B_token_GB":   b_token / 1e9,
-        "dead_weight_GB": (resident - by_class["A_streamed"]) / 1e9,
-        "by_class_GB":  {k: v / 1e9 for k, v in sorted(by_class.items())},
-    }
-
-def predict_tps(b_token_GB: float, peak_BW_GBs=1792, efficiency=0.92):
-    return peak_BW_GBs * efficiency / b_token_GB
-
-def achieved_BW(b_token_GB: float, measured_tps: float):
-    return b_token_GB * measured_tps          # GB/s — compare to peak, NOT to resident×tps
-```
-
-Run it, then run the comparison that matters:
-
-```text
-   predicted_tps  =  predict_tps(B_token)              ← what physics allows
-   measured_tps   =  benchmark()                       ← what you get
-   gap            =  predicted / measured
-
-   gap ≈ 1.0   →  you are at the bandwidth wall. Quantize.
-   gap > 1.2   →  you are NOT bandwidth-bound. Profile kernels first.
-```
-
-For the case study: `predicted = 103.9`, `measured = 81.6`, **`gap = 1.27`**. Profile the kernels.
-
----
-
-## Checkpoint
-
-You should now be able to:
-
-1. Name the four traffic classes and place any tensor into one.
-2. Reconstruct a model's parameter count and hidden dimension from a byte inventory.
-3. Build a `B_token` ledger and compute achieved bandwidth correctly.
-4. Explain why embeddings and `lm_head` — identical in size — differ by five orders of magnitude in traffic.
-5. Explain why enabling speculation *lowers* bandwidth utilization and *changes which optimization is correct*.
-6. Use the `predicted/measured` gap to decide between quantizing and profiling.
-
----
-
-## Ship it
-
-For a checkpoint you run: the analyzer script, the ledger table (all four classes), the predicted-vs-measured comparison with the gap, and **a one-sentence verdict naming your next action**. If the gap is above ~1.2, the verdict must be "profile kernels", not "quantize" — and the rest of this course will still be here when you come back.
-
----
-
-## Current as of
-
-* **Timeless:** the four traffic classes, the ledger method, byte-to-parameter reconstruction, the gap heuristic.
-* **2026 case-study pins:** the 27.06 B reconstruction, `B_token ≈ 15.88 GB`, 72.3 % achieved bandwidth at 81.6 tok/s, and ~55 % under speculation are derived from the published NVFP4/DSpark builds linked in the [course index](README.md).
-* **Note:** `BYTES_PER_PARAM` must track the formats your runtime emits. Safetensors dtype strings for 4-bit formats vary between exporters — verify against your own checkpoint rather than trusting the table.
-
----
-
-**Next:** [Module 05 — Calibration →](Lecture-05.md)
+A DSpark drafter is not the target's MTP head; their weights, state and invocation
+costs differ. Target verification can reuse weights across proposed positions,
+but its latency is not guaranteed to equal a one-token target step. Never multiply
+the size of an inactive MTP head by draft depth to model the external drafter.
+
+With images, account for image encoding and projected image tokens in prefill,
+then the resulting language-model state during decode. Streaming video can invoke
+the encoder again; “vision never contributes to decode latency” is too broad.
+
+## 6. Independent exercise and completion
+
+Run the offline inventory lab and submit a storage/traffic ledger with an evidence
+column. Then change only `lm_head` from BF16 to the reference FP4 format, including
+scale and row-padding bytes. State which numbers are exact payload counts and which
+are traffic assumptions. For a device run, retain peak allocated/reserved memory,
+state lengths, profiler counters and latency separately.
+
+**Answer guidance:** storage counts must reconcile exactly to the selected files;
+runtime memory also includes workspace, allocator behavior and state. A discrepancy
+is not automatically a loader bug. A prediction outside a timing interval calls
+for an explanation of missing traffic or compute, not a fabricated efficiency factor.

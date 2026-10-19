@@ -18,6 +18,14 @@
 
 ---
 
+## Start with a question and a small correct result
+
+Source/API review: **2026-10-18**. This is a library-selection map, not a claim that every package shares one CUDA compatibility matrix. Record GPU architecture, driver, toolkit and exact package version for each experiment. Current online documentation can describe a release newer than the library bundled with JetPack or a framework wheel.
+
+For a CPU entry exercise, run the [actual two-process Gloo/DDP lab](../../Track%20A%20-%20GPU%20Infrastructure/Nvidia%20GPU/HPC%20Setup/NCCL-Deep-Dive/CPU-Collectives-Lab/Guide.md). It proves collective and gradient-normalization semantics; it does not benchmark NCCL or CUDA. For one available CUDA GPU, begin with a non-square GEMM correctness check and a bounded timed run using the [device benchmark example](../../Track%20A%20-%20GPU%20Infrastructure/Nvidia%20GPU/HPC%20Setup/8x-H200-Training-Inference/06-Benchmarks-and-Validation.md).
+
+**Diagnostic:** for `C=A@B`, A shape 37×53 and B shape 53×19, C is 37×19 and the conventional work count is `2×37×53×19=74,518 FLOPs`. A transposed view can have the right shape but different strides; a library call must receive the correct layout/leading dimensions. A correct shape alone does not validate storage interpretation.
+
 ## What CUDA-X is
 
 **CUDA-X** is NVIDIA's full suite of GPU-accelerated libraries built on top of the CUDA runtime. While CUDA gives you the programming model (kernels, streams, memory), CUDA-X gives you **production-grade implementations** of the algorithms you'd otherwise spend months writing: linear algebra, FFTs, neural network primitives, graph analytics, video codecs, multi-GPU communication, and more.
@@ -38,20 +46,20 @@ The foundation for compute-intensive workloads: molecular dynamics, CFD, medical
 
 | Library | What it does | Key APIs / Concepts | When to use it |
 |---------|-------------|--------------------|-----------------------|
-| **cuBLAS** | GPU-accelerated BLAS (Basic Linear Algebra Subprograms) | GEMM (`cublasSgemm`, `cublasGemmEx`), batched GEMM, mixed-precision (FP16/BF16/FP8 accumulate to FP32) | Any dense matrix multiply — the single most important library for AI inference and training |
+| **cuBLAS** | GPU-accelerated BLAS (Basic Linear Algebra Subprograms) | GEMM (`cublasSgemm`, `cublasGemmEx`), batched GEMM; cuBLASLt for supported low-precision formats/layouts/scaling, including FP8. Input, output and accumulation types are separate contracts | Any dense matrix multiply — the single most important library for AI inference and training |
 | **cuFFT** | Fast Fourier Transform on GPU | 1D/2D/3D FFTs, real-to-complex, batched FFTs, multi-GPU FFT | Signal processing, audio, spectral analysis, conv via FFT |
 | **cuRAND** | Random number generation on GPU | Pseudorandom (XORWOW, MRG32k3a, Philox) and quasirandom (Sobol) generators; host and device API | Monte Carlo simulations, dropout in training, data augmentation |
-| **cuSOLVER** | Dense and sparse direct solvers | LU, Cholesky, QR, SVD, eigenvalue decomposition; sparse Cholesky | Linear systems, least squares, PCA, matrix factorization |
+| **cuSOLVER** | Dense factorizations/solvers; legacy sparse interfaces are deprecated | LU, Cholesky, QR, SVD, eigenvalues; use cuDSS for supported sparse-direct migration | Linear systems, least squares, PCA, matrix factorization |
 | **cuSPARSE** | Sparse matrix operations | SpMV, SpMM, sparse triangular solve; CSR, CSC, COO formats | GNNs, sparse attention, scientific computing with sparse matrices |
 | **cuTENSOR** | Tensor contractions and operations | Tensor contraction, reduction, element-wise ops on multi-dimensional arrays | Quantum chemistry, tensor networks, high-dimensional contractions |
 | **cuDSS** | Direct sparse solver | Sparse LU/Cholesky with GPU acceleration | Large sparse systems in structural analysis, circuit simulation |
-| **CUDA Math API** | Standard math functions | `sin`, `cos`, `exp`, `log`, `sqrt` — GPU-optimized, single and double precision | Any kernel that needs standard math — these are intrinsics, not library calls |
+| **CUDA Math API** | Standard math functions | `sin`, `cos`, `exp`, `log`, `sqrt` — GPU-optimized, single and double precision | Any kernel that needs standard math — device math functions; intrinsic and standard-function accuracy/compilation contracts differ |
 | **AmgX** | Algebraic multigrid solver | AMG preconditioner + Krylov solvers for implicit unstructured methods | CFD, structural mechanics, any PDE solver using implicit methods |
-| **nvmath-python** | Python interface to CUDA math | `nvmath.fft`, `nvmath.linalg` — NumPy-compatible but GPU-accelerated | Rapid prototyping of GPU math in Python without writing C++ |
+| **nvmath-python** | Python interface to CUDA math | Host/device math APIs with execution plans, layouts and supported array interoperability; not a universal drop-in NumPy replacement | Rapid prototyping of GPU math in Python without writing C++ |
 
 ### What to study first
 
-**cuBLAS** — if you understand GEMM (shapes, leading dimensions, transposition, batching, mixed precision), you understand 80% of AI compute. Start here.
+**cuBLAS** — start with GEMM shapes, leading dimensions, transposition, batching and numerical error. Its share of runtime depends on the model and workload; profile before assigning a percentage.
 
 ### Projects
 
@@ -103,9 +111,9 @@ The libraries that **directly implement neural network inference and training**.
 
 | Library | What it does | Layer | Key concepts |
 |---------|-------------|:-----:|-------------|
-| **cuDNN** | Neural network primitives: conv, attention, normalization, pooling, activation | L1/L2 | `cudnnConvolutionForward`, `cudnnMultiHeadAttnForward`, graph API for fusion; auto-tuning selects fastest algorithm per hardware |
-| **TensorRT** | Inference optimizer + runtime: graph optimization, layer fusion, precision calibration, engine serialization | L2/L3 | Build phase (optimize graph) → serialize → deploy phase (execute). INT8/FP8 calibration, dynamic shapes, DLA offload |
-| **[TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM)** | LLM-specific inference engine: in-flight batching, paged KV-cache, tensor/pipeline parallelism, speculative decoding, FP8/INT4 | L2/L3 | Compiles LLMs to optimized TRT engines with custom Hopper/Blackwell kernels. Python API for build + deploy. Integrates with Triton for production serving. See [Phase 4C Part 2 Unit 05](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/05%20-%20Inference%20Runtimes%20and%20Deployment/Guide.md) for deep dive |
+| **cuDNN** | Neural network primitives: conv, attention, normalization, pooling, activation | L1/L2 | Frontend/graph API, supported execution plans and workspace; older fixed-function APIs are legacy. Benchmark eligible plans for the actual shape/dtype |
+| **TensorRT** | Inference optimizer + runtime: graph optimization, layer fusion, precision calibration, engine serialization | L2/L3 | Typed networks, supported explicit quantization, dynamic-shape profiles, serialized execution. TensorRT 11.4 is a desktop/server boundary; JetPack remains on supported 10.x, with separate DLA constraints |
+| **[TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM)** | LLM-specific inference engine: in-flight batching, paged KV-cache, tensor/pipeline parallelism, speculative decoding, FP8/INT4 | L2/L3 | Current TensorRT-LLM uses its PyTorch backend and model-specific optimized kernels; the removed TensorRT backend had the older convert/build engine workflow. Pin the runtime/model support matrix. See [Phase 4C Part 2 Unit 05](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/05%20-%20Inference%20Runtimes%20and%20Deployment/Guide.md) for deep dive |
 | **CUTLASS** | C++ template library for custom GEMM, conv, and attention kernels targeting Tensor Cores | L2/L3 | CuTe layout DSL, tile-based programming, epilogue fusion, warp-level MMA. The reference for how production GEMM kernels are structured |
 | **FlashInfer** | Optimized attention and MoE kernels for LLM inference via Python API | L2 | Paged KV-cache attention, variable-length sequences, speculative decoding support |
 
@@ -118,7 +126,7 @@ The libraries that **directly implement neural network inference and training**.
 
 ### Projects
 
-1. **cuDNN algorithm benchmark** — For a specific conv layer (ResNet-50 first conv), enumerate all cuDNN algorithms (`cudnnFindConvolutionForwardAlgorithm`). Compare time and workspace for each. Understand why auto-tuning matters.
+1. **cuDNN algorithm benchmark** — For a concrete convolution graph, build supported frontend execution plans under a workspace limit. Compare numerical error, plan creation cost and warm execution; treat legacy `cudnnFind*` examples as versioned historical APIs.
 2. **CUTLASS custom GEMM** — Build a CUTLASS GEMM with a fused bias+ReLU epilogue. Benchmark against cuBLAS. Study the CuTe layout to understand tiling.
 3. **FlashInfer attention** — Run FlashInfer paged attention on a transformer model. Compare latency vs standard PyTorch attention for 4K, 16K, 64K context lengths.
 
@@ -133,7 +141,7 @@ The libraries that **directly implement neural network inference and training**.
 | **Thrust** | C++ STL-like parallel algorithms: sort, reduce, scan, transform | High-level parallel algorithms without writing raw CUDA kernels |
 | **CUB** | Warp-wide, block-wide, and device-wide cooperative primitives | Inside custom CUDA kernels — block reduce, block scan, radix sort |
 | **cuda.compute** | Python interface to CCCL device-level algorithms | GPU-accelerated algorithms from Python |
-| **cuda.parallel** | Standardized sort, scan, reduction primitives | Distributed and local parallel patterns |
+| **libcu++** | CUDA C++ standard-library facilities, synchronization and atomics | Express supported host/device contracts alongside Thrust/CUB |
 
 ### What to study first
 
@@ -152,15 +160,15 @@ GPU-accelerated data pipelines — critical for feeding models fast enough that 
 
 | Library | What it does | Replaces |
 |---------|-------------|----------|
-| **cuDF** | GPU-accelerated DataFrames | pandas, Polars, Spark (zero code changes) |
+| **cuDF** | GPU-accelerated DataFrames | DataFrame workloads; cudf.pandas can fall back to CPU for unsupported operations. Polars GPU/Spark acceleration have separate integration contracts |
 | **cuVS** | GPU vector search (nearest neighbors, CAGRA algorithm) | FAISS, Annoy — for RAG, recommendation, semantic search |
-| **cuML** | GPU-accelerated ML algorithms | scikit-learn, UMAP, HDBSCAN (zero code changes) |
+| **cuML** | GPU-accelerated ML algorithms | Supported estimators; accelerator integrations have compatibility/fallback limits, not universal sklearn replacement |
 | **cuOpt** | Decision optimization engine (millions of variables) | OR-Tools, Gurobi for routing/scheduling |
 | **cuGraph** | GPU graph analytics | NetworkX — for knowledge graphs, social networks |
 | **NeMo Curator** | Data pipeline for training/fine-tuning LLMs | Custom data cleaning scripts — text, image, video at scale |
 | **Morpheus** | Cybersecurity AI pipeline | Custom SIEM analysis pipelines |
 | **nvComp** | GPU-accelerated compression/decompression | zstd, lz4 — for training data I/O bottlenecks |
-| **GPUDirect Storage** | Direct path: NVMe → GPU memory, bypassing CPU | Standard `read()` → `cudaMemcpy()` — eliminates bounce buffers |
+| **GPUDirect Storage** | Direct path: NVMe → GPU memory, bypassing CPU | Eligible direct I/O paths; alignment/filesystem/driver constraints and compatibility fallback can reintroduce host staging |
 | **Dask** | Distributed computing framework with RAPIDS GPU support | Single-node pandas/scikit-learn — scales to clusters |
 
 ### Projects
@@ -176,7 +184,7 @@ Hardware-accelerated encode/decode and vision preprocessing — these feed the i
 
 | Library | What it does | Use case |
 |---------|-------------|----------|
-| **nvImageCodec** | GPU image encode/decode (JPEG, PNG, WebP) | High-throughput data loading for training |
+| **nvImageCodec** | Extensible image codec framework; CPU/GPU/hybrid backend support depends on codec and operation | High-throughput data loading for training |
 | **NVIDIA DALI** | GPU-accelerated data loading and preprocessing for DL | Training pipelines — replaces CPU-bound DataLoader |
 | **CV-CUDA** | GPU pre/post-processing for vision AI pipelines | Production inference: resize, normalize, color convert on GPU |
 | **cuCIM** | Accelerated image processing for biomedical/geospatial | Whole-slide imaging, satellite imagery |
@@ -199,7 +207,7 @@ Hardware-accelerated encode/decode and vision preprocessing — these feed the i
 | Library | What it does | Key operations | When to use it |
 |---------|-------------|---------------|---------------|
 | **NCCL** | Multi-GPU/multi-node collectives optimized for NVIDIA hardware | AllReduce, AllGather, ReduceScatter, Broadcast, Send/Recv | Distributed training (gradient sync), model parallelism, inference sharding |
-| **NVSHMEM** | Partitioned global address space across GPU memories | `nvshmem_put`, `nvshmem_get` — one-sided remote memory access | Fine-grained GPU-to-GPU communication without collective overhead |
+| **NVSHMEM** | Partitioned global address space across GPU memories | `nvshmem_put`, `nvshmem_get` — one-sided remote memory access | Fine-grained one-sided communication with explicit synchronization/completion and symmetric-memory contracts |
 | **NIXL** | Low-latency inference transfer library | KV-cache migration, tensor transfer between GPUs/memory tiers | LLM inference serving — moving KV-cache for disaggregated serving |
 
 ### What to study first
@@ -209,7 +217,7 @@ Hardware-accelerated encode/decode and vision preprocessing — these feed the i
 ### Projects
 
 1. **NCCL AllReduce benchmark** — Run `nccl-tests` on 2+ GPUs. Measure bandwidth and latency for AllReduce across different message sizes. Compare NVLink vs PCIe topology.
-2. **Communication-compute overlap** — In a simple 2-GPU training loop, overlap gradient AllReduce with the next forward pass. Measure the throughput improvement vs synchronous AllReduce.
+2. **Communication-compute overlap** — In a simple 2-GPU training loop, overlap ready gradient buckets with independent remaining backward computation. Complete required reductions before the optimizer update and next forward; compare the whole step with an equivalent non-overlapped baseline.
 
 ---
 
@@ -240,6 +248,16 @@ Community and third-party libraries with GPU acceleration via CUDA.
 | **AI Accelerator Architect** | CUTLASS (understand what hardware must support), cuDNN | cuBLAS, TensorRT | FlashInfer, NCCL |
 
 ---
+
+## Current API boundaries worth checking
+
+- [cuBLAS/cuBLASLt](https://docs.nvidia.com/cuda/cublas/index.html): verify the precise datatype/scaling/layout combination; hardware FP8 capability alone does not make every GEMM API accept FP8.
+- [cuSOLVER](https://docs.nvidia.com/cuda/cusolver/): deprecated sparse/RF paths direct users toward cuDSS; dense APIs remain a different scope.
+- [cuDNN graph API](https://docs.nvidia.com/cudnn/developer/graph-api/): use graph/plan concepts for new learning and identify legacy examples by version.
+- [TensorRT-LLM migration](https://nvidia.github.io/TensorRT-LLM/latest/legacy/tensorrt-backend-removal.html): current source no longer uses the old TensorRT backend's `convert_checkpoint.py` / `trtllm-build` path.
+- [TensorRT 11.x Jetson boundary](https://docs.nvidia.com/deeplearning/tensorrt/latest/api/migration/tensorrt-10x-to-11x-jetson.html): current server docs do not validate JetPack 10.x flags or DLA recipes.
+- [CCCL source and releases](https://github.com/NVIDIA/cccl): Python package/module names evolved; `cuda.compute` is not a distributed `cuda.parallel` framework. Experimental cooperative Python modules moved/changed packaging across releases; check the exact release rather than assuming a `cuda.coop` import is in every wheel.
+- [cuDF fallback behavior](https://docs.nvidia.com/cudf/latest/cudf_pandas/how-it-works/) and [nvImageCodec](https://docs.nvidia.com/cuda/nvimagecodec/index.html): report where computation actually runs.
 
 ## Resources
 

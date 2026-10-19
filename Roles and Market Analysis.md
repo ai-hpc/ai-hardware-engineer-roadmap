@@ -1,42 +1,39 @@
 # AI Hardware Engineering — Roles and Market Analysis
 
-> *Job titles, salary ranges, work arrangement data, and hiring priorities — organized by sub-layer so you can target a specific niche, not just a broad layer.*
+Choose work you want to learn, then check its requirements against current employer
+postings. This page maps **23 technical specializations** to example titles and
+portfolio evidence. The layer codes are this course's navigation scheme, not an
+official occupational classification or a ranking of careers.
 
-**Data basis:** US market, 2025–2026. Ranges reflect base salary + equity/bonus for FAANG-adjacent and well-funded startups. Adjust -20% to -30% for non-coastal or smaller companies.
-
----
+**Career sources checked: 19 October 2026.** Employer requirements and openings
+change; refresh your own sample before applying. This page does not estimate
+niche-role pay, remote-work shares, hiring volume, or market growth.
 
 ## How To Read This Data
-
-This page is decision support, not a labor-economics paper. Use it to narrow your direction inside the stack.
 
 ### What the tables mean
 
 | Field | Meaning | How to use it |
-|-------|---------|---------------|
-| **Focus** | The core technical problem area of the sub-layer | Match this to the work you actually want to do |
-| **Typical Roles** | Common job titles that map to that sub-layer | Search for these titles when validating demand |
-| **Total Comp (Top Tier)** | Approximate total compensation for top-paying US employers | Use directionally, not as a guaranteed expectation |
-| **Remote / Hybrid / Onsite** | Approximate working-mode mix for that sub-layer | Helps filter paths based on lifestyle constraints |
-| **Trending / Market Notes** | Directional hiring signal or skill premium | Helps identify where the market is tightening or accelerating |
+|---|---|---|
+| Focus | The engineering problem a specialization addresses | Choose a problem you enjoy investigating |
+| Typical roles / titles | Search terms; employer titles vary and can span layers | Read responsibilities and required qualifications |
+| Portfolio evidence | A suggested learning artifact, not an employer's universal requirement | Demonstrate a result, a failure case, and reproducible steps |
 
 ### What this data is for
 
-Use it to answer four practical questions:
-
-1. Which part of the stack matches the kind of problems you want to solve?
-2. Which roles are compatible with your preferred work arrangement?
-3. Which adjacent sub-layer should you learn next to increase your value?
-4. Which roadmap phase should you prioritize based on that target role?
+Decide which subsystem to study, what evidence to produce, and which adjacent
+skill would help you collaborate. A learner interested in robotics might start
+with L1c perception/control and L4a timing, then add L1b deployment.
 
 ### Interpretation rules
 
-- These are **directional ranges**, not exact market surveys.
-- Compensation reflects stronger employers and well-funded startups more than the median company.
-- Some titles overlap multiple sub-layers; use the work description, not just the title.
-- Higher pay usually means scarcer skills, lower remote flexibility, or both.
-
----
+- Distinguish required qualifications from preferred qualifications in each posting.
+- Check location, work arrangement, travel, lab access, and experience directly.
+  Access to a cloud GPU does not determine an employer's remote-work policy.
+- A broad occupational wage or projection does not measure a niche AI role.
+  A posted base-pay range is not total compensation or a guaranteed offer.
+- Completing course pages does not establish a job level. Assess demonstrated
+  scope, independent debugging, collaboration, and relevant experience.
 
 ## How To Use This Page With The Roadmap
 
@@ -52,7 +49,8 @@ Then map those targets back to the roadmap:
 - **L3 / L4 roles:** prioritize [Phase 1](Phase%201%20-%20Foundational%20Knowledge/Guide.md), [Phase 2](Phase%202%20-%20Embedded%20Systems/Guide.md), and selected Phase 4 tracks
 - **L5 / L6 roles:** prioritize [Phase 1](Phase%201%20-%20Foundational%20Knowledge/Guide.md), [Phase 4 Track A](Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/Guide.md), and [Phase 5F](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20F%20-%20AI%20Chip%20Design/Guide.md)
 
-This makes the data actionable instead of just interesting.
+Use [Start here](Start-Here.md) for the first robot and AI experiments, and the
+[learning guide](Learning-Guide.md) to select prerequisites and assess your work.
 
 ---
 
@@ -96,13 +94,7 @@ This makes the data actionable instead of just interesting.
 | AI Performance Engineer | Nsight profiling, roofline analysis, bottleneck identification |
 | Applied ML Engineer (Inference) | Take research models to production with latency/throughput SLAs |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $120K–$160K | 15% | 25% | 60% |
-| Mid | $170K–$230K | 10% | 25% | 65% |
-| Senior | $250K–$350K+ | 10% | 20% | 70% |
-
-**Trending:** LLM inference optimization (TensorRT-LLM, vLLM) is pushing these roles toward L2 salary levels.
+**Portfolio evidence:** Compare a model with a reference on held-out inputs; report quality, peak memory, and latency with the timing boundary and device named.
 
 ---
 
@@ -116,13 +108,7 @@ This makes the data actionable instead of just interesting.
 | Edge AI Engineer | Full pipeline: sensor → preprocess → inference → actuation |
 | Embedded AI Engineer | TFLite Micro, TinyML on Cortex-M, ultra-low-power inference |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $110K–$140K | 10% | 20% | 70% |
-| Mid | $150K–$200K | 10% | 20% | 70% |
-| Senior | $220K–$300K+ | 10% | 15% | 75% |
-
-**Note:** Hardware access (cameras, sensors, dev kits) limits remote work.
+**Portfolio evidence:** Build a timestamped sensor-to-model pipeline. Detect stale observations, bound queues, and measure power and latency on the named device when available.
 
 ---
 
@@ -137,11 +123,7 @@ This makes the data actionable instead of just interesting.
 | AI Application Engineer | SDK integration, demo systems, customer deployment |
 | AI Solutions Engineer | Pre/post-sales technical, benchmark customer workloads |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $110K–$145K | 15% | 25% | 60% |
-| Mid | $160K–$220K | 10% | 25% | 65% |
-| Senior | $240K–$320K+ | 10% | 20% | 70% |
+**Portfolio evidence:** Evaluate perception and a controller on held-out scenes or episodes; include a coordinate-frame error and a recovery case. Label simulated results.
 
 ---
 
@@ -151,24 +133,11 @@ This makes the data actionable instead of just interesting.
 
 | Title | What they do |
 |-------|-------------|
-| Agentic AI Engineer | Design multi-step AI agents: tool use, planning, memory, chain-of-thought orchestration |
+| Agentic AI Engineer | Design multi-step AI agents: tool use, planning, memory, tool routing, execution state, and evaluation |
 | GenAI Engineer | Build GenAI-powered products: chatbots, code assistants, content generation, multimodal apps |
 | AI Engineer | Full-stack AI application development: prompt engineering, fine-tuning, API integration, evaluation |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $120K–$160K | 30% | 35% | 35% |
-| Mid | $175K–$250K | 25% | 35% | 40% |
-| Senior | $270K–$400K+ | 20% | 30% | 50% |
-
-**Market notes:**
-- **Highest remote flexibility** in the entire stack — most work is API/cloud-based, no hardware needed
-- **Fastest-growing category by absolute job count** — LLM/GenAI application demand exploded 2023–2026
-- Salary premium for engineers who understand inference optimization (L1a) + agent orchestration
-- Overlaps with software engineering more than hardware — included here because these roles generate the *workloads* your AI chip must run
-- Companies hiring: OpenAI, Anthropic, Google DeepMind, Meta, every enterprise SaaS company, startups
-
-**Connection to AI hardware:** Agentic AI creates the inference demand (long-context, tool-calling, multi-turn) that drives hardware requirements. Understanding these workloads helps L2 (compiler) and L5 (architecture) engineers design for real usage patterns.
+**Portfolio evidence:** Build a small retrieval or tool-use application with source citations, validated tool arguments, bounded retries, and an evaluation set containing failures.
 
 ---
 
@@ -184,20 +153,7 @@ This makes the data actionable instead of just interesting.
 | ML Platform Engineer | Build internal ML platforms: compute scheduling, data versioning, model serving |
 | Data/ML Infrastructure Engineer | GPU cluster management for training, distributed data pipelines |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $115K–$155K | 25% | 30% | 45% |
-| Mid | $170K–$240K | 20% | 30% | 50% |
-| Senior | $260K–$380K+ | 15% | 30% | 55% |
-
-**Market notes:**
-- **Largest absolute job count** across all L1 sub-layers — every company doing AI needs ML engineers
-- Higher remote flexibility than hardware roles but less than pure GenAI (some roles need GPU cluster access)
-- MLOps is maturing: Kubernetes + GPU, model serving (Triton, vLLM), experiment tracking are standard skills
-- Strong overlap with L3c (HPC Infrastructure) for training-focused roles
-- Companies hiring: every tech company, banks, healthcare, defense, manufacturing — ML is horizontal
-
-**Connection to AI hardware:** ML engineers define the training workloads (distributed training, large batch, mixed precision) and serving requirements (latency SLAs, throughput targets) that hardware must support. Understanding MLOps helps L1a (inference optimization) and L3c (HPC) engineers.
+**Portfolio evidence:** Version a dataset split and training configuration; reproduce a model, save/reload it, and demonstrate how a failed quality check blocks deployment.
 
 ---
 
@@ -209,13 +165,9 @@ This makes the data actionable instead of just interesting.
 |-------|-------------|
 | DL Graph Optimization Engineer | Fusion passes, constant folding, memory planning, quantization insertion |
 | AI Systems Compiler Engineer | Distributed graph partitioning, multi-device scheduling |
-| Performance Compiler Engineer | Auto-tuning (BEAM search), roofline-guided pass selection |
+| Performance Compiler Engineer | Search-based tuning, cost models, roofline-guided pass selection |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $150K–$200K | 5% | 10% | 85% |
-| Mid | $230K–$320K | 2% | 10% | 88% |
-| Senior | $350K–$480K+ | 1% | 10% | 89% |
+**Portfolio evidence:** Implement one graph rewrite with its legality conditions. Compare against an unfused reference, including shapes for which the rewrite must be rejected.
 
 ---
 
@@ -231,13 +183,7 @@ This makes the data actionable instead of just interesting.
 | GPU Compiler Engineer | GPU-specific: register allocation, occupancy, instruction scheduling |
 | Code Generation Engineer | Custom NPU/TPU backend: ISA design, instruction selection, scheduling |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $160K–$210K | 5% | 10% | 85% |
-| Mid | $250K–$350K | 2% | 10% | 88% |
-| Senior | $400K–$550K+ | 1% | 10% | 89% |
-
-**Note:** Highest-paid sub-layer in the stack. Extreme scarcity — every AI chip startup needs one, few exist.
+**Portfolio evidence:** Lower a small operator to a documented target. Include IR before/after, compiler tests, and a reference comparison for edge cases.
 
 ---
 
@@ -251,13 +197,7 @@ This makes the data actionable instead of just interesting.
 | MTS Kernels (Member of Technical Staff) | Production attention/GEMM kernels for LLM training and inference |
 | HPC Compiler Engineer | Vectorization, parallelization for scientific computing |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $150K–$200K | 5% | 15% | 80% |
-| Mid | $220K–$320K | 5% | 10% | 85% |
-| Senior | $350K–$500K+ | 2% | 10% | 88% |
-
-**Trending:** Flash-Attention, long-context kernels, FP8/FP4 — hottest kernel engineering area.
+**Portfolio evidence:** Implement and validate a small kernel, explain its data movement, and measure it only on a supported target. A CPU model can explain arithmetic but cannot establish GPU speed.
 
 ---
 
@@ -272,11 +212,7 @@ This makes the data actionable instead of just interesting.
 | Inference Platform Engineer | TensorRT engine execution, Triton server, dynamic batching |
 | CUDA Runtime Engineer | Driver API, module loading, JIT compilation, multi-context |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $140K–$180K | 5% | 15% | 80% |
-| Mid | $200K–$270K | 5% | 15% | 80% |
-| Senior | $280K–$380K+ | 5% | 10% | 85% |
+**Portfolio evidence:** Show buffer ownership and event dependencies for an asynchronous execution queue; test cancellation, invalid shapes, and resource cleanup.
 
 ---
 
@@ -290,13 +226,7 @@ This makes the data actionable instead of just interesting.
 | Device Driver Engineer | PCIe/CXL endpoint driver, DMA engine, scatter-gather |
 | Embedded Linux BSP Engineer | Yocto kernel customization, device tree, L4T, rootfs |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $140K–$175K | 5% | 10% | 85% |
-| Mid | $200K–$260K | 5% | 10% | 85% |
-| Senior | $280K–$380K+ | 5% | 10% | 85% |
-
-**Note:** GPU kernel driver engineers are extremely rare — compensation approaches L2 levels.
+**Portfolio evidence:** Document a small device interface and test its bounds, lifetime, and error handling. Distinguish a userspace mock from a kernel driver tested with hardware.
 
 ---
 
@@ -311,13 +241,7 @@ This makes the data actionable instead of just interesting.
 | Parallel Computing Engineer | MPI+CUDA, GPUDirect RDMA, storage I/O optimization |
 | Systems Software Engineer (AI) | Full-stack performance: CPU-GPU coordination, profiling, debugging |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $145K–$185K | 10% | 20% | 70% |
-| Mid | $210K–$280K | 10% | 20% | 70% |
-| Senior | $300K–$400K+ | 10% | 15% | 75% |
-
-**Note:** Most remote-friendly sub-layer in L3 — infrastructure work is often SSH-based.
+**Portfolio evidence:** Produce a topology diagram and a repeatable communication experiment. Identify ranks, message sizes, synchronization, and a diagnosed failure.
 
 ---
 
@@ -329,14 +253,10 @@ This makes the data actionable instead of just interesting.
 |-------|-------------|
 | Embedded Software Engineer | ARM Cortex-M/R, FreeRTOS/Zephyr, SPI/I2C/UART/CAN drivers |
 | Firmware Engineer (AI/Edge SoC) | Command processor firmware, DMA scheduling, power management |
-| Real-Time Systems Engineer | Deterministic scheduling, deadline guarantees, PREEMPT_RT |
+| Real-Time Systems Engineer | Scheduling, bounded timing analysis, RTOS or PREEMPT_RT integration |
 | Bootloader / UEFI Engineer | U-Boot, UEFI, secure boot chain, A/B partition management |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $100K–$130K | 10% | 15% | 75% |
-| Mid | $140K–$185K | 10% | 20% | 70% |
-| Senior | $195K–$250K+ | 10% | 20% | 70% |
+**Portfolio evidence:** Implement a bounded producer/consumer path and a timing budget. Inject a missing sample or overloaded consumer, then show recovery without unbounded allocation.
 
 ---
 
@@ -350,11 +270,7 @@ This makes the data actionable instead of just interesting.
 | BSP Engineer | Board bring-up, device tree, driver integration, HAL |
 | Jetson Platform Engineer | L4T customization, JetPack, carrier board bring-up, SPE firmware |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $105K–$135K | 10% | 20% | 70% |
-| Mid | $150K–$200K | 10% | 20% | 70% |
-| Senior | $210K–$270K+ | 10% | 20% | 70% |
+**Portfolio evidence:** Record an image build, boot configuration, peripheral contract, and rollback test. Explain which steps ran on a board and which used an emulated target.
 
 ---
 
@@ -368,13 +284,7 @@ This makes the data actionable instead of just interesting.
 | IoT Firmware Engineer | Low-power wireless (BLE, LoRa, Wi-Fi), OTA, cloud connectivity |
 | Device Firmware Engineer | Storage controllers, NIC firmware, PCIe endpoint firmware |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $105K–$140K | 15% | 20% | 65% |
-| Mid | $150K–$200K | 15% | 20% | 65% |
-| Senior | $210K–$275K+ | 10% | 20% | 70% |
-
-**Note:** Automotive ADAS pays 15–25% premium due to ISO 26262 certification. IoT has most remote flexibility in L4.
+**Portfolio evidence:** Write a device state machine with disconnect/reconnect and update-failure tests. Treat safety requirements and compliance evidence as separate work from a functioning demonstration.
 
 ---
 
@@ -389,13 +299,7 @@ This makes the data actionable instead of just interesting.
 | ML Systems Architect | Workload analysis → architecture decisions, hardware-software co-design |
 | Performance Architect | Roofline modeling, bottleneck analysis, workload characterization |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Mid (5+ yr) | $280K–$380K | 5% | 10% | 85% |
-| Senior (8+ yr) | $400K–$550K+ | 2% | 10% | 88% |
-| Principal/Fellow | $600K–$1M+ | 1% | 5% | 94% |
-
-**Note:** No junior roles. Requires years of RTL + systems experience. Defines what gets built.
+**Portfolio evidence:** Use a real workload trace to compare two dataflows; account for operations, memory traffic, precision, and utilization. State the assumptions behind estimated area or power.
 
 ---
 
@@ -409,12 +313,9 @@ This makes the data actionable instead of just interesting.
 | Silicon Architect | Die floorplan, chiplet partitioning, power/thermal budgets |
 | Memory Systems Architect | HBM controller, cache hierarchy, scratchpad design |
 | Heterogeneous Computing Architect | CPU+GPU+NPU+DSP integration, coherency, shared memory |
-| Edge AI Systems Architect | Power-constrained accelerator design (< 5W TDP) |
+| Edge AI Systems Architect | Accelerator design within a stated power and thermal budget |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Mid (5+ yr) | $260K–$360K | 5% | 10% | 85% |
-| Senior (8+ yr) | $380K–$500K+ | 2% | 10% | 88% |
+**Portfolio evidence:** Build a memory and interconnect budget with explicit initiators, address ranges, coherency assumptions, and backpressure; check one bottleneck with a small model.
 
 ---
 
@@ -429,17 +330,13 @@ This makes the data actionable instead of just interesting.
 | Logic Design Engineer | Combinational/sequential optimization, area/power trade-offs |
 | SoC Integration Engineer | IP block integration, address maps, subsystem-level wiring |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $140K–$180K | 2% | 10% | 88% |
-| Mid | $200K–$280K | 2% | 10% | 88% |
-| Senior | $300K–$400K+ | 1% | 10% | 89% |
+**Portfolio evidence:** Implement a synthesizable block with reset, handshake, and overflow behavior; provide a reference testbench and synthesis constraints.
 
 ---
 
 ## L6b — Design Verification
 
-**Focus:** Prove the RTL is correct — UVM testbenches, formal, coverage, emulation.
+**Focus:** Check RTL against its specification using simulation, scoped formal properties, coverage, and emulation.
 
 | Title | What they do |
 |-------|-------------|
@@ -447,13 +344,7 @@ This makes the data actionable instead of just interesting.
 | Formal Verification Engineer | Property checking, equivalence checking for critical blocks |
 | Emulation Engineer | Palladium/Zebu, run firmware on RTL at MHz for pre-silicon validation |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $135K–$175K | 2% | 10% | 88% |
-| Mid | $195K–$270K | 2% | 10% | 88% |
-| Senior | $290K–$380K+ | 1% | 10% | 89% |
-
-**Note:** Chronic shortage. DV engineers are ~40% of chip design staff. Always in demand.
+**Portfolio evidence:** Write a verification plan linking requirements to assertions and tests; insert a bug and show a counterexample. Explain what coverage does not prove.
 
 ---
 
@@ -467,13 +358,7 @@ This makes the data actionable instead of just interesting.
 | HLS Engineer | C/C++ to RTL (Vitis HLS), pragma optimization, dataflow |
 | Hardware Design Engineer | General digital design on FPGA: interfaces, controllers |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $125K–$160K | 5% | 15% | 80% |
-| Mid | $175K–$240K | 5% | 10% | 85% |
-| Senior | $250K–$340K+ | 2% | 10% | 88% |
-
-**Note:** 10–15% lower than ASIC roles at the same level. More entry points for new grads.
+**Portfolio evidence:** Implement a small accelerator and compare software/RTL outputs. Show constraints and achieved timing if the tool ran; report board execution separately.
 
 ---
 
@@ -487,11 +372,7 @@ This makes the data actionable instead of just interesting.
 | STA Engineer | PrimeTime, setup/hold analysis, MCMM, OCV, timing ECOs |
 | Power Integrity Engineer | IR drop, EM analysis, power grid design, DVFS planning |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $130K–$165K | 1% | 5% | 94% |
-| Mid | $180K–$250K | 1% | 5% | 94% |
-| Senior | $260K–$360K+ | 1% | 5% | 94% |
+**Portfolio evidence:** Run an accessible physical-design flow for a small block and explain timing, congestion, and constraint assumptions. An educational PDK result is not production signoff.
 
 ---
 
@@ -505,11 +386,7 @@ This makes the data actionable instead of just interesting.
 | CAD/EDA Engineer | Tool flow scripts, methodology, custom EDA automation |
 | Layout Engineer | Standard cell placement, DRC/LVS clean, metal optimization |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $120K–$150K | 1% | 5% | 94% |
-| Mid | $165K–$230K | 1% | 5% | 94% |
-| Senior | $240K–$330K+ | 1% | 5% | 94% |
+**Portfolio evidence:** Create a reproducible flow script or small scan/fault-model exercise; report tested faults, coverage denominator, and limitations.
 
 ---
 
@@ -524,11 +401,7 @@ This makes the data actionable instead of just interesting.
 | Reliability Engineer | Burn-in, electromigration, thermal cycling, qualification |
 | Supply Chain Engineer | Wafer allocation, lead time, foundry contracts |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $120K–$155K | 1% | 5% | 94% |
-| Mid | $170K–$235K | 1% | 5% | 94% |
-| Senior | $240K–$330K+ | 1% | 5% | 94% |
+**Portfolio evidence:** Compare two packaging options using documented electrical, thermal, and manufacturing constraints. Separate calculations from measured qualification data.
 
 ---
 
@@ -541,240 +414,151 @@ This makes the data actionable instead of just interesting.
 | Post-Silicon Validation Engineer | First silicon bring-up, debug, speed/power characterization |
 | Test Engineer | ATE programming, production test development, yield analysis |
 
-| Level | Total Comp (Top Tier) | Remote | Hybrid | Onsite |
-|-------|----------------------|--------|--------|--------|
-| Junior | $115K–$150K | 1% | 5% | 94% |
-| Mid | $165K–$225K | 1% | 5% | 94% |
-| Senior | $235K–$310K+ | 1% | 5% | 94% |
+**Portfolio evidence:** Write a bring-up and characterization plan with instrument limits, calibration, test conditions, and failure triage. Use synthetic traces only when clearly labelled.
 
 ---
 
 ## Market Size & Industry Context
 
-### AI Chip Market
+Use primary sources at the level they actually measure. These resources were
+reviewed on **19 October 2026**:
 
-| Segment | 2025 Size | 2030 Projected | CAGR | Key Drivers |
-|---------|-----------|----------------|:----:|-------------|
-| **AI Chip (Total)** | $71B | $227B | 26% | LLM training/inference, data center AI, edge AI |
-| AI Training Chips | $38B | $105B | 23% | GPT-scale models, multi-GPU clusters |
-| AI Inference Chips | $25B | $95B | 30% | On-device AI, LLM serving, autonomous vehicles |
-| Edge AI Chips | $8B | $27B | 28% | IoT, ADAS, robotics, smart cameras |
+| Primary source | What it supports | What it does not establish |
+|---|---|---|
+| [BLS: Computer Hardware Engineers](https://www.bls.gov/ooh/architecture-and-engineering/computer-hardware-engineers.htm) | Broad US occupation duties, preparation, wages, and employment projections | Pay or vacancy counts for a specific accelerator architect or compiler team |
+| [BLS: Software Developers, Quality Assurance Analysts, and Testers](https://www.bls.gov/ooh/computer-and-information-technology/software-developers.htm) | Broad software occupations and their duties and outlook | A separate national count or growth rate for agentic AI, MLOps, or GPU kernel roles |
+| [BLS: Electrical and Electronics Engineers](https://www.bls.gov/ooh/architecture-and-engineering/electrical-and-electronics-engineers.htm) | Broader electrical/electronic engineering work and preparation | An estimate specific to this course's embedded, FPGA, or packaging categories |
+| [Apple: Hardware teams](https://www.apple.com/careers/us/work-at-apple/teams/hardware.html) | Employer descriptions of firmware, architecture, silicon verification, packaging, and related teams; links to available roles | A representative survey of employers or evidence that every listed team currently has a suitable opening |
+| [NVIDIA: Careers](https://www.nvidia.com/en-us/about-nvidia/careers/) | Official routes to current openings, university recruiting, and hiring information | A count of unique niche-role vacancies or a promise of work arrangement |
 
-*Sources: Gartner, McKinsey Semiconductor Practice, SIA (Semiconductor Industry Association), company filings.*
+BLS employment projections describe a broad occupation over a stated period.
+Projected annual openings include replacement needs as well as growth; they are
+not a count of live job advertisements. Keep the publication date, reference
+period, geography, and occupation together when using a statistic. The BLS
+profiles above provide those definitions and links to local wage data.
 
-### Semiconductor Industry
+Employer team descriptions help interpret responsibilities. For example, Apple's
+hardware page separates embedded firmware from silicon design/verification and
+packaging. This is useful evidence that the tasks differ; it does not establish
+which specialization is easier to enter or better paid. Follow its current-role
+links to inspect the actual requirements.
 
-| Metric | 2025 | Notes |
-|--------|------|-------|
-| Global semiconductor revenue | $687B | SIA estimate |
-| Semiconductor engineering workforce (US) | ~280,000 | BLS + SIA data |
-| AI hardware engineering jobs (US) | ~45,000–55,000 | Subset of semiconductor + AI infrastructure |
-| New chip design startups (2023–2025) | 150+ | Funded $10M+, most need L2/L5/L6 hires |
-
-### Adjacent Markets That Drive Hiring
-
-| Market | 2025 Size | How It Drives AI Hardware Jobs |
-|--------|-----------|-------------------------------|
-| Data center AI infrastructure | $150B+ | GPU clusters → L1a, L2c, L3c demand |
-| Autonomous vehicles (ADAS) | $45B | Edge inference → L1b, L4c demand |
-| Robotics | $18B | On-device perception → L1b, L1c demand |
-| AI cloud services (MLaaS) | $80B+ | Inference serving → L1a, L2a, L3a demand |
-| EDA tools | $16B | Chip design tools → L7a, L7b ecosystem |
-
----
+Search-engine snippets can outlive a vacancy. Confirm the employer's live
+description before treating an advertisement as open; a working URL alone does
+not establish that applications are still being accepted.
 
 ## Job Posting Volume by Sub-Layer
 
-Estimated **monthly active US job postings** (LinkedIn + Indeed + Greenhouse + company career pages, Q1 2026). These numbers represent unique open positions, not total applicants.
+A small personal search can identify relevant opportunities. It cannot establish
+national posting volume, a shortage, or a growth ranking. The same requisition
+may appear on several boards or under several locations. Count an employer's
+requisition once in your sample, recording the locations separately. A general
+team-interest page is not automatically an open requisition.
 
-### Full Table
+### Build a role-selection worksheet
 
-| Sub-Layer | Monthly US Postings | YoY Change | Supply/Demand | Avg Time-to-Fill |
-|:---------:|:-------------------:|:----------:|:-------------:|:-----------------:|
-| **L1a** Inference Optimization | 1,200–1,500 | +35% | Balanced | 45–60 days |
-| **L1b** Edge AI Deployment | 800–1,100 | +15% | Balanced | 40–55 days |
-| **L1c** AI Application | 2,000–2,500 | +10% | Slight surplus | 30–45 days |
-| **L1d** Agentic AI & GenAI | 5,000–7,000 | +120% | **High demand** | 25–40 days |
-| **L1e** ML Engineering & MLOps | 8,000–10,000 | +25% | Balanced | 30–45 days |
-| **L2a** Graph/IR Optimization | 200–350 | +60% | **Severe shortage** | 90–120 days |
-| **L2b** Compiler Backend | 300–500 | +55% | **Severe shortage** | 90–150 days |
-| **L2c** Kernel Engineering | 400–600 | +50% | **Shortage** | 75–100 days |
-| **L3a** GPU/Accelerator Runtime | 500–700 | +25% | Shortage | 60–80 days |
-| **L3b** Linux Kernel/Drivers | 600–800 | +15% | Shortage | 60–90 days |
-| **L3c** HPC Infrastructure | 700–1,000 | +30% | Balanced | 45–60 days |
-| **L4a** Embedded Software | 3,500–4,500 | +5% | Balanced | 30–45 days |
-| **L4b** Embedded Linux/BSP | 1,500–2,000 | +10% | Balanced | 35–50 days |
-| **L4c** Automotive/IoT | 2,000–2,800 | +20% | Slight shortage | 40–55 days |
-| **L5a** Accelerator Architecture | 100–200 | +70% | **Extreme shortage** | 120–180 days |
-| **L5b** System/SoC Architecture | 200–350 | +40% | **Severe shortage** | 90–150 days |
-| **L6a** RTL Design | 1,500–2,000 | +25% | Shortage | 50–70 days |
-| **L6b** Design Verification | 2,000–2,500 | +20% | **Chronic shortage** | 50–75 days |
-| **L6c** FPGA/HLS | 1,200–1,600 | +10% | Balanced | 40–55 days |
-| **L7a** Physical Design | 800–1,100 | +20% | Shortage | 55–75 days |
-| **L7b** DFT/CAD | 400–600 | +10% | Balanced | 45–60 days |
-| **L8a** Packaging/Process | 300–500 | +30% | Shortage | 60–80 days |
-| **L8b** Silicon Validation | 400–600 | +15% | Balanced | 45–60 days |
-| | **~33,700–41,800** | | | |
+Allow one study session. Choose one primary specialization and one adjacent
+specialization from the map. Find **three current postings from at least two
+employers** in locations and employment arrangements you could consider. If you
+cannot find three suitable postings, record that outcome and revise your search;
+do not invent missing examples.
 
-### Job Volume Visualization (with Remote %)
+For each posting, save this record in your own notes:
 
-**L1–L6: Hands-on in this roadmap** (practical projects and deep skill building)
-
-```
-Monthly US Postings by Sub-Layer (Q1 2026)          Postings  Remote %
-
-L1e ML Eng / MLOps     ████████████████████████████████████████████████████████████ 9,000   20%  ░░░
-L1d Agentic AI/GenAI   ████████████████████████████████████████████ 6,000                   25%  ░░░░
-L4a Embedded SW        ██████████████████████████████ 4,000                                 10%  ░
-L4c Automotive/IoT     ██████████████████ 2,400                                             15%  ░░
-L6b Verification       █████████████████ 2,250                                               2%
-L1c AI Application     █████████████████ 2,250                                              15%  ░░
-L4b Embedded Linux     █████████████ 1,750                                                  10%  ░
-L6a RTL Design         █████████████ 1,750                                                   2%
-L6c FPGA/HLS           ██████████ 1,400                                                      5%
-L1a Inference Opt      ██████████ 1,350                                                     15%  ░░
-L1b Edge AI            ███████ 950                                                          10%  ░
-L3c HPC Infra          ██████ 850                                                           10%  ░
-L3b Kernel/Drivers     █████ 700                                                             5%
-L3a GPU Runtime        ████ 600                                                              5%
-L2c Kernel Eng         ████ 500                                                              5%
-L2b Compiler Backend   ███ 400                                                               2%
-L2a Graph/IR           ██ 275                                                                2%
-L5b System/SoC Arch    ██ 275                                                                2%
-L5a Accelerator Arch   █ 150                                                                 1%
-                       └──────────────────────────────────────────────────────┘
-                       0    1K    2K    3K    4K    5K    6K    7K    8K   9K
-
-                       Remote: ░ = 10%+  ░░ = 15%+  ░░░ = 20%+  ░░░░ = 25%+
+```text
+employer and official URL:
+requisition ID, title, location, date checked:
+posting status: open | closed | unclear
+required qualifications:
+preferred qualifications:
+work arrangement / travel / lab access: stated value or unknown
+primary and adjacent layer, with one responsibility supporting each:
+my existing evidence:
+important gap and a small project that would address it:
 ```
 
-*L7–L8: Theory and guided labs only in this roadmap (OpenROAD, TinyTapeout) — listed for market context*
+Select **two required technical tasks** you can meaningfully practice. Link each
+to a course lab, a testable acceptance condition, and an artifact someone else can
+rerun. Record qualifications that a lab cannot replace, such as required work
+experience or an employer's stated degree/equivalent-experience conditions.
 
-| *Sub-Layer* | *Monthly Postings* | *Remote %* | *Note* |
-|:---:|:---:|:---:|---|
-| *L7a Physical Design* | *~950* | *1%* | *Requires EDA licenses (Synopsys, Cadence) + foundry PDK access* |
-| *L7b DFT/CAD* | *~500* | *1%* | *Security-sensitive data, tool-locked* |
-| *L8a Packaging/Process* | *~400* | *1%* | *Cleanroom and foundry interaction* |
-| *L8b Silicon Validation* | *~500* | *1%* | *Lab equipment, ATE, first silicon* |
+### Worked selection example
 
-**Total: ~34K–42K/month** (L1–L6: ~31K–39K practical roles · L7–L8: ~2,350 theory-context roles)
+Suppose a posting you read asks for embedded C/C++, sensor interfaces, and timing
+debugging. You enjoy investigating dropped messages and already know basic C.
+A reasonable primary choice is **L4a**, with **L1b** as the adjacent application.
+Build a timestamped sensor queue, inject a delayed sample, and show that the
+consumer rejects it. Report queue bounds and timing assumptions. A CPU test can
+establish the queue logic; validating electrical signals and timing on a board
+requires separate evidence.
 
-**Remote-friendly sub-layers (10%+ remote postings):**
-- L1a Inference Optimization (15%) — profiling and optimization can be done with cloud GPU access
-- L1c AI Application (15%) — SDK/solutions work, customer-facing but often remote-capable
-- L4c Automotive/IoT (15%) — IoT firmware (not ADAS) has most remote flexibility
-- L1b Edge AI (10%) — some roles allow remote with dev kit shipping
-- L3c HPC Infrastructure (10%) — cluster management is SSH-based
-- L4a Embedded Software (10%) — growing remote with remote lab access tools
-- L4b Embedded Linux/BSP (10%) — Yocto builds and kernel work can be remote
+This is an **illustrative decision**, not a claim about a particular vacancy.
+Use [Embedded Systems](Phase%202%20-%20Embedded%20Systems/Guide.md) for the interface
+work and [robotics foundations](Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20D%20-%20Robotics/Robotics%20Foundations/README.md)
+for timestamps, frames, and control. For an AI-oriented alternative, use the
+[CPU policy lab](Phase%203%20-%20Artificial%20Intelligence/0.%20AI%20and%20Robot%20Learning%20Foundations/Lab-01-CPU-Policy.md)
+to demonstrate split/training/evaluation evidence before adding deployment.
 
-**Almost zero remote (1–2%):**
-- L5a/L5b Architecture — daily whiteboard sessions with RTL and silicon teams
-- L6a/L6b RTL/DV — EDA tools, lab access, emulation hardware
-- L7a/L7b Physical Design/DFT — EDA licenses, foundry NDA data, security
-- L8a/L8b Packaging/Validation — cleanroom, lab equipment, ATE access
+### Check your interpretation
 
-### Key Insights from Job Data
-
-**Highest volume (easiest to find openings):**
-- L1e ML Engineering / MLOps (~9,000/month) — every company doing AI needs ML engineers
-- L1d Agentic AI / GenAI (~6,000/month) — LLM application demand exploding
-- L4a Embedded Software (~4,000/month) — the bread and butter of hardware engineering
-- L6b Design Verification (~2,250/month) — chronic shortage means constant openings
-
-**Lowest volume but highest pay (hardest to get, hardest to fill):**
-- L5a Accelerator Architecture (~150/month) — only ~150 open positions, but $400K–$1M+ comp
-- L2a Graph/IR Optimization (~275/month) — every chip startup needs one, few candidates exist
-- L2b Compiler Backend (~400/month) — MLIR/LLVM expertise is extremely rare
-
-**Most remote-friendly:**
-- L1d Agentic AI / GenAI (25% remote) — API/cloud-based, no hardware needed
-- L1e ML Engineering / MLOps (20% remote) — training on cloud GPUs, MLflow/K8s
-- L1a/L1c (15% remote) — inference optimization and applications
-
-**Best ROI for career investment:**
-- L2b/L2c (Compiler/Kernel) — low supply, high demand, highest pay, growing 50–60% YoY
-- L5a (Architecture) — requires experience, but once you're there, extreme scarcity = leverage
-- L6b (Verification) — chronic shortage means job security; moderate pay but never unemployed
-- L1d (Agentic AI) — if you combine agent/GenAI skills with L1a inference optimization, you're uniquely valuable
-
-**Fastest growing (YoY posting increase):**
-- L1d Agentic AI / GenAI: +120% (LLM application wave)
-- L5a Accelerator Architecture: +70% (AI chip startup wave)
-- L2a Graph/IR: +60% (every new chip needs a compiler)
-- L2b Compiler Backend: +55%
-- L2c Kernel Engineering: +50%
-- L1a Inference Optimization: +35% (LLM inference demand)
-
----
+1. Five job-board results share one employer requisition ID. How many distinct
+   requisitions have you demonstrated? **One**, unless the employer identifies
+   separate requisitions; you have not demonstrated the number of hires.
+2. A broad BLS occupation has a projected increase. Does that establish growth
+   for L2c kernel engineering? **No.** The categories and measurement differ.
+3. A posting does not mention remote work. Can you label it remote because its
+   code runs in the cloud? **No.** Mark the arrangement unknown and verify it.
+4. Your project passes all CPU tests. Are you qualified for a senior role?
+   **That conclusion does not follow.** Explain the demonstrated task and limits;
+   compare the remaining experience and responsibility requirements separately.
 
 ## Cross-Layer Summary
 
-### Compensation + Volume Combined (Senior, Top-Tier Total Comp)
+Choose an adjacent layer that explains a failure you cannot yet diagnose:
 
-| Sub-Layer | Senior Comp | Monthly Postings | Scarcity | Demand Trend |
-|:---------:|------------|:----------------:|:--------:|:------------:|
-| L1a Inference Optimization | $250K–$350K+ | ~1,350 | Medium | Growing (LLM) |
-| L1b Edge AI | $220K–$300K+ | ~950 | Medium | Stable |
-| L1c AI Application | $240K–$320K+ | ~2,250 | Low-Medium | Stable |
-| L1d Agentic AI / GenAI | $270K–$400K+ | ~6,000 | Medium | **Surging** (+120% YoY) |
-| L1e ML Eng / MLOps | $260K–$380K+ | ~9,000 | Low-Medium | Growing (+25% YoY) |
-| **L2a Graph/IR** | **$350K–$480K+** | **~275** | **High** | **Surging** |
-| **L2b Compiler Backend** | **$400K–$550K+** | **~400** | **Very High** | **Surging** |
-| **L2c Kernel Engineering** | **$350K–$500K+** | **~500** | **Very High** | **Surging** |
-| L3a GPU Runtime | $280K–$380K+ | ~600 | High | Growing |
-| L3b Kernel/Drivers | $280K–$380K+ | ~700 | High | Growing |
-| L3c HPC Infrastructure | $300K–$400K+ | ~850 | Medium-High | Growing |
-| L4a Embedded Software | $195K–$250K+ | ~4,000 | Medium | Stable |
-| L4b Embedded Linux/BSP | $210K–$270K+ | ~1,750 | Medium | Stable |
-| L4c Automotive/IoT | $210K–$275K+ | ~2,400 | Medium | Growing |
-| **L5a Accelerator Arch** | **$400K–$550K+** | **~150** | **Extreme** | **Surging** |
-| L5b System/SoC Arch | $380K–$500K+ | ~275 | Extreme | Surging |
-| L6a RTL Design | $300K–$400K+ | ~1,750 | High | Growing |
-| L6b Verification | $290K–$380K+ | ~2,250 | Chronic | Growing |
-| L6c FPGA/HLS | $250K–$340K+ | ~1,400 | Medium | Stable |
-| L7a Physical Design | $260K–$360K+ | ~950 | High | Growing |
-| L7b DFT/CAD | $240K–$330K+ | ~500 | Medium | Stable |
-| L8a Packaging/Process | $240K–$330K+ | ~400 | Medium-High | Growing |
-| L8b Silicon Validation | $235K–$310K+ | ~500 | Medium | Stable |
+| Primary work | Useful adjacent work | Connected portfolio question |
+|---|---|---|
+| L1c robotics application | L4a embedded timing | Does the controller reject an old observation? |
+| L1a inference optimization | L2c kernel engineering | Does a proposed speedup preserve the quality gate and numerical contract? |
+| L2b compiler backend | L5a architecture | Does the generated code fit the target's instructions and memory limits? |
+| L4b board support | L3b drivers | Can a peripheral failure be traced through configuration, driver, and application? |
+| L6a RTL design | L6b verification | Which test or property detects a deliberately broken handshake? |
+| L5b system architecture | L7a physical design | Which timing and power assumptions need implementation evidence? |
 
 ### Work Arrangement Summary
 
-| Work Mode | Software-Heavy (L1–L3) | Hardware-Heavy (L4–L8) |
-|-----------|----------------------|----------------------|
-| **Remote** | 5–15% | 1–10% |
-| **Hybrid** | 10–25% | 5–20% |
-| **Onsite** | 60–85% | 70–94% |
-
----
+Read the individual posting for office location, remote eligibility, travel,
+secure facilities, and lab access. If those are unclear, list them as questions
+for the employer. A role's software/hardware label alone does not answer them.
 
 ## Hiring Priority for an AI Chip Startup
 
-| Hire # | Sub-Layer | Role | Why this order |
-|:------:|:---------:|------|---------------|
-| 1 | L5a | AI Accelerator Architect | Defines the chip — everything else follows |
-| 2 | L2b | AI Compiler Engineer | Software must co-design with hardware from day 1 |
-| 3 | L6a | RTL Design Engineer (2–3x) | Implement the architect's design |
-| 4 | L6b | DV Engineer (2–3x) | Verify correctness before tape-out |
-| 5 | L2c | Kernel Optimization Engineer | Write reference kernels that prove the architecture works |
-| 6 | L4a | Firmware Engineer | Command processor, bring-up software |
-| 7 | L3a | Runtime Engineer | Host-side API and driver |
-| 8 | L7a | Physical Design Engineer | Synthesis, P&R, timing closure |
-| 9 | L1a | ML Inference Engineer | Benchmark against competition |
-| 10 | L8a | Packaging Engineer | Engage foundry, plan packaging |
+As a course exercise, derive required capabilities from a product milestone:
+workload and quality definition, compiler/runtime support, architecture and RTL,
+verification, physical feasibility, packaging, bring-up, and application testing.
+These activities constrain one another. For example, memory traffic affects both
+the architecture and compiler, while timing or package limits can invalidate an
+early performance estimate.
 
-**Estimated first-year cost (10 hires, mid/senior): $3M–$5M** salary + equity
-
----
+Draw the dependencies and assign an owner and acceptance artifact to each.
+Explain which capability is missing for the *next* milestone. This is a project
+planning exercise, not a universal hiring order or an estimate of a startup's
+headcount, payroll, or equity costs. The [Physical AI Design Studio](Physical-AI-Design-Studio.md)
+provides concrete handoffs for this exercise.
 
 ## Where This Roadmap Takes You
 
-| Roadmap Completion | Sub-Layers You Can Target | Expected Level |
-|-------------------|--------------------------|:--------------:|
-| Phase 1–3 | L1a, L1b, L1c | Junior |
-| Phase 1–3 + Phase 4B | L4a, L4b, L1b | Junior–Mid |
-| Phase 1–3 + Phase 4C | L2a, L2c | Junior |
-| Phase 1–3 + Phase 4A | L6c (FPGA) | Junior |
-| Phase 1–4 (all tracks) | L1a–L4c (any software sub-layer) | Mid |
-| Phase 1–4 + Phase 5F | L5a, L5b, L6a, L6b | Mid |
-| Phase 1–5 (full roadmap) | **Any sub-layer L1a–L6c** | Mid–Senior |
+| Learning route | Evidence to bring to a role discussion |
+|---|---|
+| AI and robot learning | Held-out evaluation, baseline, failure analysis, and reproducible model artifact |
+| Embedded / Jetson | Interface and timing contracts, a recovery test, and named execution hardware |
+| Compiler / inference | Reference-checked transformation or operator, documented constraints, and measured results where available |
+| FPGA / RTL / verification | Testbench or formal properties, reset/handshake evidence, constraints, and tool reports |
+| Architecture / chip design | Workload-derived tradeoffs, reference models, verification plan, and explicit implementation assumptions |
+
+Complete the worksheet with one chosen role, two requirement-to-evidence links,
+a runnable artifact, one limitation, and the next prerequisite you will study.
+Use the [completion rubric](Learning-Guide.md#completion-rubric) to review the
+artifact. Ask another learner to reproduce it and explain one failure case.
+The result is evidence of specific skills; employment level and hiring decisions
+remain tied to the actual role, experience, and employer assessment.

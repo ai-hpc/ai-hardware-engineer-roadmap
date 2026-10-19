@@ -1,314 +1,130 @@
-# Lecture 10: Lock-Free Programming: RCU, Atomics & Memory Ordering
+# Lecture 10: Atomics, bounded queues, and memory reclamation
 
-## Overview
+A camera producer and an inference consumer share two responsibilities: publish complete data and avoid reusing storage while the consumer still needs it. An atomic pointer or index solves only part of that problem. This lesson develops the ordering and lifetime contract before discussing Linux RCU.
 
-The core problem this lecture addresses is: can we share data between threads without using locks at all? Locks are correct but expensive — they cause cache-line bouncing, context switches, and priority inversion. For the hottest data paths in a system (a 30Hz camera frame pipeline, a 1kHz sensor fusion loop, a live model configuration update), lock overhead is measurable and unacceptable. The mental model to carry here is that of a library with a special rule: readers can always pick up a book without asking anyone, but when the librarian needs to replace a book with a new edition, they do it by leaving the old book in place until every reader who was already reading it has put it down. For an AI hardware engineer, lock-free techniques are the foundation of zero-copy camera pipelines, live model hot-reload, and sensor data aggregation at kilohertz rates.
+**Prerequisites:** [mutexes and synchronization](Lecture-09.md), basic C/C++, and object lifetime. Plan 60–90 minutes including the [native SPSC queue lab](../labs/SPSC-Queue.md). The lab runs on an ordinary CPU; kernel RCU snippets below are reading exercises, not an executed driver.
 
----
+## 1. Choose synchronization by the contract
 
-## Motivation for Lock-Free
+A mutex can be the clearest correct solution. Measure contention and blocked time before replacing it. Uncontended locks need not cause a context switch, and atomics can still require cache-line ownership transfers or retries.
 
-Locks introduce unavoidable costs even when not contended:
+Distinguish these terms:
 
-- **Cache-line bouncing**: the lock variable ping-pongs between CPU L1 caches during contention; each acquire costs ~100–300 cycles on NUMA
-- **Context switches**: blocked threads incur scheduler overhead (~1–10µs per switch)
-- **Priority inversion**: low-priority lock holder delays high-priority waiter (see Lecture 11)
-- **Convoying**: multiple threads queue behind one slow holder, serializing a hot path
-
-Lock-free algorithms use atomic hardware primitives to achieve safe concurrent access without mutual exclusion. They provide better scalability and eliminate priority inversion on performance-critical paths.
-
-> **Key Insight:** "Lock-free" does not mean "without coordination." It means coordination is done through atomic hardware instructions rather than mutual exclusion. These atomics still have costs — cache-line ownership, memory barriers — but those costs are bounded and predictable in a way that lock contention is not.
-
----
-
-## C++11/C11 Memory Model
-
-CPUs and compilers **reorder instructions** for performance. Without explicit ordering rules, a write in thread A **may not be visible** to thread B for an arbitrary time. The **C11/C++11 memory model** defines ordering guarantees via `std::atomic<T>` / `_Atomic T`:
-
-| Memory Order | Guarantee |
+| Property | Meaning |
 |---|---|
-| `memory_order_relaxed` | Atomicity only; no ordering relative to other operations; use for counters |
-| `memory_order_acquire` | No load/store after this point may be reordered before it; pairs with release |
-| `memory_order_release` | No load/store before this point may be reordered after it; pairs with acquire |
-| `memory_order_acq_rel` | Both acquire + release; for atomic read-modify-write operations |
-| `memory_order_seq_cst` | Total global order across all threads; full fence; default for `std::atomic<>` |
+| Data-race freedom | Conflicting accesses have the required synchronization or are atomic |
+| Lock-free progress | System-wide progress is guaranteed under the algorithm’s execution assumptions; one thread may starve |
+| Wait-free progress | Each operation completes within a bounded number of its own steps |
+| Bounded wall-clock latency | Completion meets a time bound under stated scheduling, hardware, and workload assumptions |
 
-**Acquire-release pairing**: a `release` store to variable X "happens-before" a subsequent `acquire` load from X in another thread. All writes before the release are visible after the acquire.
+These are different properties. A lock-free operation can be delayed by scheduling or cache misses. `std::atomic<T>` is not guaranteed to be implemented without a library lock for every T and platform; inspect the supported type and `is_lock_free()` where relevant. A queue that returns `false` when full can finish its call promptly while the application that retries forever has no bounded completion guarantee.
 
-```
-  Acquire-Release Synchronization:
+## 2. Publish data with an ordering relationship
 
-  Thread A (producer)           Thread B (consumer)
-  ─────────────────────         ─────────────────────
-  data = 42;                    // reading data before load is wrong
-  flag.store(1,                 int f = flag.load(
-    memory_order_release);        memory_order_acquire);
-                                if (f == 1) {
-  ─────────────────────────────► assert(data == 42); // guaranteed
-  All writes before release      All loads after acquire
-  are visible after acquire      see those writes
-```
+For ordinary non-atomic objects, unsynchronized conflicting accesses from different threads can constitute a C++ data race and undefined behavior. `volatile` does not establish inter-thread synchronization.
 
-> **Common Pitfall:** Using `memory_order_relaxed` for a flag that signals "data is ready" is a common error. Relaxed order only guarantees atomicity of the flag itself — it makes no promise that the data written before the flag store is visible to the thread that reads the flag. Always use `release`/`acquire` for producer-consumer signaling.
-
----
-
-## Hardware Memory Models
-
-Different CPU architectures have **different default ordering guarantees**. Understanding this matters when reading Linux kernel code that uses **bare memory barriers** instead of C11 atomics.
-
-| Architecture | Memory Model | Barrier Requirement |
-|---|---|---|
-| x86-64 | TSO (Total Store Order) — relatively strong | Few explicit barriers needed; LOCK prefix for atomics |
-| ARM64 | Weakly ordered | Explicit `DMB`/`DSB` barriers required; `LDADD`/`CAS` for atomics |
-| RISC-V | Weakly ordered (RVWMO) | `FENCE` instruction; `LR`/`SC` for LL/SC atomics |
-
-Linux kernel barrier macros:
-- `smp_mb()`: full memory barrier (load + store in both directions)
-- `smp_rmb()`: read (load) barrier only
-- `smp_wmb()`: write (store) barrier only
-
-On ARM64 (Jetson Orin, Cortex-A78AE), every acquire/release operation translates to explicit `LDAR`/`STLR` instructions. Code that runs correctly on x86-64 TSO without barriers **may silently fail on ARM64** without them. **Always use C11 atomics or kernel barrier macros** rather than plain loads/stores for shared variables.
-
----
-
-## Atomic Operations
-
-Map to **single indivisible hardware instructions**: `LOCK ADD`/`XADD`/`CMPXCHG` on x86, `LDADD`/`CAS` on ARMv8.1 LSE.
-
-```c
-atomic_t counter = ATOMIC_INIT(0);      // initialize to zero
-atomic_inc(&counter);                   // LOCK XADD on x86; LDADD on ARMv8.1; increment atomically
-atomic_dec_and_test(&counter);          // decrement; return true if result is zero (useful for refcounts)
-int old = atomic_cmpxchg(&counter, 5, 10);  // CAS: if counter==5, set to 10; return old value either way
-atomic_add_return(n, &counter);         // add n, return new value; useful for rate limiting
-```
-
-- `atomic_t` is 32-bit; `atomic64_t` for 64-bit values
-- `ATOMIC_INIT(n)` for static initialization
-- Use for: reference counts, flags, per-CPU statistics accumulators
-
----
-
-## Compare-and-Swap (CAS)
-
-**Foundation of most lock-free data structures.** CAS atomically tests a value and **replaces it only if it matches** — providing a "conditional write" without a lock.
+In this one-publication example, initialize `data` and `ready` before starting either thread:
 
 ```cpp
-std::atomic<int> val{0};
-int expected = 0;
-// Atomically: if val == expected, set val = 1; return true (success)
-// If val != expected: load actual value into expected; return false (failure, retry)
-bool ok = val.compare_exchange_strong(expected, 1,
-              std::memory_order_acq_rel,  // success: both acquire (for reads after) and release (for writes before)
-              std::memory_order_acquire); // failure: acquire only (we read the current value)
-// On failure, 'expected' now holds the actual value — retry loop uses this updated value
-```
-
-`compare_exchange_weak`: may spuriously fail on LL/SC architectures (ARM, RISC-V); preferred inside retry loops because it avoids a separate load instruction.
-
-```
-  CAS Lock-Free Update Pattern:
-
-  Thread A                      Thread B
-  ──────────────────────        ──────────────────────
-  read val (= 0)                read val (= 0)
-  CAS(val, 0, 1) ──► SUCCESS    CAS(val, 0, 1) ──► FAIL (val is now 1)
-  val is now 1                  expected = 1 (updated)
-                                CAS(val, 1, 2) ──► SUCCESS
-                                val is now 2
-```
-
-### ABA Problem
-
-CAS sees the **same value but the object was replaced**: pointer A → B → A between load and CAS; **CAS succeeds incorrectly**.
-
-```
-  ABA Problem:
-
-  Thread A: reads ptr = 0xABC0 (points to Node A)
-  Thread B: removes Node A, inserts Node C at 0xABC0 (same address, new object!)
-  Thread A: CAS(ptr, 0xABC0, new_node) — SUCCEEDS incorrectly
-            Node A may be freed; dereference = use-after-free
-```
-
-Solutions:
-- **Version tag**: pack a monotonically increasing counter alongside the pointer in a 128-bit CAS (`CMPXCHG16B` on x86-64); pointer change is always detectable
-- **Hazard pointers**: reader publishes pointer before dereferencing; reclaimer scans all hazard pointer slots before freeing
-- **RCU**: grace period mechanism ensures old objects are not freed until all readers are done
-
-> **Common Pitfall:** ABA is subtle because the buggy case requires exact memory address reuse — easy to miss in testing, dangerous in production allocators that reuse freed memory. Always consider ABA when writing CAS-based list or stack manipulations. Use tagged pointers or RCU instead.
-
----
-
-## SPSC Ring Buffer (Lock-Free)
-
-**Single-producer / single-consumer** ring buffer requires only `acquire`/`release` atomics on head and tail indices. **No locks, no cache-line bouncing** on payload data.
-
-```c
-#define N 256  // must be power of 2 for efficient modulo via bitmask
-T buf[N];
-atomic_size_t head = 0, tail = 0;  // head: consumer read position, tail: producer write position
-
-// Producer (single thread only — SPSC means exactly one producer)
-buf[tail % N] = item;             // write item to current tail slot
-// Release store: all writes to buf[tail%N] are visible before this store is seen
-atomic_store_explicit(&tail, tail + 1, memory_order_release);
-
-// Consumer (single thread only)
-size_t t = atomic_load_explicit(&tail, memory_order_acquire);
-// Acquire load: reads tail, and guarantees we see all buf writes that preceded the tail store
-if (head != t) {                  // check if there is an item to consume
-    item = buf[head % N];         // read item from current head slot
-    atomic_store_explicit(&head, head + 1, memory_order_release);
+int data = 0;
+std::atomic<bool> ready{false};
+// Producer, exactly once:
+data = 42;
+ready.store(true, std::memory_order_release);
+// Consumer:
+if (ready.load(std::memory_order_acquire)) {
+    assert(data == 42);
 }
 ```
 
-The acquire-release pair on tail is the synchronization point: the producer releases ownership of the data by updating tail; the consumer acquires ownership by reading tail. No lock needed because there is exactly one writer and one reader.
+The acquire must observe the relevant release (or its applicable release sequence) on the same atomic object. An acquire load that still reads `false` does not mean the payload is ready. The producer must also avoid modifying `data` again while the consumer reads it. Publication and permission to reuse are separate relationships. [C++ memory ordering](https://eel.is/c++draft/atomics.order), [data races and happens-before](https://eel.is/c++draft/intro.races).
 
-**Throughput**: limited only by memory bandwidth; **no lock overhead**. Used in openpilot VisionIPC for **zero-copy camera frame passing** from capture process to inference process at 30Hz.
+| Order | Useful role |
+|---|---|
+| Relaxed | Atomic access without publishing unrelated ordinary data |
+| Release | Publish prior work through an atomic store/update |
+| Acquire | Observe a matching publication before using its data |
+| Acquire-release | Both roles on a suitable read-modify-write operation |
+| Sequentially consistent | Adds an ordering requirement across participating sequentially consistent operations |
 
-> **Key Insight:** The SPSC ring buffer is the canonical example of why `memory_order_acquire`/`release` exist. A `relaxed` store of tail would be atomic, but the consumer might see the updated tail *before* seeing the data written to `buf[tail%N]`. The release/acquire pair creates an explicit ordering guarantee: "the data in buf is ready by the time you see the tail increment."
+Sequential consistency is not a global stop-the-world operation or a promise that every access compiles to a full hardware fence. C++ specifies observable behavior; the compiler maps it to the target. Do not infer correctness from an x86 run or copy one architecture’s assembly into portable code.
 
----
+## 3. Give a bounded ring both synchronization directions
 
-## RCU (Read-Copy-Update)
+The [complete C++17 lab](../labs/SPSC-Queue.md) stores small value objects and uses **exactly one producer and one consumer**. It reserves one array slot so equal indices mean empty. A storage array of five slots has usable capacity four.
 
-Linux kernel's primary mechanism for **read-mostly shared data structures**. Achieves **O(1) read-side overhead**: no locks, no atomics, no cache-line writes. RCU is conceptually the most powerful mechanism in this lecture.
+Producer steps:
 
-The librarian analogy from the overview maps directly to RCU: readers pick up the book (pointer) without asking; the librarian replaces it by placing the new edition on the shelf, then waiting until everyone reading the old edition finishes before removing it.
+1. Read its own write index.
+2. Acquire the consumer’s read index; if advancing would make the queue full, return `false`.
+3. Copy the item into the owned slot.
+4. Release-store the new write index to publish the item.
 
-### Reader Side
+Consumer steps:
+
+1. Read its own read index.
+2. Acquire the producer’s write index; if equal, return `false` for empty.
+3. Copy the item out of the published slot.
+4. Release-store the new read index to permit reuse.
+
+The second direction is essential. A producer that publishes correctly but never checks fullness can overwrite an unread sample. The regression suite deliberately removes that check and verifies that the reference catches it. A power-of-two capacity is not required by this implementation; it explicitly wraps bounded indices.
+
+The queue’s non-atomic payload is safe because ownership and happens-before separate conflicting accesses. Its indices still involve cache-coherence traffic. Capacity, scheduling, copying, and memory layout affect throughput; “no mutex” does not mean “limited only by memory bandwidth.”
+
+**Worked capacity check:** four slots can hold four pending items; a fifth push fails without changing them. After one pop, exactly one new push can succeed. A queue containing buffer pointers additionally needs a pool/lifetime protocol; the sample-value lab does not prove zero-copy DMA or cross-process synchronization.
+
+## 4. Understand CAS and the lifetime problem
+
+Compare-and-exchange changes a value only if it matches the supplied expectation:
+
+```cpp
+std::atomic<int> state{0};
+int expected = 0;
+bool changed = state.compare_exchange_strong(
+    expected, 1, std::memory_order_acq_rel, std::memory_order_acquire);
+```
+
+On a mismatch, `expected` receives the observed value. Recompute a desired update from that current state when retrying. Weak compare-and-exchange can fail spuriously and is commonly used in a retry loop; choosing weak does not eliminate all other loads or guarantee faster execution. The failure order must be valid for the operation. [C++ compare-and-exchange](https://eel.is/c++draft/atomics.types.generic).
+
+For pointers, a successful comparison does not prove that the object is still the same live object. An address can change from A to B and back to A, including through allocator reuse: the ABA problem. A generation tag can help if its width, wrap policy, atomic representation, and algorithm are correct. Tags are not a general proof of safe reclamation.
+
+A hazard-pointer protocol publishes protection and revalidates that the protected pointer still matches the source before dereferencing it. Merely publishing once and then dereferencing leaves a race with reclamation. Use a reviewed implementation with its full ordering/reclamation protocol instead of copying a three-line sketch. Availability of a standard-library facility depends on the selected language/library implementation; this lab deliberately requires only C++17.
+
+## 5. Read Linux RCU as a lifetime protocol
+
+RCU is useful for read-mostly kernel structures. An updater removes an old version from publication and defers freeing it until the relevant pre-existing readers have completed. It still needs appropriate updater synchronization and object initialization.
 
 ```c
-rcu_read_lock();                    // disable preemption only; O(1); no memory barrier emitted on most architectures
-ptr = rcu_dereference(gp);          // loads pointer with READ_ONCE + compiler barrier
-                                    // prevents compiler from caching or reordering the pointer load
-/* safely use *ptr — guaranteed to remain valid until rcu_read_unlock */
-rcu_read_unlock();                  // re-enable preemption
+/* Kernel-reading sketch; definitions/error handling/updater locking omitted. */
+rcu_read_lock();
+obj = rcu_dereference(shared);
+if (obj)
+    consume_immutable_fields(obj);
+rcu_read_unlock();
+/* Do not retain obj here without a separate lifetime mechanism. */
 ```
 
-Only cost: disable/enable preemption — a single per-CPU flag write.
+Publish with the proper RCU API; reclaim through an appropriate grace-period/callback mechanism. `synchronize_rcu()` can block. Read-side cost and preemption behavior depend on the RCU flavor/configuration: ordinary RCU read sections can be preemptible, so a context switch is not universally proof that a reader has finished. SRCU supports a different sleepable-reader contract. RCU does not serialize writers or make arbitrary in-place updates coherent. [Linux RCU explanation and examples](https://docs.kernel.org/RCU/whatisRCU.html).
 
-### Writer Side
+Replacing a model pointer also does not complete outstanding GPU operations. The device’s last use, buffer ownership, and destruction rules need separate evidence. A CPU read-side critical section is not a CUDA completion event.
 
-The write side follows a strict sequence: copy, modify, publish, wait, free.
+## 6. Keep kernel and userspace rules separate
 
-1. Allocate and populate a new version of the object
-2. Atomically publish the new pointer (so new readers see the new version)
-3. Wait for a **grace period** (all pre-existing readers have finished)
-4. Free the old object (safe: no reader can still hold a reference)
+Linux `atomic_t`, `refcount_t`, spinlocks, `kfifo`, and RCU belong to the kernel’s APIs and memory model. Kernel refcounts should use the subsystem’s prescribed lifetime API rather than assuming any atomic counter is interchangeable. IRQ suitability depends on the full operation: allocation, retries, blocking, and the lock type all matter. [Kernel atomic types](https://docs.kernel.org/core-api/wrappers/atomic_t.html), [reference counting](https://docs.kernel.org/core-api/refcount-vs-atomic.html).
 
-```c
-new_obj = kmalloc(sizeof(*new_obj), GFP_KERNEL);  // allocate new version
-*new_obj = *old_obj;               // copy: start from the current state
-new_obj->field = updated_value;    // modify the copy — old_obj is still visible to current readers
-rcu_assign_pointer(gp, new_obj);   // atomic publish: smp_wmb() + pointer store; new readers see new_obj
-synchronize_rcu();                 // BLOCK until all CPUs have exited any RCU read section that started
-                                   // before rcu_assign_pointer — the "grace period"
-kfree(old_obj);                    // safe: no pre-existing reader holds old_obj anymore
-```
+A kernel `kfifo` supports documented single-reader/single-writer use without an added lock, but callers must check full/empty return values and obey reset/concurrency restrictions. Additional readers or writers need the appropriate synchronization. [Kernel FIFO API](https://docs.kernel.org/core-api/kernel-api.html#fifo-buffer).
 
-`call_rcu(&old->rcu_head, free_fn)`: asynchronous callback form; avoids blocking `synchronize_rcu()`; used in interrupt context or when writer must not block.
+Offloading RCU callbacks can reduce interference on selected CPUs, but helper-thread affinity and other kernel work still matter. It does not establish a sub-millisecond worst-case bound. Use [CPU isolation](Lecture-08.md) and measured traces rather than treating a kernel command-line string as a guarantee.
 
-### Grace Period
+## 7. Check the complete argument
 
-A **grace period** is the interval after `rcu_assign_pointer()` until every CPU has passed through a **quiescent state**: a context switch, entry to idle, or return to user space. After the grace period, no pre-existing reader can hold a reference to the old pointer.
+The native lab runs 300,000 operations against a separate FIFO reference and transfers 400,000 items between real threads, checking order, payload, and checksum. It also runs AddressSanitizer/UndefinedBehaviorSanitizer and catches an intentional overwrite defect. Those checks do **not** prove the memory model or cover every interleaving; the ownership/order reasoning is essential.
 
-```
-  RCU Grace Period Timeline:
+**Self-checks:**
 
-  CPU 0: [RCU read A]──────────────────────[done]
-  CPU 1: [RCU read A]──────────[done]
-  CPU 2:                 [context switch]           ← quiescent state
-  CPU 3: [idle]──────[idle]                         ← quiescent state
+- Why does the producer acquire the read index? To observe that the consumer finished copying before reusing that slot.
+- Does `volatile bool ready` publish a C++ object? No; it is not the required inter-thread synchronization.
+- Does an atomic pointer keep its pointee alive? No; publication and reclamation are separate.
+- Can a lock-free algorithm miss a deadline? Yes; progress properties are not wall-clock scheduling guarantees.
 
-  Writer: rcu_assign_pointer(gp, new) ──► ... wait ... ──► kfree(old)
-                                          ◄── grace period ──►
-                                    (ends when all CPUs have passed
-                                     through at least one quiescent state)
-```
-
-### RCU Variants
-
-| Variant | Read Section Can Sleep? | Use Case |
-|---|---|---|
-| Classic RCU | No | Routing tables, `task_struct` lookup, module parameters |
-| SRCU (Sleepable RCU) | Yes | Notifier chains, subsystem registrations |
-| PREEMPT_RCU | No (but preemptible) | `CONFIG_PREEMPT` kernels |
-
-### rcu_nocbs= Kernel Parameter
-
-`rcu_nocbs=<cpulist>` **offloads `call_rcu` callbacks** to `rcuoc` kthreads running on non-isolated CPUs. Eliminates RCU callback invocations from isolated RT or inference cores, removing a source of **unpredictable latency jitter**.
-
-> **Key Insight:** RCU's power comes from moving all overhead to the writer side. Readers are completely free: no lock, no atomic, no memory barrier. This is why RCU scales perfectly with reader count — adding more readers adds exactly zero overhead. The writer pays a grace period, but writers are rare on read-mostly structures like routing tables, process lists, and model configurations.
-
----
-
-## kfifo — Kernel Lock-Free SPSC FIFO
-
-```c
-DECLARE_KFIFO(my_fifo, int, 64);   // statically declare a SPSC FIFO of 64 ints; size must be power of 2
-INIT_KFIFO(my_fifo);               // initialize head and tail indices to 0
-
-kfifo_put(&my_fifo, value);        // producer: enqueue; safe without lock for SPSC
-kfifo_get(&my_fifo, &value);       // consumer: dequeue; safe without lock for SPSC
-kfifo_len(&my_fifo);               // number of elements currently available
-```
-
-Used in kernel drivers for RX data buffers between ISR (producer) and process context (consumer). `kfifo` is the kernel's standard-library version of the SPSC ring buffer pattern described above.
-
----
-
-## Hazard Pointers
-
-**Userspace alternative to RCU** for lock-free memory reclamation:
-- Reader **publishes** the pointer it is about to dereference into a per-thread hazard pointer slot
-- Before freeing, the reclaimer scans all hazard pointer slots for the pointer
-- If found, deferral is required; if not found, free is safe
-
-```
-  Hazard Pointer Reclamation:
-
-  Thread A reading ptr P:    HP[A] = P         ← "I am using this pointer"
-  Thread B freeing ptr P:    scan all HP slots
-                             HP[A] == P? YES → defer free
-  Thread A done:             HP[A] = NULL
-  Thread B retries:          scan all HP slots
-                             HP[A] == NULL? YES → kfree(P) safe
-```
-
-Used in: Folly (Meta), Java `java.util.concurrent`. `std::hazard_pointer` standardized in C++26.
-
----
-
-## Summary
-
-| Technique | Reader Overhead | Writer Overhead | Safe for ISR? | Main Limitation |
-|---|---|---|---|---|
-| Spinlock | Cache-line write + spin | Cache-line write | Yes | Wasted CPU; no sleep |
-| CAS loop | Atomic RMW + retry | Atomic RMW + retry | Yes | ABA problem; retry cost |
-| SPSC ring buffer | Acquire load | Release store | Yes (producer or consumer) | Single producer AND single consumer only |
-| RCU | Preempt disable/enable | Copy + grace period | No (synchronize_rcu blocks) | Writer pays grace period; read-mostly |
-| Hazard pointers | Publish + load | Scan all HP slots | No | Higher reclamation overhead than RCU |
-| `kfifo` | Acquire load | Release store | Yes | Kernel-only; SPSC only |
-
-### Conceptual Review
-
-- **Why is `memory_order_relaxed` wrong for producer-consumer signaling?** Relaxed only guarantees atomicity of the atomic variable itself. It does not guarantee that data written before a `relaxed` store is visible to a thread that reads the `relaxed` variable. Use `release`/`acquire` to establish a happens-before relationship.
-- **What is the fundamental constraint of SPSC ring buffers?** Exactly one producer thread and exactly one consumer thread. With multiple producers or consumers, the head/tail updates become races that require additional synchronization (MPMC queues are significantly more complex).
-- **Why does RCU work without any reader-side locks?** RCU leverages the CPU's quiescent state detection: every context switch, idle entry, or user-space return is evidence that no active RCU read section is in progress on that CPU. The kernel tracks these events and declares a grace period complete only after all CPUs have quiesced.
-- **What problem does `rcu_nocbs=` solve on isolated inference cores?** Normally, `call_rcu` callbacks execute on the CPU that queued them. On an isolated inference core, this means RCU callbacks fire inside the inference loop at unpredictable times. `rcu_nocbs=` offloads these callbacks to helper threads on non-isolated CPUs, eliminating that latency source.
-- **When does CAS fail, and what should the retry loop do?** CAS fails when another thread changed the value between the load and the CAS instruction. On failure, CAS writes the current value into the `expected` variable. The retry loop should re-read dependent state, recompute the desired new value, and try again — not blindly retry with stale computation.
-- **How does RCU compare to a reader-writer lock for a model configuration?** An rwlock blocks new readers while a writer holds the write lock. RCU never blocks readers — the writer works on a private copy and publishes it atomically. For a 100Hz inference loop that reads configuration every cycle, even occasional brief write-lock blocking is unacceptable. RCU is the correct choice.
-
----
-
-## AI Hardware Connection
-
-- RCU enables live model configuration updates (LoRA adapter swaps, quantization config changes) without pausing inference threads; the writer publishes the new config atomically and the old config is freed only after all in-progress forward passes exit their read sections
-- SPSC ring buffer with `acquire`/`release` atomics provides the zero-copy camera frame pipeline in openpilot VisionIPC, eliminating mutex overhead on the 30Hz video path between `camerad` and `modeld`
-- `rcu_nocbs=` on Jetson inference-dedicated cores removes RCU callback execution jitter, enabling sub-millisecond worst-case latency bounds on isolated real-time inference cores
-- CAS-based lock-free queue is used in openpilot VisionIPC for multi-producer sensor data aggregation: each sensor driver enqueues readings without a mutex; the inference thread drains the queue once per inference cycle
-- Atomic reference counts (`kref`, `std::atomic<int>`) manage DMA-BUF buffer lifetimes across multiple GPU consumers in the V4L2 + CUDA pipeline; the buffer is freed only when the last consumer decrements the count to zero
-- SPSC ring buffer is the correct data structure for ISR-to-inference-thread pipelines; using a mutex in an ISR would require `spin_lock_irqsave`, adding latency; the atomic ring buffer avoids this entirely
+**Completion:** annotate both queue ownership transfers, demonstrate full/empty/wrap behavior, retain native test output, and explain how a camera-buffer pool would add lifetime/device-completion requirements. Continue to [deadlock and priority inversion](Lecture-11.md).

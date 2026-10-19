@@ -31,6 +31,8 @@ USD came from film pipelines, where hundreds of artists edit one shot without ov
 
 ---
 
+Run [the OpenUSD CPU exercise](Simulation-CPU-Lab.md#predict-which-usd-opinion-wins) alongside this lecture. It constructs its own tiny asset and tests composition without Isaac Sim, asset servers, or a GPU.
+
 ## 2. Mental model: prims, properties, stages, layers
 
 ### 2.1 The data model
@@ -65,7 +67,7 @@ over "panda" ( prepend apiSchemas = ["PhysicsArticulationRootAPI"] )      # "ove
 }
 ```
 
-Note the `over`. This layer doesn't define the links. It only adds physics opinions on top of prims that `base.usda` defines, and that split is the whole point of layering. `.usda` is text and diffs cleanly in git. `.usd` / `.usdc` is the binary crate format, faster to load and much smaller for meshes. NVIDIA's assets use text for structure and physics, binary for geometry.
+Note the `over`. This layer doesn't define the links. It only adds physics opinions on top of prims that `base.usda` defines, and that split is the whole point of layering. `.usda` is text and diffs cleanly in git. `.usdc` is the binary crate format. `.usd` is a generic extension that may contain text or crate data; inspect the format rather than inferring it from that suffix. NVIDIA's assets use text for structure and physics, binary for geometry.
 
 ### 2.2 Layers, the stage, and edit targets
 
@@ -80,7 +82,7 @@ A **layer** is one file's worth of scene description (opinions). A stage is the 
 
 * The **root layer** plus its **sublayers** form the root **layer stack**. Sublayering is how the 6.1 Franka asset stacks `physx.usda` on top of a neutral `physics.usda`.
 * The **session layer** is the strongest layer and is not saved with the stage. Use it for temporary overrides (debug colors, a test gain) that must never leak into the asset.
-* The **edit target** is the layer your writes go to, by default the root layer. `with Usd.EditContext(stage, stage.GetSessionLayer()): ...` redirects writes temporarily, so the change is visible now but never saved.
+* The **edit target** is the layer your writes go to, by default the root layer. `with Usd.EditContext(stage, stage.GetSessionLayer()): ...` redirects writes temporarily, so the change is visible now but excluded from an ordinary root-layer save. A session layer can still be explicitly exported, and flattening a composed stage includes its opinions.
 
 ### 2.3 Opinions and strength ordering, simply
 
@@ -110,7 +112,7 @@ A **reference** grafts another file's prim tree under one of your prims. `stage_
 
 ### 3.2 Payloads: lazy loading
 
-A **payload** is a reference that the stage can choose not to load. Open a stage with `Usd.Stage.Open(path, Usd.Stage.LoadNone)` and every payload stays unloaded. Its prims don't exist, its files are never read, and it costs nothing. Then `stage.Load("/World/robot_3")` brings in only what you need. For robotics this matters in three places: huge environments (load the room you're in), asset features you don't always need (grippers, ROS graphs, engine-specific physics), and fast "does this file even open" checks in CI.
+A **payload** is a reference that the stage can choose not to load. Open a stage with `Usd.Stage.Open(path, Usd.Stage.LoadNone)` and every payload stays unloaded. The payload's contributed descendants are not composed until loaded. The host prim and its payload metadata still exist, and the enclosing stage still has parsing and composition costs. Then `stage.Load("/World/robot_3")` brings in only what you need. For robotics this matters in three places: huge environments (load the room you're in), asset features you don't always need (grippers, ROS graphs, engine-specific physics), and fast "does this file even open" checks in CI.
 
 ### 3.3 Variants: switchable alternatives in one asset
 
@@ -143,7 +145,7 @@ Each variant pulls in a **payload**. Select `Gripper = robotiq_2f_85` and the Ro
 
 Mark a prim `instanceable = true` and USD may share one **prototype** for every instanceable prim that has identical composition (the same referenced file, the same variants). The descendants of an instance are read-only proxies. You can't override a property below the instance root. In return, the renderer and other consumers can store the shared subtree once.
 
-Isaac Sim's asset rules follow from that read-only constraint. Instance only the **mesh** subtrees, because link transforms change per environment and mesh data doesn't. Give every instanced mesh a **parent Xform** that carries the reference and the `instanceable` flag, since a mesh can't be the instance root itself. Put material bindings, physics materials and collision filters on that parent Xform, not on the mesh inside the instance.
+Isaac Sim's asset rules follow from that read-only constraint. Instance only the **mesh** subtrees, because link transforms change per environment and mesh data doesn't. Give every instanced mesh a **parent Xform** that carries the reference and the `instanceable` flag, so a transform and its referenced geometry form a useful shared subtree. OpenUSD instancing itself is not restricted to Xform-typed roots; a leaf mesh root has no descendant geometry to share. Put material bindings, physics materials and collision filters on that parent Xform, not on the mesh inside the instance.
 
 The 6.1 Franka follows this exactly. In `payloads/base.usda` each link has a `geometry` Xform, and below it an Xform marked `instanceable = true` that references `instances.usda`. The URDF/MJCF importers were rewritten in 6.0 and produce instanceable output by default (Lecture 06), so assets you import yourself follow the same pattern.
 

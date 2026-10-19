@@ -1,261 +1,89 @@
-# Lecture 9: Synchronization: Spinlocks, Mutexes, RW Locks & Seqlocks
+# Lecture 9: Synchronization — Ownership Before Primitive Selection
 
-## Overview
+## Start with the shared invariant
 
-The core problem this lecture addresses is: how do multiple CPUs or threads safely access the same data without corrupting it? When two threads write to the same memory location simultaneously, the result is undefined — this is a race condition. Synchronization primitives are the contracts that prevent races by ensuring only one writer (or multiple readers) can access shared state at a time. The mental model to carry here is that of a shared whiteboard in an office: a spinlock is someone standing in front of it spinning in place waiting for their turn; a mutex is someone going to sit down and do other work until notified; a seqlock is a reader who copies the board and then checks whether anyone erased it while they were copying. For an AI hardware engineer, choosing the wrong synchronization primitive can be the difference between a camera driver that works at 100Hz and one that introduces 50µs of latency on every frame handoff.
+Suppose a sensor sample contains `(sequence, timestamp, value)`. A consumer must see all three from the same update. Making only `sequence` atomic does not automatically protect ordinary reads and writes to the other fields. Concurrent conflicting non-atomic C/C++ accesses without the required synchronization can be a **data race**, with undefined behavior; a wider race condition can also occur in entirely atomic code when a multi-step protocol is wrong.
 
----
+Write down who owns the object, who can change it, and when it may be destroyed. Then choose a primitive. Mutual exclusion does not itself guarantee fairness, bounded waiting, priority inheritance, or freedom from deadlock.
 
-## Mutual Exclusion Problem
+## User space and kernel space have different contracts
 
-A **race condition** occurs when multiple CPUs or threads access shared state concurrently without coordination, and the outcome depends on scheduling order.
+A `pthread_mutex_t`, Linux `struct mutex`, `spinlock_t`, and a C++ atomic flag are different APIs. Do not copy a kernel algorithm into portable C++ and assume the memory model is identical.
 
-Three requirements for correct mutual exclusion:
+| Need | Starting point | Question to answer |
+|---|---|---|
+| Protect an ordinary user-space object | Mutex plus scoped ownership | Does every access use the same lock? |
+| Wait for a condition | Condition variable plus predicate under a mutex | Can notification occur before the waiter sleeps? |
+| Publish fixed-size samples SPSC | Reviewed atomic ownership protocol | Can a producer overwrite a slot before consumption? |
+| Protect kernel data in atomic context | Appropriate raw/spin lock variant | Can this context sleep, and can an interrupt take the same lock? |
+| Notify kernel request completion | Completion with request lifetime | What happens after timeout or cancellation? |
+| Read a kernel snapshot with retries | Appropriate seqcount/seqlock API | Can the writer be preempted by a reader that spins? |
 
-1. **Mutual exclusion**: at most one thread in the critical section at a time
-2. **Progress**: if no thread is in the critical section, a waiting thread must eventually enter
-3. **Bounded waiting**: no thread waits indefinitely (no starvation)
+## Mutex: protect the whole operation
 
-> **Key Insight:** Choosing the right synchronization primitive is not just a correctness decision — it is a performance decision. The wrong choice can add latency, reduce throughput, or introduce priority inversion. Each primitive in this lecture has a specific use case; using a mutex where a seqlock is appropriate wastes CPU cycles on writers that never contend.
+In user space, keep the predicate and its updates under the same mutex:
 
----
+```cpp
+// Conceptual C++ pattern; state and mutex must outlive both threads.
+{
+    std::lock_guard<std::mutex> lock(mutex);
+    ready = true;
+}
+condition.notify_one();
 
-## Spinlock (`spinlock_t`)
-
-**Busy-waits (spins)** on an atomic test-and-set instruction until the lock is available. **Disables preemption** on the local CPU while held.
-
-```c
-spin_lock(&lock);                        // acquire; disables preemption on local CPU
-/* critical section */
-spin_unlock(&lock);                      // release; re-enables preemption
-
-// When data is shared with an interrupt service routine:
-spin_lock_irqsave(&lock, flags);         // disables preemption + local IRQs; saves IRQ state
-/* critical section (safe against ISR) */
-spin_unlock_irqrestore(&lock, flags);    // restores IRQ state + re-enables preemption
-// flags saves the interrupt enable/disable state before the lock — not a priority number
-// This is necessary because the caller may have already disabled IRQs before acquiring the lock
+// The waiter checks before sleeping and rechecks after each wakeup.
+std::unique_lock<std::mutex> lock(mutex);
+condition.wait(lock, [&] { return ready; });
 ```
 
-Key constraints:
-- Only for **very short critical sections** (<1µs); holding while sleeping is a kernel bug
-- On NUMA systems, contended spinlocks cause **cache-line bouncing** across sockets
-- Under `PREEMPT_RT`: `spinlock_t` becomes a sleeping `rtmutex`; `raw_spinlock_t` retains true spin behavior
+The predicate handles early notification and spurious wakeups. A notification is not a durable replacement for the predicate. If `ready` is used to publish a sample, access that sample under the same ownership rule too. Use a bounded queue or sequence number when multiple events must be preserved; one Boolean cannot count ten arrivals.
 
-```
-  Spinlock Acquisition Flow:
+Kernel mutexes can use optimistic spinning before sleeping, so “mutex never spins” is inaccurate. Interruptible acquisition returns an error that must be handled before entering the protected section. Hard interrupt context cannot wait on a sleeping mutex. A threaded IRQ handler is task context, but its particular API and surrounding locks still impose constraints. See [kernel mutex design](https://docs.kernel.org/locking/mutex-design.html).
 
-  Thread A              Thread B (attempting lock)
-  ────────────          ────────────────────────────
-  spin_lock(&L)         spin_lock(&L)
-  [lock acquired]       [lock busy → spin in tight loop]
-  ... critical ...      test-and-set ... test-and-set ...
-  spin_unlock(&L)  ──►  [lock acquired]
-                        ... critical ...
-                        spin_unlock(&L)
+## Spinlocks and PREEMPT_RT
 
-  Note: Thread B burns CPU cycles while waiting.
-  This is intentional for very short waits where a context switch
-  would cost more than the spin itself.
-```
+On a non-RT kernel, acquiring `spinlock_t` disables preemption; IRQ-disabling variants also manage local interrupt state. If an interrupt on the same CPU can take the same lock, allowing it to interrupt a lock holder can deadlock. IRQ-save forms restore the prior local interrupt state instead of blindly enabling interrupts afterward.
 
-> **Common Pitfall:** If the critical section under a spinlock calls any function that can sleep — `kmalloc(GFP_KERNEL)`, `copy_from_user()`, `msleep()` — the kernel will BUG_ON on a PREEMPT_RT kernel and silently corrupt state on a standard kernel. Audit every line inside a spinlock-held section for potential sleep points.
+PREEMPT_RT changes `spinlock_t` and `rwlock_t` semantics to RT-mutex-based implementations; they must not be treated as raw hard-IRQ locks. `raw_spinlock_t` retains raw spinning semantics. A raw locked region cannot call a sleeping operation. No universal “under 1 µs means safe” threshold replaces context analysis and a bounded critical section. Do not depend on a particular warning, crash, or silent failure when violating the rule.
 
----
+Use the kernel's [lock type rules](https://docs.kernel.org/locking/locktypes.html) for the configured kernel. Reducing a lock's hold time helps, but first verify correctness of every access and interrupt path.
 
-## Mutex (`struct mutex`)
+## Reader/writer locks
 
-Task **blocks** (`TASK_UNINTERRUPTIBLE`) if lock is unavailable; scheduler runs other tasks. **No CPU wasted spinning**.
+A read lock allows concurrent readers, while a write lock excludes readers and other writers. This can help large read-dominated critical sections, but reader accounting and cache-line contention can cost more than a simple mutex for tiny reads. Fairness and priority-inheritance behavior depend on the primitive and configuration; do not assume every reader/writer lock provides writer preference or bounded writer delay.
 
-```c
-mutex_lock(&mutex);                    // blocks until acquired; process context only
-/* critical section */
-mutex_unlock(&mutex);
+**Worked lifetime problem:** an inference thread holds a read lock throughout a 20 ms forward pass. An updater waiting for the write lock may wait for that pass to finish, even if its eventual pointer swap takes only 1 µs. Releasing the read lock immediately after reading a pointer would require a separate mechanism that keeps the model alive throughout inference. A reference-counted immutable model is one possible design; synchronization of publication and destruction remains necessary.
 
-mutex_trylock(&mutex);                 // non-blocking; returns 1 if acquired, 0 if not
-// Use trylock when you can do useful work while waiting (e.g., process other requests)
+## Sequence counters: retry does not erase invalid memory access
 
-mutex_lock_interruptible(&mutex);      // returns -EINTR if signal received while waiting
-// Preferred in syscall handlers so that kill/ctrl-C can interrupt a blocked task
-```
+In a kernel seqcount pattern, the writer marks an update in progress, changes the fields, then marks completion. A reader copies the fields and accepts the copy only if the sequence observations show no intervening write. Writers must be serialized by the appropriate lock or ownership rule. `seqlock_t` includes a writer lock: **writers can wait for other writers**. Lockless readers normally do not block writers, but readers can retry repeatedly.
 
-- Cannot use in interrupt context — interrupts cannot sleep
-- Userspace equivalent: `pthread_mutex_t` backed by `futex` (fast path avoids syscall when uncontended)
-- Kernel `mutex` is not the same as `pthread_mutex_t`; different implementation and rules
+Consider a writer preempted halfway through an update. A higher-priority reader spinning on the odd sequence on that same CPU can prevent the writer from finishing. Kernel seqcount variants address serialization and preemption requirements; choose the variant for the actual writer lock and RT configuration. Read [sequence counters and sequential locks](https://docs.kernel.org/locking/seqlock.html).
 
-The transition from spinlock to mutex mirrors the **CPU vs. scheduler trade-off**: spinlocks waste CPU cycles but avoid context switch overhead. For critical sections **longer than a few microseconds**, putting the task to sleep is almost always cheaper.
+If the snapshot contains a pointer that the writer can free, a reader can dereference freed memory before its final retry check. Retrying afterward cannot repair that invalid access. Sequence protection therefore does not replace lifetime protection. Similarly, a naive portable C++ seqlock that reads ordinary payload fields concurrently with writes still has a data race; use a properly justified implementation or a mutex.
 
-### rtmutex — Priority Inheritance Mutex
+## Completions and timeout ownership
 
-`rtmutex` is a mutex with **priority inheritance (PI)**:
-- When high-priority task `H` blocks on an `rtmutex` held by low-priority task `L`, the kernel temporarily boosts `L`'s priority to `H`'s level
-- `L` runs sooner, releases the lock sooner, `H` unblocks; `L` returns to original priority on release
-- Under `PREEMPT_RT`, most kernel `spinlock_t` instances are replaced with `rtmutex`
-- Prevents the Mars Pathfinder scenario (see Lecture 11) in kernel code
+A Linux completion records an event so a later waiter can observe it. A successful `complete()` does not inherently identify which hardware request completed. Waiters need an associated request object and a defined producer lifetime.
 
-> **Key Insight:** Priority inheritance is what separates `rtmutex` from a regular mutex. Without PI, a high-priority task waiting for a lock held by a low-priority task can be stalled indefinitely by medium-priority tasks that preempt the lock holder. With PI, the lock holder's priority is raised to match the waiter's, eliminating that indefinite stall.
+**Worked timeout:** request 17 is submitted; the wait times out; the driver frees its completion object; a late IRQ calls `complete()` through the old pointer. The timeout did not cancel the IRQ or DMA, so this can become use-after-free. Before freeing memory, stop/quiesce the producer using the device's supported sequence and ensure callbacks cannot access the object. Alternatively retain ownership until an explicit terminal state. Do not reuse a completion for request 18 while request 17 can still signal it.
 
----
+`complete_all()` and `reinit_completion()` require coordinated reuse; resetting while waiters or producers still use the object can lose an event. The [completion documentation](https://docs.kernel.org/scheduler/completion.html) explains waiting contexts and timeout lifetime constraints. Kernel completion examples are distinct from C++ condition-variable semantics.
 
-## Read/Write Semaphore (`struct rw_semaphore`)
+## Lock dependency analysis
 
-Allows **multiple concurrent readers** **or** **one exclusive writer**; not both simultaneously. This is ideal when **reads are far more frequent than writes** — a common pattern for configuration tables and model weight structures.
+Document a lock order, such as `device configuration → submission queue → request state`. If one path takes queue then request while another takes request then queue, draw the cycle and remove it. Trylock only helps if failure releases the required resources and has a progress policy; repeatedly retrying can livelock.
 
-```c
-down_read(&rw_semaphore);          // shared read lock; multiple readers can hold concurrently
-/* read shared data */
-up_read(&rw_semaphore);
+Lockdep tracks observed relationships between lock classes and can diagnose potential dependency cycles without waiting for an actual deadlock. It is a development tool, not a proof that every path has been exercised or that timing requirements hold. Class assignment and nested locking need correct annotations; classes are not simply one numerical rank per object. Overhead depends on configuration and workload. See [lockdep design](https://docs.kernel.org/locking/lockdep-design.html).
 
-down_write(&rw_semaphore);         // exclusive write lock; blocks all readers + other writers
-/* modify shared data */
-up_write(&rw_semaphore);
+## Run and explain
 
-// Downgrades write lock to read lock without releasing (atomic, no window of unlocked state)
-downgrade_write(&rw_semaphore);
-```
+Run the checked C [thread/API demo](demos/rt-demo/README.md), then the C++ [SPSC queue lab](../labs/SPSC-Queue.md). The first checks mutex/condition/rwlock lifecycle; the second exposes the producer-to-consumer and consumer-to-producer ownership transfers. Its deliberate overwrite mutation must fail.
 
-- Sleeping lock; process context only; cannot use in interrupt context
-- Writer-bias: once a writer is waiting, new readers are blocked to prevent writer starvation
-- Used for: `mmap_lock` (in `mm_struct`), filesystem inode locks, device driver config tables
-- Spinlock variant `rwlock_t` exists for interrupt context (busy-waits; not sleeping)
+**Self-check answers:**
 
-```
-  RW Semaphore Access Patterns:
-
-  Timeline ──────────────────────────────────────────────────►
-
-  Reader A: ──[read]──────────────────────────────
-  Reader B:    ──[read]──────────────────────       (concurrent with A)
-  Reader C:         ──[read]──────────────────      (concurrent with A and B)
-  Writer D:                        ──[WAIT]──[write]──
-                                    ▲
-                              blocks new readers after this point
-  Reader E:                        ──[WAIT]──────[read]──
-                                               ▲
-                                         resumes after writer finishes
-```
-
----
-
-## Seqlock (`seqlock_t`)
-
-**Writers never block**. Readers detect concurrent writes via a **sequence counter** and retry if needed. The seqlock trades **occasional reader retries** for **zero writer blocking** — the right choice when writers need guaranteed forward progress.
-
-```c
-// Writer — always proceeds immediately, never blocks on readers
-write_seqlock(&seqlock);
-/* sequence counter incremented to ODD (signals: write in progress) */
-/* modify shared data */
-write_sequnlock(&seqlock);
-/* sequence counter incremented to EVEN (signals: write complete) */
-
-// Reader — retries if a concurrent write was detected
-unsigned seq;
-do {
-    seq = read_seqbegin(&seqlock);   // sample counter; if ODD, a write is in progress (spin/retry)
-    /* read shared data into local variables */
-} while (read_seqretry(&seqlock, seq));  // if counter changed, our read may be torn — retry
-// After the loop, local variables hold a consistent snapshot
-```
-
-The seqlock mechanism works because the counter is always odd during a write and even otherwise. A reader that starts when the counter is odd knows to retry immediately. A reader that finishes and finds the counter changed knows its data is inconsistent.
-
-Properties:
-- Writer overhead: two atomic counter increments; no blocking
-- Reader overhead on write-free path: two reads of the counter (extremely cheap)
-- Reader overhead on write path: retry loop (rare if writes are infrequent)
-- Not suitable for pointer-containing data (reader may dereference freed pointer before retry detects the change)
-
-Linux kernel uses seqlocks for: `jiffies_64`, `timespec64` for clock reads, kernel `xtime` timekeeping, `vDSO` time variables.
-
-> **Key Insight:** Seqlocks invert the usual lock trade-off. Most locks block writers to protect readers. Seqlocks let writers proceed freely and ask readers to retry if they were unlucky. This is the right choice when the writer is a high-priority real-time task (e.g., a sensor ISR updating a timestamp) and readers are lower-priority consumers.
-
-> **Common Pitfall:** Never use a seqlock to protect data containing pointers. If a reader reads a pointer, then a writer replaces the object and frees the old one, the reader may dereference the freed pointer before `read_seqretry` detects the change. Use RCU (Lecture 10) for pointer-containing data structures.
-
----
-
-## Completion (`struct completion`)
-
-**One-shot synchronization**: thread A waits for an event signaled by thread B. Cleaner than a semaphore for one-time events because its intent is **explicit** and it has **no spurious-wakeup risk**.
-
-```c
-DECLARE_COMPLETION(dma_done);         // static declaration; starts in "not complete" state
-
-// Waiter thread
-wait_for_completion(&dma_done);               // blocks in TASK_UNINTERRUPTIBLE until signaled
-wait_for_completion_timeout(&dma_done, HZ);   // with timeout; returns 0 on timeout, remaining jiffies on success
-wait_for_completion_interruptible(&dma_done); // can be interrupted by a signal (returns -ERESTARTSYS)
-
-// Signaler (e.g., DMA completion ISR)
-complete(&dma_done);      // wake one waiter (FIFO order)
-complete_all(&dma_done);  // wake all waiters simultaneously
-
-reinit_completion(&dma_done);  // reset for reuse after complete_all
-```
-
-Use cases: DMA transfer complete notification, kthread startup synchronization, driver probe sequencing, FPGA firmware load completion.
-
-With completions, the synchronization flow is unambiguous: the ISR signals "DMA done" and the waiting thread resumes. Compare this to a mutex (which guards access) or a semaphore (which counts available resources) — a completion is specifically for "wait until event X happens."
-
----
-
-## lockdep — Lock Dependency Validator
-
-All the synchronization primitives described above can be **used incorrectly**. `lockdep` is the kernel's **runtime tool to catch those mistakes** at development time, before they manifest as hard-to-reproduce **deadlocks**.
-
-`CONFIG_PROVE_LOCKING` enables lockdep, the kernel's runtime lock dependency validator:
-
-- Assigns each lock a **lock class** based on its static address in the binary
-- Records lock acquisition chains: "lock A held when lock B was acquired"
-- Reports **AB-BA cycles** (potential deadlocks) at first occurrence — before they manifest as actual hangs
-- Reports **lock-from-interrupt violations**: sleeping lock acquired in interrupt context
-- Output: `WARNING: possible circular locking dependency` with full stack traces in `dmesg`
-
-```bash
-# Enable in kernel config
-CONFIG_PROVE_LOCKING=y
-CONFIG_LOCK_STAT=y    # adds lock contention statistics per lock class
-
-# View lock stats after a workload run
-cat /proc/lock_stat | head -40
-# Output shows: lock name, acquisition count, contention count, wait time histogram
-```
-
-**Always enable during driver development** and regression testing. `lockdep` adds ~10% overhead; **disable in production**.
-
-> **Key Insight:** `lockdep` detects potential deadlocks the *first time* a new lock ordering is observed — even if that specific execution order has never actually deadlocked. This is more powerful than waiting for an actual hang, which may only occur under rare timing conditions in production. Think of lockdep as a static analyzer that runs at runtime.
-
----
-
-## Summary
-
-| Primitive | Context Usable | Blocks? | PI Support | Best For |
-|---|---|---|---|---|
-| `spinlock_t` | Process + IRQ | No (busy-wait) | No | Short CS (<1µs), ISR-shared data |
-| `raw_spinlock_t` | Process + IRQ | No (busy-wait) | No | Hardware-critical, cannot be sleeping lock |
-| `mutex` | Process only | Yes | No | Longer CS in process context |
-| `rtmutex` | Process only | Yes | Yes | RT tasks, PREEMPT_RT kernel |
-| `rwlock_t` | Process + IRQ | No (spin) | No | Read-heavy, short CS, IRQ context |
-| `rw_semaphore` | Process only | Yes | No | Read-heavy, longer CS |
-| `seqlock_t` | Process + IRQ (writer); retry (reader) | Writer: No; Reader: retry | No | Rarely-written, frequently-read data |
-| `struct completion` | Process only | Yes | No | One-shot event signaling |
-
-### Conceptual Review
-
-- **When should you use a spinlock instead of a mutex?** When the critical section is very short (<1µs), when you are in interrupt context (cannot sleep), or when the cost of a context switch exceeds the spin wait time. For anything longer or in process context, a mutex is almost always better.
-- **What makes `rtmutex` different from `mutex`?** Priority inheritance. When a high-priority task blocks on an rtmutex held by a low-priority task, the low-priority task's priority is temporarily raised to avoid priority inversion. Regular `mutex` has no PI mechanism.
-- **Why can't you use a mutex in an interrupt handler?** Interrupt handlers cannot sleep. A mutex blocks the caller when the lock is unavailable, which means putting the current execution context to sleep. An interrupt handler has no "current task" to sleep — it runs on top of whatever was interrupted.
-- **What is the seqlock's fundamental assumption?** That writes are rare and reads are frequent. If writes are frequent, readers spin-retry constantly and the seqlock becomes worse than a mutex. It also assumes the protected data contains no pointers that could be dereferenced during a torn read.
-- **What class of bugs does lockdep catch?** AB-BA deadlock cycles (lock A then B on CPU 0, lock B then A on CPU 1) and sleeping-lock-in-interrupt-context violations. It catches these the first time a new ordering is observed, before an actual deadlock occurs.
-- **Why use `spin_lock_irqsave` instead of `spin_lock` when sharing data with an ISR?** An ISR can preempt the thread holding a spinlock. If the ISR then tries to acquire the same spinlock, it spins forever — deadlock. `spin_lock_irqsave` disables local interrupts first, preventing the ISR from running while the lock is held.
-
----
-
-## AI Hardware Connection
-
-- `spin_lock_irqsave` in a camera DMA completion ISR protects the current frame buffer index shared with the inference thread; must not sleep in interrupt context; critical section is a single index write
-- `rw_semaphore` for model weight hot-reload: many concurrent inference threads hold the read lock during forward passes; the weight updater holds the write lock only during the pointer swap, so inference is never stalled longer than the swap itself
-- Seqlock passes hardware timestamps from the sensor acquisition thread to the fusion pipeline without blocking the sensor thread on slow readers; reader retries are negligible since sensor writes occur at 100Hz against reads at 1kHz
-- `completion` for "DMA transfer done" synchronization in FPGA accelerator drivers: the host CPU submits a command buffer, blocks on `wait_for_completion`, and the FPGA interrupt handler calls `complete()` when processing finishes
-- `rtmutex` with priority inheritance is essential on PREEMPT_RT AV compute platforms; all `spinlock_t` locks become `rtmutex` instances system-wide, providing PI in every kernel subsystem without modifying driver code
-- `lockdep` during Jetson embedded driver development catches AB-BA lock ordering violations in camera, ISP, and DMA subsystems before the hardware is deployed in a vehicle or robot
+1. Is a mutex unnecessary on a one-core machine? No; preemption can interleave accesses, and the language synchronization contract still applies.
+2. Does a notification prove a predicate is true? No; inspect the predicate under its lock.
+3. Does a completion timeout prove DMA stopped? No; timeout is an observation by the waiter.
+4. Does a seqlock guarantee writer execution immediately? No; writers serialize, scheduling still applies, and reader/writer contexts must obey the API.
+5. Does passing a stress test prove absence of all races? No; combine API/lifetime reasoning with appropriate tests and diagnostics.

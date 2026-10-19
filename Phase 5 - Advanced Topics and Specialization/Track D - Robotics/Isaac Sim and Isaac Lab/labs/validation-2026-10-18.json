@@ -1,0 +1,127 @@
+{
+  "reviewed_utc": "2026-10-18T21:58:32.121959+00:00",
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "scope": "CPU contracts and selected native library/middleware exercises; full Isaac simulator and training not executed",
+  "portable_tests": {
+    "command": "python3 -m unittest discover -s labs -p 'test_*.py' -v",
+    "passed": 27,
+    "skipped": 0
+  },
+  "syntax": {
+    "python_markdown_blocks_parsed": 49,
+    "all_lab_python_assets_parsed": true,
+    "meaning": "Parsing alone does not execute APIs or establish correctness."
+  },
+  "native_environment": {
+    "newton": "1.5.2",
+    "warp-lang": "1.16.0",
+    "numpy": "2.5.4",
+    "usd-core": "26.8",
+    "pip_check": "passed"
+  },
+  "policy_environment": {
+    "torch": "2.14.0+cpu",
+    "ros": "Jazzy / Fast DDS / Python 3.12",
+    "pip_check": "passed"
+  },
+  "executed": [
+    {
+      "script": "labs/newton_cpu.py",
+      "result": "labs/newton-reference.json",
+      "scope": "Actual CPU XPBD free fall at two timesteps; one and two independent-world floor-contact fixtures"
+    },
+    {
+      "script": "labs/usd_cpu.py",
+      "result": "labs/usd-reference.json",
+      "scope": "Actual OpenUSD payload/layer/save/flatten/unit semantics with generated local assets"
+    },
+    {
+      "script": "labs/ros2_capstone_replay.py",
+      "result": "labs/ros2-capstone-reference.json",
+      "checks": 6,
+      "scope": "Actual localhost transport; two nodes, one process, scripted actions"
+    },
+    {
+      "script": "labs/policy_adapter_smoke.py",
+      "result": "labs/policy-adapter-reference.json",
+      "checks": 3,
+      "scope": "Actual separate-process policy adapter; temporary known-weight linear TorchScript; no learned model"
+    },
+    {
+      "script": "labs/reach_tensor_cpu.py",
+      "result": "labs/reach-reference.json",
+      "checks": 6,
+      "scope": "Actual lecture class methods with CPU torch; fake scene and refresh callback"
+    },
+    {
+      "script": "labs/push_tensor_cpu.py",
+      "result": "labs/push-reference.json",
+      "checks": 8,
+      "scope": "Actual lecture class methods with CPU torch; fake poses/scene; no physics"
+    },
+    {
+      "script": "labs/simulation_semantics.py",
+      "result": "labs/semantics-reference.json",
+      "scope": "Scalar identification and paired-regression worked examples; synthetic data"
+    }
+  ],
+  "not_executed": [
+    "Isaac Sim 6.1 or 6.2 / Kit / RTX / PhysX",
+    "Isaac Lab training, assets, native data views or FK",
+    "MuJoCo-Warp, GPU Newton or CUDA graphs",
+    "Trained policy export parity or learned task success",
+    "Physical robots or hardware actuation"
+  ],
+  "artifact_sha256": {
+    "Compatibility.md": "a64d1a589f517069cc9b46595f65586da0ced5f9d3716b801fdb0e0621515508",
+    "Lab-Guide.md": "c6bb926e465e5200b5896109e3e82e6f9b24a3aeebc54f0f9de4e8483521a816",
+    "Lecture-01.md": "9a9387e13e7f475b64e5f905badf395370910b3743ab8f25e50411fb28b03830",
+    "Lecture-02.md": "021f57faceee526f1d2e1e1eb868772325d12c01372131a70b2cfbe781ea9dc9",
+    "Lecture-03.md": "b9a3fbd97c33df120aec1884afc9087130aca3ab3d2eea3e19fea36771ff53ff",
+    "Lecture-04.md": "39cf3ec128b1ef9d3b1c5a7be83eaa12adee0b24100febc99557caf901c9f3f4",
+    "Lecture-05.md": "1a9526a86fc14f749d0ccf8fe24c66bce8d56cb02e83b5c47951613fc0d72a37",
+    "Lecture-06.md": "931290100b458843fc2732561dd5db5d8a0d101933463b9e1bfbc891071a98c8",
+    "Lecture-07.md": "18b84c079377f0a5443b0ada0d6b2b55add99b9212b24eed529b3ec3d516bb43",
+    "Lecture-08.md": "73183c9b05464056753abfd041828dd9f39b3e2efadfd268e9d0265336e0eca3",
+    "Lecture-09.md": "093f040e45fb52cafe05d289e29cc45e9826b60a062111ca49edf7f4c5ddd240",
+    "Lecture-10.md": "9715326d07b84ed04b2e5d96816235060469f5abd4f49533d5da330e66561944",
+    "Lecture-10b.md": "49851cd8fccc4d10cb5939334dea96ddf188278fde4634346bffd42185422e71",
+    "Lecture-11.md": "2d3e3640d2b316dddabc8042552ad937d09a24e3d58effda7481fe21686808db",
+    "Lecture-12.md": "56d37b95caa70fa80706e4cf4d76ceab5059ec01ef2d620266a41e7b2f7833e0",
+    "Lecture-13.md": "d20b2530e60082ed5a62ba9c0f3692f79105e38a6fe7fcebca5197086453649b",
+    "Lecture-14.md": "edc26bac60b20e8be9233f95dfd9b7050ab13213ab104c7abe1e9bc75bbe16b6",
+    "Lecture-15.md": "5aa8fab83b00c4533f91ae8c9e5f6bba4715eece50e33f90a1ed0724f4fee868",
+    "Lecture-16.md": "ac3c161ae5a2a0c8099423d6e922f38768cc88f909e61cfbc4cdbf81b881183d",
+    "Lecture-17.md": "d826c1daf62eb3a92cd24e84be1e8d5bf7bcf64ad49613219d15dfc9a7ff2b93",
+    "Lecture-18.md": "b24d26d7fe8273a24394786df9359d959a0e0b3d94e9d1f43cb9cedf739aa708",
+    "Lecture-19.md": "edde98451cd34522aff4212ad3e56e2e5bced3955c53c9071edd667c132d1faa",
+    "Lecture-20.md": "fb0f80c2fe1945e0fc6f94c43ba5d1ad18be6125f274e15c202b520f61a17195",
+    "Lecture-21.md": "f33195c563939830fbf1a9411e979f2279cb245a3caf525270a7bfc7e22131de",
+    "README.md": "45bdcb864889e8ce9d25c475882baee33bbc471d02ff30a952fb4e1941642477",
+    "Simulation-CPU-Lab.md": "b92afef8d0a89bf1a9102669e0d3ebd9a5e1d97312dc8fc4a628dec2fe9ec148",
+    "labs/capstone_policy_node.py": "bb2d8b490964fda51b08c80d5f4f33bce3d090b7c2fdf6e74a117cc7ed95b767",
+    "labs/capstone_protocol.py": "b31769d982da83b3a11611e2f5e57f3a0f6656482742ba353cb94034ba014d1d",
+    "labs/isaac_capstone_bridge.py": "15de9bafc003a6a63f75fac6f039c96714f13566e359d2ec5cb75d8fe0877a84",
+    "labs/newton-reference.json": "194f74d8c9f476f94d0de8b82c8a311a710971fdab714c05586e9f8bc59d0b66",
+    "labs/newton_cpu.py": "c9441414bb0190e9bf4f25ebe613fcbe434aef730b747d0fd7e68be1c7f59a3b",
+    "labs/policy-adapter-reference.json": "2af02dcbe640e2f3d700e1426ff66e820d8ffddf126bf21a2a8005f999c49201",
+    "labs/policy_adapter_smoke.py": "269bd40a4c145b4f29f1fcba0b60ffb1d88f189a59124eefe6d2a109af55f063",
+    "labs/push-reference.json": "8e2b32353e4ed5e410e7a632c8eae4c98ecfbde47318ffee88dac3ad5947d862",
+    "labs/push_tensor_cpu.py": "2012ffe1ecb651e0666c6764a08701b955f928cfb2b6dcc3080fede82ca0333b",
+    "labs/reach-reference.json": "2b8a9546fb0e312873c90058233f1fe7932d92c2681a96b45fd064c6fcab7ec1",
+    "labs/reach_tensor_cpu.py": "2dc86005091d5d0762138f214d42fac8ba358437d2776cb0a669093ab01e3b2b",
+    "labs/requirements-native-cpu.txt": "7d6b7cb1bf6f08727d4e99369278798e68ac2cb838258c126e75b0ad625e8fb1",
+    "labs/robotics_contracts.py": "e74685254482880dfb9244c3c725844944b177f1b67bd1f0cbd314f53ac0e84e",
+    "labs/ros2-capstone-reference.json": "3915ae001126a8672a5ed8062d2cf63bcd390317fc03aee1bebffb37f00ceb8e",
+    "labs/ros2_capstone_replay.py": "ae0dbf7e933801228f651fe487026d36336b5bcaf11d12fdaeb503284d0d94fd",
+    "labs/semantics-reference.json": "13ab7141373b8217bfdaf9f1798dbfb1ba8a02f461f68ccb5bfad45f277bd388",
+    "labs/simulation_semantics.py": "34131822101c006e212fb248677a7b93e65cbc262a46aab61be80e4d7cc90f37",
+    "labs/source-review-2026-10-18.json": "423a07a4bd29bacdc9e622d70b283a22b9ffff3a161610d234406caa196c0f40",
+    "labs/test_capstone_protocol.py": "146c9eba0e7402a3a8749ce266b680b3a8b8bb9421c136c8c0f82ab808333016",
+    "labs/test_contracts.py": "033bb8d92e5ae9741317da5b9765721bd42783b4e24d48b430c3d4151991a6cf",
+    "labs/test_simulation_semantics.py": "af746f9baa9da7841efb54502d233a10987e73d8a90c23ecc5ff09baf19c1df8",
+    "labs/usd-reference.json": "214c418ebb92fad0f4c254d2c36b05d5f3754def8cc6c0acaef0c5f5d2d25bb5",
+    "labs/usd_cpu.py": "1eef2fbb46ad10e0f3d1d061e2125d6917d924c62d581464a981e012a5744e1f"
+  }
+}

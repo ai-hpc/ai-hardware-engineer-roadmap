@@ -2,13 +2,17 @@
 
 **Collection:** [MCP for AI Agents](README.md) | **Previous:** [← Lecture 02](Lecture-02.md) | **Next:** [Lecture 04](Lecture-04.md)
 
+
+**Protocol scope:** the detailed wire/SDK examples below teach the `2025-11-25` compatibility contract. Start with the [current 2026-07-28 protocol lesson](Protocol-2026-07-28.md) for new implementations; do not relabel an old handshake or reverse-request example as current.
+
+
 ---
 
 In [Lecture 02](Lecture-02.md) you watched a connection come up: host and server exchange `initialize`, negotiate capabilities, and settle into the operate phase. Now we open the operate phase and look at *what a server actually exposes*. The three server→client primitives — **Tools**, **Resources**, and **Prompts** — are the entirety of what a server offers a host on this side of the connection. (The reverse direction, server *asking the host* for things, is [Lecture 04](Lecture-04.md).) Everything an MCP server does for an agent lands in exactly one of these three buckets.
 
 The temptation, coming from plain function calling, is to see all three as "tools with different names." Resist it. The protocol draws a deliberate line through them based on **who decides to use the thing** — the model, the application, or the human. That single distinction, the *control trichotomy*, is the most important idea in this lecture, because it is what makes MCP safe to wire into a host UI. A tool the model can fire on its own is a fundamentally different security and UX object from a document the application chose to attach or a slash-command the user typed. Get the trichotomy right and the rest — schemas, URIs, templates — is detail.
 
-Everything here is JSON-RPC 2.0 over the transport from [Lecture 02](Lecture-02.md), pinned to the **2025-11-25** stable spec. We will read the actual wire messages, not SDK sugar; [Lecture 05](Lecture-05.md) puts FastMCP on top of them.
+Everything here is JSON-RPC 2.0 over the transport from [Lecture 02](Lecture-02.md), pinned to the **2025-11-25** historical spec. We will read the actual wire messages, not SDK sugar; [Lecture 05](Lecture-05.md) puts FastMCP on top of them.
 
 ---
 
@@ -309,5 +313,4 @@ With the three forward primitives in hand, [Lecture 04](Lecture-04.md) turns the
 
 ## Current as of
 
-- **Date:** June 2026
-- **Spec revision:** MCP **2025-11-25** (stable). The control trichotomy (Tools = model-controlled, Resources = application-controlled, Prompts = user-controlled), the method names (`tools/list`, `tools/call`, `resources/list`, `resources/read`, `resources/subscribe`, `prompts/list`, `prompts/get`), `outputSchema`/structured content, tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`), RFC 6570 resource templates, and `notifications/resources/updated` are all current as of this revision. Verify primitive shapes against the spec at [modelcontextprotocol.io](https://modelcontextprotocol.io) and your installed SDK before relying on exact field names.
+The original June-2026 examples target `2025-11-25`. Reviewed 2026-10-18: **2026-07-28 is current**, with a different request, result, subscription, and retry contract. Use the [current lesson and official sources](Protocol-2026-07-28.md) before implementing or migrating. SDK snippets here have not been executed against the new revision; retained benchmark numbers are historical references, not local measurements.

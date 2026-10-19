@@ -103,6 +103,14 @@ A Zynq system map that explains where compute, memory, and control live.
 
 ## Unit 2: AXI And Memory Maps
 
+### Work a control transaction
+
+AXI4-Lite's write-address and write-data channels handshake independently. A slave cannot assume `AWVALID` and `WVALID` arrive on the same cycle; it must retain each accepted item until it can form the write and produce a response. Exercise address-first, data-first, same-cycle, and stalled-response cases. Hold response fields stable until their handshake completes.
+
+For a 32-bit register at byte offset `0x10`, `WSTRB=0011` enables only the low two byte lanes. Define whether unsupported addresses return an error and whether writes are read-modify-write, write-one-to-clear, or ordinary replacement. Reading status and writing it back can accidentally clear unrelated write-one-to-clear bits. Document reset values and reserved bits so the software does not have to guess.
+
+A register address is part of the board's exported address map, not a universal constant such as `0xA0000000`. Compare the hardware design, device tree, driver resource size, and application ABI.
+
 ### Learn
 
 - AXI4-Lite for control registers
@@ -139,6 +147,14 @@ Block design diagram, address map, register definition, and software proof of re
 
 ## Unit 3: DMA And Streaming
 
+### Prove the bandwidth arithmetic
+
+An assumed 64-bit AXI data interface accepting one full beat each cycle at 100 MHz carries at most `8 bytes × 100 million = 800 MB/s` of data-channel payload. If it accepts beats on only 60% of cycles, that becomes 480 MB/s before accounting for padding or unrelated traffic. This is an interface calculation, not a DDR or board benchmark. Count accepted `VALID && READY` transfers, not asserted `VALID` cycles.
+
+A 1920×1080 RGB8 frame contains 6,220,800 bytes; at 30 frames/s its packed payload rate is 186,624,000 bytes/s. Extra read/write passes, stride padding, metadata, and other masters raise memory traffic. A producer and consumer sharing DDR can each be individually below a nominal interface limit while their combined workload exceeds the sustainable memory service.
+
+HP/HPC/ACP names indicate interface capabilities for a particular device family. A coherent-capable port alone does not prove a coherent transaction: attributes, interconnect configuration, software mapping, and cache ownership must agree. Use the target's technical reference manual, [AMD coherency explanation](https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/18842098/Zynq%2BUltraScale%2BMPSoC%2BCache%2BCoherency), and Linux DMA API, then validate under repeated dirty-cache reuse.
+
 ### Learn
 
 - AXI DMA
@@ -158,6 +174,10 @@ Start with a pass-through stream block. Then replace it with a simple transform:
 - threshold
 - fixed-point multiply
 - checksum
+
+Use the [saturating byte RTL lab](../1.%20Xilinx%20FPGA%20Development/labs/README.md) as a simulated transform first. Its contract preserves items under backpressure and explicitly flushes one queued item on reset. When attaching DMA, extend the interface for the engine's required packet length/sideband behavior; this minimal stage is not a complete AXI DMA design. Carry a sequence ID through your test data so you can distinguish corruption, reordering, duplication, and loss.
+
+Before a board run, follow the [runtime buffer ownership example](../5.%20Runtime%20and%20Driver%20Development/Guide.md): identify who may access each buffer before, during, and after DMA. A passing software copy test does not validate that device ownership transition.
 
 ### Measure It
 

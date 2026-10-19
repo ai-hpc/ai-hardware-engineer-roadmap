@@ -36,20 +36,22 @@ Detailed guides for specific GPU cluster configurations and subsystems:
 - [03 Inference Setup](./8x-H200-Training-Inference/03-Inference-Setup.md) — vLLM, TensorRT-LLM, FP8, speculative decoding
 - [04 Memory Management](./8x-H200-Training-Inference/04-Memory-Management.md) — KV cache, PagedAttention, GQA, profiling
 - [05 Performance Optimization](./8x-H200-Training-Inference/05-Performance-Optimization.md) — Roofline, CUDA Graphs, kernel fusion, NCCL tuning
-- [06 Benchmarks & Validation](./8x-H200-Training-Inference/06-Benchmarks-and-Validation.md) — MFU, MBU, latency/throughput targets
+- [06 Benchmarks & Validation](./8x-H200-Training-Inference/06-Benchmarks-and-Validation.md) — MFU, MBU, reproducible latency/throughput and quality measurements
 
 ### L40S x12 — Topics
 - [01 Hardware Architecture](./L40S-x12-Inference/01-Hardware-Architecture.md) — AD102 die, GDDR6, PCIe topology, no-NVLink constraints
 - [02 Inference Optimization](./L40S-x12-Inference/02-Inference-Optimization.md) — GPTQ, AWQ, FP8 quantization, vLLM, continuous batching
 - [03 Multi-GPU Strategy](./L40S-x12-Inference/03-Multi-GPU-Strategy.md) — PCIe parallelism, pipeline vs tensor parallel, InfiniBand
 - [04 Deployment Guide](./L40S-x12-Inference/04-Deployment-Guide.md) — systemd, Docker, Kubernetes, NGINX load balancing, monitoring
-- [05 Benchmarks](./L40S-x12-Inference/05-Benchmarks.md) — throughput tables, L40S vs H200 comparison, load testing
+- [05 Benchmarks](./L40S-x12-Inference/05-Benchmarks.md) — feasible capacity checks, controlled deployment comparisons, honest load testing
+
+Start with the [executed CPU collectives lab](./NCCL-Deep-Dive/CPU-Collectives-Lab/Guide.md) before the GPU-specific chapters.
 
 ### NCCL Deep Dive — Topics
 - [01 Fundamentals](./NCCL-Deep-Dive/01-Fundamentals.md) — AllReduce, Broadcast, AllGather, ReduceScatter, AllToAll explained with diagrams
-- [02 Algorithms & Bandwidth](./NCCL-Deep-Dive/02-Algorithms-and-Bandwidth.md) — Ring vs Tree vs Double Binary Tree, how 900 GB/s is achieved, bandwidth math
+- [02 Algorithms & Bandwidth](./NCCL-Deep-Dive/02-Algorithms-and-Bandwidth.md) — Ring vs Tree vs Double Binary Tree, aggregate link budgets, normalized bandwidth and checked arithmetic
 - [03 Framework Integration](./NCCL-Deep-Dive/03-Framework-Integration.md) — how PyTorch DDP, FSDP, DeepSpeed ZeRO, Megatron call NCCL internally
-- [04 Configuration & Tuning](./NCCL-Deep-Dive/04-Configuration-and-Tuning.md) — every important env var, per-topology recipes (H200 / L40S / multi-node)
+- [04 Configuration & Tuning](./NCCL-Deep-Dive/04-Configuration-and-Tuning.md) — versioned controls, complete smoke test and controlled tuning experiments
 - [05 Multi-Node Clusters](./NCCL-Deep-Dive/05-Multi-Node-Clusters.md) — hierarchical AllReduce, InfiniBand, GPUDirect RDMA, SHARP in-network compute
 - [06 Debugging](./NCCL-Deep-Dive/06-Debugging.md) — hangs, errors, XID codes, fault tolerance, recovery patterns
 - [07 Trillion-Parameter Scale](./NCCL-Deep-Dive/07-Trillion-Parameter-Scale.md) — 3D parallelism NCCL patterns, MoE AllToAll, communication budgets at scale
@@ -57,17 +59,17 @@ Detailed guides for specific GPU cluster configurations and subsystems:
 ### CUDA Advanced Optimization — Topics
 - [01 CUDA Graphs](./CUDA-Advanced-Optimization/01-CUDA-Graphs.md) — capture/replay pipelines, PyTorch patterns, bucketing for dynamic shapes, profiling
 - [02 Cooperative Groups](./CUDA-Advanced-Optimization/02-Cooperative-Groups.md) — thread block, warp, tiled partition, coalesced, grid-wide sync with examples
-- [03 Persistent Kernels](./CUDA-Advanced-Optimization/03-Persistent-Kernels.md) — always-resident GPU workers, GPU-side work queues, zero-overhead dispatch
+- [03 Persistent Kernels](./CUDA-Advanced-Optimization/03-Persistent-Kernels.md) — persistent tile scheduling, bounded queues and synchronization contracts
 - [04 Kernel Fusion](./CUDA-Advanced-Optimization/04-Kernel-Fusion.md) — HBM round-trip elimination, Triton, torch.compile, FlashAttention as fusion example
 - [05 Warp Specialization](./CUDA-Advanced-Optimization/05-Warp-Specialization.md) — producer/consumer warpgroups, TMA, WGMMA, software pipelining, CUTLASS 3.x
 
 ### GPUDirect Storage (GDS) — Topics
 - [01 Architecture & Data Path](./GPUDirect-Storage/01-Architecture-and-Data-Path.md) — CPU vs GDS data paths, PCIe topology, NUMA pinning, 3 transport modes
 - [02 Hardware Setup](./GPUDirect-Storage/02-Hardware-Setup.md) — WD OpenFlex reference config (A100 + CX-7 + SN3700), PCIe layout, version matrix
-- [03 Software Stack](./GPUDirect-Storage/03-Software-Stack.md) — OFED 5.8, GDS 2.17.3, libcufile install, gdscheck verification, cufile.json config
+- [03 Software Stack](./GPUDirect-Storage/03-Software-Stack.md) — version-compatible driver/runtime installation, diagnostic verification and configuration
 - [04 libcufile API](./GPUDirect-Storage/04-libcufile-API.md) — cuFileRead/Write, buffer registration, batch I/O, PyTorch DataLoader integration
 - [05 Performance Tuning](./GPUDirect-Storage/05-Performance-Tuning.md) — 512-byte alignment, optimal transfer size, queue depth, buffer pool, benchmarks
-- [06 Disaggregated Storage](./GPUDirect-Storage/06-Disaggregated-Storage.md) — NVMe-oF over RoCEv2, WD OpenFlex + RapidFlex, 75 GB/s scale-out, lossless config
+- [06 Disaggregated Storage](./GPUDirect-Storage/06-Disaggregated-Storage.md) — NVMe-oF/RDMA topology, storage evidence and fabric configuration
 
 ### Confidential Computing & Hardware Attestation — Topics
 - [01 Intel TDX Attestation Chain](./Confidential-Computing-Attestation/01-Intel-TDX-Attestation-Chain.md) — TDX Module RTM, MRTD/RTMR/REPORTDATA, TD Report → Quoting Enclave → TD Quote, DCAP verification chain

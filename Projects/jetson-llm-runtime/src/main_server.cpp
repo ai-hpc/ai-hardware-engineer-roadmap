@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
     std::string model_path;
     int port = 8080;
     int context = 0;
-    bool kv_int8 = true;
+    bool kv_int8 = false;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-m") == 0 && i+1 < argc) model_path = argv[++i];
@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
                 "  -m PATH      GGUF model (required)\n"
                 "  -p PORT      HTTP port (default: 8080)\n"
                 "  -c INT       Context length (0 = auto from memory)\n"
-                "  --fp16-kv    Use FP16 KV cache (default: INT8)\n\n"
+                "  --fp16-kv    Use FP16 KV cache (the supported teaching default)\n\n"
                 "Endpoints:\n"
                 "  GET  /health                  Jetson system health\n"
                 "  GET  /v1/models               List loaded model\n"

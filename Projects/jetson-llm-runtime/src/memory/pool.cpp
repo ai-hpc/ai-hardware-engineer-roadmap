@@ -1,15 +1,18 @@
-// pool.cpp — Scratch memory pool (bump allocator, zero malloc during inference)
+// Scratch bump allocator; other runtime components can still allocate.
 
 #include "jllm_memory.h"
 #include <cuda_runtime.h>
 #include <cstdio>
+#include <new>
 
 namespace jllm {
 
 bool ScratchPool::init(int64_t size_bytes) {
-    cudaError_t err = cudaMallocHost(&base_, size_bytes);
+    destroy();
+    if (size_bytes <= 0) return false;
+    cudaError_t err = cudaMallocManaged(&base_, static_cast<size_t>(size_bytes));
     if (err != cudaSuccess) {
-        fprintf(stderr, "[scratch] cudaMallocHost(%ld MB) failed: %s\n",
+        fprintf(stderr, "[scratch] cudaMallocManaged(%ld MiB) failed: %s\n",
                 size_bytes / (1024*1024), cudaGetErrorString(err));
         return false;
     }
@@ -20,18 +23,19 @@ bool ScratchPool::init(int64_t size_bytes) {
 }
 
 void ScratchPool::destroy() {
-    if (base_) { cudaFreeHost(base_); base_ = nullptr; }
+    if (base_) { cudaFree(base_); base_ = nullptr; }
     capacity_ = 0;
     offset_ = 0;
 }
 
 void* ScratchPool::get(int64_t size) {
-    // Align to 256 bytes (GPU coalescing + cache line friendly)
+    // Align offsets; alignment alone does not guarantee coalesced accesses.
+    if (!base_ || size <= 0 || size > std::numeric_limits<int64_t>::max()-255) return nullptr;
     size = (size + 255) & ~255LL;
 
-    if (offset_ + size > capacity_) {
-        fprintf(stderr, "[scratch] FATAL: pool exhausted (%ld / %ld bytes)\n",
-                offset_ + size, capacity_);
+    if (offset_ > capacity_ || size > capacity_ - offset_) {
+        fprintf(stderr, "[scratch] pool exhausted (used=%ld requested=%ld capacity=%ld bytes)\n",
+                offset_, size, capacity_);
         return nullptr;
     }
 
@@ -42,6 +46,18 @@ void* ScratchPool::get(int64_t size) {
 
 void ScratchPool::reset() {
     offset_ = 0;
+}
+
+void* ScratchPool::get_or_throw(int64_t size) {
+    void* pointer=get(size);
+    if(!pointer)throw std::bad_alloc();
+    return pointer;
+}
+
+bool ScratchPool::rewind(int64_t checkpoint) {
+    if(!base_ || checkpoint<0 || checkpoint>offset_ || checkpoint%256!=0)return false;
+    offset_=checkpoint;
+    return true;
 }
 
 }  // namespace jllm

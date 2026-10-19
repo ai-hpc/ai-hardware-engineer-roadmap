@@ -27,7 +27,7 @@ By the end of this lecture you should be able to:
 
 ## 1. Data cleaning — finding what's wrong
 
-Data errors are mismatches with ground truth: missing values, erroneous values, extreme values. Good models are *robust* to some of this — a deep net trained with SGD shrugs off label noise far better than a decision tree, which can carve a leaf around a single bad point — but robustness is a buffer, not a license. The consequences of skipping cleaning are insidious precisely because they are quiet: training still converges (just slower), accuracy degrades in a way that is hard to attribute, and a deployed model built on dirty data starts shaping the next batch of collected data. A poor recommender generates the "positive" clicks that become tomorrow's training labels, and the error compounds into the data flywheel.
+Data can contain missing values, mislabeled examples, invalid measurements, and valid rare events. Model robustness depends on the architecture, loss, data, and noise mechanism; deep networks can memorize noisy labels too. Investigate suspicious records before removing them, and preserve a clean evaluation protocol while developing cleaning rules.
 
 CS329P splits errors into three types, and the split matters because each demands a different detector:
 
@@ -55,21 +55,21 @@ def iqr_outlier_mask(x: np.ndarray, k: float = 1.5) -> np.ndarray:
 
 Rules encode integrity constraints you know must hold. Two flavors from the lecture:
 
-- **Functional dependencies** — `x → y` means a value of `x` determines a unique `y`. Zip code → state. EIN → company name. If one zip maps to two states in your data, one row is wrong.
+- **Functional dependencies** — `x → y` means a value of `x` determines a unique `y`. For a deliberately constrained robot log, `sensor_serial → sensor_model` may be a declared dependency. Validate the domain rule first; real postal codes can cross jurisdiction boundaries and company identifiers can span name changes.
 - **Denial constraints** — richer first-order-logic conditions: *"phone number must not be empty if the vendor has an EIN"*; *"if two captures share a tag number, the earlier one must be marked original."* These catch cross-column inconsistencies a single-column check never would.
 
 ```python
-# Functional dependency check: does each zip map to exactly one state?
+# Example declared dependency: one sensor model per serial in this dataset.
 violations = (
-    df.groupby("zip")["state"].nunique()
-      .loc[lambda s: s > 1]          # zips with >1 distinct state = broken FD
+    df.groupby("sensor_serial")["sensor_model"].nunique()
+      .loc[lambda s: s > 1]          # investigate serials associated with multiple models
 )
 ```
 
 ### Pattern-based detection
 
 - **Syntactic patterns** — map a column to its most prominent data type and flag values that don't fit, or canonicalize variants (`eng`, `en`, `english` → `English`). A "date" column where 2% of cells are free text is a syntactic violation.
-- **Semantic patterns** — bring in external knowledge, e.g. a knowledge graph that says values in a `Country` column must be capitals/nations, so `"Stanford"` is invalid even though it's a perfectly well-formed string.
+- **Semantic patterns** — bring in external knowledge, e.g. a knowledge graph that says values in a `Country` column must belong to the declared country vocabulary, so `"Stanford"` is invalid even though it's a perfectly well-formed string.
 
 **Fixing**, not just finding, is the other half. Multiple tools exist along a spectrum from manual to automatic: interactive graphical wranglers (Trifacta Wrangler, OpenRefine) let a human see and fix; automatic systems detect-and-repair against the rules above at scale. In practice you start interactive on a sample to *discover* the rules, then codify them into an automatic check that runs on every future batch — cleaning is a pipeline stage, not a one-time scrub.
 
@@ -85,28 +85,31 @@ Normalization makes training more stable — it conditions the optimization so g
 
 | Method | Formula | Output range | Use when |
 |---|---|---|---|
-| **Min-max** | `x' = (x − min)/(max − min)·(b − a) + a` | exactly `[a, b]` | You need a bounded range; distribution is roughly uniform; *but* sensitive to outliers (one extreme value squashes everything else) |
-| **Z-score** | `x' = (x − mean)/std` | mean 0, std 1, unbounded | The default. Roughly Gaussian features; less outlier-sensitive than min-max |
+| **Min-max** | `x' = (x − min)/(max − min)·(b − a) + a` | training extrema map to `[a, b]`; later values may exceed it | You need a bounded range; distribution is roughly uniform; *but* sensitive to outliers (one extreme value squashes everything else) |
+| **Z-score** | `x' = (x − mean)/std` | training mean 0/std 1 when nonconstant; unbounded | The default. Roughly Gaussian features; less outlier-sensitive than min-max |
 | **Decimal scaling** | `x' = x / 10ʲ`, smallest `j` s.t. `max(|x'|) < 1` | `(−1, 1)` | Quick magnitude normalization |
 | **Log scaling** | `x' = log(x)` | compresses tail | Heavy-tailed / multiplicative data (prices, counts, populations) |
 
-**Min-max vs. z-score** is the choice you make most. Min-max guarantees a range, which some algorithms (and bounded activations) want, but a single outlier at `max` compresses every real value toward `a`. Z-score has no bound but is far more robust to extremes and is the safe default for tree-free models that assume centered inputs. Log scaling is orthogonal — apply it *first* to a heavy-tailed column (house price spans \$10K–\$40M), then z-score the result.
+Fit all learned transforms on training data. Min-max scaling maps the fitted extrema to the requested endpoints; a new value outside those extrema falls outside the interval unless explicitly clipped. Z-score uses mean and standard deviation and remains sensitive to outliers, as the [StandardScaler documentation](https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html) explains. Use robust statistics when justified; handle constant columns and missing values explicitly. `log1p` accepts zero but still requires inputs greater than −1.
 
 ```python
-x_minmax = (x - x.min()) / (x.max() - x.min())          # → [0, 1]
-x_zscore = (x - x.mean()) / x.std()                      # → mean 0, std 1
-x_log    = np.log1p(x)                                   # log(1+x), safe at 0
+# Fit these values on training data only; reuse them for later splits.
+lo, hi = x_train.min(), x_train.max()
+mean, std = x_train.mean(), x_train.std()
+x_minmax = (x - lo) / (hi - lo if hi > lo else 1.0)
+x_zscore = (x - mean) / (std if std > 0 else 1.0)
+x_log = np.log1p(x)  # require x > -1; decide a domain rule before applying
 ```
 
 > **Discipline:** fit normalization statistics (`min`, `max`, `mean`, `std`) on the **training split only**, then apply them to validation and test. Computing them over the full dataset leaks test information into training and is one of the most common silent evaluation bugs — a preview of Lecture 04.
 
 ### 2.2 Image transformations
 
-Storage is the forcing function. CS329P's running example: scraping ~5M US home sales/year × ~20 images × ~153 KB at ~1041×732 is ~**15 TB/year**. Resize to ~320×224 and it drops to ~**1.4 TB** — a 10× cut — and ML is good at low-resolution images, so accuracy barely moves. The transforms:
+Storage is the forcing function. CS329P's running example: scraping ~5M US home sales/year × ~20 images × ~153 KB at ~1041×732 is ~**15 TB/year**. Resize to ~320×224 and it drops to ~**1.4 TB** — a 10× cut — and the storage reduction is an estimate; measure whether lost spatial detail damages the task. The transforms:
 
 - **Cropping, downsampling, compression** — shrink resolution and re-encode to save storage and load faster at training time.
 - **Lossy compression awareness** — JPEG is not free. Medium (80–90%) JPEG compression can cost ~1% accuracy on ImageNet. Know your quality knob; don't compress your eval set into a different distribution than reality.
-- **Image whitening** — a generalized normalization for vectors. Pixels in a local neighborhood are highly correlated; whitening removes that redundancy via a linear transform. With data `x` of mean 0 and covariance estimate `Σ`, choose `W` such that `WᵀW = Σ⁻¹`, so `y = Wx` has unit-diagonal covariance. Common choices: the eigensystem of `Σ` (PCA whitening) or `Σ^(−1/2)` (ZCA whitening). Models — especially unsupervised ones like GANs — converge faster on whitened input.
+- **Image whitening** — a generalized normalization for vectors. Pixels in a local neighborhood are highly correlated; whitening removes that redundancy via a linear transform. With zero-mean column vectors and covariance `Σ`, choose `W` so `WΣWᵀ=I`. For `Σ=UΛUᵀ`, PCA whitening uses `W=Λ^(−1/2)Uᵀ`; regularize small eigenvalues before inversion. Common choices: the eigensystem of `Σ` (PCA whitening) or `Σ^(−1/2)` (ZCA whitening). Whether whitening improves training must be measured; it can amplify noise in low-variance directions.
 
 ### 2.3 Video transformations
 
@@ -155,7 +158,7 @@ Working up from bag-of-counts to learned vectors:
 - **n-grams** — count contiguous sequences (bigrams, trigrams) instead of single tokens, recovering a little local order (`"not good"` becomes its own feature) at the cost of a much larger, sparser vocabulary.
 - **TF-IDF** — reweight BoW counts by **term frequency × inverse document frequency** so that words common in *this* document but rare across the corpus score high, and ubiquitous words ("the") are damped. This is the standard upgrade over raw counts for classical text models.
 - **Word embeddings (e.g. Word2vec)** — map each word to a dense vector so similar words sit close together; trained by predicting a target word from its context. Dense, low-dimensional, and they encode meaning rather than identity.
-- **Pre-trained language models (BERT, GPT, universal sentence encoders)** — giant transformers trained on vast unannotated text. Use them two ways: pull out a text **embedding** as features, or **fine-tune** the whole model on your downstream task. In 2026 this is the default for any serious text problem.
+- **Pre-trained language models (BERT, GPT, universal sentence encoders)** — giant transformers trained on vast unannotated text. Use them two ways: pull out a text **embedding** as features, or **fine-tune** the whole model on your downstream task. Compare this route with a sparse baseline under the same task and resource budget.
 
 | Text representation | Captures context? | Dimensionality | Where it shines |
 |---|---|---|---|
@@ -163,7 +166,7 @@ Working up from bag-of-counts to learned vectors:
 | **n-grams** | Local only | Higher, sparser | Phrase signals (sentiment) |
 | **TF-IDF** | No | High, sparse | Classical text classification / retrieval |
 | **Word2vec** | Word-level | Low, dense | Similarity, pre-DL pipelines |
-| **Pretrained LM** | Full | Dense, contextual | Anything where accuracy matters today |
+| **Pretrained LM** | Full | Dense, contextual | Context-sensitive tasks; evaluate quality and cost |
 
 ### 3.3 Image / video features
 
@@ -200,7 +203,7 @@ CS329P frames the whole data part as a flow chart that starts a project: *have e
 
 ---
 
-> **2026 update:** Three shifts since the 2021 slides. **(1) Deep nets killed hand feature-engineering for unstructured data** — nobody hand-codes SIFT or designs BoW vocabularies for production NLP anymore; you fine-tune a pretrained transformer or pull embeddings. But for **tabular data — still the majority of industry ML — feature engineering remains decisive**, and gradient-boosted trees (XGBoost/LightGBM) on well-crafted features routinely beat deep nets. **(2) Feature stores** — Feast (open-source) and Tecton (managed) now own the "compute a feature once, serve it consistently to training and inference" problem, killing the train/serve skew that used to silently wreck deployments (you computed a feature one way in your notebook and another way in the serving path). **(3) Data-centric AI** — Andrew Ng's reframing that *systematically improving the data beats tweaking the model* turned the "unglamorous" cleaning/labeling/augmentation work of this lecture into a first-class methodology with tooling (cleanlab for label errors, weak-supervision frameworks). The lecture's thesis aged extremely well; the field caught up to it. On tokenization, subword (BPE/WordPiece/Unigram) is now universal, and stemming/lemmatization have largely faded for neural pipelines.
+> **Practice update, reviewed 2026-10-18:** learned representations and pretrained models are useful candidates, while sparse text features, geometry, and engineered tabular features remain valid baselines. A feature store can centralize definitions and point-in-time retrieval but does not automatically remove train/serve skew. Test timestamps, availability, transformations, and missing-value behavior. Choose preprocessing from measured task quality and resource costs, not a rule that one representation has made all others obsolete.
 
 > **Hardware lens:** Preprocessing is not free setup — it is a throughput stage that competes with training for compute, and on a fast accelerator it is usually the bottleneck. The classic failure: a multi-GPU training run sits at 40% utilization because a handful of CPU cores can't JPEG-decode, resize, and augment images fast enough to feed it — the GPUs starve waiting on the input pipeline. Fixes are an engineering discipline of their own: prefetch and overlap (double-buffer the next batch while the GPU computes the current one), cache the decoded/resized tensors so you pay the cost once not every epoch, store in a sequential format (TFRecord / WebDataset / Parquet) so you read streams not millions of tiny files, and — the big one — **push decode/resize/augment onto the GPU itself** with NVIDIA **DALI**, which can turn a CPU-bound pipeline into a GPU-bound one and recover that idle utilization. The 15 TB → 1.4 TB resize from §2.2 is the same lesson at rest: smaller inputs mean less I/O, less decode, faster epochs. Measure input-pipeline throughput in samples/s alongside model FLOPs; a model that *could* train at 5,000 img/s but is fed at 1,200 img/s is a data-loading problem wearing a model costume.
 

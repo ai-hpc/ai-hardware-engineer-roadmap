@@ -1,0 +1,50 @@
+{
+  "reviewed_utc": "2026-10-18",
+  "scope": "Actual LLVM CPU compilation and execution; real shared-library export/reload; no GPU, MLC, MCU, BYOC, or successful MetaSchedule optimization.",
+  "environment": {
+    "platform": "Linux x86_64",
+    "python": "3.12.3",
+    "apache-tvm": "0.27.0.post1",
+    "apache-tvm-ffi": "0.1.14.post0",
+    "numpy": "2.5.4",
+    "ml_dtypes": "0.6.0",
+    "typing_extensions": "4.16.0",
+    "host_compiler": "GCC 13.3.0"
+  },
+  "runs": [
+    {
+      "command": "/tmp/course-tvm-venv/bin/python -m unittest discover -s . -v",
+      "tests": 8,
+      "passed": 8,
+      "skipped": 0
+    },
+    {
+      "command": "/tmp/course-tvm-venv/bin/python compiler_lab.py",
+      "status": "completed",
+      "artifact": "sample_run.json"
+    }
+  ],
+  "coverage": [
+    "LLVM affine function reference",
+    "Vectorized split tails at tile factors 1,4,8,16,64",
+    "Sentinel values beyond logical DLPack view extent",
+    "IR contains tail predicate and vectorized loop",
+    "Relax matmul+bias+ReLU for M=1,3,9 with mixed-sign reference",
+    "Wrong shape rejected with runtime mismatch",
+    "Actual shared-library export and runtime reload",
+    "Invalid schedule factors rejected"
+  ],
+  "limitations": [
+    "Tiny call timing includes Python/FFI overhead and is not a performance gate",
+    "MetaSchedule probe produced no usable measured schedule; see metaschedule_attempt.json",
+    "Wheel latest docs namespace differs from released package"
+  ],
+  "sha256": {
+    "compiler_lab.py": "3e507323ea25fbdb465f135048d4840ca2cbeef1a1550a19d5ac23011691d4f2",
+    "ir_examples.json": "25724335e5a9df23f619c9f0ad474427b7474727024889ff2e152649847d9601",
+    "metaschedule_attempt.json": "ed1d8ed7bca17c54486caeedb5e600f962bcd02fede85e70a998228966316efd",
+    "requirements.txt": "aa6db09f17ad4270377a7ada05daaf13bbde88561934f7ebad3c968180007e6d",
+    "sample_run.json": "1da1158219db1423304b9bc33ddbd839df4ca07ee469162c66c22b70773bb9f6",
+    "test_compiler_lab.py": "e49313a3e061dbcc2302ffc10c8d243bb38f1dce4f33b423f7208174d9ae2f0d"
+  }
+}

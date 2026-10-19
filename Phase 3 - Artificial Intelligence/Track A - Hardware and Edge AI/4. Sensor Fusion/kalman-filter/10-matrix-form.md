@@ -155,20 +155,46 @@ class KalmanFilter:
             x0: Initial state estimate (n×1)
             P0: Initial covariance estimate (n×n)
         """
-        self.F = F  # State transition
-        self.H = H  # Measurement matrix
-        self.Q = Q  # Process noise
-        self.R = R  # Measurement noise
-
-        self.x = x0  # State estimate
-        self.P = P0  # Covariance estimate
-
-        # Dimensions
-        self.n = F.shape[0]  # Number of states
-        self.m = H.shape[0]  # Number of measurements
-
-        # Identity matrix
+        F = np.asarray(F)
+        H = np.asarray(H)
+        if F.ndim != 2 or F.shape[0] == 0 or F.shape[0] != F.shape[1]:
+            raise ValueError("F must be a nonempty square matrix")
+        self.n = F.shape[0]
+        if H.ndim != 2 or H.shape[0] == 0 or H.shape[1] != self.n:
+            raise ValueError("H must have shape (measurements, states)")
+        self.m = H.shape[0]
+        self.F = self._array("F", F, (self.n, self.n))
+        self.H = self._array("H", H, (self.m, self.n))
+        self.Q = self._covariance("Q", Q, self.n)
+        self.R = self._covariance("R", R, self.m, positive=True)
+        self.x = self._array("x0", x0, (self.n, 1))
+        self.P = self._covariance("P0", P0, self.n)
         self.I = np.eye(self.n)
+
+    @staticmethod
+    def _array(name, value, shape):
+        if np.iscomplexobj(value):
+            raise ValueError(f"{name} must be real")
+        array = np.array(value, dtype=float, copy=True)
+        if array.shape != shape or not np.isfinite(array).all():
+            raise ValueError(f"{name} must be finite with shape {shape}")
+        return array
+
+    @classmethod
+    def _covariance(cls, name, value, size, positive=False):
+        array = cls._array(name, value, (size, size))
+        tolerance = 1e-12 * max(1., np.abs(array).max())
+        if not np.allclose(array, array.T, rtol=0, atol=tolerance):
+            raise ValueError(f"{name} must be symmetric")
+        array = (array + array.T) / 2
+        if np.linalg.eigvalsh(array).min() < -tolerance:
+            raise ValueError(f"{name} must be positive semidefinite")
+        if positive:
+            try:
+                np.linalg.cholesky(array)
+            except np.linalg.LinAlgError as error:
+                raise ValueError(f"{name} must be positive definite") from error
+        return array
 
     def predict(self):
         """
@@ -195,6 +221,11 @@ class KalmanFilter:
         Returns:
             x_updated, P_updated
         """
+        # Accept a flat vector explicitly; reject row matrices and broadcasting.
+        z = np.asarray(z)
+        if z.shape == (self.m,):
+            z = z[:, None]
+        z = self._array("z", z, (self.m, 1))
         # Innovation
         y = z - self.H @ self.x
 
@@ -202,7 +233,7 @@ class KalmanFilter:
         S = self.H @ self.P @ self.H.T + self.R
 
         # Kalman gain
-        K = self.P @ self.H.T @ np.linalg.inv(S)
+        K = np.linalg.solve(S.T, (self.P @ self.H.T).T).T
 
         # State update
         self.x = self.x + K @ y
@@ -210,6 +241,7 @@ class KalmanFilter:
         # Covariance update (Joseph form for numerical stability)
         I_KH = self.I - K @ self.H
         self.P = I_KH @ self.P @ I_KH.T + K @ self.R @ K.T
+        self.P = (self.P + self.P.T) / 2
 
         return self.x, self.P
 
@@ -220,7 +252,6 @@ class KalmanFilter:
     def get_covariance(self):
         """Get current covariance estimate"""
         return self.P.copy()
-
 
 # Example: 2D position and velocity tracking
 def example_2d_tracking():
@@ -236,7 +267,7 @@ def example_2d_tracking():
     H = np.array([[1.0, 0.0]])
 
     # Process noise covariance
-    q = 0.1  # Process noise magnitude
+    q = 0.1  # Acceleration variance, m^2/s^4, for this discrete-step model
     Q = q * np.array([[dt**4/4, dt**3/2],
                       [dt**3/2, dt**2]])
 
@@ -345,8 +376,8 @@ def example_6d_tracking():
                   [0, 1, 0, 0, 0, 0],
                   [0, 0, 1, 0, 0, 0]])
 
-    # Process noise covariance (continuous white noise model)
-    q = 0.1  # Process noise magnitude
+    # Process noise covariance (one random acceleration held constant per time step)
+    q = 0.1  # Acceleration variance, m^2/s^4, for this discrete-step model
     Q = q * np.array([
         [dt**4/4, 0,       0,       dt**3/2, 0,       0      ],
         [0,       dt**4/4, 0,       0,       dt**3/2, 0      ],
@@ -539,7 +570,7 @@ if __name__ == "__main__":
 1. **6-dimensional state tracking** - Position and velocity in 3D space
 2. **Spiral trajectory** - More interesting than straight-line motion
 3. **GPS-only measurements** - Velocity is estimated, not measured!
-4. **Proper process noise** - Uses continuous white noise model
+4. **Declared process noise** - Uses a discrete step-constant acceleration model
 5. **Different noise levels** - Z (altitude) is noisier than X, Y
 6. **Comprehensive visualization** - 6 different plots showing all aspects
 7. **Error analysis** - Quantitative performance metrics
@@ -633,19 +664,19 @@ def discrete_white_noise(dt, var):
 
 ```python
 # Each measurement independent
-R = np.diag([σ₁², σ₂², σ₃²])
+R = np.diag([sigma1**2, sigma2**2, sigma3**2])
 ```
 
 ### Correlated Measurements
 
-```python
-# Measurements have correlation
+```text
+# Symbolic covariance with correlations (not Python syntax)
 R = np.array([[σ₁²,    ρ₁₂σ₁σ₂, ρ₁₃σ₁σ₃],
               [ρ₁₂σ₁σ₂, σ₂²,    ρ₂₃σ₂σ₃],
               [ρ₁₃σ₁σ₃, ρ₂₃σ₂σ₃, σ₃²   ]])
 ```
 
-Where ρᵢⱼ is the correlation coefficient between measurements i and j.
+Where ρᵢⱼ is the correlation coefficient between measurements i and j. Individual coefficients in [−1,1] are necessary but not sufficient: the complete correlation/covariance matrix must be positive semidefinite.
 
 ## Numerical Stability
 
@@ -661,7 +692,7 @@ def enforce_symmetry(P):
 
 ### Issue: Covariance Matrix Positive Definiteness
 
-P must be positive definite. Check:
+A covariance must be symmetric positive **semidefinite**: a perfectly known component may have zero variance. Positive definiteness is a stronger condition used by Cholesky. The checked example requires positive-definite `R`, so `S` is nonsingular when `P` is valid. This test checks the stronger condition; its failure alone does not prove that a covariance is invalid:
 
 ```python
 def is_positive_definite(P):
@@ -681,7 +712,7 @@ More stable than simple form:
 # Simple form (can lose positive definiteness)
 P = (I - K @ H) @ P
 
-# Joseph form (maintains positive definiteness)
+# Joseph form (reduces numerical cancellation; still check covariance)
 I_KH = I - K @ H
 P = I_KH @ P @ I_KH.T + K @ R @ K.T
 ```
@@ -760,7 +791,8 @@ kf.update(z)
 K = P @ H.T @ (H @ P @ H.T + R)
 
 # RIGHT
-K = P @ H.T @ np.linalg.inv(H @ P @ H.T + R)
+S = H @ P @ H.T + R
+K = np.linalg.solve(S.T, (P @ H.T).T).T
 ```
 
 ## Key Takeaways

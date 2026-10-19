@@ -158,3 +158,7 @@ Lower the worked matrix/vector block into your teaching command stream. Use host
 - [Linux ioctl interfaces](https://docs.kernel.org/driver-api/ioctl.html) and [circular buffers](https://docs.kernel.org/core-api/circular-buffers.html): design explicit, versioned interfaces and correct queue synchronization.
 
 Continue to [Lecture 07 — Scheduling and Freshness](Lecture-07.md). The runtime interface now carries the information needed to analyze interference, observation age, and deadline misses.
+
+## Inspect an actual lowering boundary
+
+Use the [real MLIR CPU fixture](../Labs/Tiling-and-Dataflow.md#4-execute-linalg-through-llvm-on-the-cpu) to observe Linalg become loops, LLVM dialect, and native CPU execution. Its zero initialization, full reduction, output checks, and deallocation are visible. This establishes a working CPU path only. Your accelerator extension must separately implement command encoding, buffer ownership, completion, and the target arithmetic contract; naming a custom dialect operation does not supply those behaviors.

@@ -4,6 +4,8 @@
 
 ---
 
+**Audited wire version:** the pinned 2026-10-18 source uses protocol **4**. Package version, wire version and device-signature payload version (`v2`/`v3`) are separate numbers. The examples are protocol illustrations, not a tested live connection. See [source evidence](Lecture-Source-Evidence.md).
+
 Lecture 38 explained the App SDK from the outside.
 
 This lecture goes one layer lower:
@@ -112,7 +114,7 @@ Error response:
   "id": "req-123",
   "ok": false,
   "error": {
-    "type": "FORBIDDEN",
+    "code": "FORBIDDEN",
     "message": "Missing required scope"
   }
 }
@@ -125,8 +127,7 @@ Error response:
   "type": "event",
   "event": "agent.delta",
   "payload": {},
-  "seq": 42,
-  "stateVersion": 7
+  "seq": 42
 }
 ```
 
@@ -184,8 +185,8 @@ Example shape:
   "id": "connect-1",
   "method": "connect",
   "params": {
-    "minProtocol": 3,
-    "maxProtocol": 3,
+    "minProtocol": 4,
+    "maxProtocol": 4,
     "client": {
       "id": "cli",
       "version": "1.2.3",
@@ -201,7 +202,7 @@ Example shape:
       "id": "device_fp",
       "publicKey": "...",
       "signature": "...",
-      "signedAt": 1737264000,
+      "signedAt": 1737264000000,
       "nonce": "..."
     }
   }
@@ -253,7 +254,7 @@ Example shape:
   "ok": true,
   "payload": {
     "type": "hello-ok",
-    "protocol": 3,
+    "protocol": 4,
     "server": {
       "version": "x.y.z",
       "connId": "conn-abc"
@@ -267,10 +268,16 @@ Example shape:
       "methods": ["agents.list", "sessions.create", "agent.wait"],
       "events": ["agent.delta", "session.updated"]
     },
+    "snapshot": {
+      "presence": [],
+      "health": {},
+      "stateVersion": {"presence": 0, "health": 0},
+      "uptimeMs": 0
+    },
     "policy": {
-      "tickIntervalMs": 30000,
-      "maxPayload": 1048576,
-      "maxBufferedBytes": 4194304
+      "tickIntervalMs": 15000,
+      "maxPayload": 26214400,
+      "maxBufferedBytes": 52428800
     }
   }
 }
@@ -320,7 +327,7 @@ This is part of **deterministic startup behavior**.
 
 ## 7. Roles
 
-The two main roles are:
+The operator/node client roles are shown below. The audited revision also has a separate `worker` role on a dedicated, closed worker protocol; it is not an ordinary operator connection with broad RPC access.
 
 ```text
 operator
@@ -438,8 +445,8 @@ Operator flow:
 
 ```bash
 openclaw devices list
-openclaw devices approve <requestId>
-openclaw devices reject <requestId>
+openclaw devices approve "${OPENCLAW_REQUEST_ID:?Set OPENCLAW_REQUEST_ID to an existing authorized identifier}"
+openclaw devices reject "${OPENCLAW_REQUEST_ID:?Set OPENCLAW_REQUEST_ID to an existing authorized identifier}"
 ```
 
 Once approved, the Gateway can issue a device token.
@@ -746,8 +753,9 @@ Migration target:
 
 ```text
 1. wait for connect.challenge
-2. sign the payload that includes the server nonce
-3. send the same nonce in connect.params.device.nonce
+2. validate the challenge timestamp and use it as device.signedAt
+3. sign the payload that includes the server nonce
+4. send the same nonce in connect.params.device.nonce
 ```
 
 Preferred signing payload:
@@ -1299,7 +1307,7 @@ Compare the difference between discovery-only APIs and mutation APIs.
 
 ## References
 
-- OpenClaw Gateway protocol: [https://openclaw.knidal.com/gateway-protocol](https://openclaw.knidal.com/gateway-protocol)
+- OpenClaw Gateway protocol: [https://github.com/openclaw/openclaw/blob/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/gateway/protocol.md](https://github.com/openclaw/openclaw/blob/24aac3c15a01feb1946dad5b212282e78dc3941e/docs/gateway/protocol.md)
 - OpenClaw App SDK: [https://openclaw.knidal.com/openclaw-app-sdk](https://openclaw.knidal.com/openclaw-app-sdk)
 - OpenClaw Nodes: [https://openclaw.knidal.com/nodes](https://openclaw.knidal.com/nodes)
 - OpenClaw Tools Invoke API: [https://openclaw.knidal.com/tools-invoke-api](https://openclaw.knidal.com/tools-invoke-api)

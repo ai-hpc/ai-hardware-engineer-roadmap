@@ -1,226 +1,186 @@
-/*
- * rt_demo.c — Small user-space demo for OS Lectures 1–9.
- *
- * It shows, in one program:
- * - how a normal process asks the kernel for scheduling help
- * - how a thread can be pinned to specific CPUs
- * - how memory locking and pre-faulting reduce surprise page faults
- * - how threads coordinate with mutexes, rwlocks, and condition variables
- *
- * Build: make (from this directory)
- * Run:   ./rt_demo [--rt] [--lock-memory] [--cpu 2,3] [--no-rt]
- *        sudo ./rt_demo --rt --lock-memory --cpu 1   # full RT setup
- */
+/* Linux API/synchronization demonstration, not a latency benchmark. */
 #define _GNU_SOURCE
+#include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
+#include <pthread.h>
 #include <sched.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
-#include <pthread.h>
 
-/* ---------- L2: process/thread identity ---------- */
-static void print_process_info(void)
+static void check_thread(int code, const char *operation)
 {
-	pid_t pid = getpid();
-	pid_t tid = gettid();
-	printf("[L2] Process: pid=%d tgid=%d tid=%d\n", pid, pid, tid);
+    if (code != 0) {
+        fprintf(stderr, "%s: %s\n", operation, strerror(code));
+        exit(EXIT_FAILURE);
+    }
 }
 
-/* ---------- L8: CPU affinity ---------- */
-static int set_cpu_affinity(const char *cpu_list)
+static int parse_cpu(const char **cursor, long *value)
 {
-	cpu_set_t mask;
-	CPU_ZERO(&mask);
-	char *buf = strdup(cpu_list);
-	if (!buf) return -1;
-	char *tok = strtok(buf, ",");
-	while (tok) {
-		unsigned int a, b;
-		if (sscanf(tok, "%u-%u", &a, &b) == 2) {
-			for (; a <= b && a < 1024; a++)
-				CPU_SET(a, &mask);
-		} else if (sscanf(tok, "%u", &a) == 1 && a < 1024) {
-			CPU_SET(a, &mask);
-		}
-		tok = strtok(NULL, ",");
-	}
-	free(buf);
-	if (CPU_COUNT(&mask) == 0) {
-		fprintf(stderr, "Invalid or empty CPU list: %s\n", cpu_list);
-		return -1;
-	}
-	if (sched_setaffinity(0, sizeof(mask), &mask) != 0) {
-		perror("sched_setaffinity");
-		return -1;
-	}
-	printf("[L8] CPU affinity set to %s\n", cpu_list);
-	return 0;
+    if (!isdigit((unsigned char)**cursor)) return -1;
+    char *end;
+    errno = 0;
+    *value = strtol(*cursor, &end, 10);
+    if (errno || *value < 0 || *value >= CPU_SETSIZE) return -1;
+    *cursor = end;
+    return 0;
 }
 
-/* ---------- L6/L7: scheduler and memory lock ---------- */
-static int set_rt_scheduler(int enable)
+static int set_cpu_affinity(const char *text)
 {
-	if (!enable)
-		return 0;
-	struct sched_param param = { .sched_priority = 80 };
-	if (sched_setscheduler(0, SCHED_FIFO, &param) != 0) {
-		perror("sched_setscheduler(SCHED_FIFO)");
-		return -1;
-	}
-	printf("[L6/L7] Scheduler: SCHED_FIFO priority 80\n");
-	return 0;
+    cpu_set_t requested, allowed, obtained;
+    CPU_ZERO(&requested);
+    const char *cursor = text;
+    do {
+        long first, last;
+        if (parse_cpu(&cursor, &first) != 0) goto invalid;
+        last = first;
+        if (*cursor == '-') {
+            ++cursor;
+            if (parse_cpu(&cursor, &last) != 0 || last < first) goto invalid;
+        }
+        for (long cpu = first; cpu <= last; ++cpu) CPU_SET(cpu, &requested);
+        if (!*cursor) break;
+        if (*cursor++ != ',' || !*cursor) goto invalid;
+    } while (*cursor);
+    if (sched_getaffinity(0, sizeof(allowed), &allowed) != 0) {
+        perror("sched_getaffinity"); return -1;
+    }
+    for (int cpu = 0; cpu < CPU_SETSIZE; ++cpu) {
+        if (CPU_ISSET(cpu, &requested) && !CPU_ISSET(cpu, &allowed)) {
+            fprintf(stderr, "Requested CPU %d is outside the current allowed mask\n", cpu);
+            return -1;
+        }
+    }
+    if (sched_setaffinity(0, sizeof(requested), &requested) != 0 ||
+        sched_getaffinity(0, sizeof(obtained), &obtained) != 0) {
+        perror("CPU affinity"); return -1;
+    }
+    if (!CPU_EQUAL(&requested, &obtained)) {
+        fprintf(stderr, "Obtained affinity differs from request\n"); return -1;
+    }
+    printf("affinity=%s obtained_count=%d\n", text, CPU_COUNT(&obtained));
+    return 0;
+invalid:
+    fprintf(stderr, "Invalid CPU list: %s\n", text);
+    return -1;
 }
 
-static int lock_all_memory(int enable)
+/* Volatile accesses retain these writes; volatile is not thread synchronization. */
+static volatile unsigned char data_pages[65536];
+static void touch_pages(volatile unsigned char *buffer, size_t bytes)
 {
-	if (!enable)
-		return 0;
-	if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
-		perror("mlockall");
-		return -1;
-	}
-	printf("[L7] mlockall(MCL_CURRENT | MCL_FUTURE)\n");
-	return 0;
+    long page = sysconf(_SC_PAGESIZE);
+    if (page <= 0) { fprintf(stderr, "Unknown page size\n"); exit(EXIT_FAILURE); }
+    for (size_t offset = 0; offset < bytes; offset += (size_t)page) buffer[offset] = 1;
+    buffer[bytes - 1] = 1;
 }
 
-/* Pre-fault: touch memory so no page fault in RT loop (L7) */
-#define PREFAULT_SIZE 65536
-static char prefault_buf[PREFAULT_SIZE];
-static void prefault_pages(void)
-{
-	memset(prefault_buf, 0, sizeof(prefault_buf));
-	volatile char stack_probe[8192];
-	memset((void *)stack_probe, 0, sizeof(stack_probe));
-	printf("[L7] Pre-faulted buffer and stack\n");
-}
-
-/* ---------- L9: shared state and synchronization ---------- */
 typedef struct {
-	pthread_mutex_t mutex;       /* protects counter and ready flag */
-	pthread_rwlock_t rwlock;    /* protects config (read-heavy) */
-	pthread_cond_t cond;        /* completion-style: worker ready */
-	int counter;
-	int worker_ready;
-	int run_iterations;
-	volatile int stop;
-	/* Config (read by worker under read lock) */
-	int config_value;
-} shared_t;
+    pthread_mutex_t mutex;
+    pthread_rwlock_t config_lock;
+    pthread_cond_t condition;
+    int ready;
+    int counter;
+    int config;
+} Shared;
 
-static void *worker_thread(void *arg)
+static void *worker(void *argument)
 {
-	shared_t *s = (shared_t *)arg;
-	struct timespec ts;
-
-/* Signal that the worker is ready, like a simple completion event (L9). */
-	pthread_mutex_lock(&s->mutex);
-	s->worker_ready = 1;
-	pthread_cond_signal(&s->cond);
-	pthread_mutex_unlock(&s->mutex);
-
-	/* RT-style loop: avoid malloc and use pre-faulted data (L7). */
-	while (!s->stop && s->run_iterations > 0) {
-		/* L9: read lock for config (many readers OK) */
-		pthread_rwlock_rdlock(&s->rwlock);
-		int cfg = s->config_value;
-		pthread_rwlock_unlock(&s->rwlock);
-
-		/* Short critical section: update counter (L9 mutex) */
-		pthread_mutex_lock(&s->mutex);
-		s->counter++;
-		pthread_mutex_unlock(&s->mutex);
-
-		/* Simulate work; clock_gettime is a normal time source here (L4). */
-		clock_gettime(CLOCK_MONOTONIC, &ts);
-		(void)ts;
-		(void)cfg;
-
-		s->run_iterations--;
-	}
-	return NULL;
+    Shared *shared = argument;
+    volatile unsigned char own_stack_pages[8192];
+    touch_pages(own_stack_pages, sizeof(own_stack_pages));
+    check_thread(pthread_mutex_lock(&shared->mutex), "lock");
+    shared->ready = 1;
+    check_thread(pthread_cond_signal(&shared->condition), "signal");
+    check_thread(pthread_mutex_unlock(&shared->mutex), "unlock");
+    for (int i = 0; i < 10000; ++i) {
+        check_thread(pthread_rwlock_rdlock(&shared->config_lock), "read lock");
+        int config = shared->config;
+        check_thread(pthread_rwlock_unlock(&shared->config_lock), "read unlock");
+        if (config != 100) { fprintf(stderr, "Unexpected config\n"); exit(EXIT_FAILURE); }
+        check_thread(pthread_mutex_lock(&shared->mutex), "lock");
+        ++shared->counter;
+        check_thread(pthread_mutex_unlock(&shared->mutex), "unlock");
+        struct timespec observed;
+        if (clock_gettime(CLOCK_MONOTONIC, &observed) != 0) {
+            perror("clock_gettime"); exit(EXIT_FAILURE);
+        }
+        /* No periodic schedule or wakeup-latency measurement is claimed. */
+    }
+    return NULL;
 }
 
-static void run_demo(int use_rt, int lock_mem, const char *cpus)
+static void usage(const char *program)
 {
-	shared_t sh = { 0 };
-	pthread_t th;
-	int ret;
-
-	pthread_mutex_init(&sh.mutex, NULL);
-	pthread_rwlock_init(&sh.rwlock, NULL);
-	pthread_cond_init(&sh.cond, NULL);
-	sh.config_value = 42;
-	sh.run_iterations = 10000;
-
-	print_process_info();
-
-	if (cpus && set_cpu_affinity(cpus) != 0)
-		return;
-	if (set_rt_scheduler(use_rt) != 0)
-		return;
-	if (lock_all_memory(lock_mem) != 0)
-		return;
-	prefault_pages();
-
-	/* Update shared config briefly under the write lock (L9). */
-	pthread_rwlock_wrlock(&sh.rwlock);
-	sh.config_value = 100;
-	pthread_rwlock_unlock(&sh.rwlock);
-
-	ret = pthread_create(&th, NULL, worker_thread, &sh);
-	if (ret != 0) {
-		fprintf(stderr, "pthread_create: %d\n", ret);
-		return;
-	}
-
-	/* Wait until the worker tells us it has started (L9). */
-	pthread_mutex_lock(&sh.mutex);
-	while (!sh.worker_ready)
-		pthread_cond_wait(&sh.cond, &sh.mutex);
-	pthread_mutex_unlock(&sh.mutex);
-	printf("[L9] Worker signaled ready\n");
-
-	pthread_join(th, NULL);
-	printf("[L9] Final counter = %d\n", sh.counter);
-}
-
-static void usage(const char *prog)
-{
-	printf("Usage: %s [OPTIONS]\n", prog);
-	printf("  --rt           Use SCHED_FIFO priority 80 (needs root)\n");
-	printf("  --lock-memory  mlockall (needs root)\n");
-	printf("  --cpu <list>   CPU affinity, e.g. 1 or 2-4\n");
-	printf("  --no-rt        Default: no RT, no mlock (run without root)\n");
-	printf("\nExample: sudo %s --rt --lock-memory --cpu 1\n", prog);
+    printf("Usage: %s [--cpu 2,3-4] [--rt] [--lock-memory] [--no-rt]\n", program);
+    puts("Default: inherited normal environment; --rt requests FIFO priority 80.");
+    puts("RT and memory locking depend on permissions/resource limits; failures exit nonzero.");
+    puts("--no-rt clears prior --rt and --lock-memory options (options apply left to right).");
 }
 
 int main(int argc, char **argv)
 {
-	int use_rt = 0, lock_mem = 0;
-	const char *cpus = NULL;
-	static struct option opts[] = {
-		{ "rt",          no_argument,       0, 'r' },
-		{ "lock-memory", no_argument,       0, 'l' },
-		{ "cpu",         required_argument, 0, 'c' },
-		{ "no-rt",       no_argument,       0, 'n' },
-		{ "help",        no_argument,       0, 'h' },
-		{ 0, 0, 0, 0 }
-	};
-	int c, idx;
-	while ((c = getopt_long(argc, argv, "rlc:nh", opts, &idx)) != -1) {
-		if (c == 'r') use_rt = 1;
-		else if (c == 'l') lock_mem = 1;
-		else if (c == 'c') cpus = optarg;
-		else if (c == 'n') use_rt = 0, lock_mem = 0;
-		else if (c == 'h') { usage(argv[0]); return 0; }
-	}
-
-	run_demo(use_rt, lock_mem, cpus);
-	return 0;
+    int use_rt = 0, lock_memory = 0;
+    const char *cpus = NULL;
+    static const struct option options[] = {
+        {"rt", no_argument, NULL, 'r'}, {"lock-memory", no_argument, NULL, 'l'},
+        {"cpu", required_argument, NULL, 'c'}, {"no-rt", no_argument, NULL, 'n'},
+        {"help", no_argument, NULL, 'h'}, {NULL, 0, NULL, 0}
+    };
+    int option;
+    while ((option = getopt_long(argc, argv, "rlc:nh", options, NULL)) != -1) {
+        if (option == 'r') use_rt = 1;
+        else if (option == 'l') lock_memory = 1;
+        else if (option == 'c') cpus = optarg;
+        else if (option == 'n') use_rt = lock_memory = 0;
+        else if (option == 'h') { usage(argv[0]); return EXIT_SUCCESS; }
+        else return EXIT_FAILURE;
+    }
+    if (optind != argc) { usage(argv[0]); return EXIT_FAILURE; }
+    printf("pid=%ld tid=%ld requested_fifo=%d requested_mlock=%d\n",
+           (long)getpid(), (long)gettid(), use_rt, lock_memory);
+    if (cpus && set_cpu_affinity(cpus) != 0) return EXIT_FAILURE;
+    if (use_rt) {
+        struct sched_param requested = {.sched_priority = 80};
+        if (sched_setscheduler(0, SCHED_FIFO, &requested) != 0) {
+            perror("sched_setscheduler"); return EXIT_FAILURE;
+        }
+    }
+    struct sched_param obtained;
+    int policy = sched_getscheduler(0);
+    if (policy < 0 || sched_getparam(0, &obtained) != 0) {
+        perror("scheduler query"); return EXIT_FAILURE;
+    }
+    printf("obtained_policy=%d obtained_priority=%d\n", policy, obtained.sched_priority);
+    if (lock_memory && mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
+        perror("mlockall"); return EXIT_FAILURE;
+    }
+    printf("memory_locked=%d\n", lock_memory);
+    touch_pages(data_pages, sizeof(data_pages));
+    Shared shared = {0};
+    check_thread(pthread_mutex_init(&shared.mutex, NULL), "mutex init");
+    check_thread(pthread_rwlock_init(&shared.config_lock, NULL), "rwlock init");
+    check_thread(pthread_cond_init(&shared.condition, NULL), "condition init");
+    check_thread(pthread_rwlock_wrlock(&shared.config_lock), "write lock");
+    shared.config = 100;
+    check_thread(pthread_rwlock_unlock(&shared.config_lock), "write unlock");
+    pthread_t thread;
+    check_thread(pthread_create(&thread, NULL, worker, &shared), "pthread_create");
+    check_thread(pthread_mutex_lock(&shared.mutex), "lock");
+    while (!shared.ready)
+        check_thread(pthread_cond_wait(&shared.condition, &shared.mutex), "wait");
+    check_thread(pthread_mutex_unlock(&shared.mutex), "unlock");
+    check_thread(pthread_join(thread, NULL), "join");
+    printf("Final counter = %d\n", shared.counter);
+    check_thread(pthread_cond_destroy(&shared.condition), "condition destroy");
+    check_thread(pthread_rwlock_destroy(&shared.config_lock), "rwlock destroy");
+    check_thread(pthread_mutex_destroy(&shared.mutex), "mutex destroy");
+    if (lock_memory && munlockall() != 0) { perror("munlockall"); return EXIT_FAILURE; }
+    return shared.counter == 10000 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

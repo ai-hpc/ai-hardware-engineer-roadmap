@@ -136,6 +136,16 @@ static void test_swiglu() {
 }
 
 int main() {
+    int device_count = 0;
+    const auto device_status = cudaGetDeviceCount(&device_count);
+    if (device_status == cudaErrorNoDevice || device_status == cudaErrorInsufficientDriver || (device_status == cudaSuccess && device_count == 0)) {
+        fprintf(stderr, "SKIP: no usable CUDA device/driver; target checks were not executed\n");
+        return 77;
+    }
+    if (device_status != cudaSuccess) {
+        fprintf(stderr, "FAIL: device enumeration: %s\n", cudaGetErrorString(device_status));
+        return 1;
+    }
     printf("=== jetson-llm kernel tests ===\n\n");
     cudaSetDevice(0);
     cudaDeviceProp prop;

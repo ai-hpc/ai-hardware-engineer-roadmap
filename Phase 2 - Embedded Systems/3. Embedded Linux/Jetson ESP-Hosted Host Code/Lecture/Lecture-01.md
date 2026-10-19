@@ -1,5 +1,7 @@
 # Lecture 1 — Linux mental model for this host stack
 
+**Source boundary — reviewed October 18, 2026:** this is the historical NG fork at `ce36dec9294988e598f04e84c9d28092ca9e9786`. Board observations are attributed to that fork, not rerun here. Complete the [source-reading lab](../Source-Reading-Lab.md); it explains the current migration path and defects in these abbreviated source excerpts. Snippets containing `...` are reading excerpts, not standalone compilable programs.
+
 **Course:** [Jetson ESP-Hosted Host Code guide](../Guide.md) · **Phase 2 — Embedded Linux**
 
 **Next:** [Lecture 02 — Build, load, and board policy](Lecture-02.md)
@@ -8,7 +10,7 @@
 
 ## 1. What Linux thinks is happening
 
-From Linux userspace, the validated Jetson flow eventually looks ordinary:
+From Linux userspace, the reported legacy Jetson flow eventually looks ordinary:
 
 - `wlan0` exists
 - `hci0` exists
@@ -193,9 +195,9 @@ That is why the repo splits:
 
 ---
 
-## 5. The validated runtime story
+## 5. The reported runtime sequence
 
-On the validated Jetson path, the important runtime stages were:
+On the reported legacy Jetson path, the important runtime stages were:
 
 1. module inserted
 2. SPI device claimed

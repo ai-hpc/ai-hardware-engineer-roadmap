@@ -73,3 +73,7 @@ For each lecture, predict the worked result, reproduce it, change one assumption
 Completion requires a reviewed requirement sheet, a workload/traffic dossier, a supported operation/precision set, a compiler/runtime ABI, a scheduling/freshness analysis, a declared evaluation protocol, and one executable result at your available implementation level. The [capstone rubric](Lecture-10.md#6-assessment) distinguishes a course pass from an unproven product claim.
 
 **Next:** [Physical AI Design Studio](../../../Physical-AI-Design-Studio.md) → [full SoC capstone](../Guide.md#physical-ai-soc-capstone). Extend the accelerator prototype with Linux, sensors, wireless, and controller integration while retaining the same task and evidence contracts.
+
+## Connect the model to the hardware worksheet
+
+The [model-to-hardware CPU lab](Model-to-Hardware-Lab.md) reuses a trained scalar action model from the robotics course. Export and reload its computation graph, capture actual CPU calls, then derive parameter storage, repeated work, and proposed tile-padding costs. Keep its synthetic task and CPU execution scope in your design report.

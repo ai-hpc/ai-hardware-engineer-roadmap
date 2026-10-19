@@ -16,6 +16,10 @@ Log sensor capture, observation assembly, policy start/end, command publication,
 
 For a hypothetical 50 Hz controller, the nominal period is 20 ms. A 4 ms policy does not guarantee the deadline when capture, queues, preprocessing, transport, and actuation also consume time.
 
+## Execute the transport boundary first
+
+The [atomic ROS exercise](Simulation-CPU-Lab.md#3-atomic-observations-and-simulator-owned-actions) actually transports requests and replies locally, including duplicate, stale, prior-episode and mixed-sample failures. The simulator owns the request clock and echoes are compared on that same clock. A policy process must not advance its integrated target merely because it sent a reply: the reply may never be accepted. Carry the last **applied** action in the next observation.
+
 ## Lab
 
 1. Replay saved observations through reference and exported policy.

@@ -1,699 +1,144 @@
-# Peripheral Access
+# Peripheral access: turn device bytes into trustworthy observations
 
-<div class="course-identity auto-course" style="--course-accent: #7e22ce; --course-accent-rgb: 126, 34, 206;" markdown="1">
-<div class="course-identity__icon">PA</div>
-<div markdown="1">
-<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
-<p class="course-identity__title">Specialized course identity for Peripheral Access.</p>
-<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
-</div>
-</div>
+**Goal:** connect a Linux application to one peripheral, preserve its units and timing, and handle missing or invalid data. Plan four 60–90-minute sessions. Begin with the CPU protocol lab; use physical I/O only after identifying your module, carrier, wiring and installed software.
 
+A robot application should receive something like “distance 1.2 m, captured at time T, sequence 127, valid,” rather than an unexplained integer from a device file. The interface code must establish what the value means, when it was measured, and what happens when communication fails.
 
-**Phase 4 — Track B — Module 5.1** · Application Development
+This module covers runtime access. Use [carrier bring-up](../../2.%20Custom%20Carrier%20Board%20Design%20and%20Bring-Up/Guide.md) and [L4T customization](../../3.%20L4T%20Customization/Guide.md) for pinmux, boot configuration and driver binding. The [GPIO/SPI/I2C/CAN deep dive](../../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-GPIO-SPI-I2C-CAN/Guide.md) provides the electrical and transaction details.
 
-> **Focus:** Access and control hardware peripherals on the **Jetson Orin Nano 8GB** from Linux userspace — GPIO, PWM, UART, SPI, I2C, CAN, USB, storage, and backlight. Every interface is shown with both sysfs/chardev and library approaches.
+## 1. Begin with a working CPU observation
 
-**Hub:** [5. Application Development](../Guide.md)
-
-**Scope boundary:** this module is about **runtime access from Linux**. If you need to change **pinmux**, **device tree**, or **custom carrier board wiring**, use:
-
-- [2. Custom Carrier Board Design and Bring-Up](../../2.%20Custom%20Carrier%20Board%20Design%20and%20Bring-Up/Guide.md)
-- [3. L4T Customization](../../3.%20L4T%20Customization/Guide.md)
-
----
-
-
-## 1. GPIO (Linux)
-
-Jetson Orin Nano exposes GPIOs through the **gpiochip** character device interface (`/dev/gpiochipN`). The legacy sysfs interface (`/sys/class/gpio/`) is deprecated — use `libgpiod` instead.
-
-### libgpiod tools
+From the course repository root, run:
 
 ```bash
-# List all GPIO chips
+python3 -m unittest discover -s "Phase 4 - Track B - Nvidia Jetson/1. Nvidia Jetson Platform/Orin-Nano-GPIO-SPI-I2C-CAN/labs" -p "test_*.py" -v
+```
+
+The [sensor protocol lab](../../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-GPIO-SPI-I2C-CAN/labs/README.md) compiles actual C against Linux's CAN headers and exchanges binary records with Python. Its 11 tests include signed scaling, message length/flags, wrapping sequence numbers and a real local datagram socket. It requires a C compiler but no CAN adapter.
+
+The local socket establishes application encoding/transport behavior. It does not simulate CAN arbitration, transceiver voltages or bus errors. Keep that distinction when you later replace the local transport with SocketCAN.
+
+**Hand calculation:** the payload `01 7f 06 ff b0 04 0f 00` contains version 1, sequence 127, signed speed −250 mm/s, distance 1,200 mm and sender age 15 ms. Speed is −0.25 m/s; distance is 1.2 m. Interpreting `06 ff` as an unsigned value gives 65,286 and an implausible result. A packet can arrive successfully and still be decoded incorrectly.
+
+## 2. Discover the device before addressing it
+
+Record the board revision, BSP, kernel, interface driver and library/tool version. Useful read-only discovery commands include:
+
+```bash
+uname -r
 gpiodetect
-
-# Show all lines on a chip
-gpioinfo gpiochip0
-
-# Read a GPIO input from a real line offset
-gpioget gpiochip0 43
-
-# Set a GPIO output high on a real line offset
-gpioset gpiochip0 43=1
-
-# Monitor GPIO events (rising/falling edge) on a real line offset
-gpiomon gpiochip0 43
-```
-
-### What `gpiodetect` means on Jetson
-
-On a Jetson Orin Nano dev kit you will typically see something like:
-
-```text
-gpiochip0 [tegra234-gpio] (164 lines)
-gpiochip1 [tegra234-gpio-aon] (32 lines)
-```
-
-- `gpiochip0` is the main Tegra234 GPIO controller
-- `gpiochip1` is the **always-on** GPIO controller used for low-power and wake-related signals
-- the number in parentheses is how many line offsets exist on that controller
-
-For most 40-pin header work, you will usually spend your time on `gpiochip0`.
-
-### How to read `gpioinfo`
-
-`gpioinfo gpiochip0` prints one row per line offset. Example:
-
-```text
-line  35:      "PG.00" "Force Recovery" input active-low [used]
-line  43:      "PH.00"       unused   input  active-high
-line 131:      "PZ.01"  "interrupt"   input  active-high [used]
-```
-
-Read each field like this:
-
-| Field | Meaning |
-|-------|---------|
-| `line 43` | The **chip-relative line offset**. This is the number you pass to `gpioget`, `gpioset`, and `gpiomon`. |
-| `"PH.00"` | The SoC pad or line name exposed by the driver/device tree. |
-| `unused` / `"Force Recovery"` / `"interrupt"` | The current consumer. `unused` means no driver or userspace process owns it right now. |
-| `input` / `output` | Current direction. |
-| `active-high` / `active-low` | Logical polarity. |
-| `[used]` | The line is already requested by the kernel or another process. Do not reuse it casually. |
-
-### Runtime names you actually care about
-
-For this guide, keep these names separate:
-
-| Name | Example | Use it for |
-|------|---------|------------|
-| Header pin number | `Pin 7` | Physical wiring on the dev kit |
-| Board signal name | `GPIO09` | Board pinout tables and schematics |
-| SoC pad name | `PH.00` | Low-level identity of the signal |
-| `gpiochip` line offset | `43` | `gpioget`, `gpioset`, `gpiomon` |
-
-Short version:
-
-- use **header pin numbers** when wiring
-- use **board signal names** when reading the pinout
-- use **SoC pad names** when reading low-level GPIO or BSP data
-- use **line offsets** when talking to Linux through `libgpiod`
-
-### What names like `PH.00` mean
-
-Names like `PH.00`, `PG.00`, or `PZ.01` are **SoC pad / GPIO bank names**.
-
-Read `PH.00` as:
-
-- `P` = GPIO naming prefix
-- `H` = bank or port
-- `00` = bit number inside that bank
-
-So `PH.00` is the **SoC-side identity** of the signal. It is not a header pin number and not a Linux line offset.
-
-### Why `gpioget gpiochip0 <line>` failed in your shell
-
-`<line>` in the docs is a **placeholder**, not something you type literally.
-
-In `bash`, angle brackets mean shell redirection. So:
-
-```bash
-gpioget gpiochip0 <line>
-```
-
-is interpreted as "read stdin from a file named `line`", which is why it fails.
-
-Replace the placeholder with a real line offset from `gpioinfo`, for example:
-
-```bash
-# Read line 43 on gpiochip0
-gpioget gpiochip0 43
-
-# Drive line 43 high
-gpioset gpiochip0 43=1
-
-# Monitor line 43 for edges
-gpiomon gpiochip0 43
-```
-
-Also note:
-
-- `gpioget` is for **reading**
-- `gpioset` is for **driving outputs**
-- `gpioget gpiochip0 <line>=1` is invalid because `gpioget` does not set values
-
-### Practical workflow on Jetson
-
-Use this sequence when you are trying to identify a GPIO safely:
-
-```bash
-# 1. See which controllers exist
-gpiodetect
-
-# 2. Inspect the main controller
-gpioinfo gpiochip0
-
-# 3. Pick an UNUSED line only after checking pinmux and board function
-gpioget gpiochip0 43
-```
-
-Before driving a line with `gpioset`, verify all of these:
-
-- the pin is really muxed as GPIO
-- it is not marked `[used]`
-- it is not a boot, recovery, regulator, wake, or other board-critical signal
-- you know what external hardware is attached to it
-
-### Finding a line by name
-
-If the line names are populated, `gpiofind` is often easier than scrolling through the full list:
-
-```bash
-gpiofind "PH.00"
-```
-
-That returns the owning chip and line offset for that named line.
-
-### Where pinmux and carrier-board work belongs
-
-This guide stops at **runtime Linux access**.
-
-If you need to answer questions like:
-
-- "Which SoC pad should I route on a custom carrier?"
-- "How do I edit the NVIDIA pinmux spreadsheet?"
-- "How do I change device tree or BSP defaults?"
-- "Why is this pin SPI on my board instead of GPIO?"
-
-use these earlier modules instead:
-
-- [2. Custom Carrier Board Design and Bring-Up](../../2.%20Custom%20Carrier%20Board%20Design%20and%20Bring-Up/Guide.md)
-- [3. L4T Customization](../../3.%20L4T%20Customization/Guide.md)
-
-### libgpiod in C
-
-```c
-#include <gpiod.h>
-
-struct gpiod_chip *chip = gpiod_chip_open("/dev/gpiochip0");
-struct gpiod_line *line = gpiod_chip_get_line(chip, 42);
-
-/* Output */
-gpiod_line_request_output(line, "my-app", 0);
-gpiod_line_set_value(line, 1);
-
-/* Input */
-gpiod_line_request_input(line, "my-app");
-int val = gpiod_line_get_value(line);
-
-gpiod_chip_close(chip);
-```
-
-### libgpiod in Python
-
-```python
-import gpiod
-
-chip = gpiod.Chip('gpiochip0')
-line = chip.get_line(42)
-
-# Output
-line.request(consumer="my-app", type=gpiod.LINE_REQ_DIR_OUT)
-line.set_value(1)
-
-# Input
-line.request(consumer="my-app", type=gpiod.LINE_REQ_DIR_IN)
-val = line.get_value()
-```
-
-### Device tree GPIO configuration
-
-This module assumes the pin is **already configured correctly** for GPIO use.
-
-- On the developer kit, that often means using **Jetson-IO**
-- On a custom carrier, that means the right **pinmux** and **device tree** are already in your BSP
-
-References:
-
-- [2. Custom Carrier Board Design and Bring-Up](../../2.%20Custom%20Carrier%20Board%20Design%20and%20Bring-Up/Guide.md)
-- [3. L4T Customization](../../3.%20L4T%20Customization/Guide.md)
-
----
-
-## 2. GPIO naming — alphanumeric to numeric assignment
-
-Jetson uses several GPIO naming schemes at once. They are easy to confuse, and they are **not interchangeable**.
-
-### Finding the mapping
-
-```bash
-# Show all lines on the main chip
-gpioinfo gpiochip0
-
-# Show all lines on the always-on chip
-gpioinfo gpiochip1
-
-# Find a line by SoC pad name, if the line has a name
-gpiofind "PH.00"
-
-# Kernel debug view
-sudo cat /sys/kernel/debug/gpio
-```
-
-`gpioinfo | grep -i "GPIO"` is often not very useful on Jetson, because many lines are named like `PA.00`, `PH.00`, `PQ.05`, or have board-specific labels such as `Force Recovery`, not literal strings like `GPIO09`.
-
-### The four names you will see
-
-| Name style | Example | Where you see it | What it means |
-|------------|---------|------------------|---------------|
-| Board/header label | `GPIO09`, `GPIO15`, `GPIO22` | Carrier schematics, 40-pin header tables, Jetson pinout diagrams | A board-facing label for a header pin or connector signal |
-| SoC pad / port.pin | `PH.00`, `PQ.05`, `PZ.01` | `gpioinfo`, pinmux docs, low-level bring-up notes | The Tegra GPIO bank and bit name |
-| `gpiochip` line offset | `43`, `105`, `131` | `gpioinfo`, `gpioget`, `gpioset`, `gpiomon` | The number libgpiod uses inside one chip |
-| Legacy sysfs/global GPIO number | `348`, `391` | Older Jetson docs, `/sys/class/gpio` workflows | Deprecated numbering model; avoid for new code |
-
-### Short mental model
-
-At runtime, the one you usually act on is:
-
-```text
-gpiochipN + line offset
-```
-
-Example:
-
-```bash
-gpioget gpiochip0 43
-```
-
-That means:
-
-- controller: `gpiochip0`
-- line offset on that controller: `43`
-
-It does **not** mean:
-
-- 40-pin header pin 43
-- sysfs GPIO 43
-- board label `GPIO43`
-
-### What to trust when numbers disagree
-
-For this runtime guide, prefer this order:
-
-1. `gpioinfo` and `gpiofind` for the current Linux-visible line offsets
-2. 40-pin header tables for physical pin location on the dev kit
-3. board schematic for signal identity
-4. old sysfs numbers only when reading legacy documentation
-
-If you need to go deeper into **pinmux spreadsheet**, **carrier routing**, or **BSP integration**, jump to:
-
-- [2. Custom Carrier Board Design and Bring-Up](../../2.%20Custom%20Carrier%20Board%20Design%20and%20Bring-Up/Guide.md)
-- [3. L4T Customization](../../3.%20L4T%20Customization/Guide.md)
-
----
-
-## 3. PWM (Linux)
-
-Orin Nano exposes PWM channels via the Linux PWM subsystem.
-
-### sysfs interface
-
-```bash
-# Export PWM channel (chip 0, channel 0)
-echo 0 > /sys/class/pwm/pwmchip0/export
-
-# Configure: 1 kHz, 50% duty cycle
-echo 1000000 > /sys/class/pwm/pwmchip0/pwm0/period      # ns
-echo 500000  > /sys/class/pwm/pwmchip0/pwm0/duty_cycle   # ns
-echo 1       > /sys/class/pwm/pwmchip0/pwm0/enable
-```
-
-### Common uses on Jetson
-
-| Use case | PWM channel | Notes |
-|----------|------------|-------|
-| **Fan control** | Dedicated fan PWM | Controlled by `jetson_clocks` or device tree `pwm-fan` node |
-| **LED brightness** | GPIO-capable PWM pin | Requires pinmux set to PWM function |
-| **Servo motor** | GPIO-capable PWM pin | 50 Hz, 1–2 ms pulse width |
-| **Backlight** | Display backlight PWM | See [Backlight](#13-backlight-linux) |
-
----
-
-## 4. ADC (Linux)
-
-The Jetson Orin Nano SoM has **limited ADC** capability — no general-purpose ADC pins are exposed on the carrier connector. For analog sensing:
-
-### External ADC options
-
-| ADC | Interface | Resolution | Channels | Common use |
-|-----|-----------|-----------|----------|-----------|
-| **ADS1115** | I2C | 16-bit | 4 | Voltage, current, temperature sensors |
-| **MCP3008** | SPI | 10-bit | 8 | General-purpose analog input |
-| **INA226** | I2C | 16-bit | 2 (V + I) | Power monitoring |
-
-### Reading external ADC via IIO subsystem
-
-If your external ADC has a Linux IIO driver:
-
-```bash
-# List IIO devices
-ls /sys/bus/iio/devices/
-
-# Read raw value
-cat /sys/bus/iio/devices/iio:device0/in_voltage0_raw
-
-# Read scale
-cat /sys/bus/iio/devices/iio:device0/in_voltage0_scale
-```
-
-Voltage = raw * scale (in millivolts).
-
----
-
-## 5. UART (Linux)
-
-Orin Nano exposes multiple UART ports. The debug console uses `ttyTCU0` (Tegra Combined UART). Application UARTs appear as `/dev/ttyTHS*`.
-
-### Available UARTs
-
-| Device | Use | Baud rate |
-|--------|-----|-----------|
-| `/dev/ttyTCU0` | Debug console (bootloader + kernel) | 115200 |
-| `/dev/ttyTHS0` | Application UART 0 | Configurable |
-| `/dev/ttyTHS1` | Application UART 1 | Configurable |
-
-### Using UART from userspace
-
-```bash
-# Quick test with minicom
-minicom -D /dev/ttyTHS0 -b 115200
-
-# Or with stty + cat
-stty -F /dev/ttyTHS0 115200 cs8 -cstopb -parenb
-echo "hello" > /dev/ttyTHS0
-cat /dev/ttyTHS0
-```
-
-### Python (pyserial)
-
-```python
-import serial
-
-ser = serial.Serial('/dev/ttyTHS0', 115200, timeout=1)
-ser.write(b'hello\n')
-data = ser.readline()
-ser.close()
-```
-
----
-
-## 6. SPI (Linux)
-
-SPI buses appear as `/dev/spidevX.Y` (bus X, chip-select Y).
-
-### Enable SPI in device tree
-
-This module assumes SPI is already enabled.
-
-- On the developer kit, use **Jetson-IO**
-- On a custom carrier, use your **pinmux + device tree** configuration in the BSP
-
-References:
-
-- [2. Custom Carrier Board Design and Bring-Up](../../2.%20Custom%20Carrier%20Board%20Design%20and%20Bring-Up/Guide.md)
-- [3. L4T Customization](../../3.%20L4T%20Customization/Guide.md)
-
-### spidev test
-
-```bash
-# Loopback test (connect MOSI to MISO)
-spidev_test -D /dev/spidev0.0 -s 1000000 -v
-```
-
-### Python (spidev)
-
-```python
-import spidev
-
-spi = spidev.SpiDev()
-spi.open(0, 0)           # bus 0, CS 0
-spi.max_speed_hz = 1000000
-response = spi.xfer2([0x01, 0x02, 0x03])
-spi.close()
-```
-
----
-
-## 7. I2C (Linux)
-
-I2C buses appear as `/dev/i2c-N`.
-
-### Scanning for devices
-
-```bash
-# Scan all addresses on bus 1
-sudo i2cdetect -y -r 1
-```
-
-### Reading/writing registers
-
-```bash
-# Read register 0x00 from device 0x50 on bus 1
-sudo i2cget -y 1 0x50 0x00
-
-# Write 0xFF to register 0x01
-sudo i2cset -y 1 0x50 0x01 0xFF
-```
-
-### Python (smbus2)
-
-```python
-from smbus2 import SMBus
-
-with SMBus(1) as bus:
-    data = bus.read_byte_data(0x50, 0x00)
-    bus.write_byte_data(0x50, 0x01, 0xFF)
-```
-
-### Common I2C devices on Jetson carriers
-
-| Device | Address | Purpose |
-|--------|---------|---------|
-| **EEPROM** (carrier ID) | 0x50–0x57 | Board identification |
-| **INA3221** | 0x40–0x43 | Power monitoring (VIN, 3.3V, 5V) |
-| **IMU** (BMI088, ICM-42688) | 0x68–0x69 | Inertial measurement (robotics) |
-| **RTC** (DS3231) | 0x68 | Real-time clock (battery-backed) |
-
----
-
-## 8. CAN (Linux)
-
-CAN bus on Jetson requires an external CAN transceiver on the carrier board (the SoC has CAN controllers but no integrated PHY).
-
-### Setup
-
-```bash
-# Configure CAN interface (500 kbps)
-sudo ip link set can0 type can bitrate 500000
-sudo ip link set can0 up
-
-# For CAN-FD
-sudo ip link set can0 type can bitrate 500000 dbitrate 2000000 fd on
-sudo ip link set can0 up
-```
-
-### Send and receive
-
-```bash
-# Send a frame
-cansend can0 123#DEADBEEF
-
-# Receive (dump all frames)
-candump can0
-
-# Generate test traffic
-cangen can0
-```
-
-### Python (python-can)
-
-```python
-import can
-
-bus = can.interface.Bus(channel='can0', interface='socketcan')
-
-# Send
-msg = can.Message(arbitration_id=0x123, data=[0xDE, 0xAD, 0xBE, 0xEF])
-bus.send(msg)
-
-# Receive
-msg = bus.recv(timeout=1.0)
-print(f"ID: {msg.arbitration_id:#x}, Data: {msg.data.hex()}")
-```
-
----
-
-## 9. USB host mode (Linux)
-
-Jetson Orin Nano supports USB 3.2 Gen 2 (10 Gbps) and USB 2.0 host ports.
-
-### Enumeration
-
-```bash
-# List connected USB devices
+gpioinfo --help
+i2cdetect -l
 lsusb
-
-# Show USB tree with speeds
-lsusb -t
-
-# Detailed device info
-lsusb -v -d <vendor>:<product>
+ip -details link show
 ```
 
-### Common USB peripherals
+Some tools may need installation through the target's supported package environment. `i2cdetect -l` lists adapters; it does not probe every attached device. Do not replace it with a bus scan as a universal identification method: some devices react badly to arbitrary probe transactions.
 
-| Device type | Driver | Notes |
-|------------|--------|-------|
-| **USB camera** | UVC (`uvcvideo`) | Works out of the box, see [Multimedia](../4.%20Multimedia/Guide.md) |
-| **USB serial** (FTDI, CP210x) | `ftdi_sio`, `cp210x` | Appears as `/dev/ttyUSB*` |
-| **USB Ethernet** | `cdc_ether`, `r8152` | Appears as `eth*` or `usb*` |
-| **USB storage** | `usb-storage` | Appears as `/dev/sd*` |
-| **USB audio** | `snd-usb-audio` | ALSA device |
+Keep the following identities separate:
 
----
+| Identity | Meaning |
+| --- | --- |
+| Connector and physical pin | Where the wire connects on this carrier revision |
+| Board signal/net name | The schematic's connection and electrical domain |
+| SoC pad/pinmux function | The hardware signal/function selected for that pad |
+| Linux controller and relative offset | The runtime GPIO address exposed by that driver |
+| Peripheral protocol address | An I2C address, SPI chip-select, CAN identifier, or device-specific address |
 
-## 10. USB device mode (Linux)
+There is no universal rule that “header pin 7 means gpiochip0 line 43.” Chip numbering and line information can change with the kernel/device tree. A line labeled unused is only unclaimed by a current consumer; it does not prove that driving it is electrically appropriate. Match the actual carrier schematic, pinmux and controller mapping. [NVIDIA Orin NX/Nano adaptation](https://docs.nvidia.com/jetson/archives/r39.2/DeveloperGuide/HR/JetsonModuleAdaptationAndBringUp/JetsonOrinNxNanoSeries.html).
 
-The Orin Nano dev kit's USB-C port supports device (gadget) mode for flashing and development.
+Record a binding table for your selected sensor: device path, driver, bus parameters, voltage, protocol revision, units and expected sample cadence. Keep this configuration separate from the decoding algorithm so a board revision does not silently change measurement meaning.
 
-### USB gadget framework
+## 3. Read a GPIO with the matching libgpiod API
+
+The Linux GPIO character-device API is the current userspace interface. Prefer an existing subsystem driver when it already expresses the device, such as an input button, LED, regulator or IIO sensor. GPIO is not a replacement for every kernel subsystem. [Linux GPIO guidance](https://docs.kernel.org/driver-api/gpio/using-gpio.html).
+
+libgpiod 1.x and 2.x have different command and Python APIs. Check `gpiodetect --version` and each installed tool's help. These are **2.x command templates**, after you have assigned `GPIO_CHIP` to the verified chip and `GPIO_LINE` to its verified relative offset:
 
 ```bash
-# Load the USB gadget configfs
-modprobe libcomposite
-
-# Common gadgets:
-# - g_ether: USB Ethernet gadget (device appears as network adapter on host)
-# - g_serial: USB serial gadget (device appears as ttyACM on host)
-# - g_mass_storage: USB mass storage gadget
+: "${GPIO_CHIP:?Set the verified gpiochip path or identifier}"
+: "${GPIO_LINE:?Set the verified chip-relative line offset}"
+gpioinfo --chip "$GPIO_CHIP" "$GPIO_LINE"
+gpioget --chip "$GPIO_CHIP" "$GPIO_LINE"
 ```
 
-### Typical use cases
+The shell checks stop if a required value is missing; literal angle-bracket placeholders are not valid shell arguments. In 2.x, `--chip` selects the controller. Old examples using positional `gpioget gpiochip0 43` describe a different CLI generation.
 
-| Gadget | Use case |
-|--------|----------|
-| **Ethernet (RNDIS/ECM)** | SSH into Jetson over USB without network cable |
-| **Serial (ACM)** | Debug console over USB |
-| **Mass storage** | Expose a partition or file as USB drive |
+For an explicitly wired output exercise, the 2.x form is `gpioset --chip "$GPIO_CHIP" "$GPIO_LINE=1"`. It holds the request while the process runs. Closing the request releases ownership; do not assume the line remains at that value afterward. Logical active/inactive and electrical high/low differ when active-low is configured. See [libgpiod 2.3 command examples](https://libgpiod.readthedocs.io/en/v2.3/gpio_tools.html).
 
----
+This complete **hardware-dependent** Python 2.x example reads a verified input:
 
-## 11. NVMe / PCIe storage (Linux)
+```python
+import os
+import gpiod
+from gpiod.line import Direction
 
-Most Jetson Orin Nano deployments use NVMe SSD for the root filesystem (faster and more reliable than SD card).
-
-### NVMe operations
-
-```bash
-# List NVMe devices
-nvme list
-
-# Check health
-sudo nvme smart-log /dev/nvme0
-
-# Benchmark
-sudo fio --name=test --rw=randread --bs=4k --numjobs=4 \
-    --size=1G --runtime=30 --time_based --filename=/dev/nvme0n1
-
-# Check PCIe link speed
-sudo lspci -vv | grep -A 20 "Non-Volatile"
+chip = os.environ["GPIO_CHIP"]
+line = int(os.environ["GPIO_LINE"])
+with gpiod.request_lines(
+    chip,
+    consumer="course-input",
+    config={line: gpiod.LineSettings(direction=Direction.INPUT)},
+) as request:
+    print(request.get_value(line))
 ```
 
-### PCIe link verification
+It retains the request through the read and closes it afterward. Permission errors, an already-owned line or an incorrect offset should be reported, rather than converted to a plausible zero. This example was source-checked against [the 2.3 request API](https://libgpiod.readthedocs.io/en/v2.3/python_misc.html); physical GPIO execution was not available in this review.
 
-```bash
-# Should show Gen3 x4 or Gen4 x4 depending on module
-sudo lspci -vv | grep "LnkSta:"
-```
+For edge events, record the configured timestamp clock and sequence information. A default monotonic timestamp is not a UTC wall-clock timestamp. Mechanical switch debounce, GPIO edge time and the time a sensor finished a measurement are separate concerns.
 
-If the link trains at a lower speed than expected, check trace routing (see [Module 2 — Carrier Board](../../2.%20Custom%20Carrier%20Board%20Design%20and%20Bring-Up/Guide.md)).
+## 4. Choose the bus transaction that the sensor requires
 
----
+**I2C:** a register read often needs a write of the register address followed by a read under a repeated START. Separate `write()` and `read()` calls can insert a STOP, changing the transaction. Use the Linux combined-transfer interface when the device requires it. Preserve address width, byte order, signedness and conversion scale. A successful register read does not mean the conversion is fresh; read the sensor's data-ready/status contract.
 
-## 12. SD/MMC card (Linux)
+**SPI:** state clock polarity/phase, bit order, maximum clock, word size and chip-select behavior. A command and response may need one transfer message with chip-select held. SPI can transmit and receive simultaneously; do not add TX and RX byte counts as if both necessarily consume separate clock intervals. Dummy response bytes and multi-transfer commands depend on the device.
 
-SD card slot (if present on carrier) appears as `/dev/mmcblk*`.
+**UART:** it is a byte stream. One read can contain half a message or several messages. Use explicit framing, maximum length, version, integrity checks where appropriate, a receive deadline and resynchronization. The [native framed-telemetry lab](../../../Phase%202%20-%20Embedded%20Systems/2.%20Embedded%20Software/labs/Framed-Telemetry.md) demonstrates fragmented input, malformed lengths and a C parser. It is a better starting point than assuming a complete JSON line arrives in every read.
 
-```bash
-# Check SD card info
-sudo fdisk -l /dev/mmcblk1
+**CAN:** Linux SocketCAN exposes a network interface, while a physical controller still needs the appropriate transceiver, wiring, termination and configuration. CAN identifiers describe arbitration/message identity, not automatically a destination device. Classic CAN and CAN FD have different frame capacities and flags. The lab intentionally uses one strict Classic CAN teaching format.
 
-# Mount
-sudo mount /dev/mmcblk1p1 /mnt
+For the Orin Nano developer carrier, use its own J17 CAN connector documentation. Do not copy AGX Orin's J30 pin numbers into a Nano wiring diagram. The deep dive links the board-specific source and explains the distinction.
 
-# Check speed class
-cat /sys/block/mmcblk1/device/speed_class
-```
+**Timing example:** 100 UART bytes with 8N1 framing at 115,200 baud take `100 × 10 / 115200 ≈ 8.68 ms` on the wire. The same message at 20 Hz occupies about 17.4% of that direction's nominal line time. Processing, buffering, retries and turnaround add latency. A high CPU clock cannot shorten the wire's bit period.
 
-**Production note:** SD cards have limited write endurance. Use NVMe for root filesystem; reserve SD for optional data logging or field updates only.
+## 5. Preserve freshness across the application boundary
 
----
+An observation should carry a schema version, sensor identity, sequence/epoch, measurement units, validity and timing information. A robot may also need coordinate frame, calibration identity and uncertainty.
 
-## 13. Backlight (Linux)
+Sequence 255 followed by 0 can be normal wraparound for an eight-bit counter. The lab uses a half-range rule to distinguish forward motion from old/reordered values under a stated assumption about maximum gaps. A reboot must create a new session/epoch or reset the receiver explicitly; otherwise a restarted counter can be confused with an old packet.
 
-If your carrier has an LCD with PWM-controlled backlight:
+A sender's “age 15 ms” field only measures the age the sender knows about. Unknown network/queue delay afterward still exists. One-way age across devices requires a clock relationship or a bound justified by the communication protocol. Use local receipt and processing timestamps for intervals that actually share a clock. For multi-sensor alignment, continue to [camera-time fusion](../../../Phase%203%20-%20Artificial%20Intelligence/Track%20A%20-%20Hardware%20and%20Edge%20AI/4.%20Sensor%20Fusion/Camera-Time-Fusion-Lab/Guide.md).
 
-```bash
-# List backlight devices
-ls /sys/class/backlight/
+Keep acquisition callbacks short. Put validated observations in a bounded queue with an explicit policy: keep all for a lossless logger, or replace older pending work for a latest-observation controller when that is the intended design. Record drops. An unbounded queue can preserve every message while making decisions increasingly stale.
 
-# Get current brightness
-cat /sys/class/backlight/<device>/brightness
+For actuation, define command units/ranges, expiry, acknowledgement and a fallback owned by the receiving controller. A Jetson process sending PWM-like commands is not itself a guarantee of deterministic motor timing. Use a suitable controller for that requirement, and test the loss-of-command path.
 
-# Get max brightness
-cat /sys/class/backlight/<device>/max_brightness
+## 6. Handle USB, storage and permissions deliberately
 
-# Set brightness (0 = off, max = full)
-echo 128 > /sys/class/backlight/<device>/brightness
-```
+USB device discovery should use stable identities where available, not assume `/dev/ttyUSB0` always names the same sensor after reconnection. Match the intended vendor/product/serial/interface and confirm the selected device. Keep reconnects as state changes: discard incomplete frames, establish the new session and require fresh data.
 
-Configure the backlight PWM channel in the device tree for your display panel.
+For storage logging, distinguish “write accepted by the process,” “data flushed to the filesystem,” and the durability promised by the full hardware stack. The [OTA crash lab](../../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-OTA-Deep-Dive/labs/README.md) demonstrates real process-crash boundaries with fsync/rename, while explicitly separating them from physical power-loss testing.
 
-For custom panel timing, PWM routing, and BSP integration, see:
+Grant device access to the application through the target's appropriate group/udev/service configuration. Running every application as root conceals missing permissions and expands the consequences of a bug. Record the exact access required; a permission error is a configuration observation, not a reason to silently substitute synthetic sensor data.
 
-- [2. Custom Carrier Board Design and Bring-Up](../../2.%20Custom%20Carrier%20Board%20Design%20and%20Bring-Up/Guide.md)
-- [3. L4T Customization](../../3.%20L4T%20Customization/Guide.md)
+## 7. Build the peripheral adapter in four sessions
 
----
+| Session | Work | Evidence |
+| --- | --- | --- |
+| 1 | Run the native C/Python protocol exercise and decode the golden payload by hand | Native test log and unit conversion |
+| 2 | Identify a target interface or document a hardware-pending binding table | Board/BSP identity and mapping source |
+| 3 | Add bounded reads, session/sequence checks and explicit invalid/stale handling | Valid, truncated, duplicate, stale and restart cases |
+| 4 | Integrate one observation into a logger or controller-facing queue | Receipt/measurement clocks, queue policy and failure behavior |
 
-## 14. Projects
+The CPU route is complete without purchasing hardware. A physical extension adds a real sensor capture and reconnect/failure evidence; it does not replace the parser checks.
 
-- **Sensor dashboard:** Read an I2C temperature sensor (e.g., TMP102) and a SPI ADC (e.g., MCP3008 for analog input), display values on a UART terminal at 1 Hz.
-- **CAN bus monitor:** Build a CAN bus sniffer that logs all frames to a file with timestamps. Add filtering by arbitration ID.
-- **GPIO interrupt counter:** Use `gpiomon` or libgpiod event monitoring to count rising edges on an input pin. Measure maximum event rate.
-- **USB gadget network:** Configure the Jetson as a USB Ethernet gadget so a host laptop can SSH into it over a single USB-C cable.
+## 8. Check your understanding
 
----
+1. **A GPIO is unused. May you drive it?** Only after checking its electrical function, pinmux, board wiring and ownership requirements.
+2. **A sensor read returned zero. Is zero invalid?** Not necessarily. The protocol needs a separate status/validity contract; communication errors must not be disguised as a valid zero.
+3. **Why can two I2C calls differ from one combined transaction?** A STOP between calls may change the device's register-selection behavior.
+4. **Why can received CAN data still be stale?** It may have waited in a sender or receiver queue, and receipt time is not necessarily measurement time.
+5. **Why does a working local socket test not prove CAN works?** It bypasses CAN arbitration, device drivers, wiring and transceivers.
+6. **What should happen after reconnect?** Reset transport/parser state, establish session identity, and accept only a fresh valid observation under the new session.
 
-## 15. Resources
-
-| Resource | Description |
-|----------|-------------|
-| **Jetson Orin Nano Developer Kit User Guide** | Pin header mapping, UART/SPI/I2C bus assignments |
-| **libgpiod documentation** | Character device GPIO API (replaces sysfs) |
-| **Linux kernel SPI/I2C docs** | `Documentation/spi/` and `Documentation/i2c/` in kernel source |
-| **SocketCAN documentation** | Linux CAN subsystem, `ip link`, `candump`, `cansend` |
-| **NVMe CLI** | `nvme-cli` package for NVMe management and diagnostics |
-| [2. Custom Carrier Board](../../2.%20Custom%20Carrier%20Board%20Design%20and%20Bring-Up/Guide.md) | Connector routing, electrical design, pinmux planning |
-| [3. L4T Customization](../../3.%20L4T%20Customization/Guide.md) | Device tree, BSP integration, flash and production image workflows |
-
-
-## Integration lab: Can userspace distinguish a valid zero from a failed sensor read?
-
-Write a peripheral adapter returning value, units, monotonic timestamp, sequence ID, and status. Inject timeout and malformed data through a mock or loopback path.
-
-**Acceptance evidence:** Invalid data must remain invalid through the caller; no silent substitution with the previous sample. Submit bus-to-application timing and a stable device-identification rule.
-
-**Continue:** take this artifact to [6. ROS2](../6.%20ROS2/Guide.md). Explain which assumption from this course the next engineer must preserve.
+Continue with [network connectivity](../2.%20Network%20and%20Connectivity/Guide.md), then connect the adapter to the [ROS 2 course](../6.%20ROS2/Guide.md).

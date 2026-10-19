@@ -583,7 +583,7 @@ When should it call structured tools instead of looking at pixels?
 
 - NVIDIA Technical Blog, "NVIDIA Nemotron 3 Nano Omni Powers Multimodal Agent Reasoning in a Single Efficient Open Model": [https://developer.nvidia.com/blog/nvidia-nemotron-3-nano-omni-powers-multimodal-agent-reasoning-in-a-single-efficient-open-model/](https://developer.nvidia.com/blog/nvidia-nemotron-3-nano-omni-powers-multimodal-agent-reasoning-in-a-single-efficient-open-model/)
 - NVIDIA Nemotron 3 Nano Omni on Hugging Face: [https://huggingface.co/nvidia/Nemotron-3-Nano-Omni-30B-A3B](https://huggingface.co/nvidia/Nemotron-3-Nano-Omni-30B-A3B)
-- NVIDIA Nemotron model family: [https://huggingface.co/collections/nvidia/nemotron-3-68f03d30beec3d477b293a12](https://huggingface.co/collections/nvidia/nemotron-3-68f03d30beec3d477b293a12)
+- NVIDIA Nemotron model family: [https://huggingface.co/collections/nvidia/nvidia-nemotron-v3](https://huggingface.co/collections/nvidia/nvidia-nemotron-v3)
 - Lecture 28 - Runtime Strategy: [Lecture-28.md](Lecture-28.md)
 - Lecture 09 - Structured Tools Beat Computer Use: [Lecture-09.md](Lecture-09.md)
 

@@ -8,7 +8,7 @@ Make frame transforms, orientation conventions, timing, and action semantics exp
 
 ## Geometry is part of the model interface
 
-A VLA returns six numbers and a gripper command. Without a convention, those six numbers might mean a position and Euler angles, a displacement and rotation vector, a spatial velocity, or a target pose in some normalized space. These interpretations can all fit the same array shape.
+Consider one policy that returns six numbers and a gripper command; other embodiments use different dimensions. Without a convention, those six numbers might mean a position and Euler angles, a displacement and rotation vector, a spatial velocity, or a target pose in some normalized space. These interpretations can all fit the same array shape.
 
 The misconception is that small actions make convention errors harmless. A 2 cm motion in the wrong frame can move into an object, and repeatedly applying a small absolute target as a delta creates a large trajectory error.
 
@@ -72,6 +72,14 @@ Local and global rotation updates also differ. For a current orientation \(R\), 
 
 Joint state includes position \(q\), velocity \(\dot q\), and sometimes torque or estimated effort. A Cartesian target requires forward/inverse kinematics, joint limits, and an end-effector definition. “Tool center point” and “last link origin” can differ by several centimeters.
 
+A tool offset also changes **linear velocity**, not just pose. If \(r\) points from the last-link origin to the tool center, and all vectors are expressed in the same frame,
+
+$$
+v_{tool}=v_{link}+\omega\times r.
+$$
+
+For \(v_{link}=0\), \(\omega=(0,0,1)\) rad/s and \(r=(0.1,0,0)\) m, the tool moves at \((0,0.1,0)\) m/s. Rotating the link's zero linear velocity into another frame would miss this motion. Distinguish **changing vector coordinates** from **changing the point whose velocity is commanded**. A six-dimensional twist uses its declared ordering and adjoint convention; treating its two triples as unrelated free vectors can be wrong. [Modern Robotics: twist frame changes](https://modernrobotics.northwestern.edu/nu-gm-book-resource/3-3-2-twists-part-2-of-2/).
+
 An absolute target remains fixed if sent repeatedly. A delta target accumulates. A velocity target depends on how long it is held. A normalized action requires its decoder before any of these meanings emerge. For grippers, define whether a scalar means opening width, normalized position, velocity, force, or a binary command and specify the sign.
 
 A compliant controller may intentionally allow position error to regulate contact. Evaluating it only by positional tracking error can reward excessively stiff behavior. Separate policy target error, controller tracking error, and task outcome.
@@ -85,6 +93,8 @@ If the tool translates at 0.15 m/s and image/state synchronization differs by 40
 Record sensor timestamps on a known clock basis and define interpolation limits. Extrapolating transforms indefinitely hides dropped observations. A stale-data check should happen before transformation and again before execution when computation takes appreciable time.
 
 ## Lab: a frame and action conformance suite
+
+Start with the supplied [frame and kinematics fixtures](../Robotics%20Foundations/Lab-Guide.md) and [tool/grasp frame exercise](../Robot%20Dynamics%20and%20Task%20Execution/Lab-Guide.md). Those are runnable CPU references; the full 3D suite below is an additional implementation exercise.
 
 **Exercise / pseudocode; no robot motion is performed.** Implement rigid transform application, inversion, composition, and displacement rotation using double precision. Use the worked matrix as a known fixture. Add random valid rotations and verify round trips within a declared tolerance, such as \(10^{-9}\) for the small synthetic examples.
 

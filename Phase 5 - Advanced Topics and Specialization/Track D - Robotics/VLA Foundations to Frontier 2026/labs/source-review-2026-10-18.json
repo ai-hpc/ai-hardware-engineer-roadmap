@@ -1,0 +1,86 @@
+{
+  "checked_utc": "2026-10-18T21:06:57.606042+00:00",
+  "scope": "Source reading only; no source package installed and no checkpoint executed",
+  "sources": [
+    {
+      "repo": "google-research/rlds",
+      "commit": "b35dac3a6b73396b0cb8773095999c4b5d70947c",
+      "path": "README.md",
+      "url": "https://raw.githubusercontent.com/google-research/rlds/b35dac3a6b73396b0cb8773095999c4b5d70947c/README.md",
+      "bytes": 15281,
+      "sha256": "f354dac2afe6cf9412a674a47c9e2cab9a2624199ed38d69df82604d3aa398e0"
+    },
+    {
+      "repo": "huggingface/lerobot",
+      "commit": "146d8474932c8b566717eb2738ba459337ab71c4",
+      "path": "docs/source/lerobot-dataset-v3.mdx",
+      "url": "https://raw.githubusercontent.com/huggingface/lerobot/146d8474932c8b566717eb2738ba459337ab71c4/docs/source/lerobot-dataset-v3.mdx",
+      "bytes": 20587,
+      "sha256": "99bd88b390df17dfb4ef4ddcdbdfa3621f9e35a90452c7504a25b09b8a7cd309"
+    },
+    {
+      "repo": "huggingface/lerobot",
+      "commit": "146d8474932c8b566717eb2738ba459337ab71c4",
+      "path": "src/lerobot/datasets/lerobot_dataset.py",
+      "url": "https://raw.githubusercontent.com/huggingface/lerobot/146d8474932c8b566717eb2738ba459337ab71c4/src/lerobot/datasets/lerobot_dataset.py",
+      "bytes": 46584,
+      "sha256": "9837856f0b7611adb2ae71dc87922b2403b5f96c370a1a76925147036a2d5cf2"
+    },
+    {
+      "repo": "Physical-Intelligence/openpi",
+      "commit": "215abfb217dbac7d5f1273282331b9b1866c0479",
+      "path": "README.md",
+      "url": "https://raw.githubusercontent.com/Physical-Intelligence/openpi/215abfb217dbac7d5f1273282331b9b1866c0479/README.md",
+      "bytes": 23254,
+      "sha256": "567fc57766bd736664f50126cab8145af4071ca16cc5e238f2b11e369169c3b5"
+    },
+    {
+      "repo": "Physical-Intelligence/openpi",
+      "commit": "215abfb217dbac7d5f1273282331b9b1866c0479",
+      "path": "src/openpi/models/pi0.py",
+      "url": "https://raw.githubusercontent.com/Physical-Intelligence/openpi/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/models/pi0.py",
+      "bytes": 12887,
+      "sha256": "24b32d7c6ed5e409459afa8ca5af96a4dae09c2dcdf48e828907e411f4f12342"
+    },
+    {
+      "repo": "Physical-Intelligence/openpi",
+      "commit": "215abfb217dbac7d5f1273282331b9b1866c0479",
+      "path": "src/openpi/transforms.py",
+      "url": "https://raw.githubusercontent.com/Physical-Intelligence/openpi/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/transforms.py",
+      "bytes": 15752,
+      "sha256": "a1b94e9e72849a18834778f229c6bb389a495eb7fbe0aa800edea728b9424ff4"
+    },
+    {
+      "repo": "NVIDIA/Isaac-GR00T",
+      "commit": "dac54b313160c201c450f97df0fd74ebd379c892",
+      "path": "README.md",
+      "url": "https://raw.githubusercontent.com/NVIDIA/Isaac-GR00T/dac54b313160c201c450f97df0fd74ebd379c892/README.md",
+      "bytes": 34759,
+      "sha256": "62f6c55a356be039287416f97e03a3b5541052d038a3daec208ea9ff8045a067"
+    },
+    {
+      "repo": "NVIDIA/Isaac-GR00T",
+      "commit": "dac54b313160c201c450f97df0fd74ebd379c892",
+      "path": "gr00t/configs/model/gr00t_n1d7.py",
+      "url": "https://raw.githubusercontent.com/NVIDIA/Isaac-GR00T/dac54b313160c201c450f97df0fd74ebd379c892/gr00t/configs/model/gr00t_n1d7.py",
+      "bytes": 6460,
+      "sha256": "379ff708496a73b25b12f4656850284a16fde0e205828e2a0c0be0af61463744"
+    },
+    {
+      "repo": "NVIDIA/Isaac-GR00T",
+      "commit": "dac54b313160c201c450f97df0fd74ebd379c892",
+      "path": "scripts/deployment/README.md",
+      "url": "https://raw.githubusercontent.com/NVIDIA/Isaac-GR00T/dac54b313160c201c450f97df0fd74ebd379c892/scripts/deployment/README.md",
+      "bytes": 26233,
+      "sha256": "e0c34edf03cdddb6da65995cb697ac30609c4d9b027ce2c2011fdb16f649629f"
+    },
+    {
+      "repo": "huggingface:nvidia/GR00T-N1.7-3B",
+      "commit": "2fc962b973bccdd5d8ce4f67cc63b264d6886495",
+      "path": "README.md",
+      "url": "https://huggingface.co/nvidia/GR00T-N1.7-3B/raw/2fc962b973bccdd5d8ce4f67cc63b264d6886495/README.md",
+      "bytes": 13111,
+      "sha256": "7d0a4423a5a5bc7ac35f9ab4c1f64eb3f74f7592418a8dc5c80702b48455c788"
+    }
+  ]
+}

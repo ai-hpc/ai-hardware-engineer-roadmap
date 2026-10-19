@@ -150,6 +150,8 @@ Extend the fixture with conditioning and input/output allocations, producer/last
 
 Use [the action-parity course](../../Track%20D%20-%20Robotics/VLA%20Optimization%20and%20Action-Parity%20Harness/README.md) to distinguish replayed-observation numerical checks from closed-loop task evaluation. A synthetic shape inventory passes this lecture's analytical route; it cannot establish policy accuracy or chip performance.
 
+The [model-to-hardware lab](Model-to-Hardware-Lab.md) supplies the measured CPU route using the small scalar flow model trained in the VLA course. Export its actual graph, capture linear calls and profiler events, and compare them with parameter, operation, and tile-padding calculations. This is a trained synthetic model, not a pretrained VLA benchmark.
+
 ## 8. Self-check and handoff
 
 1. **Why is storage 4 MiB while streamed weight traffic is 14 MiB?** There are two distinct matrices, but one is loaded six times under the stated schedule.

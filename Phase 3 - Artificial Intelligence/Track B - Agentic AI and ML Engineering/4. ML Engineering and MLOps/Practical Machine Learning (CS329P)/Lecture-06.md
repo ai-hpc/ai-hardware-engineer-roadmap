@@ -4,7 +4,7 @@
 
 ---
 
-Every supervised model you have ever trained rests on one assumption so quiet you probably never wrote it down: that the data you train on and the data you serve on are drawn from the *same* distribution `p(x, y)`. This is the IID assumption — independent and identically distributed — and it is the silent load-bearing wall of machine learning. The whole edifice of generalization theory, the reason a good validation score is supposed to mean anything at all, is built on it. And production quietly breaks it. Not loudly, not with an exception in the logs — quietly. The model that scored 94% in your notebook ships, runs fine for a quarter, and then accuracy drifts down to 88% with no code change, no bug, no bad deploy. The model did not rot. The world moved.
+Every supervised model you have ever trained rests on one assumption so quiet you probably never wrote it down: that the data you train on and the data you serve on are drawn from the *same* distribution `p(x, y)`. This is the IID assumption — independent and identically distributed — and it is the silent load-bearing wall of machine learning. Many introductory generalization results assume IID samples; other theory explicitly handles dependent data and shift. A validation score needs assumptions matching how the data was collected. And production quietly breaks it. Not loudly, not with an exception in the logs — quietly. The model that scored 94% in your notebook ships, runs fine for a quarter, and then accuracy drifts down to 88% with no code change, no bug, no bad deploy. The model did not rot. The world moved.
 
 This is **distribution shift**, and it is the single most common reason deployed models decay. The empirical distribution lies — your training set was only ever a finite sample of a world that keeps changing underneath it. A vending-machine vision model demoed at CES fails on the show floor because the lighting is different from the lab (a true story from CES 2019: the fix was new data, a tablecloth to kill the table reflection, and an all-night retrain). A speech model trained on West-Coast accents stumbles on a Texan drawl. A medical classifier trained when COVID was rare gets deployed into a town right after a super-spreader event where it is suddenly common. None of these is a modeling failure in the usual sense. The function `f` is fine; the input it is now being asked about comes from a distribution it never saw.
 
@@ -39,13 +39,13 @@ What you actually care about — expected risk over the true distribution:
 
 Training drives down the first. Deployment is judged by the second — the expected loss over *all the other data you could have seen*, not the handful you did. The gap between them is the entire subject of generalization, and the reason the gap is ever bounded is the IID assumption: train and test are the same `p`.
 
-How do we get any guarantee that low empirical risk implies low expected risk? Hold out a **validation set** that was never used for training, and apply a concentration bound. For a loss bounded in `[0, 1]`, the Chernoff/Hoeffding bound says the empirical mean over `m` independent points is close to the true mean with high probability:
+How do we get any guarantee that low empirical risk implies low expected risk? Evaluate a fixed model on independent held-out examples and apply a concentration bound. Selecting the model using these same examples changes the statistical argument. For a loss bounded in `[0, 1]`, the Chernoff/Hoeffding bound says the empirical mean over `m` independent points is close to the true mean with high probability:
 
 ```text
-Pr[ | (1/m) Σ l(f(x_i), y_i) − E[l(f(x), y)] | > ε ]  ≤  exp(−2 m ε²)
+Pr[ | (1/m) Σ l(f(x_i), y_i) − E[l(f(x), y)] | > ε ]  ≤  2 exp(−2 m ε²)
 
 Solving for a confidence 1 − δ gives a sample-size rule of thumb:
-  for δ = 0.05 and ε = 0.01  →  m ≈ 15,000 independent validation points.
+  for δ = 0.05 and ε = 0.01  →  m ≥ 18,445 independent held-out points for this two-sided bound.
 ```
 
 Two caveats are exactly where production breaks. **First**, the bound assumes the validation set was *never* used for training — an assumption "often violated" the moment you tune hyperparameters against it, peek repeatedly, or leak preprocessing statistics across the split (the discipline from Lecture 02: fit normalizers on train only). **Second, and the whole point of this lecture: the bound assumes the validation points are drawn from the same distribution as test.** A pristine, untouched, perfectly-IID-with-training validation set still tells you *nothing* about a deployment whose distribution has moved.
@@ -66,13 +66,13 @@ The clean way to organize distribution shift is by *which factor of the joint di
 
 The distinction is not academic — **it dictates what fix is even possible.**
 
-- **Covariate shift** (`p(x) ≠ q(x)`, label rule fixed) is correctable by reweighting training examples so the training input distribution looks like the test one. The relationship you learned, `p(y|x)`, is still valid; you just sampled the inputs from the wrong density. This is §3.
+- **Covariate shift** (`p(x) ≠ q(x)`, label rule fixed) can be addressed under support-overlap and estimation assumptions by reweighting training examples so the training input distribution looks like the test one. The relationship you learned, `p(y|x)`, is still valid; you just sampled the inputs from the wrong density. This is §3.
 - **Label shift** (`p(y) ≠ q(y)`, `p(x|y)` fixed) is correctable by reweighting *by class*. The class-conditional appearance is still valid; only the mix of classes changed. This is §6, and it is in some ways the easier fix — *"when you have q(y), fixing models is easy."*
 - **Concept drift** is the genuinely hard one. The dependency `p(y|x)` itself has changed, so nothing you learned about the old mapping transfers cleanly. CS329P is blunt: *"much bigger problem if concept shifts between training and test set — no real guarantees possible."* If it drifts slowly over time, you can sometimes track it by training a time-indexed model `p(y|x, t)`; if it shifts abruptly, you need fresh labels.
 
-Two related cases the lecture flags as "things we didn't cover" but worth naming. **Covariate drift** is slow covariate shift over time (language usage, demographics, geographic preferences — Canada vs. USA search behavior); the strategy is to model the covariate density as a time-varying function. And **adversarial data** is its own pathological case — `supp(p) ≠ supp(q)`, where test data lands *off the support* of training data entirely — which §4 treats as the worst case.
+Two related cases the lecture flags as "things we didn't cover" but worth naming. **Covariate drift** is slow covariate shift over time (language usage, demographics, geographic preferences — Canada vs. USA search behavior); the strategy is to model the covariate density as a time-varying function. And **adversarial data** is selected to cause failures under a stated threat model; it can be on or off the natural data distribution. It is not defined solely by unequal supports.
 
-A useful sanity rule: covariate shift = "the covariate distribution lies," label shift = "the label distribution lies," concept drift = "the relationship lies." When deciding which you face, ask *which causal direction generated the data.* If `x` causes `y` (image → label), shift in `p(x)` is covariate shift. If `y` causes `x` (disease → symptoms), shift in `p(y)` is label shift. The causal arrow tells you which factor is stable and therefore which fix applies.
+A useful sanity rule: covariate shift = "the covariate distribution lies," label shift = "the label distribution lies," concept drift = "the relationship lies." When deciding which you face, ask *which causal direction generated the data.* A causal story can motivate which mechanism might remain stable; it does not prove the required invariance. Check the conditional assumptions with domain evidence and available labels. Lighting changes and disease prevalence changes are not automatically pure covariate or label shifts.
 
 ---
 
@@ -93,7 +93,7 @@ The two differ only in the input density out front. The fix is a change of measu
                             importance weight β(x)
 ```
 
-So if you reweight each training example by the **density ratio** `β(x) = q(x)/p(x)`, the *reweighted* training risk is an unbiased estimate of the test risk. Examples that are over-represented in training relative to test get down-weighted; examples that look like test get up-weighted. Concretely, the corrected objective becomes:
+This identity requires `q` to have no mass where `p` is zero, and the same conditional label distribution. Under those assumptions, if you reweight each training example by the **density ratio** `β(x) = q(x)/p(x)`, the *reweighted* training risk is an unbiased estimate of the test risk. Examples that are over-represented in training relative to test get down-weighted; examples that look like test get up-weighted. Concretely, the corrected objective becomes:
 
 ```text
 Original:    minimize_w  (1/m) Σ_i           l( y_i, f(x_i, w) )
@@ -105,9 +105,9 @@ Reweighted:  minimize_w  (1/m) Σ_i  β(x_i) · l( y_i, f(x_i, w) )
 Label every training point `+1` and every test point `−1`, pool them, and fit a probabilistic binary classifier `r(y | x)` (logistic regression is the canonical choice). At optimum its conditional class probability is:
 
 ```text
-r(y = +1 | x) =  p(x) / ( p(x) + q(x) )
+r(source | x) = π_source p(x) / [π_source p(x) + π_target q(x)]
 
-⇒  β(x) = q(x)/p(x) = r(y = −1 | x) / r(y = +1 | x)
+⇒  β(x) = [π_source/π_target] · r(target | x)/r(source | x)
 ```
 
 That ratio of the classifier's two output probabilities *is* the importance weight — no density estimation required. The full procedure:
@@ -116,17 +116,17 @@ That ratio of the classifier's two output probabilities *is* the importance weig
 COVARIATE SHIFT CORRECTION
   1. Build a pooled dataset: training points labeled +1, test/prod points labeled −1.
   2. Train a binary classifier (e.g. logistic regression) to separate the two.
-  3. CHECK FIRST: if it can't beat chance, there is no covariate shift — stop, do nothing.
-     (Reuse the generalization-performance estimate from §1 to decide.)
-  4. For each training point x_i, set weight  β(x_i) = r(−1 | x_i) / r(+1 | x_i).
+  3. Assess held-out domain discrimination against a calibrated null/permutation test.
+     Failure to detect shift is not proof that the distributions are equal.
+  4. Estimate β using domain-prior-corrected odds; use held-out/cross-fit probabilities.
   5. Retrain your real model on the training data, reweighting example i by β(x_i).
 ```
 
 Step 3 is doing double duty: the *same* classifier that produces the weights is itself a two-sample test (§5). If train and test are indistinguishable, the weights are all ≈ 1 and you have done no harm by skipping the correction.
 
-There is a deeper unity here worth seeing. This reweighting-to-be-indistinguishable is **exactly the GAN objective**: a generator reweights training data `{(x_i, y_i)} → {β_i(x_i, y_i)}` so a discriminator can no longer tell it from test data, and the minimax optimum is reached precisely when `β(x) = q(x)/p(x)` and the distributions are no longer distinguishable (the discriminator is forced to entropy mode, `r = 0.5` everywhere). Covariate-shift correction, GANs, and a maximum-entropy / moment-matching view (matching feature means via MMD) are three faces of the same idea.
+The domain classifier estimates a density ratio; this resembles discriminator reasoning in GANs, but importance weighting is not the GAN training objective. Keep the estimand, sampling priors, model calibration, and support assumptions explicit. A classifier that cannot distinguish samples may simply lack capacity or data.
 
-**Practical instability — the part that bites you.** The weights `β` are *estimates*, so they add bias and variance, and the real danger is when `p` and `q` are very different: a few enormous weights dominate and your effective sample size collapses. Make it quantitative. For a weighted sample mean `x̄ = Σ β_i x_i`, the variance scales as `‖β‖₂² σ²`, which motivates the **effective sample size**:
+**Practical instability — the part that bites you.** The weights `β` are *estimates*, so they add bias and variance, and the real danger is when `p` and `q` are very different: a few enormous weights dominate and your effective sample size collapses. Make it quantitative. For normalized fixed weights `a_i=β_i/Σβ`, independent observations with common variance have `Var(Σa_i x_i)=σ²Σa_i²`, which motivates the **effective sample size**:
 
 ```text
 m* = ‖β‖₁² / ‖β‖₂²        (equals m when all weights are equal; collapses when a few dominate)
@@ -139,7 +139,7 @@ Unclipped weights:   less bias, but HIGH variance when m* is small.
 Clipped weights:     a little bias, but smaller variance (larger effective sample size).
 ```
 
-Clipping trades a controlled bias for a large variance reduction — almost always worth it in practice. The discipline: compute `m*` before trusting a reweighting; if it has cratered relative to `m`, your covariate shift is too severe to paper over with importance weighting, and you need new data, not new weights.
+Clipping trades bias against variance; choose it using an appropriate validation protocol rather than assuming it always helps. The discipline: compute `m*` before trusting a reweighting; if it has cratered relative to `m`, your covariate shift is too severe to paper over with importance weighting, and you need new data, not new weights.
 
 ---
 
@@ -152,20 +152,20 @@ maximize_δ   l( f(x + δ), y )
 subject to   ‖δ‖ ≤ ε        (perturbation imperceptibly small)
 ```
 
-These exist and are easy to construct — adversarial images that dodge face recognition (even realized physically as 3D-printed glasses frames), audio perturbed inaudibly to transcribe as a different phrase. **Why does it work?** Because real training and "natural" test data live in a small, thin subset of input space, and the function's behavior is essentially *undefined away from where data occurred.* An adversarial point sits slightly off that support — `supp(p) ≠ supp(q)` — in a region the model was never constrained on, so the loss surface there can be pushed anywhere. This is also the abstract structure of an arms race you already know: **spam filtering.** The host retrains, the spammer finds a modification that evades, the host extends the dataset and retrains — a moving distribution driven by an adversary, forever.
+These exist and are easy to construct — adversarial images that dodge face recognition (even realized physically as 3D-printed glasses frames), audio perturbed inaudibly to transcribe as a different phrase. **Why can it work?** A model can learn a boundary that is sensitive to task-irrelevant perturbations. Off-distribution behavior is one possible weakness, but adversarial examples need not lie outside the data support. Specify the allowable perturbation and check that the intended label is unchanged; the definition is about a targeted model failure, not a universal geometric claim.
 
-The connection to the rest of the lecture: there is a theorem that *you can always find a distribution that makes things worse.* Given a loss with mean `R[p, f]` and variance `σ²[p, f]`, there exists a `q(x)` with `R[q, f] ≥ R[p, f] + σ` — just overweight the inputs where the model already errs (a mean-value-theorem argument: some region has above-average conditional loss; put `q`'s mass there). The lesson is defensive: **always confirm your train/test distributions actually match before drawing conclusions** — otherwise an apparent failure may just be an unlucky (or adversarial) reweighting.
+Concentrating more deployment probability on high-loss regions can raise risk. The increase depends on the allowed shift and loss range; there is no general guarantee of an increase of one standard deviation. For a loss bounded by one, no distribution can produce expected loss greater than one.
 
 The two defenses are duals of each other, and the difference is *what you know*:
 
 - **Invariances** — transformations you *know* leave the label unchanged. A left-right flip of a cat is still a cat; a cropped, recolored, slightly-distorted image is the same class; speech with background noise added is the same words. So you **augment** the training set with these transforms (this is the data augmentation of Lecture 02, seen now through the shift lens): you are deliberately *widening the support* of `p` to cover variations you expect at test time. Classic roots: tangent distance (Simard 1995) and virtual support vectors (Schölkopf 1997) explored a point's neighborhood; today it's the standard ImageNet augmentation stack (random crop/scale/flip, hue–saturation–brightness jitter via libraries like imgaug / Albumentations).
-- **Adversarial robustness** — transformations you do *not* know should preserve the label, and which in fact change the model's output. The defense is to treat them *as if* they were invariances: bake the worst case into the loss. An **adversarially-robust loss** takes the supremum over a family of transformations `Δ` (with a penalty `η(δ)` discouraging extreme distortions):
+- **Adversarial robustness** — optimize against a specified perturbation set while retaining a justified ground-truth label. A perturbation that changes the actual task label cannot simply reuse the old label. Define the threat model, perturbation budget, and label-preservation assumption before training. An **adversarially-robust loss** takes the supremum over a family of transformations `Δ` (with a penalty `η(δ)` discouraging extreme distortions):
 
 ```text
 L(x, y, f) = sup_{δ ∈ Δ}  η(δ) · l( f(x + δ), y )
 ```
 
-At each training step you find the *worst* perturbation and train against it, so the model is forced to be correct not just on the data point but on a robust neighborhood around it. The clean summary: with **invariances** you *know* the transformation keeps the outcome unchanged and add it to be more robust; with **adversarial data** you *don't* know it should, observe that it changes the outcome, and defend by treating it as an invariance anyway.
+At each training step you find the *worst* perturbation and train against it, so the model is forced to be correct not just on the data point but on a robust neighborhood around it. The clean summary: with **invariances** you *know* the transformation keeps the outcome unchanged and add it to be more robust; with **adversarial training** you search for model failures within a specified, label-preserving perturbation set. Performance under that threat model does not guarantee robustness to arbitrary shifts.
 
 ---
 
@@ -173,7 +173,7 @@ At each training step you find the *worst* perturbation and train against it, so
 
 Correction is moot if you don't know a shift occurred. The detection question is a classical statistics problem: given `X = {x₁, …, x_m}` drawn from `p` and `X' = {x'₁, …, x'_{m'}}` drawn from `q`, **test whether `p = q`.** Three tools, in rough order of "what to actually use."
 
-**(1) Classifier two-sample test — the one to choose.** This is the same trick as §3, repurposed as a hypothesis test: *if you can train a classifier that tells the two samples apart with above-chance accuracy on held-out data, then `p ≠ q`.* The math underneath: the classifier objective `E_p[log π(+1|x)] + E_q[log π(−1|x)]` is minimized at `π(+1|x) = p(x)/(p(x)+q(x))`, and plugging that back in yields `2·H[(p+q)/2] − H[p] − H[q] + 2log 2`, which by convexity of entropy is minimized *exactly when `p = q`*. So inseparability is equivalent to equality of distributions. It's the recommended test because it works in high dimensions, uses tooling you already have, and the *trained classifier doubles as the importance-weight estimator* if the test comes back positive.
+**(1) Classifier two-sample test.** Train a domain classifier and evaluate it on separate domain examples. Above-null discrimination can indicate shift; use a permutation/calibrated test and report effect size. Chance-level held-out performance is failure to detect a difference, not proof of equality. Distinguishing inputs also does not reveal whether `p(y|x)` changed or whether task performance worsened.
 
 **(2) Maximum Mean Discrepancy (MMD).** Find the function with the largest gap in expectation between the two distributions:
 
@@ -181,13 +181,15 @@ Correction is moot if you don't know a shift occurred. The detection question is
 MMD(p, q) = sup_{f ∈ F}  ( E_p[f(x)] − E_q[f(x)] )      — if large, p ≠ q
 ```
 
-For linear functions in a kernel feature space `φ` (a Reproducing Kernel Hilbert Space, `k(x, x') = ⟨φ(x), φ(x')⟩`), the supremum has a *closed form*: it's the distance between the mean embeddings, `‖E_p[φ(x)] − E_q[φ(x)]‖`. The big practical win is that **you don't have to train anything** — the discriminant is `f(x') = E_p[k(x, x')] − E_q[k(x, x')]`, and on finite samples MMD² is a simple sum of kernel evaluations over pairs of points:
+For functions in the **unit ball** of a kernel Hilbert space (`‖f‖H ≤ 1`) with feature map `φ` (a Reproducing Kernel Hilbert Space, `k(x, x') = ⟨φ(x), φ(x')⟩`), the supremum has a *closed form*: it's the distance between the mean embeddings, `‖E_p[φ(x)] − E_q[φ(x)]‖`. The big practical win is that **you don't have to train anything** — an unnormalized witness is `w(x') = E_p[k(x, x')] − E_q[k(x, x')]` (normalize it for the unit-ball maximizer when MMD is nonzero), and on finite samples MMD² is a simple sum of kernel evaluations over pairs of points:
 
 ```text
-MMD² ∝ (1/m(m−1)) Σ_{i≠j} [ k(x_i, x_j) + k(x'_i, x'_j) − k(x_i, x'_j) − k(x'_i, x_j) ]
+MMD²_unbiased = Σ_{i≠j}k(x_i,x_j)/[m(m−1)]
+             + Σ_{i≠j}k(z_i,z_j)/[n(n−1)]
+             − 2Σ_{i,j}k(x_i,z_j)/(mn)
 ```
 
-Pick an RBF kernel, evaluate, done — an easy-to-generate discriminator with no training loop.
+Choose a kernel and bandwidth without tuning on the final test result, then calibrate a rejection threshold, for example by permutation. This unbiased finite-sample estimate can be negative; the population MMD² is nonnegative. See the [kernel two-sample test paper](https://jmlr.org/papers/v13/gretton12a.html).
 
 **(3) Kolmogorov–Smirnov (KS) test — great for 1-D.** Restrict the witness function to bounded total variation `TV[f] ≤ 1`, and the MMD reduces to the largest gap between the two **cumulative distribution functions**:
 
@@ -197,7 +199,7 @@ sup_z | F_p(z) − F_q(z) |  =  ‖F_p − F_q‖_∞ ,    where  F_p(z) = ∫_{
 
 That sup-distance between CDFs is exactly the KS statistic. It's the natural choice for **monitoring one feature at a time** — run a KS test per scalar feature of your production stream against a training reference, and you get a cheap, interpretable per-feature drift alarm. (For high-dimensional joint shift, go back to the classifier test.)
 
-All three answer the same question — *are `X` and `X'` from the same distribution?* — and CS329P's framing is that this is the **sanity check** you run to confirm distributions match before you trust any conclusion (or trigger any correction).
+All three answer the same question — *are `X` and `X'` from the same distribution?* — and CS329P's framing is that this is evidence about differences detectable with your sample size and test. Control repeated testing, preserve temporal/group dependence, and monitor task performance when labels become available.
 
 ---
 
@@ -246,6 +248,14 @@ The contrast with §3 is the whole point of the taxonomy paying off: **covariate
 > **2026 update:** Drift monitoring is now productized infrastructure rather than something you hand-roll. **Evidently** (open-source) generates drift dashboards and test suites — per-feature statistical tests (KS, PSI, Wasserstein, chi-square) plus prediction-drift and data-quality reports — and is the common default for tabular pipelines. **NannyML** specializes in the hard, valuable case from §6: *estimating model performance on unlabeled production data* via confidence-based and BBSE-style methods, so you get an accuracy estimate before ground-truth labels land. **WhyLabs** (built on the open-source `whylogs` profiling format) does lightweight statistical profiling at scale for streaming/production telemetry without shipping raw data off-box. Cloud platforms ship it natively now — SageMaker Model Monitor, Vertex AI Model Monitoring, Azure ML data-drift monitors all run scheduled two-sample tests against a training baseline and emit alerts. The newest frontier is **LLM and embedding drift**: the inputs are unstructured text, so monitoring moved to **embedding-space drift** (MMD / classifier tests on embedding distributions — exactly §5 in a learned feature space), plus **eval drift** — tracking an LLM-judge or task-accuracy metric over time as prompts, user behavior, and an upstream model's own updates silently change the distribution under you (the spam-arms-race of §4 reborn as prompt-injection and changing usage). The CS329P mental model — *name the shift, test for it, reweight or retrain* — maps cleanly onto every one of these tools; they are productized versions of this exact lecture.
 
 ---
+
+## Worked weights and a robot failure
+
+Suppose training contains 80 nearby and 20 distant observations; deployment proportions are 40% nearby and 60% distant. Importance weights are `0.4/0.8=0.5` and `0.6/0.2=3`. Their total is 100 and squared-weight sum is `80×0.25+20×9=200`, so effective sample size is `100²/200=50`, not 100. If deployment contains a third region absent from training, weighting cannot create missing evidence there.
+
+Run the [PyTorch CPU stop-model lab](../../../2.%20Deep%20Learning%20Frameworks/PyTorch/CPU-Robot-Stop-Lab/Guide.md). A biased distance sensor changes the observation-to-label relationship; do not automatically call it pure covariate shift. Both the learned network and the analytic rule can fail because both consume that same biased observation. Independent task: explain which additional trusted sensor or calibration evidence could distinguish changed observations from changed braking dynamics.
+
+Review date: 2026-10-18. Label-shift correction additionally requires the assumptions and identifiability conditions in the [BBSE paper](https://proceedings.mlr.press/v80/lipton18a.html); it is not an unconditional repair.
 
 ## Current as of
 

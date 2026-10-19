@@ -35,9 +35,11 @@ y_{t+1}=\alpha y_t+(1-\alpha)u_{t-d}+\epsilon_t,
 
 where \(y\) is measured velocity, \(u\) is commanded velocity, and \(d\) is integer delay. This is an approximation for analysis, not a complete robot dynamics equation. Fit \(\alpha\) over candidate delays using one trajectory and compare prediction error on another. If a different input amplitude changes the fitted parameter dramatically, the linear approximation may be missing saturation, friction, or mode changes.
 
+A changing input is essential. If every sample has \(y_t=u_{t-d}=c\), then \(y_{t+1}=c\) for every \(\alpha\): the response time is unidentifiable. For a candidate delay, set \(x_t=y_t-u_{t-d}\) and \(z_t=y_{t+1}-u_{t-d}\); ordinary least squares gives \(\hat\alpha=\sum_t x_tz_t/\sum_t x_t^2\) when the denominator is nonzero. Define the stable parameter bounds and pre-history before fitting. Measurement noise in \(y_t\) also perturbs the regressor, so this basic fit is not generally an unbiased hardware estimator.
+
 For \(\alpha=0.8\) with 10 ms sampling, the equivalent first-order time constant is approximately \(-0.01/\log(0.8)=44.8\) ms. Adding a 30 ms command delay changes phase and tracking even if steady-state velocity is correct. A simulator that matches final pose but not transient response can train a policy that acts too aggressively.
 
-Use low-risk, supervised identification motions appropriate to the device and its controller. The CPU version generates data from the equation, adds seeded noise, searches candidate delays, and checks parameter recovery on held-out samples. It establishes understanding of estimation, not calibration of a real actuator.
+Use low-risk, supervised identification motions appropriate to the device and its controller. The supplied [simulation semantics CPU lab](../Isaac%20Sim%20and%20Isaac%20Lab/Simulation-CPU-Lab.md) generates data from this kind of equation, adds seeded noise, searches candidate delays, and checks prediction on a different command sequence. Its reference uses `dt=20 ms`, `τ=80 ms`, and a two-step delay; these differ deliberately from the numerical example above. Choose model/delay on fitting or validation data, then preserve an untouched command sequence for the final check. It establishes understanding of estimation, not calibration of a real actuator.
 
 ## Design domain randomization around hypotheses
 

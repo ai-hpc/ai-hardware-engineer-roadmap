@@ -20,7 +20,7 @@ An experiment can be zero-shot with respect to a task label while sharing its ob
 
 Likewise, simulator performance and physical performance have different failure distributions. A clean simulator reset can be free; a real reset can consume most of an operator's day. Deployment studies should count setup, recovery, supervision, and data collection effort alongside model execution.
 
-The RoboCasa365 leaderboard inspected for this course is dated 2026-10-13. Use it as a benchmark-specific snapshot and follow its linked protocol and artifact evidence. A table entry alone does not verify training recipe, weight access, or performance on another benchmark. [Official leaderboard](https://robocasa.ai/leaderboard.html).
+The original RoboCasa365 inspection was October 13; the [October 18 update](Current-Update-2026-10-18.md) records the current page dated October 16. Use each as a benchmark-specific snapshot and follow its linked protocol and artifact evidence. A table entry alone does not verify training recipe, weight access, or performance on another benchmark. [Official leaderboard](https://robocasa.ai/leaderboard.html).
 
 ## Worked example: uncertainty changes the conclusion
 

@@ -1,173 +1,60 @@
-# Lecture 5 - Arduino as an ESP-IDF component and the path from prototype to product
+# Lecture 5 - Arduino as an ESP-IDF component and the path to a maintainable product
 
-**Course:** [Espressif guide](../Guide.md) | **Phase 2 - Embedded Software**
+**Course:** [Espressif guide](../Guide.md) | **Previous:** [Peripheral and network boundaries](Lecture-04.md)
 
-**Previous:** [Lecture 04](Lecture-04.md)
+Use Arduino as an ESP-IDF component when an existing Arduino library is useful but you need direct control of components, configuration, partitions, or native IDF features. This is a build/integration choice. Your tested data formats, ownership rules, and failure behavior should survive the move.
 
----
+## Check the pair of versions
 
-## The most important advanced path in this ecosystem
+Reviewed 2026-10-18: the official component page documents Arduino ESP32 **3.3.12** with the **ESP-IDF 5.5** line; the stable Arduino release uses IDF **5.5.5**. Standalone IDF stable documentation is 6.1, which is not a reason to substitute it into this combination. Record exact revisions and the dependency lockfile. See [component instructions](https://docs.espressif.com/projects/arduino-esp32/en/latest/esp-idf_component.html) and [release 3.3.12](https://github.com/espressif/arduino-esp32/releases/tag/3.3.12).
 
-Espressif officially documents **Arduino as an ESP-IDF component** as the advanced integration model.
-
-This is one of the most important ideas in the entire `arduino-esp32` project because it changes the question from:
-
-> "Arduino or ESP-IDF?"
-
-to:
-
-> "How should I combine Arduino productivity with ESP-IDF control?"
-
-That is the **mature engineering question**.
-
-Official reference: [Arduino as an ESP-IDF component](https://docs.espressif.com/projects/arduino-esp32/en/latest/esp-idf_component.html)
-
----
-
-## What Espressif says about this path
-
-Espressif explicitly describes this method as:
-
-- recommended for **advanced users**
-- requiring the **ESP-IDF toolchain**
-
-Espressif also documents an important current compatibility detail:
-
-- Arduino Core ESP32 `3.3.8`
-- compatible with **ESP-IDF v5.5**
-
-That matters because **version compatibility** is part of real platform engineering.
-
----
-
-## Why you would use this model
-
-Use Arduino as an ESP-IDF component when you want:
-
-- Arduino compatibility where it helps
-- direct ESP-IDF project control
-- a more product-shaped build system
-- access to capabilities that fit better in the native Espressif workflow
-
-This model is especially useful when:
-
-- the sketch-first structure is starting to feel cramped
-- you need better control of components and configuration
-- you are integrating advanced protocol stacks or product features
-
----
-
-## Why this matters for specific chips
-
-Espressif also uses this advanced path as the documented support route for some chips and features.
-
-Important examples:
-
-- `ESP32-C2`
-- `ESP32-C61`
-
-Espressif notes these are only supported through:
-
-- Arduino as an ESP-IDF component
-- or rebuilding static libraries
-
-So this workflow is not just a power-user bonus. For some targets, it is the **correct support path**.
-
----
-
-## Important technical detail from Espressif
-
-Espressif documents that the Arduino component requires:
-
-```text
-CONFIG_FREERTOS_HZ = 1000
-```
-
-That is a good example of why component integration is real embedded engineering:
-
-- framework assumptions matter
-- RTOS configuration matters
-- version alignment matters
-
-This is far beyond the "just upload a sketch" mindset.
-
----
-
-## The practical workflow shape
-
-Espressif documents flows like:
-
-- adding the dependency
-- creating a project from an example
-
-Examples from the official docs:
+The following is a **documented build workflow**, not a claim of a build or flash executed during this revision. Activate an installed compatible IDF environment, confirm `idf.py --version`, and work in a new project directory.
 
 ```bash
-idf.py add-dependency "espressif/arduino-esp32^3.3.8"
-idf.py create-project-from-example "espressif/arduino-esp32^3.3.8:hello_world"
+idf.py create-project-from-example 'espressif/arduino-esp32==3.3.12:hello_world'
 ```
 
-The command details may evolve with future versions, but the architectural point stays the same:
+Enter the generated project directory. For a C6 board, the subsequent commands are:
 
-- Arduino becomes one component in a larger system
-- not the whole system by itself
+```bash
+idf.py set-target esp32c6
+idf.py menuconfig
+idf.py build
+idf.py size
+```
 
----
+Use the target matching your actual board. In menuconfig, select the intended Arduino entry-point mode and set `CONFIG_FREERTOS_HZ=1000` as required by this component. The exact dependency pin uses `==`; the vendor documentation's `^3.3.12` example permits compatible updates. The [Component Manager version rules](https://docs.espressif.com/projects/idf-component-manager/en/latest/reference/versioning.html) define these operators. Preserve `idf_component.yml`, `dependencies.lock`, project configuration, and tool versions so a later build can reproduce your choice.
 
-## The migration mindset
+After verifying the serial port and board, `idf.py -p YOUR_SERIAL_PORT flash monitor` performs deployment. Replace the placeholder; exit the monitor with Ctrl+]. A successful build establishes compile/link compatibility for that configuration. Boot, peripherals, radio coexistence, and timing still need separate hardware observations.
 
-A healthy way to use the Espressif stack is:
+## Choose one entry-point model
 
-### Phase 1: prove the idea quickly
+With Arduino autostart enabled, provide `setup()` and `loop()` in C++ and let the framework manage their invocation. With autostart disabled, provide `extern "C" void app_main()`, call `initArduino()` before Arduino facilities that require initialization, and own application startup explicitly. Do not define competing startup paths accidentally. Include `Arduino.h` in `.cpp` files rather than relying on sketch preprocessing.
 
-- board package
-- simple sketch
-- verify peripherals or radio behavior
+Separate application logic from framework adapters:
 
-### Phase 2: organize the firmware
+```text
+components/
+  sample_logic/    conversion, framing, validity rules; CPU-testable
+  sensor_adapter/  Wire or native IDF peripheral access
+  transport/       UART / UDP / other selected protocol
+main/              configuration and ownership wiring
+```
 
-- split modules cleanly
-- reduce hidden assumptions
-- control dependencies
+Changing adapters should not change what a timestamp means, which payloads are accepted, or how a restarted sender is identified. Move one boundary at a time and compare results against the original capture.
 
-### Phase 3: move to component-style or native-framework control
+## Treat an update as a recovery problem
 
-- when product complexity demands it
-- when chip support requires it
-- when maintainability becomes a real concern
+Before adding OTA, archive the partition table and identify which image authenticates the next stage. Receiving a file successfully is not equivalent to trusting it. A robust update flow checks the image, boots it in a trial state where supported, performs health checks, and confirms it only when the required functions work. Test interrupted downloads, invalid images, and failed health checks using the selected platform's documented recovery mechanism.
 
-This is much better than pretending a **prototype** and a **product** are the same thing.
+Similarly, “low power” is a budget: sum charge spent sampling, processing, transmitting, retrying, and sleeping. A development board's USB bridge or regulator can dominate the measured sleep current. Report measurement location, supply voltage, and workload rather than copying a chip datasheet's best-case number.
 
----
+## Migration exercise and answer checks
 
-## The engineering lesson of this course
+Move the [native C framing implementation](../../labs/Framed-Telemetry.md) into a component without changing its bytes on the wire. First rerun its host tests, then replay the same fixtures through the board transport. Keep parser failures distinct from transport failures.
 
-The deepest lesson in `arduino-esp32` is not "Arduino can do Wi-Fi."
+- **Why keep a lockfile if the manifest pins Arduino?** Its transitive dependencies also affect the build.
+- **Why not immediately migrate every library?** Each changed boundary adds uncertainty; preserve known observations and test one change at a time.
+- **Does using ESP-IDF make a system real-time?** No. Configuration, workload, ownership, scheduling, blocking, and measurement still determine whether the stated deadlines are met.
 
-It is this:
-
-> A friendly API can sit on top of a serious embedded platform, and a good engineer knows when to stay at the friendly layer and when to go deeper.
-
-That is exactly the kind of **judgment** Phase 2 should build.
-
----
-
-## Final lab
-
-Write a short transition note with three sections:
-
-1. `What Arduino gives me`
-2. `What ESP-IDF gives me`
-3. `When I would combine them instead of choosing only one`
-
-Then add one concrete product example, such as:
-
-- connected sensor node
-- smart switch
-- local gateway helper
-
-and explain which development model you would choose first and why.
-
----
-
-**Previous:** [Lecture 04](Lecture-04.md) | **Back to course hub:** [Espressif guide](../Guide.md)
+The course deliverable is a reproducible project with a boot record, one validated sensor interface, bounded communication behavior, and a recovery test. Continue to the [education exercises](../Education/Guide.md) for AI, power, and gateway project choices.

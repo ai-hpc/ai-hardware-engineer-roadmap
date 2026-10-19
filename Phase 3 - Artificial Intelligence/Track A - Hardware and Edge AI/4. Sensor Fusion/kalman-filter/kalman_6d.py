@@ -17,8 +17,6 @@ Author: Kalman Filter Learning Series
 
 import os
 import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 # Save plots next to this script
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -40,20 +38,46 @@ class KalmanFilter:
             x0: Initial state estimate (n×1)
             P0: Initial covariance estimate (n×n)
         """
-        self.F = F  # State transition
-        self.H = H  # Measurement matrix
-        self.Q = Q  # Process noise
-        self.R = R  # Measurement noise
-
-        self.x = x0  # State estimate
-        self.P = P0  # Covariance estimate
-
-        # Dimensions
-        self.n = F.shape[0]  # Number of states
-        self.m = H.shape[0]  # Number of measurements
-
-        # Identity matrix
+        F = np.asarray(F)
+        H = np.asarray(H)
+        if F.ndim != 2 or F.shape[0] == 0 or F.shape[0] != F.shape[1]:
+            raise ValueError("F must be a nonempty square matrix")
+        self.n = F.shape[0]
+        if H.ndim != 2 or H.shape[0] == 0 or H.shape[1] != self.n:
+            raise ValueError("H must have shape (measurements, states)")
+        self.m = H.shape[0]
+        self.F = self._array("F", F, (self.n, self.n))
+        self.H = self._array("H", H, (self.m, self.n))
+        self.Q = self._covariance("Q", Q, self.n)
+        self.R = self._covariance("R", R, self.m, positive=True)
+        self.x = self._array("x0", x0, (self.n, 1))
+        self.P = self._covariance("P0", P0, self.n)
         self.I = np.eye(self.n)
+
+    @staticmethod
+    def _array(name, value, shape):
+        if np.iscomplexobj(value):
+            raise ValueError(f"{name} must be real")
+        array = np.array(value, dtype=float, copy=True)
+        if array.shape != shape or not np.isfinite(array).all():
+            raise ValueError(f"{name} must be finite with shape {shape}")
+        return array
+
+    @classmethod
+    def _covariance(cls, name, value, size, positive=False):
+        array = cls._array(name, value, (size, size))
+        tolerance = 1e-12 * max(1., np.abs(array).max())
+        if not np.allclose(array, array.T, rtol=0, atol=tolerance):
+            raise ValueError(f"{name} must be symmetric")
+        array = (array + array.T) / 2
+        if np.linalg.eigvalsh(array).min() < -tolerance:
+            raise ValueError(f"{name} must be positive semidefinite")
+        if positive:
+            try:
+                np.linalg.cholesky(array)
+            except np.linalg.LinAlgError as error:
+                raise ValueError(f"{name} must be positive definite") from error
+        return array
 
     def predict(self):
         """
@@ -80,6 +104,11 @@ class KalmanFilter:
         Returns:
             x_updated, P_updated
         """
+        # Accept a flat vector explicitly; reject row matrices and broadcasting.
+        z = np.asarray(z)
+        if z.shape == (self.m,):
+            z = z[:, None]
+        z = self._array("z", z, (self.m, 1))
         # Innovation
         y = z - self.H @ self.x
 
@@ -87,7 +116,7 @@ class KalmanFilter:
         S = self.H @ self.P @ self.H.T + self.R
 
         # Kalman gain
-        K = self.P @ self.H.T @ np.linalg.inv(S)
+        K = np.linalg.solve(S.T, (self.P @ self.H.T).T).T
 
         # State update
         self.x = self.x + K @ y
@@ -95,6 +124,7 @@ class KalmanFilter:
         # Covariance update (Joseph form for numerical stability)
         I_KH = self.I - K @ self.H
         self.P = I_KH @ self.P @ I_KH.T + K @ self.R @ K.T
+        self.P = (self.P + self.P.T) / 2
 
         return self.x, self.P
 
@@ -113,6 +143,8 @@ def run_6d_tracking():
     State: [x, y, z, vx, vy, vz]
     """
 
+    import matplotlib.pyplot as plt
+
     dt = 0.1  # 10 Hz update rate
 
     # State transition matrix (constant velocity model in 3D)
@@ -128,8 +160,8 @@ def run_6d_tracking():
                   [0, 1, 0, 0, 0, 0],
                   [0, 0, 1, 0, 0, 0]])
 
-    # Process noise covariance (continuous white noise model)
-    q = 0.1  # Process noise magnitude
+    # Process noise covariance (one random acceleration held constant per time step)
+    q = 0.1  # Acceleration variance, m^2/s^4, for this discrete-step model
     Q = q * np.array([
         [dt**4/4, 0,       0,       dt**3/2, 0,       0      ],
         [0,       dt**4/4, 0,       0,       dt**3/2, 0      ],
@@ -252,7 +284,7 @@ def run_6d_tracking():
 
     # Position errors over time
     ax3 = fig.add_subplot(2, 3, 3)
-    time = np.arange(n_steps) * dt
+    time = (np.arange(n_steps) + 1) * dt
     ax3.plot(time, pos_errors, 'b-', linewidth=2)
     ax3.set_xlabel('Time (s)')
     ax3.set_ylabel('Position Error (m)')

@@ -14,6 +14,8 @@ Verilog is how you turn the digital design concepts from the previous guide into
 
 > **Language choice:** This course uses Verilog for small synthesizable blocks and introduces SystemVerilog assertions where they make a contract clearer. VHDL is another capable hardware description language; choose the language supported by your project and toolchain. Learning another HDL still requires learning its type, scheduling, and synthesis semantics. The important transferable skill is predicting hardware and checking its behavior, not memorizing syntax.
 
+**First runnable project:** after sections 1–2, try the [streaming RTL lab](../../../Phase%204%20-%20Track%20A%20-%20Xilinx%20FPGA/1.%20Xilinx%20FPGA%20Development/labs/README.md). It uses a real open-source simulator, a transaction scoreboard, and deliberate bugs to teach backpressure, reset, and saturation without a board.
+
 ---
 
 ## 1. Verilog Fundamentals
@@ -44,7 +46,7 @@ endmodule
 |-------------|----------------------------------------------|--------------------------------|
 | `wire`      | Physical connection (combinational)          | `assign`, module output, gate  |
 | `reg`       | Storage element OR combinational variable    | `always`, `initial`            |
-| `integer`   | 32-bit signed, for loops/testbenches         | Not synthesizable as hardware  |
+| `integer`   | 32-bit signed, four-state variable          | Can synthesize; explicit-width vectors make datapath intent clearer |
 | `parameter` | Named constant                               | Set at compile/instantiation   |
 | `localparam`| Named constant, cannot be overridden         | Internal to module             |
 
@@ -82,7 +84,7 @@ Format: `<width>'<radix><value>`
 8'd163           // 8-bit decimal
 32'hDEAD_BEEF    // 32-bit hex
 4'b1             // 4-bit = 4'b0001 (zero-padded)
--8'd5            // 8-bit negative = two's complement of 5
+-8'sd5           // signed 8-bit literal, then unary minus
 ```
 
 **Four-value logic:** every bit can be `0`, `1`, `x` (unknown), or `z` (high-impedance/undriven).
@@ -92,20 +94,20 @@ Format: `<width>'<radix><value>`
 8'bzzzz_zzzz     // tri-state (all high-Z)
 ```
 
-`x` propagation is the #1 source of simulation bugs. If you see `x` in your waveform, something is undriven or uninitialized — track it down.
+An `x` can come from uninitialized state, conflicting drivers, an unknown input, or an operation involving unknown values. Trace the first source instead of forcing the waveform to zero. Four-state simulation models uncertainty; physical hardware does not store a special `x` voltage. Width and signedness affect expressions: `8'd5` is unsigned, while `8'sd5` is signed.
 
 ### 1.4 Operators
 
 | Category     | Operators                             | Notes                          |
 |-------------|---------------------------------------|--------------------------------|
-| Arithmetic  | `+`, `-`, `*`, `/`, `%`              | `/` and `%` may not synthesize |
+| Arithmetic  | `+`, `-`, `*`, `/`, `%`              | Synthesis support/cost depend on tool, types, and constants |
 | Relational  | `<`, `>`, `<=`, `>=`                 | Result is 1-bit               |
-| Equality    | `==`, `!=`                            | `x` in either operand → `x` result |
-| Case equal  | `===`, `!==`                         | Compares x/z literally (sim only) |
+| Equality    | `==`, `!=`                            | Unknown bits can make the result unknown |
+| Case equal  | `===`, `!==`                         | Compares x/z literally; useful in simulation checkers |
 | Logical     | `&&`, `\|\|`, `!`                    | Result is 1-bit               |
 | Bitwise     | `&`, `\|`, `^`, `~`, `~^`           | Bit-by-bit                    |
 | Reduction   | `&a`, `\|a`, `^a`, `~&a`, `~\|a`    | Reduce vector to 1 bit        |
-| Shift       | `<<`, `>>`, `<<<`, `>>>`            | `>>>` is arithmetic (sign-extend) |
+| Shift       | `<<`, `>>`, `<<<`, `>>>`            | `>>>` sign-extends only when its left operand is signed |
 | Concatenation | `{a, b}`, `{4{a}}`                | `{4{1'b0}}` = `4'b0000`      |
 | Conditional | `cond ? a : b`                       | Synthesizes to MUX             |
 
@@ -177,7 +179,7 @@ module alu (
             3'b010: result = a + b;       // ADD
             3'b110: result = a - b;       // SUB
             3'b111: result = (a < b) ? 32'd1 : 32'd0;  // SLT
-            default: result = 32'bx;      // undefined
+            default: result = 32'd0;      // explicit fallback for unsupported op
         endcase
         zero = (result == 32'd0);
     end
@@ -188,6 +190,8 @@ endmodule
 - Use `always @(*)` — the `*` auto-includes all read signals in the sensitivity list
 - Assign EVERY output in EVERY branch (or use `default`) — incomplete assignment creates a latch (unintended memory)
 - Use blocking assignment `=` (executes in order, like software)
+
+The fallback above returns zero; a larger ALU should also expose an `illegal_op` indication if its caller needs to reject unsupported operations. Assigning `x` can become a synthesis don't-care and hide behavior that software relies on. Use explicit numeric/interface contracts. Integer variables are supported by synthesis tools, but inferred width and resource use still need inspection; see [Vivado integer types](https://docs.amd.com/r/en-US/ug901-vivado-synthesis/Integer-Data-Types).
 
 **Sequential logic — `always @(posedge clk)`:**
 

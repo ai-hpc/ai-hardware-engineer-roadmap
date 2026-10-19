@@ -174,12 +174,12 @@ RLPD (Ball, Smith, Kostrikov, Levine, 2023) asks whether a standard off-policy m
 ```text
 SAC, from scratch (no offline pre-training), plus:
   1. symmetric sampling — every batch is 50% offline data, 50% online data
-  2. LayerNorm in the critic — bounds how far Q can extrapolate to unseen actions
+  2. LayerNorm in the critic — controls feature scale; it does not certify unseen-action values
   3. an ensemble of critics with a pessimistic min over a random subset (REDQ-style)
   4. high update-to-data ratio — many gradient steps per environment step
 ```
 
-Symmetric sampling fixes the buffer imbalance by construction. LayerNorm addresses Section 2.2's extrapolation without an explicit conservatism term. High UTD extracts more learning per expensive online sample. Because it skips offline pre-training entirely, there is no pre-trained conservative critic to "un-learn," so there is no dip of the CQL kind — though the early online phase still depends on how good the offline data is.
+Symmetric sampling fixes the buffer imbalance by construction. LayerNorm addresses Section 2.2's extrapolation without an explicit conservatism term. High UTD extracts more learning per expensive online sample. Because it skips offline pre-training entirely, there is no pre-trained conservative critic to "un-learn," which avoids that specific pretraining-to-online transition. It does not guarantee monotonic online improvement or remove dependence on data quality.
 
 > **Robot connection.** For the arm, RLPD is the natural "reuse all old runs" algorithm: drop every demo, every failed rollout, and every previous policy's episodes into the offline half of the batch, and train online in sim with the other half. It needs an actor whose action log-probs or reparameterized samples are available (it is SAC underneath). For a flow-matching π0.5, that is the obstacle Section 7 deals with.
 
@@ -195,7 +195,7 @@ A flow-matching policy ([Lecture 03](Lecture-03.md)) generates an action chunk b
 | **FQL** (Park, Li, Levine, 2025) | Flow BC policy + a separate **one-step** policy trained to maximize Q while staying close to the flow policy's output | BC only; the one-step policy does the RL | One forward pass | The one-step policy *is* the deployable network |
 | **DSRL** (Wagenmaker et al., 2025) | A small policy over the **input noise** \(w\) of a frozen diffusion/flow policy | Frozen; black-box access only | Noise policy + base policy | Needs distillation |
 
-**IDQL — sample, then let the critic choose.** Draw \(N\) candidate actions from the behavior-cloned diffusion policy and select among them using weights from the critic (the paper reinterprets IQL's critic as defining an implicit actor and importance-resamples toward it). Every candidate is in-distribution by construction, because it comes from the BC model. This is critic-guided sample-and-rank, the continuous-action version of [Lecture 07](Lecture-07.md)'s "sample many moves, keep the best."
+**IDQL — sample, then let the critic choose.** Draw \(N\) candidate actions from the behavior-cloned diffusion policy and select among them using weights from the critic (the paper reinterprets IQL's critic as defining an implicit actor and importance-resamples toward it). Candidates come from the learned behavior model, which can still assign probability to unsupported actions, especially at unfamiliar states. This is a modeling restriction, not a guarantee of dataset support. This is critic-guided sample-and-rank, the continuous-action version of [Lecture 07](Lecture-07.md)'s "sample many moves, keep the best."
 
 **FQL — a fast helper that stays close to the flow.** Train the flow policy \(\mu_\phi(s, w)\) with ordinary flow matching on the data. Separately train a one-step network \(\mu_\omega(s, w)\) with
 
@@ -205,7 +205,7 @@ $$
 
 where \(\mu_\phi(s, w)\) means "integrate the flow from noise \(w\)." The distillation term keeps the one-step policy's outputs near what the expressive flow would have produced *for the same noise*; the Q term pushes it toward higher value. No gradient flows through the integration loop, and at test time there is no iterative generation at all.
 
-**DSRL — steer the noise, not the action.** Treat the frozen flow policy as a deterministic map \(w \mapsto a = \mu_\phi(s, w)\) and run RL over \(w\): a small actor \(\pi_\psi(w \mid s)\) chooses the noise, the base policy turns it into an action chunk. The output is always something the base policy can produce, so it stays a sensible movement. The base weights are never modified, training needs only forward passes of the base model, and any off-policy algorithm (SAC in noise space) works. Keep \(w\) inside a bounded range (for example, tanh-scaled to a few standard deviations), otherwise the actor will find noise vectors the base policy never saw in training — the OOD problem again, moved into noise space.
+**DSRL — steer the noise, not the action.** Treat the frozen flow policy as a deterministic map \(w \mapsto a = \mu_\phi(s, w)\) and run RL over \(w\): a small actor \(\pi_\psi(w \mid s)\) chooses the noise, the base policy turns it into an action chunk. The output belongs to the frozen generator's image, but that set can include poor or unsupported movements. Frozen weights do not establish a safety or data-manifold guarantee. The base weights are never modified, training needs only forward passes of the base model, and any off-policy algorithm (SAC in noise space) works. Keep \(w\) inside a bounded range (for example, tanh-scaled to a few standard deviations), otherwise the actor will find noise vectors the base policy never saw in training — the OOD problem again, moved into noise space.
 
 ### 7.1 Bake it back into the weights
 

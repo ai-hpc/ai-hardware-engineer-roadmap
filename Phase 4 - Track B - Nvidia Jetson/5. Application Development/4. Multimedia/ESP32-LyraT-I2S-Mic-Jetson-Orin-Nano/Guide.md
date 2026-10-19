@@ -1,4 +1,4 @@
-# ESP32-LyraT I2S Microphone Capture on Jetson Orin Nano - Application Guide
+# LyraT to Jetson I2S: a clock contract and a historical capture
 
 <div class="course-identity auto-course" style="--course-accent: #16a34a; --course-accent-rgb: 22, 163, 74;" markdown="1">
 <div class="course-identity__icon">ELIM</div>
@@ -9,693 +9,118 @@
 </div>
 </div>
 
+**Reviewed 18 October 2026.** This hardware case explains how an ESP32-LyraT V4.3 can expose an ES8388 microphone stream to a Jetson Orin Nano reference carrier. It preserves a reported May 2026 experiment without claiming that the firmware is bundled, currently reproduced, or bit-exact.
 
-> **Goal:** Use an **ESP32-LyraT audio dev kit** as a practical I2S microphone/audio frontend for the **Jetson Orin Nano 8GB / Super Developer Kit** 40-pin header, so you can test Jetson I2S capture, AHUB routing, and JetPack audio debugging before designing a custom microphone board.
+Begin with the [audio foundation](../Jetson-Audio-Setup-and-Development/Guide.md) and complete the [actual CPU audio lab](../Jetson-Audio-Setup-and-Development/CPU-Audio-Lab.md). That path has runnable code and tests. The physical integration below is an advanced extension requiring the exact board, complete firmware source and a matching Jetson BSP.
 
-**Hub:** [Multimedia](../Guide.md)  
-**Audio foundation:** [Jetson Audio Setup and Development](../Jetson-Audio-Setup-and-Development/Guide.md)
-
----
-
-## 1. What this application is testing
-
-This is not a normal "plug in a USB mic" test.
-
-This application tests the real embedded-audio path:
+## 1. Understand the two buses
 
 ```text
-microphone frontend
-  -> codec / ADC
-  -> I2S serial audio
-  -> Jetson 40-pin header I2S2
-  -> AHUB / ADMAIF
-  -> ALSA capture
-  -> recording, ASR, wake-word, or voice pipeline
+ESP32 ── I2C control ──> ES8388 registers
+microphones ──> ES8388 ADC ── I2S samples ──> Jetson I2S2 DIN
+ESP32 ── BCLK/LRCK and codec MCLK ──> configured receivers
 ```
 
-The ESP32-LyraT is useful here because it already has:
+I2C configures the codec; it does not carry the microphone samples. In this architecture the ESP32 owns codec initialization and generates the sample clocks. Jetson consumes those clocks and captures the codec's digital output. Reading samples into ESP32 DMA is a useful observation, but Jetson can listen to the same data line independently.
 
-- onboard microphones
-- an `ES8388` audio codec
-- an exposed I2S header
-- ESP-ADF examples for configuring the board-side audio path
+Keep one owner for each driven signal and codec-control path. Connecting two clock outputs together is not a synchronization method. If Jetson is to own the codec instead, design the control and pin-isolation changes explicitly rather than leaving both processors active.
 
-The important correction:
+## 2. Verify the precise board and source
 
-> Audio is not carried over I2C. On the LyraT, I2C controls the codec registers. The audio samples move over I2S.
+The checked ESP-ADF `release/v2.x` revision is `d6e1ef5ccf29ca52dcb8332a3232505366755012` (31 August 2026). Its LyraT V4.3 board pin function specifies MCLK GPIO0, BCLK GPIO5, WS GPIO25, data out GPIO26 and data in GPIO35. The directions are from the **ESP32** perspective. GPIO35 receives the codec's ADC output. [Pinned board source](https://github.com/espressif/esp-adf/blob/d6e1ef5ccf29ca52dcb8332a3232505366755012/components/audio_board/lyrat_v4_3/board_pins_config.c).
 
-So if you say "I2C mic" in this project, usually you mean one of these:
+The official hardware guide has moved to the [multimedia boards documentation](https://docs.espressif.com/projects/esp-adf/en/latest/multimedia-boards/dev-boards/board-esp32-lyrat-v4.3.html). Match the printed board revision and schematic before using JP4 names. Other LyraT variants are separate designs.
 
-- **I2S microphone / I2S audio stream:** digital audio data path
-- **I2C-controlled codec:** control path for a codec such as `ES8388`
+This source inspection confirms pin definitions; it does not establish the exact firmware that produced the historical recording. A branch name is also insufficient for reproduction: record the ADF commit, IDF commit, submodules, component lock and configuration.
 
----
+## 3. Wire the capture direction only
 
-## 2. Recommended first architecture
+Power down before wiring, use the specified logic levels and share ground. For the stated V4.3/reference-carrier configuration:
 
-Use the LyraT as the audio frontend and let the ESP32 side configure the codec.
+| LyraT JP4 signal | ESP32 connection | Jetson 40-pin connection | Driver |
+|---|---|---|---|
+| SCLK/BCLK | GPIO5 | pin 12, I2S2 SCLK | ESP32 |
+| LRCK/WS | GPIO25 | pin 35, I2S2 FS | ESP32 |
+| ASDOUT | GPIO35 input | pin 38, I2S2 DIN | ES8388 ADC |
+| GND | ground | pin 6 or another verified ground | shared reference |
 
-```text
-ESP32-LyraT
-  onboard mics
-      |
-      v
-  ES8388 codec / ADC
-      |
-      | I2S clocks + ADC data on JP4
-      v
-Jetson Orin Nano 40-pin header
-  I2S2 DIN / SCLK / FS
-      |
-      v
-Jetson AHUB -> ADMAIF1 -> ALSA arecord
-```
+MCLK GPIO0 may be essential to the **codec** even when no MCLK wire goes to Jetson. Keep Jetson's header 7 MCLK disconnected in this capture arrangement. The reference carrier's I2S2 pins are documented in the [versioned NVIDIA audio guide](https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/SD/Communications/AudioSetupAndDevelopment.html#board-interfaces).
 
-This is the lowest-risk bring-up model because:
+Leave Jetson pin 40 DOUT disconnected. LyraT's DSDIN is already attached to ESP32 GPIO26, normally an output: adding Jetson playback to that net can create two drivers. A playback extension requires isolating or explicitly disabling the existing driver and validating the new route.
 
-- ESP32-LyraT already knows how to initialize the `ES8388`
-- Jetson only has to prove that it can receive I2S
-- you avoid fighting two hosts trying to control the same codec over I2C
+## 4. Make the clock and framing contract explicit
 
-Later, for a real product, replace the LyraT with a dedicated codec or ADC board that Jetson controls directly.
+For a candidate 48 kHz stereo stream, specify all of these independently:
 
----
+- 48,000 LRCK frames/s, and which device drives LRCK/BCLK.
+- Two slots; actual wire slot width, which may exceed the 16 valid bits.
+- Philips I2S versus left-justified framing, data delay and clock edge.
+- Left/right slot assignment and sign/bit alignment.
+- Codec MCLK and ADC configuration, including input selection and gain.
+- Jetson's memory format, for example stereo S16_LE after any driver conversion.
 
-## 3. What not to do first
+With two 16-bit wire slots, BCLK is `48,000 × 2 × 16 = 1.536 MHz`. With two 32-bit slots it is `3.072 MHz`. A stereo S16_LE application stream is 192,000 bytes/s in either case. A DMA byte count therefore does not identify wire slot width or prove oscillator accuracy.
 
-Do not start by trying to make Jetson directly control the LyraT `ES8388` over I2C.
+ESP-IDF's current channel API and legacy I2S driver are distinct interfaces. An ADF revision may wrap one of them. Use the API and configuration corresponding to the pinned project; combining old `i2s_config_t` fragments with new channel handles is not a working port. [ESP-IDF 5.5.4 I2S reference](https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32/api-reference/peripherals/i2s.html).
 
-That path is possible in theory, but it is a poor first test because:
+## 5. Know which firmware is actually available
 
-- the `ES8388` is already wired to the ESP32 on the LyraT
-- the ESP32 firmware normally owns codec initialization
-- Jetson would need an ASoC codec driver and machine-driver binding
-- two hosts on the same codec control path can conflict
-- you may need board rework or firmware changes to fully tri-state the ESP32 side
+The old course referenced a local project named `lyrat_jp4_passthrough` under `esp-adf/examples/recorder/`. That project and its binary are **not included in this repository**. The upstream [minimal capture example request, issue 1607](https://github.com/espressif/esp-adf/issues/1607), was still open at this review. Do not run a flash command with invented artifact paths or infer that a successful upstream build contains this custom application.
 
-For first bring-up, treat the LyraT like a configured I2S audio source.
+A reproducible implementation must configure the V4.3 board and ES8388 microphone ADC, start the selected I2S clock/receive path, drain buffers if that driver requires it, and expose the intended JP4 signals. Retain the source/configuration and inspect the resulting waveforms. Build and flash using that project's generated instructions and partition layout, not hardcoded offsets copied from another build.
 
----
+**Learner design exercise:** list the initialization order, source revision, signal ownership, format and observations needed before connecting Jetson. A correct answer includes codec register configuration, I2S clock start, a known audio stimulus, measured BCLK/LRCK, and a sample-format check. Writing a new driver is outside the beginner completion path.
 
-## 4. Hardware prerequisites
+## 6. Bring up Jetson in observable stages
 
-- Jetson Orin Nano 8GB / Super Developer Kit
-- JetPack 6.x / L4T 36.x or newer
-- ESP32-LyraT V4.3 or similar LyraT variant
-- USB cable for powering and flashing the LyraT
-- jumper wires
-- logic analyzer or oscilloscope, strongly recommended
-- optional powered speakers or headphones for LyraT-side sanity tests
+Use the installed BSP's pinmux/device-tree workflow, not a generic “JetPack 6 or newer” promise. Configure I2S2 as the consumer of external clocks and validate the required DAI format. The old `cbm-cfm` terminology describes the codec-side clock provider in that binding; confirm the exact current binding rather than treating the text as a universal mixer value.
 
-Voltage rule:
+1. Discover the actual ALSA APE card and capture PCM with `arecord -l` and `arecord -L`.
+2. Inspect available controls and establish the configured I2S2→ADMAIF route described in the [audio lesson](../Jetson-Audio-Setup-and-Development/Guide.md).
+3. Verify the source clocks and waveform at the Jetson pins. An ALSA card or mixer control can exist before this physical path works.
+4. Negotiate the actual rate/channel/container format, capture a known stimulus, and retain kernel/ALSA XRUN logs.
+5. Decode the recording and check each channel separately. A clip that is audible can still have swapped channels or repeated samples.
 
-> Jetson 40-pin header signals are 3.3 V logic. Do not connect 5 V UART/I2S/control signals.
-
-The LyraT I2S header signals are ESP32-side 3.3 V logic, so direct signal wiring is reasonable. Still share ground.
-
----
-
-## 5. Jetson 40-pin I2S2 pins
-
-For the Orin Nano developer kit 40-pin header, the audio guide uses the header-exposed `I2S2` path:
-
-| Jetson function | 40-pin header pin | Direction in this test |
-|---|---:|---|
-| `I2S2_SCLK` / bit clock | `12` | LyraT -> Jetson if LyraT is master |
-| `I2S2_FS` / LRCK / frame sync | `35` | LyraT -> Jetson if LyraT is master |
-| `I2S2_DIN` | `38` | LyraT audio data -> Jetson |
-| `I2S2_DOUT` | `40` | Jetson playback data -> LyraT, optional |
-| `AUD_MCLK` | `7` | optional; do not connect for first capture test |
-| `GND` | `6`, `9`, `14`, etc. | common ground |
-
-For microphone capture, the minimum useful wiring is:
-
-```text
-LyraT bit clock  -> Jetson pin 12
-LyraT LRCK       -> Jetson pin 35
-LyraT ADC data   -> Jetson pin 38
-LyraT GND        -> Jetson GND
-```
-
-Do not connect both sides as clock masters. If LyraT drives `SCLK` and `LRCK`, Jetson must be configured as the I2S clock slave for that DAI link.
-
----
-
-## 6. ESP32-LyraT JP4 I2S header
-
-Espressif documents the LyraT V4.3 I2S header `JP4` as exposing the board I2S signals:
-
-| LyraT JP4 signal | ESP32 pin | Meaning for this test |
-|---|---|---|
-| `MCLK` | `GPIO0` | master clock; usually leave unconnected for first Jetson capture test |
-| `SCLK` | `GPIO5` | I2S bit clock |
-| `LRCK` | `GPIO25` | I2S left/right frame clock |
-| `DSDIN` | `GPIO26` | data into ES8388 DAC, useful for playback into LyraT |
-| `ASDOUT` | `GPIO35` | ADC data out from ES8388, useful for mic capture into Jetson |
-| `GND` | `GND` | common reference |
-
-For capture from LyraT microphones into Jetson:
-
-| LyraT signal | Jetson signal | Jetson pin |
-|---|---|---:|
-| `SCLK` | `I2S2_SCLK` | `12` |
-| `LRCK` | `I2S2_FS` | `35` |
-| `ASDOUT` | `I2S2_DIN` | `38` |
-| `GND` | `GND` | `6` / `9` / `14` |
-
-Optional playback direction:
-
-| Jetson signal | LyraT signal | Purpose |
-|---|---|---|
-| `I2S2_DOUT` pin `40` | `DSDIN` | send Jetson audio into LyraT DAC |
-
-Keep playback disconnected until capture works.
-
----
-
-## 7. Bring-up plan
-
-Use this order. It prevents chasing software routing while the wire-level clocks are still wrong.
-
-1. Prove Jetson internal audio routing.
-2. Prove LyraT microphones and codec work on the LyraT side.
-3. Make LyraT output a stable I2S mic stream — see [§9 reference firmware `lyrat_jp4_passthrough`](#reference-firmware-lyrat_jp4_passthrough-verified) and [§14 verified result](#verified-test-result-lyrat-side-2026-05-11) for a known-good control.
-4. Verify `SCLK`, `LRCK`, and `ASDOUT` on a scope or logic analyzer.
-5. Enable Jetson 40-pin `I2S2` pinmux.
-6. Configure Jetson audio route from `I2S2` to `ADMAIF1`.
-7. Record raw audio with `arecord`.
-8. Only then add GStreamer, wake-word, ASR, or beamforming.
-
----
-
-## 8. Jetson-side setup
-
-### Confirm JetPack and ALSA devices
+A bounded capture command, after identifying a compatible configured PCM:
 
 ```bash
-cat /etc/nv_tegra_release
-uname -a
-
-aplay -l
-arecord -l
-amixer -c APE controls | grep -E 'I2S2|ADMAIF'
+read -r -p 'Configured ALSA capture PCM: ' CAPTURE_PCM
+arecord -D "$CAPTURE_PCM" --dump-hw-params -d 1 -r 48000 -c 2 -f S16_LE /tmp/lyrat-probe.wav
+arecord -D "$CAPTURE_PCM" -d 5 -r 48000 -c 2 -f S16_LE lyrat.wav
 ```
 
-If `APE` does not exist, stop and fix the Jetson audio stack before wiring external hardware.
+These commands were syntax-checked only. Neither current Jetson capture nor firmware flashing was performed during this course review.
 
-### How to read a healthy JetPack 6 / R36 baseline
+## 7. Interpret the historical evidence accurately
 
-If your Jetson shows output like this:
+The earlier course recorded a **reported 11 May 2026** LyraT V4.3 experiment with custom `lyrat_jp4_passthrough` firmware, ESP-ADF `release/v2.x` and ESP-IDF 5.5.3. It reported audible speech on Jetson and the following file statistics. The original binary/source and WAV are not bundled, so these observations cannot be independently remeasured here.
 
-- `card 1: APE [NVIDIA Jetson Orin Nano APE]`
-- capture and playback devices for `ADMAIF1` through `ADMAIF20`
-- mixer controls such as `I2S2 Mux`, `I2S2 codec frame mode`, `I2S2 codec master mode`, and `ADMAIF1 Mux`
-
-that is a good sign.
-
-It means:
-
-- the `APE` sound card is present
-- the AHUB / ADMAIF fabric is registered
-- the `I2S2` driver is exposed to ALSA
-- `hw:APE,0` maps to `ADMAIF1`, which is the first practical external capture endpoint
-
-It does **not** mean the external header capture path is already working.
-
-You still need:
-
-- `I2S2` enabled on the 40-pin header
-- the correct master/slave clock relationship
-- the correct route from `I2S2` into `ADMAIF1`
-- actual `BCLK`, `LRCK`, and data on the wires
-
-### Enable 40-pin I2S2 pinmux
-
-Use Jetson-IO if your image supports it:
-
-```bash
-sudo /opt/nvidia/jetson-io/jetson-io.py
-```
-
-Select the 40-pin header configuration that enables `I2S2`, save the overlay, and reboot.
-
-After reboot:
-
-```bash
-amixer -c APE controls | grep I2S2
-```
-
-### Internal loopback first
-
-Before using the LyraT, prove that Jetson-side routing is alive:
-
-```bash
-amixer -c APE cset name="I2S2 Mux" "ADMAIF1"
-amixer -c APE cset name="ADMAIF1 Mux" "I2S2"
-amixer -c APE cset name="I2S2 Loopback" "on"
-
-aplay -D hw:APE,0 test.wav &
-arecord -D hw:APE,0 -r 48000 -c 2 -f S16_LE jetson-i2s2-loopback.wav
-```
-
-This does not prove the external pins work. It proves the AHUB route is sane.
-
----
-
-## 9. LyraT-side setup
-
-On the LyraT, use ESP-ADF or ESP-IDF firmware that:
-
-- initializes the `ES8388`
-- selects the onboard microphone input
-- configures sample rate, usually `48000`
-- configures stereo or mono capture
-- drives I2S clocks consistently
-- leaves the ADC data visible on `ASDOUT`
-
-For the first Jetson test, choose a boring format:
-
-| Parameter | Recommended first value |
+| Reported observation | What it supports |
 |---|---|
-| Sample rate | `48000` Hz |
-| Channels | `2` |
-| Sample format | `S16_LE` or 16-bit samples inside 32-bit I2S slots |
-| Clock role | LyraT master, Jetson slave |
-| Data source | LyraT onboard microphone path through `ES8388` ADC |
+| 5.000 s, 48 kHz, stereo S16_LE | A declared format and duration |
+| 480,000 scalar sample values | 240,000 stereo frames, if reported as interleaved samples |
+| 960,044 bytes total | Consistent with 960,000 PCM bytes plus a minimal 44-byte header |
+| Peak amplitude 0.233582; RMS 0.021088 | Digital amplitude statistics of that clip |
+| Mean amplitude −0.000075 | That clip's mean; not a calibrated analog offset measurement |
+| Speech reportedly audible | A useful functional listening observation |
 
-Expected wire-level clocks for a common stereo 48 kHz setup:
+WAV headers are not always 44 bytes; metadata and format chunks can differ. A valid file of the expected length does not prove zero lost samples: dropped samples can be replaced, repeated or concealed. An XRUN-free log is stronger evidence for that driver path, but bit-exact transport still needs a known sequence/reference.
 
-| Signal | Expected behavior |
+The recorded RMS corresponds to about `20 log10(0.021088) = −33.5 dBFS` using a full-scale amplitude of 1. It is not microphone SPL or SNR. SNR requires an appropriate signal/noise measurement; SoX's “rough frequency” is not a reliable speech fundamental-frequency estimator.
+
+Reported ESP32 per-second byte counters fluctuated around the expected 192,000 bytes/s. Buffer granularity, scheduling intervals and measurement windows can explain differences, but only clock/timestamp measurements can distinguish them from actual rate error. The counts do not prove a stable physical clock.
+
+## 8. Strengthen the experiment
+
+| Claim | Evidence needed |
 |---|---|
-| `LRCK` | 48 kHz |
-| `SCLK` | commonly 1.536 MHz or 3.072 MHz depending on slot width |
-| `ASDOUT` | toggles when microphone signal is active |
-
-If `LRCK` or `SCLK` is not present, Jetson cannot capture anything.
-
-### Reference firmware: `lyrat_jp4_passthrough` (verified)
-
-A minimal, capture-only ESP-ADF firmware that satisfies all of the requirements above is available in the local `esp-adf` working tree:
-
-```
-esp-adf/examples/recorder/lyrat_jp4_passthrough/
-├── CMakeLists.txt
-├── Makefile
-├── main/
-│   ├── CMakeLists.txt
-│   └── lyrat_jp4_passthrough.c
-├── partitions_passthrough_example.csv
-├── sdkconfig.defaults
-└── sdkconfig.defaults.esp32
-```
-
-What it does, in 90 lines of C:
-
-1. `audio_board_init()` — uses the in-tree `lyrat_v4_3` board config; pin map at `components/audio_board/lyrat_v4_3/board_pins_config.c` (no overrides needed).
-2. `audio_hal_ctrl_codec(... ENCODE, START)` — puts ES8388 into ADC mode driving ASDOUT/`GPIO35`.
-3. Builds an `i2s_stream` reader at 48 kHz / 16-bit / stereo / Philips, master role.
-4. `raw_stream` sink + a small drain task discards bytes — the firmware exists only to keep `BCLK`/`LRCK` alive and the codec ADC pushing data on the JP4 bus. Jetson is the actual consumer.
-5. Logs `rate=N B/s (expected=192000 B/s)` every 2 s as a runtime canary.
-
-Why the drain sink matters: ESP-ADF's `i2s_stream` reader will stall (and stop the I2S clocks) if no one consumes the ringbuffer. A tiny bytes-to-`/dev/null` task is the simplest way to guarantee the bus stays live.
-
-**Upstream tracking:** [`espressif/esp-adf#1607`](https://github.com/espressif/esp-adf/issues/1607) (feature request to merge this example upstream).
-
-**Build (macOS / Linux):**
-
-```bash
-# One-time host prereqs (macOS)
-brew install cmake ninja dfu-util
-cd esp-adf/esp-idf && ./install.sh esp32
-
-# Build
-cd esp-adf/esp-idf && . ./export.sh
-export ADF_PATH=$(realpath ..)
-cd ../examples/recorder/lyrat_jp4_passthrough
-idf.py set-target esp32 build
-```
-
-**Flash artifacts produced** (offsets fixed by the project's `partitions_passthrough_example.csv`):
-
-| File | Offset |
-|---|---|
-| `build/bootloader/bootloader.bin` | `0x1000` |
-| `build/partition_table/partition-table.bin` | `0x8000` |
-| `build/lyrat_jp4_passthrough.bin` | `0x10000` |
-
-**Flash from a Windows host** (one USB micro-B cable to LyraT — auto-bootloader works; the CP2102N enumerates as `COMx`):
-
-```powershell
-pip install esptool
-python -m esptool --chip esp32 -p COM3 -b 460800 erase_flash
-python -m esptool --chip esp32 -p COM3 -b 460800 write_flash --flash_mode dio --flash_size detect --flash_freq 80m 0x1000 build\bootloader\bootloader.bin 0x8000 build\partition_table\partition-table.bin 0x10000 build\lyrat_jp4_passthrough.bin
-```
-
-Espressif's "Flash Download Tool" GUI works too, but two gotchas have bitten this exact bring-up:
-
-- Each file row has a **checkbox on the left** — if unchecked, the row is silently skipped. Symptom: `START` finishes in milliseconds and the board boots an unrelated firmware (e.g. the factory Bluetooth speaker demo).
-- Stale offsets autofill from previous sessions. If `partition-table.bin` is missing or its offset is wrong, the bootloader loops with `flash_parts: partition 0 invalid magic number 0x...` / `Failed to verify partition table`. Re-typing all three offsets and using **EraseAll** once recovers it.
-
-`esptool` from PowerShell makes both classes of mistake impossible — the offsets are explicit on the command line.
-
----
-
-## 10. External capture on Jetson
-
-Once the LyraT is generating clocks and ADC data, route Jetson capture:
-
-```bash
-amixer -c APE cset name="I2S2 Loopback" "off"
-amixer -c APE cset name="I2S2 codec frame mode" "i2s"
-amixer -c APE cset name="I2S2 codec master mode" "cbm-cfm"
-amixer -c APE cset name="I2S2 Sample Rate" "48000"
-amixer -c APE cset name="I2S2 Capture Audio Channels" "2"
-amixer -c APE cset name="I2S2 Client Channels" "2"
-amixer -c APE cset name="I2S2 Capture Audio Bit Format" "16"
-amixer -c APE cset name="I2S2 Client Bit Format" "16"
-amixer -c APE cset name="ADMAIF1 Capture Audio Channels" "2"
-amixer -c APE cset name="ADMAIF1 Capture Client Channels" "2"
-amixer -c APE cset name="ADMAIF1 Mux" "I2S2"
-```
-
-Try a conservative capture:
-
-```bash
-arecord -D hw:APE,0 -r 48000 -c 2 -f S16_LE lyrat-i2s-capture.wav
-```
-
-Inspect the file:
-
-```bash
-file lyrat-i2s-capture.wav
-aplay lyrat-i2s-capture.wav
-```
-
-If playback is silent, inspect signal level:
-
-```bash
-sox lyrat-i2s-capture.wav -n stat
-```
-
-Why these settings matter:
-
-- `I2S2 codec frame mode = i2s` matches the normal LyraT `ES8388` I2S framing
-- `I2S2 codec master mode = cbm-cfm` means the external board is clock master and Jetson is the slave
-- `ADMAIF1 Mux = I2S2` routes external `I2S2` receive data into `hw:APE,0`
-- the channel and bit-format settings keep the I2S CIF side and ADMAIF side aligned
-
-If your LyraT firmware sends 32-bit slots with 16-bit valid microphone samples, try this second variant:
-
-```bash
-amixer -c APE cset name="I2S2 Capture Audio Bit Format" "32"
-amixer -c APE cset name="I2S2 Client Bit Format" "32"
-arecord -D hw:APE,0 -r 48000 -c 2 -f S32_LE lyrat-i2s-capture-32.wav
-```
-
-If you intentionally redesign the test so Jetson drives `BCLK` and `LRCK`, reverse the clock-role assumption and change:
-
-```bash
-amixer -c APE cset name="I2S2 codec master mode" "cbs-cfs"
-```
-
-Useful quick checks:
-
-- silence with no clocks: wiring or LyraT firmware problem
-- silence with clocks: I2S data line, codec gain, or route problem
-- distorted audio: bit depth, slot width, or master/slave mismatch
-- one channel dead: codec input route or channel ordering problem
-
----
-
-## 11. Important limitation: this may need a real ASoC binding
-
-Jetson audio is not just "GPIO plus arecord."
-
-For a robust external I2S capture card, Jetson normally needs:
-
-- `I2S2` pinmux as SFIO
-- an enabled `i2s2` controller
-- a sound-card DAI link
-- codec or dummy-codec binding
-- correct master/slave clock configuration
-- correct sample format and TDM/I2S settings
-
-If you only use mixer commands and `arecord`, you may reach the limit of what the default Jetson sound card exposes. That is normal.
-
-For a production board, use the full path from the audio deep dive:
-
-```text
-device tree overlay
-  -> codec or dummy-codec node
-  -> DAI link for I2S2
-  -> AHUB route
-  -> ALSA PCM
-```
-
----
-
-## 12. Direct Jetson control of LyraT `ES8388`
-
-This is the advanced path, not the first bring-up path.
-
-It would look like this:
-
-```text
-Jetson I2C -> ES8388 control registers
-Jetson I2S2 <-> ES8388 I2S audio
-ESP32 side disabled or kept from driving the same bus
-```
-
-Why it is hard:
-
-- the LyraT was designed for ESP32 to own the codec
-- the ESP32 and `ES8388` are already connected
-- Jetson and ESP32 must not both drive I2C/I2S
-- Linux must have a working `ES8388` codec driver and DAI binding
-- board-level pull-ups and strap behavior may matter
-
-Use this path only if you intentionally turn the LyraT into a codec breakout board.
-
-For a real Jetson audio product, it is usually cleaner to design or buy a small `ES7210`, `ES8388`, `TLV320`, or similar codec board intended to be controlled by the Jetson.
-
----
-
-## 13. Debug checklist
-
-### Jetson checks
-
-```bash
-arecord -l
-aplay -l
-amixer -c APE controls | grep I2S2
-amixer -c APE controls | grep ADMAIF
-dmesg | grep -i -E 'asoc|tegra|i2s|audio'
-```
-
-### Wire checks
-
-Use a scope or logic analyzer:
-
-- `LRCK` toggles at the expected sample rate
-- `SCLK` toggles continuously during capture
-- `ASDOUT` changes when sound reaches the microphone
-- no two devices are driving the same clock line
-- ground is shared
-
-### Format checks
-
-Try common capture variants:
-
-```bash
-arecord -D hw:APE,0 -r 48000 -c 1 -f S16_LE test-mono.wav
-arecord -D hw:APE,0 -r 48000 -c 2 -f S16_LE test-stereo.wav
-arecord -D hw:APE,0 -r 48000 -c 2 -f S32_LE test-stereo-32.wav
-```
-
-Use the one that matches the LyraT firmware's I2S slot format.
-
----
-
-## 14. What success looks like
-
-Minimum success:
-
-- LyraT outputs stable I2S clocks
-- Jetson `I2S2` is enabled on the 40-pin header
-- `ADMAIF1` routes from `I2S2`
-- `arecord` creates a non-silent WAV file
-- channel count and sample rate are correct
-
-Better success:
-
-- waveforms show clean clocks and data
-- spoken audio is intelligible
-- gain is not clipped
-- left/right channels are understood
-- recording works repeatedly after reboot
-
-Product-level success:
-
-- proper codec or ADC driver
-- stable device-tree overlay
-- reproducible ALSA route setup
-- GStreamer pipeline
-- application-level audio health checks
-- wake-word or ASR pipeline using the captured audio
-
-### Verified test result — LyraT side (2026-05-11)
-
-Flashed `lyrat_jp4_passthrough.bin` (built from `esp-adf` `release/v2.x`, ESP-IDF v5.5.3) to an ESP32-LyraT V4.3. Boot log confirms the codec/I2S path is live and DMA is moving real data:
-
-```
-I (172) boot: Loaded app from partition at offset 0x10000
-I (197) app_init: Project name:     lyrat_jp4_passthrough
-I (215) app_init: ESP-IDF:          v5.5.3
-I (298) JP4_PASSTHROUGH: [1] Init audio board (LyraT v4.3) + ES8388 codec
-I (329) JP4_PASSTHROUGH:     codec mode=ENCODE (ADC), input=LINPUT1/RINPUT1 (onboard mic)
-I (334) JP4_PASSTHROUGH: [3] I2S: rate=48000 Hz, bits=16, channels=2, format=Philips, role=master
-I (340) JP4_PASSTHROUGH:     JP4 pins: BCLK=GPIO5  LRCK=GPIO25  ASDOUT=GPIO35  MCLK=GPIO0
-I (349) JP4_PASSTHROUGH: [4] Capture started — JP4 I2S bus is live. Samples drained on-chip.
-I (2381) JP4_PASSTHROUGH: rate=194560 B/s (expected=192000 B/s)  total=389120 B
-I (4389) JP4_PASSTHROUGH: rate=192512 B/s (expected=192000 B/s)  total=774144 B
-I (6411) JP4_PASSTHROUGH: rate=194560 B/s (expected=192000 B/s)  total=1163264 B
-```
-
-What this confirms about the LyraT side of the bring-up plan (Section 7, steps 1–4):
-
-- ✅ ES8388 enumerated and put in ENCODE/ADC mode
-- ✅ Onboard mics (`LINPUT1/RINPUT1`) selected
-- ✅ I2S peripheral running as master, `BCLK`/`LRCK` clocking on JP4
-- ✅ DMA is moving 192 ± 1.3 % kB/s = `48000 Hz × 2 ch × 2 B` worth of samples per second (the small overshoot is `xTaskGetTickCount()` granularity in the 2 s reporting window, not clock drift)
-
-The Jetson side (steps 5–7) is verified separately below — see [§14 verified result — Jetson side](#verified-test-result-jetson-side-2026-05-11).
-
-The LyraT-side artifact is a known-good control: if Jetson capture ever regresses after this firmware is flashed, the failure is on the Jetson software path (pinmux, ASoC routing, master/slave config), not the bus.
-
-### Verified test result — Jetson side (2026-05-11)
-
-After the LyraT bring-up above, all four JP4 jumpers wired to the Jetson Orin Nano 40-pin header (`SCLK→12`, `LRCK→35`, `ASDOUT→38`, `GND→6`) on a single shared ground. No JetPack rebuild, no out-of-tree driver — only Jetson-IO overlay + `amixer` route.
-
-#### Step 1 — confirm overlay applied
-
-```bash
-amixer -c APE controls | grep I2S2          # expect ~19 I2S2 controls present
-amixer -c APE cget name="ADMAIF1 Mux"       # expect 'I2S2' in items list
-arecord -l                                  # expect "card 1: APE ... device 0: XBAR-ADMAIF1-0"
-```
-
-If `I2S2 Mux`, `I2S2 codec frame mode`, and `I2S2 codec master mode` are not in the control list, the 40-pin overlay didn't take — re-run `sudo /opt/nvidia/jetson-io/jetson-io.py`, save, reboot.
-
-#### Step 2 — set the AHUB route and I2S format
-
-```bash
-amixer -c APE cset name="ADMAIF1 Mux" "I2S2"
-amixer -c APE cset name="I2S2 codec master mode" "cbm-cfm"     # LyraT drives BCLK + LRCK
-amixer -c APE cset name="I2S2 codec frame mode" "i2s"          # Philips I2S framing
-amixer -c APE cset name="I2S2 Sample Rate" 48000
-amixer -c APE cset name="I2S2 Capture Audio Channels" 2
-amixer -c APE cset name="I2S2 Capture Audio Bit Format" 16
-amixer -c APE cset name="I2S2 Client Channels" 2
-amixer -c APE cset name="I2S2 Client Bit Format" 16
-amixer -c APE cset name="ADMAIF1 Capture Audio Channels" 2
-amixer -c APE cset name="ADMAIF1 Capture Client Channels" 2
-```
-
-Why each control:
-
-- `cbm-cfm` = "codec-bit-master, codec-frame-master" → Jetson is the I2S slave; LyraT drives both clocks. Matches the firmware's `I2S_ROLE_MASTER`.
-- `i2s` framing = standard Philips I2S. Matches the ES8388 / our `I2S_COMM_FORMAT_STAND_I2S`.
-- `48000 / 2 ch / 16-bit` everywhere → matches the firmware's `SAMPLE_RATE_HZ / SAMPLE_CHANNELS / SAMPLE_BITS`. Mismatch on any side here is the most common cause of distortion or silence.
-
-#### Step 3 — record and inspect
-
-```bash
-arecord -D hw:APE,0 -r 48000 -c 2 -f S16_LE -d 5 lyrat.wav
-ls -la lyrat.wav
-sox lyrat.wav -n stat
-aplay lyrat.wav
-```
-
-#### Observed result
-
-```
--rw-r--r-- 1 aihpc aihpc 960044 May 10 20:14 lyrat.wav
-
-Samples read:            480000
-Length (seconds):      5.000000
-Maximum amplitude:     0.233582
-Minimum amplitude:    -0.178314
-Midline amplitude:     0.027634
-Mean    amplitude:    -0.000075
-RMS     amplitude:     0.021088
-Rough   frequency:         1356
-Volume adjustment:        4.281
-```
-
-Speech ("one two three test") was clearly audible on `aplay` — bit-accurate capture.
-
-What each number proves:
-
-- **File size 960,044 bytes is exact**: `5.000 s × 48000 Hz × 2 ch × 2 B + 44 B WAV header = 960044`. Zero DMA underruns; LyraT-master / Jetson-slave clocking is rock solid.
-- `RMS amplitude 0.021` ≈ –33 dBFS — normal speech range, well above noise floor.
-- `Mean amplitude -0.000075` ≈ 0 — no DC offset; ES8388 input biasing is clean.
-- `Volume adjustment 4.281` → ~12 dB of headroom before clipping. If louder capture is desired, bump ES8388 PGA gain in firmware (`es8388_set_mic_gain()`) rather than amplifying digitally.
-- `Rough frequency 1356` — dominant pitch in the speech band; consistent with voice content.
-
-#### Bring-up plan §7 — final state
-
-- ✅ Step 5: 40-pin `I2S2` pinmux applied (via Jetson-IO overlay)
-- ✅ Step 6: AHUB route from `I2S2` → `ADMAIF1` configured; clock direction set to Jetson-slave
-- ✅ Step 7: `arecord -D hw:APE,0` produces a bit-accurate, byte-exact, audible WAV
-
-#### Known gap — settings do not survive reboot
-
-The 9 `amixer cset` commands are not persistent. `alsactl store` captures most of them but the NVIDIA APE card's `Mux` / `codec master mode` controls have historically not been restored cleanly by `alsa-restore.service`. For a reproducible bring-up across reboots, wrap the commands in a small `systemd` unit that runs after `sound.target` (or after the Jetson-IO overlay loads), or save with `alsactl store -f /var/lib/alsa/asound.state` and verify with `alsactl restore` before relying on it.
-
-#### Next steps anchored to this verified baseline
-
-Now that capture is bit-accurate, the next layers (Section 15) are unblocked:
-
-- GStreamer `alsasrc` to replace `arecord` and fan-out to multiple consumers
-- Streaming ASR (`whisper.cpp` with CUDA on Orin) consuming the alsasrc tap
-- Two-mic delay-and-sum beamforming, taking advantage of LyraT's L+R mics (physical spacing measured **3.5 cm** — note this is below Espressif's recommended 4–6.5 cm and the default `MASE_MIC_DISTANCE = 65 mm` in `esp-sr/include/.../esp_mase.h`, so any use of Espressif's `esp_afe_doa` / `MASE` APIs needs `mic_distance` explicitly overridden to `0.035`)
-- Eventually, replacing the LyraT with a Jetson-controlled 4-mic codec board (e.g. ES7210) for a real product
-
----
-
-## 15. Next application steps
-
-Once the raw capture path works:
-
-- convert the `arecord` path into a GStreamer capture pipeline
-- add WebRTC VAD or wake-word detection
-- test local ASR such as Whisper or a smaller streaming ASR model
-- replace LyraT with a dedicated Jetson-controlled codec board
-- design a real microphone frontend for the smart-speaker product path
-
-Example GStreamer capture starting point:
-
-```bash
-gst-launch-1.0 alsasrc device=hw:APE,0 ! \
-  audio/x-raw,rate=48000,channels=2,format=S16LE ! \
-  wavenc ! filesink location=lyrat-i2s-gst.wav
-```
-
----
-
-## 16. References
-
-- [NVIDIA Jetson Linux Developer Guide - Audio Setup and Development](https://docs.nvidia.com/jetson/archives/r38.4/DeveloperGuide/SD/Communications/AudioSetupAndDevelopment.html)
-- [NVIDIA Jetson Linux Developer Guide - Configuring the Jetson Expansion Headers](https://docs.nvidia.com/jetson/archives/r38.4/DeveloperGuide/HR/ConfiguringTheJetsonExpansionHeaders.html)
-- [ESP32-LyraT V4.3 Hardware Reference](https://espressif-docs.readthedocs-hosted.com/projects/esp-adf/en/latest/design-guide/dev-boards/board-esp32-lyrat-v4.3.html)
-- [ESP32-LyraT V4.3 schematic](https://dl.espressif.com/dl/schematics/esp32-lyrat-v4.3-schematic.pdf)
-- [Jetson Audio Setup and Development](../Jetson-Audio-Setup-and-Development/Guide.md)
-
-
-## Integration lab: Who drives the I2S clocks, and are samples actually aligned?
-
-Record clock-master/slave roles, frame polarity, slot width, valid bit width, sample rate, and voltage levels for the ESP32-to-Jetson path. Compare a known waveform in a logic capture and decoded PCM.
-
-**Acceptance evidence:** Recover the expected frequency and channel order without clipping or persistent sample slips. Save a short WAV and its transport settings for the speech/inference consumer.
-
-**Continue:** take this artifact to [Jetson-Audio-Setup-and-Development](../Jetson-Audio-Setup-and-Development/Guide.md). Explain which assumption from this course the next engineer must preserve.
+| Correct sample format | Known signed values or calibrated tone; byte/order inspection |
+| Correct channel identity | Stimulate one input at a time and compare both channels |
+| Correct physical clock | Measure BCLK/LRCK and count samples over an independent time reference |
+| No lost/repeated samples | Known sequence or continuity marker plus driver counters |
+| Speech quality | Labelled audio, noise conditions and downstream error metrics |
+| Long-run synchronization | Capture timestamps and drift across the intended duration |
+
+Complete the CPU lab first, including the chunk-boundary and wrong-header failures. For hardware completion, attach a source/configuration manifest, wiring diagram, negotiated parameters, waveform evidence and a known-stimulus result. If the hardware is unavailable, submit the clock/frame calculations and explain exactly which claims remain unmeasured.
+
+**Diagnostic answer:** a known-good ESP32 receive path narrows the search, but it does not prove the external wire, Jetson clock polarity, DAI framing or ALSA channel interpretation. Debug each boundary with a measurement.

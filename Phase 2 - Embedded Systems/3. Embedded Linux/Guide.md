@@ -41,6 +41,8 @@ For a custom inference accelerator, transfer the method: identify device resourc
 
 ## Capstone: a replayable observation service
 
+Start with the runnable [observation freshness lab](../Labs/Observation-Freshness.md) to establish queue/drop policy, age checks, and reset behavior on a CPU. Its JSON trace and negative cases form an acceptance fixture for the service. Replacing simulated timestamps with real capture provenance is part of integration, not an automatic consequence of passing that fixture.
+
 Package a small service that reads a recorded observation stream and sends work to a CPU reference backend. Define the backend interface so a GPU, FPGA, or future NPU can replace it later. Every request carries an ID, capture timestamp, input shape/dtype, and deadline; every result carries the same ID, completion timestamp, output shape, and error/status.
 
 **Pass conditions:** a fresh checkout rebuilds the package; the target starts it through its configured init system; a missing backend produces a bounded error; a delayed request is marked stale; restarting the service releases its buffers. Record latency percentiles and maximum observed age with the load and sample count. These observations do not establish a hard real-time guarantee.

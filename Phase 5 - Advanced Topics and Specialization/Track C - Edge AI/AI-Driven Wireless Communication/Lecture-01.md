@@ -1,413 +1,154 @@
-# Lecture 1: AI-Driven Wireless Communication — Neural PHY, Smart Radios, and Learned Spectrum
+# AI-driven wireless: from noisy samples to a measured receiver
 
-## Overview
+**Reviewed 18 October 2026.** Start with Python, complex numbers, probability, and gradient descent. The first experiment needs only Python 3.10+ and runs on a CPU. Allow 60–90 minutes. Its output is a receiver-quality report and a sample-buffer test, with no radio hardware or transmitted signal.
 
-The classical wireless stack — channel coding, modulation, channel estimation, equalization, decoding — is built from **hand-derived mathematical blocks** (LDPC, Polar, MMSE, Viterbi) that have been tuned over decades against tractable channel models (AWGN, Rayleigh, 3GPP TDL). In real deployments the channel is none of these: it is a moving stew of **multipath, hardware impairments, blockers, interference, and traffic**. AI-driven wireless replaces or augments these classical blocks with **learned models** that fit the *actual* channel and *actual* hardware in front of them.
+You will learn to distinguish three tasks: estimating bits from received samples, meeting a radio pipeline's timing budget, and choosing slower network-control policies. A neural network can help one task while making another worse.
 
-This lecture is written for the AI **hardware** engineer, not the communications theorist. The question is not "which loss function should we use" — it is **"where in the radio chain does an NPU/DSP/FPGA actually sit, what data crosses that boundary, and how tight is the latency budget?"** We cover three layers:
+## 1. Follow one bit through a radio
 
-* **Part A — PHY-layer ML:** neural receivers, channel estimation, beamforming, autoencoder-based air interfaces. The "1 ms TTI, billion-MAC-per-slot" world.
-* **Part B — RAN-level ML:** O-RAN's RIC architecture, scheduling, MIMO management, energy savings. Seconds-to-minutes loop, GPU/CPU in the basement.
-* **Part C — SDR + DL:** modulation classification, RF fingerprinting, anomaly detection, GNU Radio + PyTorch pipelines you can actually run on a HackRF / USRP / Jetson.
+A transmitter maps bits into symbols, shapes them into a waveform, and sends that waveform through a channel. A receiver samples it, corrects timing/frequency errors, estimates the channel, and produces soft bit evidence for a channel decoder. A complex baseband sample `I + jQ` holds two real numbers: in-phase and quadrature components. Neither component alone is a complete arbitrary modulated signal.
 
-By the end you should be able to **size the silicon** for a neural receiver, **place** ML inference correctly across UE / DU / CU / RIC, and **build** a small end-to-end demo on commodity SDR hardware.
+In an OFDM receiver, a **resource element** is one subcarrier in one OFDM symbol. A **pilot** is a known symbol used to estimate the channel. At a pilot with nonzero transmitted value `x`, least squares gives `h_hat = y/x`. Interpolating those estimates across time and frequency is a separate problem. LMMSE is optimal among linear estimators under its covariance assumptions; general MMSE optimality needs a suitable distribution model too.
 
----
+A learned receiver might refine channel estimates, predict bit likelihoods, or compensate a hardware impairment. It still needs a defined sample rate, tensor layout, output convention, and deadline. Learning only a receiver does not require changing the transmitted waveform. Jointly learning a new waveform may change interoperability and must be evaluated against the relevant interface requirements.
 
-## The Wireless Chain and Where AI Plugs In
+## 2. Work through a receiver you can solve exactly
 
-```
-   Tx bits ──► Source ──► Channel ──► Modulator ──► Pulse shaping ──► RF ──► Antenna
-              coding     coding      (QAM/OFDM)     + DAC          front-end   array
-                                                                                 │
-                                                                                 ▼
-                                                                        Wireless channel
-                                                                        (multipath, fading,
-                                                                         interference, noise)
-                                                                                 │
-   Rx bits ◄── Source ◄── Channel ◄── Demod ◄── Equalize ◄── Channel ◄── ADC ◄── RF ◄────┘
-              decode     decode      (soft       + sync       est.       front-end
-                                      LLR)
-                ▲          ▲            ▲          ▲           ▲
-                │          │            │          │           │
-            (NN decoder)(NN belief    (NN demap)(NN equal.)(NN channel
-                        prop)                              est. — the
-                                                           biggest win)
-```
+Use binary phase-shift keying (BPSK) with this explicit convention:
 
-The blocks where ML has produced **deployed or near-deployed** wins, in order of maturity:
+\[
+x=2b-1,\qquad y=x+d+n,\qquad n\sim\mathcal N(0,\sigma^2).
+\]
 
-| Block | Classical method | ML replacement | Status (2026) |
-|---|---|---|---|
-| Channel estimation | LS / LMMSE on pilots | CNN / U-Net on pilot grid | **Deployed** (Qualcomm, Samsung modems) |
-| Demapping / soft LLRs | Closed-form QAM demap | MLP demapper per RE | **Field trials**, 3GPP Rel-18 study |
-| MIMO detection | MMSE / sphere decoder | DetNet / unfolded MMSE-Net | Research → trials |
-| Channel decoding (LDPC/Polar) | BP / SC-L | NN-aided BP, neural list decoder | Research |
-| Beam management | Codebook sweep + RSRP | CNN on CSI / vision-aided beam pred. | **3GPP Rel-19 WI** |
-| End-to-end autoencoder PHY | n/a | Tx & Rx co-trained NNs | Research only (no air-interface standard) |
-| MAC scheduling | Proportional fair, etc. | RL / contextual bandits | **O-RAN xApps deployed** |
-| RF impairment compensation | Polynomial DPD | NN-based DPD | **Deployed in flagship 5G PAs** |
+Here `b` is 0 or 1, `d` is a constant receiver bias, and `n` is real Gaussian noise. Symbol/bit energy is 1, there is one bit per symbol, and there is no coding. If `gamma = 10**(EbN0_dB/10)`, then `sigma² = 1/(2 gamma)`. This real-noise variance differs from the total variance of a complex noise sample.
 
-The key insight: **the closer to the antenna, the harder the latency budget**. A neural channel estimator running per OFDM slot has ~125 µs (5G numerology 1) end-to-end including DMA. A RAN energy-saving xApp has minutes.
+For equal bit priors, expand the two Gaussian squared errors:
 
----
+\[
+\ell(y)=\log\frac{P(b=1\mid y)}{P(b=0\mid y)}
+=\frac{(y-d+1)^2-(y-d-1)^2}{2\sigma^2}
+=\frac{2(y-d)}{\sigma^2}.
+\]
 
-## Part A — PHY-Layer ML
+Positive LLR means bit **1** in this lesson. The hard decision threshold is `y=d`. Other mappers can use the opposite bit convention; check before connecting a demapper to a decoder.
 
-### A.1 Neural channel estimation — the canonical case study
+At `Eb/N0 = 2 dB`, `gamma ≈ 1.585`, `sigma² ≈ 0.3155`, and `d=0.6`. For `y=0.4`, the correct LLR is about `−1.268`, so choose bit 0. A receiver that incorrectly assumes zero bias chooses bit 1.
 
-In 5G NR the UE/gNB inserts known **DMRS (Demodulation Reference Signal)** pilots into the resource grid. The classical estimator does **least-squares** on the pilot REs, then interpolates (linear, MMSE, Wiener) onto the data REs. The MMSE estimator is optimal if you know the channel covariance — which you don't, so deployed receivers use simplified Wiener filters tuned for "average" 3GPP channel profiles.
+Now learn `ell_hat = w*y + c` from labeled samples. Binary cross entropy is
 
-A learned estimator treats the pilot-grid → full-grid problem as **image super-resolution**:
+\[
+L=\operatorname{softplus}(\ell_{hat})-b\ell_{hat},\quad
+\frac{\partial L}{\partial w}=(\operatorname{sigmoid}(\ell_{hat})-b)y,\quad
+\frac{\partial L}{\partial c}=\operatorname{sigmoid}(\ell_{hat})-b.
+\]
 
-```
-Input  : tensor[num_pilots_freq × num_pilots_time × 2]   (real, imag)
-                + noise variance estimate
-Output : tensor[num_subcarriers × num_symbols × 2]       (estimated channel)
+This two-parameter model is enough for the specified channel. A larger neural network is unnecessary here. The matched analytic receiver is the reference against which learning should be judged.
+
+## 3. Run, then explain, the CPU experiment
+
+From the repository root:
+
+```bash
+cd 'Phase 5 - Advanced Topics and Specialization/Track C - Edge AI/AI-Driven Wireless Communication'
+python3 labs/receiver.py
+python3 -m unittest discover -s labs -p 'test_*.py' -v
 ```
 
-A reference architecture (ChannelNet / SRCNN-style):
+Read [receiver.py](labs/receiver.py), [the tests](labs/test_receiver.py), and the [recorded result](labs/receiver-reference.json). Training uses 2,000 samples with seed 11; the two evaluations use 20,000 new samples each with seeds 22 and 33. Test samples never update the parameters.
 
-```python
-import torch
-import torch.nn as nn
+Observed on Python 3.12.3:
 
-class ChannelEstNet(nn.Module):
-    """
-    Input  : LS estimate on pilot grid, zero-filled to full grid.
-             Shape: [B, 2, F, T]   (real/imag, subcarriers, symbols)
-    Output : Refined channel estimate over the full grid.
-    """
-    def __init__(self, channels=64):
-        super().__init__()
-        self.conv1 = nn.Conv2d(2, channels, 9, padding=4)
-        self.conv2 = nn.Conv2d(channels, channels // 2, 1)
-        self.conv3 = nn.Conv2d(channels // 2, 2, 5, padding=2)
-        self.act = nn.ReLU(inplace=True)
+| Receiver | Same bias `d=+0.6` | Changed bias `d=−0.6` |
+|---|---:|---:|
+| Incorrect zero-threshold assumption | 12.210% BER | 12.060% BER |
+| Analytic receiver with the actual bias | 3.740% BER | 3.755% BER |
+| Learned receiver, trained only at `+0.6` | 3.780% BER | 31.525% BER |
 
-    def forward(self, x):                  # x: [B, 2, F, T]
-        x = self.act(self.conv1(x))
-        x = self.act(self.conv2(x))
-        return self.conv3(x)
+The learned threshold is about 0.586. It nearly matches 0.6 on the training distribution, then fails after the bias changes. The analytic reference is an **oracle** because it receives the true bias; a deployed receiver must estimate that value. Learning has not beaten a matched Gaussian detector in this experiment.
+
+The theoretical matched BER is
+
+\[
+P_b=Q(\sqrt{2\gamma})=\tfrac12\operatorname{erfc}(\sqrt\gamma)
+\approx 0.037506.
+\]
+
+Finite samples vary around that value. The regression test compares Monte Carlo error to a five-standard-error tolerance rather than demanding exact equality. BER counts incorrect **bits**. BLER counts **blocks** containing errors after the relevant decoding procedure; the lab has no code or decoder and makes no BLER claim. Hard-decision BER also cannot establish whether LLR magnitudes are calibrated; compare BCE and decoder performance separately.
+
+**Try it:** increase the number of gradient steps. Does BER move as much as BCE? Then train across several biases while withholding one bias and one SNR. State which parameters the receiver observes; a model cannot infer an unobserved channel change from a single ambiguous sample without additional information or assumptions.
+
+## 4. Preserve samples across callback boundaries
+
+A streaming scheduler can supply 3 samples, then 8, then 1. A classifier needing windows of 4 must keep the first 3 until another sample arrives. Returning “consumed 3” while discarding them changes the signal.
+
+`IQWindows.push()` buffers partial input and emits complete windows with absolute sample offsets. For the 11 samples `0…10`, supplied as chunks of 3 and 8, it emits windows starting at 0 and 4. Three samples remain; `finish()` explicitly reports that trailing partial window as discarded. Irregular chunks produce exactly the same windows as one complete capture. Nonfinite input is rejected before buffer mutation.
+
+At sample rate 2 MS/s, collecting 1,024 samples takes **512 microseconds**. This acquisition time exists before inference begins. An overlapping classifier with stride 512 would need a new result every 256 microseconds in steady state, while its first window still needs 512 microseconds to arrive. The supplied assembler uses non-overlapping windows; overlap is an extension.
+
+For GNU Radio 3.x integration, a `sync_block` with no output stream is a **sink**. A synchronous sink consumes the number of items returned by `work`; preserve every consumed sample in the buffer or record a deliberate drop. Publish classification results through a message port or a separate typed output design. To record raw IQ, branch the upstream stream to a file sink. A zero-output classifier sink cannot connect onward to a stream file sink. See the [official block types](https://wiki.gnuradio.org/index.php/Types_of_Blocks).
+
+The portable lab tests buffering logic. It does not execute GNU Radio, a classifier checkpoint, or an SDR. A hardware extension must record timestamp origin, sample format, scaling, discontinuities, dropped windows, bounded queues, and capture configuration. Split evaluation by capture/session/device so overlapping windows from one recording do not leak into both training and test sets. Modulation recognition alone does not decode an unknown protocol.
+
+## 5. Calculate the radio budget before choosing hardware
+
+For normal cyclic prefix, NR has 14 OFDM symbols per slot and `2**mu` slots per 1 ms subframe. Therefore:
+
+| Numerology `mu` | Subcarrier spacing | Average slot duration |
+|---|---:|---:|
+| 0 | 15 kHz | 1,000 µs |
+| 1 | 30 kHz | 500 µs |
+| 2 | 60 kHz | 250 µs |
+| 3 | 120 kHz | 125 µs |
+
+The duration follows [3GPP TS 38.211 v19.1.0, §4.2 and Table 4.3.2-1](https://www.etsi.org/deliver/etsi_TS/138200_138299/138211/19.01.00_60/ts_138211v190100p.pdf). A slot duration is not the whole estimator's available execution time: scheduling, buffering, channel decoding, transfer, and protocol deadlines also matter. Numerology 1 is **500 µs**, not 125 µs.
+
+Consider an illustrative full-grid estimator with 273 PRBs, 12 subcarriers per PRB, and 14 symbols: 45,864 positions. Three same-resolution convolutions use channel/kernel tuples `(2→64,9×9)`, `(64→32,1×1)`, and `(32→2,5×5)`. Ignore bias and activation operations for this count.
+
+\[
+\text{MACs}=45864(2\cdot64\cdot81+64\cdot32+32\cdot2\cdot25)
+=642,829,824.
+\]
+
+At 2,000 slots/s this requires **1.28566 TMAC/s**, or 2.57132 TOPS when one multiply plus one add counts as two operations. This is an arithmetic demand for this hypothetical network, not measured accelerator throughput. The first FP16 activation alone occupies 5,870,592 bytes, about 5.60 MiB. Multi-antenna streams, additional carriers, scratch storage, precision, and tiling change the cost.
+
+A 30.72 MS/s stream with signed 16-bit I and 16-bit Q needs `30.72e6 × 4 = 122.88 MB/s` per antenna before transport overhead. Complex float32 doubles that payload. Peak TOPS alone cannot establish that the estimator fits: measure supported kernels, useful bandwidth, transfers, workspace, queueing, thermal conditions, and completion-time tails.
+
+DMRS counts depend on mapping type, configuration type, symbols, ports, and CDM groups. Do not multiply the full grid by an unexplained “pilot percentage.” A network also needs to distinguish an absent pilot from a valid zero estimate, for example with an explicit pilot mask.
+
+## 6. Put network intelligence in the right control loop
+
+The PHY chain and an O-RAN controller serve different purposes. [O-RAN's architecture](https://docs.o-ran-sc.org/en/latest/architecture/architecture.html) places high PHY/MAC/RLC in the O-DU and low PHY/RF functions in the O-RU, subject to the split. The near-real-time RIC uses **E2** for telemetry and supported control actions; xApps extend that controller. The non-real-time RIC provides longer-timescale policies and model-management functions. **A1** carries policy guidance between non-real-time and near-real-time RIC components; it is not a replacement for E2 control of a radio node. See the [official A1 project](https://docs.o-ran-sc.org/projects/o-ran-sc-nonrtric/en/latest/overview.html).
+
+A scheduler policy experiment needs a concrete observation, action, and objective. For example, observations might be per-user queue lengths and estimated rates; an action selects a supported allocation; the objective trades throughput against delay and fairness. Compare to a defined baseline using identical traffic traces. Include signaling delay and stale observations in the environment. A policy score cannot establish PHY deadline compliance or a universal energy-saving percentage.
+
+For a receiver, report BER/BLER by channel and SNR. For a beam predictor, report selection error and resulting link performance with measurement overhead. For a RIC policy, report the actual network objective and constraints. One classification-accuracy number cannot substitute for all three.
+
+## 7. Current optional simulator route
+
+As reviewed on 18 October 2026, **Sionna 2.2.0** uses **PyTorch** for PHY/SYS; Sionna RT uses Mitsuba 3 and Dr.Jit. Older TensorFlow Sionna tutorials target a different major version. Start from the [current documentation](https://nvlabs.github.io/sionna/) and match installed package versions before copying a tutorial.
+
+A second supplied exercise, [sionna_cpu.py](labs/sionna_cpu.py), was actually run with Sionna 2.2.0 and PyTorch 2.14.0+cpu. From this lesson directory, create an optional environment:
+
+```bash
+python3 -m venv .venv-sionna
+.venv-sionna/bin/python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.0
+.venv-sionna/bin/python -m pip install -r labs/requirements-sionna.txt
+.venv-sionna/bin/python -m pip check
+.venv-sionna/bin/python labs/sionna_cpu.py
 ```
 
-**Hardware sizing — back of the envelope.**
+This dependency set is substantially larger than the standard-library exercise. The recorded environment reused an existing CPU PyTorch installation and installed Sionna plus its dependencies in an isolated environment; `pip check` passed. The [observed result](labs/sionna-reference.json) is 3,914 errors in 100,000 bits (3.914%), within five standard errors of the 3.751% analytic value. It also verifies noiseless decisions, tensor dimensions, unit symbol energy, and finite nonzero gradients through the demapper. Random samples may differ across dependency/platform versions.
 
-For 5G NR, 100 MHz, numerology 1: 273 PRBs × 12 = 3276 subcarriers, 14 symbols per slot, 0.5 ms slot. The DMRS pattern (Type 1, 1-symbol) gives ~6552 pilot REs per slot.
+Here QPSK carries two bits per symbol, so with unit symbol energy `Eb=1/2`. Sionna's `AWGN(...)(symbols, no)` takes **total complex noise variance** `no=N0=1/(2 gamma)` in this example. Its real and imaginary noise components each have variance `N0/2`. The PAM mapper in this Sionna version maps bit 0 to +1, the opposite BPSK symbol labeling from §2; its demapper still returns positive LLR for bit 1. The supplied simulator example uses mapper and demapper together and asserts that convention.
 
-With the network above and `channels=64`:
-- conv1: 2·64·9·9 = 10,368 MACs/output × 3276·14 outputs ≈ 475 M MACs
-- conv2: 64·32·1·1 = 2,048 MACs/output × 3276·14 ≈ 94 M MACs
-- conv3: 32·2·5·5 = 1,600 MACs/output × 3276·14 ≈ 73 M MACs
+The CPU exercise above intentionally exposes the equations without a simulator dependency. A next simulator experiment can add coding, QAM, fading, OFDM, and pilots one at a time. At each step preserve a classical baseline, assert tensor shapes and noise conventions, and rerun quality measurements. Record simulator version, channel parameters, random seeds, model/config hashes, test captures, and execution backend. Synthetic channel success establishes behavior under that simulator, not an over-the-air deployment result.
 
-→ **≈ 640 M MACs per slot, × 2000 slots/s = 1.28 TMACs/s = 2.56 TOPS** for a single 100 MHz carrier on a single UE.
+## Check your understanding
 
-A Qualcomm Hexagon NPU (X75 modem class) delivers ~10–15 TOPS at INT8 in a phone power envelope. So this estimator fits — but only with **INT8, structured pruning, and tile-friendly layouts**. A naive FP16 deployment would not.
+1. Why does changing the bias from +0.6 to −0.6 break the learned receiver? **Its learned decision threshold remains near +0.6; retraining or an observed/estimated channel parameter is needed.**
+2. Does a fourfold faster accelerator fix a 1,024-sample acquisition delay? **It reduces compute time, not the 512 µs collection time at 2 MS/s.**
+3. Why is `0.5 ms / network_runtime` insufficient evidence for a valid NR receiver? **It omits the other processing stages, scheduling and protocol deadline.**
+4. If BER is unchanged after quantization, is the decoder necessarily unchanged? **No. Soft reliability magnitudes may change even when the hard decisions do not.**
+5. Can a near-real-time xApp replace a per-symbol detector? **Their interfaces and timing roles differ; define the local PHY pipeline separately.**
 
-**Where this lives on silicon:**
-- **UE side:** modem NPU (Hexagon Tensor, Samsung's Exynos NPU, Apple's RF baseband neural blocks). Tightly coupled to the LDPC/Polar decoder via on-die SRAM.
-- **gNB side:** baseband DU. **Nvidia Aerial cuPHY** runs this on an L4/L40S/A100 GPU. **Intel FlexRAN** runs it on Xeon AVX-512 / AMX with optional FPGA offload.
-
-### A.2 Neural demapping — the cheap, high-ROI block
-
-Soft demappers convert equalized symbols into **log-likelihood ratios (LLRs)** for the channel decoder. The exact LLR for QAM-256 in colored interference is messy; classical receivers use a Gaussian approximation that loses 0.3–0.8 dB in realistic conditions.
-
-A neural demapper is tiny — usually an **MLP** with two hidden layers of 64–128 units, run **per resource element**. It is highly parallel (no temporal dependency), maps cleanly onto vector engines, and is the most common "first real ML PHY block" deployed.
-
-```python
-class NeuralDemapper(nn.Module):
-    """Map (equalized_symbol_re, equalized_symbol_im, noise_var) -> LLRs"""
-    def __init__(self, bits_per_symbol=8, hidden=128):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(3, hidden), nn.ReLU(),
-            nn.Linear(hidden, hidden), nn.ReLU(),
-            nn.Linear(hidden, bits_per_symbol),
-        )
-    def forward(self, x):  # x: [N, 3] -> [N, bits_per_symbol]
-        return self.net(x)
-```
-
-This is a **per-RE pointwise op**. Throughput is gated by memory bandwidth from the equalizer output, not by compute. On a Hexagon NPU it sustains 100s of millions of demaps/sec at INT8 — comfortable for a 100 MHz carrier.
-
-### A.3 Beam management — the Rel-19 story
-
-mmWave (FR2) and emerging FR3 systems use **hundreds** of narrow beams. Classical beam acquisition does an exhaustive sweep of an SSB codebook — slow and energy-hungry. ML approaches predict the best beam from:
-
-* a **partial sweep** of a few beams (spatial-domain beam prediction), or
-* **historical beams** (temporal-domain prediction), or
-* **side channels**: camera, GPS, environment map (sensor-aided / "Synesthesia of Machines").
-
-3GPP Rel-19 has a normative work item for **AI/ML beam management** with two sub-use-cases (spatial and temporal) — the first time a learned model gets explicit signaling support in the standard.
-
-A reference architecture is a small CNN over the RSRP grid of swept beams:
-
-```
-Input  : RSRP grid [num_swept_beams_az × num_swept_beams_el]
-Hidden : 2 conv layers + 1 FC
-Output : softmax over the full codebook (e.g., 64 or 256 beams)
-```
-
-The hardware question is **where the camera/sensor features fuse with the RF features** — typically the AP's NPU (Snapdragon Auto, Jetson) rather than the modem itself.
-
-### A.4 End-to-end autoencoder PHY (research only — but important)
-
-In this paradigm, the Tx (encoder) and Rx (decoder) are **co-trained neural networks**. The "channel" is a **differentiable layer** (AWGN noise, multipath impulse response, possibly hardware impairments). The constellation, pulse shape, and receiver are all learned jointly.
-
-```
-bits ──► [NN encoder] ──► waveform ──► [channel] ──► [NN decoder] ──► bits
-              ▲                                            ▲
-              └───── jointly trained via BCE / BLER loss ───┘
-```
-
-The result is a **non-standard air interface**. Constellations look weird (not QAM), pilots disappear, and there is no longer a clean PHY/MAC split. This is incompatible with 3GPP signaling — so it lives in **non-cellular** niches: underwater acoustic, free-space optical, LEO ISL, military waveforms.
-
-It is also the cleanest demonstration of **hardware-software co-design** in radio: the encoder/decoder topology is fixed at silicon-design time, weights ship in firmware, and updates are model retrains.
-
-### A.5 Hardware reality check — what actually ships
-
-| Vendor / Platform | AI compute available to the PHY | Used for |
-|---|---|---|
-| **Qualcomm Snapdragon X75/X80 modem** | Hexagon Tensor + 2nd-gen "AI Processor" inside the modem | Channel est., demapping, link adaptation, PA DPD |
-| **Samsung Exynos Modem 5400** | NPU shared with AP via tightly coupled L2 | Channel est., predictive scheduling hints |
-| **MediaTek M90 (Dimensity)** | APU + DSP cluster | Beam mgmt, link adaptation |
-| **Nvidia Aerial cuPHY** | A100 / L40S / H100 GPU per DU | Full inline GPU PHY: FFT, ch.est., MIMO, demap, LDPC, all CUDA kernels |
-| **Intel FlexRAN** | Xeon AVX-512/AMX + optional vRAN FPGA (ACC100/200) | Software PHY with FPGA offload for FEC |
-| **Marvell OCTEON 10 Fusion** | DPU + ML accelerator | Inline DU PHY for O-RAN |
-| **AMD T2 (Pensando)** | Adaptive SoC + ML engines | Vendor-specific O-RAN DU |
-
-> **Key Insight:** Inline PHY ML is hardest where you'd expect — the **UE modem**, with tens of milliwatts to spare and microsecond budgets. The basement (DU/gNB) has effectively unlimited compute by comparison; the engineering problem there is **scheduling latency and determinism**, not throughput.
-
----
-
-## Part B — RAN-Level ML and the O-RAN RIC
-
-The 3GPP PHY processes a slot in **microseconds**. The MAC scheduler runs every 1 ms. RRM (resource management) decisions happen on tens of milliseconds. Above that — load balancing, energy savings, mobility, anomaly detection — there is a **seconds-to-minutes** loop that is the natural home of "infrastructure ML".
-
-O-RAN formalized this with the **RIC (RAN Intelligent Controller)**:
-
-```
-   ┌──────────────────────────────────────────────────────────┐
-   │              Non-RT RIC  (in SMO, > 1 s)                  │
-   │   rApps: training pipelines, policy generation, A1 mgmt   │
-   │                  GPU/CPU servers, off-RAN                 │
-   └──────────────────────────┬───────────────────────────────┘
-                              │ A1 (policy/intent)
-                              ▼
-   ┌──────────────────────────────────────────────────────────┐
-   │             Near-RT RIC  (10 ms – 1 s)                    │
-   │   xApps: traffic steering, QoS, anomaly det., handover    │
-   │             CPU + GPU/FPGA accelerator                    │
-   └──────────────────────────┬───────────────────────────────┘
-                              │ E2 (per-cell telemetry + actions)
-                              ▼
-   ┌──────────────────────────────────────────────────────────┐
-   │   O-CU  ◄────►  O-DU  ◄────►  O-RU                        │
-   │                  ▲                                        │
-   │              (μs–ms PHY/MAC, inline ML here)              │
-   └──────────────────────────────────────────────────────────┘
-```
-
-### B.1 What runs as an xApp
-
-* **Traffic steering** — pick which cell / carrier a UE should be on, given load and QoS class.
-* **MIMO mode selection** — SU- vs MU-MIMO, rank adaptation, codebook selection.
-* **Energy savings** — switch off cells / carriers / antenna ports under low load (3GPP TR 38.864).
-* **Anomaly / intrusion detection** — flag rogue base stations, jammers, IMSI catchers.
-* **QoS prediction** — predict throughput on a route (e.g., for V2X).
-
-These are mostly **contextual bandits** or **lightweight DRL**. The decision interval is comfortable, but the action space can be large (think: "for each of 1000 UEs, pick one of 8 cells, every 100 ms"), so model size is gated by inference latency × cell count, not by accuracy.
-
-### B.2 What runs as an rApp
-
-The Non-RT RIC handles **training**. An rApp typically:
-
-1. Pulls aggregated KPIs and per-UE traces from the SMO data lake.
-2. Trains a model (often offline, often on GPUs in a colo).
-3. Pushes the model artifact + a **policy** to one or more xApps via A1.
-
-This is where ML pipelines look most like conventional MLOps — Kubeflow, Airflow, MLflow, model registry. The interesting wrinkle is that the **deployment target** (an xApp on a near-RT RIC) has hard latency constraints that the training job must respect.
-
-### B.3 ML for energy savings — the load-bearing use case
-
-Operators care about wireless ML mostly because it **reduces opex**. Cell carriers consume **40–60% of RAN energy**. ML-driven cell shutdown decisions, based on predicted traffic and mobility, are deployed at scale (Vodafone, DT, NTT, KDDI all have running production rApps).
-
-The model is usually unimpressive — gradient-boosted trees or a small LSTM on per-cell traffic timeseries. The **systems** problem is non-trivial:
-- Latency for waking a cell back up is 100–500 ms (RF PA warmup, sync).
-- A bad prediction = dropped session or coverage hole.
-- The policy must be **explainable** to operations staff and **bounded** (e.g., "never shut off more than N cells in this tracking area").
-
-This is a perfect case where the AI hardware engineer's job is **not** to add TOPS — it is to fit the explainability + safety harness onto a deployment that already works.
-
----
-
-## Part C — SDR + Deep Learning
-
-**Software-defined radio (SDR)** is the right teaching platform: it lets you put a real PyTorch model on real **IQ samples**. The minimum viable bench:
-
-| Hardware | Sample rate | Use |
-|---|---|---|
-| **RTL-SDR ($30)** | ≤ 2.4 MS/s | Modulation classification, FM/AIS demod |
-| **HackRF One** | 20 MS/s | Modulation classification, wideband scan |
-| **Adalm-Pluto** | 60 MS/s, TX+RX | Loopback experiments, end-to-end NN PHY |
-| **USRP B210 / B205mini** | 56 MS/s, 2×2 MIMO | Serious experiments |
-| **USRP X310 / N310** | 200 MS/s | Production-grade |
-| **Jetson Orin + USRP** | depends | Edge ML on IQ |
-
-### C.1 Modulation classification — the "hello world" of RF ML
-
-Given a snippet of IQ samples, classify the modulation (BPSK / QPSK / 16QAM / 64QAM / GFSK / OFDM / AM / FM / …). DeepSig's **RML2018.01a** dataset is the standard benchmark.
-
-A reference CNN (O'Shea / DeepSig "ResNet-style"):
-
-```python
-class ModClassNet(nn.Module):
-    def __init__(self, n_classes=24):
-        super().__init__()
-        # Input: [B, 2, 1024]  (I/Q over 1024 samples)
-        self.features = nn.Sequential(
-            nn.Conv1d(2, 64, 7, padding=3), nn.ReLU(), nn.MaxPool1d(2),
-            nn.Conv1d(64, 64, 5, padding=2), nn.ReLU(), nn.MaxPool1d(2),
-            nn.Conv1d(64, 64, 3, padding=1), nn.ReLU(), nn.AdaptiveAvgPool1d(1),
-        )
-        self.head = nn.Linear(64, n_classes)
-    def forward(self, x):
-        return self.head(self.features(x).squeeze(-1))
-```
-
-On RML2018.01a, this kind of model hits ~80% top-1 above 10 dB SNR (vs ~60% for handcrafted cumulant-based classifiers).
-
-### C.2 GNU Radio + PyTorch loopback
-
-GNU Radio flowgraphs are how SDR work actually happens. The PyTorch interface is a custom Python block:
-
-```python
-# torch_classifier_block.py — GNU Radio sink that runs a PyTorch model
-import numpy as np
-import torch
-from gnuradio import gr
-
-class TorchClassifier(gr.sync_block):
-    def __init__(self, model_path, window=1024):
-        gr.sync_block.__init__(
-            self,
-            name="torch_classifier",
-            in_sig=[np.complex64],
-            out_sig=None,
-        )
-        self.window = window
-        self.model = torch.jit.load(model_path).eval().cuda()
-        self.buf = np.zeros(window, dtype=np.complex64)
-
-    def work(self, input_items, output_items):
-        x = input_items[0][: self.window]
-        if len(x) < self.window:
-            return len(x)
-        iq = np.stack([x.real, x.imag], axis=0)             # [2, W]
-        t = torch.from_numpy(iq).float().unsqueeze(0).cuda()
-        with torch.no_grad():
-            logits = self.model(t)
-        # publish via stream tags / ZMQ / gr.tag_t — flow-graph specific
-        return len(x)
-```
-
-The realistic pitfalls:
-
-* **Sample-rate mismatch** — train at the *same* sample rate (or with the *same* resampling) you'll deploy at, otherwise the IQ statistics change.
-* **DC offset / IQ imbalance** — every SDR has them; either calibrate or include them in training augmentations.
-* **Frequency offset** — randomize during training; classifiers that assume perfectly synced carriers fall apart at SNRs they were trained on.
-* **Frame boundary** — for protocols with packet structure (Wi-Fi, BLE), align the input window with the preamble or accept the alignment as random and train accordingly.
-
-### C.3 RF fingerprinting — the security-adjacent use case
-
-Two transmitters running the *same* standard produce subtly different IQ tails because of **unique RF impairments** (PA nonlinearity, oscillator phase noise, mixer leakage). Models trained on **raw IQ** can distinguish individual devices — useful for authentication ("is this really my device?") and adversarial ("is this device the one that was advertised?").
-
-The hardware story: this works well on **Jetson Orin Nano** sitting next to an SDR, because the classifier is small and the **bottleneck is RF, not compute**. It is a clean roadmap project that exercises the entire embedded-AI stack.
-
-### C.4 Where ML helps vs where it doesn't (in SDR)
-
-| Task | ML helps? | Why |
-|---|---|---|
-| Modulation classification (low SNR) | **Yes** | Beats hand-engineered features |
-| Carrier / timing sync | Rarely | Mature classical algorithms, hard to beat |
-| FFT / channelization | **No** | DSP wins on power and predictability |
-| Spectrum sensing (cognitive radio) | **Yes** | Captures non-Gaussian interference |
-| Direction finding (DoA) | Sometimes | NN-MUSIC competitive in low snapshot regimes |
-| Decoding known protocols (Wi-Fi, BLE) | **No** | Standards-compliant decoders are optimal and free |
-| Decoding **unknown** protocols | **Yes** | The whole point of "RF reverse engineering" |
-
----
-
-## Where Inference Actually Lives — A Latency Map
-
-```
-   Budget       Block                            Hardware
-   ───────────────────────────────────────────────────────────────
-   ~ns          Per-sample IQ processing         RFIC / dedicated DSP
-                (filters, mixers, FFT)
-   ~µs          Per-OFDM-symbol                  FPGA / hard accel
-                (timing sync, FFT, eq.)
-   ~10 µs       Per-RE demap, LLR                NPU / GPU tensor core
-   ~100 µs      Per-slot channel est.,           NPU / GPU
-                MIMO detect, decode
-   ~1 ms        Per-TTI MAC scheduling           CPU + small NPU hints
-   ~10 ms       Link adaptation, BSR/PHR proc.   CPU
-   ~100 ms      Mobility prediction, beam mgmt   xApp on near-RT RIC
-   ~1 s         Cell on/off, slice allocation    xApp / rApp
-   ~min         Capacity planning, fault triage  rApp / SMO ML platform
-   ~hour+       Network design, model retraining offline GPU clusters
-```
-
-This is the hardware engineer's map. The "where does ML belong on this radio?" question reduces to: **which row of this table am I in?** Each row dictates a different accelerator, a different programming model, a different deployment cadence, and a different risk profile when the model is wrong.
-
----
-
-## Hands-On Exercises
-
-1. **Neural channel estimator on synthetic 3GPP data.** Generate a TDL-C channel realization (Python: `py3gpp` or `sionna`). Compute LS pilot estimates, train the `ChannelEstNet` from §A.1 to denoise/interpolate to the full grid. Compare MSE vs LMMSE at SNRs from −5 to 25 dB. Then quantize to INT8 (PTQ) and re-measure — expect <0.5 dB degradation; if you see more, your activation range calibration is wrong.
-
-2. **Neural demapper drop-in.** Build a 64-QAM transmitter and an OFDM receiver in Sionna (NVIDIA's GPU-accelerated link-level simulator). Replace its analytic demapper with the `NeuralDemapper` from §A.2. Measure BLER vs SNR with and without the neural block. Profile inference latency on the host GPU and on a Jetson Orin (TensorRT FP16 and INT8).
-
-3. **Modulation classifier on real IQ.** Capture 30 minutes of IQ in a busy ISM band with an RTL-SDR or HackRF. Slice into 1024-sample windows. Train the `ModClassNet` from §C.1 on **synthetic** GNU Radio data (so labels are correct). Run inference on the captured real data; compare predictions to what you can identify by hand on a waterfall. Document where the model is over-confident.
-
-4. **GNU Radio + PyTorch pipeline.** Build a flowgraph: `osmocom_source` → `low_pass_filter` → `torch_classifier_block` → `file_sink`. Run on Jetson Orin Nano with TensorRT-converted weights. Measure end-to-end latency from RF tap to classification publish, and identify the dominant cost (IQ DMA, host↔device copy, inference, post-processing).
-
-5. **Hardware sizing exercise.** Pick a target air interface (Wi-Fi 7, 5G FR1 100 MHz, 5G FR2 400 MHz, LEO Ka-band). Choose **one** PHY block to neuralize. Derive:
-   - MACs/sec and bytes/sec at the block's input and output,
-   - the implied SRAM working-set,
-   - the silicon area at 5 nm with a reasonable MAC/mm² figure,
-   - whether the block fits in the modem's existing NPU or needs a dedicated tile.
-
-   Compare to public information about a deployed modem (e.g., Snapdragon X80 reference docs). Identify where your estimate is off and why.
-
-6. **Pick an O-RAN xApp and read the E2 spec.** Skim O-RAN.WG3.E2SM-KPM and pick a target use case (e.g., traffic steering). Sketch the data flow from per-UE KPI report → xApp model inference → A1 / RIC control message. Note the **action latency** budget (typically 10–100 ms) and identify what model size that lets you ship.
-
----
-
-## Key Takeaways
-
-| Takeaway | Why it matters for AI hardware |
-|---|---|
-| Channel estimation is the most mature deployed PHY-ML block | If you're designing a modem NPU, the workload profile starts here |
-| The latency ladder dictates the accelerator | µs jobs go to FPGA/NPU, ms jobs to CPU+NPU, seconds+ go to GPU servers |
-| Inline PHY ML is bandwidth-bound, not compute-bound | Layout, tiling, and SRAM design dominate; raw TOPS is a vanity metric |
-| O-RAN's RIC is the canonical home for "slow ML" in wireless | Standardized telemetry (E2/A1) means MLOps tools transfer cleanly |
-| End-to-end autoencoder PHY exists but doesn't ship in 3GPP | Useful for non-cellular niches; doesn't drive cellular silicon roadmaps yet |
-| Beam management is the next standardized ML block (3GPP Rel-19) | First normative ML in cellular standards — silicon vendors will react |
-| SDR + a Jetson is the right teaching bench | You can build a complete neural-receiver demo with off-the-shelf parts |
-
----
-
-## Resources
-
-* **[NVIDIA Sionna](https://nvlabs.github.io/sionna/):** GPU-accelerated link-level simulator with first-class PyTorch / JAX integration. The reference platform for PHY-ML research.
-* **[NVIDIA Aerial / cuPHY](https://developer.nvidia.com/aerial):** Production GPU-resident PHY for 5G/6G gNB DU.
-* **[Intel FlexRAN Reference Architecture](https://networkbuilders.intel.com/solutionslibrary/flexran):** CPU+FPGA reference for software RAN — useful counterpoint to Aerial.
-* **[O-RAN Alliance Specifications](https://www.o-ran.org/specifications):** The canonical place to read about RIC, E2, A1, and ML use cases. Start with WG2 (Non-RT RIC) and WG3 (Near-RT RIC).
-* **[3GPP TR 38.843 — AI/ML for the air interface](https://www.3gpp.org/dynareport/38843.htm):** The study report behind the Rel-19 normative work; covers CSI feedback, beam management, positioning.
-* **[DeepSig RadioML datasets](https://www.deepsig.ai/datasets):** RML2016 / RML2018 — the standard benchmarks for modulation classification.
-* **["An Introduction to Deep Learning for the Physical Layer," O'Shea & Hoydis (2017)](https://arxiv.org/abs/1702.00832):** The foundational autoencoder-PHY paper. Read this once.
-* **["Machine Learning at the Wireless Edge," Park et al.](https://ieeexplore.ieee.org/document/9145080):** Survey covering edge-ML hardware constraints in wireless.
-* **[Qualcomm Wireless AI Research](https://www.qualcomm.com/research/artificial-intelligence/wireless-ai):** Publications and white papers from the team behind Hexagon-resident PHY ML.
-* **[GNU Radio](https://www.gnuradio.org/) + [gr-torch](https://github.com/gnuradio):** SDR framework + community PyTorch integrations.
-* **[Adalm-Pluto Getting Started](https://wiki.analog.com/university/tools/pluto):** Cheapest TX-capable SDR — good for end-to-end NN PHY loopback labs.
+**Deliverable:** submit the JSON receiver report, passing tests, a channel-shift plot or table, and a one-page bandwidth/timing calculation. Explain one failed hypothesis using the measured result.

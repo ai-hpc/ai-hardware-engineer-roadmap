@@ -1,0 +1,18 @@
+{
+  "review_date": "2026-10-18",
+  "compiler": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "tests_passed": 3,
+  "valid_shapes": 512,
+  "rounding_cases": 240,
+  "bank_cases": 6,
+  "mutations_detected": [
+    "drop partial unroll group",
+    "wrap instead of output saturation"
+  ],
+  "scope": "actual host C++ execution and analytical bank lower bounds; no HLS tool, synthesis, implementation, or board run",
+  "sha256": {
+    "matvec_contract.h": "66e4448a85ab3e1c96463f826b68f22f083414c1ade020a92001f3ce9e0bc1ad",
+    "verify_contract.cpp": "5d37e04d1956e29e00754b0009f26adceffc0a5e8403ef9b5b4a8a660eeff332",
+    "test_matvec_contract.py": "3aa18331344c7bd79a56cf8f1b4378e022bf5a925bca8ce6bdf9352e9691b306"
+  }
+}

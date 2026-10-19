@@ -1,0 +1,38 @@
+{
+  "scope": "CPU component microbenchmark; no model inference",
+  "fixture_bytes": 832,
+  "batches": 7,
+  "parses_per_batch": 100,
+  "draws_per_batch": 30,
+  "vocabulary": 32000,
+  "temperature": 0.7,
+  "top_k": 40,
+  "top_p": 0.9,
+  "seed": 7,
+  "parse_us_per_operation": [
+    11.35278,
+    13.81879,
+    14.74901,
+    12.74338,
+    15.12151,
+    14.8371,
+    14.20659
+  ],
+  "sample_us_per_operation": [
+    2883.872933,
+    2952.1174,
+    2770.600533,
+    2904.6041,
+    2811.616133,
+    3034.890633,
+    2932.144633
+  ],
+  "checksum": 3616479,
+  "host": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3",
+  "fixture_sha256": "bbd15e7b1c04b8d10962a1b94d16652972c92bf6c5586a831777f0ace46913a7",
+  "executable_sha256": "af282ad7668e3687dc3107c2b92e5f22de0b5181f6aa2f7684570ef1c142e3e0",
+  "timing_note": "Seven batch means; cached tiny file; shared host; not tail latency or model tokens/s.",
+  "parse_median_batch_mean_us": 14.20659,
+  "sample_median_batch_mean_us": 2904.6041
+}

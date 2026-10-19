@@ -1,4 +1,4 @@
-# Jetson LLM Runtime — Memory-First Inference Engine
+# Experimental native LLM runtime: audit correctness before speed
 
 <div class="course-identity auto-course" style="--course-accent: #65a30d; --course-accent-rgb: 101, 163, 13;" markdown="1">
 <div class="course-identity__icon">JLRM</div>
@@ -9,211 +9,66 @@
 </div>
 </div>
 
+**Reviewed 18 October 2026.** This course's [native C++/CUDA project](../../../../Projects/jetson-llm-runtime/README.md) is an experimental implementation for studying model loading, memory accounting, tokenization and kernel validation. Source files and test names do not by themselves establish coherent generation, complete model support or a performance improvement.
 
-**Parent:** [ML and AI](../Guide.md)
+Read the project's current [testing/status record](../../../../Projects/jetson-llm-runtime/TESTING.md) for checks actually executed. This lesson does not claim a Jetson GPU run, supported production model matrix, or superiority over an established runtime.
 
-> **Build a Jetson-native LLM runtime that treats memory as the primary constraint.** Not a fork of llama.cpp — a ground-up engine designed for 8 GB unified memory, with Orin-tuned CUDA kernels, power-aware inference, and zero-allocation decode.
+Start with the [native CPU lab](../../../../Projects/jetson-llm-runtime/labs/README.md): build the actual C++ sampler, GGUF parser and configuration reader, then inspect small generated binary fixtures. The tokenizer deliberately supports only the `course.greedy.bytes` teaching profile; ordinary pretrained tokenizer profiles are rejected. Passing those component tests does not establish pretrained text generation.
 
-**Source code:** [`Projects/jetson-llm-runtime/README.md`](../../../../Projects/jetson-llm-runtime/README.md)
-**Testing guide:** [`TESTING.md`](../../../../Projects/jetson-llm-runtime/TESTING.md)
+## 1. What a runtime must preserve
 
----
+A working decoder joins several contracts:
 
-## Why This Exists
-
-| Runtime | Good at | Bad on Jetson 8 GB |
-|---------|---------|-------------------|
-| **llama.cpp** | Portable, easy | Generic kernels, no memory awareness, no power integration |
-| **TensorRT-LLM** | Maximum speed | Heavy build pipeline, designed for datacenter |
-| **Ollama** | One-command UX | Wraps llama.cpp, adds overhead |
-| **jetson-llm** | Memory-first, Orin-native | You build and maintain it |
-
-The gap: **no existing runtime is designed around the 8 GB unified memory constraint.**
-
----
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────────────┐
-│                   jetson-llm                          │
-│                                                       │
-│  Serving Layer                                        │
-│    POST /v1/chat/completions | GET /health            │
-│                                                       │
-│  Engine                                               │
-│    GGUF load → tokenize → prefill → decode → sample  │
-│    transformer_layer() × N per token                  │
-│    OOM guard + thermal check per token                │
-│                                                       │
-│  CUDA Kernels (SM 8.7 only)                           │
-│    gemv_q4 | fused_rmsnorm | flash_attn | rope        │
-│    swiglu | softmax | fp16↔int8                       │
-│                                                       │
-│  Memory Manager                                       │
-│    MemoryBudget | OOMGuard | KVCachePool | ScratchPool│
-│                                                       │
-│  Jetson HAL                                           │
-│    PowerState | ThermalState | LiveStats               │
-└──────────────────────────────────────────────────────┘
+```text
+bytes and metadata → typed tensors → model equations → logits
+text → exact tokenizer/template → token IDs → positions/masks
+logits → sampling → token IDs → exact detokenizer → text
 ```
 
----
+Every arrow can fail independently. Matching a generated sentence on one prompt is weak evidence: it may conceal a wrong vocabulary, transposed weight, cache position or attention grouping.
 
-## Implementation Status
+The [CPU ONNX lab](../cpu-export-quantization/Guide.md) offers an executable example of reference output comparison, shape checks and deliberate failures. Apply that discipline to each native component.
 
-**4,200+ lines across 30 files. All components implemented.**
+## 2. Tokenization is part of the model
 
-| Layer | Components | Status |
-|-------|-----------|--------|
-| **Memory** | Budget tracker, OOM guard, tiered KV cache (pinned + overflow), scratch bump allocator | ✅ Implemented + tested |
-| **Jetson HAL** | Power mode reader, thermal zones + adaptive backoff, system probe, live stats | ✅ Implemented + tested |
-| **CUDA Kernels** | gemv_q4 (INT4 dequant-fused), fused_rmsnorm, flash_attention_decode, rope, softmax, fp16↔int8, swiglu | ✅ Implemented + 5 correctness tests |
-| **Engine** | GGUF config parser, tensor info parser, weight mapping, tokenizer (GGUF vocab), transformer forward pass (12 ops/layer), sampling (top-k/top-p/temp) | ✅ Implemented |
-| **CLI** | Interactive chat, single prompt, verbose mode, OOM pre-check | ✅ Implemented |
-| **Server** | OpenAI-compatible /v1/chat/completions, /health, /v1/models | ✅ Implemented |
-| **Scripts** | setup_jetson.sh, bench.sh, profile.sh | ✅ Ready |
-| **Tests** | test_memory (3), test_kernels (5), test_model_load (8) | ✅ Ready |
+A greedy longest-string-match tokenizer is not automatically equivalent to BPE, SentencePiece or another model tokenizer. Merge ranks, normalization, byte fallback, whitespace, added tokens, BOS/EOS rules and chat templates matter. The model was trained on particular IDs, not just visually similar text.
 
-### Previously addressed issues — verify on the target
+Create golden token-ID fixtures from the model's pinned reference tokenizer for empty text, repeated spaces, line breaks, non-ASCII text, literal special-token strings and a complete conversation. Compare both encoding and decoding. Preserve unsupported input as an explicit error rather than silently dropping unknown bytes.
 
-All 8 known bugs have been fixed in the codebase:
+**Worked failure:** vocabulary contains `a`, `b`, `c`, `ab`, `bc`. Greedy longest match on `abc` can choose `ab,c`; BPE merge priorities can choose `a,bc`. Both decode to the same string but feed different embeddings to the transformer. Round-trip text equality alone cannot validate tokenization.
 
-| # | Bug | Fix |
-|---|-----|-----|
-| 1 | GGUF offset miscalculation | Exact type sizes via `gguf_scalar_size()` helper |
-| 2 | Residual not chained | Added `vec_add()` kernel between attention and FFN |
-| 3 | Wrong memcpy direction | `cudaMemcpyDefault` (works for unified + discrete) |
-| 4 | Missing include | Added `#include <sys/mman.h>` |
-| 5 | Empty CUDA graph | Full graph capture with all transformer layers |
-| 6 | Broken attention accumulator | Per-dimension `s_out[head_dim]` in shared memory |
-| 7 | No FP32 logits | Added `fp16_to_fp32()` GPU conversion kernel |
-| 8 | Slow tokenizer O(V×L) | Hash map `token_to_id_` + longest-match-first |
+## 3. Parse a model as structured binary data
 
-**Target validation required:** use the linked testing guide to establish build, correctness, and performance results on the actual Jetson/BSP. Implementation presence and this issue list do not certify a working deployment.
+A GGUF loader must validate magic/version, bounded counts and string lengths, tensor shapes/types, alignment, byte spans, overflow and truncated reads. Do not guess the width of an unknown metadata type and continue: one wrong skip shifts all following fields.
 
----
+Distinguish a file-level quantization label such as Q4_K_M from each tensor's actual encoding. A mixed quantization can contain several tensor types. A loader supporting one block decoder cannot claim support for the entire file based only on its filename.
 
-## Milestone Roadmap
+Use tiny generated fixtures before large files: a valid single tensor, one truncated metadata array, an overflowing dimension product, an unknown type, a tensor span beyond EOF and an incorrect alignment. Require a clear failure result and no invalid memory access. See the upstream [GGUF specification](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md).
 
-```
-v0.1 — First Tokens
-  ✅ All 8 bugs fixed
-  ○ Build on Jetson, test_model_load passes
-  ○ Generate coherent text
+## 4. Compare kernels with independent references
 
-v0.2 — Benchmark Baseline
-  ○ bench.sh produces tok/s numbers
-  ○ Compare against stock llama.cpp
-  ○ Fix tokenizer performance (#8)
+For GEMV, use a non-square matrix with positive/negative values and compare against a CPU double-precision sum. For quantized GEMV, validate the block dequantizer separately before testing multiplication. For attention, use a small example with multiple query heads sharing fewer KV heads, several cache lengths, a causal mask and large logits that require stable softmax.
 
-v0.3 — Performance Target
-  ○ >20% faster than llama.cpp on decode
-  ○ CUDA graph for decode loop
-  ○ Streaming SSE in server
+Test prompt prefill followed by incremental decode against full-sequence recomputation. Correct single-token attention does not prove that cache offsets, RoPE positions or graph replay update properly across tokens.
 
-v0.4 — Production Ready
-  ○ 24-hour stability test
-  ○ Chat template support
-  ○ systemd auto-start
-  ○ Documented performance table across models
-```
+Declare absolute and relative tolerances per dtype and operation. Use finite checks and compare near-zero values sensibly. Floating-point reduction order changes are not necessarily bugs; a large change hidden by cosine similarity may still change the selected token.
 
----
+## 5. Query hardware rather than invent constants
 
-## Design Principles
+Orin Nano has no DLA. Its memory capacity and bandwidth are shared resources; a power mode changes clocks and limits, not the physical number of GPU units. Read the actual device properties for SM count, shared-memory capacity and supported features, and verify the exact module specifications.
 
-### 1. Memory-First
+A roofline ridge point needs consistent units. If a hypothetical peak is 67 TOPS and bandwidth is 102 GB/s, the ratio is about **657 operations/byte**, not 0.657. Sparse INT8 TOPS cannot be used as the dense FP16 peak without changing the comparison. Use the [memory lesson](../../../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Memory-Architecture/Guide.md) and [current compatibility record](../../../Compatibility.md).
 
-Every decision optimizes for the 8 GB unified memory budget:
+Pinned or mapped host memory is not an extra physical memory bank. CPU/GPU accessibility does not establish cache coherence behavior, registration eligibility, lifetime, or performance. Check the allocation contract and synchronize ownership before reuse.
 
-- **MemoryBudget** tracks where every MB goes (OS, CMA, CUDA, model, KV, scratch)
-- **OOMGuard** checks `/proc/meminfo` before every KV cache extension
-- **KVCachePool** uses pinned memory (fast) with unpinned overflow (still zero-copy on unified mem)
-- **ScratchPool** bump allocator — zero `malloc`/`free` during inference
-- Context length auto-calculated from remaining memory after model load
+## 6. Treat serving as another correctness boundary
 
-### 2. Orin-Only
+A server needs bounded input size, valid request parsing, supported parameters, a defined error response, cancellation, request ownership and cache isolation. A route named `/v1/chat/completions` does not establish complete compatibility with every client's protocol.
 
-No code paths for x86, discrete GPUs, or desktop hardware:
+Use two distinct prompts in alternating requests and verify their caches remain separate. Cancel a long request, then submit a short one. Test malformed JSON and out-of-range generation limits. Report unsupported features instead of accepting them and silently ignoring their values.
 
-- `CMAKE_CUDA_ARCHITECTURES="87"` — SM 8.7 only
-- Tile sizes tuned for 48 KB shared memory (not 164 KB like H100)
-- Block size 128 threads (4 warps — good occupancy on 16 SMs)
-- INT4 dequant fused into GEMV (3.5× less bandwidth than FP16)
-- sysfs paths are Jetson-specific (`/sys/devices/17000000.ga10b/`)
+## 7. Completion artifact
 
-### 3. Power/Thermal Aware
+Choose one native component. Document its input/output contract, add an independent reference case and a negative case, and run the applicable tests from [TESTING.md](../../../../Projects/jetson-llm-runtime/TESTING.md). Then explain what the result establishes and which GPU/model checks remain pending.
 
-- Reads nvpmodel power state (7W / 10W / 15W / 25W)
-- Thermal monitoring with adaptive backoff (80°C → 85°C → 90°C → 95°C)
-- Generation stops gracefully on OOM risk or extreme heat
-
-### 4. Zero-Copy on Unified Memory
-
-Jetson's CPU and GPU share the same DRAM — exploit this:
-
-- Model weights: mmap + `cudaHostRegister` (GPU reads mmap'd file directly)
-- KV cache: `cudaMallocHost` (both CPU and GPU access without copy)
-- "CPU offload" of old KV entries is just an allocation type change, not a physical copy
-
----
-
-## Key Files
-
-| File | Purpose |
-|------|---------|
-| `include/jllm.h` | Orin constants (16 SMs, 48 KB shared, 102 GB/s, 0.66 ridge point) |
-| `include/jllm_memory.h` | MemoryBudget, OOMGuard, KVCachePool, ScratchPool |
-| `include/jllm_kernels.h` | Kernel API with Orin-optimal tile/block sizes |
-| `src/kernels/gemv_q4.cu` | INT4 dequant-fused GEMV — 38% of decode time |
-| `src/kernels/attention.cu` | Flash attention with online softmax, GQA, INT8 KV |
-| `src/engine/decode.cpp` | Transformer forward pass (12 ops/layer) + generation loop |
-| `src/engine/model.cpp` | GGUF parser + mmap + tensor name→pointer mapping |
-| `src/jetson/thermal.cpp` | Thermal zone reader + adaptive backoff schedule |
-
----
-
-## How to Test
-
-Start with **TinyLlama 1.1B Q4_K_M** (669 MB) — small, fast, same architecture as target:
-
-```bash
-# Build
-./scripts/setup_jetson.sh
-
-# Test without model
-./build/test_memory
-./build/test_kernels
-
-# Test with model
-./build/test_model_load model.gguf
-./build/jetson-llm -m model.gguf -p "What is 2+2?" -n 32
-
-# Benchmark
-./scripts/bench.sh model.gguf
-```
-
-Full testing guide: [`TESTING.md`](../../../../Projects/jetson-llm-runtime/TESTING.md)
-
----
-
-## Resources
-
-| Resource | What for |
-|----------|----------|
-| [Source code](../../../../Projects/jetson-llm-runtime/README.md) | The actual implementation |
-| [TESTING.md](../../../../Projects/jetson-llm-runtime/TESTING.md) | 10-step testing guide |
-| [Orin Nano Memory Architecture](../../../1.%20Nvidia%20Jetson%20Platform/Orin-Nano-Memory-Architecture/Guide.md) | Unified memory deep dive |
-| [LLM Optimization on Jetson](../llm-optimization-jetson/Guide.md) | Quantization, model selection, FlashAttention |
-| [llama.cpp](https://github.com/ggerganov/llama.cpp) | Reference GGUF runtime |
-| [GGML CUDA kernels](https://github.com/ggerganov/llama.cpp/tree/master/ggml/src/ggml-cuda) | Reference kernel implementations |
-
-
-## Integration lab: Can runtime speedup survive request cancellation and changing context?
-
-Run the project at fixed prompt/output lengths, then vary context and cancel one request. Record model hash, tokenizer, runtime commit, cache dtype, and scheduling settings.
-
-**Acceptance evidence:** Separate prefill, first-token latency, decode inter-token latency, and aggregate throughput. Confirm cancelled work releases ownership and does not contaminate the next response.
-
-**Continue:** take this artifact to [llm-optimization-jetson](../llm-optimization-jetson/Guide.md). Explain which assumption from this course the next engineer must preserve.
+**Diagnostic answers:** a passing binary parser test does not prove valid inference; readable output does not prove tokenizer equivalence; a memory budget is not an allocation guarantee; and a faster wrong kernel is not an optimization. Continue with [LLM memory and measurement](../llm-optimization-jetson/Guide.md).

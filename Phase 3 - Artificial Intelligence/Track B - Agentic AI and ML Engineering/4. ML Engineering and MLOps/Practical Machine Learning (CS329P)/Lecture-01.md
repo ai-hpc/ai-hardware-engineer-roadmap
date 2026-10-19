@@ -73,12 +73,12 @@ A specific raw-data skill the course calls out is **data integration** — combi
 If there is no dataset to find, the rightmost branch of the flow chart is **generate it**:
 
 - **GANs** — synthesize realistic samples. The slides cite `thispersondoesnotexist.com` (synthetic faces) and synthetic furnished-room imagery (Gadde et al., ICCV'21).
-- **Simulation** — render perfectly labeled data from a simulator, the dominant approach for rare events in autonomous driving (more below).
+- **Simulation** — render labels defined by a simulator. Label correctness inside the simulator does not establish physical realism or transfer to actual sensors.
 - **Data augmentation** — the everyday workhorse. Cheap label-preserving transforms multiply an existing labeled set: image augmentation (crop, flip, color jitter — e.g. the `imgaug` library) for vision, and **back-translation** (translate to another language and back) to paraphrase text.
 
 The summary the course lands on: finding the right data is hard; raw industrial data is the norm; data integration stitches sources together; augmentation is standard practice; and **synthesizing data is getting popular**. That last line was prescient.
 
-> **2026 update:** "synthesizing data is getting popular" became the **data-centric AI** movement and then the default. The 2021 toolkit was GANs + augmentation; in 2026 the dominant synthetic-data engine is the **LLM**. Teams generate instruction-tuning corpora, classifier training sets, and eval suites by prompting frontier models, then filter for quality — distillation of capability through data rather than weights. The practitioner's risk shifts from *not enough data* to **model collapse** (training on your own model's outputs until diversity decays) and **contamination** (synthetic or scraped text leaking your benchmark into the training set). When you generate data with an LLM, keep a human-verified seed set, measure diversity, and hold out a clean, provably-uncontaminated eval split.
+> **2026 update:** "synthesizing data is getting popular" became the **data-centric AI** movement and then the default. The 2021 toolkit was GANs + augmentation; in 2026 the dominant synthetic-data engine is the **LLM**. Teams generate instruction-tuning corpora, classifier training sets, and eval suites by prompting frontier models, then filter for quality — distillation of capability through data rather than weights. The practitioner's risk shifts from *not enough data* to **model collapse** (training on your own model's outputs until diversity decays) and **contamination** (synthetic or scraped text leaking your benchmark into the training set). When you generate data with an LLM, keep a human-verified seed set, measure diversity, and hold out an independently collected evaluation split with documented provenance. For opaque pretrained models, complete absence of prior exposure may be impossible to prove; state that limit.
 
 ---
 
@@ -167,21 +167,21 @@ The confidence threshold in step 3 is the whole game — keep everything and you
 
 **Active learning** is the same small-labeled / large-unlabeled scenario, but with a **human in the loop**. The contrast with self-training is exact and worth memorizing:
 
-- **Self-training:** the model propagates labels to the data it is *most confident* about (cheap, automatic, low-risk).
+- **Self-training:** the model propagates labels to the data it is *most confident* about (cheap and automatic, but capable of reinforcing confident mistakes).
 - **Active learning:** the model selects the *most interesting / most uncertain* data and asks a **human** to label it (expensive, manual, high-information).
 
 The two query strategies the course names:
 
 | Strategy | Selects examples where… | Intuition |
 |---|---|---|
-| **Uncertainty sampling** | the prediction is least confident — the top class score is near random (≈ 1/n) | the model is on the fence, so a label resolves the most doubt |
+| **Uncertainty sampling** | choose a declared score, such as smallest top-class margin or largest predictive entropy | the model is on the fence, so a label resolves the most doubt |
 | **Query-by-committee** | an ensemble of models *disagrees* | disagreement marks the regions the current hypothesis class hasn't pinned down |
 
 In practice **active learning and self-training are combined**: train, predict on the unlabeled pool, auto-accept the *most* confident predictions as pseudo-labels (self-training), and route the *least* confident ones to human labelers (active learning). One pass through the unlabeled data feeds both the model and the annotation queue.
 
 ### 3.3 Crowdsourcing and quality control
 
-When you need volume that a small team can't produce, you **crowdsource**. The canonical example is **ImageNet**, labeled across millions of images via **Amazon Mechanical Turk** — it took *years and millions of dollars*. SageMaker Ground Truth's rough MTurk price card shows why task design matters:
+When you need volume that a small team can't produce, you **crowdsource**. The canonical example is **ImageNet**, labeled across millions of images via **Amazon Mechanical Turk** — it took *years and millions of dollars*. The following **historical CS329P price illustration** explains task-cost arithmetic; it is not a current vendor quotation:
 
 | Task | Estimated price |
 |---|---|
@@ -195,7 +195,7 @@ Three labeling-team challenges recur:
 - **Cost** — total cost ≈ *#tasks × time-per-task*; reduce both. Active learning attacks `#tasks`; good UI attacks time-per-task.
 - **Quality control** — labelers make mistakes, honest or not, and misread instructions. A bounding box comes back too big, too small, or around the wrong object.
 
-The standard quality-control mechanism is **redundancy + majority voting**: send the same task to multiple labelers and take the majority label. It is the simplest method and the most expensive. The refinements: send *more* copies for the controversial examples, and **prune low-quality labelers** by tracking who disagrees with the consensus.
+The standard quality-control mechanism is **redundancy + majority voting**: send the same task to multiple labelers and take the majority label. It is the simplest method and the most expensive. The refinements: send *more* copies for the controversial examples, and audit disagreement against adjudicated examples. A dissenting expert can be correct; majority agreement alone does not identify quality.
 
 ### 3.4 Weak supervision / data programming
 
@@ -213,9 +213,9 @@ The course closes labeling with the most demanding real example. **Tesla and Way
 
 - **Active learning** to find the scenarios that need more data and labels.
 - **ML auto-labeling** to pre-label and let humans correct.
-- **Simulation** to manufacture *perfectly labeled, unlimited* data for the rare and dangerous situations you can't safely collect on a real road.
+- **Simulation** to generate controlled labelled examples of rare situations. Rendering, sensor assumptions, and simulation coverage limit their usefulness; verify on independently collected real data.
 
-The summary: the ways to get labels are **self-training** (iteratively label the unlabeled pool), **crowdsourcing** (global labelers, manual), and **data programming** (heuristic programs, noisy). And the meta-point — if labels are too expensive in every form, reconsider whether you need them at all: **unsupervised and self-supervised learning** sidestep the labeling problem entirely.
+The summary: the ways to get labels are **self-training** (iteratively label the unlabeled pool), **crowdsourcing** (global labelers, manual), and **data programming** (heuristic programs, noisy). And the meta-point — if labels are too expensive in every form, reconsider whether you need them at all: **unsupervised and self-supervised learning** can reduce the amount of labelled training data, while downstream evaluation still needs a defensible target and reference.
 
 > **2026 update:** self-supervised pretraining won the framing the slide hints at. The default 2026 pipeline is *pretrain self-supervised on unlabeled data, then label only a small set for the downstream task* — exactly the SSL regime, but the "unlabeled" stage now does most of the work. Programmatic labeling generalized from Snorkel-style functions to **LLM-as-labeler**: prompt a strong model to annotate, treat its output as a (very capable) noisy labeling function, and reconcile it against cheap human spot-checks. The economics flipped — the bottleneck is no longer *getting* labels but *trusting* them, which is why quality control (redundancy, consensus, auditing the auto-labeler) is now the part of this lecture that scales worst and matters most.
 
@@ -226,3 +226,10 @@ The summary: the ways to get labels are **self-training** (iteratively label the
 The spine of this lecture — the acquisition flow chart, the dataset catalog and the academic-vs-competition-vs-raw tradeoff, data integration by key joins, GAN/simulation/augmentation generation, the Zillow scraping case study with its cost arithmetic, the robots.txt/ToS/legal cautions, and the labeling stack (self-training, active learning with uncertainty sampling and query-by-committee, crowdsourcing with majority-vote quality control, and Snorkel-style data programming) — is taught as the **original Stanford CS329P (2021 Fall)** material and tracks the slides directly. The **2026 refresh** layer flags what moved since: LLM-generated synthetic data and the data-centric-AI movement, the hardened legal landscape for generative-model training data (the EU AI Act and the 2023–2025 scraping litigation), and LLM-as-labeler programmatic annotation with its new trust-and-contamination failure modes. The Exploratory Data Analysis companion remains a hands-on notebook, not a lecture. Reviewed June 2026.
 
 *Adapted from [Stanford CS329P](https://c.d2l.ai/stanford-cs329p) — Huang, Li & Smola, CC-BY-SA-4.0.*
+
+
+## Worked acquisition decision
+
+A robot log has 10,000 frames but only 20 collection episodes. Split episodes before creating augmented views. A camera flip may preserve “obstacle present” but reverse the correct left/right steering label; preserve or transform the label deliberately. If one episode contributes 200 near-duplicate images, that is not 200 independent environments.
+
+**Artifact:** for ten sample records, retain source/permission, episode/time, sensor units, original label, labeling method, and any transformation. **Independent task:** find one duplicate crossing a proposed split and one unsupported pseudo-label. Repair them and explain why a model's 0.99 confidence was not a correctness guarantee. Reviewed 2026-10-18.

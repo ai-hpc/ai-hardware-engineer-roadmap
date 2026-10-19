@@ -1,200 +1,82 @@
-# 01 — L40S Hardware Architecture
+# 01 — L40S hardware and the PCIe path
 
-## 1. Die and Process
+**Outcome:** build a device/topology/memory worksheet for a named L40S server. Specification review: 2026-10-18 against [NVIDIA's L40S table](https://www.nvidia.com/en-us/data-center/l40s/). No GPU measurements are claimed.
 
-- **GPU die:** AD102 (Ada Lovelace architecture, TSMC 4N)
-- **Same die as:** RTX 4090 (consumer), but different thermal/power/firmware profile
-- **Transistors:** 76.3 billion
-- **SMs:** 142 Streaming Multiprocessors
-- **CUDA cores:** 18,176
-- **Tensor Cores:** 4th generation (FP8, FP16, BF16, TF32, INT8, INT4)
-- **FP8 TFLOPS:** ~733 TFLOPS (sparse), ~366 TFLOPS (dense)
-- **BF16 TFLOPS:** ~366 TFLOPS (sparse), ~183 TFLOPS (dense)
-- **TF32 TFLOPS:** ~183 TFLOPS (dense)
+## Read the device specification
 
-> The L40S is distinguished from L40 (no FP8) by adding FP8 Tensor Core support, making it suitable for current-generation LLM inference.
-
-## 2. GDDR6 Memory Subsystem
-
-| Property | L40S | A10 (prev gen) | A100 PCIe |
-|---|---|---|---|
-| Memory type | GDDR6 | GDDR6 | HBM2e |
-| Capacity | 48 GB | 24 GB | 80 GB |
-| Bandwidth | 864 GB/s | 600 GB/s | 1,935 GB/s |
-| Interface | 384-bit | 384-bit | 5120-bit |
-
-### GDDR6 vs HBM: Key Differences
-
-```
-GDDR6 (L40S):
-  + Cheaper to manufacture (standard PCB stacking)
-  + Higher capacity per dollar
-  + Good bandwidth for inference (memory-bound decode)
-  − ~5× less bandwidth than HBM3e
-  − PCIe attachment (shared CPU-GPU bandwidth)
-  − No on-package NVLink possible
-
-HBM3e (H200):
-  + Extreme bandwidth (4.8 TB/s per GPU)
-  + On-package with NVSwitch for GPU-GPU transfers
-  − Expensive (specialized packaging)
-  − Fixed capacity tiers (80 GB, 141 GB)
-```
-
-For LLM **decode** (the throughput bottleneck), memory bandwidth is the critical metric. L40S achieves 864 GB/s vs H200's 4.8 TB/s — the gap is significant for memory-bound workloads.
-
-### Memory Capacity Planning for 12x L40S
-
-```
-Total GPU memory: 12 × 48 GB = 576 GB
-
-Model weight allocation (FP16):
-  7B   model: 14 GB  → fits on 1 GPU (34 GB free for KV cache)
-  13B  model: 26 GB  → fits on 1 GPU (22 GB free for KV cache)
-  34B  model: 68 GB  → needs 2 GPUs (14 GB/GPU free)
-  70B  model: 140 GB → needs 3-4 GPUs (depends on KV cache needs)
-  180B model: 360 GB → needs 8-10 GPUs
-```
-
-## 3. PCIe Topology (No NVLink)
-
-The L40S uses PCIe 4.0 x16 as its only host and GPU-to-GPU interconnect. This is the most important architectural constraint to understand.
-
-### PCIe Bandwidth vs NVLink
-
-```
-PCIe 4.0 x16:   ~32 GB/s per direction (bidirectional: 64 GB/s)
-NVLink 4.0:      900 GB/s bidirectional per GPU
-
-Ratio: NVLink is 14× faster for GPU-to-GPU communication.
-```
-
-### 12-GPU PCIe Topology (Typical Server)
-
-```
-CPU 0 (socket 0)              CPU 1 (socket 1)
-   |                               |
-PCIe Root Complex 0          PCIe Root Complex 1
-   |          |                |           |
-Switch 0   Switch 1        Switch 2    Switch 3
-  / \        / \              / \          / \
-GPU0 GPU1  GPU2 GPU3       GPU4 GPU5   GPU6 GPU7
-                                       |     |
-                                      GPU8  GPU9
-                                      GPU10 GPU11
-```
-
-### Verifying PCIe Topology
-
-```bash
-# Show full topology including NUMA and PCIe relationship
-nvidia-smi topo -m
-
-# Output (simplified):
-#        GPU0 GPU1 GPU2 GPU3 ... CPU Affinity
-# GPU0    X    SYS  SYS  SYS ...   0-15
-# GPU1   SYS   X   SYS  SYS ...   0-15
-# ...
-# SYS = traverses PCIe through CPU NUMA node (highest latency)
-# NODE = traverses PCIe within same NUMA node (medium latency)
-# PHB = traverses PCIe host bridge (low latency)
-# PXB = traverses PCIe switch (lowest latency, like NVLink)
-
-# Measure actual P2P bandwidth
-python -c "
-import torch
-a = torch.randn(1024*1024*256, device='cuda:0', dtype=torch.float16)  # 512 MB
-b = torch.empty_like(a).to('cuda:1')
-import time
-for _ in range(5): b.copy_(a)
-torch.cuda.synchronize()
-t0 = time.perf_counter()
-for _ in range(100): b.copy_(a)
-torch.cuda.synchronize()
-bw = 512e6 * 100 / (time.perf_counter() - t0) / 1e9
-print(f'P2P bandwidth GPU0→GPU1: {bw:.1f} GB/s')
-# Expected: 24-30 GB/s (PCIe 4.0, direct switch)
-# Poor result: < 10 GB/s (traverses NUMA boundary)
-"
-```
-
-## 4. L40S PCIe Form Factor Advantages
-
-### Rack Density
-
-```
-2U server (typical):
-  4 × L40S @ 350W = 1,400W total
-
-4U server (dense GPU):
-  8 × L40S @ 350W = 2,800W total
-
-For 12 GPUs:
-  Option A: 3 × 4U servers (4 GPUs each), cross-server via InfiniBand
-  Option B: 1 × 6U or 8U super-dense chassis
-  Option C: 2U + 4U combination
-
-H100/H200 SXM reference:
-  DGX H100: 8 GPUs, 10.2U, 10.2kW
-  L40S equivalent 8 GPUs: ~4U, ~2.8kW
-```
-
-### Flexibility
-
-- L40S can run in any PCIe 4.0 server (no SXM baseboard needed)
-- Mix with CPUs, FPGAs, or networking cards in same chassis
-- Standard power connectors (PCIe 16-pin, 600W cable)
-- Replaceable individually (no SXM module replacement)
-
-## 5. Key Features for Inference
-
-### NVENC / NVDEC (Media Engines)
-
-L40S includes 2× NVENC + 2× NVDEC per GPU — relevant for multimodal inference pipelines processing video.
-
-### Ada Lovelace Shader Execution Reordering (SER)
-
-SER dynamically reorders shader workloads to improve occupancy — primarily useful for graphics. For compute/AI, standard CUDA scheduling applies.
-
-### ADA FP8 vs Hopper FP8
-
-```
-Ada (L40S) FP8:    FP8 Tensor Cores, E4M3 and E5M2 formats
-Hopper (H200) FP8: FP8 + Transformer Engine for automated scaling
-                   + hardware-accelerated amax tracking
-
-For L40S: FP8 quantization must be done offline (PTQ)
-          No hardware delayed scaling support
-          Use GPTQ/AWQ for post-training quantization instead
-```
-
-## 6. Power and Cooling
-
-| Property | Value |
+| Property | L40S |
 |---|---|
-| TDP per L40S | 350 W |
-| 12-GPU system TDP | ~4,200 W (GPUs) |
-| Cooling | Air-cooled (passive heatsink + server fans) |
-| Required airflow | Front-to-back, 200+ CFM recommended |
-| PCIe power connector | 16-pin ATX 3.0 (600W capable) |
+| Architecture | Ada Lovelace, AD102 family |
+| CUDA cores / Tensor Cores | 18,176 / 568 fourth-generation Tensor Cores |
+| Memory | 48 GB GDDR6 with ECC |
+| Advertised memory bandwidth | 864 GB/s |
+| FP8 Tensor Core peak | 733 TFLOP/s dense; 1,466 structured-sparse |
+| BF16/FP16 Tensor Core peak | approximately 362–366 TFLOP/s dense; 733 structured-sparse; see discrepancy below |
+| TF32 Tensor Core peak | 183 TFLOP/s dense; 366 structured-sparse |
+| FP32 CUDA core peak | 91.6 TFLOP/s |
+| Host/peer interface | PCIe Gen4 x16, 64 GB/s aggregate bidirectional theoretical rate |
+| NVLink / MIG | Neither supported |
+| Video engines | 3 NVENC and 3 NVDEC; includes AV1 encode/decode support |
+| Board maximum power | 350 W; passive server heatsink |
 
-### Thermal Management
+NVIDIA's current expanded web table lists 362.05 dense BF16/FP16 alongside 733 sparse, while half the rounded sparse number is 366.5. Preserve the exact source/SKU and flag this discrepancy instead of asserting false precision. The larger sparse rate requires a supported structured-sparse workload and kernel. It is not the dense baseline.
+
+A card's architecture family does not establish that every consumer/professional/datacenter SKU has identical firmware, clocks, media capability or software support. Use the named product's table, not assumptions from another AD102 card.
+
+## GDDR and HBM are memory technologies, not interconnect policies
+
+L40S uses GDDR6; H200 SXM uses HBM3e. Their published local-memory ceilings differ (`4.8 TB/s / 0.864 TB/s ≈ 5.56`), but this ratio is not a decode-speed prediction. Batch size, reuse, kernels, KV traffic and launch overhead change the bottleneck.
+
+GDDR does not logically forbid NVLink, and HBM does not place an NVSwitch inside the GPU package. L40S happens to lack NVLink; an HGX H200 system has a separate switched GPU fabric. Draw local memory, GPU links, PCIe switches and CPUs as distinct components.
+
+## Capacity must include everything live on the rank
+
+Twelve 48 GB cards total 576 GB nominal memory, distributed across devices. For BF16 raw weights, 7B/13B/34B/70B parameters cost approximately 14/26/68/140 GB. Subtracting this from a device label does not leave all the remainder available for cache: unquantized/replicated tensors, activations, runtime, workspace and reserve remain.
+
+Three cards have 144 GB nominal total, but a 70B BF16 deployment may not support TP=3, and 140 GB of weights leaves almost no room before overhead. Four-way partitioning is an arithmetic candidate, not a guarantee. Check head/matrix divisibility and the actual runtime's parallel support. A 180B four-bit artifact's 90 GB raw weights similarly says nothing by itself about its viable concurrency.
+
+## Inspect topology instead of assuming adjacent IDs are adjacent devices
 
 ```bash
-# Monitor GPU temperatures and fan speed
-nvidia-smi dmon -s pucvt -d 5 -i 0,1,2,3,4,5,6,7,8,9,10,11
-
-# Set power limit (if thermal throttling occurs)
-sudo nvidia-smi -pl 300 -i 0  # reduce to 300W for GPU 0
-
-# Check throttling reasons
-nvidia-smi -q -d PERFORMANCE | grep "Reason"
-# "Active: Yes" under "SW Thermal Slowdown" means throttling
+nvidia-smi --query-gpu=index,uuid,pci.bus_id,name,memory.total --format=csv
+nvidia-smi topo -m
+nvidia-smi --query-gpu=index,pcie.link.gen.current,pcie.link.width.current --format=csv
 ```
 
-## References
+In topology output, `PIX` means at most one PCIe bridge, `PXB` multiple bridges without a host bridge, `PHB` a host bridge, `NODE` a connection between host bridges within a NUMA node, and `SYS` a path through the inter-NUMA CPU interconnect. These are connectivity classes, not measured latency rankings. PXB is not “like NVLink.” Capture the legend printed by the installed tool. [nvidia-smi documentation](https://docs.nvidia.com/deploy/nvidia-smi/index.html).
 
-- [L40S Datasheet](https://www.nvidia.com/en-us/data-center/l40s/)
-- [Ada Lovelace Architecture Whitepaper](https://images.nvidia.com/akamai/marketing/documents/Ada-GPU-Architecture-Overview.pdf)
-- [PCIe 4.0 Specification](https://pcisig.com/pcie-4.0)
-- [NVIDIA L40S Deployment Guide](https://docs.nvidia.com/deeplearning/performance/dl-performance-gpu-background/index.html)
+A plausible server can fan several GPUs out from each PCIe switch; GPUs do not form a PCIe daisy-chain through one another. Draw the actual upstream links and their shared bandwidth. Peer access may be unsupported or blocked by topology/virtualization/configuration even when two GPUs are visible.
+
+## A bounded one-way transfer experiment
+
+This optional example requires two allocated CUDA GPUs. It was syntax-reviewed, not hardware-executed. The payload is **64 MiB**, and both devices are synchronized around the timed interval. A successful copy does not alone prove direct P2P; record capability and transport evidence.
+
+```python
+import time
+import torch
+
+if torch.cuda.device_count() < 2:
+    raise SystemExit("Two allocated CUDA GPUs are required")
+source = torch.full((64 * 1024**2 // 2,), 1.25, dtype=torch.float16, device="cuda:0")
+destination = torch.empty_like(source, device="cuda:1")
+print("peer capability:", torch.cuda.can_device_access_peer(0, 1))
+for _ in range(5): destination.copy_(source)
+for device in (0, 1): torch.cuda.synchronize(device)
+start = time.perf_counter()
+for _ in range(30): destination.copy_(source)
+for device in (0, 1): torch.cuda.synchronize(device)
+seconds = time.perf_counter() - start
+assert torch.all(destination == 1.25).item()
+payload = source.numel() * source.element_size()
+print("one-way payload GB/s:", payload * 30 / seconds / 1e9)
+```
+
+The one-direction theoretical Gen4 x16 budget is about 32 GB/s, before overhead and shared links. Compare like direction/scope with H200's approximately 450 GB/s one-direction **aggregate per GPU** ceiling; neither number is a guaranteed collective result. A low copy result needs a hypothesis and trace, not an automatic “bad GPU” verdict.
+
+## Precision and server integration
+
+Ada supports FP8 arithmetic, and current Transformer Engine supports eligible Ada FP8 training recipes. Scaling/quantization is a software and numerical contract; the claim that L40S must use only offline AWQ/GPTQ because FP8 scaling is unavailable is incorrect. Use a supported recipe, check kernels and compare quality. [Transformer Engine](https://github.com/NVIDIA/TransformerEngine).
+
+A passive 350 W card does not work safely in every server with a PCIe slot. Confirm the certified chassis, airflow, mechanical clearance, power connector/cabling, PSU redundancy and service procedures. Twelve GPU power ceilings sum to 4.2 kW before CPUs, memory, NICs, drives and cooling. Do not infer rack units, total power or a universal 200 CFM requirement from that sum.
+
+**Exit exercise:** draw two candidate four-GPU groups, label their shared upstream PCIe links, calculate raw weight bytes for a chosen checkpoint and identify every remaining capacity term. Submit actual device/topology evidence when hardware is available; otherwise label the worksheet a planning exercise.

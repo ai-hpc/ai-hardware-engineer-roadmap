@@ -107,25 +107,17 @@ __global__ void debug_print_half(const half* data, int n, const char* label) {
 
 void gemv_q4(half* y, const void* W_q4, const half* scales, const half* x,
              int M, int K, int group_size, cudaStream_t stream) {
+    if (!y || !W_q4 || !x || M <= 0 || K <= 0 || K % QK_K) {
+        fprintf(stderr, "[GEMV] invalid shape/pointer; K must be divisible by 256\n");
+        return;
+    }
+    (void)scales; (void)group_size;
     dim3 grid((M + 3) / 4);
     dim3 block(128);
     gemv_q4k_kernel<<<grid, block, 0, stream>>>(
         y, (const block_q4_K*)W_q4, x, M, K);
 
-    // Debug: print first GEMV output from host (only once)
-    static int dbg_count = 0;
-    if (dbg_count < 3) {
-        cudaStreamSynchronize(stream);
-        half h_y[8], h_x[8];
-        cudaMemcpy(h_y, y, 8 * sizeof(half), cudaMemcpyDeviceToHost);
-        cudaMemcpy(h_x, x, 8 * sizeof(half), cudaMemcpyDeviceToHost);
-        fprintf(stderr, "[GEMV #%d] M=%d K=%d out: ", dbg_count, M, K);
-        for (int i = 0; i < 8 && i < M; i++) fprintf(stderr, "%.4f ", __half2float(h_y[i]));
-        fprintf(stderr, " | in: ");
-        for (int i = 0; i < 8; i++) fprintf(stderr, "%.4f ", __half2float(h_x[i]));
-        fprintf(stderr, "\n");
-        dbg_count++;
-    }
+
 }
 
 }  // namespace jllm

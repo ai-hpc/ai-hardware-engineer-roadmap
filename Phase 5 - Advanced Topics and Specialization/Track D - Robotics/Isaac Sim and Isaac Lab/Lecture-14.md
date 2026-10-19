@@ -41,7 +41,7 @@ Change one layer at a time: empty renderer → one static camera → one robot �
 
 **Expected artifact:** manifest, resolved configuration, three logs, one failure/recovery pair, and an explicit hardware/feature matrix.
 
-**Reduced path:** use the supplied CPU exercises and write the planned manifests. Mark simulator launch as not run.
+**CPU path:** execute [Newton free fall/contact and OpenUSD composition](Simulation-CPU-Lab.md#2-run-actual-newton-and-openusd-on-cpu). Save their package/source hashes and compare predicted versus observed values. These are real standalone CPU library runs; mark full Isaac launch and rendering as not run.
 
 ## Self-check
 

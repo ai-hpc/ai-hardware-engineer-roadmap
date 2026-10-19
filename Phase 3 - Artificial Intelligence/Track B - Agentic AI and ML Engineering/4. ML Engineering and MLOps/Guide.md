@@ -34,6 +34,12 @@ ML engineers define the **training and serving workloads** that hardware must su
 
 ---
 
+## First complete artifact on a CPU
+
+Complete the [PyTorch robot-stop experiment](../../2.%20Deep%20Learning%20Frameworks/PyTorch/CPU-Robot-Stop-Lab/Guide.md) before distributed training. It produces a model, export, data/split hashes, errors under sensor shift, and an exact environment. Add those artifacts to an experiment tracker, then reconstruct one prediction from the saved feature order and normalization. No GPU cluster is needed to learn the lifecycle.
+
+**Diagnostic:** does saving weights alone let you resume AdamW training exactly? **Answer:** no; also preserve optimizer/scheduler state, random-generator states, epoch/batch or sampler position, preprocessing, and data revisions. Inference restoration and exact training continuation are different contracts. Seeds alone do not guarantee equality across devices or library versions.
+
 ## 1. Training Pipelines
 
 * **Data pipelines:** PyTorch DataLoader, NVIDIA DALI, streaming datasets
@@ -51,13 +57,13 @@ ML engineers define the **training and serving workloads** that hardware must su
 ## 2. Experiment Tracking & Model Registry
 
 * **Experiment tracking:** MLflow, Weights & Biases (W&B), Neptune
-* **Model registry:** versioning, staging, production promotion
+* **Model registry:** immutable versions, tags, aliases, release gates, and rollback
 * **Dataset versioning:** DVC, LakeFS
 * **Reproducibility:** environment tracking, seed management, deterministic training
 
 **Projects:**
 1. Set up MLflow tracking for a training run. Log hyperparameters, metrics, and artifacts.
-2. Register a model in MLflow. Create a staging → production promotion workflow.
+2. Register a model in MLflow. Validate a candidate, assign a `champion` alias, and rehearse restoring the prior version. MLflow model stages are deprecated; use the current [aliases/tags workflow](https://mlflow.org/docs/latest/ml/model-registry/workflow/) (checked 2026-10-18), while retaining a concrete version ID in each release manifest.
 
 ---
 
@@ -83,7 +89,7 @@ ML engineers define the **training and serving workloads** that hardware must su
 * **Container orchestration:** Docker, Kubernetes, NVIDIA GPU Operator
 * **Model testing:** unit tests for preprocessing, integration tests for inference, data drift detection
 * **Safety regression testing:** jailbreak suites, blocked-topic tests, prompt-attack replay, policy drift checks
-* **Feature stores:** Feast, Tecton — manage features for training and serving consistency
+* **Feature stores:** Feast, Tecton — manage reusable feature definitions; still test point-in-time joins, freshness, and training/serving parity
 * **Orchestration:** Kubeflow Pipelines, Apache Airflow, Prefect
 
 **Projects:**

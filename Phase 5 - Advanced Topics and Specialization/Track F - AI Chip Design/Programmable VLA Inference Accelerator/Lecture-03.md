@@ -160,3 +160,7 @@ For each candidate:
 - [Timeloop/Accelergy](https://timeloop.csail.mit.edu/): explore mappings and hardware parameters; record tool and technology-model revisions.
 
 Continue to [Lecture 04 — Memory Residency and Traffic](Lecture-04.md). The compute decision becomes credible only after its working set fits a feasible memory plan.
+
+## Execute the tile contract before scaling the array
+
+The [tiling and dataflow lab](../Labs/Tiling-and-Dataflow.md) adds a functional check to the padding calculation: every tiled result is compared with a dot-product oracle, and operand tokens carry their K index through a small systolic grid. Compare a 1×1 output on a 2×2 array with a full 2×2 output at K=3. Both modeled runs issue 12 MACs over 5 cycles, but only 3 versus 12 are useful. This separates padding loss from pipeline fill/drain loss; neither is a measured chip utilization counter.

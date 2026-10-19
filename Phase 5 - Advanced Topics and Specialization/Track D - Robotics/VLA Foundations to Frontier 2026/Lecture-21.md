@@ -36,13 +36,17 @@ Batching several robot requests can improve GPU utilization while adding queue d
 
 Quantization error propagates through an action head into physical commands. Preserve gripper decisions, rotation representation, action masks, and normalization when comparing reference and candidate. A small average action error can hide a rare sign flip at the grasp boundary. Inspect per-axis tails and event-conditioned errors before relying on an aggregate MSE.
 
-[NVIDIA's TensorRT quantization documentation](https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/quantized-types-schemes.html) distinguishes formats, scaling schemes, and supported operators. “Four bit” does not uniquely specify a format. Verify the exact runtime, GPU, model architecture, serialized checkpoint, calibration scheme, and kernel path. Loading a compressed checkpoint does not prove native low-precision execution.
+[NVIDIA's TensorRT 10.x quantization documentation](https://docs.nvidia.com/deeplearning/tensorrt/10.x.x/inference-library/work-quantized-types.html) distinguishes formats, scaling schemes, and supported operators. “Four bit” does not uniquely specify a format. Verify the exact runtime, GPU, model architecture, serialized checkpoint, calibration scheme, and kernel path. Loading a compressed checkpoint does not prove native low-precision execution.
 
 The roadmap's [DeepSeek V4.1 Flash NVFP4 course](../../Track%20G%20-%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/README.md) teaches checkpoint provenance and inference systems. Those methods transfer to VLA engineering; a DeepSeek language-model checkpoint does not thereby become a VLA, and its quantized weights do not substitute for a robot action head. Use the selected VLA's own artifact and deployment support matrix.
+
+The archived 10.x documentation describes that API family; it is not an exact JetPack package manifest. As checked on October 18, TensorRT 11.4 explicitly does not support JetPack, so a moving `latest` desktop recipe is not a Jetson upgrade path. Resolve the installed JetPack/TensorRT pairing using the [course compatibility record](../../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/Compatibility.md) and [NVIDIA migration status](https://docs.nvidia.com/deeplearning/tensorrt/latest/api/migration/tensorrt-10x-to-11x-jetson.html).
 
 For an edge device, inspect supported precision and runtime versions directly. Do not infer NVFP4 acceleration from a Jetson product name or from the GPU vendor alone. Thermal state, power limits, memory sharing, and concurrent perception workloads belong in the report. A desktop benchmark cannot establish a robot's sustained deadline margin.
 
 ## Guided profiling experiment
+
+Start with the [runnable CPU action-parity bridge](../VLA%20Optimization%20and%20Action-Parity%20Harness/CPU-Action-Parity-Lab.md). It reuses a trained policy and environment, showing both a harmless normalization fold and a timing change that fails closed-loop criteria despite identical action mathematics. The low-precision variation reconstructs weights as Python floats and cannot establish accelerator speed.
 
 Use the [specialist optimization course](../VLA%20Optimization%20and%20Action-Parity%20Harness/README.md) for a deeper runtime implementation. Here, choose one supported model and one candidate change. Freeze task seeds, image preprocessing, action statistics, runtime configuration, and evaluation horizon. Collect a reference trace before applying the change.
 

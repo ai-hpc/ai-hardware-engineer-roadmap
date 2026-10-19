@@ -124,6 +124,14 @@ That is the correct starting point for everything else in this course.
 
 ---
 
+## Worked protocol choice
+
+A robot needs 20 temperature reports per second, each with a small value and status. A camera needs hundreds of kilobytes per frame. The first workload may fit an appropriately engineered low-power mesh; the second needs a different transport budget. Count application payload, headers, retries, contention and hop count before selecting a radio. The nominal 2.4 GHz 802.15.4 bit rate is not available application throughput.
+
+Zigbee provides its application/cluster model. Thread provides an IPv6 mesh over which an application protocol can run; selecting Thread alone does not specify how a light or sensor behaves. Matter can use Thread or other supported IP transports; a Zigbee device does not become a Matter-over-Thread device merely because its radio supports 802.15.4. A bridge translates application semantics and has its own compatibility/state responsibilities.
+
+**Answer check:** Two radios use the same channel and PHY. Can they automatically exchange application commands? No: network, security, addressing and application formats must also agree. Carry this distinction into Lecture 3's decoded transaction.
+
 ## Lab
 
 Write a short comparison note with two columns:

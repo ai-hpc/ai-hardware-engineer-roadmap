@@ -1,0 +1,33 @@
+{
+  "scope": "actual CPU XPBD physics; no Kit, Isaac Lab, MJWarp, CUDA or rendering",
+  "newton": "1.5.2",
+  "warp": "1.16.0",
+  "numpy": "2.5.4",
+  "device": "cpu",
+  "freefall": [
+    {
+      "steps": 10,
+      "dt_s": 0.01,
+      "z_m": 1.9460450410842896,
+      "semi_implicit_z_m": 1.946045,
+      "continuous_z_m": 1.95095,
+      "continuous_error_m": 0.004904958915710411
+    },
+    {
+      "steps": 20,
+      "dt_s": 0.005,
+      "z_m": 1.9484974145889282,
+      "semi_implicit_z_m": 1.9484975,
+      "continuous_z_m": 1.95095,
+      "continuous_error_m": 0.0024525854110717393
+    }
+  ],
+  "resting_worlds": 2,
+  "resting_z_m": [
+    0.049965664744377136,
+    0.049965664744377136
+  ],
+  "world_replication_max_pose_difference": 0.0,
+  "maximum_resting_velocity": 0.0,
+  "script_sha256": "c9441414bb0190e9bf4f25ebe613fcbe434aef730b747d0fd7e68be1c7f59a3b"
+}

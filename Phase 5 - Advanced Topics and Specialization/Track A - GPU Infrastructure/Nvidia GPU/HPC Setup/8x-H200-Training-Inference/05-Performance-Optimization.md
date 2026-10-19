@@ -1,320 +1,62 @@
-# 05 — Performance Optimization on 8x H200
+# 05 — Optimize the bottleneck you can demonstrate
 
-## 1. Performance Targets and Roofline
+**Outcome:** turn a profile into one numerical prediction, change one factor, and recheck correctness and whole-workload performance. Source review: 2026-10-18. GPU profiling/optimization is an unexecuted hardware exercise here.
 
-### H200 Hardware Limits
+## Roofline is a bound, not a diagnosis
 
-| Bound | Metric | H200 Value |
-|---|---|---|
-| Compute (BF16) | TFLOPS | 1,979 |
-| Compute (FP8) | TFLOPS | 3,958 |
-| Memory bandwidth | TB/s | 4.8 |
-| NVLink bandwidth | GB/s bidirectional | 900 per GPU |
-| PCIe 5.0 bandwidth | GB/s | ~128 (host) |
+For a chosen arithmetic mode, attainable throughput is bounded by `min(compute_peak, memory_bandwidth × arithmetic_intensity)`. Arithmetic intensity counts useful FLOPs divided by the bytes crossing the **named memory boundary**. H200 SXM dense BF16 uses about 989.5 TFLOP/s and 4.8 TB/s, giving a ridge point near **206.15 FLOP/byte**. The 412 figure belongs to the doubled structured-sparse compute ceiling, not dense BF16. [H200 specifications](https://www.nvidia.com/en-us/data-center/h200/).
 
-### Roofline Analysis
+For square dense GEMM of size n with BF16 A/B/output and no rereads, approximate work is `2n³` FLOPs and minimum traffic `6n²` bytes, so intensity is n/3 FLOP/byte. n=2048 gives about 682.7 FLOP/byte. This optimistic bound suggests compute could dominate; small tiles, cache reuse, extra epilogue traffic and kernel dispatch can change actual behavior. A low measured rate does not by itself prove the operation is memory-bound.
 
-```
-Arithmetic Intensity (AI) = FLOPs / Bytes transferred from HBM
+For one vector addition with three BF16 arrays (read x/y, write z), there is one FLOP per six bytes: about **0.167 FLOP/byte** at that boundary. A fused epilogue can remove intermediate traffic, but still reads its operands and writes output. An AllReduce performs reductions and moves data; small-message launch/latency and large-message bandwidth require separate analysis.
 
-If AI < Ridge Point:  → MEMORY BOUND → optimize data movement
-If AI > Ridge Point:  → COMPUTE BOUND → optimize FLOPs efficiency
+## Profile the whole operation before a kernel
 
-H200 Ridge Point = 1,979 TFLOPS / 4.8 TB/s ≈ 412 FLOP/Byte (BF16)
-
-Operation AIs:
-  GEMM (large):     ~1000+ FLOP/Byte → COMPUTE BOUND ✓ (targets Tensor Cores)
-  Attention (small batch): ~10 FLOP/Byte → MEMORY BOUND (use Flash Attention)
-  Element-wise ops: ~1-4 FLOP/Byte → MEMORY BOUND (fuse them)
-  All-reduce:       ~0 FLOPs, pure bandwidth → NVLink BOUND
-```
+Begin with the [bounded correctness/measurement script](06-Benchmarks-and-Validation.md), then trace a representative application interval. Record startup/compile separately from steady-state work. Check the installed tool's options and permissions:
 
 ```bash
-# Run roofline analysis with Nsight Compute
-ncu --set roofline --target-processes all \
-    --output roofline_report \
-    python -c "import torch; a=torch.randn(4096,4096,device='cuda',dtype=torch.bfloat16); torch.mm(a,a)"
-
-# Open in Nsight Compute GUI for visualization
-ncu-ui roofline_report.ncu-rep
-```
-
-## 2. CUDA Graphs for Inference
-
-Inference has a fixed computation graph (same shapes every step). CUDA Graphs eliminate CPU kernel launch overhead.
-
-```python
-import torch
-
-# Standard inference: CPU launches each kernel individually
-# ~5-50 µs overhead per kernel → adds up for many small kernels
-
-# CUDA Graph: capture once, replay instantly
-def setup_cuda_graph(model, sample_input):
-    # Warmup (fills CUDA caches, etc.)
-    with torch.cuda.stream(torch.cuda.Stream()):
-        for _ in range(3):
-            model(sample_input)
-
-    # Capture
-    g = torch.cuda.CUDAGraph()
-    static_input = sample_input.clone()
-    static_output = torch.zeros_like(model(static_input))
-
-    with torch.cuda.graph(g):
-        static_output = model(static_input)
-
-    return g, static_input, static_output
-
-def graph_inference(g, static_input, static_output, new_input):
-    static_input.copy_(new_input)
-    g.replay()
-    return static_output.clone()
-
-# Speedup: 1.5-3× for small batch sizes (< 32)
-# Largest impact at batch_size=1 (pure latency mode)
-```
-
-### CUDA Graphs with Dynamic Shapes (Bucketing)
-
-```python
-# For variable sequence lengths, maintain a graph per "bucket"
-BUCKETS = [128, 256, 512, 1024, 2048, 4096]
-
-graphs = {}
-for seq_len in BUCKETS:
-    dummy_input = torch.zeros(1, seq_len, dtype=torch.long, device="cuda")
-    g, si, so = setup_cuda_graph(model, dummy_input)
-    graphs[seq_len] = (g, si, so)
-
-def bucketed_inference(input_ids):
-    seq_len = input_ids.shape[1]
-    bucket = next(b for b in BUCKETS if b >= seq_len)
-    padded = torch.nn.functional.pad(input_ids, (0, bucket - seq_len))
-    g, si, so = graphs[bucket]
-    return graph_inference(g, si, so, padded)
-```
-
-## 3. Kernel Fusion
-
-Fusing multiple element-wise operations into a single kernel eliminates redundant HBM reads/writes.
-
-### Manual Fusion with Triton
-
-```python
-import triton
-import triton.language as tl
-
-@triton.jit
-def fused_gelu_add_kernel(
-    x_ptr, bias_ptr, out_ptr,
-    n_elements,
-    BLOCK_SIZE: tl.constexpr,
-):
-    pid = tl.program_id(axis=0)
-    offsets = pid * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
-    mask = offsets < n_elements
-
-    x = tl.load(x_ptr + offsets, mask=mask)
-    bias = tl.load(bias_ptr + offsets, mask=mask)
-
-    # GELU approximation
-    val = x + bias
-    gelu = val * 0.5 * (1.0 + tl.math.erf(val / 1.41421356))
-
-    tl.store(out_ptr + offsets, gelu, mask=mask)
-
-# 1 HBM read + 1 HBM write instead of 3 reads + 2 writes for separate kernels
-```
-
-### torch.compile for Automatic Fusion
-
-```python
-import torch
-
-@torch.compile(mode="max-autotune")  # most aggressive optimization
-def forward(x, w, bias):
-    h = torch.mm(x, w) + bias
-    return torch.nn.functional.gelu(h)
-
-# torch.compile uses Triton to auto-fuse element-wise ops after GEMM
-# mode options: "default", "reduce-overhead" (CUDA graphs), "max-autotune"
-```
-
-## 4. Communication Optimization
-
-### Overlap Compute and Communication
-
-```python
-# Without overlap:
-# [ALL-REDUCE gradient][forward pass][ALL-REDUCE gradient]...
-#  ← communication →  ← compute →  ← communication →
-
-# With overlap (DDP default):
-# [forward][backward for layer N][ALL-REDUCE layer N, while computing layer N-1]
-# Communication is hidden behind backward computation
-
-# FSDP with prefetching
-model = FSDP(
-    model,
-    sharding_strategy=ShardingStrategy.FULL_SHARD,
-    forward_prefetch=True,     # prefetch next layer's params during forward
-    backward_prefetch=BackwardPrefetch.BACKWARD_PRE,  # prefetch during backward
-    limit_all_gathers=True,    # limit concurrent all-gathers to avoid OOM
-)
-```
-
-### Gradient Compression
-
-```python
-# PowerSGD: low-rank gradient compression for bandwidth reduction
-from torch.distributed.algorithms.ddp_comm_hooks import powerSGD_hook as powerSGD
-
-state = powerSGD.PowerSGDState(
-    process_group=None,
-    matrix_approximation_rank=32,   # rank of approximation (lower = more compression)
-    warm_start=True,
-)
-model.register_comm_hook(state, powerSGD.batched_powerSGD_hook)
-# Reduces gradient communication by 4-10× (with small quality trade-off)
-```
-
-### NCCL Tuning for H200
-
-```bash
-# Force NVLink for all inter-GPU communication
-export NCCL_P2P_LEVEL=NVL
-export NCCL_NET_GDR_LEVEL=5          # use GPUDirect RDMA where available
-export NCCL_ALGO=Tree                 # Tree or Ring; Tree often better on NVSwitch
-export NCCL_PROTO=Simple              # Simple/LL/LL128
-
-# Tune all-reduce chunk size
-export NCCL_BUFFSIZE=8388608          # 8 MB
-
-# Profile NCCL operations
-export NCCL_DEBUG=INFO
-export NCCL_DEBUG_SUBSYS=ALL
-```
-
-## 5. Mixed Precision Best Practices
-
-```python
-# Preferred: BF16 (H200 native, stable numerics)
-with torch.autocast("cuda", dtype=torch.bfloat16):
-    loss = model(inputs)
-
-# For FP8 (maximum throughput on H200):
-import transformer_engine.pytorch as te
-from transformer_engine.common.recipe import Format, DelayedScaling
-
-fp8_recipe = DelayedScaling(
-    margin=0,
-    interval=1,
-    fp8_format=Format.HYBRID,
-    amax_history_len=16,
-    amax_compute_algo="max",
-)
-
-with te.fp8_autocast(enabled=True, fp8_recipe=fp8_recipe):
-    loss = model(inputs)
-
-# FP8 gains: ~1.8× speedup on GEMM-heavy workloads vs BF16
-```
-
-## 6. torch.compile Optimization Modes
-
-```python
-# Progressive optimization levels:
-
-# Level 1: Default — safe fusions, no kernel search
-model = torch.compile(model, mode="default")
-
-# Level 2: Reduce overhead — adds CUDA graphs automatically
-model = torch.compile(model, mode="reduce-overhead")
-
-# Level 3: Max autotune — searches best kernel configs (slow first run)
-model = torch.compile(model, mode="max-autotune")
-
-# Backend options:
-# "inductor" (default): Triton-based fused kernels
-# "cudagraphs": CUDA graph capture only
-# "aot_eager": AOT Autograd without optimization (debugging)
-
-# Disable for dynamic shapes (e.g., variable-length generation)
-model = torch.compile(model, dynamic=True)
-```
-
-## 7. Profiling Workflow
-
-### Step 1: High-Level Timeline (Nsight Systems)
-
-```bash
-nsys profile \
-    --trace=cuda,nvtx,python \
-    --gpu-metrics-device=all \
-    --stats=true \
-    --output=profile_run \
-    torchrun --nproc_per_node=8 train.py
-
-# View: nsys-ui profile_run.nsys-rep
-# Look for: GPU idle gaps, PCIe transfers, NCCL synchronization
-```
-
-### Step 2: Kernel-Level Analysis (Nsight Compute)
-
-```bash
-ncu \
-    --set detailed \
-    --kernel-name "ampere_fp16_s884gemm" \
-    --launch-count 5 \
-    --target-processes all \
-    --output kernel_analysis \
+nsys profile --trace=cuda,nvtx --stats=true --output=course_timeline \
     python inference.py
-
-# Key metrics:
-# sm__throughput.avg.pct_of_peak_sustained_elapsed → SM utilization
-# dram__throughput.avg.pct_of_peak_sustained_elapsed → HBM utilization
-# l1tex__throughput → L1 hit rate
+ncu --list-sets
+ncu --list-sections
 ```
 
-### Step 3: PyTorch Profiler Integration
+Use a supported roofline section from the installed Nsight Compute version, and select a kernel observed in your own trace. A hard-coded Ampere kernel name may never occur on H200. Profilers replay/instrument work and can change timing; collect ordinary end-to-end timing separately. L1 throughput is not L1 hit rate. [Nsight Systems](https://docs.nvidia.com/nsight-systems/), [Nsight Compute](https://docs.nvidia.com/nsight-compute/).
 
-```python
-from torch.profiler import profile, record_function, ProfilerActivity
+## CUDA Graphs require a stable replay contract
 
-with profile(
-    activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
-    with_stack=True,
-    record_shapes=True,
-    profile_memory=True,
-    schedule=torch.profiler.schedule(wait=1, warmup=3, active=5),
-    on_trace_ready=torch.profiler.tensorboard_trace_handler("./prof"),
-) as prof:
-    for step, batch in enumerate(dataloader):
-        with record_function("forward"):
-            loss = model(**batch).loss
-        with record_function("backward"):
-            loss.backward()
-        prof.step()
+A graph reduces repeated launch overhead; replay is not instantaneous or free. Stable device addresses, supported capture operations, shapes and stream dependencies matter. Autoregressive inference has variable lengths, active requests and cache state, so the graph contract must be designed explicitly.
 
-# Visualize in TensorBoard: tensorboard --logdir=./prof
-```
+Use the dedicated [CUDA Graphs lesson](../CUDA-Advanced-Optimization/01-CUDA-Graphs.md) for its complete example. Warmup on another stream needs explicit dependencies before capture. Keep static buffers alive, copy new inputs, replay, and respect completion before reading/reusing results. Bucketing needs correct padding masks, position IDs, output slicing and a fallback when inputs exceed the largest bucket. Zero-padding token IDs alone can change model semantics.
 
-## 8. Common Bottlenecks and Fixes
+**Prediction exercise:** a hypothetical inference spends 2 ms in CPU launch gaps and 8 ms in irreducible device work. Even removing every launch gap gives at most `10/8=1.25×`, before graph replay/copy overhead. A 3× claim contradicts that particular profile.
 
-| Symptom | Root Cause | Fix |
+## Fusion and compilation must preserve the contract
+
+Fusion can save intermediate writes/reads and launches, but can increase registers, spills or reduce occupancy. A matrix bias of shape `[H]` needs broadcasting; indexing `bias_ptr+flat_offset` over `[B,H]` reads out of bounds. Compare tail shapes and non-contiguous/aliased inputs before timing custom kernels. Use [kernel fusion](../CUDA-Advanced-Optimization/04-Kernel-Fusion.md) for the detailed implementation path.
+
+`torch.compile` modes choose different tradeoffs, not universal optimization levels. `dynamic=True` requests dynamic-shape handling; it does **not** disable compilation or guarantee lower memory. Compilation can create multiple graphs, graph breaks, caches and warmup costs. Preserve one eager reference and compare steady-state latency, compile cost, memory and numerical differences over the shape distribution. [torch.compile API](https://docs.pytorch.org/docs/2.14/generated/torch.compile.html).
+
+## Communication overlap must respect dependencies
+
+DDP can reduce ready gradient buckets while later backward work executes. Complete required reductions before the optimizer updates parameters. FSDP prefetch can overlap gathers while increasing transient memory; current FSDP2 and older FSDP1 have different configuration APIs. See [framework communication](../NCCL-Deep-Dive/03-Framework-Integration.md).
+
+Leave NCCL algorithm/transport tuning automatic for a baseline, record logs and isolate any override. Numeric `NCCL_NET_GDR_LEVEL=5`, forced Tree, fixed channel counts or hard-coded RoCE GIDs are not universal H200 recipes. [Configuration and controlled experiments](../NCCL-Deep-Dive/04-Configuration-and-Tuning.md).
+
+PowerSGD and other compression methods approximate gradients; quality and convergence must be checked at equal training objectives/budgets. A low-rank storage ratio is not a guaranteed network or wall-time speedup.
+
+## Precision is a separate quality experiment
+
+BF16 autocast can improve throughput while retaining selected operations/state at higher precision. It does not guarantee stable numerics for all models. FP8 requires a supported runtime/Transformer Engine recipe, scaling and eligible operators. A generic float8 cast or enclosing an arbitrary model in a context does not prove its operations use valid FP8 kernels. Compare held-out quality, losses and outlier behavior with a higher-precision baseline.
+
+## Diagnose with competing explanations
+
+| Observation | Two hypotheses | Small distinguishing experiment |
 |---|---|---|
-| GPU util < 40% (training) | Data loading bottleneck | Increase DataLoader workers, use DALI |
-| GPU util < 40% (inference) | Batch size too small | Increase batch size or use continuous batching |
-| All-reduce > 30% of step time | Gradient sync dominates | Reduce DP replicas, increase gradient accumulation |
-| MFU < 20% | Memory-bound kernels | Enable Flash Attention, fuse ops, use larger batch |
-| OOM during compilation | torch.compile traces peak | Compile with `dynamic=True`, reduce batch for compile step |
-| NVLink not used | NCCL falls back to PCIe | Set `NCCL_P2P_LEVEL=NVL`, verify `nvidia-smi topo -m` |
+| Low GPU utilization | Input starvation or little demand | Replay preloaded fixed inputs at controlled request rate |
+| Large collective time | Network bottleneck or delayed rank arrival | Compare isolated collective sweep with all-rank application timeline |
+| Low GEMM throughput | Poor shape/kernel or memory/launch bound | Sweep representative sizes and inspect selected kernel/traffic |
+| Compile-time OOM | Transient compilation memory or excessive captured variants | Compare eager, one fixed shape, then shape buckets with peak memory logs |
+| Larger batch improves tokens/s | Better reuse or more padded useless work | Count valid output tokens and deadline-qualified completions |
 
-## References
-
-- [Nsight Systems User Guide](https://docs.nvidia.com/nsight-systems/)
-- [Nsight Compute User Guide](https://docs.nvidia.com/nsight-compute/)
-- [torch.compile Documentation](https://pytorch.org/tutorials/intermediate/torch_compile_tutorial.html)
-- [Triton Tutorial](https://triton-lang.org/main/getting-started/tutorials/)
-- [NCCL Developer Guide](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/)
+**Exit artifact:** one baseline trace, one falsifiable explanation, one controlled change, a numerical/quality regression check and an end-to-end result. Mark GPU results unexecuted if you only completed the CPU reference.

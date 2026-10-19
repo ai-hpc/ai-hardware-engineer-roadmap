@@ -16,7 +16,9 @@ The code studied here is the Jetson-oriented fork:
 
 - [ai-hpc/jetson-esp-hosted](https://github.com/ai-hpc/jetson-esp-hosted)
 
-The center of gravity is the `esp_hosted_ng/host/` tree, especially the SPI path validated on **Jetson Orin Nano** with **ESP32-C6**.
+The case study is the historical `esp_hosted_ng/host/` tree at revision **`ce36dec9294988e598f04e84c9d28092ca9e9786`** (April 20, 2026), with board observations reported by its authors. Start with the [source-reading lab](Source-Reading-Lab.md), reviewed October 18. It verifies the source identity, traces success and failure, and identifies ownership/error-path defects in the teaching excerpts. The legacy fork is not presented as a current production implementation.
+
+For current firmware/host integration, follow the [ESP-Hosted-Linux migration lesson](../../../Phase%204%20-%20Track%20B%20-%20Nvidia%20Jetson/5.%20Application%20Development/2.%20Network%20and%20Connectivity/ESP32-C6-ESP-Hosted-SPI-Jetson-Orin-Nano.md). Keep the two generations separate.
 
 ---
 

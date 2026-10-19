@@ -1,0 +1,21 @@
+{
+  "scope": "actual PyModbus client and teaching server over localhost TCP; no external endpoint",
+  "pymodbus": "3.16.1",
+  "checks_passed": 2,
+  "registers": [
+    2500,
+    5000
+  ],
+  "illegal_address_exception_code": 2,
+  "captured_request_hex": [
+    "000100000006010300000002",
+    "000200000006010300640001"
+  ],
+  "script_sha256": "b744314e76f2812a7ee3ea0a14fda54074cc29bdd72294b2bc1c5c0f7810c357",
+  "server_sha256": "dd16da87e1a507046ca0f47fbfc0672830872ace2c47a95500d24d3edf51cc15",
+  "limitations": [
+    "no physical PLC/sensor",
+    "read-only subset, not conformance certification",
+    "serial/TLS/retries and client concurrency not exercised"
+  ]
+}

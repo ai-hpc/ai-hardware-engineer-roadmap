@@ -1,4 +1,4 @@
-# Phase 5 — Track F: AI Chip Design (18-36 months)
+# Phase 5 — Track F: AI Chip Design
 
 <div class="course-identity ai-chip-design" markdown="1">
 <div class="course-identity__icon">ASIC</div>
@@ -15,9 +15,17 @@ The destination is a custom system on chip for physical AI: a processor running 
 
 Begin with the [professional VLA course](../Track%20D%20-%20Robotics/VLA%20Foundations%20to%20Frontier%202026/README.md) and profile an executable reference model. Treat the latest model as a versioned workload, with explicit operator, precision, shape, and action contracts. A programmable design and documented fallback path should accommodate evolving architectures. A chip optimized for one checkpoint alone does not establish support for future models.
 
+## Begin with a small executable compiler and architecture exercise
+
+Choose an implementation milestone before estimating a schedule: a CPU reference, a simulated RTL block, an FPGA prototype, a process-specific physical-design study, and fabricated silicon require different resources. Begin with the first two. Fabrication is optional for completing the software and architecture learning route.
+
+Run the [tiling, dataflow, and real MLIR CPU lab](Labs/Tiling-and-Dataflow.md) before planning a whole chip. It checks rectangular and empty matrix products, counts logical transfers and scratchpad storage, simulates operand alignment in a small systolic array, and optionally lowers a complete Linalg program through LLVM to actual CPU execution. The analytical cycles are explicitly separate from measured execution. Then read [LLVM/MLIR Lectures01–05](Lectures/Lecture-01.md) and connect their representations to the saved compiler stages.
+
 ## Recommended course: programmable VLA inference accelerator
 
 Take the [10-lecture accelerator design course](Programmable%20VLA%20Inference%20Accelerator/README.md) after establishing a reproducible VLA reference. It turns the project goal into a workload dossier, tensor/vector architecture, memory-traffic model, precision/reuse contract, compiler/runtime ABI, and prototype evidence. CPU labs make the first architecture decisions testable before hardware is available.
+
+For a first measured workload, use the [model-to-hardware bridge](Programmable%20VLA%20Inference%20Accelerator/Model-to-Hardware-Lab.md): train a small action network, reload it, export its actual computation, and compare observed CPU calls with a tile model. The exported network is a scalar teaching fixture; it does not substitute for profiling the selected VLA.
 
 Carry its outputs into the SoC capstone below. Use [memory residency](Programmable%20VLA%20Inference%20Accelerator/Lecture-04.md) to justify SRAM and bandwidth, [compiler integration](Programmable%20VLA%20Inference%20Accelerator/Lecture-06.md) to define executable commands, [scheduling](Programmable%20VLA%20Inference%20Accelerator/Lecture-07.md) to bound action age, and [prototype-to-silicon feasibility](Programmable%20VLA%20Inference%20Accelerator/Lecture-09.md) to distinguish measured results from implementation estimates.
 
@@ -129,7 +137,7 @@ Progress through these review gates. Each produces evidence that another learner
 * **Compare tinygrad on CPU vs. Your FPGA Accelerator:** Benchmark and analyze the speedup and efficiency.
 
 
-**Phase 2 (Significantly Expanded): AI Chip Design (36-60 months)**
+## Advanced architecture and physical implementation
 
 **1. Advanced Accelerator Microarchitecture**
 
@@ -172,7 +180,7 @@ Progress through these review gates. Each produces evidence that another learner
 * **Open-Source EDA and OpenROAD:**
     * **OpenROAD Flow:**  Run the OpenROAD open-source RTL-to-GDS flow for a small AI accelerator design. Use the SkyWater 130nm or GlobalFoundries 180nm PDK as a process-specific educational implementation study; GDS generation alone does not establish manufacturing readiness.
     * **Magic and KLayout:**  View and edit VLSI layouts using Magic and KLayout. Understand GDSII format, layer mappings, and design rule enforcement.
-    * **Efabless Chipignite:**  Explore multi-project wafer (MPW) shuttle programs (Efabless chipIgnite, TinyTapeout) for low-cost physical chip fabrication of student designs.
+    * **Current MPW programs:** ChipFoundry acquired Efabless assets and operates [chipIgnite](https://chipfoundry.io/efabless). [Tiny Tapeout's current shuttle list](https://www.tinytapeout.com/chips/) identifies open submissions and estimated delivery dates. Check the selected process, tile/interface limits, submission checks, costs and schedule before planning fabrication; a historical shuttle tutorial is not a current offer.
 
 * **Power Analysis and Optimization:**
     * **Dynamic and Static Power:**  Analyze dynamic power (switching activity × capacitance × voltage²) and static (leakage) power using simulation-based (VCD/SAIF) or statistical estimation tools.

@@ -1,64 +1,21 @@
-# Part 3 — MoE Inference at Blackwell
+# Part 3 — MoE inference: route the work and account for the state
 
-The Blackwell-class production inference stack for modern Mixture-of-Experts models. Five lectures, anchored on a side-by-side comparison of the two 2025 open-weight MoE case studies:
+Use DeepSeek-V3.1 and Qwen3-235B-A22B as pinned model-configuration case studies. The key distinction is between total resident parameters, per-token active work, and the union of experts touched by a batch. Attention layout, routing policy, topology, and state ownership then determine what the runtime must do.
 
-* **DeepSeek V3.1** — 671B total / 37B active params, **256 routed experts + 1 shared** per layer, top-8 routing, **MLA** (Multi-head Latent Attention) with compressed KV, native **multi-token prediction (MTP)** head.
-* **Qwen3-MoE 235B-A22B** — 235B total / 22B active params, **128 routed experts + 0 shared** per layer, top-8 routing, standard GQA attention, no native MTP.
+The [CPU lab](../Part%201%20-%20Fundamentals/labs/README.md) runs the beginner route: inspect the two public config snapshots, calculate GQA/MLA cache payload, draw a dispatch matrix, combine toy expert outputs, and prove a one-step speculation probability identity. No large weights or Blackwell hardware are required.
 
-The pair is uniquely useful: same era, with runtime support to verify per version/precision, and architecturally different in three teaching-relevant ways — attention type (MLA vs GQA), shared-expert design, and native speculation. Every concept lands on two concrete deployable systems.
+| Lesson | Question |
+|---|---|
+| [01 — MoE anatomy](Lecture-01.md) | Which experts and cache components exist in these configurations? |
+| [02 — Blackwell products](Lecture-02.md) | Which capacity, precision, and data-path figures belong to this exact SKU? |
+| [03 — expert parallelism](Lecture-03.md) | Where do tokens travel, what can be deduplicated, and which rank is hot? |
+| [04 — prefill/decode separation](Lecture-04.md) | Do scheduling savings justify transfer and ownership costs? |
+| [05 — speculation and constraints](Lecture-05.md) | What policy is preserved, what work is added, and which outputs are useful? |
 
-**Hardware case studies:** B200, B300, and GB200 NVL72. Record the exact system SKU, usable per-GPU capacity, topology, and supported formats from its documentation. A connected GPU domain is not one automatically pooled allocation.
+DeepSeek's first three layers use dense MLPs; “256 routed experts per layer” requires that qualification. Qwen3's attention head dimension is explicitly 128 despite `hidden_size/query_heads = 64`. The ideal cache calculations are 70272 bytes/token for the stated DeepSeek compressed layout and 192512 bytes/token for Qwen3 BF16 GQA, before allocator/runtime overhead.
 
-By the end of Part 3 you should be able to ship either MoE to production on a multi-Blackwell deployment, defend the precision recipe at FP4 + FP8 KV, defend the EP/TP partition, and ship a reproducible benchmark with `$/MTok` numbers measured on real hardware.
+Hardware extensions require a supported model/format/runtime combination and actual product topology. HGX B200, GB200, and B300 have different capacities. A large NVLink domain does not create one uniformly fast allocation, and TP/EP group sizes are not universally multiplied to obtain GPU count.
 
-## Access and compatibility route
+Deliver a source-backed compatibility table, per-rank resource/traffic budget, and quality/performance experiment. Mark hardware results unmeasured until executed. A full deployment adds traces, failure/cancellation handling, useful throughput under latency targets, and cost from real allocations/prices. There is no prescribed FP4 winner or unmeasured expected tokens/s figure.
 
-The full deployment experiment requires appropriate hardware. With a CPU or smaller GPU, complete the config audit, memory/traffic derivation, numerical subgraph checks, and benchmark design; label cluster throughput and cost results **not run**. This is an analysis milestone, not completion of the hardware deployment milestone.
-
-Build a model × runtime × format × parallelism compatibility table first. The parameter lists below describe the desired experiment space, not a promise that every combination is supported. Run only supported cells; explain excluded cells and keep them in the report.
-
-## Lectures
-
-<div class="lecture-map" markdown>
-
-| # | Title | Core question |
-|---|-------|---------------|
-| 01 | [Anatomy of a modern MoE — DeepSeek V3.1 and Qwen3-MoE 235B-A22B](Lecture-01.md) | What's the same, what differs, and how does each difference change inference cost? |
-| 02 | [Blackwell hardware story — B200, B300, GB200 NVL72, TE2, FP4](Lecture-02.md) | What does Blackwell silicon provide that Hopper doesn't, and how big is NVL72? |
-| 03 | [Expert parallelism (EP) and the gating hot path](Lecture-03.md) | How is an MoE partitioned across many GPUs, and where does the all-to-all cost dominate? |
-| 04 | [Disaggregated prefill / decode — Mooncake, Splitwise, DistServe](Lecture-04.md) | When does separating prefill GPUs from decode GPUs pay for itself? |
-| 05 | [Production MoE serving — MTP speculation, constrained decode, cost model](Lecture-05.md) | What's the full production recipe, and what's the $/MTok at GB200 NVL72 scale? |
-
-</div>
-
-## What you ship from Part 3
-
-Extending the benchmark repo from Parts 1 and 2:
-
-* A reproducible bench harness parametric over `--model {deepseek-v3.1, qwen3-moe-235b-a22b}` × `--runtime {sglang, vllm, trt-llm}` × `--precision {bf16, fp8, fp4}` × `--ep {2, 4, 8, 16}` × `--p-d-mode {colocated, disaggregated}`.
-* Precision-parity reports for each model at FP4 + FP8 KV, validated on MMLU / GSM8K / HumanEval / BFCL / RULER.
-* Expert-load-balance measurements showing tokens-per-expert distribution and the gating compute cost.
-* All-to-all communication time as a fraction of step time at EP=8 and EP=16.
-* For at least one of the models, a measured disaggregated P/D run showing the cost-economics crossover with the colocated baseline.
-* Final cost model: `$/MTok` for each (model, runtime, precision, EP, mode) cell on B200 and GB200 NVL72.
-
-## Exit criteria
-
-You can do all of:
-
-* Explain MLA's KV-compression mechanism in three sentences and compute its per-token KV bytes against GQA.
-* Sketch the all-to-all communication pattern for MoE EP and explain why it's harder than TP's all-reduce.
-* Defend EP=8 vs EP=16 for DeepSeek V3.1 on GB200 NVL72 from a measurement.
-* Predict where disaggregated P/D wins for an MoE workload and verify with one measurement.
-* State your `$/MTok` for one (model, runtime, precision, EP) cell on GB200 NVL72 and walk the formula.
-
-You have completed the course when these are all defended by numbers in your benchmark repo.
-
-
-## Carry this course into the physical-AI system
-
-**Start from:** A verified MoE graph, checkpoint format, and runtime compatibility matrix.
-
-**Build and challenge:** Separate total parameter storage from active expert compute. Compare one supported placement and trace communication; reject unsupported model/format/kernel combinations before benchmarking.
-
-**Pass forward:** Per-device capacity and traffic budgets that transfer to a named frontier checkpoint. Continue with [the connected course](../Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/README.md) and keep the artifact in the [Physical AI Design Studio](../../../../Physical-AI-Design-Studio.md).
+Continue to [Part 4 — Optimizing a Real Engine](../Part%204%20-%20Optimizing%20a%20Real%20Engine/README.md) or the [course overview](../README.md). Carry the routing/cache contracts into the [Physical AI Design Studio](../../../../Physical-AI-Design-Studio.md) when building a physical system.

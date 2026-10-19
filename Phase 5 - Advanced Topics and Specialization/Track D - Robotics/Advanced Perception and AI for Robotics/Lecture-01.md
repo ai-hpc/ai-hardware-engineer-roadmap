@@ -1,5 +1,12 @@
 # Lecture 3: Advanced Perception and AI for Robotics
 
+**Before this survey:** work through [camera geometry and uncertainty](../Robotics%20Foundations/Lecture-04.md) and its CPU projection/filter lab. A detector's pixel output is not yet a robot-frame pose; calibration, depth, timestamp, and uncertainty assumptions connect the two. **Artifact:** a perception-to-estimation trace with known frame/unit checks, held-out quality metrics, and capture-to-use age.
+
+**Worked practice:** the [capture-time tracking lab](Tracking-Lab.md) derives a
+camera-to-world measurement, propagates uncertainty, runs Kalman prediction and
+gating, and exposes an identity ambiguity. Its optional TF2 experiment was
+executed with the actual Jazzy library; no detector checkpoint is required.
+
 ## Overview
 
 This lecture has **three parts**:
@@ -28,23 +35,42 @@ This block maps **detection → tracking → estimation → actuation** to **ROS
 
 | Piece | Role |
 |-------|------|
-| `sensor_msgs/Image` | Raw image (often compressed with `image_transport`) |
-| `cv_bridge` | Convert ROS images ↔ OpenCV without copy mistakes |
-| `vision_msgs/Detection2D` / `Detection3D` | Standard bounding boxes + class ids; use **message_filters** for sync |
+| `sensor_msgs/Image` | Raw image; `image_transport` can select transports with different wire representations |
+| `cv_bridge` | Convert ROS images ↔ OpenCV; inspect encoding, channel order, row stride, ownership, and copies |
+| `vision_msgs/Detection2D` / `Detection3D` | Typed detections; retain the source frame and acquisition timestamp |
+
+`cv_bridge` is not a promise of zero-copy conversion. `message_filters` can pair
+messages according to their timestamps and policy; it does not synchronize
+hardware clocks or repair a receive-time stamp mislabeled as capture time.
+Inspect the relevant [image bridge](https://github.com/ros-perception/vision_opencv)
+and [message filter](https://github.com/ros2/message_filters) implementation for
+your release.
 
 **Deployment path:** Train in PyTorch → export **ONNX** → **TensorRT** on Jetson → thin ROS 2 node that only runs inference and publishes.
 
 ### A.2 Multi-object tracking (MOT)
 
-**Core loop:** **Predict** each track with a **Kalman** (or constant-velocity) model → **associate** detections to tracks (Hungarian / IoU / Mahalanobis gating) → **create** / **delete** tracks.
+**Core loop:** predict each track using a motion model, such as constant velocity
+inside a Kalman filter; gate unlikely measurements; solve an assignment problem;
+update matched tracks; and manage unmatched detections/tracks. The Kalman filter
+and the constant-velocity model are different layers of the same example.
 
-**Learning-assisted** trackers (e.g. **ByteTrack**-style) add **association** robustness when detections flicker. In ROS 2, publish **track IDs** and **markers** for RViz2 so debugging is visual.
+**ByteTrack** is a tracking-by-detection method that associates high-confidence
+detections and then uses lower-confidence detections to recover additional
+matches; its association is not inherently a learned appearance model. Track
+identity can remain ambiguous when objects overlap or leave view. In ROS 2,
+publish track IDs and markers for RViz2 to expose these failures.
+[ByteTrack paper](https://arxiv.org/abs/2110.06864)
 
 **Roadmap deep dive:** [Phase 3 — Multi-Object Tracking guide](../../../Phase%203%20-%20Artificial%20Intelligence/Track%20A%20-%20Hardware%20and%20Edge%20AI/4.%20Sensor%20Fusion/multi-object-tracking/Guide.md) (Kalman + assignment + ROS 2 patterns).
 
 ### A.3 State estimation and `robot_localization`
 
-Same mathematics as Lecture 1, applied to **perception-driven** systems: fuse **wheel odom**, **IMU**, **visual odometry**, or **GPS** (outdoor). **TF2** must stay **consistent**—a wrong `odom` → `base_link` corrupts both tracking and Nav2.
+Use the sensor/frame contracts in [the fusion section](../Advanced%20Robot%20Operating%20System/Lecture-01.md#6-sensor-fusion-robot_localization)
+before combining wheel odometry, IMU, visual odometry, or geographically transformed
+GPS. A wrong `odom` → `base_link` or an incorrect transform timestamp corrupts
+both tracking and Nav2. Two outputs derived from the same image are not
+automatically independent evidence.
 
 ### A.4 Semantic layer and behavior trees
 
@@ -54,24 +80,34 @@ Nav2 already uses **BehaviorTree.CPP**. For **semantic** goals (“only drive on
 
 **Visual servoing:** Regulate **image features** (points, lines) to desired positions; **control law** outputs **twist** or **joint velocities**. Always **transform** setpoints through **TF2** (`geometry_msgs`) so the controller operates in the **correct frame**.
 
-**Aerial / PX4:** Use [PX4 ↔ ROS 2](https://docs.px4.io/main/en/ros2/user_guide.html) (micro-ROS / uXRCE-DDS) rather than reinventing the autopilot; ROS 2 supplies **missions**, **offboard** setpoints, or **perception** hooks.
+**Aerial / PX4:** PX4's [uXRCE-DDS client/agent bridge](https://docs.px4.io/main/en/middleware/uxrce_dds)
+connects selected PX4 messages with DDS/ROS 2. This is not another name for the
+micro-ROS client stack. Pin compatible PX4/message definitions and check frame
+conventions: PX4's NED/FRD conventions and ROS's common ENU/FLU conventions need
+explicit conversion, including orientation. Begin with SITL and documented
+offboard timing/failsafe behavior before interpreting a published setpoint as
+an accepted or executed command.
 
 ### A.6 Monocular geometry
 
-**Monocular** systems lack absolute scale; **IMU** or **known object size** provides scale. **VIO** packages (ORB-SLAM3, OpenVINS, Kimera-VIO) expose **ROS** interfaces—treat outputs as **noisy** and **rate-limited** for fusion.
+Pure geometric reconstruction from monocular images has a scale ambiguity. Additional information such as inertial measurements under suitable motion and calibration, known dimensions, or learned priors can constrain scale; it does not make every monocular estimate metrically correct. For a VIO package, verify the actual sensor configuration, ROS interface/version, initialization requirements, output frames, and covariance before fusion.
 
 ### A.7 Simulation and sim-to-real
 
 * **Gazebo** + [`ros_gz`](https://github.com/gazebosim/ros_gz): ground robots, sensors.
 * **PX4 SITL:** aerial stacks before flight.
 
-**Sim-to-real:** Inject **latency**, **noise**, and **misp calibration** in sim before claiming hardware readiness.
+**Sim-to-real:** Inject **latency**, **noise**, and **miscalibration** in sim before claiming hardware readiness.
 
 ### A.8 Service integration (FastAPI, NATS)
 
-**Pattern:** ROS 2 owns **real-time-ish** sensing and control; **FastAPI** exposes **REST/WebSocket** for dashboards; **NATS** fans out **events** to analytics. **Bridge** with small nodes; **do not** starve the DDS thread with blocking HTTP.
+**Pattern:** keep the sensing/control path separate from dashboard HTTP and
+analytics events. A ROS 2 graph is not inherently real-time. Bound bridge queues,
+carry acquisition timestamps, and avoid blocking the executor callback with an
+HTTP request. Measure the resulting age and missed deadlines under load.
 
-**QoS:** [DDS tuning](https://docs.ros.org/en/humble/Concepts/About-Quality-of-Service-Settings.html) for sensor streams vs commands.
+**QoS:** work through the [executed compatibility and backlog lab](../Advanced%20Robot%20Operating%20System/Integration-Lab.md)
+for sensor streams versus commands.
 
 ### A.9 GPU, Docker, GStreamer
 
@@ -90,14 +126,14 @@ Nav2 already uses **BehaviorTree.CPP**. For **semantic** goals (“only drive on
 
 ### Canonical links (Part A)
 
-* [ROS 2 Humble tutorials](https://docs.ros.org/en/humble/Tutorials.html) · [QoS](https://docs.ros.org/en/humble/Concepts/About-Quality-of-Service-Settings.html) · [`ros2 bag`](https://docs.ros.org/en/humble/Tutorials/Beginner-CLI-Tools/Recording-And-Playing-Back-Data/Recording-And-Playing-Back-Data.html)
+* [ROS 2 Jazzy tutorial sources](https://github.com/ros2/ros2_documentation/tree/jazzy/source/Tutorials) · [QoS](https://github.com/ros2/ros2_documentation/blob/jazzy/source/Concepts/Intermediate/About-Quality-of-Service-Settings.rst) · [distribution choices](../Advanced%20Robot%20Operating%20System/Integration-Lab.md)
 * [Nav2](https://navigation.ros.org/) · [Behavior trees in Nav2](https://navigation.ros.org/behavior_trees/index.html)
 * [ros2_control](https://control.ros.org/)
-* [`vision_msgs`](https://github.com/ros-perception/vision_msgs) · [cv_bridge](https://docs.ros.org/en/humble/Tutorials/Advanced/Cvbridge/Cvbridge.html)
+* [`vision_msgs`](https://github.com/ros-perception/vision_msgs) · [cv_bridge source](https://github.com/ros-perception/vision_opencv)
 * Barfoot, *State Estimation for Robotics* — [resource page](http://asrl.utias.utoronto.ca/~tdb/bib.html)
 * [Gazebo](https://gazebosim.org/docs) · [ros_gz](https://github.com/gazebosim/ros_gz)
 * [PX4 ROS 2](https://docs.px4.io/main/en/ros2/user_guide.html) · [MAVSDK](https://mavsdk.mavlink.io/)
-* [Docker + ROS 2](https://github.com/osrf/docker_images) · [Docker how-to](https://docs.ros.org/en/humble/How-To-Guides/Run-2-nodes-in-single-or-separate-docker-containers.html)
+* [Docker + ROS 2](https://github.com/osrf/docker_images) — choose an image for the same distribution and target architecture
 * [FastAPI](https://fastapi.tiangolo.com/) · [NATS](https://docs.nats.io/)
 
 ### How Part A connects to other lectures
@@ -165,7 +201,7 @@ Nav2 already uses **BehaviorTree.CPP**. For **semantic** goals (“only drive on
 
 ### C.2 Imitation and offline RL
 
-**Behavior cloning** is fragile **out of distribution**; **DAgger** reduces **covariate shift** by mixing expert and policy data. **Diffusion Policy** outputs **smooth** multi-modal action trajectories.
+**Behavior cloning** can fail **out of distribution**; **DAgger** collects expert labels on states visited by the learner to address this distribution shift. **Diffusion Policy** models multimodal action sequences; its denoising procedure does not impose hard smoothness, velocity, acceleration, or collision constraints. Validate the executed trajectory and object-level outcome separately. See the [Diffusion Policy paper](https://arxiv.org/abs/2303.04137) and the [dynamics and task-execution course](../Robot%20Dynamics%20and%20Task%20Execution/README.md).
 
 ### C.3 Foundation models for robotics
 
@@ -177,7 +213,7 @@ Nav2 already uses **BehaviorTree.CPP**. For **semantic** goals (“only drive on
 
 ### Resources (Part C)
 
-* [Isaac Lab](https://docs.omniverse.nvidia.com/isaacsim/latest/isaac_lab_tutorials/index.html) — full treatment in the [Isaac Sim and Isaac Lab](../Isaac%20Sim%20and%20Isaac%20Lab/README.md) special course
+* [Isaac Lab compatibility and source pins](../Isaac%20Sim%20and%20Isaac%20Lab/Compatibility.md) — full treatment in the [Isaac Sim and Isaac Lab](../Isaac%20Sim%20and%20Isaac%20Lab/README.md) special course
 * Sutton & Barto, *Reinforcement Learning: An Introduction*
 * [Lerobot](https://github.com/huggingface/lerobot) (Hugging Face)
 
@@ -196,6 +232,8 @@ Nav2 already uses **BehaviorTree.CPP**. For **semantic** goals (“only drive on
 **Part B:** When does **monocular depth** fail outdoors at **high speed**?
 
 **Part C:** What is **one** failure mode of **behavior cloning** without **DAgger**?
+
+**Answer guidance:** Part A: typed detections provide explicit structure that tools and downstream consumers can inspect; they still need a shared semantic contract. Blocking an HTTP request inside the critical callback can delay sensor processing or control. Part B: blur, changing exposure, weak texture, and distribution shift can degrade depth; fast motion also makes an old estimate spatially wrong. Part C: small imitation errors can move the policy into states absent from its demonstrations, where errors accumulate; DAgger addresses coverage by gathering expert labels on policy-visited states, under its assumptions.
 
 ---
 

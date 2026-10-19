@@ -25,6 +25,10 @@ If 80 of 100 independent evaluation episodes succeed, the observed rate is 0.8. 
 
 Evaluate multiple trained seeds separately, then summarize between-seed variation. Hundreds of episodes from one policy are not hundreds of independent training runs. Repeated conditions or correlated trajectories further weaken naive intervals.
 
+## A paired comparison
+
+Suppose two policies both solve 50 of 100 tasks, but the second loses 20 tasks the first solved and gains 20 others. Equal totals hide the regressions. Save scenario IDs and count the paired changes. [The executable comparison](Simulation-CPU-Lab.md#5-compare-outcomes-without-misusing-confidence-intervals) also shows that zero observed regressions in 100 independent pairs gives a one-sided 95% upper bound near 2.63%, which fails a predeclared 1% margin. Overlapping marginal success intervals are not an equivalence test.
+
 ## Lab
 
 1. Fix success, failure, timeout, and early-stop definitions.

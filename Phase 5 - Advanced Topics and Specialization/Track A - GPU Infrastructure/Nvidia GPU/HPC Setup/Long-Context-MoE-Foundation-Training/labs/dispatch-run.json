@@ -1,0 +1,66 @@
+{
+  "backend": "gloo",
+  "device": "cpu",
+  "torch": "2.14.0+cpu",
+  "skew": false,
+  "empty_expert": false,
+  "empty_source": false,
+  "ranks": [
+    {
+      "rank": 0,
+      "input": [
+        1.0,
+        2.0
+      ],
+      "send_splits": [
+        2,
+        2
+      ],
+      "receive_splits": [
+        2,
+        3
+      ],
+      "output": [
+        3.5,
+        6.25
+      ],
+      "serial": [
+        3.5,
+        6.25
+      ],
+      "max_abs_error": 0.0,
+      "source_tokens": 2,
+      "received_assignments": 5
+    },
+    {
+      "rank": 1,
+      "input": [
+        11.0,
+        12.0,
+        13.0
+      ],
+      "send_splits": [
+        3,
+        3
+      ],
+      "receive_splits": [
+        2,
+        3
+      ],
+      "output": [
+        31.0,
+        33.75,
+        36.5
+      ],
+      "serial": [
+        31.0,
+        33.75,
+        36.5
+      ],
+      "max_abs_error": 0.0,
+      "source_tokens": 3,
+      "received_assignments": 5
+    }
+  ],
+  "script_sha256": "297a09a7b5636de01eff96642d7d26a0dab97b018811d18c1488c4952585b512"
+}

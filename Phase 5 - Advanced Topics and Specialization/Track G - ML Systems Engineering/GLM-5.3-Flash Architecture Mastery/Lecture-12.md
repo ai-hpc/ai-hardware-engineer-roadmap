@@ -118,6 +118,8 @@ If you can recite the five mechanism names — MoE, KDA, MLA, DSA, mHC — but c
 
 ## Current as of
 
+**Reviewed October 18, 2026.** [Pinned config, upstream code and CPU evidence](CPU-Hybrid-State-Lab.md#sources-and-execution-boundary) identify what was checked. Hardware capacity and throughput remain deployment-specific.
+
 * **Timeless:** the eight-stage build order and the correctness-before-performance discipline underlying stage 8.
 * **Checkpoint- and deployment-specific:** stage 7's cost model and the case study threaded through this course (8× RTX 5090, PCIe Gen4, no P2P, NVFP4, `sparkinfer-frontier`) are tied to this specific deployment — the ladder itself (stages 1–6, and the discipline of stage 8) applies unchanged to any hybrid architecture combining sparse MoE, recurrent linear attention, compressed latent attention, selective retrieval, and multi-stream residuals, whatever its specific dimensions turn out to be.
 

@@ -1,338 +1,86 @@
-# 04 — NCCL Configuration & Tuning
+# 04 — Configure NCCL by testing one hypothesis
 
-## 1. The Most Important Environment Variables
+**Outcome:** identify a transport, select the correct process-local device, and test one configuration change. Checked against NCCL **2.32.3** documentation on 2026-10-18. A framework wheel may bundle an older NCCL: record its actual version before copying settings. GPU commands below are unexecuted hardware exercises.
 
-NCCL is configured entirely through environment variables. These affect performance more than almost any code change.
+## Begin with the default configuration
 
-### Debugging and Logging
-
-```bash
-# Log level: VERSION < WARN < INFO < TRACE
-export NCCL_DEBUG=INFO          # recommended for production setup
-export NCCL_DEBUG=WARN          # quieter; only warnings and errors
-export NCCL_DEBUG=TRACE         # very verbose; use only for debugging
-
-# Filter debug output to specific subsystems
-export NCCL_DEBUG_SUBSYS=ALL
-export NCCL_DEBUG_SUBSYS=INIT   # topology detection and communicator setup
-export NCCL_DEBUG_SUBSYS=GRAPH  # algorithm and ring/tree selection
-export NCCL_DEBUG_SUBSYS=TUNING # algorithm performance tuning
-
-# Write debug output to a file (one per rank)
-export NCCL_DEBUG_FILE=/tmp/nccl_debug_%h_%p.txt
-# %h = hostname, %p = process ID
-```
-
-**Reading NCCL_DEBUG=INFO output:**
-
-```
-NCCL INFO Bootstrap: Using [0] eth0:192.168.1.100<0>
-NCCL INFO NCCL version 2.20.5+cuda12.2
-NCCL INFO Channel 00/08 : 0 1 2 3 4 5 6 7
-NCCL INFO Ring 00 : 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 0
-NCCL INFO Trees [0] 3/-1/-1->0->-1|0->1/3/-1
-NCCL INFO Setting affinity for GPU 0 to ffff
-```
-
-- `Channel 00/08`: 8 channels (parallel rings) for throughput
-- `Ring 00`: the ring order (GPU IDs) for channel 0
-- `Trees [0]`: the tree structure for the tree algorithm
-
----
-
-### Algorithm and Protocol
+NCCL has environment settings and communicator configuration APIs; environment variables are not its only interface. Tuning overrides can prevent a newer runtime from choosing a better algorithm. Record inherited `NCCL_*` and `TORCH_NCCL_*` variables, then compare an explicit clean baseline inside your allocated job. Do not modify shared cluster configuration.
 
 ```bash
-# Force algorithm (NCCL auto-selects by default)
-export NCCL_ALGO=Ring           # Ring AllReduce
-export NCCL_ALGO=Tree           # Tree AllReduce
-export NCCL_ALGO=CollNetDirect  # CollNet (in-network computing, requires switch support)
-export NCCL_ALGO=CollNetChain   # CollNet chain variant
-export NCCL_ALGO=NVLS           # NVLink SHARP (H100/H200 NVSwitch only)
-export NCCL_ALGO=NVLSTree       # NVLink SHARP tree variant
-
-# Force protocol
-export NCCL_PROTO=Simple        # best for large messages (>512 KB)
-export NCCL_PROTO=LL128         # medium messages
-export NCCL_PROTO=LL            # latency-optimized for small messages
-
-# Number of channels (parallel rings)
-export NCCL_MIN_NCHANNELS=4     # minimum channels
-export NCCL_MAX_NCHANNELS=8     # maximum channels (default: auto)
-# More channels = higher bandwidth for large messages
-# Too many channels = wasted SM resources for small messages
-```
-
----
-
-### P2P (GPU-to-GPU) Communication
-
-```bash
-# Use NVLink for P2P (strongly recommended for NVLink systems)
-export NCCL_P2P_LEVEL=NVL      # NVLink only
-export NCCL_P2P_LEVEL=SYS      # all P2P (NVLink + PCIe)
-export NCCL_P2P_LEVEL=LOC      # same socket only
-export NCCL_P2P_DISABLE=1      # disable P2P (fallback to shared memory or network)
-
-# SHM (shared memory) transport for same-host fallback
-export NCCL_SHM_DISABLE=0      # enable (default)
-export NCCL_SHM_DISABLE=1      # disable (force network transport)
-
-# Buffer size for SHM
-export NCCL_BUFFSIZE=8388608   # 8 MB (default is 4 MB)
-# Larger buffer = better bandwidth for large messages
-# Smaller buffer = less memory used
-```
-
----
-
-### InfiniBand (Multi-Node)
-
-```bash
-# Select InfiniBand HCA (Host Channel Adapter)
-export NCCL_IB_HCA=mlx5_0                    # specific HCA
-export NCCL_IB_HCA=mlx5_0,mlx5_1            # multiple HCAs (bonding)
-export NCCL_IB_HCA=^mlx5_2                  # exclude specific HCA
-
-# Enable/disable InfiniBand
-export NCCL_IB_DISABLE=0                     # enable IB (default)
-export NCCL_IB_DISABLE=1                     # force Ethernet
-
-# GPUDirect RDMA level
-export NCCL_NET_GDR_LEVEL=0   # no GPUDirect RDMA
-export NCCL_NET_GDR_LEVEL=1   # single-hop (same PCIe switch)
-export NCCL_NET_GDR_LEVEL=2   # two-hop
-export NCCL_NET_GDR_LEVEL=5   # any topology (recommended when IB is present)
-
-# Traffic class (for QoS on IB fabric)
-export NCCL_IB_TC=106         # DSCP traffic class
-export NCCL_IB_SL=0           # service level (0-15)
-export NCCL_IB_GID_INDEX=3    # GID index (3 = RoCEv2 for Ethernet-based RDMA)
-
-# Timeout (seconds) for IB operations
-export NCCL_IB_TIMEOUT=23     # 23 = ~8 seconds (2^23 × 4 ns)
-```
-
----
-
-### Timeout and Fault Tolerance
-
-```bash
-# Watchdog timeout for detecting hangs (seconds)
-export NCCL_TIMEOUT=1800       # 30 minutes (default)
-# Reduce for faster hang detection in production:
-export NCCL_TIMEOUT=300        # 5 minutes
-
-# Socket timeout for bootstrap
-export NCCL_SOCKET_TIMEOUT=60  # 60 seconds (default)
-
-# Async error handling
-export NCCL_ASYNC_ERROR_HANDLING=1  # raise errors asynchronously
-```
-
----
-
-## 2. Topology-Specific Tuning Recipes
-
-### Recipe: 8x H200 (NVSwitch, NVLink 4.0)
-
-```bash
-# Maximum performance on NVSwitch system
-export NCCL_P2P_LEVEL=NVL
-export NCCL_NET_GDR_LEVEL=5
-export NCCL_ALGO=NVLS               # NVLink SHARP (in-switch reduction)
-# or
-export NCCL_ALGO=Tree               # Double binary tree (if NVLS unavailable)
-export NCCL_MIN_NCHANNELS=8         # use all 8 channels
-export NCCL_BUFFSIZE=16777216       # 16 MB buffer
-export NCCL_DEBUG=WARN              # production verbosity
-```
-
-### Recipe: 12x L40S (PCIe, No NVLink)
-
-```bash
-# PCIe-constrained system
-export NCCL_P2P_LEVEL=SYS          # use PCIe P2P
-export NCCL_SHM_DISABLE=0          # use shared memory for same-host
-export NCCL_ALGO=Ring              # Ring preferred for PCIe
-export NCCL_MAX_NCHANNELS=4        # fewer channels (PCIe can't support many)
-export NCCL_BUFFSIZE=8388608       # 8 MB
-export NCCL_SOCKET_IFNAME=eth0     # correct network interface
-```
-
-### Recipe: Multi-Node with InfiniBand (HDR 200 Gb/s)
-
-```bash
-export NCCL_IB_HCA=mlx5_0,mlx5_1  # use both IB ports
-export NCCL_NET_GDR_LEVEL=5        # GPUDirect RDMA
-export NCCL_IB_DISABLE=0
-export NCCL_IB_GID_INDEX=3         # RoCEv2
-export NCCL_IB_TC=106
-export NCCL_IB_SL=0
-export NCCL_SOCKET_IFNAME=ib0
-export NCCL_TIMEOUT=600            # longer timeout for large clusters
-
-# Hierarchical: NVLink intra-node, IB inter-node
-# NCCL detects this automatically with correct IB + NVLink configuration
-```
-
----
-
-## 3. Topology Detection and Verification
-
-### Checking Detected Topology
-
-```bash
-# NCCL topology detection (set DEBUG=INFO before your job)
-export NCCL_DEBUG=INFO
-torchrun --nproc_per_node=8 python -c "
-import torch.distributed as dist
-dist.init_process_group('nccl')
-import time; time.sleep(2)  # let NCCL print topology
-dist.destroy_process_group()
-" 2>&1 | grep -E "Ring|Tree|Channel|NVLink|IB"
-```
-
-Expected output for 8x H200:
-```
-NCCL INFO Channel 00/08 : 0 1 2 3 4 5 6 7     ← 8 parallel channels
-NCCL INFO Ring 00 : 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 0
-NCCL INFO Using NVLink  ← NVLink detected
-NCCL INFO Trees [0] 3/-1/-1->0->-1|0->1/3/-1
-```
-
-Expected output for 8x L40S (PCIe):
-```
-NCCL INFO Channel 00/04 : 0 1 2 3 4 5 6 7     ← 4 channels (PCIe limited)
-NCCL INFO Ring 00 : 0 -> 2 -> 4 -> 6 -> 1 -> 3 -> 5 -> 7 -> 0  ← non-sequential (PCIe-aware)
-NCCL INFO Using shared memory for GPU-to-GPU  ← SHM fallback for same-host
-```
-
-### nvidia-smi Topology Check
-
-```bash
-# Full topology matrix
+printenv | sort | grep -E '^(NCCL|TORCH_NCCL)_'
 nvidia-smi topo -m
-
-# Example for 8x H200:
-#         GPU0 GPU1 GPU2 GPU3 GPU4 GPU5 GPU6 GPU7
-# GPU0      X  NV18 NV18 NV18 NV18 NV18 NV18 NV18
-# GPU1    NV18   X  NV18 NV18 NV18 NV18 NV18 NV18
-# ...
-# NV18 = 18 NVLink lanes = full NVLink 4.0 connectivity
-
-# PCIe system:
-#         GPU0 GPU1 GPU2 GPU3
-# GPU0      X  PXB  PHB  SYS
-# GPU1    PXB   X   PHB  SYS
-# PXB = same PCIe switch (fast), PHB = host bridge (slower), SYS = cross NUMA (slow)
+python -c 'import torch; print(torch.__version__, torch.version.cuda, torch.cuda.nccl.version())'
 ```
 
----
+Debug a small reproducible run with `NCCL_DEBUG=INFO` and `NCCL_DEBUG_FILE=/tmp/nccl_%h_%p.log`. `%h` and `%p` prevent hosts/processes overwriting each other's logs. Preserve all ranks' logs. `NCCL_DEBUG_SUBSYS=INIT,GRAPH,NET` narrows output; exact messages and channel counts vary by version. Restore ordinary verbosity after diagnosis.
 
-## 4. Bandwidth Tuning by Message Size
+## A complete CUDA smoke test
 
-NCCL performance varies significantly with message size. Tune based on your gradient/parameter sizes.
+Save as `nccl_smoke.py`, then launch **one process per GPU**. Global rank can exceed the number of local GPUs; device selection uses `LOCAL_RANK`.
 
-```bash
-# Find your typical gradient tensor sizes
-python - <<'EOF'
-from transformers import LlamaForCausalLM, LlamaConfig
+```python
+import os
+from datetime import timedelta
 import torch
-
-config = LlamaConfig(hidden_size=8192, num_hidden_layers=80)
-model = LlamaForCausalLM(config)
-
-total_bytes = 0
-for name, param in model.named_parameters():
-    size_mb = param.numel() * 2 / 1e6  # BF16 = 2 bytes
-    print(f"{name:60s}: {size_mb:.1f} MB")
-    total_bytes += param.numel() * 2
-
-print(f"\nTotal: {total_bytes/1e9:.1f} GB")
-# This tells you the AllReduce size for DDP
-# For ZeRO-3: each AllGather is parameter_size / world_size
-EOF
-```
-
-### Tuning for Small Gradients (< 1 MB)
-
-```bash
-# Small gradients: prioritize latency
-export NCCL_PROTO=LL          # low-latency protocol
-export NCCL_ALGO=Tree         # tree has better latency (log N steps)
-export NCCL_MAX_NCHANNELS=1   # single channel (less overhead)
-```
-
-### Tuning for Large Gradients (> 100 MB)
-
-```bash
-# Large gradients: maximize bandwidth
-export NCCL_PROTO=Simple      # best bandwidth
-export NCCL_ALGO=Ring         # bandwidth-optimal
-export NCCL_MIN_NCHANNELS=8   # all channels for parallelism
-export NCCL_BUFFSIZE=16777216  # 16 MB buffer
-```
-
----
-
-## 5. DDP Bucket Size Tuning
-
-Bucket size controls how gradients are grouped for AllReduce. Larger buckets = fewer NCCL calls = better bandwidth utilization.
-
-```python
-# Default: 25 MB per bucket
-# For large models on NVLink: increase significantly
-model = DDP(
-    model,
-    device_ids=[rank],
-    bucket_cap_mb=200,       # 200 MB per bucket — fewer, larger AllReduces
-    gradient_as_bucket_view=True,  # avoid extra buffer copy
-    static_graph=True,       # optimization if graph doesn't change (most training)
-)
-
-# Find optimal bucket size:
-# Too small: many small NCCL calls → high overhead
-# Too large: all-or-nothing sync → less overlap with backward
-# Sweet spot: ~1-2 buckets covering the largest parameter groups
-```
-
----
-
-## 6. Profile NCCL Operations
-
-```bash
-# Profile with Nsight Systems
-nsys profile \
-    --trace=cuda,nvtx,nccl \        # include NCCL in trace
-    --stats=true \
-    --output=nccl_profile \
-    torchrun --nproc_per_node=8 train.py
-
-# View nccl_profile.nsys-rep in nsys-ui
-# NCCL ops appear as colored blocks in the GPU timeline
-# Look for:
-#   ncclAllReduce → how long does it take?
-#   GPU idle between AllReduce and next compute → communication gap
-```
-
-```python
-# Mark NCCL calls with NVTX for easier profiling
-import torch.cuda.nvtx as nvtx
 import torch.distributed as dist
 
-def profile_allreduce(tensor, name="grad"):
-    nvtx.range_push(f"AllReduce:{name}")
-    dist.all_reduce(tensor)
-    torch.cuda.synchronize()
-    nvtx.range_pop()
+local_rank = int(os.environ["LOCAL_RANK"])
+torch.cuda.set_device(local_rank)
+dist.init_process_group("nccl", timeout=timedelta(seconds=60))
+try:
+    rank, world = dist.get_rank(), dist.get_world_size()
+    value = torch.tensor([rank + 1.], device=f"cuda:{local_rank}")
+    dist.all_reduce(value)
+    torch.cuda.synchronize(local_rank)
+    assert value.item() == world * (world + 1) / 2
+    print(f"rank={rank} local={local_rank} sum={value.item()}", flush=True)
+finally:
+    dist.destroy_process_group()
 ```
 
----
+```bash
+NCCL_DEBUG=INFO torchrun --standalone --nproc-per-node=8 nccl_smoke.py
+```
 
-## References
+`torchrun` takes a script path here; `torchrun ... python -c ...` mistakenly treats `python` as the script. A collective forces actual communicator use; initialization alone may defer part of setup. For a CPU-only machine run the [executed Gloo lab](CPU-Collectives-Lab/Guide.md).
 
-- [NCCL Environment Variables Reference](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html)
-- [NCCL Tuning Guide](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/collectives.html)
-- [PyTorch DDP Performance Tuning](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html)
-- [NCCL Source: Algorithm Selection](https://github.com/NVIDIA/nccl/blob/master/src/graph/search.cc)
+## What the important controls mean
+
+| Setting | Meaning and common mistake |
+|---|---|
+| `NCCL_SOCKET_IFNAME='=eth0'` | Exact IP interface match; plain `eth` is a prefix. Bootstrap/interface selection does not prove RDMA data transport. |
+| `NCCL_IB_HCA='=mlx5_0:1,mlx5_1:1'` | Exact HCA names and ports. Multiple HCAs are eligible paths, not automatic OS bonding. Discover actual devices first. |
+| `NCCL_IB_DISABLE=1` | Disable NCCL's IB/RoCE verbs transport for a diagnostic comparison; socket Ethernet and RoCE are different transports. |
+| `NCCL_P2P_LEVEL=LOC` | Disable P2P; it does **not** mean “same CPU socket.” |
+| `NCCL_P2P_LEVEL=NVL/PIX/PXB/PHB/SYS` | Increasing permitted topology distance. These are alternatives, not a literal slash-separated value. A setting cannot make unsupported peer access work. |
+| `NCCL_NET_GDR_LEVEL` | Controls permitted GPU–NIC distance for GPUDirect RDMA. Prefer documented string values, not changing legacy integers. Leave automatic selection unless testing evidence. |
+| `NCCL_IB_GID_INDEX` | Device-specific RoCE GID index. Index 3 does not universally mean RoCEv2. Modern NCCL can select it automatically. |
+| `NCCL_IB_TC`, `NCCL_IB_SL` | Match the fabric administrator's QoS policy; an arbitrary value such as 106 does not create a correctly configured lossless fabric. |
+| `NCCL_IB_TIMEOUT` | Verbs exponent: 4.096 µs × 2^value. Value 23 gives about **34.36 seconds**, before retry behavior. Not a training step watchdog. |
+| `NCCL_ALGO`, `NCCL_PROTO` | Diagnostic restrictions on supported algorithms/protocols. Removing NVLS or another eligible algorithm may regress performance. No universal message-size thresholds. |
+| `NCCL_MIN_CTAS`, `NCCL_MAX_CTAS` | Bounds on communication GPU work. More can consume compute resources; names/availability depend on release. Older channel controls are legacy. |
+
+The official reference warns against retaining debugging overrides in production. [NCCL environment reference](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html).
+
+## Timeouts belong to the correct layer
+
+`NCCL_TIMEOUT` and `NCCL_SOCKET_TIMEOUT` are not documented NCCL controls in this reviewed release. Set the PyTorch process-group `timeout` explicitly, as above. PyTorch's `TORCH_NCCL_ASYNC_ERROR_HANDLING` and watchdog/flight-recorder settings belong to **ProcessGroupNCCL**, not generic NCCL. Network retry settings and elastic rendezvous timeouts affect other layers. Increasing every timeout can conceal a missing rank rather than fix it. [PyTorch NCCL variables](https://docs.pytorch.org/docs/stable/torch_nccl_environment_variables.html).
+
+## A controlled tuning experiment
+
+1. Save baseline raw nccl-tests results, correctness checks, topology and version manifest.
+2. State a prediction: for example, “disabling RDMA will reduce large-message bandwidth across these nodes.”
+3. Change one variable for one job, repeat the same sweep, and remove it afterward.
+4. Inspect transport logs as well as timing. An unexpected no-change result may mean RDMA was already unavailable.
+5. Test the real application: a faster isolated collective may occupy SMs needed for useful compute.
+
+For DDP, a larger `bucket_cap_mb` can reduce launch count but delay communication until more gradients are ready. A smaller bucket can begin earlier but add overhead. `static_graph=True` requires stable graph/use of parameters; it is not a generic speed switch. Use a trace of **backward computation overlapping ready gradient buckets**, followed by completion before the optimizer step.
+
+```bash
+nsys profile --trace=cuda,nvtx --stats=true --output=nccl_profile \
+    torchrun --standalone --nproc-per-node=8 train.py
+```
+
+Check your installed Nsight Systems trace options before adding NCCL-specific tracing. A CUDA event or synchronization used for isolated timing can remove overlap; keep a separate end-to-end trace.
+
+**Assessment:** explain why forcing `P2P_LEVEL=NVL` is unsuitable as a universal recipe for L40S (it has no NVLink), why `LOCAL_RANK` selects the device, and why 8 channels is not guaranteed on an 8-GPU node. Submit the baseline, one controlled variation and the observed transport evidence.

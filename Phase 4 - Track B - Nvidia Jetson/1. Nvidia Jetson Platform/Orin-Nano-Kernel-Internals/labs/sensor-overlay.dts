@@ -1,0 +1,11 @@
+/dts-v1/;
+/plugin/;
+
+&i2c0 {
+    status = "okay";
+};
+
+&sensor0 {
+    status = "okay";
+    sample-rate-hz = <200>;
+};

@@ -52,9 +52,7 @@ By the end of this lecture, you should be able to:
 
 ## 1. Why this belongs in an agent course
 
-Most **agent failures** are not caused by attention math.
-
-They are caused by **harness, tool, memory, policy, and product issues**.
+Agent failures can originate in model capability, prompts/data, tools or runtime state. Trace the actual failure instead of assigning a cause from its surface appearance.
 
 Still, model mechanics matter because agents create **unusual inference workloads**:
 
@@ -97,7 +95,7 @@ The project has learners write:
 - text generation and sampling
 - experiments on real data
 
-The repository describes three workshop model sizes:
+The [pinned workshop source, 63069f99](https://github.com/angelos-p/llm-from-scratch/tree/63069f99af8ce9a6ab6e261000f4f9f1daaa1ee9) (2026-05-05) describes three model sizes. The times below are **the author's M3 Pro estimates**, not course measurements or CPU/GPU-independent guarantees. Dataset, steps, precision and backend determine the actual duration:
 
 | Config | Approx params | Layers | Heads | Embedding dim | Example train time |
 |---|---:|---:|---:|---:|---|

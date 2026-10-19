@@ -1,5 +1,8 @@
 # Part 4 · Lecture 07 — Sharding 896 Experts, and the Amdahl Trap That Followed
 
+**Practice:** [CPU source lab](CPU-Source-Lab.md). Historical GPU results are source reports; use the **Answers** after attempting the self-check.
+
+
 ## Overview
 
 896 routed experts, top-16, across 8 GPUs. The obvious partition — 112 whole experts per rank — is correct, balanced *on average*, and **leaves ~43% of the MoE layer's critical path on the table**, for a reason that is pure probability rather than engineering.
@@ -35,9 +38,9 @@ The only question is *where*. And the answer is forced:
    BEFORE it.
 ```
 
-> **A collective's position is determined by the first non-linearity downstream of the partial sum.** Every linear op — scaling, adding a residual, a further matmul — commutes with the sum and can happen on either side. The first non-linearity cannot, and that is where the reduce must land.
+> **A collective's position is determined by the first non-linearity downstream of the partial sum.** A shared linear map W satisfies W(Σx_r) = ΣW(x_r). Adding a replicated residual or bias is affine: Σ(x_r+b) = Σx_r + N·b, so add b once after reduction or partition it explicitly. The first non-linearity cannot, and that is where the reduce must land.
 
-Move it two ops later, past `routed_up`, and two things go wrong simultaneously: you skip the reduce the experts needed, **and** — because `routed_norm`, `routed_up` and the shared experts are all replicated, so every rank already holds the complete tensor — you reduce a complete tensor and **multiply the FFN output by `tp_size`**.
+Move it two ops later, past `routed_up`, and two things go wrong simultaneously: you skip the reduce the experts needed, **and** — because `routed_norm`, `routed_up` and the shared experts are all replicated, so every rank already holds the complete tensor — a misplaced reduction can duplicate replicated contributions by `tp_size` and apply normalization separately to partials. The resulting error is not generally a single scale factor.
 
 Multiplying an FFN output by 8 does not crash. It produces fluent text.
 
@@ -76,7 +79,8 @@ A 93-layer model on 8 GPUs *sounds* comm-bound. It was not.
 ```text
    MEASURED, ExpertsOnly, tp_size 8, 8× H200, NCCL:
 
-     92 all-reduces/token × 14 KiB × 58.7 µs/call  =  ~5.4 ms/token
+     92 calls/token × 58.7 µs/call = 5.4004 ms/token
+     payload per call = 14 KiB (not another factor in the time equation)
      token time at the time of measurement          =  281.6 ms
      collective share                               ≈  2%
 ```
@@ -90,7 +94,7 @@ Verdict: not the bottleneck. And the regime matters as much as the share:
    ⇒ optimize the CALL COUNT and the BARRIER, not the bytes.
 ```
 
-This is why the validation tool reports microseconds per call, and why §7's improvements are about *barrier mechanism* rather than bandwidth. For any collective under ~1 MB, GB/s is a meaningless unit — it tells you about your fixed overhead, not your fabric.
+This is why the validation tool reports microseconds per call, and why §7's improvements are about *barrier mechanism* rather than bandwidth. There is no universal 1 MB boundary. Report payload and latency together, fit a latency-plus-size model over a sweep, and measure the relevant concurrency and topology.
 
 ---
 
@@ -106,16 +110,16 @@ Then the MoE dispatch got ~3× faster:
 | tp=8, 16 layers | 80.61 ms/token | **54.33** |
 | **tp=8 vs tp=1** | **2.44×** | **~1.1×** |
 
-Nothing regressed — `tp=8` improved from 80.61 to 54.33 ms/token, a real 1.48×. But the replicated attention did not get faster and did not get sharded, so it became the **entire serial term**. Solving Amdahl for the serial fraction:
+The reported `tp=8` time improved from 80.61 to 54.33 ms/token, a real 1.48×. Replicated attention is a candidate for the remaining cost. Fitting an ideal Amdahl model gives an **effective** serial fraction, not a measured attention fraction:
 
 ```text
    speedup(N) = 1 / ( s + (1−s)/N )
 
-   before:  2.44× at N=8  →  s ≈ 0.33
-   after:   1.10× at N=8  →  s ≈ 0.90
+   before:  196.65/80.61 = 2.4395× at N=8 → s ≈ 0.326
+   after:   60.66/54.33 = 1.1165× at N=8 → s ≈ 0.881
 ```
 
-The parallel part shrank 3×; the serial part did not move; its *share* went from a third to nine tenths. Every additional GPU now buys almost nothing.
+These pairs cannot prove a constant serial component and a 3× faster parallel component. Fitting T(N)=S+P/N gives old S=64.03 ms, P=132.62 ms; new S=53.43 ms, P=7.23 ms. Kernel changes, communication, and other overhead are folded into the fit; use phase measurements to attribute the cause.
 
 Two conclusions, and the second is the one teams get wrong:
 
@@ -136,7 +140,7 @@ Whole-expert sharding looks perfectly balanced on paper: 896 experts ÷ 8 ranks 
 But a synchronous layer does not wait for the average rank. **It waits for the busiest one.**
 
 ```text
-   top_k = 16 active experts, thrown into 8 ranks
+   illustrative assumption: 16 independent uniform assignments into 8 ranks
      → balls in bins:  16 balls, 8 bins
 
    expected count in a given bin      =  2.0
@@ -145,7 +149,7 @@ But a synchronous layer does not wait for the average rank. **It waits for the b
    critical-path expert-rows = 4.20 × 3072 rows = 12,902
 ```
 
-The gap between 2.0 and 4.2 is a factor of **2.1×**, and it is not a load-balancing bug you can fix by shuffling the assignment. It is the max of a multinomial. With few balls and many bins, the maximum is far above the mean, and the layer's cost is set by the maximum.
+The gap between 2.0 and 4.2 is a factor of **2.1×**, and under an independent uniform-assignment approximation it is the maximum of multinomial counts. Real top-k routing selects distinct experts and may be correlated/nonuniform; placement can improve a skewed workload. Measure the routing histogram before adopting the model. With few balls and many bins, the maximum is far above the mean, and the layer's cost is set by the maximum.
 
 > **Steal this.** For any top-*k* routing over *N* ranks, your synchronous critical path is governed by `E[max bin]`, not `k/N`. With small *k*, those differ by a factor of two or more. Compute it — analytically or by simulation — before you conclude your expert partition is balanced.
 
@@ -170,7 +174,7 @@ So shard on **two** axes: expert groups × FFN band.
                                                      (0.57×)
 ```
 
-You deliberately make the *random* axis worse — 4.2 → 9.57 expected busiest — because you get the loss back on an axis with **no variance**. Total bytes per rank are unchanged; only the critical path shortens, by 43%.
+You deliberately make the *random* axis worse — 4.2 → 9.57 expected busiest — because you get the loss back on an axis with **no variance**. Total bytes per rank are unchanged; only the critical path shortens, by about 43% in this simplified expert-row model; actual latency also includes launches, quantization, collectives, and non-expert work.
 
 Measured: **33.42 → 29.81 ms/token at 128k, +12.1% decode.**
 
@@ -373,7 +377,7 @@ Pass criterion: a committed sharding decision justified by an `E[max bin]` calcu
 ## Self-check
 
 1. Your expert dispatch produces a partial sum, then a scale, then an RMS norm, then a matmul. Where can the all-reduce go, and where must it not? Give the algebra.
-2. You move the reduce past the up-projection. Nothing crashes and the text is fluent. What is the output multiplied by, and why does that specific factor appear?
+2. You move the reduce past the up-projection. Nothing crashes and the text is fluent. Which replicated terms are multiplied by the rank count, and why is the full error generally more than a scale factor?
 3. Your model has hidden 7168 and expert latent 3584. You size the collective off hidden. By what factor is your bandwidth estimate wrong, and would you notice from the timing?
 4. Top-8 routing over 4 ranks. Compute `k/N` and estimate `E[max bin]`. What is the imbalance factor, and what does it cost a synchronous layer?
 5. Explain why deliberately worsening expert balance (2 groups instead of 8) can shorten the critical path. Give the arithmetic with a 3072-row FFN.
@@ -383,11 +387,24 @@ Pass criterion: a committed sharding decision justified by an `E[max bin]` calcu
 9. A 3× improvement to a phase makes your 8-GPU scaling worse. Compute the serial fraction before and after, and name what to fix next.
 10. Approximation A is 4.063e-03 from the reference, B is 5.146e-03, and A-to-B is 3.255e-03. Which is more accurate, and what is the defensible claim?
 
+## Answers
+
+1. A shared linear scale commutes with summation; RMS normalization does not. Reduce before the norm; add replicated bias/residual only once or explicitly partition it.
+2. Replicated additions can be multiplied by N. Normalizing partials separately also changes directions/magnitudes, so the full mistake is not generally an N-fold output scale.
+3. Twice as many bytes at the same dtype. A latency-dominated measurement may barely change, so timing alone can hide the mistake.
+4. Mean=2; under eight independent uniform assignments to four ranks, exact enumeration gives E[max]=3.5381, about 1.769× the mean. Distinct-expert top-k routing and real correlations require their own distribution.
+5. The illustrative row costs are 4.20×3072≈12,902 versus 9.57×768≈7,350. Smaller FFN slices can outweigh larger expert counts; these are modeled row counts, not a guaranteed wall-time ratio.
+6. Report payload and μs/call. Test fixed costs, call count, synchronization, and larger payloads before choosing a backend.
+7. The benchmark never enabled its flag/default. Print and retain the selected backend and capabilities in each run; compare that with the claimed fast arm.
+8. Equal byte counts can still copy overlapping/wrong bands. Assert global coverage with no gaps/overlap and compare reconstructed tensor values; the CPU source lab runs these upstream checks.
+9. The table fits effective serial fractions about 0.326 and 0.881, but does not prove unchanged serial time or a 3× parallel-component change. Profile the remaining phases and shard useful replicated work only when its communication cost pays.
+10. A has smaller KL to this reference on this fixture. KL is not a distance metric or universal quality ordering, and the A-to-B value cannot be subtracted to isolate error components.
+
 ---
 
 ## References
 
-* **The PRs** — [#59](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/59) (f32 peer one-shot, Mode B, shared-expert banding), [#74](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/74) (make unset mean auto), [#96](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/96) (2-D MoE sharding; the balls-in-bins argument; the byte-conservation test; the disclosed load regression), plus [#107](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/107) (one-rendezvous all-reduce). [`docs/tensor-parallel.md`](https://github.com/gittensor-ai-lab/sparkinfer-k3/blob/main/docs/tensor-parallel.md) is the source for §1–§3.
+* **The PRs** — [#59](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/59) (f32 peer one-shot, Mode B, shared-expert banding), [#74](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/74) (make unset mean auto), [#96](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/96) (2-D MoE sharding; the balls-in-bins argument; the byte-conservation test; the disclosed load regression), plus [#107](https://github.com/gittensor-ai-lab/sparkinfer-k3/pull/107) (one-rendezvous all-reduce). [`docs/tensor-parallel.md`](https://github.com/gittensor-ai-lab/sparkinfer-k3/blob/7689cc77e0e18d4b4f1937cf2a189dcd5a8d90f3/docs/tensor-parallel.md) is the source for §1–§3.
 * **Megatron-LM tensor parallelism** — [arXiv:1909.08053](https://arxiv.org/abs/1909.08053) — the row-then-col composition §4.2 relies on.
 * **vLLM custom all-reduce** — [github.com/vllm-project/vllm](https://github.com/vllm-project/vllm), `csrc/custom_all_reduce.cuh` (Apache-2.0) — the `Signal` layout, dual-counter barrier and packed FP32 reduce that §6's peer one-shot adapts, with attribution retained in the repo's `NOTICE`.
 * **NCCL** — [docs.nvidia.com/deeplearning/nccl](https://docs.nvidia.com/deeplearning/nccl/) — ring and tree all-reduce, and the small-message regime where a custom kernel wins.

@@ -1,346 +1,127 @@
-# 06 — Disaggregated Storage: NVMe-oF + OpenFlex + RapidFlex
+# 06 — Shared storage: capacity, bandwidth, and failure domains
 
-## 1. Why Disaggregated Storage for AI
+Disaggregated storage lets compute and storage capacity grow independently, but
+it also introduces shared resources and network dependencies. Design it from
+workload measurements rather than a promise of linear scaling.
 
-Traditional HPC storage model: **storage is local to the compute node**.
+**Prerequisites:** [data path](01-Architecture-and-Data-Path.md) and
+[measurement](05-Performance-Tuning.md). **Artifact:** a storage plan with capacity,
+bandwidth, redundancy, and failure assumptions. Allow 1–2 hours for analysis;
+network deployment is an optional hardware exercise.
 
-```
-Compute Node A:    GPU + 8 × NVMe local drives
-Compute Node B:    GPU + 8 × NVMe local drives
-Compute Node C:    GPU + 8 × NVMe local drives
+## What remote storage changes
 
-Problems:
-  - Dataset must be replicated to every node (wastes capacity)
-  - When a node fails, its local data is unavailable
-  - Storage is idle when the node is running a different job
-  - Adding more compute means buying more storage too (coupled scaling)
-```
-
-Disaggregated storage model:
-
-```
-Compute Node A:    GPU + NIC (no local NVMe)
-Compute Node B:    GPU + NIC (no local NVMe)
-Compute Node C:    GPU + NIC (no local NVMe)
-
-Storage Server:    OpenFlex Data24 × N (NVMe pool, shared)
-Network:           RoCEv2, 200 Gb/s (NVIDIA SN3700)
-
-Benefits:
-  + Dataset stored once, accessed by any compute node
-  + Storage fails independently from compute (no coupled failure)
-  + Add more storage without adding compute (and vice versa)
-  + Storage utilization: 90%+ (shared pool vs 40% with local)
+```text
+application -> filesystem/block layer -> transport -> storage target -> media
+                                      -> network and target failure domains
 ```
 
----
+NVMe over Fabrics extends NVMe over a fabric; its transports and implementation
+support depend on the selected stack. The official
+[NVM Express specifications](https://nvmexpress.org/specifications/)
+define the protocol families. A file-reading application can often retain its
+logical API while the underlying path changes. That does not guarantee unchanged
+latency, supported GDS mode, error behavior, or code/configuration requirements.
 
-## 2. NVMe-oF Protocol Stack
+Local caching and shared storage can coexist. The useful comparison is among
+actual workload designs: dataset copies, cache reuse, access concurrency,
+checkpoint write bursts, recovery, and operational cost.
 
-NVMe over Fabrics (NVMe-oF) extends the NVMe protocol over a network fabric:
+## A capacity and bandwidth plan you can calculate
 
-```
-Standard NVMe (local):          NVMe-oF (network):
+The following **hypothetical inputs** are teaching values, not OpenFlex or another
+product's specifications:
 
-Application                     Application
-    │                               │
-    │ read(fd, buf, size)           │ read(fd, buf, size)   ← IDENTICAL API
-    ▼                               ▼
-VFS / Block Layer               VFS / Block Layer
-    │                               │
-NVMe Driver                     NVMe-oF Host Driver
-    │                               │
-PCIe Bus                        RDMA transport (RoCEv2 / iWARP / InfiniBand)
-    │                               │
-NVMe SSD                        Network Switch
-                                    │
-                                NVMe-oF Target (OpenFlex)
-                                    │
-                                NVMe SSDs
-```
+- 32 GPU workers need 10 decimal GB/s each during an I/O-heavy phase;
+- each storage unit supplies a measured 75 GB/s useful throughput for that pattern;
+- each unit has 300 TB of usable capacity after its internal protection;
+- the dataset is 500 TB and an additional replication policy requires 1.5× storage.
 
-The GDS driver sees NVMe-oF namespaces as identical to local NVMe — same GDS code works for both.
-
----
-
-## 3. RapidFlex Adapters: Making Remote Look Local
-
-The WD RapidFlex AIC (Add-In Card) is installed in the **compute server** and handles the NVMe-oF protocol:
-
-```
-Inside the compute server:
-
-PCIe Bus
-├── GPU (x16)
-├── NIC / ConnectX-7 (x16)
-└── RapidFlex AIC (x8)
-    │  Presents remote storage as local NVMe namespaces
-    │  /dev/nvme0n1  →  actually OpenFlex drive 0 (over RDMA)
-    │  /dev/nvme1n1  →  actually OpenFlex drive 1 (over RDMA)
-    └── GDS sees these as standard NVMe devices
-```
-
-From GDS's perspective: **remote NVMe-oF storage looks exactly like local NVMe**.
-
-This means:
-- Zero application code changes to use disaggregated storage
-- Same `cuFileRead()` call works for local and remote NVMe
-- Driver handles the NVMe-oF transport transparently
-
----
-
-## 4. OpenFlex Data24 3200: Reference Storage System
-
-```
-WD OpenFlex Data24 3200 Series specifications:
-
-Internal:
-  24 × U.2 NVMe SSD slots (PCIe Gen3)
-  Internal bandwidth: limited by PCIe Gen3 backplane
-
-Frontend (network-facing):
-  6 × 100 Gb/s Ethernet ports (via RapidFlex AIC frontend cards)
-  Each port: 12.5 GB/s
-  Total aggregate: 75 GB/s  (6 × 12.5 GB/s)
-  Protocol: NVMe-oF over RoCEv2
-
-Capacity:
-  Scales with NVMe drive selection (e.g., 24 × 15.36 TB = 368 TB raw)
-  After redundancy (RAID-like protection): ~300 TB usable
-```
-
-### The 75 GB/s Ceiling
-
-The OpenFlex's **6 × 100 Gb/s** frontend is the key constraint:
-
-```
-4 compute nodes × 4 GPUs each = 16 GPUs total
-OpenFlex: 75 GB/s total
-
-Per-GPU bandwidth from OpenFlex: 75 / 16 = 4.7 GB/s
-  ← sufficient for most training workloads (dataset read is not usually the bottleneck)
-
-For GPU-intensive workloads where I/O IS the bottleneck:
-  → Add more OpenFlex units (linear scaling: 2× units = 2× bandwidth)
-  → 3 × OpenFlex = 225 GB/s = 14 GB/s per GPU (approaches NIC limits)
-```
-
----
-
-## 5. Network Configuration: Lossless RoCEv2
-
-RoCEv2 (RDMA over Converged Ethernet v2) requires a **lossless** network — any dropped packet causes RDMA retransmission which degrades performance severely.
-
-### NVIDIA SN3700 Switch Configuration
-
-```bash
-# On the Spectrum-2 switch, configure lossless settings:
-
-# 1. Enable Priority Flow Control (PFC) for RDMA priority
-# PFC pauses specific traffic classes instead of dropping packets
-
-# 2. Configure ECN (Explicit Congestion Notification)
-# Early warning to senders before buffers overflow
-
-# 3. Set DSCP markings for RDMA traffic
-# Traffic class 3 (DSCP 26) for RDMA on most deployments
-
-# Using NVOS CLI on SN3700:
-interface ethernet 1/1 traffic-class 3 pfc
-interface ethernet 1/1 congestion-control ecn minimum-absolute 150 maximum-absolute 1500
-```
-
-### Server-Side RoCEv2 Configuration
-
-```bash
-# On each compute server (ConnectX-7):
-
-# Step 1: Set trust mode to DSCP (match switch DSCP markings)
-mlnx_qos -i ens1f0 --trust=dscp
-
-# Step 2: Enable PFC for priority 3 (RDMA)
-mlnx_qos -i ens1f0 -p 0,0,0,1,0,0,0,0   # enable PFC on priority 3
-
-# Step 3: Set DSCP→priority mapping
-mlnx_qos -i ens1f0 --dscp2prio=26,3       # DSCP 26 → priority 3
-
-# Step 4: Verify RoCEv2 mode
-cat /sys/class/infiniband/mlx5_0/ports/1/gid_attrs/types/3
-# Expected: RoCE v2
-
-# Step 5: Set RoCEv2 ECN (on the NIC)
-cma_roce_mode -d mlx5_0 -p 1 -m 2        # mode 2 = RoCEv2
-
-# Test RDMA connectivity
-ib_write_bw -d mlx5_0 --report_gbits storage-server-ip &   # server
-ib_write_bw -d mlx5_0 --report_gbits storage-server-ip     # client
-# Expected: ~190 Gb/s (95% of 200 Gb/s ConnectX-7)
-```
-
----
-
-## 6. Connecting to OpenFlex via nvme-cli
-
-```bash
-# Step 1: Discover NVMe-oF targets on the OpenFlex
-nvme discover \
-    --transport rdma \
-    --traddr 192.168.100.10 \       # OpenFlex frontend IP
-    --trsvcid 4420                  # standard NVMe-oF RDMA port
-
-# Expected output:
-# Discovery Log Number of Records 8, Generation counter 1
-# =====Discovery Log Entry 0======
-# trtype: rdma
-# adrfam: ipv4
-# subtype: nvme subsystem
-# treq: not specified
-# portid: 0
-# trsvcid: 4420
-# subnqn: nqn.2018-01.org.nvmexpress:wd:data24:ns0
-# traddr: 192.168.100.10
-
-# Step 2: Connect to all discovered subsystems
-nvme connect-all \
-    --transport rdma \
-    --traddr 192.168.100.10 \
-    --trsvcid 4420
-
-# Step 3: Verify connected namespaces
-nvme list
-# /dev/nvme4n1   WD OpenFlex Data24  NVMeoF   500GB
-# /dev/nvme5n1   WD OpenFlex Data24  NVMeoF   500GB
-# ...
-
-# Step 4: Verify GDS sees the NVMe-oF devices
-/usr/local/cuda/gds/tools/gdscheck -p
-# Should show NVMe-oF devices in the GDS-compatible device list
-
-# Step 5: Mount and prepare filesystem
-mkfs.ext4 /dev/nvme4n1
-mkdir -p /mnt/openflex0
-mount -o noatime /dev/nvme4n1 /mnt/openflex0
-
-# Step 6: Test GDS bandwidth over NVMe-oF
-/usr/local/cuda/gds/tools/gds_bandwidth \
-    --file=/mnt/openflex0/test.bin \
-    --size=16384M \                    # 16 GB test file
-    --gpu_id=0 \
-    --pattern=sequential
-# Expected: 20–25 GB/s (ConnectX-7 200 Gb/s NIC limited)
-```
-
----
-
-## 7. Linear Scale-Out
-
-The key advantage of disaggregated storage: **linear performance and capacity scaling**.
-
-```
-1 × OpenFlex Data24:
-  Frontend: 75 GB/s
-  Capacity: ~300 TB usable
-  Serves: up to 12 GPUs at 6 GB/s each
-
-2 × OpenFlex Data24:
-  Frontend: 150 GB/s (2 × 75)
-  Capacity: ~600 TB usable
-  Serves: up to 24 GPUs at 6 GB/s each
-
-N × OpenFlex Data24:
-  Frontend: N × 75 GB/s
-  Capacity: N × 300 TB
-  No central bottleneck — each unit has independent NIC ports
-
-Compare with SAN/NAS:
-  Traditional NAS: central controller = single point of failure + bottleneck
-  OpenFlex: no central controller, each unit is independent
-```
-
-### Storage-Compute Ratio Planning
+Bandwidth requires `ceil(320 / 75) = 5` units. Capacity requires
+`ceil(500 × 1.5 / 300) = 3`. Under these assumptions the initial count is 5.
+It is only feasible if the network, client paths, placement, and software can
+carry the demand. Avoid applying a redundancy multiplier twice if it is already
+included in the usable-capacity input.
 
 ```python
-def plan_gds_storage(
-    num_gpus: int,
-    per_gpu_io_bw_gbps: float,   # GB/s needed per GPU during training
-    dataset_tb: float,            # total dataset size in TB
-    replication_factor: float = 1.5  # some redundancy
-):
-    total_io_bw = num_gpus * per_gpu_io_bw_gbps
-    openflex_per_unit_bw = 75   # GB/s
-    openflex_per_unit_cap = 300  # TB usable
+from math import ceil
 
-    units_for_bw = total_io_bw / openflex_per_unit_bw
-    units_for_cap = (dataset_tb * replication_factor) / openflex_per_unit_cap
-    units_needed = max(units_for_bw, units_for_cap)
-
-    print(f"GPUs: {num_gpus}")
-    print(f"Required I/O bandwidth: {total_io_bw:.0f} GB/s")
-    print(f"Units for bandwidth: {units_for_bw:.1f}")
-    print(f"Units for capacity ({dataset_tb} TB): {units_for_cap:.1f}")
-    print(f"OpenFlex units needed: {int(units_needed) + 1}")
-
-# Example: 32 GPUs, each needs 10 GB/s, 500 TB dataset
-plan_gds_storage(num_gpus=32, per_gpu_io_bw_gbps=10, dataset_tb=500)
-# GPUs: 32
-# Required I/O bandwidth: 320 GB/s → 5 units for bandwidth
-# Units for capacity (500 TB): 2.5 → 3 units for capacity
-# OpenFlex units needed: 5 (bandwidth-limited)
+workers = 32
+worker_GB_s = 10.0
+unit_GB_s = 75.0
+usable_unit_TB = 300.0
+stored_TB = 500.0 * 1.5
+units = max(ceil(workers * worker_GB_s / unit_GB_s),
+            ceil(stored_TB / usable_unit_TB))
+print(units)  # 5, under the stated assumptions
 ```
 
----
+Use `ceil`, not `int(x) + 1`: the latter overallocates when the requirement is an
+exact integer. Check that capacities and throughput inputs are positive before
+turning this calculation into a reusable tool.
 
-## 8. End-to-End GDS + OpenFlex Architecture
+**Follow-up:** if one unit must fail without missing the same peak bandwidth target,
+six units are an initial N+1 arithmetic candidate. That still requires suitable
+data placement, failover behavior, network headroom, and measured degraded-mode
+performance. Simply buying six independent units does not establish resilience.
 
-```
-Complete reference architecture (WD technical brief):
+## Why linear scale-out can stop
 
-┌─────────────────────────────────────────────────────────────────┐
-│                      Compute Cluster                            │
-│                                                                 │
-│  Node 0                           Node 1                        │
-│  ┌──────────────────────┐         ┌──────────────────────┐      │
-│  │ 4 × A100 GPU         │         │ 4 × A100 GPU         │      │
-│  │ 6 × ConnectX-7       │         │ 6 × ConnectX-7       │      │
-│  │   (3 per NUMA node)  │         │   (3 per NUMA node)  │      │
-│  │ Local NVMe (8-bay)   │         │ Local NVMe (8-bay)   │      │
-│  │   → hot tier cache   │         │   → hot tier cache   │      │
-│  └──────────┬───────────┘         └──────────┬───────────┘      │
-└─────────────┼───────────────────────────────┼──────────────────┘
-              │  200 Gb/s RoCEv2               │
-              │  (24 × DAC cables)             │
-              ▼                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│           NVIDIA SN3700 Spectrum-2 Switch                       │
-│           32 × 200 Gb/s, lossless RoCEv2                        │
-└─────────────────────────────────────────────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│           WD OpenFlex Data24 3200                               │
-│                                                                 │
-│  ┌─────────────────────────────────────────────┐               │
-│  │ RapidFlex AIC (6 × 100 Gb/s Ethernet)       │               │
-│  │ → Exposes NVMe namespaces via NVMe-oF/RoCEv2 │               │
-│  └─────────────────────────────────────────────┘               │
-│                                                                 │
-│  24 × U.2 NVMe SSD (PCIe Gen3 internal)                         │
-│  Max throughput: 75 GB/s total                                  │
-└─────────────────────────────────────────────────────────────────┘
+Storage devices, controller paths, switch uplinks, clients, metadata services,
+CPU processing, and the application can all constrain scaling. Adding two equal
+storage units doubles their nominal aggregate capacity; it does not guarantee
+that each training job sees twice the throughput.
 
-Data flow (GDS active):
-  Training data on OpenFlex → RoCEv2 → ConnectX-7 → GPU HBM
-  No CPU involvement at any stage
-  GPU sees OpenFlex drives as local /dev/nvmeXnY via NVMe-oF
-```
+Compare these cases with the same dataset and correctness check:
 
----
+| Experiment | What it separates |
+|---|---|
+| One client, one target | Baseline path and integrity |
+| Several clients, one target | Target and shared-link contention |
+| One client, several targets | Client-side aggregation limits |
+| Several clients, several targets | Placement, fairness, and scale-out behavior |
+| One controlled unavailable path | Recovery behavior and remaining capacity |
 
-## References
+Report the slowest worker and completion-time distribution when synchronized
+training makes stragglers important. Aggregate bandwidth alone can hide one worker
+that repeatedly stalls an entire step.
 
-- [WD OpenFlex Data24 3200 Datasheet](https://www.westerndigital.com/products/data-center-platforms/openflex-data24)
-- [WD RapidFlex AIC Technical Brief](https://www.westerndigital.com/solutions/data-center/openflex)
-- [NVMe-oF Specification (NVM Express)](https://nvmexpress.org/developers/nvme-of-specification/)
-- [RoCEv2 Deployment Guide](https://community.mellanox.com/s/article/recommended-network-configuration-examples-for-roce-deployment)
-- [NVIDIA GDS + NVMe-oF Design Guide](https://docs.nvidia.com/gpudirect-storage/design-guide/index.html#nvme-over-fabrics)
-- [RAPIDS kvikIO (Python GDS)](https://github.com/rapidsai/kvikio)
+## Network configuration belongs to the selected stack
+
+RoCE deployments require deliberate congestion, queue, priority, and loss-recovery
+configuration. Do not treat “lossless network” as an unconditional guarantee or
+copy a switch CLI for a different network operating system. Use the selected NIC,
+firmware, switch, and driver documentation, and validate the agreed traffic class
+end to end.
+
+For a controlled lab, begin with read-only inventory and the documented diagnostic
+commands. Then establish transport connectivity, a mounted test path, payload
+integrity, and finally the intended GDS mode. Keep network throughput and
+application/file-I/O throughput as distinct measurements.
+
+Use the official [nvme-cli project](https://github.com/linux-nvme/nvme-cli) for
+command semantics and the [GDS configuration guide](https://docs.nvidia.com/gpudirect-storage/configuration-guide/index.html)
+for supported storage-path testing. Discovery, connection, formatting, and
+multi-host mounting are different operations; this lesson does not require
+formatting a device or changing a production network.
+
+## Apply it to robot learning
+
+A robot-learning dataset may contain many small compressed images, metadata,
+actions, and episode boundaries. A sequential tensor-read benchmark omits file
+lookup, decoding, sample grouping, and random access. Measure the loader that
+preserves episode identity and timestamp alignment. A faster loader that pairs
+an image with the wrong action is incorrect.
+
+**Independent task:** design a local-cache plus shared-storage loader for a
+recorded-data experiment. Specify the cache key, dataset revision, eviction and
+invalidation rules, behavior after a partial download, and checksum verification.
+Measure repeated-epoch and first-epoch behavior separately if hardware is available.
+
+**Self-check with answer:** does shared storage eliminate failure? No. It changes
+which failures are coupled. Storage and network failure can affect multiple compute
+nodes; replication, failover, backups, and recovery tests address different risks.
+
+**Exit criteria:** calculate the two sizing constraints, identify at least one
+shared bottleneck, and distinguish analytical sizing from measured support and
+performance. [Return to the course index](README.md).

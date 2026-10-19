@@ -1,191 +1,87 @@
-# Orin Nano — Tensor Core Architecture and How It Works
+# Tensor Cores: matrix work, numeric formats and measured benefit
 
-<div class="course-identity auto-course" style="--course-accent: #4f46e5; --course-accent-rgb: 79, 70, 229;" markdown="1">
-<div class="course-identity__icon">ONTC</div>
-<div markdown="1">
-<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
-<p class="course-identity__title">Specialized course identity for Orin Nano — Tensor Core Architecture and How It Works.</p>
-<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
-</div>
-</div>
+**Goal:** explain what Tensor Cores accelerate, calculate useful matrix work, and evaluate a lower-precision model without confusing a format name with a performance result. **Pace:** three 60–90-minute sessions. Start after [CUDA programming](../Orin-Nano-CUDA-Programming/Guide.md) and basic matrix multiplication.
 
+Orin Nano 8 GB has 32 Tensor Cores within eight Ampere SMs. They accelerate supported matrix operations alongside the GPU's general-purpose execution units. A complete inference pipeline also needs memory movement, normalization, activation functions, indexing, scheduling and host work. No single hardware peak describes all of that work.
 
-> **Context:** This deep dive explains **tensor core** architecture on the Jetson Orin Nano (Ampere GPU) and how it enables fast, power-efficient AI inference. Understanding this helps you choose precisions (FP16/INT8), interpret benchmarks, and reason about why TensorRT and cuDNN achieve high TOPS on Orin.
+## 1. Start with the actual operation
 
----
+A matrix multiply-accumulate computes `D = A × B + C`. If A is M×K and B is K×N, each output sums K products. The common dense operation-count convention is approximately `2MNK` floating-point operations, counting a multiply and an add separately. State the convention when reporting FLOPs.
 
+**Hand example:** A=`[[1,2],[3,4]]`, B=`[[2,0],[1,2]]`, C=zeros. The output is `[[4,4],[10,8]]`. The top-left value is `1×2 + 2×1 = 4`. This small example establishes layout and arithmetic before tiling or quantization changes the implementation.
 
-## 1. What Are Tensor Cores?
+For M=N=K=256, the convention gives 33,554,432 FLOPs. If a hypothetical correctly measured execution interval is 0.20 ms, achieved throughput is approximately 167.8 GFLOP/s. The time is illustrative; it is not an Orin result. A different interval that includes allocation/copies answers a different performance question.
 
-**Tensor Cores** are dedicated hardware units inside NVIDIA GPUs that perform **matrix multiply-accumulate (MMA)** operations in a single instruction. They are optimized for the dense matrix math that dominates deep learning: linear layers, convolutions, and attention are all built from matrix multiplies.
+## 2. Understand what a matrix instruction promises
 
-* **Introduced:** Volta (2017); evolved in Turing, Ampere, Ada, Hopper, Blackwell.
-* **Orin Nano GPU:** Based on **Ampere** architecture — the same family as datacenter A100, but scaled down for edge (fewer SMs, lower power).
+At the CUDA programming level, a warp cooperates on matrix fragments and collective matrix operations. Fragment layout across lanes is an interface contract; do not infer it from a diagram of a logical matrix. Correct participation, data layout, alignment and supported shapes matter.
 
-In one cycle, a tensor core can do many more multiply-adds than a CUDA core on the same matrix operation. That is why **FP16** and **INT8** inference on Orin Nano can reach **40 AI TOPS** (trillion operations per second) while staying within a few watts: most of the work is done by tensor cores, not by the general-purpose CUDA cores.
+A WMMA operation is not a promise that a complete logical 16×16×16 multiplication takes one clock cycle or maps to one machine instruction. Compilation and architecture determine the actual instruction sequence and scheduling. Tensor Cores do not remove the time to load operands, handle boundary tiles or write results. Use the [PTX matrix-operation specification](https://docs.nvidia.com/cuda/parallel-thread-execution/#warp-level-matrix-instructions-wmma) for exact instruction constraints.
 
----
+Use a compatible cuBLAS/cuDNN/TensorRT path before writing a custom matrix kernel. Libraries can select different tactics for dimensions, layout, precision and workspace. Their internal implementation is not necessarily the public WMMA C++ API. A requested low-precision mode also does not establish that every operation uses a Tensor Core.
 
-## 2. Tensor Cores vs CUDA Cores
+## 3. Separate storage type, multiply precision and accumulation
 
-| Aspect | CUDA Cores | Tensor Cores |
-|--------|------------|--------------|
-| **Function** | General-purpose: scalar/vector math, logic, memory ops | Specialized: matrix multiply-accumulate (D = A×B + C) |
-| **Granularity** | Per-thread: one or a few ops per instruction | Per-warp: one instruction does a full small matrix (e.g. 16×16×16) |
-| **Precision** | FP32, INT32, etc. | FP16, BF16, TF32, INT8, INT4 (architecture-dependent) |
-| **Used for** | Non-matmul work: activations, reductions, element-wise, control flow | Matmul: linear layers, conv, attention (when expressed as matmul) |
-| **Throughput** | Lower ops/cycle for matrix math | Much higher ops/cycle for matrix math |
+| Format/concept | What to remember |
+| --- | --- |
+| FP32 | 32-bit storage with a wider significand than FP16/BF16; a library may permit reduced-precision multiply behavior under its policy |
+| FP16 | 16-bit floating-point storage; limited exponent range can overflow on values that fit FP32 |
+| BF16 | 16-bit storage with FP32-like exponent range but fewer significand bits than FP16 |
+| TF32 computation | Reduced-significand matrix multiplication using FP32 inputs/outputs under supported policies; not a general 19-bit tensor storage dtype |
+| INT8 | Integer values plus quantization scale/zero-point/layout semantics; accumulator and requantization behavior matter |
+| INT4 or weight-only formats | Packed representation and kernel-specific decoding; four-bit weights do not imply that every multiply executes as native four-bit matrix arithmetic |
 
-On Orin Nano (Ampere):
+FP16's largest finite value is 65,504. BF16 retains the broad FP32 exponent range but rounds many neighboring values to the same representation. A model can therefore encounter range problems in one format and precision problems in another. Accumulating products in FP32 can reduce accumulation error while still retaining errors introduced when operands were rounded earlier.
 
-* **1024 CUDA cores** — handle everything that is not a dense matmul: activations (ReLU, GELU), softmax, normalization, data movement, custom kernels.
-* **32 tensor cores** — handle the heavy matmul work. When TensorRT or cuDNN runs a layer, they schedule **WMMA** (Warp Matrix Multiply-Accumulate) or library-built kernels that target these 32 tensor cores.
+A float32 tensor may use Tensor Core matrix arithmetic through a TF32-enabled library path. Consequently, “FP32 always means CUDA cores only” is incorrect without specifying the compute policy. Conversely, changing storage to FP16 does not make an arbitrary elementwise kernel a matrix operation.
 
-So: **CUDA cores** = general compute; **tensor cores** = matrix engines. Inference is fast when most time is spent in tensor-core matmul and the rest is minimal (fused ops, good memory access).
+For accuracy testing, compare against a specified reference, retain absolute/relative error statistics and examine sensitive operations such as reductions, normalization and softmax. Use the installed runtime's precision controls and inspect the selected graph/tactics. [TensorRT accuracy considerations](https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/accuracy-considerations.html).
 
----
+## 4. Calculate one quantized dot product
 
-## 3. Ampere Tensor Core Architecture (Orin Nano)
+For a simple symmetric quantizer, approximate a real value by `x ≈ scale_x × q_x`, with integer q and a positive scale. Suppose x=`[0.2,−0.4]`, w=`[0.3,0.1]`, and both scales are 0.1. Integer vectors are qx=`[2,−4]` and qw=`[3,1]`.
 
-Orin Nano’s GPU is a **Tegra234** (T234) SoC with an **Ampere**-class GPU. The exact layout is proprietary, but the public model is:
+The integer dot product is `2×3 + (−4)×1 = 2`. Multiplying by the scale product, `0.1×0.1`, gives 0.02, matching the unquantized result for these deliberately representable values. With nonzero zero-points, subtract them before the product according to the quantization scheme. Per-channel scales introduce another indexing contract.
 
-* **Streaming Multiprocessors (SMs):** The GPU is divided into SMs. Each SM has:
-  * **CUDA cores** (integer and floating-point)
-  * **Tensor cores** (one or more per SM)
-  * **Shared memory**, **L1 cache**, **warp schedulers**
+Now choose a scale too small for an outlier: the integer value may exceed the representable range and saturate. Choose a scale too large: nearby small values collapse into the same integer. Calibration and clipping choices trade those errors; a lower bit width is not automatically accurate for a specific deployment distribution.
 
-* **Orin Nano 8GB** has **32 tensor cores** total (often quoted as “32 tensor cores” in the key specs). These are distributed among the SMs; each SM issues matrix instructions to its own execution resources.
+**Exercise:** quantize 0.26 with scale 0.1 under a specified round-to-nearest policy. The stored integer is 3 and reconstructed value is 0.3, an error of 0.04. State the tie policy before testing an exact halfway value. Different rounding and saturation rules can make otherwise similar CPU/hardware implementations disagree.
 
-* **Memory path:** Tensor cores read **A** and **B** matrices (and optionally **C** for accumulate) from **registers** and/or **shared memory**. Data is brought from **global memory** (LPDDR5) by CUDA cores or load instructions, then staged in shared memory and registers so that tensor cores operate on tiles. So **memory bandwidth** (LPDDR5 speed) and **tiling** (how well you reuse data in shared memory) still limit peak tensor-core utilization.
+## 5. Work through a real export and calibration experiment
 
-Conceptually:
+Complete the [CPU PyTorch→ONNX→INT8 lab](../../5.%20Application%20Development/5.%20ML%20and%20AI/cpu-export-quantization/Guide.md). It trains/loads a small synthetic stop-decision model, exports it and executes ONNX Runtime on the CPU. The review actually ran the framework integration tests.
 
-```
-                    Orin Nano GPU (Ampere)
-┌─────────────────────────────────────────────────────────────┐
-│  SMs (Streaming Multiprocessors)                             │
-│  ┌─────────────┐  ┌─────────────┐       ┌─────────────┐     │
-│  │ CUDA cores  │  │ Tensor cores│  ...  │ Tensor cores│     │
-│  │ Shared mem  │  │ (MMA units) │       │ (MMA units) │     │
-│  └─────────────┘  └─────────────┘       └─────────────┘     │
-│         ↕                  ↕                      ↕            │
-│  L1 / Shared memory ←→ Register file ←→ Tensor Core arrays    │
-└─────────────────────────────────────────────────────────────┘
-                              ↕
-                    L2 cache / Unified memory (LPDDR5)
-```
+In the recorded exercise, representative calibration retained stop recall around 99.24%, while repeatedly calibrating on one row reduced it to about 64.89%. A separate sensor-shift test also reduced recall. Those are results for the synthetic dataset and model, not field-robot safety guarantees. The tiny quantized artifact was larger because quantization metadata/node overhead outweighed its weight savings.
 
----
+This experiment establishes why “INT8 means only a slight accuracy loss and at least 2× speedup” is not a valid course rule. Quality, size and latency are separate measurements. CPU ONNX Runtime results do not prove TensorRT/Orin speed, and an equivalent exported graph still needs its target implementation checked.
 
-## 4. How Tensor Cores Work: Matrix Multiply-Accumulate
+Use held-out data by the appropriate session/scene/task split. Keep calibration data separate from evaluation data. Report false negatives or other task-relevant failures, not only aggregate accuracy. Preserve the exact model, preprocessing, calibration and runtime identities with the result.
 
-### 4.1 The Operation
+## 6. Count memory reuse as well as operations
 
-Tensor cores compute:
+For an idealized FP16 square GEMM with M=N=K=256, A and B each contain 65,536 elements or 131,072 bytes. Writing an FP32 output adds 262,144 bytes. Ignoring a separate C read and all repeated loads, requested traffic is 524,288 bytes; arithmetic intensity is `33,554,432 / 524,288 = 64 FLOP/byte`.
 
-**D = A × B + C**
+That is an optimistic traffic model, not measured DRAM traffic. Actual tiling, caches, workspace, output type, C/bias/activation reads and split reductions change it. State what you counted. A tiny batch or a matrix-vector operation can have very different reuse from the square matrix example.
 
-* **A**, **B**: input matrices (e.g. activations and weights).
-* **C**: accumulator (often the previous partial result).
-* **D**: output (accumulated result).
+Dense FP16 FLOPs, dense INT8 operations and sparse INT8 operations are different quantities. Structured-sparse peak specifications assume an eligible sparsity pattern and execution path; ordinary zeros in arbitrary weights are insufficient. Compare achieved work to a relevant peak and supported mode, not to the largest TOPS number on the product page.
 
-This is exactly the pattern of a linear layer or a convolution (when flattened to matmul). One **tensor-core instruction** completes a small block of this (e.g. a 16×16×16 MMA in FP16). Many such blocks are scheduled by the compiler/runtime to cover the full matrix.
+Shared LPDDR bandwidth is also used by CPU, cameras and other engines. A kernel measured alone may compete differently in the full robot pipeline. Connect this calculation to the [memory architecture lesson](../Orin-Nano-Memory-Architecture/Guide.md).
 
-### 4.2 Warp-Level Operation
+## 7. Run a target experiment when hardware is available
 
-Tensor cores are **warp-level**: one **warp** (32 threads) cooperates to feed one MMA. The threads in the warp hold different parts of the matrices (e.g. different rows/columns of the 16×16 tile). The hardware executes the full small matmul in one go. So:
+Pin the BSP, TensorRT/library versions, model hash, input shapes, precision controls and power mode. Begin with a compatible reference implementation and numerical comparisons. Check unsupported operators, dynamic-shape profiles, layout conversions and fallback behavior.
 
-* You don’t write a loop of scalar multiplies; you **load tiles** into registers (and shared memory), then **issue one WMMA instruction** per tile.
-* **Tiling** (how you break the big matrix into 16×16 or 8×8 blocks) is chosen so that tiles fit in registers and shared memory and so that tensor cores stay busy.
+Then measure cold initialization, warmed inference, queue delay, peak memory and useful end-to-end throughput. Compare the same input workload and quality requirement. Include concurrent camera/CPU activity if the deployed robot uses them. Record clocks/temperature rather than treating an advertised peak as sustained operation.
 
-### 4.3 Data Flow (Simplified)
+Inspect the engine/kernel evidence to determine what executed. A `--fp16` flag alone does not prove every layer's precision or which hardware units were used. A profile alone does not establish task accuracy. The [real-time inference module](../Orin-Nano-Real-Time-Inference/Guide.md) connects those checks to frame freshness and deadline behavior.
 
-1. **Load:** CUDA loads tiles of **A** and **B** from global/shared memory into registers (or shared memory for the tensor core to read).
-2. **Compute:** Tensor core instruction: **D = A×B + C** on that tile.
-3. **Store:** Result **D** is written back to shared memory or registers; then written to global memory or reused for the next layer.
+## 8. Answer before continuing
 
-Efficient kernels **fuse** steps (e.g. add bias, ReLU) in the same kernel so that result **D** is not written to global memory and read back — that saves bandwidth and improves performance.
+1. **Does a matrix instruction imply one clock cycle?** No; API shape and instruction scheduling are different levels.
+2. **Can float32 tensors use Tensor Core arithmetic?** Yes, under a supported library compute policy such as TF32; specify that policy when comparing accuracy.
+3. **Why can a quantized tiny model be larger?** Metadata and graph overhead can exceed the saved weight bytes.
+4. **Why does FP32 accumulation not eliminate operand rounding error?** The products already use rounded input representations.
+5. **Why compare task recall as well as numerical error?** Small numerical changes can cross decision thresholds and affect the task unevenly.
+6. **Why can fewer bytes fail to improve latency?** Conversion overhead, unsupported operations, poor tiling or another pipeline bottleneck may dominate.
 
----
-
-## 5. Precision Support: FP16, BF16, INT8, TF32
-
-Tensor cores support different **numeric formats**; each trades precision for throughput and power.
-
-| Format | Bit width | Typical use | Throughput (vs FP32) | Orin Nano / Ampere |
-|--------|-----------|-------------|------------------------|---------------------|
-| **FP32** | 32-bit float | Training, reference | 1× (no tensor core) | CUDA cores only |
-| **TF32** | 19-bit (mantissa truncated) | Training on Ampere+ | High | Ampere supports |
-| **FP16** | 16-bit float | Inference, mixed precision | ~2× (tensor core) | ✅ Native |
-| **BF16** | 16-bit (same exponent range as FP32) | Training, some inference | ~2× (tensor core) | ✅ Native |
-| **INT8** | 8-bit integer | Quantized inference | ~4× (tensor core) | ✅ Native |
-| **INT4** | 4-bit | Very low bit inference | Higher still | Architecture-dependent |
-
-On **Orin Nano (Ampere)** for inference you care most about:
-
-* **FP16** — Default for TensorRT and many models; tensor cores are used; good accuracy.
-* **INT8** — Quantized models; 2× or more speedup over FP16 when calibrated correctly; slight accuracy loss.
-* **FP32** — No tensor cores; runs on CUDA cores; slower, used for debugging or when precision is required.
-
-TensorRT on Jetson will choose kernels that use tensor cores when you build an engine with `--fp16` or `--int8`. So “how tensor cores work” directly explains why FP16/INT8 engines are so much faster than FP32 on the same hardware.
-
----
-
-## 6. How Software Uses Tensor Cores (TensorRT, cuDNN)
-
-### 6.1 TensorRT
-
-When you build a TensorRT engine (e.g. `trtexec --onnx=model.onnx --fp16`):
-
-1. The **ONNX** (or other) graph is parsed and optimized.
-2. Layers (e.g. `Gemm`, `Conv`) are **mapped to GPU kernels**. For linear/conv layers, TensorRT selects **tensor-core kernels** (FP16 or INT8) when available.
-3. The engine is a **sequence of kernel launches**. Many of those kernels are **WMMA-based** or use NVIDIA’s internal tensor-core APIs so that the 32 tensor cores on Orin Nano are used for the bulk of the math.
-4. **Fusion** (e.g. conv + bias + ReLU in one kernel) keeps data in registers/shared memory and reduces round-trips to global memory.
-
-You don’t write tensor-core code by hand for inference; TensorRT (and cuDNN under the hood) do it. Understanding that they are using tensor cores explains the **40 TOPS** and the big gain from `--fp16` / `--int8`.
-
-### 6.2 cuDNN
-
-cuDNN provides **routines** for convolutions, matmuls, and other ops. On Ampere, these routines use **tensor-core implementations** when the problem size and precision match. PyTorch and other frameworks call cuDNN; TensorRT also uses cuDNN or its own tensor-core kernels. So “software uses tensor cores” means: **TensorRT and cuDNN (and thus most frameworks) automatically schedule tensor-core MMA instructions** when you use FP16/INT8.
-
-### 6.3 Writing Your Own Kernels (WMMA, CUTLASS)
-
-If you write custom CUDA:
-
-* **WMMA (Warp Matrix Multiply-Accumulate)** — PTX/CUDA APIs let a warp perform a small matrix multiply (e.g. 16×16×16) in one instruction. The compiler lowers this to tensor-core instructions.
-* **CUTLASS / CuTe** — NVIDIA’s template library for GEMM and related ops; it explicitly tiles and schedules tensor-core MMAs. Used when you need maximum control (e.g. custom shapes, fusions).
-
-On Orin Nano, most users rely on TensorRT/cuDNN; the deep dive here is so you know **what** is running on the 32 tensor cores when you enable FP16/INT8.
-
----
-
-## 7. Why This Matters for Edge Inference
-
-* **Throughput:** Tensor cores deliver most of the **40 AI TOPS** on Orin Nano 8GB. Without them, the same chip would be much slower on neural networks.
-* **Power:** Doing more ops per cycle means the same workload finishes sooner and the GPU can sleep sooner — important for battery and thermal limits.
-* **Precision choice:** FP16 and INT8 are the “tensor-core paths”; FP32 is the slow path. Picking FP16 (or INT8 with calibration) is how you get both speed and acceptable accuracy.
-* **Debugging:** If a model is slow, check that the engine is built with FP16/INT8 and that layers are not falling back to FP32 or to non–tensor-core kernels (e.g. small or odd shapes).
-* **DLA vs GPU:** Orin Nano has no DLA. Its tensor cores are matrix units inside the GPU. DLA-equipped NX/AGX modules add a separate inference engine; see the [capability comparison](../Orin-Nano-DLA-Deep-Dive/Guide.md).
-
----
-
-## 8. Resources
-
-* **NVIDIA Ampere Architecture (white paper)** — Tensor core description and block diagrams.
-* **NVIDIA CUDA Programming Guide** — WMMA API and warp-level matrix ops.
-* **TensorRT Developer Guide** — How TensorRT selects kernels and uses FP16/INT8.
-* **Jetson Orin Nano datasheet / technical brief** — Official SM and tensor core counts and TOPS.
-* **cuDNN Developer Guide** — Convolution and matmul algorithms and tensor-core usage.
-
----
-
-*Back to [Nvidia Jetson Platform — Practical Complete Guide](../Guide.md).*
-
-
-## Integration lab: Does the workload reach matrix instructions?
-
-Profile one FP32, FP16, and supported INT8 matrix workload with dimensions that do and do not align with efficient tiles. Inspect executed kernels/instructions and retain a high-precision reference.
-
-**Acceptance evidence:** Separate sparse advertised TOPS from dense measured work. Submit error and time at equal shapes plus evidence that the intended matrix path ran.
-
-**Continue:** take this artifact to [02 - Kernel Engineering](../../../Phase%204%20-%20Track%20C%20-%20DL%20Inference%20Optimization/02%20-%20Kernel%20Engineering/Guide.md). Explain which assumption from this course the next engineer must preserve.
+Submit the hand matrix/dot-product calculations, the real CPU calibration report and a target-test plan. If you execute on hardware, add numerical and timing evidence for that exact configuration; keep the CPU and target results labeled separately.

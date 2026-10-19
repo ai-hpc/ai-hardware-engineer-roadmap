@@ -134,7 +134,7 @@ $$
 \hat a = \epsilon + v^\star(\epsilon, 0, o) = \mathbb{E}[a \mid o] .
 $$
 
-With \(K = 1\), a perfectly trained flow policy *is* the MSE policy, and drives into the tree. Multimodality lives in the later integration steps. This is the first thing to remember when someone proposes cutting denoising steps to speed up rollouts: fewer steps is not just "slightly less accurate". In the limit, it removes the property you chose flow matching for. (Distillation and consistency-style methods train a model specifically for 1-2 steps; that is a different model, not the same model sampled with fewer steps.)
+For the ideal conditional-mean vector field evaluated exactly at t=0, this single Euler step returns the conditional action mean. A finite network trained on sampled times need not equal that endpoint field exactly, so K=1 is not a universal numerical identity for every trained policy. It is a reason to evaluate aggressive step reduction, not a guarantee of a particular collision rate. A model distilled specifically for one/few steps has a different training objective and can preserve multimodal sampling.
 
 **Convention warning.** The π0 paper writes the path with \(\tau\) weighting the action and samples \(\tau\) from a shifted Beta distribution that emphasizes noisier timesteps. The openpi code uses the opposite labeling: \(x_t = t\,\epsilon + (1-t)\,a\), target \(\epsilon - a\), and integrates from \(t = 1\) down to \(0\) with \(\delta = -1/K\), \(K = 10\) by default. These are the same family of models. When you port weights, write a sampler, or add noise injection for RL (Lecture 11), follow the code's convention, not a paper's or this lecture's.
 
@@ -299,7 +299,7 @@ Train an MSE MLP (`nn.Sequential` 2 → 256 → 256 → 2) and a `Flow(2, 2)` on
 * a plot of 50 rollouts per method, with the obstacle drawn
 * the **number of side switches** per rollout for the flow policy (sign changes of \(x\) while \(y < 1\))
 
-Expected: MSE-BC goes straight up and collides. Flow at \(K = 1\) behaves like MSE-BC (§4.2). Flow at \(K \ge 5\) splits roughly evenly between left and right, with occasional dithering near the axis. Then make the flow policy predict **chunks** of 8 steps (`act_dim = 16`), execute \(H = 8\), and show the dithering disappears.
+Hypothesis to test: mean regression may collide in this constructed multimodal dataset, while sufficiently resolved flow integration may represent both paths. Record measured collision and switching rates; do not substitute these expected tendencies for results. Predicting/executing longer chunks may reduce switching but can also reduce feedback and increase collisions.
 
 ### Lab 3b — Chunked flow policy on PickCube
 
@@ -317,6 +317,8 @@ def make_chunks(O, A, P):
     return O.reshape(N * T, -1), A_pad[:, idx].reshape(N * T, P * da)   # (N*T, P*7)
 ```
 
+The compact chunk builder assumes all T stored actions belong to one valid episode and deliberately uses last-action padding as a training target. It is not a variable-length/autoreset dataset adapter. For real episodes, retain lengths and validity masks, exclude post-terminal targets, and never cross a reset boundary. Do not treat repeated padding as newly observed expert actions.
+
 Train `Flow(obs_dim, P * 7)` on normalized observations with \(P = 16\). Then evaluate with GPU-parallel envs:
 
 ```python
@@ -325,6 +327,8 @@ import time, torch
 
 @torch.no_grad()
 def evaluate(flow, mu, sd, P, H, K, n=1024, T=50, seed=0):
+    if not 1 <= H <= P or K < 1:
+        raise ValueError("require 1 <= executed H <= predicted P and K>=1")
     env = make_env(n); obs, _ = env.reset(seed=seed)
     succ = torch.zeros(n, dtype=torch.bool, device=obs.device)
     calls, t_pol = 0, 0.0
@@ -335,6 +339,7 @@ def evaluate(flow, mu, sd, P, H, K, n=1024, T=50, seed=0):
             torch.cuda.synchronize(); t_pol += time.perf_counter() - t0; calls += 1
         obs, _, _, _, info = env.step(chunk[:, t % H].clamp(-1, 1))
         succ |= info["success"]
+    env.close()
     return succ.float().mean().item(), calls, t_pol / calls
 ```
 

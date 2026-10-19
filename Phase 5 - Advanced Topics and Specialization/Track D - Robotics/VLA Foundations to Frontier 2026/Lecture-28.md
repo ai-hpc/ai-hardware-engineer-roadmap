@@ -4,7 +4,7 @@ Compare accessible policy families by their interfaces, reproduction costs, and 
 
 **Stack:** model workloads, training systems, memory, deployment. **Roles:** research engineer, robot learning engineer. **Prerequisites:** [Lecture 27](Lecture-27.md), fine-tuning and benchmark design. **Next:** [Reasoning and world models](Lecture-29.md). **Cutoff:** 2026-10-13.
 
-## Four practical reference points
+## Three practical reference points
 
 OpenVLA-OFT is a 2025-02-27 paper and adaptation recipe for OpenVLA. Its combination of parallel decoding, chunking, continuous outputs, and an L1 objective illustrates that adapting a pretrained backbone can change the policy's inference path substantially. Calling it “OpenVLA” without specifying OFT loses an important architectural distinction. [OFT paper](https://arxiv.org/abs/2502.19645).
 
@@ -48,7 +48,7 @@ For training, a rough unfactored Adam accounting may include parameters, gradien
 
 LoRA lowers trainable-state cost but does not eliminate the frozen model, activation storage, or data processing. Suppose adaptation uses only 30M trainable parameters: at the same illustrative 16 bytes, their states are about 480 MB, yet the 12 GB BF16 backbone is still present. Measure total peak memory instead of advertising the adapter size as the memory requirement.
 
-For context, the inspected OFT repository documents about 16 GB inference memory for its LIBERO path and more for its ALOHA path; these are upstream configuration-specific requirements. [OFT system requirements](https://github.com/moojink/openvla-oft).
+For context, the inspected OFT repository documents about 16 GB inference memory for its LIBERO path and more for its ALOHA path; these are upstream configuration-specific requirements. [OFT requirements at the reviewed commit](https://github.com/moojink/openvla-oft/tree/e4287e94541f459edc4feabc4e181f537cd569a8).
 
 ## Build it: one baseline and one challenger
 
@@ -61,7 +61,7 @@ For context, the inspected OFT repository documents about 16 GB inference memory
 5. Run the pinned upstream training/evaluation entry point. Label these instructions **upstream documented, not tested here**. Capture the resolved configuration and raw logs; do not depend on an unrecorded command-line default.
 6. Compare held-out closed-loop success, time to completion, p95 sensor-to-action latency, peak VRAM, interventions, and failure categories. Also log offline action error, while explaining why it does not replace closed-loop evaluation.
 
-The negative case swaps two camera labels while retaining valid tensor shapes. Your schema audit should detect the mismatch if identities are declared; otherwise the experiment should reveal why shape validation alone is inadequate. Restore the correct mapping before any robot execution.
+The negative case swaps two camera labels while retaining valid tensor shapes. A provenance-aware mapping check or a known-view fixture can detect the mismatch. Merely declaring valid camera IDs cannot prove the corresponding pixel contents came from those cameras: falsely relabeled images still satisfy the schema. Preserve source identity through acquisition and preprocessing, and test scene markers or geometric consistency where available. Restore the correct mapping before any robot execution.
 
 **Exercise / pseudocode:**
 

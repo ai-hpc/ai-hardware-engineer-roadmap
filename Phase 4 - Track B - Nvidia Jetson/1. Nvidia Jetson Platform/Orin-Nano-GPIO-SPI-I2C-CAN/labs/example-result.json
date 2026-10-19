@@ -1,0 +1,44 @@
+{
+  "transport": "actual AF_UNIX datagram socketpair; no SocketCAN interface or wire",
+  "payload_hex": "017f06ffb0040f00",
+  "abi_bytes": 16,
+  "received": {
+    "sequence": 127,
+    "speed_mm_s": -250,
+    "distance_mm": 1200,
+    "sender_age_ms": 15
+  },
+  "sequence_progress": [
+    {
+      "sequence": 254,
+      "classification": "first",
+      "missed": 0
+    },
+    {
+      "sequence": 255,
+      "classification": "next",
+      "missed": 0
+    },
+    {
+      "sequence": 0,
+      "classification": "next",
+      "missed": 0
+    },
+    {
+      "sequence": 0,
+      "classification": "duplicate",
+      "missed": 0
+    },
+    {
+      "sequence": 3,
+      "classification": "gap",
+      "missed": 2
+    },
+    {
+      "sequence": 2,
+      "classification": "old_or_ambiguous",
+      "missed": 0
+    }
+  ],
+  "sender_age_limit": "sender-declared age excludes unknown transport delay; not capture-age proof"
+}

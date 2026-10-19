@@ -1,0 +1,44 @@
+{
+  "worked_state": [
+    [
+      4.0,
+      0.5
+    ],
+    [
+      0.0,
+      4.0
+    ]
+  ],
+  "worked_output": [
+    4.0,
+    0.5
+  ],
+  "one_request_128k": {
+    "context_tokens_per_request": 131072,
+    "concurrent_requests": 1,
+    "kda_all_heads_bytes_per_request": 142606336,
+    "kda_bytes_per_gpu": 17825792,
+    "mla_bytes_per_gpu_if_replicated": 1476395008,
+    "excluded": [
+      "weights",
+      "convolution state",
+      "indexer state",
+      "rollback copies",
+      "workspace"
+    ]
+  },
+  "two_requests_1m": {
+    "context_tokens_per_request": 1048576,
+    "concurrent_requests": 2,
+    "kda_all_heads_bytes_per_request": 142606336,
+    "kda_bytes_per_gpu": 35651584,
+    "mla_bytes_per_gpu_if_replicated": 23622320128,
+    "excluded": [
+      "weights",
+      "convolution state",
+      "indexer state",
+      "rollback copies",
+      "workspace"
+    ]
+  }
+}

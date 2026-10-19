@@ -34,7 +34,7 @@ Teaches:                   Teaches:                   Teaches:
   ∙ How backward() works     ∙ Industry patterns        ∙ Compiler internals
 ```
 
-**Learning order:** micrograd → PyTorch → tinygrad
+**Learning routes:** use micrograd → PyTorch → tinygrad to study implementation internals, or run the [complete PyTorch CPU lab](../PyTorch/CPU-Robot-Stop-Lab/Guide.md) first and return to the scalar derivative explanations. Allow 60–90 minutes for the scalar engine and a separate session for each framework; this long page is a reference, not one sitting.
 
 ---
 
@@ -108,7 +108,7 @@ class Value:
 
         def _backward():
             # d(x^n)/dx = n * x^(n-1)
-            self.grad += (exponent * self.data ** (exponent - 1)) * out.grad
+            self.grad += (0.0 if exponent == 0 else exponent * self.data ** (exponent - 1)) * out.grad
 
         out._backward = _backward
         return out
@@ -162,6 +162,7 @@ class Value:
     def __rmul__(self, other): return self * other
     def __neg__(self):         return self * -1
     def __sub__(self, other):  return self + (-other)
+    def __rsub__(self, other): return other + (-self)
     def __truediv__(self, other): return self * other**-1
     def __rtruediv__(self, other): return Value(other) * self**-1
 
@@ -355,11 +356,11 @@ for x, y in zip(X, Y):
 ```
 micrograd concept                tinygrad equivalent
 ──────────────────────           ─────────────────────────────────
-Value._prev (set of inputs)      LazyBuffer.srcs (source buffers)
+Value._prev (set of inputs)      UOp source edges (current graph)
 Value._backward (grad fn)        Tensor.grad_fn
 build_topo() + reversed()        topological sort in realize()
 self.grad += ...                  gradient accumulation in backward
-Value.data = float               LazyBuffer → realized numpy/cuda array
+Value.data = float               UOp graph → scheduled execution → buffer
 ```
 
 ---
@@ -703,11 +704,13 @@ class MNISTDataset(Dataset):
 
 train_ds = MNISTDataset(X_train, Y_train)
 train_dl = DataLoader(train_ds, batch_size=64, shuffle=True, num_workers=2, pin_memory=True)
-# pin_memory=True: allocates batch in pinned (page-locked) CPU memory → faster GPU transfer
-# num_workers=2: 2 background processes prefetch data while GPU trains
+# pin_memory can help supported asynchronous host-to-device paths; benchmark it.
+# num_workers=2 uses worker processes; CPU-only/small-data examples may be faster with 0.
 ```
 
 ### Complete training loop
+
+This sketch assumes nonempty loaders and unweighted mean cross-entropy with one target per example. Accumulate loss sums weighted by the actual batch size; the last batch may be shorter. Weighted or masked losses require their own denominator. Define train/validation data before running; the [complete CPU lab](../PyTorch/CPU-Robot-Stop-Lab/Guide.md) supplies a tested setup.
 
 ```python
 def train_epoch(model, loader, loss_fn, optimizer, device):
@@ -731,11 +734,11 @@ def train_epoch(model, loader, loss_fn, optimizer, device):
         # 4. Update
         optimizer.step()
 
-        total_loss += loss.item()
+        total_loss += loss.item() * len(y)
         correct    += (logits.argmax(1) == y).sum().item()
         total      += len(y)
 
-    return total_loss / len(loader), correct / total
+    return total_loss / total, correct / total
 
 @torch.no_grad()
 def evaluate(model, loader, loss_fn, device):
@@ -744,10 +747,10 @@ def evaluate(model, loader, loss_fn, device):
     for X, y in loader:
         X, y = X.to(device), y.to(device)
         logits = model(X)
-        total_loss += loss_fn(logits, y).item()
+        total_loss += loss_fn(logits, y).item() * len(y)
         correct    += (logits.argmax(1) == y).sum().item()
         total      += len(y)
-    return total_loss / len(loader), correct / total
+    return total_loss / total, correct / total
 
 # Run training
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -1086,17 +1089,14 @@ print(y.grad_fn)                    # AddBackward0
 print(y.grad_fn.next_functions)     # (PowBackward0, MulBackward0)
 print(y.grad_fn.next_functions[0][0].next_functions)  # (AccumulateGrad,)
 
-# tinygrad: inspect LazyBuffer
-import os; os.environ['DEBUG'] = '1'   # show schedule
-from tinygrad.tensor import Tensor
+# tinygrad 0.14-style public inspection: trace execution under Context.
+from tinygrad import Tensor, Context
 
 x = Tensor([2.0])
 y = x ** 2 + x * 3
-y.numpy()   # trigger computation — DEBUG=1 shows the ops
+with Context(DEBUG=4):
+    print(y.numpy())  # realization emits generated code/debug output
 
-# With DEBUG=4: shows the generated GPU/CPU kernel code
-os.environ['DEBUG'] = '4'
-z = (x * x).sum().numpy()
 ```
 
 ### Gradient flow visualization
@@ -1127,12 +1127,12 @@ This is the critical section for tinygrad mastery. For every PyTorch operation, 
 ```python
 # PyTorch: eager execution — operations run immediately
 x = torch.randn(1000, 1000)
-y = x @ x                     # matmul runs NOW, result in y immediately
+y = x @ x                     # eager dispatch; GPU work can still be asynchronous
 
 # tinygrad: lazy execution — operations are scheduled, not run
 from tinygrad.tensor import Tensor
 x = Tensor.randn(1000, 1000)
-y = x.matmul(x)               # NO computation yet — y is a LazyBuffer
+y = x.matmul(x)               # y is a Tensor whose computation is a UOp graph
                                # just a description of "matmul of x and x"
 result = y.numpy()             # NOW the computation runs (realize())
 
@@ -1140,7 +1140,7 @@ result = y.numpy()             # NOW the computation runs (realize())
 #   → Operations can be fused before execution
 #   → Redundant operations can be eliminated
 #   → The scheduler can optimize the compute graph
-#   → This is how XLA (TensorFlow/JAX), tinygrad, and torch.compile all work
+#   → These systems use graph optimization, but capture/staging/runtime semantics differ.
 ```
 
 ### Kernel fusion
@@ -1151,17 +1151,19 @@ x = torch.randn(1024, 1024, device='cuda')
 y = x.relu()        # launch kernel 1: relu
 z = y * 2           # launch kernel 2: mul
 w = z + 1           # launch kernel 3: add
-# Each launch has overhead: CPU→GPU sync, memory roundtrip
+# Launches incur dispatch overhead; they do not each imply a host/device synchronization.
 
 # tinygrad: these FUSE into a single kernel
-import os; os.environ['CUDA'] = '1'; os.environ['DEBUG'] = '4'
+# Select the device before process startup; use Context for debug overrides.
+from tinygrad import Context
 from tinygrad.tensor import Tensor
 x = Tensor.randn(1024, 1024)
-w = (x.relu() * 2 + 1).numpy()   # ONE kernel: relu+mul+add fused
+with Context(DEBUG=4):
+    w = (x.relu() * 2 + 1).numpy()  # inspect actual schedule; initialization may add kernels
 # DEBUG=4 shows the generated kernel source — single loop doing all three ops
 
-# torch.compile() (PyTorch 2.0+) also does this, but via C++ Triton
-# tinygrad does it in pure Python — readable
+# torch.compile/Inductor may emit Triton or C++ kernels and dispatch libraries.
+# tinygrad compiler logic is Python; generated execution uses native target code.
 ```
 
 ### The kernel code you can read
@@ -1170,7 +1172,7 @@ w = (x.relu() * 2 + 1).numpy()   # ONE kernel: relu+mul+add fused
 # tinygrad lets you inspect the generated kernel
 import os
 os.environ['DEBUG'] = '4'
-os.environ['CPU'] = '1'
+os.environ['DEV'] = 'CPU'  # pinned tinygrad 0.14 route; set before import
 
 from tinygrad.tensor import Tensor
 
@@ -1189,7 +1191,7 @@ c.numpy()
 #     }
 #   }
 # }
-# You can READ this. Try doing that with PyTorch.
+# Read emitted code; PyTorch Inductor also exposes generated code through its debug tools.
 ```
 
 ### Memory management: allocation and synchronization

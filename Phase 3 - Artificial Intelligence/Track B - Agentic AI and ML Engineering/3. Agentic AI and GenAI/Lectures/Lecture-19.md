@@ -8,7 +8,7 @@
 
 - Design multi-agent topologies (supervisor, pipeline, peer-to-peer)
 - Implement an agent-to-agent communication protocol
-- Use CrewAI for role-based agent teams
+- Distinguish a role prompt from a worker with actual tools, evidence and enforced limits
 - Prevent coordination failures and infinite loops
 
 ---
@@ -24,168 +24,42 @@
 
 ---
 
-## 2. Supervisor Pattern (from scratch)
+## 2. A supervisor needs a bounded dispatcher
 
-```python
-import anthropic
-import json
-from typing import Callable
+A supervisor asks a worker to produce an artifact, then evaluates that artifact before deciding the next action. Role prompts alone do not grant tools or evidence. A “researcher” with no retrieval tool is generating from model context, not searching current sources.
 
-client = anthropic.Anthropic()
+Start from the [executed provider dispatcher](Provider-Contract-Lab.md), then extend its allowlist with a `delegate_task` operation. Validate the worker name, task length, total worker-call budget and per-worker model-turn budget before dispatch. Return a result for every accepted call ID; an unknown worker is an error result, not a missing response. Refusal/truncation must not be labeled success. Preserve all assistant blocks and provider continuation state.
 
-# ── Worker agents ─────────────────────────────────────────────
+For this design exercise, use this application-level result schema:
 
-def researcher_agent(task: str) -> str:
-    """Gathers information and facts."""
-    response = client.messages.create(
-        model="your-fast-model-id",
-        max_tokens=1024,
-        system="You are a research specialist. Find relevant facts and technical details. Be thorough.",
-        messages=[{"role": "user", "content": task}]
-    )
-    return response.content[0].text
-
-def coder_agent(task: str) -> str:
-    """Writes and reviews code."""
-    response = client.messages.create(
-        model="your-agent-model-id",
-        max_tokens=2048,
-        system="You are a senior software engineer. Write clean, well-commented code with examples.",
-        messages=[{"role": "user", "content": task}]
-    )
-    return response.content[0].text
-
-def reviewer_agent(task: str) -> str:
-    """Reviews and critiques work."""
-    response = client.messages.create(
-        model="your-agent-model-id",
-        max_tokens=1024,
-        system="You are a strict technical reviewer. Identify bugs, edge cases, and improvements.",
-        messages=[{"role": "user", "content": task}]
-    )
-    return response.content[0].text
-
-def writer_agent(task: str) -> str:
-    """Writes documentation and explanations."""
-    response = client.messages.create(
-        model="your-fast-model-id",
-        max_tokens=1024,
-        system="You are a technical writer. Create clear, well-structured documentation.",
-        messages=[{"role": "user", "content": task}]
-    )
-    return response.content[0].text
-
-WORKERS: dict[str, Callable[[str], str]] = {
-    "researcher": researcher_agent,
-    "coder": coder_agent,
-    "reviewer": reviewer_agent,
-    "writer": writer_agent,
+```json
+{
+  "task_id": "review-1",
+  "worker": "reviewer",
+  "status": "completed",
+  "artifact_ids": ["review-1.txt"],
+  "checks": [{"name": "unit_suite", "passed": false}],
+  "claims_verified": false
 }
-
-# ── Supervisor ────────────────────────────────────────────────
-
-SUPERVISOR_TOOLS = [
-    {
-        "name": "delegate_task",
-        "description": "Delegate a subtask to a specialist agent.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "agent": {
-                    "type": "string",
-                    "enum": list(WORKERS.keys()),
-                    "description": "Which specialist to use"
-                },
-                "task": {
-                    "type": "string",
-                    "description": "Specific task description for this agent"
-                }
-            },
-            "required": ["agent", "task"]
-        }
-    },
-    {
-        "name": "finish",
-        "description": "Return the final answer to the user.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "answer": {"type": "string", "description": "Final synthesized answer"}
-            },
-            "required": ["answer"]
-        }
-    }
-]
-
-SUPERVISOR_SYSTEM = """You are a supervisor managing a team of specialist agents:
-- researcher: gathers information and facts
-- coder: writes and explains code
-- reviewer: identifies bugs and improvements
-- writer: creates documentation
-
-Break the user's task into subtasks, delegate each to the right specialist,
-then synthesize the results. Use 'finish' when done."""
-
-def supervisor_agent(user_task: str) -> str:
-    messages = [{"role": "user", "content": user_task}]
-    results = {}
-
-    for _ in range(20):  # max iterations
-        response = client.messages.create(
-            model="your-agent-model-id",
-            max_tokens=1024,
-            system=SUPERVISOR_SYSTEM,
-            tools=SUPERVISOR_TOOLS,
-            messages=messages
-        )
-
-        messages.append({"role": "assistant", "content": response.content})
-
-        if response.stop_reason == "end_turn":
-            return next((b.text for b in response.content if hasattr(b, "text")), "")
-
-        tool_results = []
-        for block in response.content:
-            if block.type != "tool_use":
-                continue
-
-            if block.name == "finish":
-                return block.input["answer"]
-
-            elif block.name == "delegate_task":
-                agent_name = block.input["agent"]
-                subtask = block.input["task"]
-                print(f"  → delegating to {agent_name}: {subtask[:60]}...")
-
-                agent_result = WORKERS[agent_name](subtask)
-                results[agent_name] = agent_result
-
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": f"[{agent_name}]: {agent_result}"
-                })
-
-        if tool_results:
-            messages.append({"role": "user", "content": tool_results})
-
-    return "Supervisor did not complete within iteration limit."
-
-# Test
-result = supervisor_agent(
-    "Build a Python class for a simple LRU cache. Include code, review, and a docstring."
-)
-print(result)
 ```
 
----
+“Completed” says the worker returned; `checks` say whether its artifact passed the declared criteria. The supervisor must not equate those fields. A final-answer tool must not bypass outstanding worker results or unresolved failed checks.
+
+**Worked budget:** four workers, each allowed three model turns, plus a supervisor allowed five turns can use up to 17 model requests, before retries. A five-turn supervisor limit alone does not cap the workers' hidden loops. Account for all child work under the same run budget.
+
+No hosted multi-agent run is claimed here. For a fully executed account-free graph with two independent deterministic checks, approval, saved state and failure injection, use [Lab 02](Lab-02-Multi-Agent-Pipeline.md). A model-backed reviewer is a separate extension requiring its own held-out quality assessment.
+
+The remaining snippets are optional provider integration fragments: configure the SDK client and supported model IDs first. They are not account-free programs or executed model-quality evidence. Multiple role prompts using one model may share correlated errors; agreement is not an independent correctness check.
 
 ## 3. Pipeline Pattern
 
 Simple **sequential hand-off** between agents:
 
 ```python
+import anthropic
 from dataclasses import dataclass
+
+client = anthropic.Anthropic()  # Live integration only; requires credentials.
 
 @dataclass
 class PipelineContext:
@@ -217,7 +91,9 @@ def outline_stage(task: str, artifacts: dict) -> str:
         max_tokens=512,
         messages=[{"role": "user", "content": f"Create a brief outline for: {task}"}]
     )
-    return response.content[0].text
+    if response.stop_reason != "end_turn":
+        raise RuntimeError(f"incomplete worker: {response.stop_reason}")
+    return "".join(b.text for b in response.content if b.type == "text")
 
 def draft_stage(outline: str, artifacts: dict) -> str:
     response = client.messages.create(
@@ -225,7 +101,9 @@ def draft_stage(outline: str, artifacts: dict) -> str:
         max_tokens=2048,
         messages=[{"role": "user", "content": f"Write a technical guide based on this outline:\n{outline}"}]
     )
-    return response.content[0].text
+    if response.stop_reason != "end_turn":
+        raise RuntimeError(f"incomplete worker: {response.stop_reason}")
+    return "".join(b.text for b in response.content if b.type == "text")
 
 def review_stage(draft: str, artifacts: dict) -> str:
     response = client.messages.create(
@@ -234,7 +112,9 @@ def review_stage(draft: str, artifacts: dict) -> str:
         system="Identify errors and suggest improvements. Be specific.",
         messages=[{"role": "user", "content": draft}]
     )
-    return response.content[0].text
+    if response.stop_reason != "end_turn":
+        raise RuntimeError(f"incomplete worker: {response.stop_reason}")
+    return "".join(b.text for b in response.content if b.type == "text")
 
 def revise_stage(review: str, artifacts: dict) -> str:
     draft = artifacts.get("draft_stage", "")
@@ -246,7 +126,9 @@ def revise_stage(review: str, artifacts: dict) -> str:
             "content": f"Revise this draft based on the review:\n\nDraft:\n{draft}\n\nReview:\n{review}"
         }]
     )
-    return response.content[0].text
+    if response.stop_reason != "end_turn":
+        raise RuntimeError(f"incomplete worker: {response.stop_reason}")
+    return "".join(b.text for b in response.content if b.type == "text")
 
 # Build and run pipeline
 write_guide = build_pipeline(
@@ -284,7 +166,9 @@ def debate_agents(question: str, rounds: int = 2) -> str:
                 "content": f"Question: {question}\n\nArguments so far:\n{history}\n\nYour turn:"
             }]
         )
-        return response.content[0].text
+        if response.stop_reason != "end_turn":
+            raise RuntimeError(f"incomplete worker: {response.stop_reason}")
+        return "".join(b.text for b in response.content if b.type == "text")
 
     arguments = []
     for round_num in range(rounds):
@@ -305,7 +189,9 @@ def debate_agents(question: str, rounds: int = 2) -> str:
             "content": f"Question: {question}\n\nDebate:\n{transcript}\n\nSynthesize the best answer:"
         }]
     )
-    return judge_response.content[0].text
+    if judge_response.stop_reason != "end_turn":
+        raise RuntimeError(f"incomplete judge: {judge_response.stop_reason}")
+    return "".join(b.text for b in judge_response.content if b.type == "text")
 
 verdict = debate_agents(
     "Should ML inference pipelines use dynamic batching or static batching for latency-sensitive workloads?"

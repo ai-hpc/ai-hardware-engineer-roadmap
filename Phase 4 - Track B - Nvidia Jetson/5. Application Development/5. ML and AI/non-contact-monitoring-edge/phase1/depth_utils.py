@@ -1,60 +1,51 @@
-"""
-Depth conversion and ROI depth for Free-Viewpoint RGB-D Video Dataset.
-Grayscale depth frames (0–255) -> metric depth (meters).
-"""
+"""Decode dataset disparity; metric scale must come from external evidence."""
+import math
 import numpy as np
 
-# Dataset constants (from dataset README)
 FB = 32504.0
-MIN_DEPTH = 40.0   # cm
-MAX_DEPTH = 150.0  # cm
-MAX_DISP = FB / MIN_DEPTH
-MIN_DISP = FB / MAX_DEPTH
+MIN_DEPTH = 40.0
+MAX_DEPTH = 150.0
 
 
-def gray_to_depth(gray: np.ndarray, in_meters: bool = True) -> np.ndarray:
+def gray_to_depth(gray, *, encoding="byte", units_to_meters=None):
+    """Return dataset depth units, or metres with an explicitly supplied scale.
+
+    byte: grayscale [0,255]; normalized: [0,1]. Never infer encoding from
+    one frame's maximum. In the published mapping zero is far depth, not
+    automatically a missing-pixel marker. Supply any validity mask separately.
     """
-    Convert grayscale depth frame (0–255) to metric depth.
-    gray: uint8 or float in [0, 255], shape (H, W).
-    Returns float array; units are meters if in_meters=True, else cm.
-    """
-    depth = np.asarray(gray, dtype=np.float32)
-    if depth.max() <= 1.0:
-        depth = depth * 255.0
-    disp = depth / 255.0 * (MAX_DISP - MIN_DISP) + MIN_DISP
-    np.maximum(disp, 1e-6, out=disp)
-    out = FB / disp
-    if in_meters:
-        out = out / 100.0  # cm -> m
-    return out
+    p = np.asarray(gray, dtype=np.float64)
+    if p.ndim != 2 or not p.size or not np.isfinite(p).all():
+        raise ValueError("nonempty finite 2-D grayscale frame required")
+    if encoding not in ("byte", "normalized"):
+        raise ValueError("encoding must be byte or normalized")
+    upper = 255 if encoding == "byte" else 1
+    if np.any((p < 0) | (p > upper)):
+        raise ValueError("grayscale outside declared encoding range")
+    disparity = p / upper * (FB/MIN_DEPTH - FB/MAX_DEPTH) + FB/MAX_DEPTH
+    result = FB / disparity
+    if units_to_meters is not None:
+        if not math.isfinite(units_to_meters) or units_to_meters <= 0:
+            raise ValueError("metric scale must be finite and positive")
+        result *= units_to_meters
+    return result
 
 
-def depth_in_roi(
-    depth_map: np.ndarray,
-    bbox: tuple[int, int, int, int],
-    valid_min: float = 0.1,
-    valid_max: float = 10.0,
-    use_median: bool = True,
-) -> float | None:
-    """
-    Compute representative depth inside a bounding box.
-    bbox: (x1, y1, x2, y2) in pixel coordinates.
-    depth_map: float (H, W) or (H, W, C); same units as valid_min/valid_max (default meters).
-    valid_min, valid_max: ignore depth outside this range.
-    use_median: if True use median, else mean.
-    Returns depth in same units as depth_map, or None if no valid pixels.
-    """
-    if depth_map.ndim == 3:
-        depth_map = depth_map[:, :, 0] if depth_map.shape[2] >= 1 else depth_map.mean(axis=2)
+def depth_in_roi(depth_map, bbox, valid_min=0, valid_max=float("inf"), use_median=True):
+    """Median/mean of finite positive depth in clipped half-open xyxy box."""
+    d = np.asarray(depth_map)
+    if d.ndim != 2 or len(bbox) != 4 or not all(math.isfinite(v) for v in bbox):
+        raise ValueError("2-D depth and finite xyxy box required")
+    if not 0 <= valid_min < valid_max:
+        raise ValueError("invalid depth bounds")
     x1, y1, x2, y2 = bbox
-    h, w = depth_map.shape
-    x1 = max(0, min(x1, w - 1))
-    x2 = max(0, min(x2, w))
-    y1 = max(0, min(y1, h - 1))
-    y2 = max(0, min(y2, h))
-    roi = depth_map[y1:y2, x1:x2]
-    mask = (roi >= valid_min) & (roi <= valid_max)
-    vals = roi[mask]
-    if vals.size == 0:
+    if x2 <= x1 or y2 <= y1:
         return None
-    return float(np.median(vals) if use_median else np.mean(vals))
+    h, w = d.shape
+    x1, x2 = max(0, math.floor(x1)), min(w, math.ceil(x2))
+    y1, y2 = max(0, math.floor(y1)), min(h, math.ceil(y2))
+    if x1 >= x2 or y1 >= y2:
+        return None
+    roi = d[y1:y2, x1:x2]
+    vals = roi[np.isfinite(roi) & (roi > 0) & (roi >= valid_min) & (roi <= valid_max)]
+    return None if not len(vals) else float(np.median(vals) if use_median else np.mean(vals))

@@ -1,192 +1,42 @@
-# Lecture 2 - HomePod 2018 lessons: great sound is not enough
+# Lecture 2 - HomePod 2018: separate specifications from product hypotheses
 
-**Course:** [Product Design for Embedded Systems](../Guide.md) | **Phase 2 - Embedded Systems**
+**Course:** [Product Design](../Guide.md) | **Previous:** [Requirements](Lecture-01.md) | **Next:** [2023 platform boundaries](Lecture-03.md)
 
-**Previous:** [Lecture 01](Lecture-01.md) | **Next:** [Lecture 03 - Later HomePod / 2023-era platform lessons](Lecture-03.md)
+A historical product is useful when it helps you ask better engineering questions. It is weak evidence for claims such as “users rejected it because the assistant was poor” unless you have appropriate user research or commercial data. This case study therefore separates documented launch features from hypotheses you can test in your own prototype.
 
-> **Case-study method:** The product judgments below are design interpretations, not a measured causal explanation of commercial success or failure. Turn each claim into a testable hypothesis for your own device—for example setup completion rate or a user's ability to identify microphone state—and keep product specifications separate from that interpretation.
+## Establish the historical facts
 
----
+Apple's January 2018 announcement described HomePod as a music speaker with Siri tasks, HomeKit accessory control, and an Apple Music integration. It announced February 9 availability in the initial markets. Those are documented launch statements; promotional descriptions of sound quality are not independent comparative measurements. See the [original launch announcement](https://www.apple.com/newsroom/2018/01/homepod-arrives-february-9-available-to-order-this-friday/).
 
-## Why study the 2018 HomePod
+Do not use a current support page to silently rewrite a 2018 feature set. Also, do not assume that a launch-era limitation is still a current limitation. State the date and software context whenever they matter.
 
-The first HomePod is a useful product-design lesson because it showed a very specific failure mode:
+## Convert observations into your own experiment
 
-- the speaker hardware felt stronger than the assistant
+| Product question | Prototype experiment | Evidence to record |
+|---|---|---|
+| Does audio quality help users understand responses? | Play the same spoken replies at controlled levels/noise positions | Correctly understood content and replay requests |
+| Is the assistant useful for routine tasks? | Ask participants to complete timer and supported home-control tasks | Completion, correction and failure counts |
+| Is setup understandable? | Give a first-time participant the package and intended instructions | Time to ready, assistance required, abandoned steps |
+| Are privacy states clear? | Ask participants to identify capture/mute states during scripted changes | Correct interpretation and ambiguous states |
 
-That makes it a perfect case study for embedded engineers.
+Keep your own observations separate from claims about HomePod customers. A five-person formative session can reveal usability problems; it does not establish market demand or a reliable population-wide percentage.
 
-It proves that:
+## Shared-room behavior is an interface requirement
 
-- premium acoustics alone do not make a strong AI product
+A voice appliance may hear guests, children, a television, or another household member. Voice recognition can help personalize a response, but recognition alone should not silently authorize every private-data or physical-control action. Specify the allowed action classes and the extra conditions each requires.
 
----
+For a prototype, choose a small local command set and make rejected/ambiguous requests understandable. A timer request can be confirmed with its duration; a request that changes an external device needs an explicit action policy. A generated answer and an executed action are distinct outputs.
 
-## What HomePod got right
+Privacy claims should identify a boundary. “Local wake-word processing” describes where one stage runs; it does not establish where later audio, text, logs, or embeddings go. Draw those data paths and retention settings. If the product says a physical control disables microphone capture, inspect the electrical path and queued-data behavior that implement that statement.
 
-The early HomePod proved that people immediately notice and value:
+## Ecosystem dependencies are design inputs
 
-- strong sound quality
-- good far-field microphone pickup
-- premium industrial design
-- simple setup
-- an object that feels display-worthy in a living room
+A service integration can provide useful capabilities and also add account, network, availability, and compatibility dependencies. List which basic tasks remain available without it. Test a disconnected session and show the user which task could not complete. Do not invent a generic rule that every closed ecosystem is unusable or every local implementation is private and reliable.
 
-This matters because it confirms a hard truth:
+## Exercise with an example answer
 
-- audio and physical quality are not optional in a home voice product
+Choose one launch feature from the primary source and write: documented fact → your design hypothesis → experiment → possible failure.
 
-If the object sounds weak or feels cheap, the user **notices instantly**.
+Example: “The launch described voice-controlled timers” → “A local timer will remain useful during a network outage” → disconnect the network and attempt start/cancel/expiry → failure if the system silently accepts the request but never schedules the timer.
 
-So the first HomePod was right about one important thing:
-
-- a smart speaker is still a speaker
-
----
-
-## What HomePod got wrong
-
-The weakness was **not the hardware**. The weakness was that the **assistant felt limited**.
-
-The common complaints were:
-
-- Siri felt weaker than Alexa or Google Assistant
-- everyday tasks felt limited
-- the product felt too dependent on one ecosystem
-- shared-space privacy behavior could become awkward or unsafe
-
-This created a bad product asymmetry:
-
-- strong hardware
-- weaker everyday usefulness
-
-That is the exact **trap** a new AI speaker must avoid.
-
----
-
-## The core product lesson
-
-The HomePod 2018 lesson is simple:
-
-- great sound can make people notice your product
-- but everyday usefulness decides whether they keep it in their home
-
-So the product cannot be:
-
-- amazing speaker, weak assistant
-
-It needs to be:
-
-- strong room object, strong household tool, and strong trust object at the same time
-
----
-
-## The shared-space privacy lesson
-
-A home AI speaker lives in **shared space**.
-
-That changes the product rules.
-
-The living room is not a phone.
-
-It is not private by default.
-
-So the device should assume:
-
-- voice is public by default
-- secrets are not safe by default
-- identification can personalize responses
-- identification should not casually authorize private data exposure
-
-This is one of the sharpest product lessons from first-wave assistants.
-
-Embedded consequence:
-
-- microphone mute must be physical
-- mute state must be visible
-- listening/responding states must be legible across the room
-
----
-
-## The utility lesson
-
-People forgive some missing features if the device is **useful every day**.
-
-That means the speaker should be reliably good at:
-
-- timers
-- reminders
-- weather
-- household memory
-- home control
-- routines
-- simple follow-up conversation
-
-This is a better target than feature theater.
-
-Do not optimize around:
-
-- rare demo features
-
-Optimize around:
-
-- repeated daily usefulness
-
----
-
-## The ecosystem lesson
-
-The first HomePod also showed the danger of **ecosystem prison**.
-
-If the product only feels strong inside one closed service world, its usefulness narrows quickly.
-
-The product lesson is:
-
-- the core experience should be useful before the ecosystem expansion layer is added
-
-For a local-first AI speaker, that means:
-
-- good local voice
-- good local memory
-- good local control behavior
-- ecosystem integration as expansion, not identity
-
----
-
-## Translation for an AI smart speaker
-
-If you are designing your own AI smart speaker, keep:
-
-- premium room presence
-- strong far-field microphones
-- good spoken and ambient audio
-- simple setup
-
-Avoid:
-
-- weak assistant capability behind premium hardware
-- casual exposure of private information in shared space
-- a product that only works well inside one vendor ecosystem
-- over-relying on audio quality as the whole product story
-
----
-
-## One sentence
-
-HomePod 2018 teaches that great sound can launch a product, but trust and everyday usefulness decide whether the product deserves to stay in the room.
-
----
-
-## Lab
-
-Answer these three questions for your own smart-speaker concept:
-
-1. What is the one thing users should notice immediately?
-2. What is the one thing users should trust immediately?
-3. What everyday task set must be excellent before you add long-tail features?
-
-If you can answer those, you are already designing a stronger product than "good hardware with assistant features attached."
-
----
-
-**Previous:** [Lecture 01](Lecture-01.md) | **Next:** [Lecture 03 - Later HomePod / 2023-era platform lessons](Lecture-03.md)
+Deliver two such chains and one unresolved question. This approach gives you a practical design lesson without presenting speculation as product history.

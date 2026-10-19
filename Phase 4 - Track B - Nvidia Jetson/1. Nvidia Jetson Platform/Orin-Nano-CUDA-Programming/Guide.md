@@ -1,608 +1,147 @@
-# Orin Nano 8GB -- CUDA Programming Deep Dive
+# CUDA on Orin Nano: correct results before faster results
 
-<div class="course-identity auto-course" style="--course-accent: #4f46e5; --course-accent-rgb: 79, 70, 229;" markdown="1">
-<div class="course-identity__icon">ON8C</div>
-<div markdown="1">
-<p class="course-identity__eyebrow">Deep Dive · Jetson Track</p>
-<p class="course-identity__title">Specialized course identity for Orin Nano 8GB -- CUDA Programming Deep Dive.</p>
-<p class="course-identity__meta">Artifact: Jetson integration demo · Measure: latency, memory, power, logs</p>
-</div>
-</div>
+**Prerequisites:** C++ arrays and pointers, basic linear algebra, and the [memory lesson](../Orin-Nano-Memory-Architecture/Guide.md). **Pace:** six sessions of 60–90 minutes. **Outcome:** explain a kernel's indexing, validate every output, describe buffer ownership, and measure a complete perception stage.
 
+CUDA runs many instances of a function over data. A useful first robotics example is converting camera pixels into a model's input tensor. The arithmetic is simple; the difficult parts are image layout, bounds, ordering, and knowing when another component may reuse the buffer.
 
-> **Scope:** Production-level CUDA programming on Jetson Orin Nano 8GB (T234 SoC) -- toolchain, kernel authoring, memory optimization, profiling, camera zero-copy, TensorRT integration, and production patterns.
->
-> **Prerequisites:** Familiarity with [Orin Nano memory architecture](../Orin-Nano-Memory-Architecture/Guide.md) (unified memory, CMA, SMMU) and C/C++. JetPack 6.x installed.
+Start with the CPU exercises linked below if you do not have a Jetson. The supplied advanced CUDA harness has been compiled, but this course review had no GPU. CPU references, successful compilation, and hardware execution are recorded separately.
 
----
+## 1. Establish the actual device and software
 
+Orin Nano 8 GB has an Ampere GPU with eight SMs, 1,024 CUDA cores, 32 Tensor Cores, and compute capability 8.7. It has no DLA. CPU, GPU and multimedia engines share physical LPDDR memory; they do not automatically share every allocation, cache policy or synchronization contract. See the [platform guide](../Guide.md) and [CUDA for Tegra](https://docs.nvidia.com/cuda/cuda-for-tegra-appnote/).
 
-> **TensorRT API versions:** This reference includes legacy binding-based execution or V2 plugin examples. Pin the installed TensorRT version before using a block. TensorRT 10.x execution uses named tensors, `set_tensor_address`, and `execute_async_v3`; legacy examples are not drop-in 10.x code. Newer major releases have further changes. Use NVIDIA's [8.x→10.x migration guide](https://docs.nvidia.com/deeplearning/tensorrt/10.x.x/api/tensorrt-8x-to-10x-python-api.html) and the API documentation matching your BSP.
+Read the [compatibility matrix](../../Compatibility.md) before selecting packages. JetPack 6 and JetPack 7 releases have different OS, kernel and CUDA combinations. A compiler version available on a workstation is not evidence that it is a supported replacement for the toolkit on your target BSP.
 
-## 1. CUDA on Jetson vs Discrete GPU
-
-The critical mental-model shift: **there is no PCIe bus between CPU and GPU**. They share the same physical LPDDR5.
-
-| Property | Discrete GPU (e.g. A100) | Jetson Orin Nano 8GB |
-|---|---|---|
-| Memory | Separate VRAM (HBM/GDDR) | Shared 8GB LPDDR5 |
-| CPU-GPU transfer | Interconnect transfer for separate allocations | Shared physical DRAM; separate allocations can still require a copy |
-| `cudaMemcpy` H2D/D2H | Real DMA copy | memcpy within DRAM (no bus crossing) |
-| Memory bandwidth | 2 TB/s (A100 HBM) | BSP/mode-dependent bandwidth shared by CPU, GPU, camera, and other engines |
-| `cudaMallocManaged` | Page migration over PCIe | Pages already in unified pool |
-| Power envelope | GPU/SKU-dependent board power | Mode-dependent module power; include carrier and sensors separately |
-| SM count | 108 (A100) | 8 SMs (1024 CUDA cores) |
-
-Shared DRAM removes the discrete-GPU PCIe hop, but does not make allocations identical or synchronization optional. Compare device, managed, and mapped pinned memory for your access pattern: cache behavior and coherency work can outweigh a saved copy. Orin supports I/O coherency; full CPU/GPU cache coherence is a different capability. Query device properties and use the [CUDA for Tegra memory guidance](https://docs.nvidia.com/cuda/cuda-for-tegra-appnote/).
-
----
-
-## 2. Jetson CUDA Toolchain
-
-### 2.1 Verification and Compilation
+Record these read-only observations on the development system:
 
 ```bash
-nvcc --version                    # JetPack 6.x ships CUDA 12.2+
-nvcc -arch=sm_87 -O2 -o my_kernel my_kernel.cu   # sm_87 = Orin Nano
-
-# Key flags:
-#   -arch=sm_87          Ampere GA10B compute capability 8.7
-#   --ptxas-options=-v   Show register/shared memory usage per kernel
-#   -use_fast_math       Fast but less precise (use with care)
+uname -m
+uname -r
+nvcc --version
+cat /etc/nv_tegra_release
 ```
 
-### 2.2 Cross-Compilation from x86 Host
+The last file is a Jetson BSP observation and may be absent on a workstation. Query `cudaGetDeviceProperties` in the application for SM count, compute capability, L2 size, shared-memory limits and other runtime capabilities. Check its return status. Obtain current clocks and mode separately; a device property's nominal limit is not an observed clock during your workload.
 
-```bash
-/usr/local/cuda-12.2/bin/nvcc -arch=sm_87 \
-    --compiler-bindir=/usr/bin/aarch64-linux-gnu-g++ \
-    -O2 -o my_kernel my_kernel.cu
-```
+Do not reuse an old “512 KB L2” or “625 MHz GPU” constant as a current measurement. Clock limits and available power modes depend on module, carrier configuration and BSP. The [power lesson](../Orin-Nano-Power-Thermal/Guide.md) explains what to record.
 
-### 2.3 CMakeLists.txt Template
+## 2. Map one element to one thread
 
-```cmake
-cmake_minimum_required(VERSION 3.18)
-project(jetson_cuda LANGUAGES CXX CUDA)
-set(CMAKE_CUDA_ARCHITECTURES 87)
-set(CMAKE_CUDA_STANDARD 17)
-add_executable(my_kernel src/my_kernel.cu)
-target_link_libraries(my_kernel PRIVATE cuda cudart)
-```
+A grid contains blocks; a block contains threads. Threads execute in warps of 32. Blocks can run in any order, so ordinary kernels cannot assume block 0 has completed before block 1 starts.
 
----
-
-## 3. Ampere Architecture on Orin Nano
-
-Cut-down GA10B (Ampere), compute capability **sm_87**.
-
-| Resource | Value | Resource | Value |
-|---|---|---|---|
-| SMs | 8 | Tensor Cores/SM | 4 (3rd-gen) |
-| CUDA cores/SM | 128 (4x32 FP32) | Max threads/SM | 1536 |
-| Total CUDA cores | 1024 | Warp size | 32 |
-| Registers/SM | 65536 (32-bit) | Shared mem/SM | Up to 164 KB |
-| L2 cache | 512 KB | Max clock | ~625 MHz |
-
-Thread hierarchy: Grid -> Block (up to 1024 threads) -> Warp (32 threads) -> Thread. Each SM has 4 sub-partitions, each with its own warp scheduler, 32 FP32 ALUs, and 1 Tensor Core. Shared resources: L1/shared memory (164 KB configurable) and register file (256 KB).
-
-**Register pressure:** 65536 regs / 1536 max threads = 42 regs/thread before occupancy drops. Check with `nvcc --ptxas-options=-v -arch=sm_87 kernel.cu`.
-
----
-
-## 4. Tensor Cores
-
-Fixed-function **D = A * B + C** units. FP16: 16x8x16 tile, 256 FMAs/TC/cycle. INT8: 16x8x32, 512 MACs. TF32: 16x8x8, 128 FMAs.
-
-### 4.1 WMMA Example (FP16 GEMM)
+This is a **kernel fragment**, not a complete executable:
 
 ```cuda
-#include <mma.h>
-using namespace nvcuda::wmma;
-
-__global__ void tc_gemm(half *A, half *B, float *C, int M, int N, int K) {
-    fragment<matrix_a, 16, 16, 16, half, row_major> a_frag;
-    fragment<matrix_b, 16, 16, 16, half, col_major> b_frag;
-    fragment<accumulator, 16, 16, 16, float>         c_frag;
-    fill_fragment(c_frag, 0.0f);
-    int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / 32 * 16;
-    int warpN = blockIdx.y * 16;
-    for (int k = 0; k < K; k += 16) {
-        load_matrix_sync(a_frag, A + warpM*K + k, K);
-        load_matrix_sync(b_frag, B + k*N + warpN, N);
-        mma_sync(c_frag, a_frag, b_frag, c_frag);
-    }
-    store_matrix_sync(C + warpM*N + warpN, c_frag, N, mem_row_major);
-}
-```
-
-When to use: dense FP16/INT8 matrix ops not covered by cuBLAS/TensorRT (which route to TCs automatically via `cublasGemmEx` with `CUBLAS_COMPUTE_16F`).
-
----
-
-## 5. Unified Memory Deep Dive
-
-| API | Best Use on Jetson |
-|---|---|
-| `cudaMalloc` | GPU-only buffers, CUDA graphs |
-| `cudaMallocHost` | CPU+GPU concurrent access, DMA targets |
-| `cudaMallocManaged` | Shared managed allocation; obey synchronization and device capability rules |
-| `NvBufSurface` | Camera/video zero-copy (DMA-BUF backed) |
-
-On Jetson, `cudaMallocManaged` pages never physically migrate -- same LPDDR5 page in both address spaces:
-
-```cuda
-float *data;
-cudaMallocManaged(&data, N * sizeof(float));
-for (int i = 0; i < N; i++) data[i] = i * 0.1f;  // CPU writes
-kernel<<<blocks, threads>>>(data, N);              // GPU reads -- same DRAM, no copy
-cudaDeviceSynchronize();
-printf("result[0] = %f\n", data[0]);               // CPU reads -- no copy back
-cudaFree(data);
-```
-
----
-
-## 6. Memory Access Patterns
-
-### 6.1 Coalesced Global Memory Access
-
-A warp accessing consecutive 4-byte elements issues one 128-byte transaction. Strided access causes 10-30x slowdown -- critical when 68 GB/s is shared.
-
-```cuda
-// GOOD: coalesced -- threads read consecutive addresses
-int i = blockIdx.x * blockDim.x + threadIdx.x;
-out[i] = in[i] * 2.0f;
-// BAD: strided -- each thread skips 'stride' elements
-int i = (blockIdx.x * blockDim.x + threadIdx.x) * stride;
-```
-
-### 6.2 Shared Memory Bank Conflicts
-
-32 banks, 4 bytes each. Two threads in a warp accessing the same bank (different addresses) serialize. Same address broadcasts for free.
-
-### 6.3 L2 Cache Residency Control
-
-Orin Nano L2 is 512 KB. Keep working sets under this. Use `cudaAccessPropertyPersisting` hints:
-
-```cuda
-cudaStreamAttrValue attr;
-attr.accessPolicyWindow.base_ptr = (void *)data;
-attr.accessPolicyWindow.num_bytes = 256 * 1024;
-attr.accessPolicyWindow.hitRatio = 1.0f;
-attr.accessPolicyWindow.hitProp = cudaAccessPropertyPersisting;
-attr.accessPolicyWindow.missProp = cudaAccessPropertyStreaming;
-cudaStreamSetAttribute(stream, cudaStreamAttributeAccessPolicyWindow, &attr);
-```
-
----
-
-## 7. Writing Your First CUDA Kernel on Jetson
-
-### 7.1 Vector Addition (Complete Example)
-
-```cuda
-// vecadd.cu -- compile: nvcc -arch=sm_87 -O2 -o vecadd vecadd.cu
-#include <cstdio>
-#include <cuda_runtime.h>
-
-__global__ void vec_add(const float *a, const float *b, float *c, int n) {
+__global__ void normalize(const float* input, float* output,
+                          int n, float mean, float inverse_std) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) c[i] = a[i] + b[i];
-}
-int main() {
-    const int N = 1 << 20;
-    float *a, *b, *c;
-    cudaMallocManaged(&a, N*sizeof(float));
-    cudaMallocManaged(&b, N*sizeof(float));
-    cudaMallocManaged(&c, N*sizeof(float));
-    for (int i = 0; i < N; i++) { a[i] = 1.0f; b[i] = 2.0f; }
-    vec_add<<<(N+255)/256, 256>>>(a, b, c, N);
-    cudaDeviceSynchronize();
-    printf("c[0] = %f (expected 3.0)\n", c[0]);
-    cudaFree(a); cudaFree(b); cudaFree(c);
+    if (i < n) output[i] = (input[i] - mean) * inverse_std;
 }
 ```
 
-### 7.2 Naive Matrix Multiply
+For 1,003 elements and 256 threads per block, launch four blocks: `(1003 + 255) / 256 = 4`. There are 1,024 launched threads; 21 must do no work. Without the bound check, the last block writes beyond the allocation. For zero elements, skip the launch: a grid dimension of zero is not a useful empty operation.
 
-```cuda
-__global__ void matmul(const float *A, const float *B, float *C, int M, int N, int K) {
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
-    if (row < M && col < N) {
-        float sum = 0.0f;
-        for (int k = 0; k < K; k++) sum += A[row*K + k] * B[k*N + col];
-        C[row*N + col] = sum;
-    }
-}  // Launch: dim3 block(16,16); dim3 grid((N+15)/16, (M+15)/16);
+**Work it out:** block 2, thread 17 handles element `2 × 256 + 17 = 529`. With input 0.75, mean 0.5 and standard deviation 0.25, the output is 1.0. The caller validates that the standard deviation is finite and positive before calculating its reciprocal.
+
+Use the complete [CUDA correctness lab](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20A%20-%20GPU%20Infrastructure/Nvidia%20GPU/HPC%20Setup/CUDA-Advanced-Optimization/labs/README.md) for executable code. Begin with its CPU references, then trace the fused affine/ReLU kernel and its host allocation/error handling. The harness covers lengths 0, 1, 31, 32, 33, 255, 256, 257 and 1,003, including sizes near warp and block boundaries.
+
+The lab's recorded compiler target is `sm_80`. For an Orin build, select `-arch=sm_87` with a compatible compiler. The source uses capabilities available on Orin, but that alone does not establish target numerical or timing results. Record your own build and execution outcome.
+
+## 3. Treat memory as owned data with a lifetime
+
+The important question is: **who may read or write this allocation now?**
+
+| Allocation/interface | What to establish |
+| --- | --- |
+| Device allocation | Which GPU operations own it; where host input/output copies occur |
+| Managed allocation | Runtime/device access capabilities and synchronization before CPU access |
+| Mapped pinned host allocation | Mapping support, device alias, CPU/GPU caching and producer/consumer ordering |
+| Camera DMA-BUF/NvBufSurface | Plane format, pitch, layout, import API, fences and producer return/reuse contract |
+
+Shared physical DRAM does not make a `cudaMemcpy` between two distinct allocations disappear. Such a copy still reads and writes memory. Likewise, pinned memory does not permit two processors to modify the same bytes without coordination. Orin's I/O coherency and newer full CPU/GPU cache-coherent platforms are different cases; use the matching Tegra documentation.
+
+Consider two camera slots. CPU preparation of slot 0 must wait until the previous GPU consumer of slot 0 is finished. Merely alternating `slot = frame_id % 2` is insufficient. Keep a completion event or an equivalent documented ownership signal for each slot. Check both “not ready” and actual error results when polling events; an error is not another reason to wait forever.
+
+A useful ownership sequence is:
+
+```text
+capture owns slot → frame ready → preprocess/inference owns slot
+→ completion observed → downstream result copied/consumed → capture may reuse slot
 ```
 
----
+The CPU can prepare a different free slot while the GPU works. Overlap is possible only when dependencies, available engines, memory type and resource use permit it. Two streams express two ordered queues; they do not guarantee simultaneous execution.
 
-## 8. Convolution Kernel
+## 4. Count bytes and check layout before tuning
 
-### 8.1 Naive 2D Convolution
+A contiguous 640 × 480 RGB8 image has `640 × 480 × 3 = 921,600` payload bytes. An FP32 RGB tensor of the same dimensions uses 3,686,400 bytes. One ideal conversion reads the former and writes the latter: 4,608,000 bytes, before cache effects and extra operations. At 30 frames/s, that is 138.24 MB/s of requested array traffic. It is not the total camera/inference DRAM traffic.
 
-```cuda
-__global__ void conv2d_naive(const float *in, const float *kern,
-                             float *out, int H, int W, int KH, int KW) {
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int hKH = KH / 2, hKW = KW / 2;
-    if (row < H && col < W) {
-        float sum = 0.0f;
-        for (int kh = 0; kh < KH; kh++)
-            for (int kw = 0; kw < KW; kw++) {
-                int r = row + kh - hKH, c = col + kw - hKW;
-                if (r >= 0 && r < H && c >= 0 && c < W)
-                    sum += in[r * W + c] * kern[kh * KW + kw];
-            }
-        out[row * W + col] = sum;
-    }
-}
-```
+Real image rows may have padding. The [video lab](../Orin-Nano-Video-Codec-DeepStream/labs/README.md) demonstrates a 65-pixel RGB row with 195 payload bytes but a 196-byte GStreamer stride. Indexing the second row as `row * width * 3` would begin one byte early. Block-linear surfaces require their documented access/import path; they are not ordinary pitched arrays.
 
-### 8.2 Tiled with Shared Memory (3x3)
+Before fusing resize, color conversion, normalization and HWC→CHW, specify:
 
-```cuda
-#define TILE 16
-#define RAD  1
+- RGB versus BGR, source bit depth and numeric range;
+- plane layout, pitch and valid crop;
+- resize mapping, interpolation and border policy;
+- per-channel mean/standard deviation and destination layout;
+- exact shape, dtype and tensor address accepted by inference.
 
-__global__ void conv2d_tiled(const float *in, const float *kern, float *out, int H, int W) {
-    __shared__ float tile[TILE + 2*RAD][TILE + 2*RAD];
-    int tx = threadIdx.x, ty = threadIdx.y;
-    int col = blockIdx.x * TILE + tx, row = blockIdx.y * TILE + ty;
-    int sc = tx + RAD, sr = ty + RAD;
+A single kernel with undefined `pixel`, `mean` or `std_dev` variables is a sketch, not a working preprocessing implementation. Validate the transform on a tiny image whose pixel values you can calculate by hand, including odd dimensions and a nonzero crop origin.
 
-    tile[sr][sc] = (row < H && col < W) ? in[row * W + col] : 0.0f;
-    // Load halo edges (left, right, top, bottom -- boundary threads only)
-    if (tx < RAD)
-        tile[sr][tx] = (row < H && col-RAD >= 0) ? in[row*W + col-RAD] : 0.0f;
-    if (tx >= TILE - RAD)
-        tile[sr][sc+RAD] = (row < H && col+RAD < W) ? in[row*W + col+RAD] : 0.0f;
-    // (top/bottom halo similar)
-    __syncthreads();
+## 5. Understand coalescing and shared memory
 
-    if (row < H && col < W) {
-        float sum = 0.0f;
-        for (int kr = -RAD; kr <= RAD; kr++)
-            for (int kc = -RAD; kc <= RAD; kc++)
-                sum += tile[sr+kr][sc+kc] * kern[(kr+RAD)*3 + (kc+RAD)];
-        out[row * W + col] = sum;
-    }
-}
-```
+For the current CUDA coalescing model on compute capability 6.0 and later, count the 32-byte sectors needed by a warp's access. Thirty-two aligned adjacent FP32 elements occupy 128 bytes and require four sectors. Shifting the starting address by one FP32 element spans five sectors. A stride of eight FP32 elements places each lane's value in a different sector, using 128 requested bytes across 1,024 bytes of sectors. Cache reuse and the rest of the kernel influence measured time; these counts are not universal speedup ratios. [CUDA memory-access guidance](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#coalesced-access-to-global-memory).
 
-Tiled version reduces global reads from H\*W\*K\*K to ~H\*W\*(1 + halo) -- 5-9x improvement for 3x3-7x7.
+Shared memory lets threads in a block reuse values. It also consumes a limited SM resource. The compute-capability 8.7 limits include up to 164 KiB of shared memory per SM and 163 KiB per block with the relevant opt-in, while allocations above the default 48 KiB block limit require the documented dynamic-memory configuration. Query device and function limits, and inspect the compiler's resource report. [CUDA capability tables](https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/compute-capabilities.html).
 
----
+**Worked stencil:** a 16 × 16 output tile for a 3 × 3 filter needs an 18 × 18 input tile including its halo: 324 values rather than 2,304 independent input references in a naive nine-load-per-output count. Actual memory traffic may differ because the naive version can reuse cached data. All halo edges **and corners** must be initialized. Omitting “top/bottom halo, similar” creates invalid results, not an optimization exercise.
 
-## 9. CUDA Streams and Concurrency
+All participating block threads must reach a block barrier consistently. Place the barrier after cooperative loading, with out-of-image loads replaced by the selected border value; do not return some threads early while others execute `__syncthreads()`.
 
-Streams enable concurrent kernel execution. On Orin Nano (8 SMs), concurrency helps when individual kernels are small.
+Occupancy is the fraction of supported resident warps that are active. Registers, shared memory, block dimensions and architectural limits constrain it. Higher occupancy can help hide latency, but “over 50%” is not a universal success threshold. A change that increases occupancy while spilling registers may run slower. Use occupancy APIs to understand constraints, then compare measured workloads.
 
-```cuda
-cudaStream_t s1, s2;
-cudaStreamCreate(&s1); cudaStreamCreate(&s2);
-kernelA<<<grid, block, 0, s1>>>(dataA);  // may run concurrently
-kernelB<<<grid, block, 0, s2>>>(dataB);
-cudaStreamSynchronize(s1); cudaStreamSynchronize(s2);
-cudaStreamDestroy(s1); cudaStreamDestroy(s2);
-```
+## 6. Separate numerical correctness from Tensor Core availability
 
-### 9.1 Multi-Stream Pipeline
+Start matrix multiplication with a trusted CPU or library reference and state the accumulation precision and error tolerance. Tensor Cores accelerate supported matrix operations; they do not accelerate every FP16 kernel automatically.
 
-Process frame N on GPU while CPU prepares N+1. Double-buffer with 2 streams:
+For `C[M,N] = A[M,K] × B[K,N]`, define row/column layout and leading dimensions before using cuBLAS or a matrix fragment API. For a row-major B, `B[k*N+n]` is appropriate; declaring that same storage column-major changes its interpretation. Handle dimensions that are not tile multiples, alignment requirements and valid participation of a complete warp.
 
-```cuda
-cudaStream_t st[2];
-for (int i = 0; i < 2; i++) cudaStreamCreate(&st[i]);
-for (int f = 0; f < total; f++) {
-    int s = f % 2;
-    preprocess<<<g, b, 0, st[s]>>>(in[s], pre[s]);
-    inference<<<g, b, 0, st[s]>>>(pre[s], res[s]);
-    postprocess<<<g, b, 0, st[s]>>>(res[s], out[s]);
-}
-for (int i = 0; i < 2; i++) { cudaStreamSynchronize(st[i]); cudaStreamDestroy(st[i]); }
-```
+Use a supported library implementation first. Custom WMMA/MMA work is an advanced step when a specific workload justifies it. Avoid claiming that a particular compute type always selects Tensor Cores, or mixing sparse INT8 TOPS with dense FP32 FLOPs when calculating a roofline.
 
----
+**Amdahl example:** if preprocessing takes 4 ms and the rest takes 16 ms, making preprocessing four times faster gives `1 + 16 = 17 ms`, or about **1.18×** overall speedup. It does not make the entire 20 ms pipeline four times faster. Measure where the time actually goes before writing a more complex kernel.
 
-## 10. Synchronization Primitives
+## 7. Add streams and graphs only after validating the baseline
 
-### 10.1 Events (Timing)
+Operations in one stream are ordered. Cross-stream dependencies need events or another documented synchronization mechanism. Record an event after the producer's last write; make the consumer stream wait before its first read. Retain allocations until all asynchronous consumers complete.
 
-```cuda
-cudaEvent_t start, stop;
-cudaEventCreate(&start); cudaEventCreate(&stop);
-cudaEventRecord(start, stream);
-my_kernel<<<grid, block, 0, stream>>>(data);
-cudaEventRecord(stop, stream);
-cudaEventSynchronize(stop);
-float ms; cudaEventElapsedTime(&ms, start, stop);
-```
+CUDA graphs can reduce repeated launch overhead when a stable workload is replayed. Stable addresses do not imply stable input contents; new data can be written into the same buffers with correct ordering. Changes to shapes, pointers or dynamic state must follow the graph update/recapture contract. A replay that silently retains the old cache position is incorrect even if it launches quickly.
 
-### 10.2 Inter-Stream Dependencies
+The [graphs lesson](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20A%20-%20GPU%20Infrastructure/Nvidia%20GPU/HPC%20Setup/CUDA-Advanced-Optimization/01-CUDA-Graphs.md) and complete harness exercise changing inputs. Study those before adding graph capture to a camera or language-model pipeline.
 
-```cuda
-cudaEventRecord(ev, streamA);          // record after kernelA
-cudaStreamWaitEvent(streamB, ev, 0);   // streamB blocks until ev fires
-kernelB<<<g, b, 0, streamB>>>(dataB);  // guaranteed after kernelA
-```
+TensorRT integration also has versioned contracts. For the course's TensorRT 10 path, use named I/O tensors, explicit shapes/addresses and `execute_async_v3` as described in the [inference lesson](../Orin-Nano-Real-Time-Inference/Guide.md). An old incomplete V2 plugin class is not a complete current plugin. Use the extension API matching the installed release, and pass the runtime's supplied stream through custom work.
 
-### 10.3 Sync API
+## 8. Measure a meaningful interval
 
-`cudaDeviceSynchronize()` blocks on all streams. `cudaStreamSynchronize(s)` blocks on one. `cudaEventQuery(e)` / `cudaStreamQuery(s)` poll without blocking.
+Use CUDA events around work in the same stream for a device execution interval, and a monotonic host clock for a caller-visible interval. Synchronize the stop event before reading event elapsed time. Check allocation, copy, launch, event and synchronization results; launch errors and asynchronous execution errors can appear at different calls.
 
----
+Measure warm-up separately. Report input sizes, numerical mode, power mode, temperature, clocks, build flags and number of samples. For a robot, record capture-to-action age as well as kernel duration. A 2 ms kernel operating on a frame that spent 100 ms queued is still using old information.
 
-## 11. CUDA + Camera Zero-Copy
-
-Camera frames flow ISP -> NvBufSurface (DMA-BUF). Import directly into CUDA -- no copy.
-
-```
-Sensor -> VI -> ISP -> NvBufSurface (DMA-BUF fd)
-                            |
-                 EGLImageKHR (EGL interop)
-                            |
-                 cudaGraphicsResource (cuGraphicsEGLRegisterImage)
-                            |
-                 cudaArray / cudaSurfaceObject -> CUDA Kernel
-```
-
-```cuda
-#include <cudaEGL.h>
-void process_frame(EGLImageKHR egl_image) {
-    cudaGraphicsResource_t res;
-    cudaGraphicsEGLRegisterImage(&res, egl_image, cudaGraphicsRegisterFlagsReadOnly);
-    cudaArray_t arr;
-    cudaGraphicsSubResourceGetMappedArray(&arr, res, 0, 0);
-    cudaResourceDesc rd = {}; rd.resType = cudaResourceTypeArray; rd.res.array.array = arr;
-    cudaSurfaceObject_t surf; cudaCreateSurfaceObject(&surf, &rd);
-    process_kernel<<<grid, block>>>(surf, width, height);
-    cudaDeviceSynchronize();
-    cudaDestroySurfaceObject(surf);
-    cudaGraphicsUnregisterResource(res);
-}
-```
-
-Higher-level: `NvBufSurfaceMapEglImage(surface, 0)` then `surface->surfaceList[0].mappedAddr.eglImage`. True zero-copy -- ISP-written LPDDR5 pages read directly by CUDA kernel.
-
----
-
-## 12. CUDA + TensorRT Integration
-
-### 12.1 Custom Plugin with CUDA Kernel
-
-```cpp
-class NormalizePlugin : public nvinfer1::IPluginV2DynamicExt {
-    int enqueue(const nvinfer1::PluginTensorDesc *inDesc, /*...*/) override {
-        int n = inDesc[0].dims.d[0] * inDesc[0].dims.d[1] * inDesc[0].dims.d[2] * inDesc[0].dims.d[3];
-        normalize_kernel<<<(n+255)/256, 256, 0, stream>>>(
-            (const half*)inputs[0], (half*)outputs[0], n, mean_, std_);
-        return 0;
-    }
-};
-```
-
-### 12.2 Fused Pre-Processing Kernel
-
-Resize + normalize + HWC-to-CHW in a single kernel avoids 3 separate passes:
-
-```cuda
-__global__ void preprocess_fused(const uint8_t *src, float *dst,
-                                  int srcH, int srcW, int dstH, int dstW, int C) {
-    int dx = blockIdx.x * blockDim.x + threadIdx.x;
-    int dy = blockIdx.y * blockDim.y + threadIdx.y;
-    if (dx >= dstW || dy >= dstH) return;
-    // bilinear sample -> normalize -> write CHW
-    for (int c = 0; c < C; c++)
-        dst[c*dstH*dstW + dy*dstW + dx] = (pixel[c]/255.0f - mean[c]) / std_dev[c];
-}
-```
-
-Full pipeline: Camera (zero-copy) -> CUDA preprocess (fused) -> TensorRT `engine.execute` -> CUDA postprocess (NMS/decode) -> Output.
-
----
-
-## 13. Nsight Systems Profiling
+On a system with a compatible profiler, a starting command is:
 
 ```bash
-nsys profile -o trace --trace=cuda,nvtx,osrt --gpu-metrics-device=0 ./my_app
-# Remote: nsys profile --target=ssh://user@jetson_ip --trace=cuda,nvtx -o trace /path/to/app
+nsys profile --trace=cuda,nvtx,osrt -o course-cuda-trace ./my_app
 ```
 
-Transfer `.nsys-rep` to host for GUI analysis. Look for: gaps between kernels (CPU bottleneck), missing stream overlap, unnecessary `cudaMemcpy`. Annotate with NVTX:
+Here `my_app` is your built, validated program; the command is a template. Check the installed tool's help and choose a new output name. Start with the timeline: CPU gaps, dependencies, copies and serialization. Then use Nsight Compute for a specific kernel hypothesis. Profiling can perturb execution; do not treat a profiler-heavy run as the only latency measurement.
 
-```cuda
-#include <nvtx3/nvToolsExt.h>
-nvtxRangePush("Preprocessing");
-preprocess<<<g, b, 0, stream>>>(data);
-nvtxRangePop();
-```
+Use Compute Sanitizer's appropriate checks on the hardware execution path, and preserve errors in the result. The [complete lab](../../../Phase%205%20-%20Advanced%20Topics%20and%20Specialization/Track%20A%20-%20GPU%20Infrastructure/Nvidia%20GPU/HPC%20Setup/CUDA-Advanced-Optimization/labs/README.md) fills output buffers with NaNs before each implementation so a missing write cannot inherit a previous correct result. Sanitizer success and numerical comparisons cover different failure classes.
 
----
+## 9. Practice, answers and completion criteria
 
-## 14. Nsight Compute
+1. **Why test 257 elements?** It needs two 256-thread blocks and exposes an incomplete final block.
+2. **Why can two streams race even though each stream is ordered?** Ordering within one stream does not order the other stream's accesses to shared storage.
+3. **Why can eliminating a copy make a stage slower?** The alternative may have worse caching, access patterns or synchronization costs; measure the complete stage.
+4. **Why reject NaNs explicitly in a comparison?** A check such as `abs(actual-reference) > tolerance` can be false when the difference is NaN, accidentally accepting an unwritten value.
+5. **Why does a 3×3 shared tile need corners?** Outputs near a tile corner read diagonal neighbors as well as horizontal/vertical ones.
+6. **Why is GPU utilization alone inadequate?** It does not establish correct outputs, useful throughput, frame freshness, tail latency or energy per accepted result.
 
-```bash
-ncu --set full --kernel-name "my_kernel" --launch-skip 2 --launch-count 3 ./my_app
-```
-
-| Metric | Target | Red Flag |
-|---|---|---|
-| Achieved Occupancy | >50% | <25% -- register/smem pressure |
-| Memory Throughput | Near 68 GB/s | Well below -- check coalescing |
-| SM Throughput | >60% | <30% -- kernel too small or memory-bound |
-
-Find optimal block size programmatically: `cudaOccupancyMaxPotentialBlockSize(&minGrid, &blockSz, my_kernel, 0, 0);`
-
----
-
-## 15. Common Optimization Techniques
-
-**Occupancy tuning:** Use `__launch_bounds__(256, 4)` to hint max threads and min blocks/SM. Reduces register allocation, increases concurrent warps.
-
-**Warp divergence:** Avoid branching within a warp (`threadIdx.x % 2`). Restructure so divergence aligns to warp boundaries (multiples of 32).
-
-**ILP (Instruction-Level Parallelism):** Each thread processes multiple elements so independent operations pipeline:
-
-```cuda
-__global__ void ilp4(float *out, const float *in, int N) {
-    int base = (blockIdx.x * blockDim.x + threadIdx.x) * 4;
-    float a=in[base], b=in[base+1], c=in[base+2], d=in[base+3];
-    out[base]=a*a; out[base+1]=b*b; out[base+2]=c*c; out[base+3]=d*d;
-}
-```
-
-**Kernel fusion:** Launch overhead (~5-10 us) is proportionally expensive on Jetson. Fuse sequential kernels:
-
-```cuda
-// BEFORE: normalize<<<g,b>>>(d); activate<<<g,b>>>(d); scale<<<g,b>>>(d);
-// AFTER:
-__global__ void fused(float *data, float mean, float std, float s) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    data[i] = fmaxf((data[i] - mean) / std, 0.0f) * s;
-}
-```
-
----
-
-## 16. Power-Aware CUDA Programming
-
-Power modes: **15W** (~625 MHz GPU), **7W** (~306 MHz GPU). Both keep all 8 SMs active.
-
-```bash
-sudo nvpmodel -m 0 && sudo jetson_clocks     # max performance
-tegrastats --interval 1000                    # monitor power
-# Lock GPU clock for latency-sensitive work:
-sudo sh -c 'echo 625500000 > /sys/devices/17000000.gpu/devfreq/17000000.gpu/min_freq'
-```
-
-Maximizing TOPS/watt: use INT8/FP16 (Tensor Core sweet spot), minimize idle GPU time, batch small kernels, compare supported DLA offload only on NX/AGX hardware (Nano has no DLA; see [DLA comparison](../Orin-Nano-DLA-Deep-Dive/Guide.md)). The GPU governor (`nvhost_podgov`) scales clocks on load; bursty workloads may run at lower clocks during ramp-up.
-
----
-
-## 17. Debugging CUDA on Jetson
-
-### 17.1 compute-sanitizer
-
-```bash
-compute-sanitizer --tool memcheck  ./my_app   # OOB/misaligned
-compute-sanitizer --tool racecheck ./my_app   # race conditions (slow)
-compute-sanitizer --tool initcheck ./my_app   # uninitialized reads
-```
-
-### 17.2 Common Pitfalls
-
-| Pitfall | Symptom | Fix |
-|---|---|---|
-| Missing `cudaDeviceSynchronize()` | Stale GPU results on CPU | Sync before CPU reads |
-| Silent launch failure | Wrong results, no error | `cudaGetLastError()` after every launch |
-| Shared memory overflow | `cudaErrorLaunchFailure` | Reduce smem or block size |
-| OOM on 8GB shared pool | `cudaErrorMemoryAllocation` | Monitor with `tegrastats`; reduce batch |
-| Wrong arch (sm_50 on sm_87) | `cudaErrorInvalidDeviceFunction` | Compile with `-arch=sm_87` |
-
-### 17.3 Error-Checking Macro
-
-```cuda
-#define CUDA_CHECK(call) do {                                       \
-    cudaError_t err = call;                                         \
-    if (err != cudaSuccess) {                                       \
-        fprintf(stderr, "CUDA error %s:%d: %s\n",                  \
-                __FILE__, __LINE__, cudaGetErrorString(err));        \
-        exit(EXIT_FAILURE); }                                       \
-} while (0)
-
-// Usage: check alloc, launch, and sync
-CUDA_CHECK(cudaMallocManaged(&data, N * sizeof(float)));
-my_kernel<<<grid, block>>>(data);
-CUDA_CHECK(cudaGetLastError());          // launch config errors
-CUDA_CHECK(cudaDeviceSynchronize());     // execution errors
-```
-
----
-
-## 18. Production CUDA Patterns
-
-### 18.1 RAII Resource Management
-
-```cpp
-struct CudaBuffer {
-    void *ptr = nullptr; size_t size = 0;
-    CudaBuffer(size_t bytes) : size(bytes) { CUDA_CHECK(cudaMallocManaged(&ptr, bytes)); }
-    ~CudaBuffer() { if (ptr) cudaFree(ptr); }
-    CudaBuffer(const CudaBuffer&) = delete;
-    CudaBuffer& operator=(const CudaBuffer&) = delete;
-    CudaBuffer(CudaBuffer&& o) noexcept : ptr(o.ptr), size(o.size) { o.ptr = nullptr; }
-};
-```
-
-### 18.2 Async Pipeline with Error Propagation
-
-```cpp
-class CudaPipeline {
-    cudaStream_t stream_; cudaEvent_t done_;
-public:
-    CudaPipeline() {
-        CUDA_CHECK(cudaStreamCreateWithFlags(&stream_, cudaStreamNonBlocking));
-        CUDA_CHECK(cudaEventCreateWithFlags(&done_, cudaEventDisableTiming));
-    }
-    ~CudaPipeline() { cudaStreamDestroy(stream_); cudaEventDestroy(done_); }
-    void submit(const float *in, float *out, int N) {
-        my_kernel<<<(N+255)/256, 256, 0, stream_>>>(in, out, N);
-        CUDA_CHECK(cudaGetLastError());
-        cudaEventRecord(done_, stream_);
-    }
-    bool is_complete() { return cudaEventQuery(done_) == cudaSuccess; }
-    void wait() { CUDA_CHECK(cudaEventSynchronize(done_)); }
-};
-```
-
-### 18.3 Python (CuPy on Jetson)
-
-```python
-import cupy as cp
-a = cp.random.randn(1024, 1024, dtype=cp.float32)
-c = cp.matmul(a, a)  # runs on Orin Nano GPU
-
-# Custom kernel via RawKernel
-kern = cp.RawKernel(r'''
-extern "C" __global__ void relu(float *d, int n) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) d[i] = fmaxf(d[i], 0.0f);
-}''', 'relu')
-data = cp.random.randn(1 << 20, dtype=cp.float32)
-kern(((data.size + 255) // 256,), (256,), (data, data.size))
-```
-
----
-
-## 19. References
-
-### Internal Guides
-
-* [Orin Nano Platform Guide](../Guide.md) -- boot chain, JetPack, ROS2, inference optimization
-* [Orin Nano Memory Architecture](../Orin-Nano-Memory-Architecture/Guide.md) -- SMMU, CMA, zero-copy, GPU memory
-* [Orin Nano DLA Deep Dive](../Orin-Nano-DLA-Deep-Dive/Guide.md) -- DLA vs GPU, TensorRT DLA, multi-engine scheduling
-
-### NVIDIA Documentation
-
-* [CUDA C++ Programming Guide](https://docs.nvidia.com/cuda/cuda-c-programming-guide/)
-* [CUDA C++ Best Practices Guide](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/)
-* [Jetson Orin Nano Developer Kit](https://developer.nvidia.com/embedded/jetson-orin-nano-developer-kit)
-* [Nsight Systems User Guide](https://docs.nvidia.com/nsight-systems/)
-* [Nsight Compute User Guide](https://docs.nvidia.com/nsight-compute/)
-* [TensorRT Developer Guide](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/)
-* [CUDA WMMA API](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#wmma)
-* [Jetson Linux Multimedia API](https://docs.nvidia.com/jetson/l4t-multimedia/)
-
-
-## Integration lab: Is eliminating a copy faster than retaining device-local reuse?
-
-Implement the same reduction using device allocation plus copies, managed memory, and mapped pinned memory where supported. Use repeated GPU reads and a single-pass variant; separate allocation, synchronization, and timed work.
-
-**Acceptance evidence:** All variants must match a tolerance fixed before benchmarking. Preserve device properties and a timeline explaining which memory access pattern wins; do not infer bandwidth from GPU utilization alone.
-
-**Continue:** take this artifact to [Orin-Nano-Real-Time-Inference](../Orin-Nano-Real-Time-Inference/Guide.md). Explain which assumption from this course the next engineer must preserve.
+Submit a CPU reference result, build command, complete output-comparison policy, memory/ownership diagram and measured stage report. If you lack a GPU, submit the CPU and compile evidence with hardware execution explicitly pending. On hardware, add error-checked numerical runs before timing, then one optimization justified by a measured bottleneck. Continue to [real-time inference](../Orin-Nano-Real-Time-Inference/Guide.md) and the [robotics deployment path](../../../Learning-Guide.md).
