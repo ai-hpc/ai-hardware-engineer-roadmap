@@ -64,4 +64,6 @@ Stop after 20 audited episodes or two hours of collection. **Acceptance criteria
 3. **Can failed data help BC?** Useful recovery segments can help, but blindly imitating failure actions can degrade behavior. Selection must match the objective.
 4. **What makes this engineering work reproducible?** An explicit timing/action contract, immutable raw data, versioned selection, and audit artifacts.
 
+**Go deeper:** [Egocentric Data and VLA Fine-Tuning](../Egocentric%20Data%20and%20VLA%20Fine-Tuning/README.md) extends collection to first-person human video: dataset licenses, Aria capture geometry, auditing and hand-to-robot retargeting.
+
 [Previous: flow matching](Lecture-12.md) · [Course index](README.md) · [Next: dataset engineering](Lecture-14.md)

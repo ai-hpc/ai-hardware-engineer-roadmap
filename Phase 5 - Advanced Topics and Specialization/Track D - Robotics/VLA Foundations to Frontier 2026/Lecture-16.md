@@ -71,4 +71,6 @@ Stop after a preregistered step count or three validation checks without improve
 3. **Can you update normalization independently of weights?** Only with an explicit compatibility strategy and validation of physical actions.
 4. **What must be shipped?** Weights/adapters, base revision, configuration, preprocessing, action transforms, normalization, and evaluation evidence.
 
+**Go deeper:** [Egocentric Data and VLA Fine-Tuning, Lectures 09–12](../Egocentric%20Data%20and%20VLA%20Fine-Tuning/README.md) compare LeRobot, openpi, Isaac-GR00T and OpenVLA-OFT fine-tuning on 8, 24 and 80 GB, and evaluate the result with a paired test.
+
 [Previous: pretraining](Lecture-15.md) · [Course index](README.md) · [Next: RL post-training](Lecture-17.md)

@@ -972,6 +972,25 @@ nav:
           - Training and Data: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Sources-Training.md
           - Systems and Evaluation: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Sources-Systems.md
           - Frontier Research: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Foundations to Frontier 2026/Sources-Frontier.md
+      - "Special Course: Egocentric Data and VLA Fine-Tuning":
+        - Overview: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Egocentric Data and VLA Fine-Tuning/README.md
+        - Laboratory Guide: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Egocentric Data and VLA Fine-Tuning/Lab-Guide.md
+        - "Part A — Egocentric Human Data":
+          - "01: Why Egocentric Human Data": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Egocentric Data and VLA Fine-Tuning/Lecture-01.md
+          - "02: Dataset Landscape and Licenses": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Egocentric Data and VLA Fine-Tuning/Lecture-02.md
+          - "03: Capture Geometry, SLAM and Time": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Egocentric Data and VLA Fine-Tuning/Lecture-03.md
+          - "04: Data Pipeline and LeRobot Format": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Egocentric Data and VLA Fine-Tuning/Lecture-04.md
+          - "05: Auditing a Dataset": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Egocentric Data and VLA Fine-Tuning/Lecture-05.md
+          - "06: Hands and Objects": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Egocentric Data and VLA Fine-Tuning/Lecture-06.md
+          - "07: Retargeting Hands to Robot Actions": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Egocentric Data and VLA Fine-Tuning/Lecture-07.md
+          - "08: Learning from Video Without Actions": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Egocentric Data and VLA Fine-Tuning/Lecture-08.md
+        - "Part B — VLA Fine-Tuning":
+          - "09: Choosing a Base Model and Stack": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Egocentric Data and VLA Fine-Tuning/Lecture-09.md
+          - "10: Building the Fine-Tuning Dataset": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Egocentric Data and VLA Fine-Tuning/Lecture-10.md
+          - "11: Fine-Tuning on 8, 24 and 80 GB": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Egocentric Data and VLA Fine-Tuning/Lecture-11.md
+          - "12: Evaluating What Human Data Bought": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Egocentric Data and VLA Fine-Tuning/Lecture-12.md
+          - "13: Capstone: Egocentric-Augmented Fine-Tune": Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Egocentric Data and VLA Fine-Tuning/Lecture-13.md
+        - Source Register: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/Egocentric Data and VLA Fine-Tuning/Sources.md
       - "Special Course: VLA Optimization & Action-Parity Harness":
         - Overview: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/README.md
         - CPU Action-Parity Lab: Phase 5 - Advanced Topics and Specialization/Track D - Robotics/VLA Optimization and Action-Parity Harness/CPU-Action-Parity-Lab.md

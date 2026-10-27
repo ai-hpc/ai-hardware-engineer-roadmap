@@ -69,4 +69,6 @@ Stop after both formats pass the audit; additional datasets should be added one 
 3. **Why save the mixture schedule?** It determines which empirical distribution generated gradients and may change throughout training.
 4. **What is a valid dataset handoff?** Data, contracts, converter revision, split manifest, normalization statistics, and audit evidence together.
 
+**Go deeper:** [Egocentric Data and VLA Fine-Tuning, Lectures 04, 05 and 10](../Egocentric%20Data%20and%20VLA%20Fine-Tuning/README.md) cover the LeRobot v3.0 layout, leakage audits, per-stack normalization statistics and human/robot co-training mixtures, with CPU labs.
+
 [Previous: data collection](Lecture-13.md) · [Course index](README.md) · [Next: pretraining and transfer](Lecture-15.md)

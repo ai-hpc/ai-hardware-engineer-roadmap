@@ -137,7 +137,7 @@ The 2026 coverage includes verified work on π0.7, GR00T N1.7, Gemini Robotics 2
 
 ## Connections to the roadmap
 
-Continue with [VLA Optimization and Action-Parity Harness](../VLA%20Optimization%20and%20Action-Parity%20Harness/README.md) for specialist inference work, [Deep RL](../Deep%20RL%20for%20Robot%20Learning/README.md) for deeper control learning, and [Isaac Sim and Isaac Lab](../Isaac%20Sim%20and%20Isaac%20Lab/README.md) for simulator engineering. The [DeepSeek NVFP4 course](../../Track%20G%20-%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/README.md) contributes checkpoint and runtime methods; language-model deployment and robot action deployment still require different output and evaluation contracts.
+Continue with [Egocentric Data and VLA Fine-Tuning](../Egocentric%20Data%20and%20VLA%20Fine-Tuning/README.md) to train on first-person human video and fine-tune an open VLA end to end, [VLA Optimization and Action-Parity Harness](../VLA%20Optimization%20and%20Action-Parity%20Harness/README.md) for specialist inference work, [Deep RL](../Deep%20RL%20for%20Robot%20Learning/README.md) for deeper control learning, and [Isaac Sim and Isaac Lab](../Isaac%20Sim%20and%20Isaac%20Lab/README.md) for simulator engineering. The [DeepSeek NVFP4 course](../../Track%20G%20-%20ML%20Systems%20Engineering/AI%20Inference%20Engineer%202026/Part%205%20-%20DeepSeek%20V4.1%20Flash%20NVFP4/README.md) contributes checkpoint and runtime methods; language-model deployment and robot action deployment still require different output and evaluation contracts.
 
 
 ## Carry this course into the physical-AI system
